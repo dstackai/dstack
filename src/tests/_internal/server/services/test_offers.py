@@ -46,11 +46,11 @@ class TestGetOffersByRequirements:
             aws_backend_mock.TYPE = BackendType.AWS
             aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS)
             aws_backend_mock.compute.return_value.get_offers.return_value = [aws_offer]
-            runpod_backend_mock = Mock()
-            runpod_backend_mock.TYPE = BackendType.RUNPOD
-            runpod_offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
-            runpod_backend_mock.compute.return_value.get_offers.return_value = [runpod_offer]
-            m.return_value = [aws_backend_mock, runpod_backend_mock]
+            vastai_backend_mock = Mock()
+            vastai_backend_mock.TYPE = BackendType.VASTAI
+            vastai_offer = get_instance_offer_with_availability(backend=BackendType.VASTAI)
+            vastai_backend_mock.compute.return_value.get_offers.return_value = [vastai_offer]
+            m.return_value = [aws_backend_mock, vastai_backend_mock]
             res = await get_offers_by_requirements(
                 project=Mock(),
                 profile=profile,

@@ -33,7 +33,7 @@ func NewMetricsCollector() (*MetricsCollector, error) {
 	}, nil
 }
 
-func (s *MetricsCollector) GetSystemMetrics() (*schemas.SystemMetrics, error) {
+func (s *MetricsCollector) GetSystemMetrics(ctx context.Context) (*schemas.SystemMetrics, error) {
 	timestamp := time.Now()
 	cpuUsage, err := s.GetCPUUsageMicroseconds()
 	if err != nil {
@@ -48,7 +48,7 @@ func (s *MetricsCollector) GetSystemMetrics() (*schemas.SystemMetrics, error) {
 		return nil, err
 	}
 	memoryWorkingSet := memoryUsage - memoryCache
-	gpuMetrics, err := s.GetGPUMetrics()
+	gpuMetrics, err := s.GetGPUMetrics(ctx)
 	if err != nil {
 		log.Debug(context.TODO(), "Failed to get gpu metrics", "err", err)
 	}
@@ -148,16 +148,16 @@ func (s *MetricsCollector) GetMemoryCacheBytes() (uint64, error) {
 	return 0, fmt.Errorf("inactive_file not found in cpu.stat")
 }
 
-func (s *MetricsCollector) GetGPUMetrics() ([]schemas.GPUMetrics, error) {
+func (s *MetricsCollector) GetGPUMetrics(ctx context.Context) ([]schemas.GPUMetrics, error) {
 	var metrics []schemas.GPUMetrics
 	var err error
 	switch s.gpuVendor {
 	case common.GpuVendorNvidia:
-		metrics, err = s.GetNVIDIAGPUMetrics()
+		metrics, err = s.GetNVIDIAGPUMetrics(ctx)
 	case common.GpuVendorAmd:
-		metrics, err = s.GetAMDGPUMetrics()
+		metrics, err = s.GetAMDGPUMetrics(ctx)
 	case common.GpuVendorIntel:
-		metrics, err = s.GetIntelAcceleratorMetrics()
+		metrics, err = s.GetIntelAcceleratorMetrics(ctx)
 	case common.GpuVendorTenstorrent:
 		err = errors.New("tenstorrent metrics not suppored")
 	case common.GpuVendorNone:
@@ -169,8 +169,8 @@ func (s *MetricsCollector) GetGPUMetrics() ([]schemas.GPUMetrics, error) {
 	return metrics, err
 }
 
-func (s *MetricsCollector) GetNVIDIAGPUMetrics() ([]schemas.GPUMetrics, error) {
-	cmd := exec.Command("nvidia-smi", "--query-gpu=memory.used,utilization.gpu", "--format=csv,noheader,nounits")
+func (s *MetricsCollector) GetNVIDIAGPUMetrics(ctx context.Context) ([]schemas.GPUMetrics, error) {
+	cmd := exec.CommandContext(ctx, "nvidia-smi", "--query-gpu=memory.used,utilization.gpu", "--format=csv,noheader,nounits")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -179,8 +179,8 @@ func (s *MetricsCollector) GetNVIDIAGPUMetrics() ([]schemas.GPUMetrics, error) {
 	return parseNVIDIASMILikeMetrics(out.String())
 }
 
-func (s *MetricsCollector) GetAMDGPUMetrics() ([]schemas.GPUMetrics, error) {
-	cmd := exec.Command("amd-smi", "monitor", "-vu", "--csv")
+func (s *MetricsCollector) GetAMDGPUMetrics(ctx context.Context) ([]schemas.GPUMetrics, error) {
+	cmd := exec.CommandContext(ctx, "amd-smi", "monitor", "-vu", "--csv")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -245,8 +245,8 @@ func (s *MetricsCollector) getAMDGPUMetrics(csv string) ([]schemas.GPUMetrics, e
 	return metrics, nil
 }
 
-func (s *MetricsCollector) GetIntelAcceleratorMetrics() ([]schemas.GPUMetrics, error) {
-	cmd := exec.Command("hl-smi", "--query-aip=memory.used,utilization.aip", "--format=csv,noheader,nounits")
+func (s *MetricsCollector) GetIntelAcceleratorMetrics(ctx context.Context) ([]schemas.GPUMetrics, error) {
+	cmd := exec.CommandContext(ctx, "hl-smi", "--query-aip=memory.used,utilization.aip", "--format=csv,noheader,nounits")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {

@@ -11,7 +11,6 @@ import (
 
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/executor"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
@@ -85,7 +84,7 @@ func (s *Server) Run() error {
 	case <-s.jobBarrierCh: // job started
 	case <-time.After(s.submitWaitDuration):
 		log.Error(context.TODO(), "Job didn't start in time, shutting down")
-		return gerrors.Newf("no job")
+		return errors.New("no job submitted")
 	}
 
 	// todo timeout on code and run

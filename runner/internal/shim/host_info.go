@@ -24,7 +24,7 @@ type hostInfo struct {
 func WriteHostInfo(dir string, resources Resources) error {
 	path := filepath.Join(dir, "host_info.json")
 	// if host_info.json already exists, do nothing and return os.ErrExist
-	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrExist) {
 		return err
 	}
 

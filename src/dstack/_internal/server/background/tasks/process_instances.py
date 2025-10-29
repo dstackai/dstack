@@ -8,7 +8,7 @@ import requests
 from paramiko.pkey import PKey
 from paramiko.ssh_exception import PasswordRequiredException
 from pydantic import ValidationError
-from sqlalchemy import delete, func, select
+from sqlalchemy import and_, delete, func, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -57,7 +57,6 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
-    Retry,
 )
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.tasks.common import get_provisioning_timeout
@@ -166,6 +165,14 @@ async def _process_next_instance():
                             InstanceStatus.IDLE,
                             InstanceStatus.TERMINATING,
                         ]
+                    ),
+                    # Terminating instances belonging to a compute group
+                    # are handled by process_compute_groups.
+                    not_(
+                        and_(
+                            InstanceModel.status == InstanceStatus.TERMINATING,
+                            InstanceModel.compute_group_id.is_not(None),
+                        )
                     ),
                     InstanceModel.id.not_in(lockset),
                     InstanceModel.last_processed_at
@@ -918,51 +925,48 @@ async def _terminate(instance: InstanceModel) -> None:
     ):
         return
     jpd = get_instance_provisioning_data(instance)
-    if jpd is not None:
-        if jpd.backend != BackendType.REMOTE:
-            backend = await backends_services.get_project_backend_by_type(
-                project=instance.project, backend_type=jpd.backend
+    if jpd is not None and jpd.backend != BackendType.REMOTE:
+        backend = await backends_services.get_project_backend_by_type(
+            project=instance.project, backend_type=jpd.backend
+        )
+        if backend is None:
+            logger.error(
+                "Failed to terminate instance %s. Backend %s not available.",
+                instance.name,
+                jpd.backend,
             )
-            if backend is None:
-                logger.error(
-                    "Failed to terminate instance %s. Backend %s not available.",
-                    instance.name,
-                    jpd.backend,
+        else:
+            logger.debug("Terminating runner instance %s", jpd.hostname)
+            try:
+                await run_async(
+                    backend.compute().terminate_instance,
+                    jpd.instance_id,
+                    jpd.region,
+                    jpd.backend_data,
                 )
-            else:
-                logger.debug("Terminating runner instance %s", jpd.hostname)
-                try:
-                    await run_async(
-                        backend.compute().terminate_instance,
-                        jpd.instance_id,
-                        jpd.region,
-                        jpd.backend_data,
-                    )
-                except Exception as e:
-                    if instance.first_termination_retry_at is None:
-                        instance.first_termination_retry_at = get_current_datetime()
-                    instance.last_termination_retry_at = get_current_datetime()
-                    if _next_termination_retry_at(instance) < _get_termination_deadline(instance):
-                        if isinstance(e, NotYetTerminated):
-                            logger.debug(
-                                "Instance %s termination in progress: %s", instance.name, e
-                            )
-                        else:
-                            logger.warning(
-                                "Failed to terminate instance %s. Will retry. Error: %r",
-                                instance.name,
-                                e,
-                                exc_info=not isinstance(e, BackendError),
-                            )
-                        return
-                    logger.error(
-                        "Failed all attempts to terminate instance %s."
-                        " Please terminate the instance manually to avoid unexpected charges."
-                        " Error: %r",
-                        instance.name,
-                        e,
-                        exc_info=not isinstance(e, BackendError),
-                    )
+            except Exception as e:
+                if instance.first_termination_retry_at is None:
+                    instance.first_termination_retry_at = get_current_datetime()
+                instance.last_termination_retry_at = get_current_datetime()
+                if _next_termination_retry_at(instance) < _get_termination_deadline(instance):
+                    if isinstance(e, NotYetTerminated):
+                        logger.debug("Instance %s termination in progress: %s", instance.name, e)
+                    else:
+                        logger.warning(
+                            "Failed to terminate instance %s. Will retry. Error: %r",
+                            instance.name,
+                            e,
+                            exc_info=not isinstance(e, BackendError),
+                        )
+                    return
+                logger.error(
+                    "Failed all attempts to terminate instance %s."
+                    " Please terminate the instance manually to avoid unexpected charges."
+                    " Error: %r",
+                    instance.name,
+                    e,
+                    exc_info=not isinstance(e, BackendError),
+                )
 
     instance.deleted = True
     instance.deleted_at = get_current_datetime()
@@ -1124,10 +1128,6 @@ def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:
     if instance.last_job_processed_at is not None:
         last_time = instance.last_job_processed_at
     return get_current_datetime() - last_time
-
-
-def _get_retry_duration_deadline(instance: InstanceModel, retry: Retry) -> datetime.datetime:
-    return instance.created_at + timedelta(seconds=retry.duration)
 
 
 def _get_provisioning_deadline(

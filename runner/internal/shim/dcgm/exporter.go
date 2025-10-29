@@ -107,7 +107,7 @@ func (c *DCGMExporter) Start(ctx context.Context) error {
 
 	configFile, err := os.CreateTemp("", "counters-*.csv")
 	if err != nil {
-		return err
+		return fmt.Errorf("create config file: %w", err)
 	}
 	defer configFile.Close()
 	c.configPath = configFile.Name()
@@ -115,7 +115,7 @@ func (c *DCGMExporter) Start(ctx context.Context) error {
 	for _, counter := range counters {
 		err := configWriter.Write([]string{counter.Name, counter.Type, counter.Help})
 		if err != nil {
-			return err
+			return fmt.Errorf("write config file: %w", err)
 		}
 	}
 	configWriter.Flush()

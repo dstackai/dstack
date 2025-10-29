@@ -1,4 +1,14 @@
 from pathlib import Path
+from typing import List
+
+from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.runs import Job
+from dstack._internal.core.models.volumes import Volume
+
+
+class JobConfiguration(CoreModel):
+    job: Job
+    volumes: List[Volume]
 
 
 def fill_data(values: dict, filename_field: str = "filename", data_field: str = "data") -> dict:

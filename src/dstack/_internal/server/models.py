@@ -25,6 +25,7 @@ from sqlalchemy_utils import UUIDType
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
+from dstack._internal.core.models.compute_groups import ComputeGroupStatus
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.health import HealthStatus
@@ -448,6 +449,12 @@ class JobModel(BaseModel):
     # Whether the replica is registered to receive service requests.
     # Always `False` for non-service runs.
     registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    # `waiting_master_job` is `True` for non-master jobs that have to wait
+    # for master processing before they can be processed.
+    # This allows updating all replica jobs even when only master is locked,
+    # e.g. to provision instances for all jobs when processing master.
+    # If not set, all jobs should be processed only one-by-one.
+    waiting_master_job: Mapped[Optional[bool]] = mapped_column(Boolean)
 
 
 class GatewayModel(BaseModel):
@@ -591,6 +598,9 @@ class InstanceModel(BaseModel):
 
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
+
+    compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
+    compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(EnumAsString(InstanceStatus, 100), index=True)
     unreachable: Mapped[bool] = mapped_column(Boolean)
@@ -741,6 +751,35 @@ class PlacementGroupModel(BaseModel):
 
     configuration: Mapped[str] = mapped_column(Text)
     provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class ComputeGroupModel(BaseModel):
+    __tablename__ = "compute_groups"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    fleet_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped["FleetModel"] = relationship(foreign_keys=[fleet_id])
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    status: Mapped[ComputeGroupStatus] = mapped_column(EnumAsString(ComputeGroupStatus, 100))
+    last_processed_at: Mapped[datetime] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
+    provisioning_data: Mapped[str] = mapped_column(Text)
+
+    first_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    last_termination_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
+    instances: Mapped[List["InstanceModel"]] = relationship(back_populates="compute_group")
 
 
 class JobMetricsPoint(BaseModel):

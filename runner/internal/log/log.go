@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -107,7 +106,7 @@ func GetLogger(ctx context.Context) *logrus.Entry {
 func CreateAppendFile(path string) (*os.File, error) {
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
-		return nil, gerrors.Wrap(err)
+		return nil, fmt.Errorf("open file: %w", err)
 	}
 	return f, nil
 }

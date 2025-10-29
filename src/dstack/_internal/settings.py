@@ -1,9 +1,10 @@
 import os
 
 from dstack import version
+from dstack._internal.utils.version import parse_version
 
 DSTACK_VERSION = os.getenv("DSTACK_VERSION", version.__version__)
-if DSTACK_VERSION == "0.0.0":
+if parse_version(DSTACK_VERSION) is None:
     # The build backend (hatching) requires not None for versions,
     # but the code currently treats None as dev version.
     # TODO: update the code to treat 0.0.0 as dev version.
@@ -33,3 +34,5 @@ class FeatureFlags:
     large features. This class may be empty if there are no such features in
     development. Feature flags are environment variables of the form DSTACK_FF_*
     """
+
+    pass

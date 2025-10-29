@@ -10,7 +10,6 @@ import (
 
 	"github.com/codeclysm/extract/v4"
 	"github.com/dstackai/dstack/runner/internal/common"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
@@ -18,16 +17,16 @@ var renameRegex = regexp.MustCompile(`^([^/]*)(/|$)`)
 
 func (ex *RunExecutor) AddFileArchive(id string, src io.Reader) error {
 	if err := os.MkdirAll(ex.archiveDir, 0o755); err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("create archive directory: %w", err)
 	}
 	archivePath := path.Join(ex.archiveDir, id)
 	archive, err := os.Create(archivePath)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("create archive file: %w", err)
 	}
 	defer func() { _ = archive.Close() }()
 	if _, err = io.Copy(archive, src); err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("copy archive data: %w", err)
 	}
 	return nil
 }
@@ -38,14 +37,12 @@ func (ex *RunExecutor) setupFiles(ctx context.Context) error {
 	for _, fa := range ex.jobSpec.FileArchives {
 		archivePath := path.Join(ex.archiveDir, fa.Id)
 		if err := extractFileArchive(ctx, archivePath, fa.Path, ex.jobWorkingDir, ex.jobUid, ex.jobGid, ex.jobHomeDir); err != nil {
-			return gerrors.Wrap(err)
+			return fmt.Errorf("extract file archive %s: %w", fa.Id, err)
 		}
 	}
-
 	if err := os.RemoveAll(ex.archiveDir); err != nil {
 		log.Warning(ctx, "Failed to remove file archives dir", "path", ex.archiveDir, "err", err)
 	}
-
 	return nil
 }
 
@@ -54,11 +51,11 @@ func extractFileArchive(ctx context.Context, archivePath string, destPath string
 
 	destPath, err := common.ExpandPath(destPath, baseDir, homeDir)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("expand destination path: %w", err)
 	}
 	destBase, destName := path.Split(destPath)
 	if err := common.MkdirAll(ctx, destBase, uid, gid); err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("create destination directory: %w", err)
 	}
 	if err := os.RemoveAll(destPath); err != nil {
 		log.Warning(ctx, "Failed to remove", "path", destPath, "err", err)
@@ -66,7 +63,7 @@ func extractFileArchive(ctx context.Context, archivePath string, destPath string
 
 	archive, err := os.Open(archivePath)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("open archive file: %w", err)
 	}
 	defer archive.Close()
 
@@ -78,7 +75,7 @@ func extractFileArchive(ctx context.Context, archivePath string, destPath string
 		return s
 	}
 	if err := extract.Tar(ctx, archive, destBase, renameAndRemember); err != nil {
-		return gerrors.Wrap(err)
+		return fmt.Errorf("extract tar archive: %w", err)
 	}
 
 	if uid != -1 || gid != -1 {

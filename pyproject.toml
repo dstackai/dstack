@@ -84,6 +84,7 @@ include = [
     "src/dstack/_internal/server",
     "src/dstack/_internal/core/services",
     "src/dstack/_internal/core/backends/kubernetes",
+    "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/cli/services/configurators",
     "src/dstack/_internal/cli/commands",
 ]

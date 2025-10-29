@@ -161,7 +161,7 @@ class JobConfigurator(ABC):
             stop_duration=self._stop_duration(),
             utilization_policy=self._utilization_policy(),
             registry_auth=self._registry_auth(),
-            requirements=self._requirements(),
+            requirements=self._requirements(jobs_per_replica),
             retry=self._retry(),
             working_dir=self._working_dir(),
             volumes=self._volumes(job_num),
@@ -295,13 +295,14 @@ class JobConfigurator(ABC):
     def _registry_auth(self) -> Optional[RegistryAuth]:
         return self.run_spec.configuration.registry_auth
 
-    def _requirements(self) -> Requirements:
+    def _requirements(self, jobs_per_replica: int) -> Requirements:
         spot_policy = self._spot_policy()
         return Requirements(
             resources=self.run_spec.configuration.resources,
             max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
             reservation=self.run_spec.merged_profile.reservation,
+            multinode=jobs_per_replica > 1,
         )
 
     def _retry(self) -> Optional[Retry]:

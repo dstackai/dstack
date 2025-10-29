@@ -25,6 +25,7 @@ SUPPORTED_GPUHUNT_FLAGS = [
     "gcp-a4",
     "gcp-g4",
     "gcp-dws-calendar-mode",
+    "runpod-cluster",
 ]
 
 

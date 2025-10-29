@@ -96,6 +96,19 @@ def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
     )
 
 
+def find_jobs(
+    jobs: List[Job],
+    replica_num: Optional[int] = None,
+    job_num: Optional[int] = None,
+) -> list[Job]:
+    res = jobs
+    if replica_num is not None:
+        res = [j for j in res if j.job_spec.replica_num == replica_num]
+    if job_num is not None:
+        res = [j for j in res if j.job_spec.job_num == job_num]
+    return res
+
+
 async def get_run_job_model(
     session: AsyncSession,
     project: ProjectModel,

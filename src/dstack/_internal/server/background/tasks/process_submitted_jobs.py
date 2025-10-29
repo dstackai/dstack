@@ -3,16 +3,22 @@ import itertools
 import math
 import uuid
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
 
 from dstack._internal.core.backends.base.backend import Backend
-from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
+from dstack._internal.core.backends.base.compute import (
+    ComputeWithGroupProvisioningSupport,
+    ComputeWithVolumeSupport,
+)
+from dstack._internal.core.backends.base.models import JobConfiguration
+from dstack._internal.core.backends.features import BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.compute_groups import ComputeGroupProvisioningData
 from dstack._internal.core.models.fleets import (
     Fleet,
     FleetConfiguration,
@@ -42,8 +48,10 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server import settings
+from dstack._internal.server.background.tasks.process_compute_groups import ComputeGroupStatus
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
+    ComputeGroupModel,
     FleetModel,
     InstanceModel,
     JobModel,
@@ -69,6 +77,7 @@ from dstack._internal.server.services.instances import (
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     find_job,
+    find_jobs,
     get_instances_ids_with_detaching_volumes,
     get_job_configured_volume_models,
     get_job_configured_volumes,
@@ -132,6 +141,7 @@ async def _process_next_submitted_job():
                 .join(JobModel.run)
                 .where(
                     JobModel.status == JobStatus.SUBMITTED,
+                    JobModel.waiting_master_job.is_not(True),
                     JobModel.id.not_in(lockset),
                 )
                 .options(load_only(JobModel.id))
@@ -190,6 +200,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     run_spec = run.run_spec
     run_profile = run_spec.merged_profile
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+    replica_jobs = find_jobs(run.jobs, replica_num=job_model.replica_num)
+    replica_job_models = _get_job_models_for_jobs(run_model.jobs, replica_jobs)
     multinode = job.job_spec.jobs_per_replica > 1
 
     # Master job chooses fleet for the run.
@@ -323,6 +335,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 return
             # If no instances were locked, we can proceed in the same transaction.
 
+    # TODO: Volume attachment for compute groups is not yet supported since
+    # currently supported compute groups (e.g. Runpod) don't need explicit volume attachment.
+    need_volume_attachment = True
+
     if job_model.instance is not None:
         res = await session.execute(
             select(InstanceModel)
@@ -333,7 +349,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         instance = res.unique().scalar_one()
         job_model.status = JobStatus.PROVISIONING
     else:
-        # Assigned no instance, create a new one
         if run_profile.creation_policy == CreationPolicy.REUSE:
             logger.debug("%s: reuse instance failed", fmt(job_model))
             job_model.status = JobStatus.TERMINATING
@@ -342,13 +357,23 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
 
-        # Create a new cloud instance
-        run_job_result = await _run_job_on_new_instance(
+        jobs_to_provision = [job]
+        if (
+            multinode
+            and job.job_spec.job_num == 0
+            # job_model.waiting_master_job is not set for legacy jobs.
+            # In this case compute group provisioning not supported
+            # and jobs always provision one-by-one.
+            and job_model.waiting_master_job is not None
+        ):
+            jobs_to_provision = replica_jobs
+
+        run_job_result = await _run_jobs_on_new_instances(
             project=project,
             fleet_model=fleet_model,
             job_model=job_model,
             run=run,
-            job=job,
+            jobs=jobs_to_provision,
             project_ssh_public_key=project.ssh_public_key,
             project_ssh_private_key=project.ssh_private_key,
             master_job_provisioning_data=master_job_provisioning_data,
@@ -362,72 +387,102 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
 
-        logger.info("%s: now is provisioning a new instance", fmt(job_model))
-        job_provisioning_data, offer, effective_profile, _ = run_job_result
-        job_model.job_provisioning_data = job_provisioning_data.json()
-        job_model.status = JobStatus.PROVISIONING
         if fleet_model is None:
             fleet_model = await _create_fleet_model_for_job(
                 session=session,
                 project=project,
                 run=run,
             )
-        # FIXME: Fleet is not locked which may lead to duplicate instance_num.
-        # This is currently hard to fix without locking the fleet for entire provisioning duration.
-        # Processing should be done in multiple steps so that
-        # InstanceModel is created before provisioning.
-        instance_num = await _get_next_instance_num(
-            session=session,
-            fleet_model=fleet_model,
-        )
-        instance = _create_instance_model_for_job(
-            project=project,
-            fleet_model=fleet_model,
-            job_model=job_model,
-            job_provisioning_data=job_provisioning_data,
-            offer=offer,
-            instance_num=instance_num,
-            profile=effective_profile,
-        )
-        job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
-        # Both this task and process_fleets can add instances to fleets.
-        # TODO: Ensure this does not violate nodes.max when it's enforced.
-        instance.fleet_id = fleet_model.id
-        logger.info(
-            "The job %s created the new instance %s",
-            job_model.job_name,
-            instance.name,
-            extra={
-                "instance_name": instance.name,
-                "instance_status": InstanceStatus.PROVISIONING.value,
-            },
-        )
-        session.add(instance)
-        session.add(fleet_model)
-        job_model.used_instance_id = instance.id
+            session.add(fleet_model)
+
+        provisioning_data, offer, effective_profile, _ = run_job_result
+        compute_group_model = None
+        if isinstance(provisioning_data, ComputeGroupProvisioningData):
+            need_volume_attachment = False
+            provisioned_jobs = jobs_to_provision
+            jpds = provisioning_data.job_provisioning_datas
+            compute_group_model = ComputeGroupModel(
+                id=uuid.uuid4(),
+                project=project,
+                fleet=fleet_model,
+                status=ComputeGroupStatus.RUNNING,
+                provisioning_data=provisioning_data.json(),
+            )
+            session.add(compute_group_model)
+        else:
+            provisioned_jobs = [job]
+            jpds = [provisioning_data]
+            if len(jobs_to_provision) > 1:
+                # Tried provisioning multiple jobs but provisioned only one.
+                # Allow other jobs to provision one-by-one.
+                for replica_job_model in replica_job_models:
+                    replica_job_model.waiting_master_job = False
+
+        logger.info("%s: provisioned %s new instance(s)", fmt(job_model), len(provisioned_jobs))
+        provisioned_job_models = _get_job_models_for_jobs(run_model.jobs, provisioned_jobs)
+        instance = None  # Instance for attaching volumes in case of single job provisioned
+        for provisioned_job_model, jpd in zip(provisioned_job_models, jpds):
+            provisioned_job_model.job_provisioning_data = jpd.json()
+            provisioned_job_model.status = JobStatus.PROVISIONING
+            # FIXME: Fleet is not locked which may lead to duplicate instance_num.
+            # This is currently hard to fix without locking the fleet for entire provisioning duration.
+            # Processing should be done in multiple steps so that
+            # InstanceModel is created before provisioning.
+            instance_num = await _get_next_instance_num(
+                session=session,
+                fleet_model=fleet_model,
+            )
+            instance = _create_instance_model_for_job(
+                project=project,
+                fleet_model=fleet_model,
+                compute_group_model=compute_group_model,
+                job_model=provisioned_job_model,
+                job_provisioning_data=jpd,
+                offer=offer,
+                instance_num=instance_num,
+                profile=effective_profile,
+            )
+            provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
+                offer, multinode
+            ).json()
+            logger.info(
+                "Created a new instance %s for job %s",
+                instance.name,
+                provisioned_job_model.job_name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.PROVISIONING.value,
+                },
+            )
+            session.add(instance)
+            provisioned_job_model.used_instance_id = instance.id
+            provisioned_job_model.last_processed_at = common_utils.get_current_datetime()
 
     volumes_ids = sorted([v.id for vs in volume_models for v in vs])
-    # TODO: lock instances for attaching volumes?
-    # Take lock to prevent attaching volumes that are to be deleted.
-    # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
-    await session.execute(
-        select(VolumeModel)
-        .where(VolumeModel.id.in_(volumes_ids))
-        .options(joinedload(VolumeModel.user).load_only(UserModel.name))
-        .order_by(VolumeModel.id)  # take locks in order
-        .with_for_update(key_share=True, of=VolumeModel)
-    )
-    async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
-        if len(volume_models) > 0:
-            await _attach_volumes(
-                session=session,
-                project=project,
-                job_model=job_model,
-                instance=instance,
-                volume_models=volume_models,
-            )
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
+    if need_volume_attachment:
+        # TODO: Lock instances for attaching volumes?
+        # Take lock to prevent attaching volumes that are to be deleted.
+        # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
+        await session.execute(
+            select(VolumeModel)
+            .where(VolumeModel.id.in_(volumes_ids))
+            .options(joinedload(VolumeModel.user).load_only(UserModel.name))
+            .order_by(VolumeModel.id)  # take locks in order
+            .with_for_update(key_share=True, of=VolumeModel)
+        )
+        async with get_locker(get_db().dialect_name).lock_ctx(
+            VolumeModel.__tablename__, volumes_ids
+        ):
+            if len(volume_models) > 0:
+                assert instance is not None
+                await _attach_volumes(
+                    session=session,
+                    project=project,
+                    job_model=job_model,
+                    instance=instance,
+                    volume_models=volume_models,
+                )
+            await session.commit()
 
 
 async def _select_fleet_models(
@@ -553,10 +608,9 @@ async def _find_optimal_fleet_with_offers(
         except ValueError:
             fleet_backend_offers = []
         else:
-            multinode = (
-                candidate_fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-                or job.job_spec.jobs_per_replica > 1
-            )
+            # Handle multinode for old jobs that don't have requirements.multinode set.
+            # TODO: Drop multinode param.
+            multinode = requirements.multinode or job.job_spec.jobs_per_replica > 1
             fleet_backend_offers = await get_offers_by_requirements(
                 project=project,
                 profile=profile,
@@ -728,19 +782,33 @@ async def _assign_job_to_fleet_instance(
     return instance
 
 
-async def _run_job_on_new_instance(
+async def _run_jobs_on_new_instances(
     project: ProjectModel,
     job_model: JobModel,
     run: Run,
-    job: Job,
+    jobs: list[Job],
     project_ssh_public_key: str,
     project_ssh_private_key: str,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
-    volumes: Optional[List[List[Volume]]] = None,
+    volumes: Optional[list[list[Volume]]] = None,
     fleet_model: Optional[FleetModel] = None,
-) -> Optional[tuple[JobProvisioningData, InstanceOfferWithAvailability, Profile, Requirements]]:
+) -> Optional[
+    tuple[
+        Union[JobProvisioningData, ComputeGroupProvisioningData],
+        InstanceOfferWithAvailability,
+        Profile,
+        Requirements,
+    ]
+]:
+    """
+    Provisions an instance for a job or a compute group for multiple jobs and runs the jobs.
+    Even when multiple jobs are passes, it may still provision only one instance
+    and run only the master job in case there are no offers supporting cluster groups.
+    Other jobs should be provisioned one-by-one later.
+    """
     if volumes is None:
         volumes = []
+    job = jobs[0]
     profile = run.run_spec.merged_profile
     requirements = job.job_spec.requirements
     fleet = None
@@ -758,9 +826,7 @@ async def _run_job_on_new_instance(
             return None
         # TODO: Respect fleet provisioning properties such as tags
 
-    multinode = job.job_spec.jobs_per_replica > 1 or (
-        fleet is not None and fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-    )
+    multinode = requirements.multinode or job.job_spec.jobs_per_replica > 1
     offers = await get_offers_by_requirements(
         project=project,
         profile=profile,
@@ -784,17 +850,31 @@ async def _run_job_on_new_instance(
             offer.price,
         )
         offer_volumes = _get_offer_volumes(volumes, offer)
+        job_configurations = [JobConfiguration(job=j, volumes=offer_volumes) for j in jobs]
+        compute = backend.compute()
         try:
-            job_provisioning_data = await common_utils.run_async(
-                backend.compute().run_job,
-                run,
-                job,
-                offer,
-                project_ssh_public_key,
-                project_ssh_private_key,
-                offer_volumes,
-            )
-            return job_provisioning_data, offer, profile, requirements
+            if len(jobs) > 1 and offer.backend in BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT:
+                assert isinstance(compute, ComputeWithGroupProvisioningSupport)
+                cgpd = await common_utils.run_async(
+                    compute.run_jobs,
+                    run,
+                    job_configurations,
+                    offer,
+                    project_ssh_public_key,
+                    project_ssh_private_key,
+                )
+                return cgpd, offer, profile, requirements
+            else:
+                jpd = await common_utils.run_async(
+                    compute.run_job,
+                    run,
+                    job,
+                    offer,
+                    project_ssh_public_key,
+                    project_ssh_private_key,
+                    offer_volumes,
+                )
+                return jpd, offer, profile, requirements
         except BackendError as e:
             logger.warning(
                 "%s: %s launch in %s/%s failed: %s",
@@ -912,6 +992,7 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
 def _create_instance_model_for_job(
     project: ProjectModel,
     fleet_model: FleetModel,
+    compute_group_model: Optional[ComputeGroupModel],
     job_model: JobModel,
     job_provisioning_data: JobProvisioningData,
     offer: InstanceOfferWithAvailability,
@@ -931,6 +1012,8 @@ def _create_instance_model_for_job(
         name=f"{fleet_model.name}-{instance_num}",
         instance_num=instance_num,
         project=project,
+        fleet=fleet_model,
+        compute_group=compute_group_model,
         created_at=common_utils.get_current_datetime(),
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PROVISIONING,
@@ -1081,3 +1164,15 @@ async def _attach_volume(
     instance.volume_attachments.append(volume_attachment_model)
 
     volume_model.last_job_processed_at = common_utils.get_current_datetime()
+
+
+def _get_job_models_for_jobs(
+    job_models: list[JobModel],
+    jobs: list[Job],
+) -> list[JobModel]:
+    """
+    Returns job models of latest submissions for a list of jobs.
+    Preserves jobs order.
+    """
+    id_to_job_model_map = {jm.id: jm for jm in job_models}
+    return [id_to_job_model_map[j.job_submissions[-1].id] for j in jobs]
