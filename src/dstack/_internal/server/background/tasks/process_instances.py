@@ -286,7 +286,7 @@ def _can_terminate_fleet_instances_on_idle_duration(fleet_model: FleetModel) -> 
     # That's ok: in the worst case we go below `nodes.min`, but
     # the fleet consolidation logic will provision new nodes.
     fleet = fleet_model_to_fleet(fleet_model)
-    if fleet.spec.configuration.nodes is None:
+    if fleet.spec.configuration.nodes is None or fleet.spec.autocreated:
         return True
     active_instances = [i for i in fleet_model.instances if i.status.is_active()]
     active_instances_num = len(active_instances)
