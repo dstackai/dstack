@@ -196,16 +196,26 @@ async def _process_next_instance():
 
 
 async def _process_instance(session: AsyncSession, instance: InstanceModel):
+    # Refetch to load related attributes.
+    # Load related attributes only for statuses that always need them.
     if instance.status in (
         InstanceStatus.PENDING,
         InstanceStatus.TERMINATING,
     ):
-        # Refetch to load related attributes.
-        # Load related attributes only for statuses that always need them.
         res = await session.execute(
             select(InstanceModel)
             .where(InstanceModel.id == instance.id)
             .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+            .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
+            .execution_options(populate_existing=True)
+        )
+        instance = res.unique().scalar_one()
+    elif instance.status == InstanceStatus.IDLE:
+        res = await session.execute(
+            select(InstanceModel)
+            .where(InstanceModel.id == instance.id)
+            .options(joinedload(InstanceModel.project))
             .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
             .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
             .execution_options(populate_existing=True)
@@ -242,6 +252,14 @@ def _check_and_mark_terminating_if_idle_duration_expired(instance: InstanceModel
         and not instance.jobs
     ):
         return False
+    if instance.fleet is not None and not _can_terminate_fleet_instances_on_idle_duration(
+        instance.fleet
+    ):
+        logger.debug(
+            "Skipping instance %s termination on idle duration. Fleet is already at `nodes.min`.",
+            instance.name,
+        )
+        return False
     idle_duration = _get_instance_idle_duration(instance)
     idle_seconds = instance.termination_idle_time
     delta = datetime.timedelta(seconds=idle_seconds)
@@ -259,6 +277,20 @@ def _check_and_mark_terminating_if_idle_duration_expired(instance: InstanceModel
         )
         return True
     return False
+
+
+def _can_terminate_fleet_instances_on_idle_duration(fleet_model: FleetModel) -> bool:
+    # Do not terminate instances on idle duration if fleet is already at `nodes.min`.
+    # This is an optimization to avoid terminate-create loop.
+    # There may be race conditions since we don't take the fleet lock.
+    # That's ok: in the worst case we go below `nodes.min`, but
+    # the fleet consolidation logic will provision new nodes.
+    fleet = fleet_model_to_fleet(fleet_model)
+    if fleet.spec.configuration.nodes is None:
+        return True
+    active_instances = [i for i in fleet_model.instances if i.status.is_active()]
+    active_instances_num = len(active_instances)
+    return active_instances_num > fleet.spec.configuration.nodes.min
 
 
 async def _add_remote(instance: InstanceModel) -> None:
