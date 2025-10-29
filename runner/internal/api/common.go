@@ -113,11 +113,13 @@ func JSONResponseHandler(handler func(http.ResponseWriter, *http.Request) (inter
 			if errors.As(err, &apiErr) {
 				status = apiErr.Status
 				errMsg = apiErr.Error()
-				log.Warning(r.Context(), "API error", "err", errMsg, "status", status)
+				log.Warning(r.Context(), "API error", "err", errMsg, "method", r.Method, "endpoint", r.URL.Path, "status", status)
 			} else {
 				status = http.StatusInternalServerError
-				log.Error(r.Context(), "Unexpected API error", "err", err, "status", status)
+				log.Error(r.Context(), "Unexpected API error", "err", err, "method", r.Method, "endpoint", r.URL.Path, "status", status)
 			}
+		} else {
+			log.Trace(r.Context(), "", "method", r.Method, "endpoint", r.URL.Path, "status", status)
 		}
 
 		if status != 500 && body != nil {
@@ -127,7 +129,5 @@ func JSONResponseHandler(handler func(http.ResponseWriter, *http.Request) (inter
 		} else {
 			http.Error(w, errMsg, status)
 		}
-
-		log.Debug(r.Context(), "", "method", r.Method, "endpoint", r.URL.Path, "status", status)
 	}
 }
