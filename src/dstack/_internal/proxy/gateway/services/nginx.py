@@ -81,6 +81,7 @@ class Nginx:
     def __init__(self, conf_dir: Path = Path("/etc/nginx/sites-enabled")) -> None:
         self._conf_dir = conf_dir
         self._lock: Lock = Lock()
+        self._domain_to_model_id: dict[str, str] = {}
 
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
         logger.debug("Registering %s domain %s", conf.type, conf.domain)
@@ -92,9 +93,15 @@ class Nginx:
             if hasattr(conf, "router") and conf.router == "sglang":
                 replicas = len(conf.replicas)
                 model_id = conf.model_id
-                logger.info("Registering sglang router with model %s", model_id)
+                logger.info(
+                    "Registering sglang router with model %s with %d replicas in domain %s",
+                    model_id,
+                    replicas,
+                    conf.domain,
+                )
+                self._domain_to_model_id[conf.domain] = model_id
                 await run_async(self.write_sglang_workers_conf, conf)
-                await run_async(self.start_or_update_sglang_router, replicas)
+                await run_async(self.start_or_update_sglang_router, replicas, model_id)
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
@@ -108,7 +115,13 @@ class Nginx:
             workers_conf_path = self._conf_dir / f"sglang-workers.{domain}.conf"
             if workers_conf_path.exists():
                 await run_async(sudo_rm, workers_conf_path)
-                await run_async(self.stop_sglang_router)
+                # Get model_id for this domain before removing workers
+                model_id = self._domain_to_model_id.get(domain)
+                # This allows other services with different models to continue running
+                await run_async(self.remove_sglang_workers_for_model, model_id)
+                # Clean up the mapping
+                del self._domain_to_model_id[domain]
+                # await run_async(self.stop_sglang_router)
             await run_async(self.reload)
         logger.info("Unregistered domain %s", domain)
 
@@ -120,10 +133,10 @@ class Nginx:
             raise UnexpectedProxyError("Failed to reload nginx")
 
     @staticmethod
-    def start_or_update_sglang_router(replicas: int) -> None:
+    def start_or_update_sglang_router(replicas: int, model_id: str) -> None:
         if not Nginx.is_sglang_router_running():
             Nginx.start_sglang_router()
-        Nginx.update_sglang_router_workers(replicas)
+        Nginx.update_sglang_router_workers(replicas, model_id)
 
     @staticmethod
     def is_sglang_router_running() -> bool:
@@ -172,25 +185,27 @@ class Nginx:
             raise
 
     @staticmethod
-    def get_sglang_router_workers() -> list[dict]:
+    def get_sglang_router_workers(model_id: str) -> list[dict]:
         try:
             result = subprocess.run(
                 ["curl", "-s", "http://localhost:3000/workers"], capture_output=True, timeout=5
             )
             if result.returncode == 0:
                 response = json.loads(result.stdout.decode())
-                return response.get("workers", [])
+                workers = response.get("workers", [])
+                workers = [w for w in workers if w.get("model_id") == model_id]
+                return workers
             return []
         except Exception as e:
             logger.error(f"Error getting sglang router workers: {e}")
             return []
 
     @staticmethod
-    def update_sglang_router_workers(replicas: int) -> None:
+    def update_sglang_router_workers(replicas: int, model_id: str) -> None:
         """Update sglang router workers via HTTP API"""
         try:
             # Get current workers
-            current_workers = Nginx.get_sglang_router_workers()
+            current_workers = Nginx.get_sglang_router_workers(model_id)
             current_worker_urls = {worker["url"] for worker in current_workers}
 
             # Calculate target worker URLs
@@ -208,26 +223,26 @@ class Nginx:
 
             # Add workers
             for worker_url in sorted(workers_to_add):
-                success = Nginx.add_sglang_router_worker(worker_url)
+                success = Nginx.add_sglang_router_worker(worker_url, model_id)
                 if not success:
                     logger.warning("Failed to add worker %s, continuing with others", worker_url)
 
             # Remove workers
             for worker_url in sorted(workers_to_remove):
-                success = Nginx.remove_sglang_router_worker(worker_url)
+                success = Nginx.remove_sglang_router_worker(worker_url, model_id)
                 if not success:
                     logger.warning(
                         "Failed to remove worker %s, continuing with others", worker_url
                     )
 
         except Exception as e:
-            logger.error(f"Error updating sglang router workers: {e}")
+            logger.error(f"Error updating sglang router workers for model {model_id}: {e}")
             raise
 
     @staticmethod
-    def add_sglang_router_worker(worker_url: str) -> bool:
+    def add_sglang_router_worker(worker_url: str, model_id: str) -> bool:
         try:
-            payload = {"url": worker_url, "worker_type": "regular"}
+            payload = {"url": worker_url, "worker_type": "regular", "model_id": model_id}
             result = subprocess.run(
                 [
                     "curl",
@@ -259,7 +274,7 @@ class Nginx:
             return False
 
     @staticmethod
-    def remove_sglang_router_worker(worker_url: str) -> bool:
+    def remove_sglang_router_worker(worker_url: str, model_id: str) -> bool:
         """Remove a single worker from sglang router"""
         try:
             # URL encode the worker URL for the DELETE request
@@ -274,17 +289,36 @@ class Nginx:
             if result.returncode == 0:
                 response = json.loads(result.stdout.decode())
                 if response.get("status") == "accepted":
-                    logger.info("Removed worker %s from sglang router", worker_url)
+                    logger.info(
+                        "Removed worker %s from sglang router model %s", worker_url, model_id
+                    )
                     return True
                 else:
-                    logger.error("Failed to remove worker %s: %s", worker_url, response)
+                    logger.error(
+                        "Failed to remove worker %s model %s: %s", worker_url, model_id, response
+                    )
                     return False
             else:
-                logger.error("Failed to remove worker %s: %s", worker_url, result.stderr.decode())
+                logger.error(
+                    "Failed to remove worker %s model %s: %s",
+                    worker_url,
+                    model_id,
+                    result.stderr.decode(),
+                )
                 return False
         except Exception as e:
-            logger.error(f"Error removing worker {worker_url}: {e}")
+            logger.error(f"Error removing worker {worker_url} model {model_id}: {e}")
             return False
+
+    @staticmethod
+    def remove_sglang_workers_for_model(model_id: str) -> None:
+        try:
+            workers = Nginx.get_sglang_router_workers(model_id)
+            for worker in workers:
+                Nginx.remove_sglang_router_worker(worker["url"], model_id)
+        except Exception as e:
+            logger.error(f"Error removing sglang router workers for model {model_id}: {e}")
+            raise
 
     @staticmethod
     def stop_sglang_router() -> None:
