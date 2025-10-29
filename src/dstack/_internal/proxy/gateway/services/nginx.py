@@ -67,6 +67,7 @@ class ServiceConfig(SiteConfig):
     locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
     router: Optional[str] = None
+    model_id: Optional[str] = None
 
 
 class ModelEntrypointConfig(SiteConfig):
@@ -90,6 +91,8 @@ class Nginx:
             await run_async(self.write_conf, conf.render(), conf_name)
             if hasattr(conf, "router") and conf.router == "sglang":
                 replicas = len(conf.replicas)
+                model_id = conf.model_id
+                logger.info("Registering sglang router with model %s", model_id)
                 await run_async(self.write_sglang_workers_conf, conf)
                 await run_async(self.start_or_update_sglang_router, replicas)
 
@@ -146,6 +149,7 @@ class Nginx:
                 "0.0.0.0",
                 "--port",
                 "3000",
+                "--enable-igw",
                 "--log-level",
                 "debug",
                 "--log-dir",

@@ -56,6 +56,7 @@ async def register_service(
         client_max_body_size=client_max_body_size,
         replicas=(),
         router=router,
+        model_id=model.name if model is not None else None,
     )
 
     async with lock:
@@ -338,6 +339,7 @@ async def get_nginx_service_config(
         locations=locations,
         replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
         router=service.router,
+        model_id=service.model_id,
     )
 
 

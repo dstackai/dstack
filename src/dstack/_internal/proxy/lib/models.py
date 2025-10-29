@@ -58,6 +58,7 @@ class Service(ImmutableModel):
     strip_prefix: bool = True  # only used in-server
     replicas: tuple[Replica, ...]
     router: Optional[str] = None
+    model_id: Optional[str] = None
 
     @property
     def domain_safe(self) -> str:
