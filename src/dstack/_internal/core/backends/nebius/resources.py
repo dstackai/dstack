@@ -117,7 +117,9 @@ def wait_for_operation(
         if time.monotonic() + interval > deadline:
             raise TimeoutError(f"Operation {op.id} wait timeout")
         time.sleep(interval)
-        LOOP.await_(op.update(per_retry_timeout=REQUEST_TIMEOUT))
+        LOOP.await_(
+            op.update(per_retry_timeout=REQUEST_TIMEOUT, auth_options=REQUEST_AUTH_OPTIONS)
+        )
 
 
 def get_region_to_project_id_map(
