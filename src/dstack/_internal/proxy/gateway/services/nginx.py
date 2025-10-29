@@ -82,6 +82,10 @@ class Nginx:
         self._conf_dir = conf_dir
         self._lock: Lock = Lock()
         self._domain_to_model_id: dict[str, str] = {}
+        # Track next available port for worker allocation
+        self._next_worker_port: int = 10001  # Start from 10001
+        # Track which ports are used by which domain
+        self._domain_to_ports: dict[str, list[int]] = {}  # domain -> [port1, port2, ...]
 
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
         logger.debug("Registering %s domain %s", conf.type, conf.domain)
@@ -100,8 +104,18 @@ class Nginx:
                     conf.domain,
                 )
                 self._domain_to_model_id[conf.domain] = model_id
-                await run_async(self.write_sglang_workers_conf, conf)
-                await run_async(self.start_or_update_sglang_router, replicas, model_id)
+                # Allocate unique ports for this service
+                allocated_ports = list(
+                    range(self._next_worker_port, self._next_worker_port + replicas)
+                )
+                self._domain_to_ports[conf.domain] = allocated_ports
+                self._next_worker_port += replicas  # Reserve ports for next service
+
+                # Pass allocated ports to worker config generation
+                await run_async(self.write_sglang_workers_conf, conf, allocated_ports)
+                await run_async(
+                    self.start_or_update_sglang_router, replicas, model_id, allocated_ports
+                )
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
@@ -121,6 +135,9 @@ class Nginx:
                 await run_async(self.remove_sglang_workers_for_model, model_id)
                 # Clean up the mapping
                 del self._domain_to_model_id[domain]
+                # Free up ports
+                if domain in self._domain_to_ports:
+                    del self._domain_to_ports[domain]
                 # await run_async(self.stop_sglang_router)
             await run_async(self.reload)
         logger.info("Unregistered domain %s", domain)
@@ -133,10 +150,13 @@ class Nginx:
             raise UnexpectedProxyError("Failed to reload nginx")
 
     @staticmethod
-    def start_or_update_sglang_router(replicas: int, model_id: str) -> None:
+    def start_or_update_sglang_router(
+        replicas: int, model_id: str, allocated_ports: list[int]
+    ) -> None:
         if not Nginx.is_sglang_router_running():
             Nginx.start_sglang_router()
-        Nginx.update_sglang_router_workers(replicas, model_id)
+        # Pass allocated ports to worker update
+        Nginx.update_sglang_router_workers(replicas, model_id, allocated_ports)
 
     @staticmethod
     def is_sglang_router_running() -> bool:
@@ -201,7 +221,9 @@ class Nginx:
             return []
 
     @staticmethod
-    def update_sglang_router_workers(replicas: int, model_id: str) -> None:
+    def update_sglang_router_workers(
+        replicas: int, model_id: str, allocated_ports: list[int]
+    ) -> None:
         """Update sglang router workers via HTTP API"""
         try:
             # Get current workers
@@ -209,7 +231,9 @@ class Nginx:
             current_worker_urls = {worker["url"] for worker in current_workers}
 
             # Calculate target worker URLs
-            target_worker_urls = {f"http://127.0.0.1:{10000 + i}" for i in range(1, replicas + 1)}
+            # target_worker_urls = {f"http://127.0.0.1:{10000 + i}" for i in range(1, replicas + 1)}
+            # Use explicitly assigned ports instead of calculation
+            target_worker_urls = {f"http://127.0.0.1:{port}" for port in allocated_ports}
 
             # Workers to add
             workers_to_add = target_worker_urls - current_worker_urls
@@ -407,18 +431,20 @@ class Nginx:
         conf = read_package_resource("00-log-format.conf")
         self.write_conf(conf, "00-log-format.conf")
 
-    def write_sglang_workers_conf(self, conf: SiteConfig) -> None:
-        workers_config = generate_sglang_workers_config(conf)
+    def write_sglang_workers_conf(self, conf: SiteConfig, allocated_ports: list[int]) -> None:
+        # Pass ports to template
+        workers_config = generate_sglang_workers_config(conf, allocated_ports)
         workers_conf_name = f"sglang-workers.{conf.domain}.conf"
         workers_conf_path = self._conf_dir / workers_conf_name
         sudo_write(workers_conf_path, workers_config)
         self.reload()
 
 
-def generate_sglang_workers_config(conf: SiteConfig) -> str:
+def generate_sglang_workers_config(conf: SiteConfig, allocated_ports: list[int]) -> str:
     template = read_package_resource("sglang_workers.jinja2")
     return jinja2.Template(template).render(
         replicas=conf.replicas,
+        ports=allocated_ports,
         proxy_port=PROXY_PORT_ON_GATEWAY,
     )
 

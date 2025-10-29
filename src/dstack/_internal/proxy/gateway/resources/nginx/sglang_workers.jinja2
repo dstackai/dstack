@@ -5,7 +5,7 @@ upstream sglang_worker_{{ loop.index }}_upstream {
 }
 
 server {
-    listen 127.0.0.1:{{ 10000 + loop.index }};
+    listen 127.0.0.1:{{ ports[loop.index0] }};
     access_log off; # disable access logs for this internal endpoint
 
     proxy_read_timeout 300s;
