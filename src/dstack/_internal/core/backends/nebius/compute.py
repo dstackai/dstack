@@ -28,8 +28,11 @@ from dstack._internal.core.backends.base.offers import (
     get_offers_disk_modifier,
 )
 from dstack._internal.core.backends.nebius import resources
-from dstack._internal.core.backends.nebius.fabrics import get_suitable_infiniband_fabrics
-from dstack._internal.core.backends.nebius.models import NebiusConfig, NebiusServiceAccountCreds
+from dstack._internal.core.backends.nebius.models import (
+    NebiusConfig,
+    NebiusOfferBackendData,
+    NebiusServiceAccountCreds,
+)
 from dstack._internal.core.errors import (
     BackendError,
     NotYetTerminated,
@@ -281,12 +284,16 @@ class NebiusCompute(
         master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         assert placement_group.configuration.placement_strategy == PlacementStrategy.CLUSTER
-        backend_data = NebiusPlacementGroupBackendData(cluster=None)
+        master_instance_offer_backend_data: NebiusOfferBackendData = (
+            NebiusOfferBackendData.__response__.parse_obj(master_instance_offer.backend_data)
+        )
+        fabrics = list(master_instance_offer_backend_data.fabrics)
+        if self.config.fabrics is not None:
+            fabrics = [f for f in fabrics if f in self.config.fabrics]
+        placement_group_backend_data = NebiusPlacementGroupBackendData(cluster=None)
         # Only create a Nebius cluster if the instance supports it.
         # For other instances, return dummy PlacementGroupProvisioningData.
-        if fabrics := get_suitable_infiniband_fabrics(
-            master_instance_offer, allowed_fabrics=self.config.fabrics
-        ):
+        if fabrics:
             fabric = random.choice(fabrics)
             op = resources.create_cluster(
                 self._sdk,
@@ -294,10 +301,13 @@ class NebiusCompute(
                 project_id=self._region_to_project_id[placement_group.configuration.region],
                 fabric=fabric,
             )
-            backend_data.cluster = NebiusClusterBackendData(id=op.resource_id, fabric=fabric)
+            placement_group_backend_data.cluster = NebiusClusterBackendData(
+                id=op.resource_id,
+                fabric=fabric,
+            )
         return PlacementGroupProvisioningData(
             backend=BackendType.NEBIUS,
-            backend_data=backend_data.json(),
+            backend_data=placement_group_backend_data.json(),
         )
 
     def delete_placement_group(self, placement_group: PlacementGroup) -> None:
@@ -317,16 +327,15 @@ class NebiusCompute(
         if placement_group.configuration.region != instance_offer.region:
             return False
         assert placement_group.provisioning_data is not None
-        backend_data = NebiusPlacementGroupBackendData.load(
+        placement_group_backend_data = NebiusPlacementGroupBackendData.load(
             placement_group.provisioning_data.backend_data
         )
+        instance_offer_backend_data: NebiusOfferBackendData = (
+            NebiusOfferBackendData.__response__.parse_obj(instance_offer.backend_data)
+        )
         return (
-            backend_data.cluster is None
-            or backend_data.cluster.fabric
-            in get_suitable_infiniband_fabrics(
-                instance_offer,
-                allowed_fabrics=None,  # enforced at cluster creation time, no need to enforce here
-            )
+            placement_group_backend_data.cluster is None
+            or placement_group_backend_data.cluster.fabric in instance_offer_backend_data.fabrics
         )
 
 
