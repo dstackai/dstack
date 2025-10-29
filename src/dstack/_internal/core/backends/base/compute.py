@@ -699,7 +699,7 @@ def get_shim_env(
     backend_shim_env: Optional[Dict[str, str]] = None,
     arch: Optional[str] = None,
 ) -> Dict[str, str]:
-    log_level = "6"  # Trace
+    log_level = "5"  # Debug
     envs = {
         "DSTACK_SHIM_HOME": get_dstack_working_dir(base_path),
         "DSTACK_SHIM_HTTP_PORT": str(DSTACK_SHIM_HTTP_PORT),
