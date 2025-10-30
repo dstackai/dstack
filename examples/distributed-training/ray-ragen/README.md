@@ -1,15 +1,31 @@
 # Ray + RAGEN
 
 This example shows how use `dstack` and [RAGEN :material-arrow-top-right-thin:{ .external }](https://github.com/RAGEN-AI/RAGEN){:target="_blank"} 
-to fine-tune an agent on mulitiple nodes.
+to fine-tune an agent on multiple nodes.
 
-Under the hood `RAGEN` uses [verl :material-arrow-top-right-thin:{ .external }](https://github.com/volcengine/verl){:target="_blank"} for Reinforcement Learning and [Ray :material-arrow-top-right-thin:{ .external }](https://docs.ray.io/en/latest/){:target="_blank"} for ditributed training.
+Under the hood `RAGEN` uses [verl :material-arrow-top-right-thin:{ .external }](https://github.com/volcengine/verl){:target="_blank"} for Reinforcement Learning and [Ray :material-arrow-top-right-thin:{ .external }](https://docs.ray.io/en/latest/){:target="_blank"} for distributed training.
 
 ## Create fleet
 
-Before submitted disributed training runs, make sure to create a fleet with a `placement` set to `cluster`.
+Before submitting distributed training runs, make sure to create a fleet with `placement: cluster`. Here's a fleet configuration suitable for this example:
 
-> For more detials on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
+<div editor-title="examples/distributed-training/ray-ragen/fleet.dstack.yml">
+
+```yaml
+type: fleet
+name: ray-ragen-cluster-fleet
+
+nodes: 2
+placement: cluster
+
+resources:
+  gpu: 80GB:8
+  shm_size: 128GB
+```
+
+</div>
+
+> For more details on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
 
 ## Run a Ray cluster
 

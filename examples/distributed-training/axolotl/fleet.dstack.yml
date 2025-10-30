@@ -1,0 +1,9 @@
+type: fleet
+name: axolotl-fleet
+
+nodes: 2
+placement: cluster
+
+resources:
+  gpu: 80GB:8
+  shm_size: 128GB

@@ -1,0 +1,9 @@
+type: fleet
+name: cluster-fleet
+
+nodes: 2
+placement: cluster
+
+resources:
+  gpu: nvidia:1..8
+  shm_size: 16GB
