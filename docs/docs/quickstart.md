@@ -1,6 +1,6 @@
 # Quickstart
 
-> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}
 
 ## Set up a directory
     
@@ -10,6 +10,46 @@ Set up a directory where you'll store you project files and `dstack` configurati
 
 ```shell
 $ mkdir quickstart && cd quickstart
+```
+
+</div>
+
+## Create a fleet
+
+Before submitting runs, we need to create a fleet where new instances will be provisioned.
+
+### Define a configuration
+
+Create the following fleet configuration inside your project folder:
+
+<div editor-title="fleet.dstack.yml"> 
+
+```yaml
+type: fleet
+name: default-fleet
+nodes: 0..
+```
+
+</div>
+
+### Apply the configuration
+
+Apply the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ dstack apply -f fleet.dstack.yml
+    
+     #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
+     1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
+     2  azure    westeurope       2xCPU, 8GB, 100GB (disk)  yes   $0.0132
+     3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
+
+Fleet cloud-fleet does not exist yet.
+Create the fleet? [y/n]: y
+ FLEET          INSTANCE  BACKEND  RESOURCES  PRICE  STATUS  CREATED 
+ defalut-fleet  -         -        -          -      -       10:36
 ```
 
 </div>
