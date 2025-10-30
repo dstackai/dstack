@@ -16,7 +16,7 @@ $ mkdir quickstart && cd quickstart
 
 ## Create a fleet
 
-Before submitting runs, we need to create a fleet where new instances will be provisioned.
+Before submitting runs, you need to create a fleet where new instances will be provisioned.
 
 ### Define a configuration
 
