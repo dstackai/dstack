@@ -32,7 +32,6 @@ func (ex *RunExecutor) AddFileArchive(id string, src io.Reader) error {
 }
 
 // setupFiles must be called from Run
-// ex.jobWorkingDir must be already created
 func (ex *RunExecutor) setupFiles(ctx context.Context) error {
 	for _, fa := range ex.jobSpec.FileArchives {
 		archivePath := path.Join(ex.archiveDir, fa.Id)
