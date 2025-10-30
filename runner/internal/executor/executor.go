@@ -422,8 +422,8 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
 	cmd.Cancel = func() error {
 		// returns error on Windows
-		if err = cmd.Process.Signal(os.Interrupt); err != nil {
-			return fmt.Errorf("send interrupt signal: %w", err)
+		if signalErr := cmd.Process.Signal(os.Interrupt); signalErr != nil {
+			return fmt.Errorf("send interrupt signal: %w", signalErr)
 		}
 		return nil
 	}
