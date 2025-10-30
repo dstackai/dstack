@@ -190,11 +190,9 @@ See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/e
 ### Creation policy
 
 By default, when you run `dstack apply` with a dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing [fleet](../concepts/fleets.md).
-If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
-using configured backends.
+if no `idle` instances from the available fleets meet the requirements, `dstack` provisions a new instance using configured backends.
 
-To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
+To ensure `dstack apply` doesn't provision a new instance but reuses an existing one,
 pass `-R` (or `--reuse`) to `dstack apply`.
 
 <div class="termy">
@@ -205,16 +203,14 @@ $ dstack apply -R -f examples/.dstack.yml
 
 </div>
 
+Or, set [`creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
+
 ### Idle duration
 
-If a fleet is created automatically, it stays `idle` for 5 minutes by default and can be reused within that time.
-If the fleet is not reused within this period, it is automatically terminated.
+If a run provisions a new instance, the instance stays `idle` for 5 minutes by default and can be reused within that time.
+If the instance is not reused within this period, it is automatically terminated.
 To change the default idle duration, set
-[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
-unlimited).
-
-> For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
-> [fleets](../concepts/fleets.md) directly.
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for unlimited).
 
 ## Volumes
 
