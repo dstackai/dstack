@@ -214,10 +214,10 @@ blocks: 4
 #### Idle duration
 
 By default, fleet instances stay `idle` for 3 days and can be reused within that time.
-If the fleet is not reused within this period, it is automatically terminated.
+If an instance is not reused within this period, it is automatically terminated.
 
 To change the default idle duration, set
-[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the fleet configuration (e.g., `0s`, `1m`, or `off` for
 unlimited).
 
 <div editor-title="examples/misc/fleets/.dstack.yml">
