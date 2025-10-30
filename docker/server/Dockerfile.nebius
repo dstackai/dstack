@@ -1,0 +1,5 @@
+ARG BASE_IMAGE
+
+FROM ${BASE_IMAGE}
+
+RUN curl -sSL https://storage.eu-north1.nebius.cloud/cli/install.sh | bash
