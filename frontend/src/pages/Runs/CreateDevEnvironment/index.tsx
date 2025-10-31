@@ -7,7 +7,8 @@ import * as yup from 'yup';
 import { Box, Link, WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Wizard } from 'components';
+import type { ToggleProps } from 'components';
+import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Toggle, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
@@ -18,6 +19,7 @@ import { OfferList } from 'pages/Offers/List';
 import { convertMiBToGB, renderRange, round } from 'pages/Offers/List/helpers';
 
 import { getRunSpecFromYaml } from './helpers/getRunSpecFromYaml';
+import { useGenerateYaml } from './hooks/useGenerateYaml';
 
 import { IRunEnvironmentFormValues } from './types';
 
@@ -161,6 +163,16 @@ export const CreateDevEnvironment: React.FC = () => {
         onNavigate({ requestedStepIndex, reason });
     };
 
+    const toggleDocker: ToggleProps['onChange'] = ({ detail }) => {
+        setValue('docker', detail.checked);
+
+        if (detail.checked) {
+            setValue('python', '');
+        } else {
+            setValue('image', '');
+        }
+    };
+
     const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => {
         const newSelectedOffers = detail?.selectedItems ?? [];
         setSelectedOffers(newSelectedOffers);
@@ -227,31 +239,13 @@ export const CreateDevEnvironment: React.FC = () => {
         }
     };
 
+    const yaml = useGenerateYaml({ formValues });
+
+    console.log(yaml);
+
     useEffect(() => {
-        if (!formValues.offer || !formValues.ide) {
-            return;
-        }
-
-        setValue(
-            'config_yaml',
-            `type: dev-environment
-${`${
-    formValues.name
-        ? `name: ${formValues.name}
-
-`
-        : ''
-}`}ide: ${formValues.ide}
-
-resources:
-  gpu: ${formValues.offer.name}:${round(convertMiBToGB(formValues.offer.memory_mib))}GB:${renderRange(formValues.offer.count)}
-
-backends: [${formValues.offer.backends?.join(', ')}]
-
-spot_policy: auto
-        `,
-        );
-    }, [formValues.name, formValues.ide, formValues.offer]);
+        setValue('config_yaml', yaml);
+    }, [yaml]);
 
     return (
         <form className={cn({ [styles.wizardForm]: activeStepIndex === 0 })} onSubmit={handleSubmit(onSubmit)}>
@@ -304,12 +298,53 @@ spot_policy: auto
                                         name="name"
                                         disabled={loading}
                                     />
+
                                     <FormSelect
                                         label={t('runs.dev_env.wizard.ide')}
                                         description={t('runs.dev_env.wizard.ide_description')}
                                         control={control}
                                         name="ide"
                                         options={ideOptions}
+                                        disabled={loading}
+                                    />
+
+                                    <Toggle checked={formValues.docker} onChange={toggleDocker}>
+                                        {t('runs.dev_env.wizard.docker')}
+                                    </Toggle>
+
+                                    <FormInput
+                                        label={t('runs.dev_env.wizard.docker_image')}
+                                        description={t('runs.dev_env.wizard.docker_image_description')}
+                                        placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
+                                        control={control}
+                                        name="image"
+                                        disabled={loading || !formValues.docker}
+                                    />
+
+                                    <FormInput
+                                        label={t('runs.dev_env.wizard.python')}
+                                        description={t('runs.dev_env.wizard.python_description')}
+                                        placeholder={t('runs.dev_env.wizard.python_placeholder')}
+                                        control={control}
+                                        name="python"
+                                        disabled={loading || formValues.docker}
+                                    />
+
+                                    <FormInput
+                                        label={t('runs.dev_env.wizard.repo')}
+                                        description={t('runs.dev_env.wizard.repo_description')}
+                                        placeholder={t('runs.dev_env.wizard.repo_placeholder')}
+                                        control={control}
+                                        name="repo"
+                                        disabled={loading}
+                                    />
+
+                                    <FormInput
+                                        label={t('runs.dev_env.wizard.repo_local_path')}
+                                        description={t('runs.dev_env.wizard.repo_local_path_description')}
+                                        placeholder={t('runs.dev_env.wizard.repo_local_path_placeholder')}
+                                        control={control}
+                                        name="repo_local_path"
                                         disabled={loading}
                                     />
                                 </SpaceBetween>
