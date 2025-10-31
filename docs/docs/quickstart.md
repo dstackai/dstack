@@ -26,7 +26,8 @@ Create the following fleet configuration inside your project folder:
 
 ```yaml
 type: fleet
-name: default-fleet
+name: default
+
 nodes: 0..
 ```
 
