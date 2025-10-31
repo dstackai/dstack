@@ -98,6 +98,7 @@ from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
 from dstack._internal.server.utils import sentry_utils
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
@@ -311,16 +312,27 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 master_job_provisioning_data=master_job_provisioning_data,
                 volumes=volumes,
             )
-            if fleet_model is None and run_spec.merged_profile.fleets is not None:
-                # Run cannot create new fleets when fleets are specified
-                logger.debug("%s: failed to use specified fleets", fmt(job_model))
-                job_model.status = JobStatus.TERMINATING
-                job_model.termination_reason = (
-                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-                )
-                job_model.last_processed_at = common_utils.get_current_datetime()
-                await session.commit()
-                return
+            if fleet_model is None:
+                if run_spec.merged_profile.fleets is not None:
+                    # Run cannot create new fleets when fleets are specified
+                    logger.debug("%s: failed to use specified fleets", fmt(job_model))
+                    job_model.status = JobStatus.TERMINATING
+                    job_model.termination_reason = (
+                        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                    )
+                    job_model.last_processed_at = common_utils.get_current_datetime()
+                    await session.commit()
+                    return
+                if FeatureFlags.AUTOCREATED_FLEETS_DISABLED:
+                    logger.debug("%s: no fleet found", fmt(job_model))
+                    job_model.status = JobStatus.TERMINATING
+                    job_model.termination_reason = (
+                        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                    )
+                    job_model.termination_reason_message = "Failed to find fleet"
+                    job_model.last_processed_at = common_utils.get_current_datetime()
+                    await session.commit()
+                    return
             instance = await _assign_job_to_fleet_instance(
                 session=session,
                 instances_with_offers=fleet_instances_with_offers,
@@ -647,8 +659,10 @@ async def _find_optimal_fleet_with_offers(
         )
     if len(candidate_fleets_with_offers) == 0:
         return None, []
-    if run_spec.merged_profile.fleets is None and all(
-        t[2] == 0 and t[3] == 0 for t in candidate_fleets_with_offers
+    if (
+        not FeatureFlags.AUTOCREATED_FLEETS_DISABLED
+        and run_spec.merged_profile.fleets is None
+        and all(t[2] == 0 and t[3] == 0 for t in candidate_fleets_with_offers)
     ):
         # If fleets are not specified and no fleets have available pool
         # or backend offers, create a new fleet.
