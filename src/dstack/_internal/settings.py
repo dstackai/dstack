@@ -35,4 +35,4 @@ class FeatureFlags:
     development. Feature flags are environment variables of the form DSTACK_FF_*
     """
 
-    pass
+    AUTOCREATED_FLEETS_DISABLED = os.getenv("DSTACK_FF_AUTOCREATED_FLEETS_DISABLED") is not None
