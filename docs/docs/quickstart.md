@@ -18,7 +18,7 @@ $ mkdir quickstart && cd quickstart
 
 Before submitting runs, you need to create a fleet where new instances will be provisioned.
 
-### Define a configuration
+<h3>Define a configuration</h3>
 
 Create the following fleet configuration inside your project folder:
 
