@@ -32,7 +32,7 @@ nodes: 0..
 
 </div>
 
-### Apply the configuration
+<h3>Apply the configuration</h3>
 
 Apply the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
 
