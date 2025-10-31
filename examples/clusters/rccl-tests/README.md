@@ -2,26 +2,25 @@
 
 This example shows how to run distributed [RCCL tests :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/rccl-tests){:target="_blank"} with MPI using `dstack`.
 
-## Create fleet
+??? info "Fleet"
+    Before running RCCL tests, make sure to create a fleet with `placement: cluster`. Here's a fleet configuration suitable for this example:
 
-Before running RCCL tests, make sure to create a fleet with `placement: cluster`. Here's a fleet configuration suitable for this example:
+    <div editor-title="examples/clusters/rccl-tests/fleet.dstack.yml">
 
-<div editor-title="examples/clusters/rccl-tests/fleet.dstack.yml">
+    ```yaml
+    type: fleet
+    name: cluster-fleet
 
-```yaml
-type: fleet
-name: cluster-fleet
+    nodes: 2
+    placement: cluster
 
-nodes: 2
-placement: cluster
+    resources:
+      gpu: MI300X:8
+    ```
 
-resources:
-  gpu: MI300X:8
-```
+    </div>
 
-</div>
-
-> For more details on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
+    > For more details on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
 
 
 ## Running as a task

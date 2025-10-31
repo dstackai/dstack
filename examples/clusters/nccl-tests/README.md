@@ -2,27 +2,26 @@
 
 This example shows how to run distributed [NCCL tests :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/nccl-tests){:target="_blank"} with MPI using `dstack`.
 
-## Create fleet
+??? info "Fleet"
+    Before running NCCL tests, make sure to create a fleet with `placement: cluster`. Here's a fleet configuration suitable for this example:
 
-Before running NCCL tests, make sure to create a fleet with `placement: cluster`. Here's a fleet configuration suitable for this example:
+    <div editor-title="examples/clusters/nccl-tests/fleet.dstack.yml">
 
-<div editor-title="examples/clusters/nccl-tests/fleet.dstack.yml">
+    ```yaml
+    type: fleet
+    name: cluster-fleet
 
-```yaml
-type: fleet
-name: cluster-fleet
+    nodes: 2
+    placement: cluster
 
-nodes: 2
-placement: cluster
+    resources:
+      gpu: nvidia:1..8
+      shm_size: 16GB
+    ```
 
-resources:
-  gpu: nvidia:1..8
-  shm_size: 16GB
-```
+    </div>
 
-</div>
-
-> For more details on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
+    > For more details on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
 
 ## Running as a task
 

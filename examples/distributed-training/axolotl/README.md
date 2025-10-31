@@ -13,27 +13,26 @@ This example walks you through how to run distributed fine-tune using [Axolotl :
     ```
     </div>
 
-## Create fleet
+??? info "Fleet"
+    Before submitting distributed training runs, make sure to create a fleet with `placement: cluster`. Here's a fleet configuration suitable for this example:
 
-Before submitting distributed training runs, make sure to create a fleet with `placement: cluster`. Here's a fleet configuration suitable for this example:
+    <div editor-title="examples/distributed-training/axolotl/fleet.dstack.yml">
 
-<div editor-title="examples/distributed-training/axolotl/fleet.dstack.yml">
+    ```yaml
+    type: fleet
+    name: axolotl-fleet
 
-```yaml
-type: fleet
-name: axolotl-fleet
+    nodes: 2
+    placement: cluster
 
-nodes: 2
-placement: cluster
+    resources:
+      gpu: 80GB:8
+      shm_size: 128GB
+    ```
 
-resources:
-  gpu: 80GB:8
-  shm_size: 128GB
-```
+    </div>
 
-</div>
-
-> For more details on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
+    > For more details on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
 
 ## Define a configuration
 
