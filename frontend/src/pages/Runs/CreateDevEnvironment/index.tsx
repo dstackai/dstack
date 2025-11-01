@@ -241,8 +241,6 @@ export const CreateDevEnvironment: React.FC = () => {
 
     const yaml = useGenerateYaml({ formValues });
 
-    console.log(yaml);
-
     useEffect(() => {
         setValue('config_yaml', yaml);
     }, [yaml]);
