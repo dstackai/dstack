@@ -170,12 +170,8 @@ Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
     For convenience, `~/.ssh/config` is preconfigured with these options, so a simple `ssh <node_ip>` is enough.
     For a list of nodes IPs check the `DSTACK_NODES_IPS` environment variable.
 
-!!! info "Fleets"
-    Distributed tasks can only run on fleets with
-    [cluster placement](fleets.md#cloud-placement).
-    While `dstack` can provision such fleets automatically, it is
-    recommended to create them via a fleet configuration
-    to ensure the highest level of inter-node connectivity.
+!!! info "Cluster fleets"
+    To run distributed tasks, you need to create a fleet with [`placement: cluster`](fleets.md#cloud-placement).
 
 > See the [Clusters](../guides/clusters.md) guide for more details on how to use `dstack` on clusters.
 

@@ -1,6 +1,6 @@
 # Quickstart
 
-> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}
 
 ## Set up a directory
     
@@ -14,13 +14,64 @@ $ mkdir quickstart && cd quickstart
 
 </div>
 
+## Create a fleet
+
+If [backends](concepts/backends.md) are configured, `dstack` can create a new [backend fleet](concepts/fleets.md#backend-fleets) on the fly. However, it’s recommended to create them explicitly.
+
+<h3>Define a configuration</h3>
+
+Create the following fleet configuration inside your project folder:
+
+<div editor-title="fleet.dstack.yml"> 
+
+```yaml
+type: fleet
+name: default
+
+# Allow to provision of up to 2 instances
+nodes: 0..2
+
+# Deprovision instances above the minimum if they remain idle
+idle_duration: 1h
+
+resources:
+  # Allow to provision up to 8 GPUs
+  gpu: 0..8
+```
+
+</div>
+
+<h3>Apply the configuration</h3>
+
+Apply the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
+
+<div class="termy">
+
+```shell
+$ dstack apply -f fleet.dstack.yml
+    
+     #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
+     1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
+     2  azure    westeurope       2xCPU, 8GB, 100GB (disk)  yes   $0.0132
+     3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
+
+Fleet cloud-fleet does not exist yet.
+Create the fleet? [y/n]: y
+ FLEET          INSTANCE  BACKEND  RESOURCES  PRICE  STATUS  CREATED 
+ defalut-fleet  -         -        -          -      -       10:36
+```
+
+</div>
+
+Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
+
 ## Submit your first run
 
 `dstack` supports three types of run configurations.
 
 === "Dev environment"
 
-    A dev environment lets you provision an instance and access it with your desktop IDE.
+    A [dev environment](concepts/dev-environments.md) lets you provision an instance and access it with your desktop IDE.
 
     <h3>Define a configuration</h3>
 
@@ -76,7 +127,7 @@ $ mkdir quickstart && cd quickstart
 
 === "Task"
 
-    A task allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
+    A [task](concepts/tasks.md) allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
 
     <h3>Define a configuration</h3>
 
@@ -140,7 +191,7 @@ $ mkdir quickstart && cd quickstart
 
 === "Service"
 
-    A service allows you to deploy a model or any web app as an endpoint.
+    A [service](concepts/services.md) allows you to deploy a model or any web app as an endpoint.
 
     <h3>Define a configuration</h3>
 

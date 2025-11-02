@@ -1,15 +1,12 @@
 # Ray + RAGEN
 
 This example shows how use `dstack` and [RAGEN :material-arrow-top-right-thin:{ .external }](https://github.com/RAGEN-AI/RAGEN){:target="_blank"} 
-to fine-tune an agent on mulitiple nodes.
+to fine-tune an agent on multiple nodes.
 
-Under the hood `RAGEN` uses [verl :material-arrow-top-right-thin:{ .external }](https://github.com/volcengine/verl){:target="_blank"} for Reinforcement Learning and [Ray :material-arrow-top-right-thin:{ .external }](https://docs.ray.io/en/latest/){:target="_blank"} for ditributed training.
+Under the hood `RAGEN` uses [verl :material-arrow-top-right-thin:{ .external }](https://github.com/volcengine/verl){:target="_blank"} for Reinforcement Learning and [Ray :material-arrow-top-right-thin:{ .external }](https://docs.ray.io/en/latest/){:target="_blank"} for distributed training.
 
-## Create fleet
-
-Before submitted disributed training runs, make sure to create a fleet with a `placement` set to `cluster`.
-
-> For more detials on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
+!!! info "Prerequisites"
+    Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](https://dstack.ai/docs/concepts/fleets#backend-placement) or an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh-placement)).
 
 ## Run a Ray cluster
 

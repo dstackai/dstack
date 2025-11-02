@@ -1,0 +1,8 @@
+type: fleet
+name: my-efa-fleet
+
+nodes: 2
+placement: cluster
+
+resources:
+  gpu: H100:8

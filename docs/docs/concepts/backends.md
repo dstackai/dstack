@@ -9,9 +9,8 @@ They can be configured via `~/.dstack/server/config.yml` or through the [project
   * [Container-based](#container-based) – use either `dstack`'s native integration with cloud providers or Kubernetes to orchestrate container-based runs; provisioning in this case is delegated to the cloud provider or Kubernetes.  
   * [On-prem](#on-prem) – use `dstack`'s native support for on-prem servers without needing Kubernetes.  
 
-??? info "dstack Sky"
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},  
-    you can either configure your own backends or use the pre-configured backend that gives you access to compute from the GPU marketplace.
+!!! info "dstack Sky"
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, backend configuration is optional. dstack Sky lets you use pre-configured backends to access GPU marketplace.
 
 See the examples of backend configuration below.
 
