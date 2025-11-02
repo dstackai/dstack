@@ -1,27 +1,9 @@
 # NCCL tests
 
-This example shows how to run distributed [NCCL tests :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/nccl-tests){:target="_blank"} with MPI using `dstack`.
+This example shows how to run [NCCL tests :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/nccl-tests){:target="_blank"} on a cluster using [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks).
 
-??? info "Fleet"
-    Before running NCCL tests, make sure to create a fleet with `placement: cluster`. Here's a fleet configuration suitable for this example:
-
-    <div editor-title="examples/clusters/nccl-tests/fleet.dstack.yml">
-
-    ```yaml
-    type: fleet
-    name: cluster-fleet
-
-    nodes: 2
-    placement: cluster
-
-    resources:
-      gpu: nvidia:1..8
-      shm_size: 16GB
-    ```
-
-    </div>
-
-    > For more details on how to use clusters with `dstack`, check the [Clusters](https://dstack.ai/docs/guides/clusters) guide.
+!!! info "Prerequisites"
+    Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](https://dstack.ai/docs/concepts/fleets#backend-placement) or an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh-placement)).
 
 ## Running as a task
 
@@ -97,5 +79,5 @@ The source-code of this example can be found in
 
 ## What's next?
 
-1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
-   [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/concepts/fleets).
+1. Check [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), 
+   [services](https://dstack.ai/docsconcepts/services), and [fleets](https://dstack.ai/docs/concepts/fleets).

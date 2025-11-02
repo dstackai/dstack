@@ -16,7 +16,7 @@ $ mkdir quickstart && cd quickstart
 
 ## Create a fleet
 
-Before submitting runs, you need to create a fleet where new instances will be provisioned.
+If [backends](concepts/backends.md) are configured, `dstack` can create a new [backend fleet](concepts/fleets.md#backend-fleets) on the fly. However, it’s recommended to create them explicitly.
 
 <h3>Define a configuration</h3>
 
@@ -28,7 +28,15 @@ Create the following fleet configuration inside your project folder:
 type: fleet
 name: default
 
-nodes: 0..
+# Allow to provision of up to 2 instances
+nodes: 0..2
+
+# Deprovision instances above the minimum if they remain idle
+idle_duration: 1h
+
+resources:
+  # Allow to provision up to 8 GPUs
+  gpu: 0..8
 ```
 
 </div>
@@ -55,13 +63,15 @@ Create the fleet? [y/n]: y
 
 </div>
 
+Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
+
 ## Submit your first run
 
 `dstack` supports three types of run configurations.
 
 === "Dev environment"
 
-    A dev environment lets you provision an instance and access it with your desktop IDE.
+    A [dev environment](concepts/dev-environments.md) lets you provision an instance and access it with your desktop IDE.
 
     <h3>Define a configuration</h3>
 
@@ -117,7 +127,7 @@ Create the fleet? [y/n]: y
 
 === "Task"
 
-    A task allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
+    A [task](concepts/tasks.md) allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
 
     <h3>Define a configuration</h3>
 
@@ -181,7 +191,7 @@ Create the fleet? [y/n]: y
 
 === "Service"
 
-    A service allows you to deploy a model or any web app as an endpoint.
+    A [service](concepts/services.md) allows you to deploy a model or any web app as an endpoint.
 
     <h3>Define a configuration</h3>
 
