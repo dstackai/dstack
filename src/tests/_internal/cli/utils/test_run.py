@@ -209,7 +209,7 @@ class TestGetRunsTable:
 
         assert row["NAME"] == "test-run"
         assert row["BACKEND"] == "aws (us-east-1)"
-        assert row["RESOURCES"] == "cpu=2 mem=4GB disk=100GB"
+        assert row["GPU"] == "-"  # No GPU in test resources
         assert row["PRICE"] == "$0.0464"
         assert row["STATUS"] == "running"
         assert row["SUBMITTED"] == "3 years ago"
