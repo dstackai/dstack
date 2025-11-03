@@ -16,6 +16,7 @@ from dstack._internal.core.models.runs import (
     Probe,
     ProbeSpec,
     RunPlan,
+    RunStatus,
 )
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.utils.common import (
@@ -182,6 +183,54 @@ def print_run_plan(
         console.print(NO_OFFERS_WARNING)
 
 
+def _get_run_status_style(status: RunStatus, status_message: Optional[str] = None) -> str:
+    color_map = {
+        RunStatus.PENDING: "white",
+        RunStatus.SUBMITTED: "grey",
+        RunStatus.PROVISIONING: "deep_sky_blue1",
+        RunStatus.RUNNING: "sea_green3",
+        RunStatus.TERMINATING: "white",
+        RunStatus.TERMINATED: "grey",
+        RunStatus.FAILED: "indian_red1",
+        RunStatus.DONE: "grey",
+    }
+
+    if status_message == "no offers" or status_message == "interrupted":
+        color = "gold1"
+    elif status_message == "pulling":
+        color = "sea_green3"
+    else:
+        color = color_map.get(status, "white")
+
+    if not status.is_finished():
+        return f"bold {color}"
+    return color
+
+
+def _get_job_status_style(status_message: str, job_status: JobStatus) -> str:
+    if status_message in ("no offers", "interrupted"):
+        color = "gold1"
+    elif status_message == "stopped":
+        color = "grey"
+    else:
+        color_map = {
+            JobStatus.SUBMITTED: "grey",
+            JobStatus.PROVISIONING: "deep_sky_blue1",
+            JobStatus.PULLING: "sea_green3",
+            JobStatus.RUNNING: "sea_green3",
+            JobStatus.TERMINATING: "white",
+            JobStatus.TERMINATED: "grey",
+            JobStatus.ABORTED: "gold1",
+            JobStatus.FAILED: "indian_red1",
+            JobStatus.DONE: "grey",
+        }
+        color = color_map.get(job_status, "white")
+
+    if not job_status.is_finished():
+        return f"bold {color}"
+    return color
+
+
 def get_runs_table(
     runs: List[Run], verbose: bool = False, format_date: DateFormatter = pretty_date
 ) -> Table:
@@ -212,15 +261,20 @@ def get_runs_table(
         )
         merge_job_rows = len(run.jobs) == 1 and not show_deployment_num
 
+        status_text = (
+            run.latest_job_submission.status_message
+            if run.status.is_finished() and run.latest_job_submission
+            else run.status_message
+        )
+        status_style = _get_run_status_style(
+            run.status, status_message=status_text if run.status.is_finished() else status_text
+        )
+
         run_row: Dict[Union[str, int], Any] = {
             "NAME": run.run_spec.run_name
             + (f" [secondary]deployment={run.deployment_num}[/]" if show_deployment_num else ""),
             "SUBMITTED": format_date(run.submitted_at),
-            "STATUS": (
-                run.latest_job_submission.status_message
-                if run.status.is_finished() and run.latest_job_submission
-                else run.status_message
-            ),
+            "STATUS": f"[{status_style}]{status_text}[/]",
         }
         if run.error:
             run_row["ERROR"] = run.error
@@ -233,6 +287,9 @@ def get_runs_table(
             if verbose and latest_job_submission.inactivity_secs:
                 inactive_for = format_duration_multiunit(latest_job_submission.inactivity_secs)
                 status += f" (inactive for {inactive_for})"
+            status_text = latest_job_submission.status_message
+            status_style = _get_job_status_style(status_text, latest_job_submission.status)
+
             job_row: Dict[Union[str, int], Any] = {
                 "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}"
                 + (
@@ -240,7 +297,7 @@ def get_runs_table(
                     if show_deployment_num
                     else ""
                 ),
-                "STATUS": latest_job_submission.status_message,
+                "STATUS": f"[{status_style}]{status_text}[/]",
                 "PROBES": _format_job_probes(
                     job.job_spec.probes, latest_job_submission.probes, latest_job_submission.status
                 ),
@@ -267,8 +324,8 @@ def get_runs_table(
                     }
                 )
             if merge_job_rows:
-                # merge rows
                 job_row.update(run_row)
+                job_row["STATUS"] = run_row["STATUS"]
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 
     return table
