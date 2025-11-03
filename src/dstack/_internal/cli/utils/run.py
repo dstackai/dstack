@@ -287,6 +287,23 @@ def get_runs_table(
         if not merge_job_rows:
             add_row_from_dict(table, run_row)
 
+        # Determine if we need to show replica= and job= fields
+        replica_nums = {job.job_spec.replica_num for job in run.jobs}
+        show_replica = len(replica_nums) > 1  # Show if there are multiple different replicas
+
+        # Group jobs by replica to check if each replica has multiple jobs
+        jobs_by_replica: Dict[int, List[Any]] = {}
+        for job in run.jobs:
+            replica_num = job.job_spec.replica_num
+            if replica_num not in jobs_by_replica:
+                jobs_by_replica[replica_num] = []
+            jobs_by_replica[replica_num].append(job)
+
+        # Check if any replica has multiple different job_nums
+        show_job = any(
+            len({j.job_spec.job_num for j in jobs}) > 1 for jobs in jobs_by_replica.values()
+        )
+
         for job in run.jobs:
             latest_job_submission = job.job_submissions[-1]
             status = latest_job_submission.status.value
@@ -296,13 +313,23 @@ def get_runs_table(
             status_text = latest_job_submission.status_message
             status_style = _get_job_status_style(status_text, latest_job_submission.status)
 
+            # Build NAME field conditionally showing replica= and job=
+            name_parts = []
+            if show_replica:
+                name_parts.append(f"replica={job.job_spec.replica_num}")
+            if show_job:
+                name_parts.append(f"job={job.job_spec.job_num}")
+            name_suffix = (
+                f" deployment={latest_job_submission.deployment_num}"
+                if show_deployment_num
+                else ""
+            )
+            # Always include indentation for job rows, even if there are no parts
+            name_value = "  " + (" ".join(name_parts) if name_parts else "")
+            name_value += name_suffix
+
             job_row: Dict[Union[str, int], Any] = {
-                "NAME": f"  replica={job.job_spec.replica_num} job={job.job_spec.job_num}"
-                + (
-                    f" deployment={latest_job_submission.deployment_num}"
-                    if show_deployment_num
-                    else ""
-                ),
+                "NAME": name_value,
                 "STATUS": f"[{status_style}]{status_text}[/]",
                 "PROBES": _format_job_probes(
                     job.job_spec.probes, latest_job_submission.probes, latest_job_submission.status
