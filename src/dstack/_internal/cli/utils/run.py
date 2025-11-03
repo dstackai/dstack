@@ -189,7 +189,7 @@ def _get_run_status_style(status: RunStatus, status_message: Optional[str] = Non
         RunStatus.SUBMITTED: "grey",
         RunStatus.PROVISIONING: "deep_sky_blue1",
         RunStatus.RUNNING: "sea_green3",
-        RunStatus.TERMINATING: "white",
+        RunStatus.TERMINATING: "deep_sky_blue1",
         RunStatus.TERMINATED: "grey",
         RunStatus.FAILED: "indian_red1",
         RunStatus.DONE: "grey",
@@ -218,7 +218,7 @@ def _get_job_status_style(status_message: str, job_status: JobStatus) -> str:
             JobStatus.PROVISIONING: "deep_sky_blue1",
             JobStatus.PULLING: "sea_green3",
             JobStatus.RUNNING: "sea_green3",
-            JobStatus.TERMINATING: "white",
+            JobStatus.TERMINATING: "deep_sky_blue1",
             JobStatus.TERMINATED: "grey",
             JobStatus.ABORTED: "gold1",
             JobStatus.FAILED: "indian_red1",
@@ -237,9 +237,12 @@ def get_runs_table(
     table = Table(box=None, expand=shutil.get_terminal_size(fallback=(120, 40)).columns <= 110)
     table.add_column("NAME", style="bold", no_wrap=True, ratio=2)
     table.add_column("BACKEND", style="grey58", ratio=2)
-    table.add_column("RESOURCES", ratio=3 if not verbose else 2)
     if verbose:
-        table.add_column("INSTANCE TYPE", no_wrap=True, ratio=1)
+        table.add_column("RESOURCES", style="grey58", ratio=3)
+    else:
+        table.add_column("GPU", ratio=2)
+    if verbose:
+        table.add_column("INSTANCE TYPE", style="grey58", no_wrap=True, ratio=1)
     table.add_column("PRICE", style="grey58", ratio=1)
     table.add_column("STATUS", no_wrap=True, ratio=1)
     if verbose or any(
@@ -270,11 +273,14 @@ def get_runs_table(
             run.status, status_message=status_text if run.status.is_finished() else status_text
         )
 
+        resource_key = "RESOURCES" if verbose else "GPU"
         run_row: Dict[Union[str, int], Any] = {
             "NAME": run.run_spec.run_name
             + (f" [secondary]deployment={run.deployment_num}[/]" if show_deployment_num else ""),
             "SUBMITTED": format_date(run.submitted_at),
             "STATUS": f"[{status_style}]{status_text}[/]",
+            resource_key: "-",  # Default value when no provisioning data
+            "PRICE": "-",  # Default value when no provisioning data
         }
         if run.error:
             run_row["ERROR"] = run.error
@@ -303,6 +309,8 @@ def get_runs_table(
                 ),
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
                 "ERROR": latest_job_submission.error,
+                resource_key: "-",  # Initialize with default, will be updated if provisioning data exists
+                "PRICE": "-",  # Initialize with default, will be updated if provisioning data exists
             }
             jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
@@ -315,16 +323,28 @@ def get_runs_table(
                         instance_type += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
                 if jpd.reservation:
                     instance_type += f" ({jpd.reservation})"
-                job_row.update(
-                    {
-                        "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
-                        "RESOURCES": resources.pretty_format(include_spot=True),
-                        "INSTANCE TYPE": instance_type,
-                        "PRICE": f"${jpd.price:.4f}".rstrip("0").rstrip("."),
-                    }
+                resource_value = (
+                    resources.pretty_format(include_spot=False)
+                    if verbose
+                    else resources.pretty_format(gpu_only=True, include_spot=False)
                 )
+                price_str = f"${jpd.price:.4f}".rstrip("0").rstrip(".")
+                if resources.spot:
+                    price_str += " (spot)"
+                update_dict: Dict[Union[str, int], Any] = {
+                    "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
+                    resource_key: resource_value,
+                    "INSTANCE TYPE": instance_type,
+                    "PRICE": price_str,
+                }
+                job_row.update(update_dict)
             if merge_job_rows:
+                # Merge run_row into job_row, but preserve job_row's resource_key if it was set
+                resource_value = job_row.get(resource_key, "-")
+                price_value = job_row.get("PRICE", "")
                 job_row.update(run_row)
+                job_row[resource_key] = resource_value  # Restore job-specific resource value
+                job_row["PRICE"] = price_value  # Restore job-specific price value
                 job_row["STATUS"] = run_row["STATUS"]
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 

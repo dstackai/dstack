@@ -114,6 +114,8 @@ async def create_run_with_job(
             run_status = RunStatus.FAILED
         elif job_status in [JobStatus.TERMINATED, JobStatus.ABORTED]:
             run_status = RunStatus.TERMINATED
+        elif job_status == JobStatus.TERMINATING:
+            run_status = RunStatus.TERMINATING
         elif job_status == JobStatus.PROVISIONING:
             run_status = RunStatus.PROVISIONING
         elif job_status == JobStatus.PULLING:
@@ -268,6 +270,7 @@ class TestGetRunsTable:
             (JobStatus.RUNNING, None, None, "running", "bold sea_green3"),
             (JobStatus.PROVISIONING, None, None, "provisioning", "bold deep_sky_blue1"),
             (JobStatus.PULLING, None, None, "pulling", "bold sea_green3"),
+            (JobStatus.TERMINATING, None, None, "terminating", "bold deep_sky_blue1"),
         ],
     )
     async def test_status_messages(
