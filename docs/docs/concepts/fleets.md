@@ -383,7 +383,7 @@ By default, a job uses the entire instance—e.g., all 8 GPUs. To allow multiple
           # As many as possible, according to numbers of GPUs and CPUs
           blocks: auto
         - hostname: 3.255.177.53
-          # Do not sclice. This is the default value, may be omitted
+          # Do not slice. This is the default value, may be omitted
           blocks: 1
     ```
 
