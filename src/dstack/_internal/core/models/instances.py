@@ -83,7 +83,23 @@ class Resources(CoreModel):
         gpus: List[Gpu],
         spot: bool,
         include_spot: bool = False,
+        gpu_only: bool = False,
     ) -> str:
+        if gpu_only:
+            if not gpus:
+                return "-"
+            gpu = gpus[0]
+            gpu_resources = {
+                "gpu_name": gpu.name,
+                "gpu_count": len(gpus),
+            }
+            if gpu.memory_mib > 0:
+                gpu_resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
+            output = pretty_resources(**gpu_resources)
+            if include_spot and spot:
+                output += " (spot)"
+            return output
+
         resources = {}
         if cpus > 0:
             resources["cpus"] = cpus
@@ -103,7 +119,7 @@ class Resources(CoreModel):
             output += " (spot)"
         return output
 
-    def pretty_format(self, include_spot: bool = False) -> str:
+    def pretty_format(self, include_spot: bool = False, gpu_only: bool = False) -> str:
         return Resources._pretty_format(
             self.cpus,
             self.cpu_arch,
@@ -112,6 +128,7 @@ class Resources(CoreModel):
             self.gpus,
             self.spot,
             include_spot,
+            gpu_only,
         )
 
 
