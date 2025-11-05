@@ -5,16 +5,19 @@ from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
-from dstack._internal.core.models.instances import InstanceAvailability, Resources
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOfferWithAvailability,
+    InstanceType,
+)
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
     Job,
-    JobProvisioningData,
-    JobRuntimeData,
     JobStatus,
     JobSubmission,
     Probe,
@@ -294,27 +297,24 @@ def _format_price(price: float, is_spot: bool) -> str:
     return price_str
 
 
-def _format_backend(backend: Any, region: str) -> str:
-    backend_str = getattr(backend, "value", backend)
-    backend_str = backend_str.replace("remote", "ssh")
+def _format_backend(backend_type: BackendType, region: str) -> str:
+    backend_str = backend_type.value
+    if backend_type == BackendType.REMOTE:
+        backend_str = "ssh"
     return f"{backend_str} ({region})"
 
 
-def _format_instance_type(jpd: JobProvisioningData, jrd: Optional[JobRuntimeData]) -> str:
-    instance_type = jpd.instance_type.name
-    if jrd is not None and getattr(jrd, "offer", None) is not None:
-        if jrd.offer.total_blocks > 1:
-            instance_type += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
-    if jpd.reservation:
-        instance_type += f" ({jpd.reservation})"
-    return instance_type
-
-
-def _get_resources(jpd: JobProvisioningData, jrd: Optional[JobRuntimeData]) -> Resources:
-    resources: Resources = jpd.instance_type.resources
-    if jrd is not None and getattr(jrd, "offer", None) is not None:
-        resources = jrd.offer.instance.resources
-    return resources
+def _format_instance_type(
+    instance_type: InstanceType,
+    shared_offer: Optional[InstanceOfferWithAvailability],
+    reservation: Optional[str],
+) -> str:
+    instance_type_str = instance_type.name
+    if shared_offer is not None:
+        instance_type_str += f" ({shared_offer.blocks}/{shared_offer.total_blocks})"
+    if reservation is not None:
+        instance_type_str += f" ({reservation})"
+    return instance_type_str
 
 
 def _format_run_name(run: CoreRun, show_deployment_num: bool) -> str:
@@ -387,16 +387,35 @@ def get_runs_table(
             }
             jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
+                shared_offer: Optional[InstanceOfferWithAvailability] = None
+                instance_type = jpd.instance_type
+                price = jpd.price
                 jrd = latest_job_submission.job_runtime_data
-                resources = _get_resources(jpd, jrd)
-                update_dict: Dict[Union[str, int], Any] = {
-                    "BACKEND": _format_backend(jpd.backend, jpd.region),
-                    "RESOURCES": resources.pretty_format(include_spot=False),
-                    "GPU": resources.pretty_format(gpu_only=True, include_spot=False),
-                    "INSTANCE TYPE": _format_instance_type(jpd, jrd),
-                    "PRICE": _format_price(jpd.price, resources.spot),
-                }
-                job_row.update(update_dict)
+                if jrd is not None and jrd.offer is not None and jrd.offer.total_blocks > 1:
+                    # We only use offer data from jrd if the job is/was running on a shared
+                    # instance (the instance blocks feature). In that case, jpd contains the full
+                    # instance offer data, while jrd contains the shared offer (a fraction of
+                    # the full offer). Although jrd always contains the offer, we don't use it in
+                    # other cases, as, unlike jpd offer data, jrd offer is not updated after
+                    # Compute.update_provisioning_data() call, but some backends, namely
+                    # Kubernetes, may update offer data via that method.
+                    # As long as we don't have a backend which both supports the blocks feature
+                    # and may update offer data in update_provisioning_data(), this logic is fine.
+                    shared_offer = jrd.offer
+                    instance_type = shared_offer.instance
+                    price = shared_offer.price
+                resources = instance_type.resources
+                job_row.update(
+                    {
+                        "BACKEND": _format_backend(jpd.backend, jpd.region),
+                        "RESOURCES": resources.pretty_format(include_spot=False),
+                        "GPU": resources.pretty_format(gpu_only=True, include_spot=False),
+                        "INSTANCE TYPE": _format_instance_type(
+                            instance_type, shared_offer, jpd.reservation
+                        ),
+                        "PRICE": _format_price(price, resources.spot),
+                    }
+                )
             if merge_job_rows:
                 _status = job_row["STATUS"]
                 _resources = job_row["RESOURCES"]
