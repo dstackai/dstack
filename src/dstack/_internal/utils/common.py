@@ -144,20 +144,32 @@ def pretty_resources(
     return " ".join(parts)
 
 
-def since(timestamp: str) -> datetime:
+def parse_since(value: str) -> datetime:
+    """
+    Returns a timestamp given an RFC 3339 string (e.g. 2023-09-24T15:30:00Z)
+    or a duration (e.g. 10s, 5m, 1d) between the timestamp and now.
+    """
     try:
-        seconds = parse_pretty_duration(timestamp)
+        seconds = parse_pretty_duration(value)
         return get_current_datetime() - timedelta(seconds=seconds)
     except ValueError:
         pass
     try:
-        return datetime.fromisoformat(timestamp)
+        res = datetime.fromisoformat(value)
     except ValueError:
         pass
+    else:
+        return check_time_offset_aware(res)
     try:
-        return datetime.fromtimestamp(int(timestamp))
+        return datetime.fromtimestamp(int(value), tz=timezone.utc)
     except Exception:
         raise ValueError("Invalid datetime format")
+
+
+def check_time_offset_aware(time: datetime) -> datetime:
+    if time.tzinfo is None:
+        raise ValueError("Timestamp is not offset-aware. Specify timezone.")
+    return time
 
 
 def parse_pretty_duration(duration: str) -> int:
