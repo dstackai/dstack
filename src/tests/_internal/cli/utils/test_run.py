@@ -214,7 +214,7 @@ class TestGetRunsTable:
 
         assert row["NAME"] == "test-run"
         assert row["BACKEND"] == "aws (us-east-1)"
-        assert row["GPU"] == "-"  # No GPU in test resources
+        assert row["GPU"] == "-"
         assert row["PRICE"] == "$0.0464"
         assert row["STATUS"] == "running"
         assert row["SUBMITTED"] == "3 years ago"
@@ -304,14 +304,15 @@ class TestGetRunsTable:
         assert status_style == expected_style
 
     async def test_multi_node_task_with_multiple_jobs(self, session: AsyncSession):
-        """Test that a multi-node task with multiple jobs shows replica= and job= in table rows."""
+        # Verifies that a multi-node task with 3 jobs (all same replica_num=0, different job_num=0,1,2)
+        # displays only job= in table rows, not replica=, since all jobs share the same replica.
+        # Expected: 4 rows total (1 run header + 3 job rows with job=0,1,2).
         submitted_at = datetime(2023, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
 
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
 
-        # Create a multi-node task configuration (3 nodes)
         configuration = TaskConfiguration(
             type="task",
             image="ubuntu:latest",
@@ -337,7 +338,6 @@ class TestGetRunsTable:
             submitted_at=submitted_at,
         )
 
-        # Create 3 jobs, all with replica_num=0 but different job_num values
         resources = Resources(
             cpus=2,
             memory_mib=4096,
@@ -357,7 +357,6 @@ class TestGetRunsTable:
             instance_type=instance_type,
         )
 
-        # Create 3 jobs: all replica_num=0, job_num=0,1,2
         for job_num in range(3):
             await create_job(
                 session=session,
@@ -390,30 +389,24 @@ class TestGetRunsTable:
         table = get_runs_table([api_run], verbose=False)
         cells = get_table_cells(table)
 
-        # Should have 4 rows: 1 run header + 3 job rows
         assert len(cells) == 4
-
-        # First row should be the run header
         assert cells[0]["NAME"] == "multi-node-run"
 
-        # Next 3 rows should be job rows with job=0,1,2 (replica= should NOT be shown since all jobs have same replica)
         for i in range(1, 4):
             job_row = cells[i]
-            assert (
-                "replica=" not in job_row["NAME"]
-            )  # Should not show replica since all are replica=0
+            assert "replica=" not in job_row["NAME"]
             assert f"job={i - 1}" in job_row["NAME"]
             assert job_row["STATUS"] == "running"
 
     async def test_service_with_multiple_replicas_and_jobs(self, session: AsyncSession):
-        """Test that a service with multiple replicas and jobs shows different replica= and same job= in table rows."""
+        # Verifies that a service with 3 replicas and 1 job per replica displays replica= but not job=
+        # in table rows (since there's only one job per replica). Expected: 4 rows total (1 run header + 3 job rows).
         submitted_at = datetime(2023, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
 
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
 
-        # Create a service configuration with 3 replicas
         configuration = ServiceConfiguration(
             type="service",
             image="ubuntu:latest",
@@ -440,10 +433,6 @@ class TestGetRunsTable:
             submitted_at=submitted_at,
         )
 
-        # Create jobs: 3 replicas, 2 jobs per replica
-        # replica=0: job=0, job=1
-        # replica=1: job=0, job=1
-        # replica=2: job=0, job=1
         resources = Resources(
             cpus=2,
             memory_mib=4096,
@@ -463,19 +452,17 @@ class TestGetRunsTable:
             instance_type=instance_type,
         )
 
-        # Create 3 replicas, each with 2 jobs
         for replica_num in range(3):
-            for job_num in range(2):
-                await create_job(
-                    session=session,
-                    run=run_model_db,
-                    status=JobStatus.RUNNING,
-                    submitted_at=submitted_at,
-                    last_processed_at=submitted_at,
-                    job_provisioning_data=job_provisioning_data,
-                    replica_num=replica_num,
-                    job_num=job_num,
-                )
+            await create_job(
+                session=session,
+                run=run_model_db,
+                status=JobStatus.RUNNING,
+                submitted_at=submitted_at,
+                last_processed_at=submitted_at,
+                job_provisioning_data=job_provisioning_data,
+                replica_num=replica_num,
+                job_num=0,
+            )
 
         await session.refresh(run_model_db)
 
@@ -497,25 +484,11 @@ class TestGetRunsTable:
         table = get_runs_table([api_run], verbose=False)
         cells = get_table_cells(table)
 
-        # Should have 7 rows: 1 run header + 6 job rows (3 replicas × 2 jobs)
-        assert len(cells) == 7
-
-        # First row should be the run header
+        assert len(cells) == 4
         assert cells[0]["NAME"] == "service-run"
 
-        # Next 6 rows should be job rows with both replica= and job= (since there are multiple replicas and multiple jobs per replica)
-        # Expected order: replica=0 job=0, replica=0 job=1, replica=1 job=0, replica=1 job=1, replica=2 job=0, replica=2 job=1
-        expected_jobs = [
-            (0, 0),
-            (0, 1),
-            (1, 0),
-            (1, 1),
-            (2, 0),
-            (2, 1),
-        ]
-
-        for i, (expected_replica, expected_job) in enumerate(expected_jobs, start=1):
+        for i in range(1, 4):
             job_row = cells[i]
-            assert f"replica={expected_replica}" in job_row["NAME"]
-            assert f"job={expected_job}" in job_row["NAME"]
+            assert f"replica={i - 1}" in job_row["NAME"]
+            assert "job=" not in job_row["NAME"]
             assert job_row["STATUS"] == "running"
