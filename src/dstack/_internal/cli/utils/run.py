@@ -6,17 +6,24 @@ from rich.table import Table
 
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
-from dstack._internal.core.models.instances import InstanceAvailability
+from dstack._internal.core.models.instances import InstanceAvailability, Resources
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
+    Job,
+    JobProvisioningData,
+    JobRuntimeData,
     JobStatus,
+    JobSubmission,
     Probe,
     ProbeSpec,
     RunPlan,
     RunStatus,
+)
+from dstack._internal.core.models.runs import (
+    Run as CoreRun,
 )
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.utils.common import (
@@ -183,7 +190,13 @@ def print_run_plan(
         console.print(NO_OFFERS_WARNING)
 
 
-def _get_run_status_style(status: RunStatus, status_message: Optional[str] = None) -> str:
+def _format_run_status(run) -> str:
+    status_text = (
+        run.latest_job_submission.status_message
+        if run.status.is_finished() and run.latest_job_submission
+        else run.status_message
+    )
+    # Inline of _get_run_status_style
     color_map = {
         RunStatus.PENDING: "white",
         RunStatus.SUBMITTED: "grey",
@@ -194,20 +207,19 @@ def _get_run_status_style(status: RunStatus, status_message: Optional[str] = Non
         RunStatus.FAILED: "indian_red1",
         RunStatus.DONE: "grey",
     }
-
-    if status_message == "no offers" or status_message == "interrupted":
+    if status_text == "no offers" or status_text == "interrupted":
         color = "gold1"
-    elif status_message == "pulling":
+    elif status_text == "pulling":
         color = "sea_green3"
     else:
-        color = color_map.get(status, "white")
-
-    if not status.is_finished():
-        return f"bold {color}"
-    return color
+        color = color_map.get(run.status, "white")
+    status_style = f"bold {color}" if not run.status.is_finished() else color
+    return f"[{status_style}]{status_text}[/]"
 
 
-def _get_job_status_style(status_message: str, job_status: JobStatus) -> str:
+def _format_job_submission_status(job_submission: JobSubmission, verbose: bool) -> str:
+    status_message = job_submission.status_message
+    job_status = job_submission.status
     if status_message in ("no offers", "interrupted"):
         color = "gold1"
     elif status_message == "stopped":
@@ -225,10 +237,91 @@ def _get_job_status_style(status_message: str, job_status: JobStatus) -> str:
             JobStatus.DONE: "grey",
         }
         color = color_map.get(job_status, "white")
+    status_style = f"bold {color}" if not job_status.is_finished() else color
+    formatted_status_message = f"[{status_style}]{status_message}[/]"
+    if verbose and job_submission.inactivity_secs:
+        inactive_for = format_duration_multiunit(job_submission.inactivity_secs)
+        formatted_status_message += f" (inactive for {inactive_for})"
+    return formatted_status_message
 
-    if not job_status.is_finished():
-        return f"bold {color}"
-    return color
+
+def _get_show_deployment_replica_job(run: CoreRun, verbose: bool) -> tuple[bool, bool, bool]:
+    show_deployment_num = (
+        verbose and run.run_spec.configuration.type == "service"
+    ) or run.is_deployment_in_progress()
+
+    replica_nums = {job.job_spec.replica_num for job in run.jobs}
+    show_replica = len(replica_nums) > 1
+
+    jobs_by_replica: Dict[int, List[Any]] = {}
+    for job in run.jobs:
+        replica_num = job.job_spec.replica_num
+        if replica_num not in jobs_by_replica:
+            jobs_by_replica[replica_num] = []
+        jobs_by_replica[replica_num].append(job)
+
+    show_job = any(
+        len({j.job_spec.job_num for j in jobs}) > 1 for jobs in jobs_by_replica.values()
+    )
+
+    return show_deployment_num, show_replica, show_job
+
+
+def _format_job_name(
+    job: Job,
+    latest_job_submission: JobSubmission,
+    show_deployment_num: bool,
+    show_replica: bool,
+    show_job: bool,
+) -> str:
+    name_parts = []
+    if show_replica:
+        name_parts.append(f"replica={job.job_spec.replica_num}")
+    if show_job:
+        name_parts.append(f"job={job.job_spec.job_num}")
+    name_suffix = (
+        f" deployment={latest_job_submission.deployment_num}" if show_deployment_num else ""
+    )
+    name_value = "  " + (" ".join(name_parts) if name_parts else "")
+    name_value += name_suffix
+    return name_value
+
+
+def _format_price(price: float, is_spot: bool) -> str:
+    price_str = f"${price:.4f}".rstrip("0").rstrip(".")
+    if is_spot:
+        price_str += " (spot)"
+    return price_str
+
+
+def _format_backend(backend: Any, region: str) -> str:
+    backend_str = getattr(backend, "value", backend)
+    backend_str = backend_str.replace("remote", "ssh")
+    return f"{backend_str} ({region})"
+
+
+def _format_instance_type(jpd: JobProvisioningData, jrd: Optional[JobRuntimeData]) -> str:
+    instance_type = jpd.instance_type.name
+    if jrd is not None and getattr(jrd, "offer", None) is not None:
+        if jrd.offer.total_blocks > 1:
+            instance_type += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
+    if jpd.reservation:
+        instance_type += f" ({jpd.reservation})"
+    return instance_type
+
+
+def _get_resources(jpd: JobProvisioningData, jrd: Optional[JobRuntimeData]) -> Resources:
+    resources: Resources = jpd.instance_type.resources
+    if jrd is not None and getattr(jrd, "offer", None) is not None:
+        resources = jrd.offer.instance.resources
+    return resources
+
+
+def _format_run_name(run: CoreRun, show_deployment_num: bool) -> str:
+    parts: List[str] = [run.run_spec.run_name]
+    if show_deployment_num:
+        parts.append(f" [secondary]deployment={run.deployment_num}[/]")
+    return "".join(parts)
 
 
 def get_runs_table(
@@ -239,10 +332,9 @@ def get_runs_table(
     table.add_column("BACKEND", style="grey58", ratio=2)
     if verbose:
         table.add_column("RESOURCES", style="grey58", ratio=3)
+        table.add_column("INSTANCE TYPE", style="grey58", no_wrap=True, ratio=1)
     else:
         table.add_column("GPU", ratio=2)
-    if verbose:
-        table.add_column("INSTANCE TYPE", style="grey58", no_wrap=True, ratio=1)
     table.add_column("PRICE", style="grey58", ratio=1)
     table.add_column("STATUS", no_wrap=True, ratio=1)
     if verbose or any(
@@ -257,122 +349,64 @@ def get_runs_table(
 
     for run in runs:
         run = run._run  # TODO(egor-s): make public attribute
-        show_deployment_num = (
-            verbose
-            and run.run_spec.configuration.type == "service"
-            or run.is_deployment_in_progress()
+        show_deployment_num, show_replica, show_job = _get_show_deployment_replica_job(
+            run, verbose
         )
         merge_job_rows = len(run.jobs) == 1 and not show_deployment_num
 
-        status_text = (
-            run.latest_job_submission.status_message
-            if run.status.is_finished() and run.latest_job_submission
-            else run.status_message
-        )
-        status_style = _get_run_status_style(
-            run.status, status_message=status_text if run.status.is_finished() else status_text
-        )
-
-        resource_key = "RESOURCES" if verbose else "GPU"
         run_row: Dict[Union[str, int], Any] = {
-            "NAME": run.run_spec.run_name
-            + (f" [secondary]deployment={run.deployment_num}[/]" if show_deployment_num else ""),
+            "NAME": _format_run_name(run, show_deployment_num),
             "SUBMITTED": format_date(run.submitted_at),
-            "STATUS": f"[{status_style}]{status_text}[/]",
-            resource_key: "-",  # Default value when no provisioning data
-            "PRICE": "-",  # Default value when no provisioning data
+            "STATUS": _format_run_status(run),
+            "RESOURCES": "-",
+            "GPU": "-",
+            "PRICE": "-",
         }
         if run.error:
             run_row["ERROR"] = run.error
         if not merge_job_rows:
             add_row_from_dict(table, run_row)
 
-        # Determine if we need to show replica= and job= fields
-        replica_nums = {job.job_spec.replica_num for job in run.jobs}
-        show_replica = len(replica_nums) > 1  # Show if there are multiple different replicas
-
-        # Group jobs by replica to check if each replica has multiple jobs
-        jobs_by_replica: Dict[int, List[Any]] = {}
-        for job in run.jobs:
-            replica_num = job.job_spec.replica_num
-            if replica_num not in jobs_by_replica:
-                jobs_by_replica[replica_num] = []
-            jobs_by_replica[replica_num].append(job)
-
-        # Check if any replica has multiple different job_nums
-        show_job = any(
-            len({j.job_spec.job_num for j in jobs}) > 1 for jobs in jobs_by_replica.values()
-        )
-
         for job in run.jobs:
             latest_job_submission = job.job_submissions[-1]
-            status = latest_job_submission.status.value
-            if verbose and latest_job_submission.inactivity_secs:
-                inactive_for = format_duration_multiunit(latest_job_submission.inactivity_secs)
-                status += f" (inactive for {inactive_for})"
-            status_text = latest_job_submission.status_message
-            status_style = _get_job_status_style(status_text, latest_job_submission.status)
-
-            # Build NAME field conditionally showing replica= and job=
-            name_parts = []
-            if show_replica:
-                name_parts.append(f"replica={job.job_spec.replica_num}")
-            if show_job:
-                name_parts.append(f"job={job.job_spec.job_num}")
-            name_suffix = (
-                f" deployment={latest_job_submission.deployment_num}"
-                if show_deployment_num
-                else ""
-            )
-            # Always include indentation for job rows, even if there are no parts
-            name_value = "  " + (" ".join(name_parts) if name_parts else "")
-            name_value += name_suffix
+            status_formatted = _format_job_submission_status(latest_job_submission, verbose)
 
             job_row: Dict[Union[str, int], Any] = {
-                "NAME": name_value,
-                "STATUS": f"[{status_style}]{status_text}[/]",
+                "NAME": _format_job_name(
+                    job, latest_job_submission, show_deployment_num, show_replica, show_job
+                ),
+                "STATUS": status_formatted,
                 "PROBES": _format_job_probes(
                     job.job_spec.probes, latest_job_submission.probes, latest_job_submission.status
                 ),
                 "SUBMITTED": format_date(latest_job_submission.submitted_at),
                 "ERROR": latest_job_submission.error,
-                resource_key: "-",  # Initialize with default, will be updated if provisioning data exists
-                "PRICE": "-",  # Initialize with default, will be updated if provisioning data exists
+                "RESOURCES": "-",
+                "GPU": "-",
+                "PRICE": "-",
             }
             jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
-                resources = jpd.instance_type.resources
-                instance_type = jpd.instance_type.name
                 jrd = latest_job_submission.job_runtime_data
-                if jrd is not None and jrd.offer is not None:
-                    resources = jrd.offer.instance.resources
-                    if jrd.offer.total_blocks > 1:
-                        instance_type += f" ({jrd.offer.blocks}/{jrd.offer.total_blocks})"
-                if jpd.reservation:
-                    instance_type += f" ({jpd.reservation})"
-                resource_value = (
-                    resources.pretty_format(include_spot=False)
-                    if verbose
-                    else resources.pretty_format(gpu_only=True, include_spot=False)
-                )
-                price_str = f"${jpd.price:.4f}".rstrip("0").rstrip(".")
-                if resources.spot:
-                    price_str += " (spot)"
+                resources = _get_resources(jpd, jrd)
                 update_dict: Dict[Union[str, int], Any] = {
-                    "BACKEND": f"{jpd.backend.value.replace('remote', 'ssh')} ({jpd.region})",
-                    resource_key: resource_value,
-                    "INSTANCE TYPE": instance_type,
-                    "PRICE": price_str,
+                    "BACKEND": _format_backend(jpd.backend, jpd.region),
+                    "RESOURCES": resources.pretty_format(include_spot=False),
+                    "GPU": resources.pretty_format(gpu_only=True, include_spot=False),
+                    "INSTANCE TYPE": _format_instance_type(jpd, jrd),
+                    "PRICE": _format_price(jpd.price, resources.spot),
                 }
                 job_row.update(update_dict)
             if merge_job_rows:
-                # Merge run_row into job_row, but preserve job_row's resource_key if it was set
-                resource_value = job_row.get(resource_key, "-")
-                price_value = job_row.get("PRICE", "")
+                _status = job_row["STATUS"]
+                _resources = job_row["RESOURCES"]
+                _gpu = job_row["GPU"]
+                _price = job_row["PRICE"]
                 job_row.update(run_row)
-                job_row[resource_key] = resource_value  # Restore job-specific resource value
-                job_row["PRICE"] = price_value  # Restore job-specific price value
-                job_row["STATUS"] = run_row["STATUS"]
+                job_row["RESOURCES"] = _resources
+                job_row["GPU"] = _gpu
+                job_row["PRICE"] = _price
+                job_row["STATUS"] = _status
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 
     return table
