@@ -7,8 +7,8 @@ import * as yup from 'yup';
 import { Box, Link, WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import type { ToggleProps } from 'components';
-import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Toggle, Wizard } from 'components';
+import type { TabsProps, ToggleProps } from 'components';
+import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Tabs, Toggle, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
@@ -38,6 +38,11 @@ const ideOptions = [
         value: 'vscode',
     },
 ];
+
+enum DockerPythonTabs {
+    DOCKER = 'docker',
+    PYTHON = 'python',
+}
 
 const envValidationSchema = yup.object({
     offer: yup.object().required(requiredFieldError),
@@ -89,6 +94,8 @@ export const CreateDevEnvironment: React.FC = () => {
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
     const [activeStepIndex, setActiveStepIndex] = useState(0);
+    const [isEnabledRepo, setIsEnabledRepo] = useState(false);
+    const [activeTab, setActiveTab] = useState(DockerPythonTabs.DOCKER);
     const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
     const [selectedProject, setSelectedProject] = useState<IProject['project_name'] | null>(
         () => searchParams.get('project_name') ?? null,
@@ -163,12 +170,21 @@ export const CreateDevEnvironment: React.FC = () => {
         onNavigate({ requestedStepIndex, reason });
     };
 
-    const toggleDocker: ToggleProps['onChange'] = ({ detail }) => {
-        setValue('docker', detail.checked);
+    const toggleRepo: ToggleProps['onChange'] = ({ detail }) => {
+        setIsEnabledRepo(detail.checked);
 
-        if (detail.checked) {
+        if (!detail.checked) {
+            setValue('repo_url', '');
+            setValue('repo_local_path', '');
+        }
+    };
+
+    const onChangeTab: TabsProps['onChange'] = ({ detail }) => {
+        if (detail.activeTabId === DockerPythonTabs.DOCKER) {
             setValue('python', '');
-        } else {
+        }
+
+        if (detail.activeTabId === DockerPythonTabs.PYTHON) {
             setValue('image', '');
         }
     };
@@ -306,45 +322,69 @@ export const CreateDevEnvironment: React.FC = () => {
                                         disabled={loading}
                                     />
 
-                                    <Toggle checked={formValues.docker} onChange={toggleDocker}>
-                                        {t('runs.dev_env.wizard.docker')}
+                                    <Tabs
+                                        onChange={onChangeTab}
+                                        tabs={[
+                                            {
+                                                label: t('runs.dev_env.wizard.docker'),
+                                                id: DockerPythonTabs.DOCKER,
+                                                content: (
+                                                    <div>
+                                                        <FormInput
+                                                            label={t('runs.dev_env.wizard.docker_image')}
+                                                            description={t('runs.dev_env.wizard.docker_image_description')}
+                                                            placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
+                                                            control={control}
+                                                            name="image"
+                                                            disabled={loading}
+                                                        />
+                                                    </div>
+                                                ),
+                                            },
+                                            {
+                                                label: t('runs.dev_env.wizard.python'),
+                                                id: DockerPythonTabs.PYTHON,
+                                                content: (
+                                                    <div>
+                                                        <FormInput
+                                                            label={t('runs.dev_env.wizard.python')}
+                                                            description={t('runs.dev_env.wizard.python_description')}
+                                                            placeholder={t('runs.dev_env.wizard.python_placeholder')}
+                                                            control={control}
+                                                            name="python"
+                                                            disabled={loading}
+                                                        />
+                                                    </div>
+                                                ),
+                                            },
+                                        ]}
+                                    />
+
+                                    <Toggle checked={isEnabledRepo} onChange={toggleRepo}>
+                                        {t('runs.dev_env.wizard.repo')}
                                     </Toggle>
 
-                                    <FormInput
-                                        label={t('runs.dev_env.wizard.docker_image')}
-                                        description={t('runs.dev_env.wizard.docker_image_description')}
-                                        placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
-                                        control={control}
-                                        name="image"
-                                        disabled={loading || !formValues.docker}
-                                    />
+                                    {isEnabledRepo && (
+                                        <>
+                                            <FormInput
+                                                label={t('runs.dev_env.wizard.repo_url')}
+                                                description={t('runs.dev_env.wizard.repo_url_description')}
+                                                placeholder={t('runs.dev_env.wizard.repo_url_placeholder')}
+                                                control={control}
+                                                name="repo_url"
+                                                disabled={loading}
+                                            />
 
-                                    <FormInput
-                                        label={t('runs.dev_env.wizard.python')}
-                                        description={t('runs.dev_env.wizard.python_description')}
-                                        placeholder={t('runs.dev_env.wizard.python_placeholder')}
-                                        control={control}
-                                        name="python"
-                                        disabled={loading || formValues.docker}
-                                    />
-
-                                    <FormInput
-                                        label={t('runs.dev_env.wizard.repo')}
-                                        description={t('runs.dev_env.wizard.repo_description')}
-                                        placeholder={t('runs.dev_env.wizard.repo_placeholder')}
-                                        control={control}
-                                        name="repo"
-                                        disabled={loading}
-                                    />
-
-                                    <FormInput
-                                        label={t('runs.dev_env.wizard.repo_local_path')}
-                                        description={t('runs.dev_env.wizard.repo_local_path_description')}
-                                        placeholder={t('runs.dev_env.wizard.repo_local_path_placeholder')}
-                                        control={control}
-                                        name="repo_local_path"
-                                        disabled={loading}
-                                    />
+                                            <FormInput
+                                                label={t('runs.dev_env.wizard.repo_local_path')}
+                                                description={t('runs.dev_env.wizard.repo_local_path_description')}
+                                                placeholder={t('runs.dev_env.wizard.repo_local_path_placeholder')}
+                                                control={control}
+                                                name="repo_local_path"
+                                                disabled={loading}
+                                            />
+                                        </>
+                                    )}
                                 </SpaceBetween>
                             </Container>
                         ),

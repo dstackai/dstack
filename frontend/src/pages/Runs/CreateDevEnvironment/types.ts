@@ -6,6 +6,6 @@ export interface IRunEnvironmentFormValues {
     docker: boolean;
     image?: string;
     python?: string;
-    repo?: string;
+    repo_url?: string;
     repo_local_path?: string;
 }

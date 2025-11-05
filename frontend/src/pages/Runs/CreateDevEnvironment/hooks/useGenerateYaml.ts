@@ -15,25 +15,24 @@ export const useGenerateYaml = ({ formValues }: UseGenerateYamlArgs) => {
             return '';
         }
 
-        const { name, ide, docker, image, python, offer, repo, repo_local_path } = formValues;
+        const { name, ide, image, python, offer, repo_url, repo_local_path } = formValues;
 
         return jsYaml.dump({
             type: 'dev-environment',
             ...(name ? { name } : {}),
             ide,
-            ...(docker ? { docker } : {}),
-            ...(image ? { image } : {}),
+            ...(image ? { docker: true, image } : {}),
             ...(python ? { python } : {}),
 
             resources: {
                 gpu: `${offer.name}:${round(convertMiBToGB(offer.memory_mib))}GB:${renderRange(offer.count)}`,
             },
 
-            ...(repo || repo_local_path
+            ...(repo_url || repo_local_path
                 ? {
                       repos: [
                           {
-                              ...(repo ? { url: repo } : {}),
+                              ...(repo_url ? { url: repo_url } : {}),
                               ...(repo_local_path ? { local_path: repo_local_path } : {}),
                           },
                       ],
@@ -49,7 +48,7 @@ export const useGenerateYaml = ({ formValues }: UseGenerateYamlArgs) => {
         formValues.offer,
         formValues.python,
         formValues.image,
-        formValues.repo,
+        formValues.repo_url,
         formValues.repo_local_path,
     ]);
 };
