@@ -1,8 +1,8 @@
 # Installation
 
-!!! info "dstack Sky"
+<!-- !!! info "dstack Sky"
     If you don't want to host the `dstack` server (or want to access GPU marketplace),
-    skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+    skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}. -->
 
 ## Set up the server
 

@@ -4,8 +4,8 @@ Fleets act both as pools of instances and as templates for how those instances a
 
 `dstack` supports two kinds of fleets: 
 
-* [Backend fleets](#backend) – dynamically provisioned through configured backends; they are supported with any type of backends: [VM-based](backends.md#vm-based) and [container-based](backends.md#container-based) (incl. [`kubernetes`](backends.md#kubernetes))
-* [SSH fleets](#ssh) – created using on-prem servers; do not require backends
+* [Backend fleets](#backend-fleets) – dynamically provisioned through configured backends; they are supported with any type of backends: [VM-based](backends.md#vm-based) and [container-based](backends.md#container-based) (incl. [`kubernetes`](backends.md#kubernetes))
+* [SSH fleets](#ssh-fleets) – created using on-prem servers; do not require backends
 
 When you run `dstack apply` to start a dev environment, task, or service, `dstack` will reuse idle instances from an existing fleet whenever available.
 
