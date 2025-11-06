@@ -53,6 +53,9 @@ func extractFileArchive(ctx context.Context, archivePath string, destPath string
 		return fmt.Errorf("expand destination path: %w", err)
 	}
 	destBase, destName := path.Split(destPath)
+	if destBase == "" {
+		destBase = "."
+	}
 	if err := common.MkdirAll(ctx, destBase, uid, gid); err != nil {
 		return fmt.Errorf("create destination directory: %w", err)
 	}
