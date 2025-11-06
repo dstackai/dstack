@@ -6,6 +6,7 @@ from typing import Iterable, Optional
 
 import dstack._internal.proxy.gateway.schemas.registry as schemas
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.proxy.gateway import models as gateway_models
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import (
@@ -44,6 +45,7 @@ async def register_service(
     repo: GatewayProxyRepo,
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
+    router_config: Optional[AnyRouterConfig] = None,
 ) -> None:
     service = models.Service(
         project_name=project_name,
@@ -54,6 +56,8 @@ async def register_service(
         auth=auth,
         client_max_body_size=client_max_body_size,
         replicas=(),
+        router_config=router_config,
+        model_id=model.name if model is not None else None,
     )
 
     async with lock:
@@ -335,6 +339,8 @@ async def get_nginx_service_config(
         limit_req_zones=limit_req_zones,
         locations=locations,
         replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
+        router_config=service.router_config,
+        model_id=service.model_id,
     )
 
 

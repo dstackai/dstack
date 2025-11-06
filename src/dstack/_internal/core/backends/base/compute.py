@@ -38,6 +38,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -876,7 +877,9 @@ def get_run_shim_script(
     ]
 
 
-def get_gateway_user_data(authorized_key: str) -> str:
+def get_gateway_user_data(
+    authorized_key: str, router_config: Optional[AnyRouterConfig] = None
+) -> str:
     return get_cloud_config(
         package_update=True,
         packages=[
@@ -892,7 +895,7 @@ def get_gateway_user_data(authorized_key: str) -> str:
                 "s/# server_names_hash_bucket_size 64;/server_names_hash_bucket_size 128;/",
                 "/etc/nginx/nginx.conf",
             ],
-            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
+            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands(router_config))],
         ],
         ssh_authorized_keys=[authorized_key],
     )
@@ -1021,16 +1024,24 @@ def get_dstack_gateway_wheel(build: str) -> str:
         r.raise_for_status()
         build = r.text.strip()
         logger.debug("Found the latest gateway build: %s", build)
-    return f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
+    # return f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
+    return "https://bihan-test-bucket.s3.eu-west-1.amazonaws.com/dstack_gateway-0.0.1-py3-none-any.whl"
 
 
-def get_dstack_gateway_commands() -> List[str]:
+def get_dstack_gateway_commands(router_config: Optional[AnyRouterConfig] = None) -> List[str]:
     build = get_dstack_runner_version()
+    wheel = get_dstack_gateway_wheel(build)
+    # Use router type directly as pip extra
+    if router_config:
+        gateway_package = f"dstack-gateway[{router_config.type}]"
+    else:
+        gateway_package = "dstack-gateway"
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",
         "python3 -m venv /home/ubuntu/dstack/green",
-        f"/home/ubuntu/dstack/blue/bin/pip install {get_dstack_gateway_wheel(build)}",
+        f"/home/ubuntu/dstack/blue/bin/pip install {wheel}",
+        f"/home/ubuntu/dstack/blue/bin/pip install --upgrade '{gateway_package}'",
         "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
     ]
 

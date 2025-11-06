@@ -599,7 +599,9 @@ class GCPCompute(
             machine_type="e2-medium",
             accelerators=[],
             spot=False,
-            user_data=get_gateway_user_data(configuration.ssh_key_pub),
+            user_data=get_gateway_user_data(
+                configuration.ssh_key_pub, router_config=configuration.router_config
+            ),
             authorized_keys=[configuration.ssh_key_pub],
             labels=labels,
             tags=[gcp_resources.DSTACK_GATEWAY_TAG],

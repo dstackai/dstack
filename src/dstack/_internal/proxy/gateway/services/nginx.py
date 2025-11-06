@@ -9,7 +9,13 @@ import jinja2
 from pydantic import BaseModel
 from typing_extensions import Literal
 
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.proxy.gateway.const import PROXY_PORT_ON_GATEWAY
+from dstack._internal.proxy.gateway.model_routers import (
+    Router,
+    RouterContext,
+    get_router,
+)
 from dstack._internal.proxy.gateway.models import ACMESettings
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.utils.common import run_async
@@ -64,6 +70,8 @@ class ServiceConfig(SiteConfig):
     limit_req_zones: list[LimitReqZoneConfig]
     locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
+    router_config: Optional[AnyRouterConfig] = None
+    model_id: Optional[str] = None
 
 
 class ModelEntrypointConfig(SiteConfig):
@@ -77,15 +85,46 @@ class Nginx:
     def __init__(self, conf_dir: Path = Path("/etc/nginx/sites-enabled")) -> None:
         self._conf_dir = conf_dir
         self._lock: Lock = Lock()
+        self._router: Optional[Router] = None
 
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
         logger.debug("Registering %s domain %s", conf.type, conf.domain)
         conf_name = self.get_config_name(conf.domain)
-
         async with self._lock:
             if conf.https:
                 await run_async(self.run_certbot, conf.domain, acme)
             await run_async(self.write_conf, conf.render(), conf_name)
+
+            if isinstance(conf, ServiceConfig) and conf.router_config and conf.model_id:
+                if self._router is None:
+                    ctx = RouterContext(
+                        host="127.0.0.1",
+                        port=3000,
+                        log_dir=Path("./router_logs"),
+                        log_level="info",
+                    )
+                    self._router = get_router(conf.router_config, context=ctx)
+                    if not await run_async(self._router.is_running):
+                        await run_async(self._router.start)
+
+                replicas = await run_async(
+                    self._router.register_replicas,
+                    conf.domain,
+                    len(conf.replicas),
+                    conf.model_id,
+                )
+
+                allocated_ports = [int(r.url.rsplit(":", 1)[-1]) for r in replicas]
+                try:
+                    await run_async(self.write_router_workers_conf, conf, allocated_ports)
+                except Exception as e:
+                    logger.exception(
+                        "write_router_workers_conf failed for domain=%s: %s", conf.domain, e
+                    )
+                    raise
+                finally:
+                    # Always update router state, regardless of nginx reload status
+                    await run_async(self._router.update_replicas, replicas)
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
@@ -96,6 +135,16 @@ class Nginx:
             return
         async with self._lock:
             await run_async(sudo_rm, conf_path)
+            # Generic router implementation
+            if self._router is not None:
+                # Unregister replicas for this domain (router handles domain-to-model_id lookup)
+                await run_async(self._router.unregister_replicas, domain)
+
+                # Remove workers config file (router-specific naming)
+                workers_conf_path = self._conf_dir / f"router-workers.{domain}.conf"
+                if workers_conf_path.exists():
+                    await run_async(sudo_rm, workers_conf_path)
+
             await run_async(self.reload)
         logger.info("Unregistered domain %s", domain)
 
@@ -167,6 +216,25 @@ class Nginx:
     def write_global_conf(self) -> None:
         conf = read_package_resource("00-log-format.conf")
         self.write_conf(conf, "00-log-format.conf")
+
+    def write_router_workers_conf(self, conf: ServiceConfig, allocated_ports: list[int]) -> None:
+        """Write router workers configuration file (generic)."""
+        # Pass ports to template
+        workers_config = generate_router_workers_config(conf, allocated_ports)
+        workers_conf_name = f"router-workers.{conf.domain}.conf"
+        workers_conf_path = self._conf_dir / workers_conf_name
+        sudo_write(workers_conf_path, workers_config)
+        self.reload()
+
+
+def generate_router_workers_config(conf: ServiceConfig, allocated_ports: list[int]) -> str:
+    """Generate router workers configuration (generic, uses sglang_workers.jinja2 template)."""
+    template = read_package_resource("sglang_workers.jinja2")
+    return jinja2.Template(template).render(
+        replicas=conf.replicas,
+        ports=allocated_ports,
+        proxy_port=PROXY_PORT_ON_GATEWAY,
+    )
 
 
 def read_package_resource(file: str) -> str:

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 
 
@@ -57,6 +58,8 @@ class Service(ImmutableModel):
     client_max_body_size: int  # only enforced on gateways
     strip_prefix: bool = True  # only used in-server
     replicas: tuple[Replica, ...]
+    router_config: Optional[AnyRouterConfig] = None
+    model_id: Optional[str] = None
 
     @property
     def domain_safe(self) -> str:

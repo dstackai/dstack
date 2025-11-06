@@ -36,6 +36,7 @@ async def register_service(
         model=body.options.openai.model if body.options.openai is not None else None,
         ssh_private_key=body.ssh_private_key,
         repo=repo,
+        router_config=body.router_config,
         nginx=nginx,
         service_conn_pool=service_conn_pool,
     )
