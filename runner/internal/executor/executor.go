@@ -196,7 +196,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 
 	ex.setJobCredentials(ctx)
 
-	if err := ex.prepareJobWorkingDir(ctx); err != nil {
+	if err := ex.setJobWorkingDir(ctx); err != nil {
 		ex.SetJobStateWithTerminationReason(
 			ctx,
 			types.JobStateFailed,
@@ -352,7 +352,7 @@ func (ex *RunExecutor) setJobCredentials(ctx context.Context) {
 	log.Trace(ctx, "Job credentials", "uid", ex.jobUid, "gid", ex.jobGid, "home", ex.jobHomeDir)
 }
 
-func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
+func (ex *RunExecutor) setJobWorkingDir(ctx context.Context) error {
 	var err error
 	if ex.jobSpec.WorkingDir == nil {
 		ex.jobWorkingDir, err = os.Getwd()
@@ -372,9 +372,6 @@ func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
 		}
 	}
 	log.Trace(ctx, "Job working dir", "path", ex.jobWorkingDir)
-	if err := common.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUid, ex.jobGid); err != nil {
-		return fmt.Errorf("create working directory: %w", err)
-	}
 	return nil
 }
 
@@ -429,6 +426,9 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
+	if err := common.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUid, ex.jobGid); err != nil {
+		return fmt.Errorf("create working directory: %w", err)
+	}
 	cmd.Dir = ex.jobWorkingDir
 
 	// User must be already set

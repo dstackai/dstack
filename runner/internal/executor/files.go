@@ -2,10 +2,12 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 
 	"github.com/codeclysm/extract/v4"
@@ -32,7 +34,14 @@ func (ex *RunExecutor) AddFileArchive(id string, src io.Reader) error {
 }
 
 // setupFiles must be called from Run
+// ex.jobWorkingDir must be already set
 func (ex *RunExecutor) setupFiles(ctx context.Context) error {
+	if ex.jobWorkingDir == "" {
+		return errors.New("setup files: working dir is not set")
+	}
+	if !filepath.IsAbs(ex.jobWorkingDir) {
+		return fmt.Errorf("setup files: working dir must be absolute: %s", ex.jobWorkingDir)
+	}
 	for _, fa := range ex.jobSpec.FileArchives {
 		archivePath := path.Join(ex.archiveDir, fa.Id)
 		if err := extractFileArchive(ctx, archivePath, fa.Path, ex.jobWorkingDir, ex.jobUid, ex.jobGid, ex.jobHomeDir); err != nil {
@@ -53,9 +62,6 @@ func extractFileArchive(ctx context.Context, archivePath string, destPath string
 		return fmt.Errorf("expand destination path: %w", err)
 	}
 	destBase, destName := path.Split(destPath)
-	if destBase == "" {
-		destBase = "."
-	}
 	if err := common.MkdirAll(ctx, destBase, uid, gid); err != nil {
 		return fmt.Errorf("create destination directory: %w", err)
 	}
