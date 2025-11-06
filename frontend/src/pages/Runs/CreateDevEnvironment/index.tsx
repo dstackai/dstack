@@ -16,7 +16,6 @@ import { ROUTES } from 'routes';
 import { useApplyRunMutation } from 'services/run';
 
 import { OfferList } from 'pages/Offers/List';
-import { convertMiBToGB, renderRange, round } from 'pages/Offers/List/helpers';
 
 import { getRunSpecFromYaml } from './helpers/getRunSpecFromYaml';
 import { useGenerateYaml } from './hooks/useGenerateYaml';
@@ -27,6 +26,7 @@ import styles from './styles.module.scss';
 
 const requiredFieldError = 'This is required field';
 const namesFieldError = 'Only latin characters, dashes, and digits';
+const urlFormatError = 'Only URLs';
 
 const ideOptions = [
     {
@@ -49,6 +49,16 @@ const envValidationSchema = yup.object({
     name: yup.string().matches(/^[a-z][a-z0-9-]{1,40}$/, namesFieldError),
     ide: yup.string().required(requiredFieldError),
     config_yaml: yup.string().required(requiredFieldError),
+
+    image: yup.string().when('docker', {
+        is: true,
+        then: yup.string().required(requiredFieldError),
+    }),
+
+    repo_url: yup.string().when('repo_enabled', {
+        is: true,
+        then: yup.string().url(urlFormatError).required(requiredFieldError),
+    }),
 });
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -94,8 +104,6 @@ export const CreateDevEnvironment: React.FC = () => {
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
     const [activeStepIndex, setActiveStepIndex] = useState(0);
-    const [isEnabledRepo, setIsEnabledRepo] = useState(false);
-    const [activeTab, setActiveTab] = useState(DockerPythonTabs.DOCKER);
     const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
     const [selectedProject, setSelectedProject] = useState<IProject['project_name'] | null>(
         () => searchParams.get('project_name') ?? null,
@@ -121,6 +129,8 @@ export const CreateDevEnvironment: React.FC = () => {
         resolver,
         defaultValues: {
             ide: 'cursor',
+            docker: true,
+            repo_enabled: false,
         },
     });
     const { handleSubmit, control, trigger, setValue, watch, formState, getValues } = formMethods;
@@ -134,15 +144,13 @@ export const CreateDevEnvironment: React.FC = () => {
         return await trigger(['offer']);
     };
 
-    const validateName = async () => {
-        return await trigger(['name', 'ide']);
+    const validateSecondStep = async () => {
+        return await trigger(['name', 'ide', 'docker', 'image', 'python', 'repo_enabled', 'repo_url', 'repo_local_path']);
     };
 
     const validateConfig = async () => {
         return await trigger(['config_yaml']);
     };
-
-    const emptyValidator = async () => Promise.resolve(true);
 
     const onNavigate = ({
         requestedStepIndex,
@@ -151,7 +159,7 @@ export const CreateDevEnvironment: React.FC = () => {
         requestedStepIndex: number;
         reason: WizardProps.NavigationReason;
     }) => {
-        const stepValidators = [validateOffer, validateName, validateConfig, emptyValidator];
+        const stepValidators = [validateOffer, validateSecondStep, validateConfig];
 
         if (reason === 'next') {
             stepValidators[activeStepIndex]?.().then((isValid) => {
@@ -171,7 +179,7 @@ export const CreateDevEnvironment: React.FC = () => {
     };
 
     const toggleRepo: ToggleProps['onChange'] = ({ detail }) => {
-        setIsEnabledRepo(detail.checked);
+        setValue('repo_enabled', detail.checked);
 
         if (!detail.checked) {
             setValue('repo_url', '');
@@ -187,6 +195,8 @@ export const CreateDevEnvironment: React.FC = () => {
         if (detail.activeTabId === DockerPythonTabs.PYTHON) {
             setValue('image', '');
         }
+
+        setValue('docker', detail.activeTabId === DockerPythonTabs.DOCKER);
     };
 
     const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => {
@@ -360,11 +370,11 @@ export const CreateDevEnvironment: React.FC = () => {
                                         ]}
                                     />
 
-                                    <Toggle checked={isEnabledRepo} onChange={toggleRepo}>
+                                    <Toggle checked={!!formValues.repo_enabled} onChange={toggleRepo}>
                                         {t('runs.dev_env.wizard.repo')}
                                     </Toggle>
 
-                                    {isEnabledRepo && (
+                                    {formValues.repo_enabled && (
                                         <>
                                             <FormInput
                                                 label={t('runs.dev_env.wizard.repo_url')}

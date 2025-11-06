@@ -15,13 +15,14 @@ export const useGenerateYaml = ({ formValues }: UseGenerateYamlArgs) => {
             return '';
         }
 
-        const { name, ide, image, python, offer, repo_url, repo_local_path } = formValues;
+        const { name, ide, image, python, offer, docker, repo_url, repo_local_path } = formValues;
 
         return jsYaml.dump({
             type: 'dev-environment',
             ...(name ? { name } : {}),
             ide,
-            ...(image ? { docker: true, image } : {}),
+            ...(docker ? { docker } : {}),
+            ...(image ? { image } : {}),
             ...(python ? { python } : {}),
 
             resources: {
