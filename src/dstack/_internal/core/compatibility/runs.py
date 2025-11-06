@@ -201,6 +201,8 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
         spec_excludes["probes"] = True
     if all(s.repo_dir in [None, LEGACY_REPO_DIR] for s in job_specs):
         spec_excludes["repo_dir"] = True
+    if all(s.requirements.multinode is None for s in job_specs):
+        spec_excludes["requirements"] = {"multinode": True}
 
     return spec_excludes
 
