@@ -31,7 +31,7 @@ func MkdirAll(ctx context.Context, pth string, uid int, gid int) error {
 	paths := []string{pth}
 	for {
 		pth = path.Dir(pth)
-		if pth == "/" {
+		if pth == "/" || pth == "." {
 			break
 		}
 		paths = append(paths, pth)
