@@ -228,9 +228,10 @@ class Nginx:
 
 
 def generate_router_workers_config(conf: ServiceConfig, allocated_ports: list[int]) -> str:
-    """Generate router workers configuration (generic, uses sglang_workers.jinja2 template)."""
-    template = read_package_resource("sglang_workers.jinja2")
+    """Generate router workers configuration (generic, uses router_workers.jinja2 template)."""
+    template = read_package_resource("router_workers.jinja2")
     return jinja2.Template(template).render(
+        domain=conf.domain,
         replicas=conf.replicas,
         ports=allocated_ports,
         proxy_port=PROXY_PORT_ON_GATEWAY,

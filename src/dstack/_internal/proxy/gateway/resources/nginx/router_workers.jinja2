@@ -1,6 +1,6 @@
 {% for replica in replicas %}
 # Worker {{ loop.index }}
-upstream sglang_worker_{{ ports[loop.index0] }}_upstream {
+upstream router_worker_{{ domain|replace('.', '_') }}_{{ ports[loop.index0] }}_upstream {
     server unix:{{ replica.socket }};
 }
 
@@ -12,7 +12,7 @@ server {
     proxy_send_timeout 300s;
 
     location / {
-        proxy_pass http://sglang_worker_{{ ports[loop.index0] }}_upstream;
+        proxy_pass http://router_worker_{{ domain|replace('.', '_') }}_{{ ports[loop.index0] }}_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
