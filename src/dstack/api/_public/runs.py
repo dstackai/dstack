@@ -10,7 +10,7 @@ from copy import copy
 from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO, Dict, Iterable, List, Optional, Union
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from websocket import WebSocketApp
 
@@ -136,9 +136,7 @@ class Run(ABC):
             ),
         )
 
-    def _attached_logs(
-        self,
-    ) -> Iterable[bytes]:
+    def _attached_logs(self, start_time: Optional[datetime] = None) -> Iterable[bytes]:
         q = queue.Queue()
         _done = object()
 
@@ -150,8 +148,14 @@ class Run(ABC):
                 logger.debug("WebSocket logs are done for %s", self.name)
                 q.put(_done)
 
+        url = f"ws://localhost:{self.ports[DSTACK_RUNNER_HTTP_PORT]}/logs_ws"
+        query_params = {}
+        if start_time is not None:
+            query_params["start_time"] = start_time.isoformat()
+        if query_params:
+            url = f"{url}?{urlencode(query_params)}"
         ws = WebSocketApp(
-            f"ws://localhost:{self.ports[DSTACK_RUNNER_HTTP_PORT]}/logs_ws",
+            url=url,
             on_open=lambda _: logger.debug("WebSocket logs are connected to %s", self.name),
             on_close=lambda _, status_code, msg: logger.debug(
                 "WebSocket logs are disconnected. status_code: %s; message: %s",
@@ -215,7 +219,7 @@ class Run(ABC):
             Log messages.
         """
         if diagnose is False and self._ssh_attach is not None:
-            yield from self._attached_logs()
+            yield from self._attached_logs(start_time=start_time)
         else:
             job = self._find_job(replica_num=replica_num, job_num=job_num)
             if job is None:

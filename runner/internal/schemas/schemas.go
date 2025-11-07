@@ -16,7 +16,7 @@ type JobStateEvent struct {
 
 type LogEvent struct {
 	Message   []byte `json:"message"`
-	Timestamp int64  `json:"timestamp"`
+	Timestamp int64  `json:"timestamp"` // milliseconds
 }
 
 type SubmitBody struct {
