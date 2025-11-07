@@ -225,6 +225,7 @@ def get_offers_disk_modifier(
         offer_copy.instance.resources.disk = Disk(
             size_mib=get_or_error(disk_size_range.min) * 1024
         )
+        offer_copy.instance.resources.update_description()
         return offer_copy
 
     return modifier
