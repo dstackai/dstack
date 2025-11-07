@@ -278,7 +278,7 @@ class AzureCompute(
             vm_size="Standard_B1ms",
             instance_name=instance_name,
             user_data=get_gateway_user_data(
-                configuration.ssh_key_pub, router_config=configuration.router_config
+                configuration.ssh_key_pub, router=configuration.router
             ),
             ssh_pub_keys=[configuration.ssh_key_pub],
             spot=False,

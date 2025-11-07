@@ -46,7 +46,7 @@ class GatewayClient:
         options: dict,
         rate_limits: list[RateLimit],
         ssh_private_key: str,
-        router_config: Optional[AnyRouterConfig] = None,
+        router: Optional[AnyRouterConfig] = None,
     ):
         if "openai" in options:
             entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
@@ -61,7 +61,7 @@ class GatewayClient:
             "options": options,
             "rate_limits": [limit.dict() for limit in rate_limits],
             "ssh_private_key": ssh_private_key,
-            "router_config": router_config.dict() if router_config is not None else None,
+            "router": router.dict() if router is not None else None,
         }
         resp = await self._client.post(
             self._url(f"/api/registry/{project}/services/register"), json=payload

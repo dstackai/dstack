@@ -40,13 +40,13 @@ class Router(ABC):
 
     def __init__(
         self,
-        router_config: Optional[AnyRouterConfig] = None,
+        router: Optional[AnyRouterConfig] = None,
         context: Optional[RouterContext] = None,
     ):
         """Initialize router with context.
 
         Args:
-            router_config: Optional router configuration (implementation-specific)
+            router: Optional router configuration (implementation-specific)
             context: Runtime context for the router (host, port, logging, etc.)
         """
         self.context = context or RouterContext()

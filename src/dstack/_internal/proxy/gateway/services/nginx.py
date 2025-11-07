@@ -70,7 +70,7 @@ class ServiceConfig(SiteConfig):
     limit_req_zones: list[LimitReqZoneConfig]
     locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
-    router_config: Optional[AnyRouterConfig] = None
+    router: Optional[AnyRouterConfig] = None
     model_id: Optional[str] = None
 
 
@@ -95,7 +95,7 @@ class Nginx:
                 await run_async(self.run_certbot, conf.domain, acme)
             await run_async(self.write_conf, conf.render(), conf_name)
 
-            if isinstance(conf, ServiceConfig) and conf.router_config and conf.model_id:
+            if isinstance(conf, ServiceConfig) and conf.router and conf.model_id:
                 if self._router is None:
                     ctx = RouterContext(
                         host="127.0.0.1",
@@ -103,7 +103,7 @@ class Nginx:
                         log_dir=Path("./router_logs"),
                         log_level="info",
                     )
-                    self._router = get_router(conf.router_config, context=ctx)
+                    self._router = get_router(conf.router, context=ctx)
                     if not await run_async(self._router.is_running):
                         await run_async(self._router.start)
 

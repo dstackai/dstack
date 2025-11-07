@@ -877,9 +877,7 @@ def get_run_shim_script(
     ]
 
 
-def get_gateway_user_data(
-    authorized_key: str, router_config: Optional[AnyRouterConfig] = None
-) -> str:
+def get_gateway_user_data(authorized_key: str, router: Optional[AnyRouterConfig] = None) -> str:
     return get_cloud_config(
         package_update=True,
         packages=[
@@ -895,7 +893,7 @@ def get_gateway_user_data(
                 "s/# server_names_hash_bucket_size 64;/server_names_hash_bucket_size 128;/",
                 "/etc/nginx/nginx.conf",
             ],
-            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands(router_config))],
+            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands(router))],
         ],
         ssh_authorized_keys=[authorized_key],
     )
@@ -1028,12 +1026,12 @@ def get_dstack_gateway_wheel(build: str) -> str:
     return "https://bihan-test-bucket.s3.eu-west-1.amazonaws.com/dstack_gateway-0.0.1-py3-none-any.whl"
 
 
-def get_dstack_gateway_commands(router_config: Optional[AnyRouterConfig] = None) -> List[str]:
+def get_dstack_gateway_commands(router: Optional[AnyRouterConfig] = None) -> List[str]:
     build = get_dstack_runner_version()
     wheel = get_dstack_gateway_wheel(build)
     # Use router type directly as pip extra
-    if router_config:
-        gateway_package = f"dstack-gateway[{router_config.type}]"
+    if router:
+        gateway_package = f"dstack-gateway[{router.type}]"
     else:
         gateway_package = "dstack-gateway"
     return [

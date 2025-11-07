@@ -108,7 +108,7 @@ async def create_gateway_compute(
         ssh_key_pub=gateway_ssh_public_key,
         certificate=configuration.certificate,
         tags=configuration.tags,
-        router_config=configuration.router_config,
+        router=configuration.router,
     )
 
     gpd = await run_async(
@@ -455,8 +455,8 @@ async def _update_gateway(gateway_compute_model: GatewayComputeModel, build: str
     )
 
     # Determine gateway package with router extras (similar to compute.py)
-    if compute_config.router_config:
-        gateway_package = f"dstack-gateway[{compute_config.router_config.type}]"
+    if compute_config.router:
+        gateway_package = f"dstack-gateway[{compute_config.router.type}]"
     else:
         gateway_package = "dstack-gateway"
 

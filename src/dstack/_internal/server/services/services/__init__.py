@@ -82,7 +82,7 @@ async def _register_service_in_gateway(
 
     gateway_configuration = get_gateway_configuration(gateway)
     service_https = _get_service_https(run_spec, gateway_configuration)
-    router_config = gateway_configuration.router_config
+    router = gateway_configuration.router
     service_protocol = "https" if service_https else "http"
 
     if service_https and gateway_configuration.certificate is None:
@@ -120,7 +120,7 @@ async def _register_service_in_gateway(
                 options=service_spec.options,
                 rate_limits=run_spec.configuration.rate_limits,
                 ssh_private_key=run_model.project.ssh_private_key,
-                router_config=router_config,
+                router=router,
             )
         logger.info("%s: service is registered as %s", fmt(run_model), service_spec.url)
     except SSHError:

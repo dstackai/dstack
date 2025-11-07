@@ -45,7 +45,7 @@ async def register_service(
     repo: GatewayProxyRepo,
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
-    router_config: Optional[AnyRouterConfig] = None,
+    router: Optional[AnyRouterConfig] = None,
 ) -> None:
     service = models.Service(
         project_name=project_name,
@@ -56,7 +56,7 @@ async def register_service(
         auth=auth,
         client_max_body_size=client_max_body_size,
         replicas=(),
-        router_config=router_config,
+        router=router,
         model_id=model.name if model is not None else None,
     )
 
@@ -339,7 +339,7 @@ async def get_nginx_service_config(
         limit_req_zones=limit_req_zones,
         locations=locations,
         replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
-        router_config=service.router_config,
+        router=service.router,
         model_id=service.model_id,
     )
 

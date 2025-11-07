@@ -461,7 +461,7 @@ class AWSCompute(
                 instance_type="t3.micro",
                 iam_instance_profile=None,
                 user_data=get_gateway_user_data(
-                    configuration.ssh_key_pub, router_config=configuration.router_config
+                    configuration.ssh_key_pub, router=configuration.router
                 ),
                 tags=tags,
                 security_group_id=security_group_id,

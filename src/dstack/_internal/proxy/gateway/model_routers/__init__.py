@@ -37,9 +37,9 @@ def get_router_class(router_type: RouterType) -> Optional[Type[Router]]:
     return _ROUTER_TYPE_TO_CLASS_MAP.get(router_type)
 
 
-def get_router(router_config: AnyRouterConfig, context: Optional[RouterContext] = None) -> Router:
+def get_router(router: AnyRouterConfig, context: Optional[RouterContext] = None) -> Router:
     """Factory function to create a router instance from router configuration."""
-    router_type = RouterType(router_config.type)
+    router_type = RouterType(router.type)
     router_class = get_router_class(router_type)
 
     if router_class is None:
@@ -50,8 +50,8 @@ def get_router(router_config: AnyRouterConfig, context: Optional[RouterContext] 
         )
 
     # Router implementations may have different constructor signatures
-    # SglangRouter takes (router_config, context), others might differ
-    return router_class(router_config=router_config, context=context)
+    # SglangRouter takes (router, context), others might differ
+    return router_class(router=router, context=context)
 
 
 __all__ = [

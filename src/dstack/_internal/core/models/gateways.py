@@ -51,7 +51,7 @@ class GatewayConfiguration(CoreModel):
     default: Annotated[bool, Field(description="Make the gateway default")] = False
     backend: Annotated[BackendType, Field(description="The gateway backend")]
     region: Annotated[str, Field(description="The gateway region")]
-    router_config: Annotated[
+    router: Annotated[
         Optional[AnyRouterConfig],
         Field(description="The router configuration"),
     ] = None
@@ -118,7 +118,7 @@ class GatewayComputeConfiguration(CoreModel):
     ssh_key_pub: str
     certificate: Optional[AnyGatewayCertificate] = None
     tags: Optional[Dict[str, str]] = None
-    router_config: Optional[AnyRouterConfig] = None
+    router: Optional[AnyRouterConfig] = None
 
 
 class GatewayProvisioningData(CoreModel):

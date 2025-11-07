@@ -20,15 +20,15 @@ class SglangRouter(Router):
 
     TYPE = "sglang"
 
-    def __init__(self, router_config: SGLangRouterConfig, context: Optional[RouterContext] = None):
+    def __init__(self, router: SGLangRouterConfig, context: Optional[RouterContext] = None):
         """Initialize SGLang router.
 
         Args:
-            router_config: SGLang router configuration (policy, cache_threshold, etc.)
+            router: SGLang router configuration (policy, cache_threshold, etc.)
             context: Runtime context for the router (host, port, logging, etc.)
         """
-        super().__init__(router_config=router_config, context=context)
-        self.config = router_config
+        super().__init__(router=router, context=context)
+        self.config = router
         self._domain_to_model_id: Dict[str, str] = {}  # domain -> model_id
         self._domain_to_ports: Dict[
             str, List[int]

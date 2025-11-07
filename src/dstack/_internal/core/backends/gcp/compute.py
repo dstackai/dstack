@@ -600,7 +600,7 @@ class GCPCompute(
             accelerators=[],
             spot=False,
             user_data=get_gateway_user_data(
-                configuration.ssh_key_pub, router_config=configuration.router_config
+                configuration.ssh_key_pub, router=configuration.router
             ),
             authorized_keys=[configuration.ssh_key_pub],
             labels=labels,
