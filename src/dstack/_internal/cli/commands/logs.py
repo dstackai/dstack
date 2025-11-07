@@ -1,12 +1,10 @@
 import argparse
 import sys
-from datetime import datetime
-from typing import Optional
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.completion import RunNameCompleter
+from dstack._internal.cli.utils.common import get_start_time
 from dstack._internal.core.errors import CLIError
-from dstack._internal.utils.common import parse_since
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -49,7 +47,7 @@ class LogsCommand(APIBaseCommand):
         if run is None:
             raise CLIError(f"Run {args.run_name} not found")
 
-        start_time = _get_start_time(args.since)
+        start_time = get_start_time(args.since)
         logs = run.logs(
             start_time=start_time,
             diagnose=args.diagnose,
@@ -62,12 +60,3 @@ class LogsCommand(APIBaseCommand):
                 sys.stdout.buffer.flush()
         except KeyboardInterrupt:
             pass
-
-
-def _get_start_time(since: Optional[str]) -> Optional[datetime]:
-    if since is None:
-        return None
-    try:
-        return parse_since(since)
-    except ValueError as e:
-        raise CLIError(e.args[0])
