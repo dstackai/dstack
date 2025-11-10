@@ -3,7 +3,7 @@ import tempfile
 import threading
 import time
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
 from kubernetes import client
@@ -29,7 +29,6 @@ from dstack._internal.core.backends.kubernetes.utils import (
     call_api_method,
     get_api_from_config_data,
     get_cluster_public_ip,
-    get_value,
 )
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError
@@ -53,7 +52,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Memory
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
-from dstack._internal.utils.common import parse_memory
+from dstack._internal.utils.common import get_or_error, parse_memory
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -115,14 +114,9 @@ class KubernetesCompute(
 
     def get_offers_by_requirements(
         self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    ) -> list[InstanceOfferWithAvailability]:
         instance_offers: list[InstanceOfferWithAvailability] = []
-        node_list = call_api_method(
-            self.api.list_node,
-            client.V1NodeList,
-        )
-        nodes = get_value(node_list, ".items", list[client.V1Node], required=True)
-        for node in nodes:
+        for node in self.api.list_node().items:
             if (instance_offer := _get_instance_offer_from_node(node)) is not None:
                 instance_offers.extend(
                     filter_offers_by_requirements([instance_offer], requirements)
@@ -136,7 +130,7 @@ class KubernetesCompute(
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-        volumes: List[Volume],
+        volumes: list[Volume],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name_for_job(run, job)
         assert run.run_spec.ssh_key_pub is not None
@@ -277,15 +271,11 @@ class KubernetesCompute(
                 volumes=volumes_,
             ),
         )
-        call_api_method(
-            self.api.create_namespaced_pod,
-            client.V1Pod,
+        self.api.create_namespaced_pod(
             namespace=self.config.namespace,
             body=pod,
         )
-        call_api_method(
-            self.api.create_namespaced_service,
-            client.V1Service,
+        self.api.create_namespaced_service(
             namespace=self.config.namespace,
             body=client.V1Service(
                 metadata=client.V1ObjectMeta(name=_get_pod_service_name(instance_name)),
@@ -325,28 +315,24 @@ class KubernetesCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ):
-        pod = call_api_method(
-            self.api.read_namespaced_pod,
-            client.V1Pod,
+        pod = self.api.read_namespaced_pod(
             name=provisioning_data.instance_id,
             namespace=self.config.namespace,
         )
-        pod_ip = get_value(pod, ".status.pod_ip", str)
+        if pod.status is None:
+            return
+        pod_ip = pod.status.pod_ip
         if not pod_ip:
             return
         provisioning_data.internal_ip = pod_ip
-        service = call_api_method(
-            self.api.read_namespaced_service,
-            client.V1Service,
+        service = self.api.read_namespaced_service(
             name=_get_pod_service_name(provisioning_data.instance_id),
             namespace=self.config.namespace,
         )
-        provisioning_data.hostname = get_value(service, ".spec.cluster_ip", str, required=True)
-        node = call_api_method(
-            self.api.read_node,
-            client.V1Node,
-            name=get_value(pod, ".spec.node_name", str, required=True),
-        )
+        service_spec = get_or_error(service.spec)
+        provisioning_data.hostname = get_or_error(service_spec.cluster_ip)
+        pod_spec = get_or_error(pod.spec)
+        node = self.api.read_node(name=get_or_error(pod_spec.node_name))
         if (instance_offer := _get_instance_offer_from_node(node)) is not None:
             provisioning_data.instance_type = instance_offer.instance
             provisioning_data.region = instance_offer.region
@@ -357,7 +343,6 @@ class KubernetesCompute(
     ):
         call_api_method(
             self.api.delete_namespaced_service,
-            client.V1Service,
             expected=404,
             name=_get_pod_service_name(instance_id),
             namespace=self.config.namespace,
@@ -365,7 +350,6 @@ class KubernetesCompute(
         )
         call_api_method(
             self.api.delete_namespaced_pod,
-            client.V1Pod,
             expected=404,
             name=instance_id,
             namespace=self.config.namespace,
@@ -414,9 +398,7 @@ class KubernetesCompute(
                 ]
             ),
         )
-        call_api_method(
-            self.api.create_namespaced_pod,
-            client.V1Pod,
+        self.api.create_namespaced_pod(
             namespace=self.config.namespace,
             body=pod,
         )
@@ -446,9 +428,7 @@ class KubernetesCompute(
                 ],
             ),
         )
-        call_api_method(
-            self.api.create_namespaced_service,
-            client.V1Service,
+        self.api.create_namespaced_service(
             namespace=self.config.namespace,
             body=service,
         )
@@ -485,22 +465,24 @@ class KubernetesCompute(
 
 def _get_instance_offer_from_node(node: client.V1Node) -> Optional[InstanceOfferWithAvailability]:
     try:
-        name = get_value(node, ".metadata.name", str, required=True)
-        cpu_arch = normalize_arch(
-            get_value(node, ".status.node_info.architecture", str)
-        ).to_cpu_architecture()
-        allocatable = get_value(node, ".status.allocatable", dict[str, str], required=True)
+        node_name = get_or_error(get_or_error(node.metadata).name)
+        node_status = get_or_error(node.status)
+        allocatable = get_or_error(node_status.allocatable)
+        _cpu_arch: Optional[str] = None
+        if node_status.node_info is not None:
+            _cpu_arch = node_status.node_info.architecture
+        cpu_arch = normalize_arch(_cpu_arch).to_cpu_architecture()
         cpus = _parse_cpu(allocatable["cpu"])
         memory_mib = _parse_memory(allocatable["memory"])
         disk_size_mib = _parse_memory(allocatable["ephemeral-storage"])
         gpus = _get_node_gpus(node)
-    except (AttributeError, KeyError, ValueError) as e:
+    except (ValueError, KeyError) as e:
         logger.exception("Failed to process node: %s: %s", type(e).__name__, e)
         return None
     return InstanceOfferWithAvailability(
         backend=BackendType.KUBERNETES,
         instance=InstanceType(
-            name=name,
+            name=node_name,
             resources=Resources(
                 cpus=cpus,
                 cpu_arch=cpu_arch,
@@ -535,10 +517,18 @@ def _render_memory(memory: Memory) -> str:
     return f"{float(memory)}Gi"
 
 
+def _get_node_labels(node: client.V1Node) -> dict[str, str]:
+    if (metadata := node.metadata) is None:
+        return {}
+    if (labels := metadata.labels) is None:
+        return {}
+    return labels
+
+
 def _get_node_gpus(node: client.V1Node) -> list[Gpu]:
-    node_name = get_value(node, ".metadata.name", str, required=True)
-    allocatable = get_value(node, ".status.allocatable", dict[str, str], required=True)
-    labels = get_value(node, ".metadata.labels", dict[str, str]) or {}
+    node_name = get_or_error(get_or_error(node.metadata).name)
+    allocatable = get_or_error(get_or_error(node.status).allocatable)
+    labels = _get_node_labels(node)
     for gpu_resource, gpu_getter in (
         (NVIDIA_GPU_RESOURCE, _get_nvidia_gpu_from_node_labels),
         (AMD_GPU_RESOURCE, _get_amd_gpu_from_node_labels),
@@ -609,8 +599,7 @@ def _get_amd_gpu_from_node_labels(labels: dict[str, str]) -> Optional[Gpu]:
 def _get_pod_spec_parameters_for_gpu(
     api: client.CoreV1Api, gpu_spec: GPUSpec
 ) -> tuple[str, client.V1NodeAffinity, str]:
-    node_list = call_api_method(api.list_node, client.V1NodeList)
-    nodes = get_value(node_list, ".items", list[client.V1Node], required=True)
+    nodes = api.list_node().items
     gpu_vendor = gpu_spec.vendor
     # If no vendor specified, we assume it's NVIDIA. Technically, it's possible to request either
     # NVIDIA or AMD in the run configuration using only GPU names (e.g.,`gpu: H100,MI300X:8`),
@@ -629,7 +618,7 @@ def _get_nvidia_gpu_node_affinity(
 ) -> client.V1NodeAffinity:
     matching_gpu_label_values: set[str] = set()
     for node in nodes:
-        labels = get_value(node, ".metadata.labels", dict[str, str]) or {}
+        labels = _get_node_labels(node)
         gpu = _get_nvidia_gpu_from_node_labels(labels)
         if gpu is not None and _gpu_matches_gpu_spec(gpu, gpu_spec):
             matching_gpu_label_values.add(labels[NVIDIA_GPU_PRODUCT_LABEL])
@@ -662,7 +651,7 @@ def _get_amd_gpu_node_affinity(
 ) -> client.V1NodeAffinity:
     matching_device_ids: set[int] = set()
     for node in nodes:
-        labels = get_value(node, ".metadata.labels", dict[str, str]) or {}
+        labels = _get_node_labels(node)
         gpu = _get_amd_gpu_from_node_labels(labels)
         if gpu is not None and _gpu_matches_gpu_spec(gpu, gpu_spec):
             matching_device_ids.update(AMD_GPU_NAME_TO_DEVICE_IDS[gpu.name])
@@ -732,15 +721,14 @@ def _create_jump_pod_service_if_not_exists(
     api: client.CoreV1Api,
     namespace: str,
     project_name: str,
-    ssh_public_keys: List[str],
+    ssh_public_keys: list[str],
     jump_pod_port: Optional[int],
-) -> Tuple[int, bool]:
+) -> tuple[int, bool]:
     created = False
     service: Optional[client.V1Service] = None
     pod: Optional[client.V1Pod] = None
     _namespace = call_api_method(
         api.read_namespace,
-        client.V1Namespace,
         expected=404,
         name=namespace,
     )
@@ -751,22 +739,16 @@ def _create_jump_pod_service_if_not_exists(
                 labels={"app.kubernetes.io/name": namespace},
             ),
         )
-        call_api_method(
-            api.create_namespace,
-            client.V1Namespace,
-            body=_namespace,
-        )
+        api.create_namespace(body=_namespace)
     else:
         service = call_api_method(
             api.read_namespaced_service,
-            client.V1Service,
             expected=404,
             name=_get_jump_pod_service_name(project_name),
             namespace=namespace,
         )
         pod = call_api_method(
             api.read_namespaced_pod,
-            client.V1Pod,
             expected=404,
             name=_get_jump_pod_name(project_name),
             namespace=namespace,
@@ -782,7 +764,13 @@ def _create_jump_pod_service_if_not_exists(
             jump_pod_port=jump_pod_port,
         )
         created = True
-    port = get_value(service, ".spec.ports[0].node_port", int, required=True)
+    port: Optional[int] = None
+    if service.spec is not None and service.spec.ports:
+        port = service.spec.ports[0].node_port
+    if port is None:
+        raise ComputeError(
+            f"Failed to get NodePort of jump pod Service for project '{project_name}'"
+        )
     return port, created
 
 
@@ -790,39 +778,36 @@ def _create_jump_pod_service(
     api: client.CoreV1Api,
     namespace: str,
     project_name: str,
-    ssh_public_keys: List[str],
+    ssh_public_keys: list[str],
     jump_pod_port: Optional[int],
 ) -> client.V1Service:
     # TODO use restricted ssh-forwarding-only user for jump pod instead of root.
     pod_name = _get_jump_pod_name(project_name)
     call_api_method(
         api.delete_namespaced_pod,
-        client.V1Pod,
         expected=404,
         namespace=namespace,
         name=pod_name,
     )
 
-    node_list = call_api_method(api.list_node, client.V1NodeList)
-    nodes = get_value(node_list, ".items", list[client.V1Node], required=True)
     # False if we found at least one node without any "hard" taint, that is, if we don't need to
     # specify the toleration.
     toleration_required = True
     # (key, effect) pairs.
     tolerated_taints: set[tuple[str, str]] = set()
-    for node in nodes:
+    for node in api.list_node().items:
+        if (node_spec := node.spec) is None:
+            continue
         # True if the node has at least one NoExecute or NoSchedule taint.
         has_hard_taint = False
-        taints = get_value(node, ".spec.taints", list[client.V1Taint]) or []
+        taints = node_spec.taints or []
         for taint in taints:
-            effect = get_value(taint, ".effect", str, required=True)
             # A "soft" taint, ignore.
-            if effect == TaintEffect.PREFER_NO_SCHEDULE:
+            if taint.effect == TaintEffect.PREFER_NO_SCHEDULE:
                 continue
             has_hard_taint = True
-            key = get_value(taint, ".key", str, required=True)
-            if key in TOLERATED_NODE_TAINTS:
-                tolerated_taints.add((key, effect))
+            if taint.key in TOLERATED_NODE_TAINTS:
+                tolerated_taints.add((taint.key, taint.effect))
         if not has_hard_taint:
             toleration_required = False
             break
@@ -859,16 +844,13 @@ def _create_jump_pod_service(
             tolerations=tolerations,
         ),
     )
-    call_api_method(
-        api.create_namespaced_pod,
-        client.V1Pod,
+    api.create_namespaced_pod(
         namespace=namespace,
         body=pod,
     )
     service_name = _get_jump_pod_service_name(project_name)
     call_api_method(
         api.delete_namespaced_service,
-        client.V1Service,
         expected=404,
         namespace=namespace,
         name=service_name,
@@ -887,15 +869,13 @@ def _create_jump_pod_service(
             ],
         ),
     )
-    return call_api_method(
-        api.create_namespaced_service,
-        client.V1Service,
+    return api.create_namespaced_service(
         namespace=namespace,
         body=service,
     )
 
 
-def _get_jump_pod_commands(authorized_keys: List[str]) -> List[str]:
+def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
     commands = [
         # prohibit password authentication
@@ -925,16 +905,14 @@ def _wait_for_pod_ready(
     while True:
         pod = call_api_method(
             api.read_namespaced_pod,
-            client.V1Pod,
             expected=404,
             name=pod_name,
             namespace=namespace,
         )
         if pod is not None:
-            phase = get_value(pod, ".status.phase", str, required=True)
-            container_statuses = get_value(
-                pod, ".status.container_statuses", list[client.V1ContainerStatus], required=True
-            )
+            pod_status = get_or_error(pod.status)
+            phase = get_or_error(pod_status.phase)
+            container_statuses = get_or_error(pod_status.container_statuses)
             if phase == "Running" and all(status.ready for status in container_statuses):
                 return True
         elapsed_time = time.time() - start_time
@@ -954,15 +932,18 @@ def _wait_for_load_balancer_hostname(
     while True:
         service = call_api_method(
             api.read_namespaced_service,
-            client.V1Service,
             expected=404,
             name=service_name,
             namespace=namespace,
         )
-        if service is not None:
-            hostname = get_value(service, ".status.load_balancer.ingress[0].hostname", str)
-            if hostname is not None:
-                return hostname
+        if (
+            service is not None
+            and (service_status := service.status) is not None
+            and (lb_status := service_status.load_balancer) is not None
+            and (ingresses := lb_status.ingress)
+            and (hostname := ingresses[0].hostname) is not None
+        ):
+            return hostname
         elapsed_time = time.time() - start_time
         if elapsed_time >= timeout_seconds:
             logger.warning("Timeout waiting for load balancer %s to get ip", service_name)
@@ -988,7 +969,7 @@ def _add_authorized_key_to_jump_pod(
     )
 
 
-def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
+def _get_gateway_commands(authorized_keys: list[str]) -> list[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
     gateway_commands = " && ".join(get_dstack_gateway_commands())
     commands = [

@@ -108,6 +108,7 @@ dev = [
     "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
     "pyinstrument>=5.0.0",
+    "kubernetes-stubs-elephant-fork",
 ]
 
 [project.optional-dependencies]
