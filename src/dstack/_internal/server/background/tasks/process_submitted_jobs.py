@@ -335,17 +335,14 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                     return
             instance = await _assign_job_to_fleet_instance(
                 session=session,
+                fleet_model=fleet_model,
                 instances_with_offers=fleet_instances_with_offers,
                 job_model=job_model,
                 multinode=multinode,
             )
-            job_model.fleet = fleet_model
-            job_model.instance_assigned = True
             job_model.last_processed_at = common_utils.get_current_datetime()
-            if len(instances_ids) > 0:
-                await session.commit()
-                return
-            # If no instances were locked, we can proceed in the same transaction.
+            await session.commit()
+            return
 
     # TODO: Volume attachment for compute groups is not yet supported since
     # currently supported compute groups (e.g. Runpod) don't need explicit volume attachment.
@@ -598,6 +595,13 @@ async def _find_optimal_fleet_with_offers(
     ] = []
     for candidate_fleet_model in fleet_models:
         candidate_fleet = fleet_model_to_fleet(candidate_fleet_model)
+        if (
+            job.job_spec.jobs_per_replica > 1
+            and candidate_fleet.spec.configuration != InstanceGroupPlacement.CLUSTER
+        ):
+            # Limit multinode runs to cluster fleets to guarantee best connectivity.
+            continue
+
         fleet_instances_with_pool_offers = _get_fleet_instances_with_pool_offers(
             fleet_model=candidate_fleet_model,
             run_spec=run_spec,
@@ -760,8 +764,9 @@ def _get_fleet_instances_with_pool_offers(
 
 async def _assign_job_to_fleet_instance(
     session: AsyncSession,
-    instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+    fleet_model: Optional[FleetModel],
     job_model: JobModel,
+    instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
     multinode: bool,
 ) -> Optional[InstanceModel]:
     if len(instances_with_offers) == 0:
@@ -789,6 +794,8 @@ async def _assign_job_to_fleet_instance(
         },
     )
     logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
+    job_model.fleet = fleet_model
+    job_model.instance_assigned = True
     job_model.instance = instance
     job_model.used_instance_id = instance.id
     job_model.job_provisioning_data = instance.job_provisioning_data
