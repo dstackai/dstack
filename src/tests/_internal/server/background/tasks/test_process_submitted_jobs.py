@@ -546,6 +546,7 @@ class TestProcessSubmittedJobs:
         )
         offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
         fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
         fleet_spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=None)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
         instance = await create_instance(

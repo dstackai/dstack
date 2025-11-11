@@ -585,7 +585,6 @@ async def _refetch_fleet_models_with_instances(
             *instance_filters,
         )
         .options(contains_eager(FleetModel.instances))
-        .execution_options(populate_existing=True)
     )
     fleet_models = list(res.unique().scalars().all())
     return fleet_models
@@ -631,7 +630,7 @@ async def _find_optimal_fleet_with_offers(
         candidate_fleet = fleet_model_to_fleet(candidate_fleet_model)
         if (
             job.job_spec.jobs_per_replica > 1
-            and candidate_fleet.spec.configuration != InstanceGroupPlacement.CLUSTER
+            and candidate_fleet.spec.configuration.placement != InstanceGroupPlacement.CLUSTER
         ):
             # Limit multinode runs to cluster fleets to guarantee best connectivity.
             continue
@@ -826,6 +825,8 @@ async def _assign_job_to_fleet_instance(
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
     multinode: bool,
 ) -> Optional[InstanceModel]:
+    job_model.fleet = fleet_model
+    job_model.instance_assigned = True
     if len(instances_with_offers) == 0:
         return None
 
@@ -851,8 +852,6 @@ async def _assign_job_to_fleet_instance(
         },
     )
     logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
-    job_model.fleet = fleet_model
-    job_model.instance_assigned = True
     job_model.instance = instance
     job_model.used_instance_id = instance.id
     job_model.job_provisioning_data = instance.job_provisioning_data
