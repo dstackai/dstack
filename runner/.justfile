@@ -56,7 +56,12 @@ build-shim-binary:
     cd {{source_directory()}}/cmd/shim
     if [ -n "$shim_os" ] && [ -n "$shim_arch" ]; then
         echo "Building shim for $shim_os/$shim_arch"
-        GOOS=$shim_os GOARCH=$shim_arch go build -ldflags "-X 'main.Version=$version' -extldflags '-static'"
+        if [ "$shim_os" = "linux" ] && [ "$(uname -s)" != "Linux" ]; then
+            echo "WARNING: Cross-compiling to Linux, disabling CGO (DCGM unavailable)"
+            CGO_ENABLED=0 GOOS=$shim_os GOARCH=$shim_arch go build -ldflags "-X 'main.Version=$version' -extldflags '-static'"
+        else
+            GOOS=$shim_os GOARCH=$shim_arch go build -ldflags "-X 'main.Version=$version' -extldflags '-static'"
+        fi
     else
         echo "Building shim for current platform"
         go build -ldflags "-X 'main.Version=$version' -extldflags '-static'"
