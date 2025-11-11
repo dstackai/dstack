@@ -50,7 +50,13 @@ from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_compute_groups import ComputeGroupStatus
-from dstack._internal.server.db import get_db, get_session_ctx, sqlite_commit
+from dstack._internal.server.db import (
+    get_db,
+    get_session_ctx,
+    is_db_postgres,
+    is_db_sqlite,
+    sqlite_commit,
+)
 from dstack._internal.server.models import (
     ComputeGroupModel,
     FleetModel,
@@ -289,7 +295,7 @@ async def _process_submitted_job(
         await exit_stack.enter_async_context(
             get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids)
         )
-        if get_db().dialect_name == "sqlite":
+        if is_db_sqlite():
             fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
             fleet_models_with_instances = await _refetch_fleet_models_with_instances(
                 session=session,
@@ -1069,10 +1075,10 @@ async def _create_fleet_model_for_job(
         placement = InstanceGroupPlacement.CLUSTER
     nodes = _get_nodes_required_num_for_run(run.run_spec)
     lock_namespace = f"fleet_names_{project.name}"
-    if get_db().dialect_name == "sqlite":
+    if is_db_sqlite():
         # Start new transaction to see committed changes after lock
         await session.commit()
-    if get_db().dialect_name == "postgresql":
+    elif is_db_postgres():
         await session.execute(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )

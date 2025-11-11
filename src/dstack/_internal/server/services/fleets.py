@@ -45,7 +45,7 @@ from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import ModelDiff, copy_model, diff_models
-from dstack._internal.server.db import get_db
+from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -675,14 +675,13 @@ async def _create_fleet(
     spec: FleetSpec,
 ) -> Fleet:
     lock_namespace = f"fleet_names_{project.name}"
-    if get_db().dialect_name == "sqlite":
+    if is_db_sqlite():
         # Start new transaction to see committed changes after lock
         await session.commit()
-    elif get_db().dialect_name == "postgresql":
+    elif is_db_postgres():
         await session.execute(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
-
     lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         if spec.configuration.name is not None:
