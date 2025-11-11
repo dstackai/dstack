@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import math
 import uuid
+from contextlib import AsyncExitStack
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
 
@@ -170,14 +171,21 @@ async def _process_next_submitted_job():
             lockset.add(job_model.id)
         job_model_id = job_model.id
         try:
-            await _process_submitted_job(session=session, job_model=job_model)
+            async with AsyncExitStack() as exit_stack:
+                await _process_submitted_job(
+                    exit_stack=exit_stack,
+                    session=session,
+                    job_model=job_model,
+                )
         finally:
             lockset.difference_update([job_model_id])
         global last_processed_at
         last_processed_at = common_utils.get_current_datetime()
 
 
-async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
+async def _process_submitted_job(
+    exit_stack: AsyncExitStack, session: AsyncSession, job_model: JobModel
+):
     # Refetch to load related attributes.
     res = await session.execute(
         select(JobModel)
@@ -368,11 +376,19 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
         master_instance_provisioning_data = None
         if job.job_spec.job_num == 0 and fleet_model is not None:
-            # TODO: Lock on SQLite
             fleet = fleet_model_to_fleet(fleet_model)
             if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
                 # To avoid violating fleet placement cluster during master provisioning,
                 # we must lock empty fleets and respect existing instances in non-empty fleets.
+                # On SQLite, always take the lock during master provisioning for simplicity.
+                await exit_stack.enter_async_context(
+                    get_locker(get_db().dialect_name).lock_ctx(
+                        FleetModel.__tablename__, [fleet_model.id]
+                    )
+                )
+                if get_db().dialect_name == "sqlite":
+                    # Start new transaction to see committed changes after lock
+                    await session.commit()
                 res = await session.execute(
                     select(FleetModel)
                     .outerjoin(FleetModel.instances)
@@ -381,6 +397,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                         InstanceModel.id.is_(None),
                     )
                     .with_for_update(key_share=True, of=FleetModel)
+                    .execution_options(populate_existing=True)
                 )
                 empty_fleet_model = res.unique().scalar()
                 if empty_fleet_model is not None:
@@ -390,6 +407,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                         select(FleetModel)
                         .where(FleetModel.id == fleet_model.id)
                         .options(joinedload(FleetModel.instances))
+                        .execution_options(populate_existing=True)
                     )
                     fleet_model = res.unique().scalar_one()
                 master_instance_provisioning_data = _get_fleet_master_instance_provisioning_data(
@@ -513,19 +531,19 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             .order_by(VolumeModel.id)  # take locks in order
             .with_for_update(key_share=True, of=VolumeModel)
         )
-        async with get_locker(get_db().dialect_name).lock_ctx(
-            VolumeModel.__tablename__, volumes_ids
-        ):
-            if len(volume_models) > 0:
-                assert instance is not None
-                await _attach_volumes(
-                    session=session,
-                    project=project,
-                    job_model=job_model,
-                    instance=instance,
-                    volume_models=volume_models,
-                )
-            await session.commit()
+        await exit_stack.enter_async_context(
+            get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids)
+        )
+        if len(volume_models) > 0:
+            assert instance is not None
+            await _attach_volumes(
+                session=session,
+                project=project,
+                job_model=job_model,
+                instance=instance,
+                volume_models=volume_models,
+            )
+    await session.commit()
 
 
 async def _select_fleet_models(
@@ -542,6 +560,7 @@ async def _select_fleet_models(
         .options(contains_eager(FleetModel.instances))
         .order_by(InstanceModel.id)  # take locks in order
         .with_for_update(key_share=True, of=InstanceModel)
+        .execution_options(populate_existing=True)
     )
     fleet_models_with_instances = list(res.unique().scalars().all())
     fleet_models_with_instances_ids = [f.id for f in fleet_models_with_instances]
@@ -561,6 +580,7 @@ async def _select_fleet_models(
         # Load empty list of instances so that downstream code
         # knows this fleet has no instances eligible for offers.
         .options(noload(FleetModel.instances))
+        .execution_options(populate_existing=True)
     )
     fleet_models_without_instances = list(res.unique().scalars().all())
     return fleet_models_with_instances, fleet_models_without_instances
