@@ -366,6 +366,37 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
 
+        master_instance_provisioning_data = None
+        if job.job_spec.job_num == 0 and fleet_model is not None:
+            # TODO: Lock on SQLite
+            fleet = fleet_model_to_fleet(fleet_model)
+            if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
+                # To avoid violating fleet placement cluster during master provisioning,
+                # we must lock empty fleets and respect existing instances in non-empty fleets.
+                res = await session.execute(
+                    select(FleetModel)
+                    .outerjoin(FleetModel.instances)
+                    .where(
+                        FleetModel.id == fleet_model.id,
+                        InstanceModel.id.is_(None),
+                    )
+                    .with_for_update(key_share=True, of=FleetModel)
+                )
+                empty_fleet_model = res.unique().scalar()
+                if empty_fleet_model is not None:
+                    fleet_model = empty_fleet_model
+                else:
+                    res = await session.execute(
+                        select(FleetModel)
+                        .where(FleetModel.id == fleet_model.id)
+                        .options(joinedload(FleetModel.instances))
+                    )
+                    fleet_model = res.unique().scalar_one()
+                master_instance_provisioning_data = _get_fleet_master_instance_provisioning_data(
+                    fleet_model=fleet_model,
+                    fleet_spec=fleet.spec,
+                )
+
         jobs_to_provision = [job]
         if (
             multinode
@@ -377,6 +408,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         ):
             jobs_to_provision = replica_jobs
 
+        master_provisioning_data = (
+            master_job_provisioning_data or master_instance_provisioning_data
+        )
         run_job_result = await _run_jobs_on_new_instances(
             project=project,
             fleet_model=fleet_model,
@@ -385,7 +419,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             jobs=jobs_to_provision,
             project_ssh_public_key=project.ssh_public_key,
             project_ssh_private_key=project.ssh_private_key,
-            master_job_provisioning_data=master_job_provisioning_data,
+            master_job_provisioning_data=master_provisioning_data,
             volumes=volumes,
         )
         if run_job_result is None:
@@ -606,7 +640,9 @@ async def _find_optimal_fleet_with_offers(
             fleet_model=candidate_fleet_model,
             run_spec=run_spec,
             job=job,
-            master_job_provisioning_data=master_job_provisioning_data,
+            # No need to pass master_job_provisioning_data for master job
+            # as all pool offers are suitable.
+            master_job_provisioning_data=None,
             volumes=volumes,
         )
         fleet_has_pool_capacity = nodes_required_num <= len(fleet_instances_with_pool_offers)
@@ -624,6 +660,11 @@ async def _find_optimal_fleet_with_offers(
         except ValueError:
             fleet_backend_offers = []
         else:
+            # Master job offers must be in the same cluster as existing instances.
+            master_instance_provisioning_data = _get_fleet_master_instance_provisioning_data(
+                fleet_model=candidate_fleet_model,
+                fleet_spec=candidate_fleet.spec,
+            )
             # Handle multinode for old jobs that don't have requirements.multinode set.
             # TODO: Drop multinode param.
             multinode = requirements.multinode or job.job_spec.jobs_per_replica > 1
@@ -633,7 +674,7 @@ async def _find_optimal_fleet_with_offers(
                 requirements=requirements,
                 exclude_not_available=True,
                 multinode=multinode,
-                master_job_provisioning_data=master_job_provisioning_data,
+                master_job_provisioning_data=master_instance_provisioning_data,
                 volumes=volumes,
                 privileged=job.job_spec.privileged,
                 instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
@@ -687,6 +728,22 @@ def _get_nodes_required_num_for_run(run_spec: RunSpec) -> int:
     ):
         nodes_required_num = run_spec.configuration.replicas.min
     return nodes_required_num
+
+
+def _get_fleet_master_instance_provisioning_data(
+    fleet_model: FleetModel,
+    fleet_spec: FleetSpec,
+) -> Optional[JobProvisioningData]:
+    master_instance_provisioning_data = None
+    if fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
+        # Offers for master jobs must be in the same cluster as existing instances.
+        fleet_instance_models = [im for im in fleet_model.instances if not im.deleted]
+        if len(fleet_instance_models) > 0:
+            master_instance_model = fleet_instance_models[0]
+            master_instance_provisioning_data = JobProvisioningData.__response__.parse_raw(
+                master_instance_model.job_provisioning_data
+            )
+    return master_instance_provisioning_data
 
 
 def _run_can_fit_into_fleet(run_spec: RunSpec, fleet: Fleet) -> bool:

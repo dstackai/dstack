@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import TaskConfiguration
-from dstack._internal.core.models.fleets import FleetNodesSpec
+from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -1188,6 +1188,59 @@ class TestProcessSubmittedJobs:
         assert job2.status == JobStatus.PROVISIONING
         res = await session.execute(select(ComputeGroupModel))
         assert res.scalar() is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_provisioning_master_job_respects_cluster_placement_in_non_empty_fleet(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            backend=BackendType.AWS,
+            job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
+        )
+        configuration = TaskConfiguration(image="debian", nodes=2)
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            fleet=fleet,
+            instance_assigned=True,
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            offer1 = get_instance_offer_with_availability(region="eu-west-2")
+            offer2 = get_instance_offer_with_availability(region="eu-west-1")
+            backend_mock.compute.return_value.get_offers.return_value = [offer1, offer2]
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
+            await process_submitted_jobs()
+            m.assert_called_once()
+            backend_mock.compute.return_value.get_offers.assert_called_once()
+            backend_mock.compute.return_value.run_job.assert_called_once()
+            selected_offer = backend_mock.compute.return_value.run_job.call_args[0][2]
+            assert selected_offer.region == "eu-west-1"
+        await session.refresh(job)
+        assert job.status == JobStatus.PROVISIONING
 
 
 @pytest.mark.parametrize(
