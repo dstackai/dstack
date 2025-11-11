@@ -103,6 +103,23 @@ def session_decorator(func):
     return new_func
 
 
+def is_db_sqlite() -> bool:
+    return get_db().dialect_name == "sqlite"
+
+
+def is_db_postgres() -> bool:
+    return get_db().dialect_name == "postgresql"
+
+
+async def sqlite_commit(session: AsyncSession):
+    """
+    Commit an sqlite transaction.
+    Should be used before taking locks in active sessions to see committed changes.
+    """
+    if is_db_sqlite():
+        await session.commit()
+
+
 def _run_alembic_upgrade(connection):
     alembic_cfg = config.Config()
     alembic_cfg.set_main_option("script_location", settings.ALEMBIC_MIGRATIONS_LOCATION)

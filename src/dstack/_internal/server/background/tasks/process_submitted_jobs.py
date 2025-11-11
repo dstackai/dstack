@@ -50,7 +50,7 @@ from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_compute_groups import ComputeGroupStatus
-from dstack._internal.server.db import get_db, get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx, sqlite_commit
 from dstack._internal.server.models import (
     ComputeGroupModel,
     FleetModel,
@@ -266,25 +266,16 @@ async def _process_submitted_job(
     # Then, the job runs on the assigned instance or a new instance is provisioned.
     # This is needed to avoid holding instances lock for a long time.
     if not job_model.instance_assigned:
-        # If another job freed the instance but is still trying to detach volumes,
-        # do not provision on it to prevent attaching volumes that are currently detaching.
-        detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
-
-        fleet_filters = [
-            FleetModel.project_id == project.id,
-            FleetModel.deleted == False,
-        ]
-        if run_model.fleet is not None:
-            fleet_filters.append(FleetModel.id == run_model.fleet_id)
-        if run_spec.merged_profile.fleets is not None:
-            fleet_filters.append(FleetModel.name.in_(run_spec.merged_profile.fleets))
-
-        instance_filters = [
-            InstanceModel.deleted == False,
-            InstanceModel.id.not_in(detaching_instances_ids),
-        ]
-
-        fleet_models_with_instances, fleet_models_without_instances = await _select_fleet_models(
+        fleet_filters, instance_filters = await _get_candidate_fleet_models_filters(
+            session=session,
+            project=project,
+            run_model=run_model,
+            run_spec=run_spec,
+        )
+        (
+            fleet_models_with_instances,
+            fleet_models_without_instances,
+        ) = await _select_fleet_models_with_filters(
             session=session,
             fleet_filters=fleet_filters,
             instance_filters=instance_filters,
@@ -294,63 +285,61 @@ async def _process_submitted_job(
                 [i.id for i in f.instances] for f in fleet_models_with_instances
             )
         )
+        await sqlite_commit(session)
+        await exit_stack.enter_async_context(
+            get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids)
+        )
         if get_db().dialect_name == "sqlite":
-            # Start new transaction to see committed changes after lock
-            await session.commit()
-
-        async with get_locker(get_db().dialect_name).lock_ctx(
-            InstanceModel.__tablename__, instances_ids
-        ):
-            if get_db().dialect_name == "sqlite":
-                fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
-                fleet_models_with_instances = await _refetch_fleet_models_with_instances(
-                    session=session,
-                    fleets_ids=fleets_with_instances_ids,
-                    instances_ids=instances_ids,
-                    fleet_filters=fleet_filters,
-                    instance_filters=instance_filters,
-                )
-            fleet_models = fleet_models_with_instances + fleet_models_without_instances
-            fleet_model, fleet_instances_with_offers = await _find_optimal_fleet_with_offers(
-                project=project,
-                fleet_models=fleet_models,
-                run_model=run_model,
-                run_spec=run.run_spec,
-                job=job,
-                master_job_provisioning_data=master_job_provisioning_data,
-                volumes=volumes,
-            )
-            if fleet_model is None:
-                if run_spec.merged_profile.fleets is not None:
-                    # Run cannot create new fleets when fleets are specified
-                    logger.debug("%s: failed to use specified fleets", fmt(job_model))
-                    job_model.status = JobStatus.TERMINATING
-                    job_model.termination_reason = (
-                        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-                    )
-                    job_model.last_processed_at = common_utils.get_current_datetime()
-                    await session.commit()
-                    return
-                if FeatureFlags.AUTOCREATED_FLEETS_DISABLED:
-                    logger.debug("%s: no fleet found", fmt(job_model))
-                    job_model.status = JobStatus.TERMINATING
-                    job_model.termination_reason = (
-                        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-                    )
-                    job_model.termination_reason_message = "Failed to find fleet"
-                    job_model.last_processed_at = common_utils.get_current_datetime()
-                    await session.commit()
-                    return
-            instance = await _assign_job_to_fleet_instance(
+            fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
+            fleet_models_with_instances = await _refetch_fleet_models_with_instances(
                 session=session,
-                fleet_model=fleet_model,
-                instances_with_offers=fleet_instances_with_offers,
-                job_model=job_model,
-                multinode=multinode,
+                fleets_ids=fleets_with_instances_ids,
+                instances_ids=instances_ids,
+                fleet_filters=fleet_filters,
+                instance_filters=instance_filters,
             )
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
-            return
+        fleet_models = fleet_models_with_instances + fleet_models_without_instances
+        fleet_model, fleet_instances_with_offers = await _find_optimal_fleet_with_offers(
+            project=project,
+            fleet_models=fleet_models,
+            run_model=run_model,
+            run_spec=run.run_spec,
+            job=job,
+            master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
+        )
+        if fleet_model is None:
+            if run_spec.merged_profile.fleets is not None:
+                # Run cannot create new fleets when fleets are specified
+                logger.debug("%s: failed to use specified fleets", fmt(job_model))
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = (
+                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                )
+                job_model.termination_reason_message = "Failed to use specified fleets"
+                job_model.last_processed_at = common_utils.get_current_datetime()
+                await session.commit()
+                return
+            if FeatureFlags.AUTOCREATED_FLEETS_DISABLED:
+                logger.debug("%s: no fleet found", fmt(job_model))
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = (
+                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                )
+                job_model.termination_reason_message = "Failed to find fleet"
+                job_model.last_processed_at = common_utils.get_current_datetime()
+                await session.commit()
+                return
+        instance = await _assign_job_to_fleet_instance(
+            session=session,
+            fleet_model=fleet_model,
+            instances_with_offers=fleet_instances_with_offers,
+            job_model=job_model,
+            multinode=multinode,
+        )
+        job_model.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
+        return
 
     # TODO: Volume attachment for compute groups is not yet supported since
     # currently supported compute groups (e.g. Runpod) don't need explicit volume attachment.
@@ -374,47 +363,6 @@ async def _process_submitted_job(
             await session.commit()
             return
 
-        master_instance_provisioning_data = None
-        if job.job_spec.job_num == 0 and fleet_model is not None:
-            fleet = fleet_model_to_fleet(fleet_model)
-            if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
-                # To avoid violating fleet placement cluster during master provisioning,
-                # we must lock empty fleets and respect existing instances in non-empty fleets.
-                # On SQLite, always take the lock during master provisioning for simplicity.
-                await exit_stack.enter_async_context(
-                    get_locker(get_db().dialect_name).lock_ctx(
-                        FleetModel.__tablename__, [fleet_model.id]
-                    )
-                )
-                if get_db().dialect_name == "sqlite":
-                    # Start new transaction to see committed changes after lock
-                    await session.commit()
-                res = await session.execute(
-                    select(FleetModel)
-                    .outerjoin(FleetModel.instances)
-                    .where(
-                        FleetModel.id == fleet_model.id,
-                        InstanceModel.id.is_(None),
-                    )
-                    .with_for_update(key_share=True, of=FleetModel)
-                    .execution_options(populate_existing=True)
-                )
-                empty_fleet_model = res.unique().scalar()
-                if empty_fleet_model is not None:
-                    fleet_model = empty_fleet_model
-                else:
-                    res = await session.execute(
-                        select(FleetModel)
-                        .where(FleetModel.id == fleet_model.id)
-                        .options(joinedload(FleetModel.instances))
-                        .execution_options(populate_existing=True)
-                    )
-                    fleet_model = res.unique().scalar_one()
-                master_instance_provisioning_data = _get_fleet_master_instance_provisioning_data(
-                    fleet_model=fleet_model,
-                    fleet_spec=fleet.spec,
-                )
-
         jobs_to_provision = [job]
         if (
             multinode
@@ -426,6 +374,14 @@ async def _process_submitted_job(
         ):
             jobs_to_provision = replica_jobs
 
+        master_instance_provisioning_data = (
+            await _fetch_fleet_with_master_instance_provisioning_data(
+                exit_stack=exit_stack,
+                session=session,
+                fleet_model=fleet_model,
+                job=job,
+            )
+        )
         master_provisioning_data = (
             master_job_provisioning_data or master_instance_provisioning_data
         )
@@ -450,6 +406,7 @@ async def _process_submitted_job(
 
         if fleet_model is None:
             fleet_model = await _create_fleet_model_for_job(
+                exit_stack=exit_stack,
                 session=session,
                 project=project,
                 run=run,
@@ -521,9 +478,9 @@ async def _process_submitted_job(
 
     volumes_ids = sorted([v.id for vs in volume_models for v in vs])
     if need_volume_attachment:
-        # TODO: Lock instances for attaching volumes?
         # Take lock to prevent attaching volumes that are to be deleted.
         # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
+        # TODO: Lock instances for attaching volumes?
         await session.execute(
             select(VolumeModel)
             .where(VolumeModel.id.in_(volumes_ids))
@@ -546,7 +503,31 @@ async def _process_submitted_job(
     await session.commit()
 
 
-async def _select_fleet_models(
+async def _get_candidate_fleet_models_filters(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_model: RunModel,
+    run_spec: RunSpec,
+) -> tuple[list, list]:
+    # If another job freed the instance but is still trying to detach volumes,
+    # do not provision on it to prevent attaching volumes that are currently detaching.
+    detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
+    fleet_filters = [
+        FleetModel.project_id == project.id,
+        FleetModel.deleted == False,
+    ]
+    if run_model.fleet is not None:
+        fleet_filters.append(FleetModel.id == run_model.fleet_id)
+    if run_spec.merged_profile.fleets is not None:
+        fleet_filters.append(FleetModel.name.in_(run_spec.merged_profile.fleets))
+    instance_filters = [
+        InstanceModel.deleted == False,
+        InstanceModel.id.not_in(detaching_instances_ids),
+    ]
+    return fleet_filters, instance_filters
+
+
+async def _select_fleet_models_with_filters(
     session: AsyncSession, fleet_filters: list, instance_filters: list
 ) -> tuple[list[FleetModel], list[FleetModel]]:
     # Selecting fleets in two queries since Postgres does not allow
@@ -577,8 +558,6 @@ async def _select_fleet_models(
                 not_(and_(*instance_filters)),
             )
         )
-        # Load empty list of instances so that downstream code
-        # knows this fleet has no instances eligible for offers.
         .options(noload(FleetModel.instances))
         .execution_options(populate_existing=True)
     )
@@ -761,6 +740,54 @@ def _get_fleet_master_instance_provisioning_data(
             master_instance_model = fleet_instance_models[0]
             master_instance_provisioning_data = JobProvisioningData.__response__.parse_raw(
                 master_instance_model.job_provisioning_data
+            )
+    return master_instance_provisioning_data
+
+
+async def _fetch_fleet_with_master_instance_provisioning_data(
+    exit_stack: AsyncExitStack,
+    session: AsyncSession,
+    fleet_model: Optional[FleetModel],
+    job: Job,
+) -> Optional[JobProvisioningData]:
+    master_instance_provisioning_data = None
+    if job.job_spec.job_num == 0 and fleet_model is not None:
+        fleet = fleet_model_to_fleet(fleet_model)
+        if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
+            # To avoid violating fleet placement cluster during master provisioning,
+            # we must lock empty fleets and respect existing instances in non-empty fleets.
+            # On SQLite always take the lock during master provisioning for simplicity.
+            await exit_stack.enter_async_context(
+                get_locker(get_db().dialect_name).lock_ctx(
+                    FleetModel.__tablename__, [fleet_model.id]
+                )
+            )
+            await sqlite_commit(session)
+            res = await session.execute(
+                select(FleetModel)
+                .outerjoin(FleetModel.instances)
+                .where(
+                    FleetModel.id == fleet_model.id,
+                    InstanceModel.id.is_(None),
+                )
+                .with_for_update(key_share=True, of=FleetModel)
+                .execution_options(populate_existing=True)
+                .options(noload(FleetModel.instances))
+            )
+            empty_fleet_model = res.unique().scalar()
+            if empty_fleet_model is not None:
+                fleet_model = empty_fleet_model
+            else:
+                res = await session.execute(
+                    select(FleetModel)
+                    .where(FleetModel.id == fleet_model.id)
+                    .options(joinedload(FleetModel.instances))
+                    .execution_options(populate_existing=True)
+                )
+                fleet_model = res.unique().scalar_one()
+            master_instance_provisioning_data = _get_fleet_master_instance_provisioning_data(
+                fleet_model=fleet_model,
+                fleet_spec=fleet.spec,
             )
     return master_instance_provisioning_data
 
@@ -1032,6 +1059,7 @@ def _can_create_new_instance_in_fleet(fleet: Fleet) -> bool:
 
 
 async def _create_fleet_model_for_job(
+    exit_stack: AsyncExitStack,
     session: AsyncSession,
     project: ProjectModel,
     run: Run,
@@ -1040,16 +1068,18 @@ async def _create_fleet_model_for_job(
     if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
         placement = InstanceGroupPlacement.CLUSTER
     nodes = _get_nodes_required_num_for_run(run.run_spec)
-
     lock_namespace = f"fleet_names_{project.name}"
-    # TODO: Lock fleet names on SQLite.
-    # Needs some refactoring so that the lock is released after commit.
+    if get_db().dialect_name == "sqlite":
+        # Start new transaction to see committed changes after lock
+        await session.commit()
     if get_db().dialect_name == "postgresql":
         await session.execute(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
+    await exit_stack.enter_async_context(
+        get_locker(get_db().dialect_name).get_lockset(lock_namespace)[0]
+    )
     fleet_name = await generate_fleet_name(session=session, project=project)
-
     spec = FleetSpec(
         configuration=FleetConfiguration(
             name=fleet_name,
