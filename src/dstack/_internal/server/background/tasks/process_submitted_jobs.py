@@ -13,10 +13,14 @@ from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, select
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import (
     ComputeWithGroupProvisioningSupport,
+    ComputeWithPlacementGroupSupport,
     ComputeWithVolumeSupport,
 )
 from dstack._internal.core.backends.base.models import JobConfiguration
-from dstack._internal.core.backends.features import BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT
+from dstack._internal.core.backends.features import (
+    BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT,
+    BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
+)
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.compute_groups import ComputeGroupProvisioningData
@@ -74,6 +78,7 @@ from dstack._internal.server.services.fleets import (
     generate_fleet_name,
     get_fleet_requirements,
     get_next_instance_num,
+    is_cloud_cluster,
 )
 from dstack._internal.server.services.instances import (
     filter_pool_instances,
@@ -93,6 +98,13 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.placement import (
+    find_or_create_suitable_placement_group,
+    get_fleet_placement_group_models,
+    get_placement_group_model_for_job,
+    placement_group_model_to_placement_group_optional,
+    schedule_fleet_placement_groups_deletion,
+)
 from dstack._internal.server.services.requirements.combine import (
     combine_fleet_and_run_profiles,
     combine_fleet_and_run_requirements,
@@ -392,6 +404,7 @@ async def _process_submitted_job(
             master_job_provisioning_data or master_instance_provisioning_data
         )
         run_job_result = await _run_jobs_on_new_instances(
+            session=session,
             project=project,
             fleet_model=fleet_model,
             job_model=job_model,
@@ -774,7 +787,10 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
                 .outerjoin(FleetModel.instances)
                 .where(
                     FleetModel.id == fleet_model.id,
-                    InstanceModel.id.is_(None),
+                    or_(
+                        InstanceModel.id.is_(None),
+                        InstanceModel.deleted == True,
+                    ),
                 )
                 .with_for_update(key_share=True, of=FleetModel)
                 .execution_options(populate_existing=True)
@@ -786,7 +802,10 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
             else:
                 res = await session.execute(
                     select(FleetModel)
-                    .where(FleetModel.id == fleet_model.id)
+                    .where(
+                        FleetModel.id == fleet_model.id,
+                        InstanceModel.deleted == False,
+                    )
                     .options(joinedload(FleetModel.instances))
                     .execution_options(populate_existing=True)
                 )
@@ -913,6 +932,7 @@ async def _assign_job_to_fleet_instance(
 
 
 async def _run_jobs_on_new_instances(
+    session: AsyncSession,
     project: ProjectModel,
     job_model: JobModel,
     run: Run,
@@ -956,6 +976,16 @@ async def _run_jobs_on_new_instances(
             return None
         # TODO: Respect fleet provisioning properties such as tags
 
+    # The placement group is determined when provisioning the master instance
+    # and used for all other instances in the fleet.
+    placement_group_models = await get_fleet_placement_group_models(
+        session=session,
+        fleet_id=fleet_model.id if fleet_model else None,
+    )
+    placement_group_model = get_placement_group_model_for_job(
+        placement_group_models=placement_group_models,
+        fleet_model=fleet_model,
+    )
     multinode = requirements.multinode or job.job_spec.jobs_per_replica > 1
     offers = await get_offers_by_requirements(
         project=project,
@@ -967,6 +997,7 @@ async def _run_jobs_on_new_instances(
         volumes=volumes,
         privileged=job.job_spec.privileged,
         instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
+        placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
     )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
@@ -982,6 +1013,27 @@ async def _run_jobs_on_new_instances(
         offer_volumes = _get_offer_volumes(volumes, offer)
         job_configurations = [JobConfiguration(job=j, volumes=offer_volumes) for j in jobs]
         compute = backend.compute()
+        if (
+            fleet_model is not None
+            and len(fleet_model.instances) == 0
+            and is_cloud_cluster(fleet_model)
+            and offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
+            and isinstance(compute, ComputeWithPlacementGroupSupport)
+            and (
+                compute.are_placement_groups_compatible_with_reservations(offer.backend)
+                or job.job_spec.requirements.reservation is None
+            )
+        ):
+            placement_group_model = await find_or_create_suitable_placement_group(
+                fleet_model=fleet_model,
+                placement_groups=placement_group_models,
+                instance_offer=offer,
+                compute=compute,
+            )
+            if placement_group_model is None:  # error occurred
+                continue
+            session.add(placement_group_model)
+            placement_group_models.append(placement_group_model)
         try:
             if len(jobs) > 1 and offer.backend in BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT:
                 assert isinstance(compute, ComputeWithGroupProvisioningSupport)
@@ -992,6 +1044,7 @@ async def _run_jobs_on_new_instances(
                     offer,
                     project_ssh_public_key,
                     project_ssh_private_key,
+                    placement_group_model_to_placement_group_optional(placement_group_model),
                 )
                 return cgpd, offer, profile, requirements
             else:
@@ -1003,6 +1056,7 @@ async def _run_jobs_on_new_instances(
                     project_ssh_public_key,
                     project_ssh_private_key,
                     offer_volumes,
+                    placement_group_model_to_placement_group_optional(placement_group_model),
                 )
                 return jpd, offer, profile, requirements
         except BackendError as e:
@@ -1024,6 +1078,18 @@ async def _run_jobs_on_new_instances(
                 offer.region,
             )
             continue
+        finally:
+            if fleet_model is not None and len(fleet_model.instances) == 0:
+                # Clean up placement groups that did not end up being used.
+                # Flush to update still uncommitted placement groups.
+                await session.flush()
+                await schedule_fleet_placement_groups_deletion(
+                    session=session,
+                    fleet_id=fleet_model.id,
+                    except_placement_group_ids=(
+                        [placement_group_model.id] if placement_group_model is not None else []
+                    ),
+                )
     return None
 
 

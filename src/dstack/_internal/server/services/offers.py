@@ -220,3 +220,22 @@ def generate_shared_offer(
         blocks=blocks,
         total_blocks=total_blocks,
     )
+
+
+def get_instance_offer_with_restricted_az(
+    instance_offer: InstanceOfferWithAvailability,
+    master_job_provisioning_data: Optional[JobProvisioningData],
+) -> InstanceOfferWithAvailability:
+    instance_offer = instance_offer.copy()
+    if (
+        master_job_provisioning_data is not None
+        and master_job_provisioning_data.availability_zone is not None
+    ):
+        if instance_offer.availability_zones is None:
+            instance_offer.availability_zones = [master_job_provisioning_data.availability_zone]
+        instance_offer.availability_zones = [
+            z
+            for z in instance_offer.availability_zones
+            if z == master_job_provisioning_data.availability_zone
+        ]
+    return instance_offer

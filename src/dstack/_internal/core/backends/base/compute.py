@@ -111,6 +111,7 @@ class Compute(ABC):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         """
         Launches a new instance for the job. It should return `JobProvisioningData` ASAP.
@@ -287,6 +288,7 @@ class ComputeWithCreateInstanceSupport(ABC):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         """
         The default `run_job()` implementation for all backends that support `create_instance()`.
@@ -303,7 +305,9 @@ class ComputeWithCreateInstanceSupport(ABC):
         )
         instance_offer = instance_offer.copy()
         self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
-        return self.create_instance(instance_offer, instance_config, placement_group=None)
+        return self.create_instance(
+            instance_offer, instance_config, placement_group=placement_group
+        )
 
     def _restrict_instance_offer_az_to_volumes_az(
         self,
@@ -335,6 +339,7 @@ class ComputeWithGroupProvisioningSupport(ABC):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        placement_group: Optional[PlacementGroup],
     ) -> ComputeGroupProvisioningData:
         pass
 
