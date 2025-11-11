@@ -58,7 +58,7 @@ from dstack._internal.core.models.volumes import (
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.server import settings
-from dstack._internal.server.db import get_db
+from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
     JobModel,
@@ -510,14 +510,13 @@ async def submit_run(
     )
 
     lock_namespace = f"run_names_{project.name}"
-    if get_db().dialect_name == "sqlite":
+    if is_db_sqlite():
         # Start new transaction to see committed changes after lock
         await session.commit()
-    elif get_db().dialect_name == "postgresql":
+    elif is_db_postgres():
         await session.execute(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
-
     lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         # FIXME: delete_runs commits, so Postgres lock is released too early.
