@@ -108,3 +108,31 @@ Note that:
 
 * This pattern works assuming that Postgres is using default isolation level Read Committed. By the time a transaction acquires the advisory lock, all other transactions that can take the name have committed, so their changes can be seen and a unique name is taken.
 * SQLite needs a commit before selecting taken names due to Snapshot Isolation as noted above.
+
+**Use `AsyncExitStack`**
+
+In-memory locking typically requires taking lock for long (until commit).
+Using lock context managers for in-memory locking is often hard because the lock is tied to a block:
+
+```python
+if something:
+    # Can't do this because the lock will be released before commit. How to lock?
+    async with get_locker(get_db().dialect_name).lock_ctx(...):
+        # ...
+# ...
+await session.commit()
+```
+
+Use [`contextlib.AsyncExitStack`](https://docs.python.org/3/library/contextlib.html#contextlib.AsyncExitStack):
+
+```python
+async with AsyncExitStack() as exit_stack:
+    if something:
+        # The lock will be released only on stack exit, so it's ok.
+        await exit_stack.enter_async_context(
+            get_locker(get_db().dialect_name).lock_ctx(...)
+        )
+        # ...
+    # ...
+    await session.commit()
+```
