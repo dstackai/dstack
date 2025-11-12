@@ -120,7 +120,7 @@ def get_repo_creds(
     if os.path.exists(default_ssh_key):
         with suppress(InvalidRepoCredentialsError):
             _private_key = _read_private_key(default_ssh_key)
-            creds, default_branch = _get_repo_creds_ssh(url, default_ssh_key, _private_key)
+            creds = _get_repo_creds_ssh(url, default_ssh_key, _private_key)
             logger.debug(
                 "Git repo %s is private. Using default identity file: %s.",
                 repo_url,
