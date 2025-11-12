@@ -14,7 +14,7 @@ from dstack._internal.core.models.repos.base import Repo, RepoType
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.repos import (
     InvalidRepoCredentialsError,
-    get_repo_creds_and_default_branch,
+    get_repo_creds,
     load_repo,
 )
 from dstack._internal.utils.logging import get_logger
@@ -76,7 +76,7 @@ class RepoCollection:
         if creds is None and isinstance(repo, RemoteRepo):
             assert repo.repo_url is not None
             try:
-                creds, _ = get_repo_creds_and_default_branch(
+                creds = get_repo_creds(
                     repo_url=repo.repo_url,
                     identity_file=git_identity_file,
                     oauth_token=oauth_token,
