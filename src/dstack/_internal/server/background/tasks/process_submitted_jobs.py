@@ -94,6 +94,8 @@ from dstack._internal.server.services.jobs import (
     get_job_configured_volume_models,
     get_job_configured_volumes,
     get_job_runtime_data,
+    is_master_job,
+    is_multinode_job,
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
@@ -359,6 +361,7 @@ async def _process_submitted_job(
         await session.commit()
         return
 
+    jobs_to_provision = _get_jobs_to_provision(job, replica_jobs, job_model)
     # TODO: Volume attachment for compute groups is not yet supported since
     # currently supported compute groups (e.g. Runpod) don't need explicit volume attachment.
     need_volume_attachment = True
@@ -380,17 +383,6 @@ async def _process_submitted_job(
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
-
-        jobs_to_provision = [job]
-        if (
-            multinode
-            and job.job_spec.job_num == 0
-            # job_model.waiting_master_job is not set for legacy jobs.
-            # In this case compute group provisioning not supported
-            # and jobs always provision one-by-one.
-            and job_model.waiting_master_job is not None
-        ):
-            jobs_to_provision = replica_jobs
 
         master_instance_provisioning_data = (
             await _fetch_fleet_with_master_instance_provisioning_data(
@@ -449,11 +441,6 @@ async def _process_submitted_job(
         else:
             provisioned_jobs = [job]
             jpds = [provisioning_data]
-            if len(jobs_to_provision) > 1:
-                # Tried provisioning multiple jobs but provisioned only one.
-                # Allow other jobs to provision one-by-one.
-                for replica_job_model in replica_job_models:
-                    replica_job_model.waiting_master_job = False
 
         logger.info("%s: provisioned %s new instance(s)", fmt(job_model), len(provisioned_jobs))
         provisioned_job_models = _get_job_models_for_jobs(run_model.jobs, provisioned_jobs)
@@ -494,6 +481,8 @@ async def _process_submitted_job(
             session.add(instance)
             provisioned_job_model.used_instance_id = instance.id
             provisioned_job_model.last_processed_at = common_utils.get_current_datetime()
+
+    _allow_other_replica_jobs_to_provision(job_model, replica_job_models, jobs_to_provision)
 
     volumes_ids = sorted([v.id for vs in volume_models for v in vs])
     if need_volume_attachment:
@@ -647,7 +636,7 @@ async def _find_optimal_fleet_with_offers(
     for candidate_fleet_model in fleet_models:
         candidate_fleet = fleet_model_to_fleet(candidate_fleet_model)
         if (
-            job.job_spec.jobs_per_replica > 1
+            is_multinode_job(job)
             and candidate_fleet.spec.configuration.placement != InstanceGroupPlacement.CLUSTER
         ):
             # Limit multinode runs to cluster fleets to guarantee best connectivity.
@@ -684,7 +673,7 @@ async def _find_optimal_fleet_with_offers(
             )
             # Handle multinode for old jobs that don't have requirements.multinode set.
             # TODO: Drop multinode param.
-            multinode = requirements.multinode or job.job_spec.jobs_per_replica > 1
+            multinode = requirements.multinode or is_multinode_job(job)
             fleet_backend_offers = await get_offers_by_requirements(
                 project=project,
                 profile=profile,
@@ -770,7 +759,7 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
     job: Job,
 ) -> Optional[JobProvisioningData]:
     master_instance_provisioning_data = None
-    if job.job_spec.job_num == 0 and fleet_model is not None:
+    if is_master_job(job) and fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)
         if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
             # To avoid violating fleet placement cluster during master provisioning,
@@ -861,7 +850,7 @@ def _get_fleet_instances_with_pool_offers(
     pool_instances = fleet_model.instances
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]]
     profile = run_spec.merged_profile
-    multinode = job.job_spec.jobs_per_replica > 1
+    multinode = is_multinode_job(job)
     nonshared_instances = filter_pool_instances(
         pool_instances=pool_instances,
         profile=profile,
@@ -932,6 +921,34 @@ async def _assign_job_to_fleet_instance(
     return instance
 
 
+def _get_jobs_to_provision(job: Job, replica_jobs: list[Job], job_model: JobModel) -> list[Job]:
+    """
+    Returns the passed job for non-master jobs and all replica jobs for master jobs in multinode setups.
+    """
+    jobs_to_provision = [job]
+    if (
+        is_multinode_job(job)
+        and is_master_job(job)
+        # job_model.waiting_master_job is not set for legacy jobs.
+        # In this case compute group provisioning not supported
+        # and jobs always provision one-by-one.
+        and job_model.waiting_master_job is not None
+    ):
+        jobs_to_provision = replica_jobs
+    return jobs_to_provision
+
+
+def _allow_other_replica_jobs_to_provision(
+    job_model: JobModel,
+    replica_job_models: list[JobModel],
+    jobs_to_provision: list[Job],
+):
+    if len(jobs_to_provision) > 1:
+        logger.debug("%s: allow replica jobs to be provisioned one-by-one", fmt(job_model))
+        for replica_job_model in replica_job_models:
+            replica_job_model.waiting_master_job = False
+
+
 async def _run_jobs_on_new_instances(
     session: AsyncSession,
     project: ProjectModel,
@@ -987,7 +1004,7 @@ async def _run_jobs_on_new_instances(
         placement_group_models=placement_group_models,
         fleet_model=fleet_model,
     )
-    multinode = requirements.multinode or job.job_spec.jobs_per_replica > 1
+    multinode = requirements.multinode or is_multinode_job(job)
     offers = await get_offers_by_requirements(
         project=project,
         profile=profile,

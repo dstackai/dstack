@@ -59,6 +59,7 @@ from dstack._internal.server.services.jobs import (
     find_job,
     get_job_attached_volumes,
     get_job_runtime_data,
+    is_master_job,
     job_model_to_job_submission,
 )
 from dstack._internal.server.services.locking import get_locker
@@ -178,12 +179,15 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
     initial_status = job_model.status
     if initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
-        # Wait until all other jobs in the replica are provisioned
         for other_job in run.jobs:
             if (
                 other_job.job_spec.replica_num == job.job_spec.replica_num
                 and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
             ):
+                logger.debug(
+                    "%s: waiting for all jobs in the replica to be provisioned",
+                    fmt(job_model),
+                )
                 job_model.last_processed_at = common_utils.get_current_datetime()
                 await session.commit()
                 return
@@ -466,7 +470,7 @@ def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> boo
         )
         return True
     if (
-        job.job_spec.job_num == 0
+        is_master_job(job)
         and run.run_spec.merged_profile.startup_order == StartupOrder.WORKERS_FIRST
     ):
         for other_job in run.jobs:
