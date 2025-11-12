@@ -27,7 +27,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
     const { t } = useTranslation();
 
     const getAttachCommand = (runData: IRun) => {
-        const attachCommand = `dstack attach ${runData.run_spec.run_name}`;
+        const attachCommand = `dstack attach ${runData.run_spec.run_name} --logs`;
 
         const copyAttachCommand = () => {
             copyToClipboard(attachCommand);
@@ -233,7 +233,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                 />
             )}
 
-            {run.status === 'running' && (
+            {run.status !== 'running' && (
                 <SpaceBetween size="s">
                     <Box />
                     <Alert type="info">Waiting for the run to start.</Alert>
