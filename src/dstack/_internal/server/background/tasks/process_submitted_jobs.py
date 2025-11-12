@@ -802,11 +802,12 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
             else:
                 res = await session.execute(
                     select(FleetModel)
+                    .join(FleetModel.instances)
                     .where(
                         FleetModel.id == fleet_model.id,
                         InstanceModel.deleted == False,
                     )
-                    .options(joinedload(FleetModel.instances))
+                    .options(contains_eager(FleetModel.instances))
                     .execution_options(populate_existing=True)
                 )
                 fleet_model = res.unique().scalar_one()

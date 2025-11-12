@@ -15,6 +15,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceStatus,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
@@ -35,6 +36,7 @@ from dstack._internal.server.models import (
     ComputeGroupModel,
     InstanceModel,
     JobModel,
+    PlacementGroupModel,
     VolumeAttachmentModel,
 )
 from dstack._internal.server.settings import JobNetworkMode
@@ -52,6 +54,7 @@ from dstack._internal.server.testing.common import (
     get_fleet_spec,
     get_instance_offer_with_availability,
     get_job_provisioning_data,
+    get_placement_group_provisioning_data,
     get_run_spec,
     get_volume_provisioning_data,
 )
@@ -1240,6 +1243,55 @@ class TestProcessSubmittedJobs:
             backend_mock.compute.return_value.run_job.assert_called_once()
             selected_offer = backend_mock.compute.return_value.run_job.call_args[0][2]
             assert selected_offer.region == "eu-west-1"
+        await session.refresh(job)
+        assert job.status == JobStatus.PROVISIONING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_creates_placement_group(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_name="test-run",
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+        )
+        offer = get_instance_offer_with_availability()
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.run_job.return_value = get_job_provisioning_data()
+            compute_mock.create_placement_group.return_value = (
+                get_placement_group_provisioning_data()
+            )
+            await process_submitted_jobs()
+            m.assert_called_once()
+            compute_mock.get_offers.assert_called_once()
+            compute_mock.run_job.assert_called_once()
+            compute_mock.create_placement_group.assert_called_once()
+            pg_arg = compute_mock.run_job.call_args[0][6]
+            assert isinstance(pg_arg, PlacementGroup)
+        placement_group = (await session.execute(select(PlacementGroupModel))).scalar()
+        assert placement_group is not None
         await session.refresh(job)
         assert job.status == JobStatus.PROVISIONING
 
