@@ -17,7 +17,6 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
@@ -817,17 +816,6 @@ class TestProcessSubmittedJobs:
         fleet_spec = get_fleet_spec()
         fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
         await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
-        # Need a second non-empty fleet to have two-stage processing
-        fleet2 = await create_fleet(
-            session=session, project=project, spec=fleet_spec, name="fleet2"
-        )
-        await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet2,
-            instance_num=0,
-            status=InstanceStatus.BUSY,
-        )
         run = await create_run(
             session=session,
             project=project,
@@ -858,20 +846,6 @@ class TestProcessSubmittedJobs:
         fleet_spec1.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
         fleet1 = await create_fleet(
             session=session, project=project, spec=fleet_spec1, name="fleet"
-        )
-        # Need a second non-empty fleet to have two-stage processing
-        fleet_spec2 = get_fleet_spec()
-        # Empty resources intersection to return no backend offers
-        fleet_spec2.configuration.resources = ResourcesSpec(cpu=Range(min=0, max=0))
-        fleet2 = await create_fleet(
-            session=session, project=project, spec=fleet_spec2, name="fleet2"
-        )
-        await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet2,
-            instance_num=0,
-            status=InstanceStatus.BUSY,
         )
         run = await create_run(
             session=session,
