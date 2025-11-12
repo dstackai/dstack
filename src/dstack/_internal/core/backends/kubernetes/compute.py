@@ -49,6 +49,7 @@ from dstack._internal.core.models.instances import (
     Resources,
     SSHConnectionParams,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Memory
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
@@ -131,6 +132,7 @@ class KubernetesCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: list[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name_for_job(run, job)
         assert run.run_spec.ssh_key_pub is not None

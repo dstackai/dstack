@@ -20,6 +20,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceRuntime,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
@@ -82,6 +83,7 @@ class VastAICompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         instance_name = generate_unique_instance_name_for_job(
             run, job, max_length=MAX_INSTANCE_NAME_LEN
