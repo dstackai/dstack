@@ -2,15 +2,10 @@ name: Build & Deploy Docs
 
 on:
   workflow_dispatch:
-    inputs:
-      release-tag:
-        description: "dstack version"
 
 jobs:
   build-docs:
     uses: ./.github/workflows/build-docs.yml
-    with:
-      release-tag: ${{ inputs.release-tag }}
     secrets: inherit
 
   deploy-docs:

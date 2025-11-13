@@ -3,9 +3,10 @@ name = "dstack-plugin-server"
 version = "0.1.0"
 description = "Example plugin server"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 dependencies = [
-    "fastapi[standard]>=0.115.12",
+    "fastapi",
+    "uvicorn",
     "dstack",
 ]
 
