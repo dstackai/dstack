@@ -58,6 +58,7 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+JUMP_POD_IMAGE = "testcontainers/sshd:1.3.0@sha256:c50c0f59554dcdb2d9e5e705112144428ae9d04ac0af6322b365a18e24213a6a"
 JUMP_POD_SSH_PORT = 22
 DUMMY_REGION = "-"
 
@@ -832,8 +833,7 @@ def _create_jump_pod_service(
             containers=[
                 client.V1Container(
                     name=f"{pod_name}-container",
-                    # TODO: Choose appropriate image for jump pod
-                    image="dstackai/base:py3.11-0.4rc4",
+                    image=JUMP_POD_IMAGE,
                     command=["/bin/sh"],
                     args=["-c", " && ".join(commands)],
                     ports=[
@@ -880,10 +880,7 @@ def _create_jump_pod_service(
 def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
     commands = [
-        # prohibit password authentication
-        'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
-        # create ssh dirs and add public key
-        "mkdir -p /run/sshd ~/.ssh",
+        "mkdir -p ~/.ssh",
         "chmod 700 ~/.ssh",
         f"echo '{authorized_keys_content}' > ~/.ssh/authorized_keys",
         "chmod 600 ~/.ssh/authorized_keys",
@@ -891,8 +888,14 @@ def _get_jump_pod_commands(authorized_keys: list[str]) -> list[str]:
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
         # start sshd
-        f"/usr/sbin/sshd -p {JUMP_POD_SSH_PORT} -o PermitUserEnvironment=yes",
-        "sleep infinity",
+        (
+            f"/usr/sbin/sshd -D -e -p {JUMP_POD_SSH_PORT}"
+            " -o LogLevel=ERROR"
+            " -o PasswordAuthentication=no"
+            " -o AllowTcpForwarding=local"
+            # proxy jumping only, no shell access
+            " -o ForceCommand=/bin/false"
+        ),
     ]
     return commands
 
