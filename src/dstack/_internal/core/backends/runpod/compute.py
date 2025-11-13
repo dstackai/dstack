@@ -218,6 +218,7 @@ class RunpodCompute(
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        placement_group: Optional[PlacementGroup],
     ) -> ComputeGroupProvisioningData:
         master_job_configuration = job_configurations[0]
         master_job = master_job_configuration.job
