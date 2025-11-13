@@ -9,6 +9,7 @@ from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.configurations import RateLimit
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.core.models.runs import JobSpec, JobSubmission, Run, get_service_port
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
 from dstack._internal.server import settings
@@ -45,6 +46,7 @@ class GatewayClient:
         options: dict,
         rate_limits: list[RateLimit],
         ssh_private_key: str,
+        router: Optional[AnyRouterConfig] = None,
     ):
         if "openai" in options:
             entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
@@ -59,6 +61,7 @@ class GatewayClient:
             "options": options,
             "rate_limits": [limit.dict() for limit in rate_limits],
             "ssh_private_key": ssh_private_key,
+            "router": router.dict() if router is not None else None,
         }
         resp = await self._client.post(
             self._url(f"/api/registry/{project}/services/register"), json=payload
