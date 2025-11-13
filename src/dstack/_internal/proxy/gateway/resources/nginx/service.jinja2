@@ -5,7 +5,11 @@ limit_req_zone {{ zone.key }} zone={{ zone.name }}:10m rate={{ zone.rpm }}r/m;
 {% if replicas %}
 upstream {{ domain }}.upstream {
     {% if router is not none %}
-    server 127.0.0.1:3000;  # SGLang router on the gateway
+    {% if router.type == "sglang" and router_port is not none %}
+    server 127.0.0.1:{{ router_port }};  # SGLang router on the gateway (new implementation)
+    {% else %}
+    server 127.0.0.1:3000;  # SGLang router on the gateway (legacy sglang_deprecated)
+    {% endif %}
     {% else %}
     {% for replica in replicas %}
     server unix:{{ replica.socket }};  # replica {{ replica.id }}
@@ -22,7 +26,7 @@ server {
     access_log {{ access_log_path }} dstack_stat;
     client_max_body_size {{ client_max_body_size }};
 
-    {% if router is not none and router.type == "sglang" %}
+    {% if router is not none and (router.type == "sglang" or router.type == "sglang_deprecated") %}
     # Whitelist approach: Only allow safe user-facing endpoints
     # Allow /generate
     location = /generate {

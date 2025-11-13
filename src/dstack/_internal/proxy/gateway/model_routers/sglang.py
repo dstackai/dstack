@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 class SglangRouter(Router):
     """SGLang router implementation using IGW (Inference Gateway) mode for multi-model serving."""
 
-    TYPE = "sglang"
+    TYPE = "sglang_deprecated"
 
     def __init__(self, router: SGLangRouterConfig, context: Optional[RouterContext] = None):
         """Initialize SGLang router.

@@ -9,10 +9,17 @@ from dstack._internal.core.models.common import CoreModel
 
 class RouterType(str, Enum):
     SGLANG = "sglang"
+    SGLANG_DEPRECATED = "sglang_deprecated"
+    SGLANG_NEW = "sglang_new"
     VLLM = "vllm"
 
 
 class SGLangRouterConfig(CoreModel):
+    type: Literal["sglang_deprecated"] = "sglang_deprecated"
+    policy: str = "cache_aware"
+
+
+class SGLangNewRouterConfig(CoreModel):
     type: Literal["sglang"] = "sglang"
     policy: str = "cache_aware"
 
@@ -23,5 +30,5 @@ class VLLMRouterConfig(CoreModel):
 
 
 AnyRouterConfig = Annotated[
-    Union[SGLangRouterConfig, VLLMRouterConfig], Field(discriminator="type")
+    Union[SGLangRouterConfig, SGLangNewRouterConfig, VLLMRouterConfig], Field(discriminator="type")
 ]

@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 from asyncio import Lock
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import jinja2
 from pydantic import BaseModel
@@ -34,10 +34,9 @@ class SiteConfig(BaseModel):
 
     def render(self) -> str:
         template = read_package_resource(f"{self.type}.jinja2")
-        return jinja2.Template(template).render(
-            **self.dict(),
-            proxy_port=PROXY_PORT_ON_GATEWAY,
-        )
+        render_dict = self.dict()
+        render_dict["proxy_port"] = PROXY_PORT_ON_GATEWAY
+        return jinja2.Template(template).render(**render_dict)
 
 
 class ReplicaConfig(BaseModel):
@@ -72,6 +71,7 @@ class ServiceConfig(SiteConfig):
     replicas: list[ReplicaConfig]
     router: Optional[AnyRouterConfig] = None
     model_id: Optional[str] = None
+    router_port: Optional[int] = None
 
 
 class ModelEntrypointConfig(SiteConfig):
@@ -85,7 +85,11 @@ class Nginx:
     def __init__(self, conf_dir: Path = Path("/etc/nginx/sites-enabled")) -> None:
         self._conf_dir = conf_dir
         self._lock: Lock = Lock()
-        self._router: Optional[Router] = None
+        self._router: Optional[Router] = None  # For legacy sglang router (shared)
+        # For sglang_new: 1:1 service-to-router mapping
+        self._router_port_to_domain: Dict[int, str] = {}  # router_port -> domain
+        self._domain_to_router: Dict[str, Router] = {}  # domain -> router instance
+        self._next_router_port: int = 10001  # Starting port for routers (10001-11999)
 
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
         logger.debug("Registering %s domain %s", conf.type, conf.domain)
@@ -93,38 +97,95 @@ class Nginx:
         async with self._lock:
             if conf.https:
                 await run_async(self.run_certbot, conf.domain, acme)
-            await run_async(self.write_conf, conf.render(), conf_name)
 
-            if isinstance(conf, ServiceConfig) and conf.router and conf.model_id:
-                if self._router is None:
+            if isinstance(conf, ServiceConfig) and conf.router:
+                # Handle sglang router type (1:1 service-to-router) - new implementation
+                if conf.router.type == "sglang":
+                    # Allocate router port
+                    router_port = self._allocate_router_port()
+                    conf.router_port = router_port
+
+                    # Create per-service log directory
+                    log_dir = Path(f"./router_logs/{conf.domain}")
+
+                    # Create router context with allocated port
                     ctx = RouterContext(
                         host="127.0.0.1",
-                        port=3000,
-                        log_dir=Path("./router_logs"),
+                        port=router_port,
+                        log_dir=log_dir,
                         log_level="info",
                     )
-                    self._router = get_router(conf.router, context=ctx)
-                    if not await run_async(self._router.is_running):
-                        await run_async(self._router.start)
 
-                replicas = await run_async(
-                    self._router.register_replicas,
-                    conf.domain,
-                    len(conf.replicas),
-                    conf.model_id,
-                )
+                    # Create new router instance for this service
+                    router = get_router(conf.router, context=ctx)
 
-                allocated_ports = [int(r.url.rsplit(":", 1)[-1]) for r in replicas]
-                try:
-                    await run_async(self.write_router_workers_conf, conf, allocated_ports)
-                except Exception as e:
-                    logger.exception(
-                        "write_router_workers_conf failed for domain=%s: %s", conf.domain, e
+                    # Store mappings
+                    self._router_port_to_domain[router_port] = conf.domain
+                    self._domain_to_router[conf.domain] = router
+
+                    # Start router if not running
+                    if not await run_async(router.is_running):
+                        await run_async(router.start)
+
+                    # Register replicas (no model_id needed for new sglang implementation)
+                    # This allocates worker ports and returns Replica objects
+                    replicas = await run_async(
+                        router.register_replicas,
+                        conf.domain,
+                        len(conf.replicas),
+                        None,  # model_id not required for new sglang implementation
                     )
-                    raise
-                finally:
-                    # Always update router state, regardless of nginx reload status
-                    await run_async(self._router.update_replicas, replicas)
+
+                    # Extract allocated worker ports from replicas
+                    allocated_ports = [int(r.url.rsplit(":", 1)[-1]) for r in replicas]
+
+                    # Write router workers config
+                    try:
+                        if conf.replicas:
+                            await run_async(self.write_router_workers_conf, conf, allocated_ports)
+                    except Exception as e:
+                        logger.exception(
+                            "write_router_workers_conf failed for domain=%s: %s", conf.domain, e
+                        )
+                        raise
+
+                    # Add replicas to router (actual HTTP API calls to add workers)
+                    # For new sglang implementation, we add workers with their allocated ports
+                    await run_async(router.add_replicas, replicas)
+
+                # Handle legacy sglang router type (shared router with IGW) - deprecated
+                elif conf.router.type == "sglang_deprecated" and conf.model_id:
+                    if self._router is None:
+                        ctx = RouterContext(
+                            host="127.0.0.1",
+                            port=3000,
+                            log_dir=Path("./router_logs"),
+                            log_level="info",
+                        )
+                        self._router = get_router(conf.router, context=ctx)
+                        if not await run_async(self._router.is_running):
+                            await run_async(self._router.start)
+
+                    replicas = await run_async(
+                        self._router.register_replicas,
+                        conf.domain,
+                        len(conf.replicas),
+                        conf.model_id,
+                    )
+
+                    allocated_ports = [int(r.url.rsplit(":", 1)[-1]) for r in replicas]
+                    try:
+                        await run_async(self.write_router_workers_conf, conf, allocated_ports)
+                    except Exception as e:
+                        logger.exception(
+                            "write_router_workers_conf failed for domain=%s: %s", conf.domain, e
+                        )
+                        raise
+                    finally:
+                        # Always update router state, regardless of nginx reload status
+                        await run_async(self._router.update_replicas, replicas)
+
+            await run_async(self.write_conf, conf.render(), conf_name)
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
@@ -135,11 +196,27 @@ class Nginx:
             return
         async with self._lock:
             await run_async(sudo_rm, conf_path)
-            # Generic router implementation
-            if self._router is not None:
+
+            # Handle sglang router (1:1 service-to-router) - new implementation
+            if domain in self._domain_to_router:
+                router = self._domain_to_router[domain]
+                # Stop and kill the router
+                await run_async(router.stop)
+                # Unregister replicas
+                await run_async(router.unregister_replicas, domain)
+                # Remove from mappings
+                router_port = router.context.port
+                if router_port in self._router_port_to_domain:
+                    del self._router_port_to_domain[router_port]
+                del self._domain_to_router[domain]
+                # Remove workers config file
+                workers_conf_path = self._conf_dir / f"router-workers.{domain}.conf"
+                if workers_conf_path.exists():
+                    await run_async(sudo_rm, workers_conf_path)
+            # Handle legacy sglang router (shared router with IGW) - deprecated
+            elif self._router is not None:
                 # Unregister replicas for this domain (router handles domain-to-model_id lookup)
                 await run_async(self._router.unregister_replicas, domain)
-
                 # Remove workers config file (router-specific naming)
                 workers_conf_path = self._conf_dir / f"router-workers.{domain}.conf"
                 if workers_conf_path.exists():
@@ -212,6 +289,19 @@ class Nginx:
     @staticmethod
     def get_config_name(domain: str) -> str:
         return f"443-{domain}.conf"
+
+    def _allocate_router_port(self) -> int:
+        """Allocate next available router port in range 10001-11999."""
+        port = self._next_router_port
+        # Check if port is already allocated
+        while port in self._router_port_to_domain:
+            port += 1
+            if port > 11999:
+                raise UnexpectedProxyError("Router port range exhausted (10001-11999)")
+        self._next_router_port = port + 1
+        if self._next_router_port > 11999:
+            self._next_router_port = 10001  # Wrap around
+        return port
 
     def write_global_conf(self) -> None:
         conf = read_package_resource("00-log-format.conf")
