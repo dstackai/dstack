@@ -22,6 +22,28 @@ server {
     access_log {{ access_log_path }} dstack_stat;
     client_max_body_size {{ client_max_body_size }};
 
+    {% if router is not none and router.type == "sglang" %}
+    # Whitelist approach: Only allow safe user-facing endpoints
+    # Allow /generate
+    location = /generate {
+        {% if auth %}
+        auth_request /_dstack_auth;
+        {% endif %}
+        try_files /nonexistent @$http_upgrade;
+    }
+    # Allow /v1/* endpoints (regex match)
+    location ~ ^/v1/ {
+        {% if auth %}
+        auth_request /_dstack_auth;
+        {% endif %}
+        try_files /nonexistent @$http_upgrade;
+    }
+    # Block everything else
+    # This will match any path that doesn't match /generate or /v1/*
+    location ~ . {
+        return 403;
+    }
+    {% else %}
     {% for location in locations %}
     location {{ location.prefix }} {
         {% if auth %}
@@ -35,6 +57,7 @@ server {
         {% endif %}
     }
     {% endfor %}
+    {% endif %}
 
     location @websocket {
         set $dstack_replica_hit 1;
