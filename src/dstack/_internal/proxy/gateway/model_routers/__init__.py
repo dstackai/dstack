@@ -3,7 +3,7 @@ from typing import Optional
 from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.proxy.gateway.model_routers.sglang import SglangRouter
 
-from .base import Replica, Router, RouterContext
+from .base import Router, RouterContext
 
 
 def get_router(router: AnyRouterConfig, context: Optional[RouterContext] = None) -> Router:
@@ -16,6 +16,5 @@ def get_router(router: AnyRouterConfig, context: Optional[RouterContext] = None)
 __all__ = [
     "Router",
     "RouterContext",
-    "Replica",
     "get_router",
 ]

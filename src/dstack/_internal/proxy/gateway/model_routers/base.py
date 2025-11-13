@@ -19,20 +19,8 @@ class RouterContext(BaseModel):
     log_level: Literal["debug", "info", "warning", "error"] = "info"
 
 
-class Replica(BaseModel):
-    """Represents a single replica (worker) endpoint managed by the router.
-
-    The model field identifies which model this replica serves.
-    In SGLang, model = model_id (e.g., "meta-llama/Meta-Llama-3.1-8B-Instruct").
-    """
-
-    url: str  # HTTP URL where the replica is accessible (e.g., "http://127.0.0.1:10001")
-    model: str  # (e.g., "meta-llama/Meta-Llama-3.1-8B-Instruct")
-
-
 class Router(ABC):
-    """Abstract base class for router implementations (e.g., SGLang, vLLM).
-
+    """Abstract base class for router implementations.
     A router manages the lifecycle of worker replicas and handles request routing.
     Different router implementations may have different mechanisms for managing
     replicas.
@@ -79,55 +67,11 @@ class Router(ABC):
         ...
 
     @abstractmethod
-    def register_replicas(
-        self, domain: str, num_replicas: int, model_id: Optional[str] = None
-    ) -> List[Replica]:
-        """Register replicas to a domain (allocate ports/URLs for workers).
-
-        Args:
-            domain: The domain name for this service.
-            num_replicas: The number of replicas to allocate for this domain.
-            model_id: Optional model identifier (e.g., "meta-llama/Meta-Llama-3.1-8B-Instruct").
-                Required only for routers that support IGW (Inference Gateway) mode for multi-model serving.
-
-        Returns:
-            List of Replica objects with allocated URLs and model_id set (if provided).
-
-        Raises:
-            Exception: If allocation fails.
-        """
-        ...
-
-    @abstractmethod
-    def unregister_replicas(self, domain: str) -> None:
-        """Unregister replicas for a domain (remove model and unassign all its replicas).
-
-        Args:
-            domain: The domain name for this service.
-
-        Raises:
-            Exception: If removal fails or domain is not found.
-        """
-        ...
-
-    @abstractmethod
-    def add_replicas(self, replicas: List[Replica]) -> None:
-        """Register replicas with the router (actual API calls to add workers).
-
-        Args:
-            replicas: The list of replicas to add to router.
-
-        Raises:
-            Exception: If adding replicas fails.
-        """
-        ...
-
-    @abstractmethod
-    def remove_replicas(self, replicas: List[Replica]) -> None:
+    def remove_replicas(self, replica_urls: List[str]) -> None:
         """Unregister replicas from the router (actual API calls to remove workers).
 
         Args:
-            replicas: The list of replicas to remove from router.
+            replica_urls: The list of replica URLs to remove from router.
 
         Raises:
             Exception: If removing replicas fails.
@@ -135,11 +79,11 @@ class Router(ABC):
         ...
 
     @abstractmethod
-    def update_replicas(self, replicas: List[Replica]) -> None:
+    def update_replicas(self, replica_urls: List[str]) -> None:
         """Update replicas for service, replacing the current set.
 
         Args:
-            replicas: The new list of replicas for this service.
+            replica_urls: The new list of replica URLs for this service.
 
         Raises:
             Exception: If updating replicas fails.
