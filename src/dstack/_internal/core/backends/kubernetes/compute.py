@@ -367,8 +367,6 @@ class KubernetesCompute(
         # If the cluster does not support Load Balancer, the service will be provisioned but
         # the external IP/hostname will never be allocated.
 
-        # TODO: This implementation is only tested on EKS. Test other managed Kubernetes.
-
         # TODO: By default EKS creates a Classic Load Balancer for Load Balancer services.
         # Consider deploying an NLB. It seems it requires some extra configuration on the cluster:
         # https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
@@ -397,6 +395,10 @@ class KubernetesCompute(
                                 container_port=443,
                             ),
                         ],
+                        security_context=client.V1SecurityContext(
+                            run_as_user=0,
+                            run_as_group=0,
+                        ),
                     )
                 ]
             ),
@@ -435,13 +437,14 @@ class KubernetesCompute(
             namespace=self.config.namespace,
             body=service,
         )
-        hostname = _wait_for_load_balancer_hostname(
+        # address is eiher a domain name or an IP address
+        address = _wait_for_load_balancer_address(
             api=self.api,
             namespace=self.config.namespace,
             service_name=_get_pod_service_name(instance_name),
         )
         region = DUMMY_REGION
-        if hostname is None:
+        if address is None:
             self.terminate_instance(instance_name, region=region)
             raise ComputeError(
                 "Failed to get gateway hostname. "
@@ -449,7 +452,7 @@ class KubernetesCompute(
             )
         return GatewayProvisioningData(
             instance_id=instance_name,
-            ip_address=hostname,
+            ip_address=address,
             region=region,
         )
 
@@ -927,7 +930,7 @@ def _wait_for_pod_ready(
         time.sleep(1)
 
 
-def _wait_for_load_balancer_hostname(
+def _wait_for_load_balancer_address(
     api: client.CoreV1Api,
     namespace: str,
     service_name: str,
@@ -945,10 +948,16 @@ def _wait_for_load_balancer_hostname(
             service is not None
             and (service_status := service.status) is not None
             and (lb_status := service_status.load_balancer) is not None
-            and (ingresses := lb_status.ingress)
-            and (hostname := ingresses[0].hostname) is not None
+            and (ingress_points := lb_status.ingress)
         ):
-            return hostname
+            ingress_point = ingress_points[0]
+            # > Hostname is set for load-balancer ingress points that are DNS based (typically
+            # > AWS load-balancers)
+            # > IP is set for load-balancer ingress points that are IP based (typically GCE or
+            # > OpenStack load-balancers)
+            address = ingress_point.hostname or ingress_point.ip
+            if address is not None:
+                return address
         elapsed_time = time.time() - start_time
         if elapsed_time >= timeout_seconds:
             logger.warning("Timeout waiting for load balancer %s to get ip", service_name)
@@ -982,7 +991,7 @@ def _get_gateway_commands(authorized_keys: list[str]) -> list[str]:
         "apt-get update && apt-get install -y sudo wget openssh-server nginx python3.10-venv libaugeas0",
         # install docker-systemctl-replacement
         "wget https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/b18d67e521f0d1cf1d705dbb8e0416bef23e377c/files/docker/systemctl3.py -O /usr/bin/systemctl",
-        "chmod + /usr/bin/systemctl",
+        "chmod a+rx /usr/bin/systemctl",
         # install certbot
         "python3 -m venv /root/certbotvenv/",
         "/root/certbotvenv/bin/pip install certbot-nginx",
@@ -990,8 +999,7 @@ def _get_gateway_commands(authorized_keys: list[str]) -> list[str]:
         # prohibit password authentication
         'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
         # set up ubuntu user
-        "adduser ubuntu",
-        "usermod -aG sudo ubuntu",
+        "useradd -mUG sudo ubuntu",
         "echo 'ubuntu ALL=(ALL:ALL) NOPASSWD: ALL' | tee /etc/sudoers.d/ubuntu",
         # create ssh dirs and add public key
         "mkdir -p /run/sshd /home/ubuntu/.ssh",

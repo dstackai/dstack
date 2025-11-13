@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 DSTACK_DIR_PATH = Path("~/.dstack/").expanduser()
 
-SERVER_DIR_PATH = Path(os.getenv("DSTACK_SERVER_DIR", DSTACK_DIR_PATH / "server"))
+SERVER_DIR_PATH = Path(os.getenv("DSTACK_SERVER_DIR", DSTACK_DIR_PATH / "server")).resolve()
 
 SERVER_CONFIG_FILE_PATH = SERVER_DIR_PATH / "config.yml"
 
