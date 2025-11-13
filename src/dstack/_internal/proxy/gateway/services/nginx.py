@@ -1,4 +1,5 @@
 import importlib.resources
+import socket
 import subprocess
 import tempfile
 from asyncio import Lock
@@ -297,18 +298,65 @@ class Nginx:
     def get_config_name(domain: str) -> str:
         return f"443-{domain}.conf"
 
+    @staticmethod
+    def _is_port_available(port: int) -> bool:
+        """Check if a port is actually available (not in use by any process).
+
+        Tries to bind to the port to see if it's available.
+        """
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                try:
+                    sock.bind(("127.0.0.1", port))
+                    # If bind succeeds, port is available
+                    return True
+                except OSError:
+                    # If bind fails (e.g., Address already in use), port is not available
+                    return False
+        except Exception:
+            # If we can't check, assume port is not available to be safe
+            logger.debug("Error checking port %s availability, assuming in use", port)
+            return False
+
     def _allocate_router_port(self) -> int:
-        """Allocate next available router port in range 10001-11999."""
+        """Allocate next available router port in range 10001-11999.
+
+        Checks both our internal allocation map and actual port availability
+        to avoid conflicts with other services (e.g., Prometheus).
+        """
         port = self._next_router_port
-        # Check if port is already allocated
-        while port in self._router_port_to_domain:
+        max_attempts = 1999  # Maximum ports in range 10001-11999
+        attempts = 0
+
+        while attempts < max_attempts:
+            # Check if port is already allocated by us
+            if port in self._router_port_to_domain:
+                port += 1
+                if port > 11999:
+                    port = 10001  # Wrap around
+                attempts += 1
+                continue
+
+            # Check if port is actually available on the system
+            if self._is_port_available(port):
+                # Port is available, allocate it
+                self._next_router_port = port + 1
+                if self._next_router_port > 11999:
+                    self._next_router_port = 10001  # Wrap around
+                logger.debug("Allocated router port %s", port)
+                return port
+
+            # Port is in use, try next one
+            logger.debug("Port %s is in use, trying next port", port)
             port += 1
             if port > 11999:
-                raise UnexpectedProxyError("Router port range exhausted (10001-11999)")
-        self._next_router_port = port + 1
-        if self._next_router_port > 11999:
-            self._next_router_port = 10001  # Wrap around
-        return port
+                port = 10001  # Wrap around
+            attempts += 1
+
+        raise UnexpectedProxyError(
+            "Router port range exhausted (10001-11999). All ports in range appear to be in use."
+        )
 
     def write_global_conf(self) -> None:
         conf = read_package_resource("00-log-format.conf")
