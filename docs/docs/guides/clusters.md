@@ -15,7 +15,7 @@ Ensure a fleet is created before you run any distributed task. This can be eithe
 ### Cloud fleets
 
 [Cloud fleets](../concepts/fleets.md#cloud) allow to provision interconnected clusters across supported backends.
-For cloud fleets, fast interconnect is currently supported only on the `aws`, `gcp`, and `nebius` backends.
+For cloud fleets, fast interconnect is currently supported only on the `aws`, `gcp`, `nebius`, and `runpod` backends.
 
 === "AWS"
     When you create a cloud fleet with AWS, [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
@@ -35,6 +35,9 @@ For cloud fleets, fast interconnect is currently supported only on the `aws`, `g
 
 === "Nebius"
     When you create a cloud fleet with Nebius, [InfiniBand :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
+
+=== "Runpod"
+    When you run multinode tasks in a cluster cloud fleet with Runpod, `dstack` provisions [Runpod Instant Clusters](https://docs.runpod.io/instant-clusters) with InfiniBand networking configured.
 
 > To request fast interconnect support for other backends,
 file an [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_ blank"}.
