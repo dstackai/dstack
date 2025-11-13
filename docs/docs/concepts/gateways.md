@@ -51,8 +51,7 @@ Provisioning...
 
 ### Backend
 
-Gateways are currently supported in `aws`, `azure`, `gcp`, and `kubernetes` backends, but it does not mean that services are limited
-to these backends, quite contrary, you can use a gateway deployed in any supported backend with a service deployed in any backend.
+You can create gateways with the `aws`, `azure`, `gcp`, or `kubernetes` backends, but that does not limit where services run. A gateway can use one backend while services run on any other backend supported by dstack, including backends where gateways themselves cannot be created.
 
 ??? info "Kubernetes"
     Gateways in `kubernetes` backend require an external load balancer. Managed Kubernetes solutions usually include a load balancer.
