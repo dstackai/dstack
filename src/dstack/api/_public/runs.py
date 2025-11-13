@@ -490,6 +490,18 @@ class RunCollection:
         if repo_dir is None and configuration.repos:
             repo_dir = configuration.repos[0].path
 
+        self._validate_configuration_files(configuration, configuration_path)
+        file_archives: list[FileArchiveMapping] = []
+        for file_mapping in configuration.files:
+            with tempfile.TemporaryFile("w+b") as fp:
+                try:
+                    archive_hash = create_file_archive(file_mapping.local_path, fp)
+                except OSError as e:
+                    raise ClientError(f"failed to archive '{file_mapping.local_path}': {e}") from e
+                fp.seek(0)
+                archive = self._api_client.files.upload_archive(hash=archive_hash, fp=fp)
+            file_archives.append(FileArchiveMapping(id=archive.id, path=file_mapping.path))
+
         if ssh_identity_file:
             ssh_key_pub = Path(ssh_identity_file).with_suffix(".pub").read_text()
         else:
@@ -513,6 +525,7 @@ class RunCollection:
             repo_data=repo.run_repo_data,
             repo_code_hash=repo_code_hash,
             repo_dir=repo_dir,
+            file_archives=file_archives,
             # Server doesn't use this field since 0.19.27, but we still send it for compatibility
             # with older servers
             working_dir=configuration.working_dir,
@@ -548,22 +561,6 @@ class RunCollection:
         if reserve_ports:
             # TODO handle multiple jobs
             ports_lock = _reserve_ports(run_plan.job_plans[0].job_spec)
-
-        run_spec = run_plan.run_spec
-        configuration = run_spec.configuration
-
-        self._validate_configuration_files(configuration, run_spec.configuration_path)
-        for file_mapping in configuration.files:
-            with tempfile.TemporaryFile("w+b") as fp:
-                try:
-                    archive_hash = create_file_archive(file_mapping.local_path, fp)
-                except OSError as e:
-                    raise ClientError(f"failed to archive '{file_mapping.local_path}': {e}") from e
-                fp.seek(0)
-                archive = self._api_client.files.upload_archive(hash=archive_hash, fp=fp)
-            run_spec.file_archives.append(
-                FileArchiveMapping(id=archive.id, path=file_mapping.path)
-            )
 
         if repo is None:
             repo = VirtualRepo()
