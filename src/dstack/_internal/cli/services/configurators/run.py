@@ -54,7 +54,7 @@ from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import (
     InvalidRepoCredentialsError,
-    get_repo_creds,
+    get_repo_creds_and_default_branch,
     load_repo,
 )
 from dstack._internal.utils.common import local_time
@@ -617,7 +617,7 @@ class BaseRunConfigurator(
                 init = True
 
             try:
-                repo_creds = get_repo_creds(
+                repo_creds, default_repo_branch = get_repo_creds_and_default_branch(
                     repo_url=repo.repo_url,
                     identity_file=git_identity_file,
                     private_key=git_private_key,
@@ -626,9 +626,15 @@ class BaseRunConfigurator(
             except InvalidRepoCredentialsError as e:
                 raise CLIError(*e.args) from e
 
-            # repo_branch and repo_hash are taken from the repo_spec
-            if repo_branch is not None:
-                repo.run_repo_data.repo_branch = repo_branch
+            if repo_branch is None and repo_hash is None:
+                if default_repo_branch is None:
+                    raise CLIError(
+                        "Failed to automatically detect remote repo branch."
+                        " Specify branch or hash."
+                    )
+                # TODO: remove in 0.20. Currently `default_repo_branch` is sent only for backward compatibility of `dstack-runner`.
+                repo_branch = default_repo_branch
+            repo.run_repo_data.repo_branch = repo_branch
             if repo_hash is not None:
                 repo.run_repo_data.repo_hash = repo_hash
 
