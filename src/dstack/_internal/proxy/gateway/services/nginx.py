@@ -101,31 +101,38 @@ class Nginx:
             if isinstance(conf, ServiceConfig) and conf.router:
                 # Handle sglang router type (1:1 service-to-router) - new implementation
                 if conf.router.type == "sglang":
-                    # Allocate router port
-                    router_port = self._allocate_router_port()
-                    conf.router_port = router_port
+                    # Check if router already exists for this domain
+                    if conf.domain in self._domain_to_router:
+                        # Router already exists, reuse it
+                        router = self._domain_to_router[conf.domain]
+                        router_port = router.context.port
+                        conf.router_port = router_port
+                    else:
+                        # Allocate router port for new router
+                        router_port = self._allocate_router_port()
+                        conf.router_port = router_port
 
-                    # Create per-service log directory
-                    log_dir = Path(f"./router_logs/{conf.domain}")
+                        # Create per-service log directory
+                        log_dir = Path(f"./router_logs/{conf.domain}")
 
-                    # Create router context with allocated port
-                    ctx = RouterContext(
-                        host="127.0.0.1",
-                        port=router_port,
-                        log_dir=log_dir,
-                        log_level="info",
-                    )
+                        # Create router context with allocated port
+                        ctx = RouterContext(
+                            host="127.0.0.1",
+                            port=router_port,
+                            log_dir=log_dir,
+                            log_level="info",
+                        )
 
-                    # Create new router instance for this service
-                    router = get_router(conf.router, context=ctx)
+                        # Create new router instance for this service
+                        router = get_router(conf.router, context=ctx)
 
-                    # Store mappings
-                    self._router_port_to_domain[router_port] = conf.domain
-                    self._domain_to_router[conf.domain] = router
+                        # Store mappings
+                        self._router_port_to_domain[router_port] = conf.domain
+                        self._domain_to_router[conf.domain] = router
 
-                    # Start router if not running
-                    if not await run_async(router.is_running):
-                        await run_async(router.start)
+                        # Start router if not running
+                        if not await run_async(router.is_running):
+                            await run_async(router.start)
 
                     # Register replicas (no model_id needed for new sglang implementation)
                     # This allocates worker ports and returns Replica objects
