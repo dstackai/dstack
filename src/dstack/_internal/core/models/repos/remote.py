@@ -135,14 +135,12 @@ class RemoteRepo(Repo):
 
         Args:
             repo_url: The URL of a remote Git repo.
-            repo_branch: The name of the remote branch. Must be specified if `hash` is not specified.
-            repo_hash: The hash of the revision. Must be specified if `branch` is not specified.
+            repo_branch: The name of the remote branch.
+            repo_hash: The hash of the revision.
 
         Returns:
             A remote repo instance.
         """
-        if repo_branch is None and repo_hash is None:
-            raise ValueError("Either `repo_branch` or `repo_hash` must be specified.")
         return RemoteRepo(
             repo_url=repo_url,
             repo_branch=repo_branch,

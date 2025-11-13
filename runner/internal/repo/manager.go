@@ -16,20 +16,26 @@ type Manager struct {
 	ctx       context.Context
 	localPath string
 	clo       git.CloneOptions
+	branch    string
 	hash      string
 }
 
 func NewManager(ctx context.Context, url, branch, hash string, singleBranch bool) *Manager {
 	ctx = log.AppendArgsCtx(ctx, "url", url, "branch", branch, "hash", hash)
 	m := &Manager{
-		ctx: ctx,
+		ctx:    ctx,
+		branch: branch,
+		hash:   hash,
 		clo: git.CloneOptions{
 			URL:               url,
 			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-			ReferenceName:     plumbing.NewBranchReferenceName(branch),
 			SingleBranch:      singleBranch,
 		},
-		hash: hash,
+	}
+	// Only set ReferenceName if branch is non-empty
+	// If empty, it will default to HEAD in CloneOptions.Validate()
+	if branch != "" {
+		m.clo.ReferenceName = plumbing.NewBranchReferenceName(branch)
 	}
 
 	return m
@@ -69,23 +75,41 @@ func (m *Manager) Checkout() error {
 		return fmt.Errorf("clone repo: %w", err)
 	}
 	if ref != nil {
-		branchRef, err := ref.Reference(m.clo.ReferenceName, true)
-		if err != nil {
-			return fmt.Errorf("get branch reference: %w", err)
-		}
 		var cho git.CheckoutOptions
-		if m.hash == "" || m.hash == branchRef.Hash().String() {
-			cho.Branch = m.clo.ReferenceName
+		needCheckout := false
+
+		if m.branch != "" {
+			branchRef, err := ref.Reference(m.clo.ReferenceName, true)
+			if err != nil {
+				return fmt.Errorf("get branch reference: %w", err)
+			}
+			if m.hash == "" || m.hash == branchRef.Hash().String() {
+				// Hash is empty or matches branch head: checkout branch
+				cho.Branch = m.clo.ReferenceName
+				needCheckout = true
+			} else {
+				// Hash is specified and different: checkout by hash
+				cho.Hash = plumbing.NewHash(m.hash)
+				needCheckout = true
+			}
 		} else {
-			cho.Hash = plumbing.NewHash(m.hash)
+			// Branch is empty: checkout by hash if specified, otherwise HEAD is already checked out
+			if m.hash != "" {
+				cho.Hash = plumbing.NewHash(m.hash)
+				needCheckout = true
+			}
+			// If hash is also empty, HEAD is already checked out by clone, no need to checkout again
 		}
-		workTree, err := ref.Worktree()
-		if err != nil {
-			return fmt.Errorf("get worktree: %w", err)
-		}
-		err = workTree.Checkout(&cho)
-		if err != nil {
-			return fmt.Errorf("checkout: %w", err)
+
+		if needCheckout {
+			workTree, err := ref.Worktree()
+			if err != nil {
+				return fmt.Errorf("get worktree: %w", err)
+			}
+			err = workTree.Checkout(&cho)
+			if err != nil {
+				return fmt.Errorf("checkout: %w", err)
+			}
 		}
 	} else {
 		log.Warning(m.ctx, "git clone ref==nil")

@@ -54,7 +54,7 @@ from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import (
     InvalidRepoCredentialsError,
-    get_repo_creds_and_default_branch,
+    get_repo_creds,
     load_repo,
 )
 from dstack._internal.utils.common import local_time
@@ -562,8 +562,7 @@ class BaseRunConfigurator(
             local_path = Path.cwd()
             legacy_local_path = True
         if url:
-            # "master" is a dummy value, we'll fetch the actual default branch later
-            repo = RemoteRepo.from_url(repo_url=url, repo_branch="master")
+            repo = RemoteRepo.from_url(repo_url=url)
             repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
         elif local_path:
             if legacy_local_path:
@@ -618,7 +617,7 @@ class BaseRunConfigurator(
                 init = True
 
             try:
-                repo_creds, default_repo_branch = get_repo_creds_and_default_branch(
+                repo_creds = get_repo_creds(
                     repo_url=repo.repo_url,
                     identity_file=git_identity_file,
                     private_key=git_private_key,
@@ -627,16 +626,11 @@ class BaseRunConfigurator(
             except InvalidRepoCredentialsError as e:
                 raise CLIError(*e.args) from e
 
-            if repo_branch is None and repo_hash is None:
-                repo_branch = default_repo_branch
-                if repo_branch is None:
-                    raise CLIError(
-                        "Failed to automatically detect remote repo branch."
-                        " Specify branch or hash."
-                    )
-            repo = RemoteRepo.from_url(
-                repo_url=repo.repo_url, repo_branch=repo_branch, repo_hash=repo_hash
-            )
+            # repo_branch and repo_hash are taken from the repo_spec
+            if repo_branch is not None:
+                repo.run_repo_data.repo_branch = repo_branch
+            if repo_hash is not None:
+                repo.run_repo_data.repo_hash = repo_hash
 
         if init:
             self.api.repos.init(
