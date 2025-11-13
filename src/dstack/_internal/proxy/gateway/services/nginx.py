@@ -13,6 +13,7 @@ from typing_extensions import Literal
 from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.proxy.gateway.const import PROXY_PORT_ON_GATEWAY
 from dstack._internal.proxy.gateway.model_routers import (
+    Replica,
     Router,
     RouterContext,
     get_router,
@@ -90,7 +91,16 @@ class Nginx:
         # For sglang_new: 1:1 service-to-router mapping
         self._router_port_to_domain: Dict[int, str] = {}  # router_port -> domain
         self._domain_to_router: Dict[str, Router] = {}  # domain -> router instance
-        self._next_router_port: int = 10001  # Starting port for routers (10001-11999)
+        # Fixed port ranges (avoiding ephemeral ports which typically start at 32768)
+        self._ROUTER_PORT_MIN: int = 20000  # Router port range: 20000-24999
+        self._ROUTER_PORT_MAX: int = 24999
+        self._WORKER_PORT_MIN: int = 10001  # Worker port range: 10001-11999
+        self._WORKER_PORT_MAX: int = 11999
+        self._next_router_port: int = self._ROUTER_PORT_MIN
+        # Global tracking of worker ports to avoid conflicts across router instances
+        self._allocated_worker_ports: set[int] = set()  # Set of all allocated worker ports
+        self._domain_to_worker_ports: Dict[str, list[int]] = {}  # domain -> list of worker ports
+        self._next_worker_port: int = self._WORKER_PORT_MIN
 
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
         logger.debug("Registering %s domain %s", conf.type, conf.domain)
@@ -135,8 +145,24 @@ class Nginx:
                         if not await run_async(router.is_running):
                             await run_async(router.start)
 
+                    # Free old worker ports if domain already has allocated ports (e.g., scaling replicas)
+                    if conf.domain in self._domain_to_worker_ports:
+                        old_worker_ports = self._domain_to_worker_ports[conf.domain]
+                        for port in old_worker_ports:
+                            self._allocated_worker_ports.discard(port)
+                        logger.debug(
+                            "Freed old worker ports %s for domain %s (scaling replicas)",
+                            old_worker_ports,
+                            conf.domain,
+                        )
+
+                    # Allocate worker ports globally to avoid conflicts across router instances
+                    allocated_ports = self._allocate_worker_ports(len(conf.replicas))
+                    # Track worker ports for this domain
+                    self._domain_to_worker_ports[conf.domain] = allocated_ports
+
                     # Register replicas (no model_id needed for new sglang implementation)
-                    # This allocates worker ports and returns Replica objects
+                    # Pass pre-allocated ports to router
                     replicas = await run_async(
                         router.register_replicas,
                         conf.domain,
@@ -144,14 +170,23 @@ class Nginx:
                         None,  # model_id not required for new sglang implementation
                     )
 
-                    # Extract allocated worker ports from replicas
-                    allocated_ports = [int(r.url.rsplit(":", 1)[-1]) for r in replicas]
+                    # Update replicas with the globally allocated ports
+                    # (router may have allocated different ports, so we override)
+                    replicas = [
+                        Replica(url=f"http://{router.context.host}:{port}", model=r.model)
+                        for r, port in zip(replicas, allocated_ports)
+                    ]
 
                     # Write router workers config
                     try:
                         if conf.replicas:
                             await run_async(self.write_router_workers_conf, conf, allocated_ports)
                     except Exception as e:
+                        # Free allocated worker ports on error
+                        for port in allocated_ports:
+                            self._allocated_worker_ports.discard(port)
+                        if conf.domain in self._domain_to_worker_ports:
+                            del self._domain_to_worker_ports[conf.domain]
                         logger.exception(
                             "write_router_workers_conf failed for domain=%s: %s", conf.domain, e
                         )
@@ -159,7 +194,18 @@ class Nginx:
 
                     # Add replicas to router (actual HTTP API calls to add workers)
                     # For new sglang implementation, we add workers with their allocated ports
-                    await run_async(router.add_replicas, replicas)
+                    try:
+                        await run_async(router.add_replicas, replicas)
+                    except Exception as e:
+                        # Free allocated worker ports on error
+                        for port in allocated_ports:
+                            self._allocated_worker_ports.discard(port)
+                        if conf.domain in self._domain_to_worker_ports:
+                            del self._domain_to_worker_ports[conf.domain]
+                        logger.exception(
+                            "Failed to add replicas to router for domain=%s: %s", conf.domain, e
+                        )
+                        raise
 
                 # Handle legacy sglang router type (shared router with IGW) - deprecated
                 elif conf.router.type == "sglang_deprecated" and conf.model_id:
@@ -217,6 +263,15 @@ class Nginx:
                 if router_port in self._router_port_to_domain:
                     del self._router_port_to_domain[router_port]
                 del self._domain_to_router[domain]
+
+                # Free up worker ports for this domain
+                if domain in self._domain_to_worker_ports:
+                    worker_ports = self._domain_to_worker_ports[domain]
+                    for port in worker_ports:
+                        self._allocated_worker_ports.discard(port)
+                    del self._domain_to_worker_ports[domain]
+                    logger.debug("Freed worker ports %s for domain %s", worker_ports, domain)
+
                 # Remove workers config file
                 workers_conf_path = self._conf_dir / f"router-workers.{domain}.conf"
                 if workers_conf_path.exists():
@@ -320,21 +375,21 @@ class Nginx:
             return False
 
     def _allocate_router_port(self) -> int:
-        """Allocate next available router port in range 10001-11999.
+        """Allocate next available router port in fixed range (20000-24999).
 
         Checks both our internal allocation map and actual port availability
-        to avoid conflicts with other services (e.g., Prometheus).
+        to avoid conflicts with other services. Range chosen to avoid ephemeral ports.
         """
         port = self._next_router_port
-        max_attempts = 1999  # Maximum ports in range 10001-11999
+        max_attempts = self._ROUTER_PORT_MAX - self._ROUTER_PORT_MIN + 1
         attempts = 0
 
         while attempts < max_attempts:
             # Check if port is already allocated by us
             if port in self._router_port_to_domain:
                 port += 1
-                if port > 11999:
-                    port = 10001  # Wrap around
+                if port > self._ROUTER_PORT_MAX:
+                    port = self._ROUTER_PORT_MIN  # Wrap around
                 attempts += 1
                 continue
 
@@ -342,21 +397,81 @@ class Nginx:
             if self._is_port_available(port):
                 # Port is available, allocate it
                 self._next_router_port = port + 1
-                if self._next_router_port > 11999:
-                    self._next_router_port = 10001  # Wrap around
+                if self._next_router_port > self._ROUTER_PORT_MAX:
+                    self._next_router_port = self._ROUTER_PORT_MIN  # Wrap around
                 logger.debug("Allocated router port %s", port)
                 return port
 
             # Port is in use, try next one
             logger.debug("Port %s is in use, trying next port", port)
             port += 1
-            if port > 11999:
-                port = 10001  # Wrap around
+            if port > self._ROUTER_PORT_MAX:
+                port = self._ROUTER_PORT_MIN  # Wrap around
             attempts += 1
 
         raise UnexpectedProxyError(
-            "Router port range exhausted (10001-11999). All ports in range appear to be in use."
+            f"Router port range exhausted ({self._ROUTER_PORT_MIN}-{self._ROUTER_PORT_MAX}). "
+            "All ports in range appear to be in use."
         )
+
+    def _allocate_worker_ports(self, num_ports: int) -> list[int]:
+        """Allocate worker ports globally in fixed range (10001-11999).
+
+        Worker ports are used by nginx to listen and proxy to worker sockets.
+        They must be unique across all router instances. Range chosen to avoid ephemeral ports.
+
+        Args:
+            num_ports: Number of worker ports to allocate
+
+        Returns:
+            List of allocated worker port numbers
+        """
+        allocated = []
+        port = self._next_worker_port
+        max_attempts = (self._WORKER_PORT_MAX - self._WORKER_PORT_MIN + 1) * 2  # Allow wrap-around
+        attempts = 0
+
+        while len(allocated) < num_ports and attempts < max_attempts:
+            # Check if port is already allocated globally
+            if port in self._allocated_worker_ports:
+                port += 1
+                if port > self._WORKER_PORT_MAX:
+                    port = self._WORKER_PORT_MIN  # Wrap around
+                attempts += 1
+                continue
+
+            # Check if port is actually available on the system
+            if self._is_port_available(port):
+                allocated.append(port)
+                self._allocated_worker_ports.add(port)
+                logger.debug("Allocated worker port %s", port)
+                port += 1
+                if port > self._WORKER_PORT_MAX:
+                    port = self._WORKER_PORT_MIN  # Wrap around
+            else:
+                logger.debug("Worker port %s is in use, trying next port", port)
+                port += 1
+                if port > self._WORKER_PORT_MAX:
+                    port = self._WORKER_PORT_MIN  # Wrap around
+
+            attempts += 1
+
+        if len(allocated) < num_ports:
+            # Free up the ports we did allocate
+            for p in allocated:
+                self._allocated_worker_ports.discard(p)
+            raise UnexpectedProxyError(
+                f"Failed to allocate {num_ports} worker ports in range "
+                f"({self._WORKER_PORT_MIN}-{self._WORKER_PORT_MAX}). "
+                f"Only allocated {len(allocated)} ports after {attempts} attempts."
+            )
+
+        # Update next worker port for next allocation
+        self._next_worker_port = port
+        if self._next_worker_port > self._WORKER_PORT_MAX:
+            self._next_worker_port = self._WORKER_PORT_MIN  # Wrap around
+
+        return allocated
 
     def write_global_conf(self) -> None:
         conf = read_package_resource("00-log-format.conf")

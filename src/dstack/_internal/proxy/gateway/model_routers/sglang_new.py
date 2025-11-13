@@ -31,9 +31,7 @@ class SglangRouterNew(Router):
         self._domain: Optional[str] = None  # domain for this router instance
         self._replica_urls: List[str] = []  # List of worker URLs registered with this router
         self._domain_to_ports: Dict[str, List[int]] = {}  # domain -> allocated worker ports
-        self._next_worker_port: int = (
-            12000  # Starting port for worker endpoints (avoid router port range 10001-11999)
-        )
+        self._next_worker_port: int = 10001  # Starting port for worker endpoints (managed globally by Nginx, range 10001-11999)
 
     def start(self) -> None:
         """Start the SGLang router process."""
