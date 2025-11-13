@@ -187,7 +187,7 @@ jobs:
           if [[ "${{ inputs.staging }}" == "false" ]]; then
             sed \
               -i.old \
-              "s|@ git+https://github.com/dstackai/dstack.git@master|== ${{ inputs.version }}|" \
+              "s|@ https://github.com/dstackai/dstack/archive/refs/heads/master.tar.gz|== ${{ inputs.version }}|" \
               pyproject.toml
             diff pyproject.toml pyproject.toml.old > /dev/null && echo "Could not set version" && exit 1
           fi
