@@ -643,6 +643,18 @@ def is_fleet_empty(fleet_model: FleetModel) -> bool:
     return len(active_instances) == 0
 
 
+def is_cloud_cluster(fleet_model: FleetModel) -> bool:
+    fleet = fleet_model_to_fleet(fleet_model)
+    return (
+        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        and fleet.spec.configuration.ssh_config is None
+    )
+
+
+def is_fleet_master_instance(instance: InstanceModel) -> bool:
+    return instance.fleet is not None and instance.id == instance.fleet.instances[0].id
+
+
 def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
     profile = fleet_spec.merged_profile
     requirements = Requirements(

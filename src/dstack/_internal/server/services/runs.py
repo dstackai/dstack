@@ -84,6 +84,7 @@ from dstack._internal.server.services.jobs import (
     get_job_configured_volumes,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
+    is_multinode_job,
     job_model_to_job_submission,
     stop_runner,
 )
@@ -862,7 +863,7 @@ async def _get_pool_offers(
     detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
     pool_instances = await get_pool_instances(session, project)
     pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
-    multinode = job.job_spec.jobs_per_replica > 1
+    multinode = is_multinode_job(job)
 
     shared_instances_with_offers = get_shared_pool_instances_with_offers(
         pool_instances=pool_instances,

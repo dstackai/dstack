@@ -83,6 +83,7 @@ class {{ backend_name }}Compute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         # TODO: Implement if create_instance() is not implemented. Delete otherwise.
         raise NotImplementedError()

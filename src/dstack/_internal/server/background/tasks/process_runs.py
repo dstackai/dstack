@@ -32,6 +32,7 @@ from dstack._internal.server.services.jobs import (
     find_job,
     get_job_specs_from_run_spec,
     group_jobs_by_replica_latest,
+    is_master_job,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
@@ -606,6 +607,6 @@ def _should_stop_on_master_done(run: Run) -> bool:
     if run.run_spec.merged_profile.stop_criteria != StopCriteria.MASTER_DONE:
         return False
     for job in run.jobs:
-        if job.job_spec.job_num == 0 and job.job_submissions[-1].status == JobStatus.DONE:
+        if is_master_job(job) and job.job_submissions[-1].status == JobStatus.DONE:
             return True
     return False
