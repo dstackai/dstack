@@ -460,7 +460,7 @@ retry:
 
 !!! info "Retry duration"
     The duration period is calculated as a run age for `no-capacity` event
-    and as a time passed since the last `interruption` and `error` for `interruption` and `error` events..
+    and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
 
 ### Inactivity duration
 

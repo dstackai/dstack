@@ -311,7 +311,8 @@ class ProfileParams(CoreModel):
         Optional[Union[Literal["off"], int]],
         Field(
             description=(
-                "The maximum duration of a run (e.g., `2h`, `1d`, etc)."
+                "The maximum duration of a run (e.g., `2h`, `1d`, etc)"
+                " in a running state, excluding provisioning and pulling."
                 " After it elapses, the run is automatically stopped."
                 " Use `off` for unlimited duration. Defaults to `off`"
             )
