@@ -113,6 +113,7 @@ from dstack._internal.server.services.requirements.combine import (
 )
 from dstack._internal.server.services.runs import (
     check_run_spec_requires_instance_mounts,
+    get_nodes_required_num_for_run,
     run_model_to_run,
 )
 from dstack._internal.server.services.volumes import (
@@ -319,7 +320,7 @@ async def _process_submitted_job(
                 instance_filters=instance_filters,
             )
         fleet_models = fleet_models_with_instances + fleet_models_without_instances
-        fleet_model, fleet_instances_with_offers = await _find_optimal_fleet_with_offers(
+        fleet_model, fleet_instances_with_offers, _ = await _find_optimal_fleet_with_offers(
             project=project,
             fleet_models=fleet_models,
             run_model=run_model,
@@ -600,24 +601,34 @@ async def _refetch_fleet_models_with_instances(
 async def _find_optimal_fleet_with_offers(
     project: ProjectModel,
     fleet_models: list[FleetModel],
-    run_model: RunModel,
+    run_model: Optional[RunModel],
     run_spec: RunSpec,
     job: Job,
     master_job_provisioning_data: Optional[JobProvisioningData],
     volumes: Optional[list[list[Volume]]],
-) -> tuple[Optional[FleetModel], list[tuple[InstanceModel, InstanceOfferWithAvailability]]]:
-    if run_model.fleet is not None:
+) -> tuple[
+    Optional[FleetModel],
+    list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+    list[tuple[Backend, InstanceOfferWithAvailability]],
+]:
+    """
+    Finds the optimal fleet for the run among the given fleet models and returns
+    the fleet model, pool offers with instances, and backend offers.
+    Returns empty backend offers if run_model.fleet is set since
+    backend offer from this function are needed only for run plan.
+    """
+    if run_model is not None and run_model.fleet is not None:
         # Using the fleet that was already chosen by the master job
-        fleet_instances_with_pool_offers = _get_fleet_instances_with_pool_offers(
+        fleet_instance_offers = _get_fleet_instance_offers(
             fleet_model=run_model.fleet,
             run_spec=run_spec,
             job=job,
             master_job_provisioning_data=master_job_provisioning_data,
             volumes=volumes,
         )
-        return run_model.fleet, fleet_instances_with_pool_offers
+        return run_model.fleet, fleet_instance_offers, []
 
-    nodes_required_num = _get_nodes_required_num_for_run(run_spec)
+    nodes_required_num = get_nodes_required_num_for_run(run_spec)
     # The current strategy is first to consider fleets that can accommodate
     # the run without additional provisioning and choose the one with the cheapest pool offer.
     # Then choose a fleet with the cheapest pool offer among all fleets with pool offers.
@@ -628,6 +639,7 @@ async def _find_optimal_fleet_with_offers(
         tuple[
             Optional[FleetModel],
             list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+            list[tuple[Backend, InstanceOfferWithAvailability]],
             int,
             int,
             tuple[int, float, float],
@@ -642,7 +654,7 @@ async def _find_optimal_fleet_with_offers(
             # Limit multinode runs to cluster fleets to guarantee best connectivity.
             continue
 
-        fleet_instances_with_pool_offers = _get_fleet_instances_with_pool_offers(
+        fleet_instance_offers = _get_fleet_instance_offers(
             fleet_model=candidate_fleet_model,
             run_spec=run_spec,
             job=job,
@@ -651,10 +663,10 @@ async def _find_optimal_fleet_with_offers(
             master_job_provisioning_data=None,
             volumes=volumes,
         )
-        fleet_has_pool_capacity = nodes_required_num <= len(fleet_instances_with_pool_offers)
-        fleet_cheapest_pool_offer = math.inf
-        if len(fleet_instances_with_pool_offers) > 0:
-            fleet_cheapest_pool_offer = fleet_instances_with_pool_offers[0][1].price
+        fleet_has_pool_capacity = nodes_required_num <= len(fleet_instance_offers)
+        fleet_cheapest_instance_offer = math.inf
+        if len(fleet_instance_offers) > 0:
+            fleet_cheapest_instance_offer = fleet_instance_offers[0][1].price
 
         try:
             _check_can_create_new_instance_in_fleet(candidate_fleet)
@@ -696,44 +708,33 @@ async def _find_optimal_fleet_with_offers(
 
         fleet_priority = (
             not fleet_has_pool_capacity,
-            fleet_cheapest_pool_offer,
+            fleet_cheapest_instance_offer,
             fleet_cheapest_backend_offer,
         )
         candidate_fleets_with_offers.append(
             (
                 candidate_fleet_model,
-                fleet_instances_with_pool_offers,
-                len(fleet_instances_with_pool_offers),
+                fleet_instance_offers,
+                fleet_backend_offers,
+                len(fleet_instance_offers),
                 len(fleet_backend_offers),
                 fleet_priority,
             )
         )
     if len(candidate_fleets_with_offers) == 0:
-        return None, []
+        return None, [], []
     if (
         not FeatureFlags.AUTOCREATED_FLEETS_DISABLED
         and run_spec.merged_profile.fleets is None
-        and all(t[2] == 0 and t[3] == 0 for t in candidate_fleets_with_offers)
+        and all(t[3] == 0 and t[4] == 0 for t in candidate_fleets_with_offers)
     ):
         # If fleets are not specified and no fleets have available pool
         # or backend offers, create a new fleet.
         # This is for compatibility with non-fleet-first UX when runs created new fleets
         # if there are no instances to reuse.
-        return None, []
+        return None, [], []
     candidate_fleets_with_offers.sort(key=lambda t: t[-1])
-    return candidate_fleets_with_offers[0][:2]
-
-
-def _get_nodes_required_num_for_run(run_spec: RunSpec) -> int:
-    nodes_required_num = 1
-    if run_spec.configuration.type == "task":
-        nodes_required_num = run_spec.configuration.nodes
-    elif (
-        run_spec.configuration.type == "service"
-        and run_spec.configuration.replicas.min is not None
-    ):
-        nodes_required_num = run_spec.configuration.replicas.min
-    return nodes_required_num
+    return candidate_fleets_with_offers[0][:3]
 
 
 def _get_fleet_master_instance_provisioning_data(
@@ -818,7 +819,7 @@ def _run_can_fit_into_fleet(run_spec: RunSpec, fleet: Fleet) -> bool:
     """
     # No check for cloud fleets with blocks > 1 since we don't know
     # how many jobs such fleets can accommodate.
-    nodes_required_num = _get_nodes_required_num_for_run(run_spec)
+    nodes_required_num = get_nodes_required_num_for_run(run_spec)
     if (
         fleet.spec.configuration.nodes is not None
         and fleet.spec.configuration.blocks == 1
@@ -840,7 +841,7 @@ def _run_can_fit_into_fleet(run_spec: RunSpec, fleet: Fleet) -> bool:
     return True
 
 
-def _get_fleet_instances_with_pool_offers(
+def _get_fleet_instance_offers(
     fleet_model: FleetModel,
     run_spec: RunSpec,
     job: Job,
@@ -1157,7 +1158,7 @@ async def _create_fleet_model_for_job(
     placement = InstanceGroupPlacement.ANY
     if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
         placement = InstanceGroupPlacement.CLUSTER
-    nodes = _get_nodes_required_num_for_run(run.run_spec)
+    nodes = get_nodes_required_num_for_run(run.run_spec)
     lock_namespace = f"fleet_names_{project.name}"
     if is_db_sqlite():
         # Start new transaction to see committed changes after lock

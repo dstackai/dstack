@@ -352,7 +352,6 @@ async def get_plan(
         secrets=secrets,
         replica_num=0,
     )
-
     volumes = await get_job_configured_volumes(
         session=session,
         project=project,
@@ -1324,6 +1323,18 @@ def is_job_ready(probes: Iterable[ProbeModel], probe_specs: Iterable[ProbeSpec])
 def is_replica_registered(jobs: list[JobModel]) -> bool:
     # Only job_num=0 is supposed to receive service requests
     return jobs[0].registered
+
+
+def get_nodes_required_num_for_run(run_spec: RunSpec) -> int:
+    nodes_required_num = 1
+    if run_spec.configuration.type == "task":
+        nodes_required_num = run_spec.configuration.nodes
+    elif (
+        run_spec.configuration.type == "service"
+        and run_spec.configuration.replicas.min is not None
+    ):
+        nodes_required_num = run_spec.configuration.replicas.min
+    return nodes_required_num
 
 
 def _remove_job_spec_sensitive_info(spec: JobSpec):
