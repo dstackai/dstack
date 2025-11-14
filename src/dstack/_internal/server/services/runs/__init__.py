@@ -18,11 +18,6 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import ApplyAction
-from dstack._internal.core.models.configurations import (
-    RUN_PRIORITY_DEFAULT,
-    AnyRunConfiguration,
-    ServiceConfiguration,
-)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -32,9 +27,7 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     RetryEvent,
 )
-from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
 from dstack._internal.core.models.runs import (
-    LEGACY_REPO_DIR,
     ApplyRunPlanInput,
     Job,
     JobPlan,
@@ -52,12 +45,8 @@ from dstack._internal.core.models.runs import (
     ServiceSpec,
 )
 from dstack._internal.core.models.volumes import (
-    InstanceMountPoint,
     Volume,
 )
-from dstack._internal.core.services import validate_dstack_resource_name
-from dstack._internal.core.services.diff import diff_models
-from dstack._internal.server import settings
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
@@ -70,7 +59,6 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import services
-from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.instances import (
     filter_pool_instances,
     get_instance_offer,
@@ -94,6 +82,12 @@ from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.probes import is_probe_ready
 from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.resources import set_resources_defaults
+from dstack._internal.server.services.runs.spec import (
+    can_update_run_spec,
+    check_can_update_run_spec,
+    check_run_spec_requires_instance_mounts,
+    validate_run_spec_and_set_defaults,
+)
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.utils.logging import get_logger
@@ -319,7 +313,7 @@ async def get_plan(
         spec=effective_run_spec,
     )
     effective_run_spec = RunSpec.parse_obj(effective_run_spec.dict())
-    _validate_run_spec_and_set_defaults(
+    validate_run_spec_and_set_defaults(
         user=user,
         run_spec=effective_run_spec,
         legacy_default_working_dir=legacy_default_working_dir,
@@ -340,7 +334,7 @@ async def get_plan(
             # For backward compatibility (current_resource may has been submitted before
             # some fields, e.g., CPUSpec.arch, were added)
             set_resources_defaults(current_resource.run_spec.configuration.resources)
-            if not current_resource.status.is_finished() and _can_update_run_spec(
+            if not current_resource.status.is_finished() and can_update_run_spec(
                 current_resource.run_spec, effective_run_spec
             ):
                 action = ApplyAction.UPDATE
@@ -428,7 +422,7 @@ async def apply_plan(
     )
     # Spec must be copied by parsing to calculate merged_profile
     run_spec = RunSpec.parse_obj(run_spec.dict())
-    _validate_run_spec_and_set_defaults(
+    validate_run_spec_and_set_defaults(
         user=user, run_spec=run_spec, legacy_default_working_dir=legacy_default_working_dir
     )
     if run_spec.run_name is None:
@@ -455,7 +449,7 @@ async def apply_plan(
     # some fields, e.g., CPUSpec.arch, were added)
     set_resources_defaults(current_resource.run_spec.configuration.resources)
     try:
-        _check_can_update_run_spec(current_resource.run_spec, run_spec)
+        check_can_update_run_spec(current_resource.run_spec, run_spec)
     except ServerClientError:
         # The except is only needed to raise an appropriate error if run is active
         if not current_resource.status.is_finished():
@@ -497,7 +491,7 @@ async def submit_run(
     project: ProjectModel,
     run_spec: RunSpec,
 ) -> Run:
-    _validate_run_spec_and_set_defaults(user, run_spec)
+    validate_run_spec_and_set_defaults(user, run_spec)
     repo = await _get_run_repo_or_error(
         session=session,
         project=project,
@@ -751,18 +745,6 @@ def run_model_to_run(
     return run
 
 
-def get_nodes_required_num_for_run(run_spec: RunSpec) -> int:
-    nodes_required_num = 1
-    if run_spec.configuration.type == "task":
-        nodes_required_num = run_spec.configuration.nodes
-    elif (
-        run_spec.configuration.type == "service"
-        and run_spec.configuration.replicas.min is not None
-    ):
-        nodes_required_num = run_spec.configuration.replicas.min
-    return nodes_required_num
-
-
 def _get_run_jobs_with_submissions(
     run_model: RunModel,
     job_submissions_limit: Optional[int],
@@ -926,13 +908,6 @@ async def _generate_run_name(
         idx += 1
 
 
-def check_run_spec_requires_instance_mounts(run_spec: RunSpec) -> bool:
-    return any(
-        isinstance(mp, InstanceMountPoint) and not mp.optional
-        for mp in run_spec.configuration.volumes
-    )
-
-
 async def _validate_run(
     session: AsyncSession,
     user: UserModel,
@@ -1003,150 +978,6 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
         return 0
     duration_hours = job_submission.duration.total_seconds() / 3600
     return job_submission.job_provisioning_data.price * duration_hours
-
-
-def _validate_run_spec_and_set_defaults(
-    user: UserModel, run_spec: RunSpec, legacy_default_working_dir: bool = False
-):
-    # This function may set defaults for null run_spec values,
-    # although most defaults are resolved when building job_spec
-    # so that we can keep both the original user-supplied value (null in run_spec)
-    # and the default in job_spec.
-    # If a property is stored in job_spec - resolve the default there.
-    # Server defaults are preferable over client defaults so that
-    # the defaults depend on the server version, not the client version.
-    if run_spec.run_name is not None:
-        validate_dstack_resource_name(run_spec.run_name)
-    for mount_point in run_spec.configuration.volumes:
-        if not is_valid_docker_volume_target(mount_point.path):
-            raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
-    if run_spec.repo_id is None and run_spec.repo_data is not None:
-        raise ServerClientError("repo_data must not be set if repo_id is not set")
-    if run_spec.repo_id is not None and run_spec.repo_data is None:
-        raise ServerClientError("repo_id must not be set if repo_data is not set")
-    # Some run_spec parameters have to be set here and not in the model defaults since
-    # the client may not pass them or pass null, but they must be always present, e.g. for runner.
-    if run_spec.repo_id is None:
-        run_spec.repo_id = DEFAULT_VIRTUAL_REPO_ID
-    if run_spec.repo_data is None:
-        run_spec.repo_data = VirtualRunRepoData()
-    if (
-        run_spec.merged_profile.utilization_policy is not None
-        and run_spec.merged_profile.utilization_policy.time_window
-        > settings.SERVER_METRICS_RUNNING_TTL_SECONDS
-    ):
-        raise ServerClientError(
-            f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
-        )
-    if isinstance(run_spec.configuration, ServiceConfiguration):
-        if run_spec.merged_profile.schedule and run_spec.configuration.replicas.min == 0:
-            raise ServerClientError(
-                "Scheduled services with autoscaling to zero are not supported"
-            )
-        if len(run_spec.configuration.probes) > settings.MAX_PROBES_PER_JOB:
-            raise ServerClientError(
-                f"Cannot configure more than {settings.MAX_PROBES_PER_JOB} probes"
-            )
-        if any(
-            p.timeout is not None and p.timeout > settings.MAX_PROBE_TIMEOUT
-            for p in run_spec.configuration.probes
-        ):
-            raise ServerClientError(
-                f"Probe timeout cannot be longer than {settings.MAX_PROBE_TIMEOUT}s"
-            )
-    if run_spec.configuration.priority is None:
-        run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
-    set_resources_defaults(run_spec.configuration.resources)
-    if run_spec.ssh_key_pub is None:
-        if user.ssh_public_key:
-            run_spec.ssh_key_pub = user.ssh_public_key
-        else:
-            raise ServerClientError("ssh_key_pub must be set if the user has no ssh_public_key")
-    if run_spec.configuration.working_dir is None and legacy_default_working_dir:
-        run_spec.configuration.working_dir = LEGACY_REPO_DIR
-
-
-_UPDATABLE_SPEC_FIELDS = ["configuration_path", "configuration"]
-_TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS = {
-    "service": [
-        # rolling deployment
-        "repo_data",
-        "repo_code_hash",
-        "file_archives",
-        "working_dir",
-    ],
-}
-_CONF_UPDATABLE_FIELDS = ["priority"]
-_TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
-    "dev-environment": ["inactivity_duration"],
-    "service": [
-        # in-place
-        "replicas",
-        "scaling",
-        # rolling deployment
-        # NOTE: keep this list in sync with the "Rolling deployment" section in services.md
-        "port",
-        "probes",
-        "resources",
-        "volumes",
-        "docker",
-        "files",
-        "image",
-        "user",
-        "privileged",
-        "entrypoint",
-        "working_dir",
-        "python",
-        "nvcc",
-        "single_branch",
-        "env",
-        "shell",
-        "commands",
-    ],
-}
-
-
-def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bool:
-    try:
-        _check_can_update_run_spec(current_run_spec, new_run_spec)
-    except ServerClientError as e:
-        logger.debug("Run cannot be updated: %s", repr(e))
-        return False
-    return True
-
-
-def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
-    spec_diff = diff_models(current_run_spec, new_run_spec)
-    changed_spec_fields = list(spec_diff.keys())
-    updatable_spec_fields = _UPDATABLE_SPEC_FIELDS + _TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS.get(
-        new_run_spec.configuration.type, []
-    )
-    for key in changed_spec_fields:
-        if key not in updatable_spec_fields:
-            raise ServerClientError(
-                f"Failed to update fields {changed_spec_fields}."
-                f" Can only update {updatable_spec_fields}."
-            )
-    _check_can_update_configuration(current_run_spec.configuration, new_run_spec.configuration)
-
-
-def _check_can_update_configuration(
-    current: AnyRunConfiguration, new: AnyRunConfiguration
-) -> None:
-    if current.type != new.type:
-        raise ServerClientError(
-            f"Configuration type changed from {current.type} to {new.type}, cannot update"
-        )
-    updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
-        new.type, []
-    )
-    diff = diff_models(current, new)
-    changed_fields = list(diff.keys())
-    for key in changed_fields:
-        if key not in updatable_fields:
-            raise ServerClientError(
-                f"Failed to update fields {changed_fields}. Can only update {updatable_fields}"
-            )
 
 
 async def process_terminating_run(session: AsyncSession, run_model: RunModel):
