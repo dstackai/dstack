@@ -38,10 +38,12 @@ from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import (
     fmt,
-    is_replica_registered,
     process_terminating_run,
-    retry_run_replica_jobs,
     run_model_to_run,
+)
+from dstack._internal.server.services.runs.replicas import (
+    is_replica_registered,
+    retry_run_replica_jobs,
     scale_run_replicas,
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
