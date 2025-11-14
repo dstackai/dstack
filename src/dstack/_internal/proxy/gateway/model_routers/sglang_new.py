@@ -48,6 +48,10 @@ class SglangRouterNew(Router):
             # Use Python from the active venv
             venv_python = DSTACK_DIR_ON_GATEWAY / version / "bin" / "python3"
 
+            # Calculate prometheus port: router_port + 10000
+            # Router ports: 20000-24999, Prometheus ports: 30000-34999
+            prometheus_port = self.context.port + 10000
+
             cmd = [
                 str(venv_python),
                 "-m",
@@ -56,6 +60,8 @@ class SglangRouterNew(Router):
                 "0.0.0.0",  # Bind to all interfaces (nginx connects via 127.0.0.1)
                 "--port",
                 str(self.context.port),
+                "--prometheus-port",
+                str(prometheus_port),
                 # Note: No --enable-igw flag for this router type
                 "--log-level",
                 self.context.log_level,
@@ -75,7 +81,11 @@ class SglangRouterNew(Router):
             if not self.is_running():
                 raise Exception(f"Failed to start sglang router on port {self.context.port}")
 
-            logger.info("Sglang router started successfully on port %s", self.context.port)
+            logger.info(
+                "Sglang router started successfully on port %s (prometheus on %s)",
+                self.context.port,
+                prometheus_port,
+            )
 
         except Exception as e:
             logger.error(f"Failed to start sglang-router-new: {e}")
