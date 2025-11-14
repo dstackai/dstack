@@ -1117,11 +1117,17 @@ def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec)
                 f"Failed to update fields {changed_spec_fields}."
                 f" Can only update {updatable_spec_fields}."
             )
-    _check_can_update_configuration(current_run_spec.configuration, new_run_spec.configuration)
+    # We don't allow update if the order of archives has been changed, as even if the archives
+    # are the same (the same id => hash => content and the same container path), the order of
+    # unpacking matters when one path is a subpath of another.
+    ignore_files = current_run_spec.file_archives == new_run_spec.file_archives
+    _check_can_update_configuration(
+        current_run_spec.configuration, new_run_spec.configuration, ignore_files
+    )
 
 
 def _check_can_update_configuration(
-    current: AnyRunConfiguration, new: AnyRunConfiguration
+    current: AnyRunConfiguration, new: AnyRunConfiguration, ignore_files: bool
 ) -> None:
     if current.type != new.type:
         raise ServerClientError(
@@ -1130,6 +1136,13 @@ def _check_can_update_configuration(
     updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
         new.type, []
     )
+    if ignore_files:
+        # We ignore files diff if the file archives are the same. It allows the user to move
+        # local files/dirs as long as their name(*), content, and the container path stay the same.
+        # (*) We could also ignore local name changes if the names didn't change in the tarballs.
+        # Currently, the client preserves the original file/dir name it the tarball, but it could
+        # use some generic names like "file"/"directory" instead.
+        updatable_fields.append("files")
     diff = diff_models(current, new)
     changed_fields = list(diff.keys())
     for key in changed_fields:
