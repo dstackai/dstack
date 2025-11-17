@@ -1029,17 +1029,16 @@ def get_dstack_gateway_wheel(build: str) -> str:
 def get_dstack_gateway_commands(router: Optional[AnyRouterConfig] = None) -> List[str]:
     build = get_dstack_runner_version()
     wheel = get_dstack_gateway_wheel(build)
-    # Use router type directly as pip extra
+    # Build package spec with extras if router is specified
     if router:
-        gateway_package = f"dstack-gateway[{router.type}]"
+        gateway_package = f"dstack-gateway[{router.type}] @ {wheel}"
     else:
-        gateway_package = "dstack-gateway"
+        gateway_package = f"dstack-gateway @ {wheel}"
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",
         "python3 -m venv /home/ubuntu/dstack/green",
-        f"/home/ubuntu/dstack/blue/bin/pip install {wheel}",
-        f"/home/ubuntu/dstack/blue/bin/pip install --upgrade '{gateway_package}'",
+        f"/home/ubuntu/dstack/blue/bin/pip install '{gateway_package}'",
         "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
     ]
 

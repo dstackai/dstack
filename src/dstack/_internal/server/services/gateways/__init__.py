@@ -454,20 +454,19 @@ async def _update_gateway(gateway_compute_model: GatewayComputeModel, build: str
         gateway_compute_model.configuration
     )
 
-    # Determine gateway package with router extras (similar to compute.py)
+    # Build package spec with extras and wheel URL (similar to compute.py)
+    wheel = get_dstack_gateway_wheel(build)
     if compute_config.router:
-        gateway_package = f"dstack-gateway[{compute_config.router.type}]"
+        gateway_package = f"dstack-gateway[{compute_config.router.type}] @ {wheel}"
     else:
-        gateway_package = "dstack-gateway"
+        gateway_package = f"dstack-gateway @ {wheel}"
 
     commands = [
         # prevent update.sh from overwriting itself during execution
         "cp dstack/update.sh dstack/_update.sh",
-        f"sh dstack/_update.sh {get_dstack_gateway_wheel(build)} {build}",
+        # Pass the full package spec (with extras) to update.sh instead of just the wheel
+        f"sh dstack/_update.sh '{gateway_package}' {build}",
         "rm dstack/_update.sh",
-        # Install gateway package with router extras to the active venv (blue or green)
-        # update.sh writes the active version to dstack/version
-        f"version=$(cat /home/ubuntu/dstack/version) && /home/ubuntu/dstack/$version/bin/pip install --upgrade '{gateway_package}'",
     ]
     stdout = await connection.tunnel.aexec("/bin/sh -c '" + " && ".join(commands) + "'")
     if "Update successfully completed" in stdout:
