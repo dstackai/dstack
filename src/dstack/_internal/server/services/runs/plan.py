@@ -108,19 +108,10 @@ async def get_job_plans(
         # Keep the old behavior returning all offers irrespective of fleets.
         # Needed for supporting offers with autocreated fleets flow.
         # TODO: Consider dropping when autocreated fleets are dropped.
-        backend_offers = await get_offers_by_requirements(
-            project=project,
-            profile=profile,
-            requirements=jobs[0].job_spec.requirements,
-            exclude_not_available=False,
-            multinode=is_multinode_job(jobs[0]),
-            volumes=volumes,
-            privileged=jobs[0].job_spec.privileged,
-            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
-        )
-        instance_offers = await _get_pool_offers(
+        instance_offers, backend_offers = await _get_non_fleet_offers(
             session=session,
             project=project,
+            profile=profile,
             run_spec=run_spec,
             job=jobs[0],
             volumes=volumes,
@@ -128,18 +119,12 @@ async def get_job_plans(
 
     job_plans = []
     for job in jobs:
-        job_offers: List[InstanceOfferWithAvailability] = []
-        job_offers.extend(offer for _, offer in instance_offers)
-        if profile.creation_policy == CreationPolicy.REUSE_OR_CREATE:
-            job_offers.extend(offer for _, offer in backend_offers)
-        job_offers.sort(key=lambda offer: not offer.availability.is_available())
-        job_spec = job.job_spec
-        remove_job_spec_sensitive_info(job_spec)
-        job_plan = JobPlan(
-            job_spec=job_spec,
-            offers=job_offers[: (max_offers or DEFAULT_MAX_OFFERS)],
-            total_offers=len(job_offers),
-            max_price=max((offer.price for offer in job_offers), default=None),
+        job_plan = _get_job_plan(
+            instance_offers=instance_offers,
+            backend_offers=backend_offers,
+            profile=profile,
+            job=job,
+            max_offers=max_offers,
         )
         job_plans.append(job_plan)
 
@@ -513,3 +498,59 @@ async def _get_pool_offers(
 
     pool_offers.sort(key=lambda offer: offer[1].price)
     return pool_offers
+
+
+async def _get_non_fleet_offers(
+    session: AsyncSession,
+    project: ProjectModel,
+    profile: Profile,
+    run_spec: RunSpec,
+    job: Job,
+    volumes: List[List[Volume]],
+) -> tuple[
+    list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+    list[tuple[Backend, InstanceOfferWithAvailability]],
+]:
+    """
+    Returns instance and backend offers for job irrespective of fleets,
+    i.e. all pool instances and project backends matching the spec.
+    """
+    instance_offers = await _get_pool_offers(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+        job=job,
+        volumes=volumes,
+    )
+    backend_offers = await get_offers_by_requirements(
+        project=project,
+        profile=profile,
+        requirements=job.job_spec.requirements,
+        exclude_not_available=False,
+        multinode=is_multinode_job(job),
+        volumes=volumes,
+        privileged=job.job_spec.privileged,
+        instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+    )
+    return instance_offers, backend_offers
+
+
+async def _get_job_plan(
+    instance_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]],
+    profile: Profile,
+    job: Job,
+    max_offers: Optional[int],
+) -> JobPlan:
+    job_offers: List[InstanceOfferWithAvailability] = []
+    job_offers.extend(offer for _, offer in instance_offers)
+    if profile.creation_policy == CreationPolicy.REUSE_OR_CREATE:
+        job_offers.extend(offer for _, offer in backend_offers)
+    job_offers.sort(key=lambda offer: not offer.availability.is_available())
+    remove_job_spec_sensitive_info(job.job_spec)
+    return JobPlan(
+        job_spec=job.job_spec,
+        offers=job_offers[: (max_offers or DEFAULT_MAX_OFFERS)],
+        total_offers=len(job_offers),
+        max_price=max((offer.price for offer in job_offers), default=None),
+    )
