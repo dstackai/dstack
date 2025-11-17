@@ -5,7 +5,7 @@ from contextlib import AsyncExitStack
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
 
-from sqlalchemy import and_, func, not_, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
 
@@ -46,7 +46,6 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     Requirements,
     Run,
-    RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
@@ -86,7 +85,6 @@ from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     find_job,
     find_jobs,
-    get_instances_ids_with_detaching_volumes,
     get_job_configured_volume_models,
     get_job_configured_volumes,
     get_job_runtime_data,
@@ -108,7 +106,9 @@ from dstack._internal.server.services.runs import (
 )
 from dstack._internal.server.services.runs.plan import (
     find_optimal_fleet_with_offers,
+    get_run_candidate_fleet_models_filters,
     get_run_profile_and_requirements_in_fleet,
+    select_run_candidate_fleet_models_with_filters,
 )
 from dstack._internal.server.services.runs.spec import (
     check_run_spec_requires_instance_mounts,
@@ -285,7 +285,7 @@ async def _process_submitted_job(
     # Then, the job runs on the assigned instance or a new instance is provisioned.
     # This is needed to avoid holding instances lock for a long time.
     if not job_model.instance_assigned:
-        fleet_filters, instance_filters = await _get_candidate_fleet_models_filters(
+        fleet_filters, instance_filters = await get_run_candidate_fleet_models_filters(
             session=session,
             project=project,
             run_model=run_model,
@@ -294,10 +294,11 @@ async def _process_submitted_job(
         (
             fleet_models_with_instances,
             fleet_models_without_instances,
-        ) = await _select_fleet_models_with_filters(
+        ) = await select_run_candidate_fleet_models_with_filters(
             session=session,
             fleet_filters=fleet_filters,
             instance_filters=instance_filters,
+            lock_instances=True,
         )
         instances_ids = sorted(
             itertools.chain.from_iterable(
@@ -508,68 +509,6 @@ async def _process_submitted_job(
                 volume_models=volume_models,
             )
     await session.commit()
-
-
-async def _get_candidate_fleet_models_filters(
-    session: AsyncSession,
-    project: ProjectModel,
-    run_model: RunModel,
-    run_spec: RunSpec,
-) -> tuple[list, list]:
-    # If another job freed the instance but is still trying to detach volumes,
-    # do not provision on it to prevent attaching volumes that are currently detaching.
-    detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
-    fleet_filters = [
-        FleetModel.project_id == project.id,
-        FleetModel.deleted == False,
-    ]
-    if run_model.fleet is not None:
-        fleet_filters.append(FleetModel.id == run_model.fleet_id)
-    if run_spec.merged_profile.fleets is not None:
-        fleet_filters.append(FleetModel.name.in_(run_spec.merged_profile.fleets))
-    instance_filters = [
-        InstanceModel.deleted == False,
-        InstanceModel.id.not_in(detaching_instances_ids),
-    ]
-    return fleet_filters, instance_filters
-
-
-async def _select_fleet_models_with_filters(
-    session: AsyncSession, fleet_filters: list, instance_filters: list
-) -> tuple[list[FleetModel], list[FleetModel]]:
-    # Selecting fleets in two queries since Postgres does not allow
-    # locking nullable side of an outer join. So, first lock instances with inner join.
-    # Then select left out fleets without instances.
-    res = await session.execute(
-        select(FleetModel)
-        .join(FleetModel.instances)
-        .where(*fleet_filters)
-        .where(*instance_filters)
-        .options(contains_eager(FleetModel.instances))
-        .order_by(InstanceModel.id)  # take locks in order
-        .with_for_update(key_share=True, of=InstanceModel)
-        .execution_options(populate_existing=True)
-    )
-    fleet_models_with_instances = list(res.unique().scalars().all())
-    fleet_models_with_instances_ids = [f.id for f in fleet_models_with_instances]
-    res = await session.execute(
-        select(FleetModel)
-        .outerjoin(FleetModel.instances)
-        .where(
-            *fleet_filters,
-            FleetModel.id.not_in(fleet_models_with_instances_ids),
-        )
-        .where(
-            or_(
-                InstanceModel.id.is_(None),
-                not_(and_(*instance_filters)),
-            )
-        )
-        .options(noload(FleetModel.instances))
-        .execution_options(populate_existing=True)
-    )
-    fleet_models_without_instances = list(res.unique().scalars().all())
-    return fleet_models_with_instances, fleet_models_without_instances
 
 
 async def _refetch_fleet_models_with_instances(
