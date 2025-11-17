@@ -44,7 +44,7 @@ machines equipped with Intel Gaudi accelerators.
 ## Create a fleet
 
 To manage container workloads on on-prem machines with Intel Gaudi accelerators, start by configuring an 
-[SSH fleet](../../docs/concepts/fleets.md#ssh). Here’s an example configuration for your fleet:
+[SSH fleet](../../docs/concepts/fleets.md#ssh-fleets). Here’s an example configuration for your fleet:
 
 <div editor-title="examples/misc/fleets/gaudi.dstack.yml">
 

@@ -55,7 +55,7 @@ For active checks today, you can run [NCCL tests](../../examples/clusters/nccl-t
 
 ## Supported backends
 
-Passive GPU health checks work on AWS (except with custom `os_images`), Azure (except A10 GPUs), GCP, OCI, and [SSH fleets](../../docs/concepts/fleets.md#ssh) where DCGM is installed and configured for background checks. 
+Passive GPU health checks work on AWS (except with custom `os_images`), Azure (except A10 GPUs), GCP, OCI, and [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets) where DCGM is installed and configured for background checks. 
 
 > Fleets created before version 0.19.22 need to be recreated to enable this feature.
 

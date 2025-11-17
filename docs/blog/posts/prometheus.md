@@ -49,7 +49,7 @@ For a full list of available metrics and labels, check out [Metrics](../../docs/
 
 ??? info "NVIDIA"
     NVIDIA DCGM metrics are automatically collected for `aws`, `azure`, `gcp`, and `oci` backends,
-    as well as for [SSH fleets](../../docs/concepts/fleets.md#ssh).
+    as well as for [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets).
 
     To ensure NVIDIA DCGM metrics are collected from SSH fleets, ensure the `datacenter-gpu-manager-4-core`,
     `datacenter-gpu-manager-4-proprietary`, and `datacenter-gpu-manager-exporter` packages are installed on the hosts.

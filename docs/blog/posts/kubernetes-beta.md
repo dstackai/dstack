@@ -299,7 +299,7 @@ VM-based backends also offer more granular control over cluster provisioning.
 
 ### SSH fleets vs Kubernetes backend
 
-If you’re using on-prem servers and Kubernetes isn’t a requirement, [SSH fleets](../../docs/concepts/fleets.md#ssh) may be simpler.
+If you’re using on-prem servers and Kubernetes isn’t a requirement, [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets) may be simpler.
 They provide a lightweight and flexible alternative.
 
 ### AMD GPUs
