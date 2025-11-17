@@ -735,6 +735,10 @@ async def get_job_attached_volumes(
     return job_volumes
 
 
+def remove_job_spec_sensitive_info(spec: JobSpec):
+    spec.ssh_key = None
+
+
 def _get_job_mount_point_attached_volume(
     volumes: List[Volume],
     job_provisioning_data: JobProvisioningData,

@@ -18,19 +18,12 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import ApplyAction
-from dstack._internal.core.models.instances import (
-    InstanceAvailability,
-    InstanceOfferWithAvailability,
-    InstanceStatus,
-)
 from dstack._internal.core.models.profiles import (
-    CreationPolicy,
     RetryEvent,
 )
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Job,
-    JobPlan,
     JobSpec,
     JobStatus,
     JobSubmission,
@@ -44,9 +37,6 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
     ServiceSpec,
 )
-from dstack._internal.core.models.volumes import (
-    Volume,
-)
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
@@ -59,33 +49,25 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import services
-from dstack._internal.server.services.instances import (
-    filter_pool_instances,
-    get_instance_offer,
-    get_pool_instances,
-    get_shared_pool_instances_with_offers,
-)
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     delay_job_instance_termination,
-    get_instances_ids_with_detaching_volumes,
     get_job_configured_volumes,
     get_jobs_from_run_spec,
-    is_multinode_job,
     job_model_to_job_submission,
+    remove_job_spec_sensitive_info,
     stop_runner,
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.probes import is_probe_ready
 from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.resources import set_resources_defaults
+from dstack._internal.server.services.runs.plan import get_job_plans
 from dstack._internal.server.services.runs.spec import (
     can_update_run_spec,
     check_can_update_run_spec,
-    check_run_spec_requires_instance_mounts,
     validate_run_spec_and_set_defaults,
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
@@ -100,8 +82,6 @@ JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
 }
-
-DEFAULT_MAX_OFFERS = 50
 
 
 async def list_user_runs(
@@ -318,9 +298,7 @@ async def get_plan(
         run_spec=effective_run_spec,
         legacy_default_working_dir=legacy_default_working_dir,
     )
-
     profile = effective_run_spec.merged_profile
-    creation_policy = profile.creation_policy
 
     current_resource = None
     action = ApplyAction.CREATE
@@ -339,61 +317,13 @@ async def get_plan(
             ):
                 action = ApplyAction.UPDATE
 
-    secrets = await get_project_secrets_mapping(session=session, project=project)
-    jobs = await get_jobs_from_run_spec(
-        run_spec=effective_run_spec,
-        secrets=secrets,
-        replica_num=0,
-    )
-    volumes = await get_job_configured_volumes(
+    job_plans = await get_job_plans(
         session=session,
         project=project,
-        run_spec=effective_run_spec,
-        job_num=0,
+        profile=profile,
+        run_spec=run_spec,
+        max_offers=max_offers,
     )
-
-    pool_offers = await _get_pool_offers(
-        session=session,
-        project=project,
-        run_spec=effective_run_spec,
-        job=jobs[0],
-        volumes=volumes,
-    )
-    effective_run_spec.run_name = "dry-run"  # will regenerate jobs on submission
-
-    # Get offers once for all jobs
-    offers = []
-    if creation_policy == CreationPolicy.REUSE_OR_CREATE:
-        offers = await get_offers_by_requirements(
-            project=project,
-            profile=profile,
-            requirements=jobs[0].job_spec.requirements,
-            exclude_not_available=False,
-            multinode=jobs[0].job_spec.jobs_per_replica > 1,
-            volumes=volumes,
-            privileged=jobs[0].job_spec.privileged,
-            instance_mounts=check_run_spec_requires_instance_mounts(effective_run_spec),
-        )
-
-    job_plans = []
-    for job in jobs:
-        job_offers: List[InstanceOfferWithAvailability] = []
-        job_offers.extend(pool_offers)
-        job_offers.extend(offer for _, offer in offers)
-        job_offers.sort(key=lambda offer: not offer.availability.is_available())
-
-        job_spec = job.job_spec
-        _remove_job_spec_sensitive_info(job_spec)
-
-        job_plan = JobPlan(
-            job_spec=job_spec,
-            offers=job_offers[: (max_offers or DEFAULT_MAX_OFFERS)],
-            total_offers=len(job_offers),
-            max_price=max((offer.price for offer in job_offers), default=None),
-        )
-        job_plans.append(job_plan)
-
-    effective_run_spec.run_name = run_spec.run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name,
         user=user.name,
@@ -783,7 +713,7 @@ def _get_run_jobs_with_submissions(
                 # Use the spec from the latest submission. Submissions can have different specs
                 job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
                 if not include_sensitive:
-                    _remove_job_spec_sensitive_info(job_spec)
+                    remove_job_spec_sensitive_info(job_spec)
                 jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
     return jobs
 
@@ -841,51 +771,6 @@ def _get_run_fleet(run_model: RunModel) -> Optional[RunFleet]:
         id=run_model.fleet.id,
         name=run_model.fleet.name,
     )
-
-
-async def _get_pool_offers(
-    session: AsyncSession,
-    project: ProjectModel,
-    run_spec: RunSpec,
-    job: Job,
-    volumes: List[List[Volume]],
-) -> list[InstanceOfferWithAvailability]:
-    pool_offers: list[InstanceOfferWithAvailability] = []
-
-    detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
-    pool_instances = await get_pool_instances(session, project)
-    pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
-    multinode = is_multinode_job(job)
-
-    shared_instances_with_offers = get_shared_pool_instances_with_offers(
-        pool_instances=pool_instances,
-        profile=run_spec.merged_profile,
-        requirements=job.job_spec.requirements,
-        volumes=volumes,
-        multinode=multinode,
-    )
-    for _, offer in shared_instances_with_offers:
-        pool_offers.append(offer)
-
-    nonshared_instances = filter_pool_instances(
-        pool_instances=pool_instances,
-        profile=run_spec.merged_profile,
-        requirements=job.job_spec.requirements,
-        multinode=multinode,
-        volumes=volumes,
-        shared=False,
-    )
-    for instance in nonshared_instances:
-        offer = get_instance_offer(instance)
-        if offer is None:
-            continue
-        offer.availability = InstanceAvailability.BUSY
-        if instance.status == InstanceStatus.IDLE:
-            offer.availability = InstanceAvailability.IDLE
-        pool_offers.append(offer)
-
-    pool_offers.sort(key=lambda offer: offer.price)
-    return pool_offers
 
 
 async def _generate_run_name(
@@ -1043,10 +928,6 @@ async def process_terminating_run(session: AsyncSession, run_model: RunModel):
 
 def is_job_ready(probes: Iterable[ProbeModel], probe_specs: Iterable[ProbeSpec]) -> bool:
     return all(is_probe_ready(probe, probe_spec) for probe, probe_spec in zip(probes, probe_specs))
-
-
-def _remove_job_spec_sensitive_info(spec: JobSpec):
-    spec.ssh_key = None
 
 
 def _get_next_triggered_at(run_spec: RunSpec) -> Optional[datetime]:

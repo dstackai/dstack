@@ -3,10 +3,21 @@ from typing import List, Optional
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.models.fleets import Fleet, InstanceGroupPlacement
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability, InstanceStatus
-from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, RunSpec
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOfferWithAvailability,
+    InstanceStatus,
+)
+from dstack._internal.core.models.profiles import CreationPolicy, Profile
+from dstack._internal.core.models.runs import (
+    Job,
+    JobPlan,
+    JobProvisioningData,
+    Requirements,
+    RunSpec,
+)
 from dstack._internal.core.models.volumes import Volume
+from dstack._internal.server.db import AsyncSession
 from dstack._internal.server.models import FleetModel, InstanceModel, ProjectModel, RunModel
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
@@ -17,9 +28,16 @@ from dstack._internal.server.services.fleets import (
 from dstack._internal.server.services.instances import (
     filter_pool_instances,
     get_instance_offer,
+    get_pool_instances,
     get_shared_pool_instances_with_offers,
 )
-from dstack._internal.server.services.jobs import is_multinode_job
+from dstack._internal.server.services.jobs import (
+    get_instances_ids_with_detaching_volumes,
+    get_job_configured_volumes,
+    get_jobs_from_run_spec,
+    is_multinode_job,
+    remove_job_spec_sensitive_info,
+)
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.requirements.combine import (
     combine_fleet_and_run_profiles,
@@ -29,11 +47,83 @@ from dstack._internal.server.services.runs.spec import (
     check_run_spec_requires_instance_mounts,
     get_nodes_required_num,
 )
+from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+DEFAULT_MAX_OFFERS = 50
+
+
+async def get_job_plans(
+    session: AsyncSession,
+    project: ProjectModel,
+    profile: Profile,
+    run_spec: RunSpec,
+    max_offers: Optional[int],
+) -> list[JobPlan]:
+    run_name = run_spec.run_name
+    if run_spec.run_name is None:
+        # Set/unset dummy run name to generate job names for run plan.
+        run_spec.run_name = "dry-run"
+
+    secrets = await get_project_secrets_mapping(session=session, project=project)
+    jobs = await get_jobs_from_run_spec(
+        run_spec=run_spec,
+        secrets=secrets,
+        replica_num=0,
+    )
+    volumes = await get_job_configured_volumes(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+        job_num=0,
+    )
+    pool_offers = await _get_pool_offers(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+        job=jobs[0],
+        volumes=volumes,
+    )
+
+    # Get offers once for all jobs
+    offers = []
+    if profile.creation_policy == CreationPolicy.REUSE_OR_CREATE:
+        offers = await get_offers_by_requirements(
+            project=project,
+            profile=profile,
+            requirements=jobs[0].job_spec.requirements,
+            exclude_not_available=False,
+            multinode=jobs[0].job_spec.jobs_per_replica > 1,
+            volumes=volumes,
+            privileged=jobs[0].job_spec.privileged,
+            instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+        )
+
+    job_plans = []
+    for job in jobs:
+        job_offers: List[InstanceOfferWithAvailability] = []
+        job_offers.extend(pool_offers)
+        job_offers.extend(offer for _, offer in offers)
+        job_offers.sort(key=lambda offer: not offer.availability.is_available())
+
+        job_spec = job.job_spec
+        remove_job_spec_sensitive_info(job_spec)
+
+        job_plan = JobPlan(
+            job_spec=job_spec,
+            offers=job_offers[: (max_offers or DEFAULT_MAX_OFFERS)],
+            total_offers=len(job_offers),
+            max_price=max((offer.price for offer in job_offers), default=None),
+        )
+        job_plans.append(job_plan)
+
+    run_spec.run_name = run_name
+    return job_plans
 
 
 async def find_optimal_fleet_with_offers(
@@ -263,3 +353,48 @@ def _run_can_fit_into_fleet(run_spec: RunSpec, fleet: Fleet) -> bool:
         if total_idle_blocks < nodes_required_num:
             return False
     return True
+
+
+async def _get_pool_offers(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+    job: Job,
+    volumes: List[List[Volume]],
+) -> list[InstanceOfferWithAvailability]:
+    pool_offers: list[InstanceOfferWithAvailability] = []
+
+    detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
+    pool_instances = await get_pool_instances(session, project)
+    pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
+    multinode = is_multinode_job(job)
+
+    shared_instances_with_offers = get_shared_pool_instances_with_offers(
+        pool_instances=pool_instances,
+        profile=run_spec.merged_profile,
+        requirements=job.job_spec.requirements,
+        volumes=volumes,
+        multinode=multinode,
+    )
+    for _, offer in shared_instances_with_offers:
+        pool_offers.append(offer)
+
+    nonshared_instances = filter_pool_instances(
+        pool_instances=pool_instances,
+        profile=run_spec.merged_profile,
+        requirements=job.job_spec.requirements,
+        multinode=multinode,
+        volumes=volumes,
+        shared=False,
+    )
+    for instance in nonshared_instances:
+        offer = get_instance_offer(instance)
+        if offer is None:
+            continue
+        offer.availability = InstanceAvailability.BUSY
+        if instance.status == InstanceStatus.IDLE:
+            offer.availability = InstanceAvailability.IDLE
+        pool_offers.append(offer)
+
+    pool_offers.sort(key=lambda offer: offer.price)
+    return pool_offers
