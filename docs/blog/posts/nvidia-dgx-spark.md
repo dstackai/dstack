@@ -117,12 +117,9 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
-Workloads behave exactly like they do on other supported compute targets. You can use DGX Spark for fine tuning, interactive development, or model serving without changing workflows.
-
-!!! info "Aknowledgement"
-    Thanks to the [Graphsignal :material-arrow-top-right-thin:{ .external }](https://graphsignal.com/){:target="_blank"} team for access to DGX Spark and for supporting testing and validation. Graphsignal provides inference observability tooling used to profile CUDA workloads during both training and inference.
-
 ## What's next?
+
+> Running workloads on DGX Spark with `dstack` works the same way as on any other [backend](../../docs/concepts/backends.md) (including GPU clouds): you can run [dev environments](../../docs/concepts/dev-environments.md) for interactive development, [tasks](../../docs/concepts/tasks.md) for fine tuning, and [services](../../docs/concepts/services.md) for inference through the unified interface.
 
 1. Read the [NVIDIA DGX Spark in-depth review :material-arrow-top-right-thin:{ .external }](https://lmsys.org/blog/2025-10-13-nvidia-dgx-spark/){:target="_blank"} by the SGLang team.
 2. Check [dev environments](../../docs/concepts/dev-environments.md), 
@@ -130,3 +127,6 @@ Workloads behave exactly like they do on other supported compute targets. You ca
     and [fleets](../../docs/concepts/fleets.md)
 3. Follow [Quickstart](../../docs/quickstart.md)
 4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+
+!!! info "Aknowledgement"
+    Thanks to the [Graphsignal :material-arrow-top-right-thin:{ .external }](https://graphsignal.com/){:target="_blank"} team for access to DGX Spark and for supporting testing and validation. Graphsignal provides inference observability tooling used to profile CUDA workloads during both training and inference.
