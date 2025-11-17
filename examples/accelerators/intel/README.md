@@ -1,7 +1,7 @@
 # Intel Gaudi
 
 `dstack` supports running dev environments, tasks, and services on Intel Gaudi GPUs via 
-[SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh).
+[SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets).
 
 ## Deployment
 

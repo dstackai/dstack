@@ -43,7 +43,7 @@ image: https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-m
 
     </div>
 
-    For more details on fleet configuration, refer to [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh).
+    For more details on fleet configuration, refer to [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets).
 
 ## Services
 

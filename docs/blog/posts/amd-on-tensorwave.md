@@ -15,7 +15,7 @@ to orchestrate AI containers with any AI cloud vendor, whether they provide on-d
 
 In this tutorial, we’ll walk you through how `dstack` can be used with
 [TensorWave :material-arrow-top-right-thin:{ .external }](https://tensorwave.com/){:target="_blank"} using
-[SSH fleets](../../docs/concepts/fleets.md#ssh).
+[SSH fleets](../../docs/concepts/fleets.md#ssh-fleets).
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-tensorwave-v2.png" width="630"/>
 
@@ -235,6 +235,6 @@ Want to see how it works? Check out the video below:
 <iframe width="750" height="520" src="https://www.youtube.com/embed/b1vAgm5fCfE?si=qw2gYHkMjERohdad&rel=0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 !!! info "What's next?"
-    1. See [SSH fleets](../../docs/concepts/fleets.md#ssh)
+    1. See [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets)
     2. Read about [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), and [services](../../docs/concepts/services.md)
     3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
