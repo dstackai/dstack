@@ -100,13 +100,13 @@ async def get_job_plans(
         master_job_provisioning_data=None,
         volumes=volumes,
     )
-    if (
+    if _should_force_non_fleet_offers(run_spec) or (
         not FeatureFlags.AUTOCREATED_FLEETS_DISABLED
         and profile.fleets is None
         and fleet_model is None
     ):
         # Keep the old behavior returning all offers irrespective of fleets.
-        # Needed for supporting offers with autocreated fleets flow.
+        # Needed for supporting offers with autocreated fleets flow (and for `dstack offer`).
         # TODO: Consider dropping when autocreated fleets are dropped.
         instance_offers, backend_offers = await _get_non_fleet_offers(
             session=session,
@@ -535,7 +535,7 @@ async def _get_non_fleet_offers(
     return instance_offers, backend_offers
 
 
-async def _get_job_plan(
+def _get_job_plan(
     instance_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
     backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]],
     profile: Profile,
@@ -554,3 +554,10 @@ async def _get_job_plan(
         total_offers=len(job_offers),
         max_price=max((offer.price for offer in job_offers), default=None),
     )
+
+
+def _should_force_non_fleet_offers(run_spec: RunSpec) -> bool:
+    # A hack to force non-fleet offers for `dstack offer` command that uses
+    # get run plan API to show offers and the only way to distinguish it is commands.
+    # Assuming real runs will not use such commands.
+    return run_spec.configuration.type == "task" and run_spec.configuration.commands == [":"]
