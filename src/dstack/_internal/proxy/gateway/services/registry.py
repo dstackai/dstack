@@ -6,7 +6,7 @@ from typing import Iterable, Optional
 
 import dstack._internal.proxy.gateway.schemas.registry as schemas
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyRouterConfig
+from dstack._internal.core.models.routers import AnyRouterConfig, RouterType
 from dstack._internal.proxy.gateway import models as gateway_models
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import (
@@ -57,7 +57,6 @@ async def register_service(
         client_max_body_size=client_max_body_size,
         replicas=(),
         router=router,
-        model_id=model.name if model is not None else None,
     )
 
     async with lock:
@@ -310,6 +309,15 @@ async def get_nginx_service_config(
 ) -> ServiceConfig:
     limit_req_zones: list[LimitReqZoneConfig] = []
     locations: list[LocationConfig] = []
+    is_sglang = service.router and service.router.type == RouterType.SGLANG
+    sglang_whitelisted_paths = [
+        "/generate",
+        "/v1/",
+        "/chat/completions",
+    ]  # Prefix match for paths that end with a slash and exact match for paths that don't
+    sglang_limits: dict[str, LimitReqConfig] = {}
+    sglang_prefix_lengths: dict[str, int] = {}  # Track prefix lengths for most-specific selection
+
     for i, rate_limit in enumerate(service.rate_limits):
         zone_name = f"{i}.{service.domain_safe}"
         if isinstance(rate_limit.key, models.IPAddressPartitioningKey):
@@ -321,13 +329,39 @@ async def get_nginx_service_config(
         limit_req_zones.append(
             LimitReqZoneConfig(name=zone_name, key=key, rpm=round(rate_limit.rps * 60))
         )
-        locations.append(
-            LocationConfig(
-                prefix=rate_limit.prefix,
-                limit_req=LimitReqConfig(zone=zone_name, burst=rate_limit.burst),
+        if is_sglang:
+            for path in sglang_whitelisted_paths:
+                if rate_limit.prefix == path or path.startswith(rate_limit.prefix):
+                    # Use the longest prefix if multiple prefixes match the same path
+                    current_prefix_len = len(rate_limit.prefix)
+                    if path not in sglang_limits or current_prefix_len > sglang_prefix_lengths.get(
+                        path, 0
+                    ):
+                        sglang_limits[path] = LimitReqConfig(
+                            zone=zone_name, burst=rate_limit.burst
+                        )
+                        sglang_prefix_lengths[path] = current_prefix_len
+        else:
+            locations.append(
+                LocationConfig(
+                    prefix=rate_limit.prefix,
+                    limit_req=LimitReqConfig(zone=zone_name, burst=rate_limit.burst),
+                )
             )
-        )
-    if not any(location.prefix == "/" for location in locations):
+
+    # Add SGLang whitelisted paths as locations
+    if is_sglang:
+        for path in sglang_whitelisted_paths:
+            # Use prefix match for paths that end with a slash and exact match for paths that don't
+            if path.endswith("/"):
+                locations.append(LocationConfig(prefix=path, limit_req=sglang_limits.get(path)))
+            else:
+                locations.append(
+                    LocationConfig(prefix=f"= {path}", limit_req=sglang_limits.get(path))
+                )
+
+    # Don't auto-add / location for SGLang routers (catch-all 403 handles it)
+    if not any(location.prefix == "/" for location in locations) and not is_sglang:
         locations.append(LocationConfig(prefix="/", limit_req=None))
     return ServiceConfig(
         domain=service.domain_safe,
@@ -340,7 +374,6 @@ async def get_nginx_service_config(
         locations=locations,
         replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
         router=service.router,
-        model_id=service.model_id,
     )
 
 

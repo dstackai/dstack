@@ -1,3 +1,4 @@
+import shlex
 import subprocess
 import tempfile
 import threading
@@ -51,6 +52,7 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
 )
 from dstack._internal.core.models.resources import CPUSpec, Memory
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import parse_memory
@@ -403,7 +405,9 @@ class KubernetesCompute(
         # Consider deploying an NLB. It seems it requires some extra configuration on the cluster:
         # https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
         instance_name = generate_unique_gateway_instance_name(configuration)
-        commands = _get_gateway_commands(authorized_keys=[configuration.ssh_key_pub])
+        commands = _get_gateway_commands(
+            authorized_keys=[configuration.ssh_key_pub], router=configuration.router
+        )
         pod = client.V1Pod(
             metadata=client.V1ObjectMeta(
                 name=instance_name,
@@ -940,9 +944,13 @@ def _add_authorized_key_to_jump_pod(
     )
 
 
-def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
+def _get_gateway_commands(
+    authorized_keys: List[str], router: Optional[AnyRouterConfig] = None
+) -> List[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
-    gateway_commands = " && ".join(get_dstack_gateway_commands())
+    gateway_commands = " && ".join(get_dstack_gateway_commands(router=router))
+    quoted_gateway_commands = shlex.quote(gateway_commands)
+
     commands = [
         # install packages
         "apt-get update && apt-get install -y sudo wget openssh-server nginx python3.10-venv libaugeas0",
@@ -971,7 +979,7 @@ def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
         # start sshd
         "/usr/sbin/sshd -p 22 -o PermitUserEnvironment=yes",
         # run gateway
-        f"su ubuntu -c '{gateway_commands}'",
+        f"su ubuntu -c {quoted_gateway_commands}",
         "sleep infinity",
     ]
     return commands

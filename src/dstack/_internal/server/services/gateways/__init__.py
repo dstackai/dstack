@@ -454,18 +454,12 @@ async def _update_gateway(gateway_compute_model: GatewayComputeModel, build: str
         gateway_compute_model.configuration
     )
 
-    # Build package spec with extras and wheel URL (similar to compute.py)
-    wheel = get_dstack_gateway_wheel(build)
-    if compute_config.router:
-        gateway_package = f"dstack-gateway[{compute_config.router.type}] @ {wheel}"
-    else:
-        gateway_package = f"dstack-gateway @ {wheel}"
-
+    # Build package spec with extras and wheel URL
+    gateway_package = get_dstack_gateway_wheel(build, compute_config.router)
     commands = [
         # prevent update.sh from overwriting itself during execution
         "cp dstack/update.sh dstack/_update.sh",
-        # Pass the full package spec (with extras) to update.sh instead of just the wheel
-        f"sh dstack/_update.sh '{gateway_package}' {build}",
+        f'sh dstack/_update.sh "{gateway_package}" {build}',
         "rm dstack/_update.sh",
     ]
     stdout = await connection.tunnel.aexec("/bin/sh -c '" + " && ".join(commands) + "'")

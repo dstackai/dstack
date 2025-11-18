@@ -1,12 +1,13 @@
-import json
 import shutil
 import subprocess
+import sys
 import time
 import urllib.parse
 from typing import List, Optional
 
+import httpx
+
 from dstack._internal.core.models.routers import RouterType, SGLangRouterConfig
-from dstack._internal.proxy.gateway.const import DSTACK_DIR_ON_GATEWAY
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.utils.logging import get_logger
 
@@ -20,49 +21,42 @@ class SglangRouter(Router):
 
     TYPE = RouterType.SGLANG
 
-    def __init__(self, router: SGLangRouterConfig, context: Optional[RouterContext] = None):
+    def __init__(self, config: SGLangRouterConfig, context: Optional[RouterContext] = None):
         """Initialize SGLang router.
 
         Args:
-            router: SGLang router configuration (policy, cache_threshold, etc.)
+            config: SGLang router configuration (policy, cache_threshold, etc.)
             context: Runtime context for the router (host, port, logging, etc.)
         """
-        super().__init__(router=router, context=context)
-        self.config = router
+        super().__init__(config=config, context=context)
+        self.config = config
 
     def start(self) -> None:
         try:
             logger.info("Starting sglang-router-new on port %s...", self.context.port)
 
-            # Determine active venv (blue or green)
-            version_file = DSTACK_DIR_ON_GATEWAY / "version"
-            if version_file.exists():
-                version = version_file.read_text().strip()
-            else:
-                version = "blue"
-
-            venv_python = DSTACK_DIR_ON_GATEWAY / version / "bin" / "python3"
-
+            # Prometheus port is offset by 10000 from router port to keep it in a separate range
             prometheus_port = self.context.port + 10000
 
             cmd = [
-                str(venv_python),
+                sys.executable,
                 "-m",
                 "sglang_router.launch_router",
                 "--host",
-                "0.0.0.0",
+                self.context.host,
                 "--port",
                 str(self.context.port),
                 "--prometheus-port",
                 str(prometheus_port),
+                "--prometheus-host",
+                self.context.host,
                 "--log-level",
                 self.context.log_level,
                 "--log-dir",
                 str(self.context.log_dir),
+                "--policy",
+                self.config.policy,
             ]
-
-            if hasattr(self.config, "policy") and self.config.policy:
-                cmd.extend(["--policy", self.config.policy])
 
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -129,12 +123,9 @@ class SglangRouter(Router):
     def is_running(self) -> bool:
         """Check if the SGLang router is running and responding to HTTP requests on the assigned port."""
         try:
-            result = subprocess.run(
-                ["curl", "-s", f"http://{self.context.host}:{self.context.port}/workers"],
-                capture_output=True,
-                timeout=5,
-            )
-            return result.returncode == 0
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(f"http://{self.context.host}:{self.context.port}/workers")
+                return response.status_code == 200
         except Exception as e:
             logger.error(f"Error checking sglang router status on port {self.context.port}: {e}")
             return False
@@ -151,8 +142,11 @@ class SglangRouter(Router):
         for worker in current_workers:
             url = worker.get("url")
             if url and isinstance(url, str):
-                current_worker_urls.add(url)
-        target_worker_urls = set(replica_urls)
+                # Normalize URL by removing trailing slashes to avoid path artifacts
+                normalized_url = url.rstrip("/")
+                current_worker_urls.add(normalized_url)
+        # Normalize target URLs to ensure consistent comparison
+        target_worker_urls = {url.rstrip("/") for url in replica_urls}
 
         # Workers to add
         workers_to_add = target_worker_urls - current_worker_urls
@@ -186,16 +180,13 @@ class SglangRouter(Router):
 
     def _get_router_workers(self) -> List[dict]:
         try:
-            result = subprocess.run(
-                ["curl", "-s", f"http://{self.context.host}:{self.context.port}/workers"],
-                capture_output=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                response = json.loads(result.stdout.decode())
-                workers = response.get("workers", [])
-                return workers
-            return []
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(f"http://{self.context.host}:{self.context.port}/workers")
+                if response.status_code == 200:
+                    response_data = response.json()
+                    workers = response_data.get("workers", [])
+                    return workers
+                return []
         except Exception as e:
             logger.error(f"Error getting sglang router workers: {e}")
             return []
@@ -203,36 +194,31 @@ class SglangRouter(Router):
     def _add_worker_to_router(self, worker_url: str) -> bool:
         try:
             payload = {"url": worker_url, "worker_type": "regular"}
-            result = subprocess.run(
-                [
-                    "curl",
-                    "-X",
-                    "POST",
+            with httpx.Client(timeout=5.0) as client:
+                response = client.post(
                     f"http://{self.context.host}:{self.context.port}/workers",
-                    "-H",
-                    "Content-Type: application/json",
-                    "-d",
-                    json.dumps(payload),
-                ],
-                capture_output=True,
-                timeout=5,
-            )
-
-            if result.returncode == 0:
-                response = json.loads(result.stdout.decode())
-                if response.get("status") == "accepted":
-                    logger.info(
-                        "Added worker %s to sglang router on port %s",
-                        worker_url,
-                        self.context.port,
-                    )
-                    return True
+                    json=payload,
+                )
+                if response.status_code == 200:
+                    response_data = response.json()
+                    if response_data.get("status") == "accepted":
+                        logger.info(
+                            "Added worker %s to sglang router on port %s",
+                            worker_url,
+                            self.context.port,
+                        )
+                        return True
+                    else:
+                        logger.error("Failed to add worker %s: %s", worker_url, response_data)
+                        return False
                 else:
-                    logger.error("Failed to add worker %s: %s", worker_url, response)
+                    logger.error(
+                        "Failed to add worker %s: status %d, %s",
+                        worker_url,
+                        response.status_code,
+                        response.text,
+                    )
                     return False
-            else:
-                logger.error("Failed to add worker %s: %s", worker_url, result.stderr.decode())
-                return False
         except Exception as e:
             logger.error(f"Error adding worker {worker_url}: {e}")
             return False
@@ -240,33 +226,30 @@ class SglangRouter(Router):
     def _remove_worker_from_router(self, worker_url: str) -> bool:
         try:
             encoded_url = urllib.parse.quote(worker_url, safe="")
-
-            result = subprocess.run(
-                [
-                    "curl",
-                    "-X",
-                    "DELETE",
-                    f"http://{self.context.host}:{self.context.port}/workers/{encoded_url}",
-                ],
-                capture_output=True,
-                timeout=5,
-            )
-
-            if result.returncode == 0:
-                response = json.loads(result.stdout.decode())
-                if response.get("status") == "accepted":
-                    logger.info(
-                        "Removed worker %s from sglang router on port %s",
-                        worker_url,
-                        self.context.port,
-                    )
-                    return True
+            with httpx.Client(timeout=5.0) as client:
+                response = client.delete(
+                    f"http://{self.context.host}:{self.context.port}/workers/{encoded_url}"
+                )
+                if response.status_code == 200:
+                    response_data = response.json()
+                    if response_data.get("status") == "accepted":
+                        logger.info(
+                            "Removed worker %s from sglang router on port %s",
+                            worker_url,
+                            self.context.port,
+                        )
+                        return True
+                    else:
+                        logger.error("Failed to remove worker %s: %s", worker_url, response_data)
+                        return False
                 else:
-                    logger.error("Failed to remove worker %s: %s", worker_url, response)
+                    logger.error(
+                        "Failed to remove worker %s: status %d, %s",
+                        worker_url,
+                        response.status_code,
+                        response.text,
+                    )
                     return False
-            else:
-                logger.error("Failed to remove worker %s: %s", worker_url, result.stderr.decode())
-                return False
         except Exception as e:
             logger.error(f"Error removing worker {worker_url}: {e}")
             return False

@@ -9,7 +9,7 @@ from .base import Router, RouterContext
 
 def get_router(router: AnyRouterConfig, context: Optional[RouterContext] = None) -> Router:
     if router.type == "sglang":
-        return SglangRouter(router=router, context=context)
+        return SglangRouter(config=router, context=context)
     raise ProxyError(f"Router type '{router.type}' is not available")
 
 

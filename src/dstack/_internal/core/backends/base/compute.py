@@ -1014,7 +1014,7 @@ def get_latest_runner_build() -> Optional[str]:
     return None
 
 
-def get_dstack_gateway_wheel(build: str) -> str:
+def get_dstack_gateway_wheel(build: str, router: Optional[AnyRouterConfig] = None) -> str:
     channel = "release" if settings.DSTACK_RELEASE else "stgn"
     base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
     if build == "latest":
@@ -1022,18 +1022,17 @@ def get_dstack_gateway_wheel(build: str) -> str:
         r.raise_for_status()
         build = r.text.strip()
         logger.debug("Found the latest gateway build: %s", build)
-    # return f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
-    return "https://bihan-test-bucket.s3.eu-west-1.amazonaws.com/dstack_gateway-0.0.1-py3-none-any.whl"
+    # wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
+    wheel = "https://bihan-test-bucket.s3.eu-west-1.amazonaws.com/dstack_gateway-0.0.1-py3-none-any.whl"
+    # Build package spec with extras if router is specified
+    if router:
+        return f"dstack-gateway[{router.type}] @ {wheel}"
+    return f"dstack-gateway @ {wheel}"
 
 
 def get_dstack_gateway_commands(router: Optional[AnyRouterConfig] = None) -> List[str]:
     build = get_dstack_runner_version()
-    wheel = get_dstack_gateway_wheel(build)
-    # Build package spec with extras if router is specified
-    if router:
-        gateway_package = f"dstack-gateway[{router.type}] @ {wheel}"
-    else:
-        gateway_package = f"dstack-gateway @ {wheel}"
+    gateway_package = get_dstack_gateway_wheel(build, router)
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",

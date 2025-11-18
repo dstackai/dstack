@@ -71,7 +71,6 @@ class ServiceConfig(SiteConfig):
     locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
     router: Optional[AnyRouterConfig] = None
-    model_id: Optional[str] = None
     router_port: Optional[int] = None
 
 
@@ -124,10 +123,8 @@ class Nginx:
 
                         # Create router context with allocated port
                         ctx = RouterContext(
-                            host="127.0.0.1",
                             port=router_port,
                             log_dir=log_dir,
-                            log_level="info",
                         )
 
                         # Create new router instance for this service
@@ -421,9 +418,7 @@ class Nginx:
         # Pass ports to template
         workers_config = generate_router_workers_config(conf, allocated_ports)
         workers_conf_name = f"router-workers.{conf.domain}.conf"
-        workers_conf_path = self._conf_dir / workers_conf_name
-        sudo_write(workers_conf_path, workers_config)
-        self.reload()
+        self.write_conf(workers_config, workers_conf_name)
 
 
 def generate_router_workers_config(conf: ServiceConfig, allocated_ports: list[int]) -> str:
