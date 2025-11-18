@@ -5,8 +5,9 @@ import time
 import urllib.parse
 from typing import List, Optional
 
-from dstack._internal.core.models.routers import SGLangRouterConfig
+from dstack._internal.core.models.routers import RouterType, SGLangRouterConfig
 from dstack._internal.proxy.gateway.const import DSTACK_DIR_ON_GATEWAY
+from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.utils.logging import get_logger
 
 from .base import Router, RouterContext
@@ -17,7 +18,7 @@ logger = get_logger(__name__)
 class SglangRouter(Router):
     """SGLang router implementation with 1:1 service-to-router."""
 
-    TYPE = "sglang"
+    TYPE = RouterType.SGLANG
 
     def __init__(self, router: SGLangRouterConfig, context: Optional[RouterContext] = None):
         """Initialize SGLang router.
@@ -68,7 +69,9 @@ class SglangRouter(Router):
             time.sleep(2)
 
             if not self.is_running():
-                raise Exception(f"Failed to start sglang router on port {self.context.port}")
+                raise UnexpectedProxyError(
+                    f"Failed to start sglang router on port {self.context.port}"
+                )
 
             logger.info(
                 "Sglang router started successfully on port %s (prometheus on %s)",

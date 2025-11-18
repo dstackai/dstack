@@ -10,7 +10,7 @@ import jinja2
 from pydantic import BaseModel
 from typing_extensions import Literal
 
-from dstack._internal.core.models.routers import AnyRouterConfig
+from dstack._internal.core.models.routers import AnyRouterConfig, RouterType
 from dstack._internal.proxy.gateway.const import PROXY_PORT_ON_GATEWAY
 from dstack._internal.proxy.gateway.model_routers import (
     Router,
@@ -107,7 +107,7 @@ class Nginx:
                 await run_async(self.run_certbot, conf.domain, acme)
 
             if isinstance(conf, ServiceConfig) and conf.router:
-                if conf.router.type == "sglang":
+                if conf.router.type == RouterType.SGLANG:
                     # Check if router already exists for this domain
                     if conf.domain in self._domain_to_router:
                         # Router already exists, reuse it
@@ -314,7 +314,7 @@ class Nginx:
             return False
 
     def _allocate_router_port(self) -> int:
-        """Allocate next available router port in fixed range (20000-24999).
+        """Allocate next available router port in fixed range.
 
         Checks both our internal allocation map and actual port availability
         to avoid conflicts with other services. Range chosen to avoid ephemeral ports.
@@ -354,7 +354,7 @@ class Nginx:
         )
 
     def _allocate_worker_ports(self, num_ports: int) -> list[int]:
-        """Allocate worker ports globally in fixed range (10001-11999).
+        """Allocate worker ports globally in fixed range.
 
         Worker ports are used by nginx to listen and proxy to worker sockets.
         They must be unique across all router instances. Range chosen to avoid ephemeral ports.
