@@ -1,5 +1,5 @@
 import math
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from sqlalchemy import and_, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -99,6 +99,7 @@ async def get_job_plans(
         job=jobs[0],
         master_job_provisioning_data=None,
         volumes=volumes,
+        exclude_not_available=False,
     )
     if _should_force_non_fleet_offers(run_spec) or (
         not FeatureFlags.AUTOCREATED_FLEETS_DISABLED
@@ -211,6 +212,7 @@ async def find_optimal_fleet_with_offers(
     job: Job,
     master_job_provisioning_data: Optional[JobProvisioningData],
     volumes: Optional[list[list[Volume]]],
+    exclude_not_available: bool,
 ) -> tuple[
     Optional[FleetModel],
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
@@ -221,17 +223,21 @@ async def find_optimal_fleet_with_offers(
     the fleet model, pool offers with instances, and backend offers.
     Returns empty backend offers if run_model.fleet is set since
     backend offer from this function are needed only for run plan.
+    Only available offers are considered for selecting fleets but may return
+    either available or all offers depending on `exclude_not_available`.
     """
     if run_model is not None and run_model.fleet is not None:
         # Using the fleet that was already chosen by the master job
-        fleet_instance_offers = _get_run_fleet_instance_offers(
+        instance_offers = _get_run_fleet_instance_offers(
             fleet_model=run_model.fleet,
             run_spec=run_spec,
             job=job,
             master_job_provisioning_data=master_job_provisioning_data,
             volumes=volumes,
         )
-        return run_model.fleet, fleet_instance_offers, []
+        if exclude_not_available:
+            instance_offers = _exclude_non_available_instance_offers(instance_offers)
+        return run_model.fleet, instance_offers, []
 
     nodes_required_num = get_nodes_required_num(run_spec)
     # The current strategy is first to consider fleets that can accommodate
@@ -259,7 +265,7 @@ async def find_optimal_fleet_with_offers(
             # Limit multinode runs to cluster fleets to guarantee best connectivity.
             continue
 
-        fleet_instance_offers = _get_run_fleet_instance_offers(
+        instance_offers = _get_run_fleet_instance_offers(
             fleet_model=candidate_fleet_model,
             run_spec=run_spec,
             job=job,
@@ -268,10 +274,13 @@ async def find_optimal_fleet_with_offers(
             master_job_provisioning_data=None,
             volumes=volumes,
         )
-        fleet_has_pool_capacity = nodes_required_num <= len(fleet_instance_offers)
-        fleet_cheapest_instance_offer = math.inf
-        if len(fleet_instance_offers) > 0:
-            fleet_cheapest_instance_offer = fleet_instance_offers[0][1].price
+        available_instance_offers = _exclude_non_available_instance_offers(instance_offers)
+        if exclude_not_available:
+            instance_offers = available_instance_offers
+        has_pool_capacity = nodes_required_num <= len(available_instance_offers)
+        min_instance_offer_price = _get_min_instance_or_backend_offer_price(
+            available_instance_offers
+        )
 
         try:
             check_can_create_new_cloud_instance_in_fleet(candidate_fleet)
@@ -281,7 +290,7 @@ async def find_optimal_fleet_with_offers(
                 fleet=candidate_fleet,
             )
         except ValueError:
-            fleet_backend_offers = []
+            backend_offers = []
         else:
             # Master job offers must be in the same cluster as existing instances.
             master_instance_provisioning_data = get_fleet_master_instance_provisioning_data(
@@ -291,11 +300,10 @@ async def find_optimal_fleet_with_offers(
             # Handle multinode for old jobs that don't have requirements.multinode set.
             # TODO: Drop multinode param.
             multinode = requirements.multinode or is_multinode_job(job)
-            fleet_backend_offers = await get_offers_by_requirements(
+            backend_offers = await get_offers_by_requirements(
                 project=project,
                 profile=profile,
                 requirements=requirements,
-                exclude_not_available=True,
                 multinode=multinode,
                 master_job_provisioning_data=master_instance_provisioning_data,
                 volumes=volumes,
@@ -303,26 +311,29 @@ async def find_optimal_fleet_with_offers(
                 instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
             )
 
-        fleet_cheapest_backend_offer = math.inf
-        if len(fleet_backend_offers) > 0:
-            fleet_cheapest_backend_offer = fleet_backend_offers[0][1].price
+        available_backend_offers = _exclude_non_available_backend_offers(backend_offers)
+        if exclude_not_available:
+            backend_offers = available_backend_offers
+        min_backend_offer_price = _get_min_instance_or_backend_offer_price(
+            available_backend_offers
+        )
 
         if not _run_can_fit_into_fleet(run_spec, candidate_fleet):
             logger.debug("Skipping fleet %s from consideration: run cannot fit into fleet")
             continue
 
         fleet_priority = (
-            not fleet_has_pool_capacity,
-            fleet_cheapest_instance_offer,
-            fleet_cheapest_backend_offer,
+            not has_pool_capacity,
+            min_instance_offer_price,
+            min_backend_offer_price,
         )
         candidate_fleets_with_offers.append(
             (
                 candidate_fleet_model,
-                fleet_instance_offers,
-                fleet_backend_offers,
-                len(fleet_instance_offers),
-                len(fleet_backend_offers),
+                instance_offers,
+                backend_offers,
+                len(available_instance_offers),
+                len(available_backend_offers),
                 fleet_priority,
             )
         )
@@ -391,35 +402,29 @@ def _get_run_fleet_instance_offers(
     volumes: Optional[List[List[Volume]]] = None,
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     pool_instances = fleet_model.instances
-    instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]]
     profile = run_spec.merged_profile
     multinode = is_multinode_job(job)
     nonshared_instances = filter_pool_instances(
         pool_instances=pool_instances,
         profile=profile,
         requirements=job.job_spec.requirements,
-        status=InstanceStatus.IDLE,
         fleet_model=fleet_model,
         multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
         shared=False,
     )
-    instances_with_offers = [
-        (instance, common_utils.get_or_error(get_instance_offer(instance)))
-        for instance in nonshared_instances
-    ]
+    instances_with_offers = _get_offers_from_instances(nonshared_instances)
     shared_instances_with_offers = get_shared_pool_instances_with_offers(
         pool_instances=pool_instances,
         profile=profile,
         requirements=job.job_spec.requirements,
-        idle_only=True,
         fleet_model=fleet_model,
         multinode=multinode,
         volumes=volumes,
     )
     instances_with_offers.extend(shared_instances_with_offers)
-    instances_with_offers.sort(key=lambda instance_with_offer: instance_with_offer[0].price or 0)
+    instances_with_offers.sort(key=lambda o: o[0].price or 0)
     return instances_with_offers
 
 
@@ -468,7 +473,6 @@ async def _get_pool_offers(
     pool_instances = await get_pool_instances(session, project)
     pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
     multinode = is_multinode_job(job)
-
     shared_instances_with_offers = get_shared_pool_instances_with_offers(
         pool_instances=pool_instances,
         profile=run_spec.merged_profile,
@@ -487,16 +491,9 @@ async def _get_pool_offers(
         volumes=volumes,
         shared=False,
     )
-    for instance in nonshared_instances:
-        offer = get_instance_offer(instance)
-        if offer is None:
-            continue
-        offer.availability = InstanceAvailability.BUSY
-        if instance.status == InstanceStatus.IDLE:
-            offer.availability = InstanceAvailability.IDLE
-        pool_offers.append((instance, offer))
-
-    pool_offers.sort(key=lambda offer: offer[1].price)
+    nonshared_instances_with_offers = _get_offers_from_instances(nonshared_instances)
+    pool_offers.extend(nonshared_instances_with_offers)
+    pool_offers.sort(key=lambda o: o[1].price)
     return pool_offers
 
 
@@ -561,3 +558,46 @@ def _should_force_non_fleet_offers(run_spec: RunSpec) -> bool:
     # get run plan API to show offers and the only way to distinguish it is commands.
     # Assuming real runs will not use such commands.
     return run_spec.configuration.type == "task" and run_spec.configuration.commands == [":"]
+
+
+def _get_offers_from_instances(
+    instances: list[InstanceModel],
+) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
+    instances_with_offers = []
+    for instance in instances:
+        offer = common_utils.get_or_error(get_instance_offer(instance))
+        offer.availability = InstanceAvailability.BUSY
+        if instance.status == InstanceStatus.IDLE:
+            offer.availability = InstanceAvailability.IDLE
+        instances_with_offers.append((instance, offer))
+    return instances_with_offers
+
+
+def _get_min_instance_or_backend_offer_price(
+    offers: Union[
+        list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+        list[tuple[Backend, InstanceOfferWithAvailability]],
+    ],
+) -> float:
+    min_offer_price = math.inf
+    if len(offers) > 0:
+        min_offer_price = offers[0][1].price
+    return min_offer_price
+
+
+def _exclude_non_available_instance_offers(
+    instance_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
+    return [
+        (instance, offer)
+        for instance, offer in instance_offers
+        if offer.availability.is_available()
+    ]
+
+
+def _exclude_non_available_backend_offers(
+    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]],
+) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
+    return [
+        (backend, offer) for backend, offer in backend_offers if offer.availability.is_available()
+    ]

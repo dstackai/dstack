@@ -327,6 +327,7 @@ async def _process_submitted_job(
             job=job,
             master_job_provisioning_data=master_job_provisioning_data,
             volumes=volumes,
+            exclude_not_available=True,
         )
         if fleet_model is None:
             if run_spec.merged_profile.fleets is not None:
