@@ -4,6 +4,9 @@ Displays available offers (hardware configurations) from configured backends or 
 
 The output shows backend, region, instance type, resources, spot availability, and pricing.
 
+!!! info "Experimental"
+    `dstack offer` command is currently an experimental feature. Backward compatibility is not guaranteed across releases.
+
 ## Usage
 
 This command accepts most of the same arguments as [`dstack apply`](apply.md).
