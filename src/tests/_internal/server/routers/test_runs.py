@@ -97,7 +97,7 @@ def get_dev_env_run_plan_dict(
                 " && echo"
                 " && echo 'To open in VS Code Desktop, use link below:'"
                 " && echo"
-                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_REPO_DIR"'
+                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_WORKING_DIR"'
                 " && echo"
                 " && echo 'To connect via SSH, use: `ssh dry-run`'"
                 " && echo"
@@ -121,7 +121,7 @@ def get_dev_env_run_plan_dict(
                 " && echo"
                 " && echo 'To open in VS Code Desktop, use link below:'"
                 " && echo"
-                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_REPO_DIR"'
+                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_WORKING_DIR"'
                 " && echo"
                 " && echo 'To connect via SSH, use: `ssh dry-run`'"
                 " && echo"
@@ -302,7 +302,7 @@ def get_dev_env_run_dict(
                 " && echo"
                 " && echo 'To open in VS Code Desktop, use link below:'"
                 " && echo"
-                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_REPO_DIR"'
+                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_WORKING_DIR"'
                 " && echo"
                 " && echo 'To connect via SSH, use: `ssh test-run`'"
                 " && echo"
@@ -326,7 +326,7 @@ def get_dev_env_run_dict(
                 " && echo"
                 " && echo 'To open in VS Code Desktop, use link below:'"
                 " && echo"
-                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_REPO_DIR"'
+                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_WORKING_DIR"'
                 " && echo"
                 " && echo 'To connect via SSH, use: `ssh test-run`'"
                 " && echo"
