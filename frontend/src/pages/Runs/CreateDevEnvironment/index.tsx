@@ -17,8 +17,8 @@ import { useApplyRunMutation } from 'services/run';
 
 import { OfferList } from 'pages/Offers/List';
 
-import { getRunSpecFromYaml } from './helpers/getRunSpecFromYaml';
 import { useGenerateYaml } from './hooks/useGenerateYaml';
+import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
 
 import { IRunEnvironmentFormValues } from './types';
 
@@ -57,7 +57,10 @@ const envValidationSchema = yup.object({
 
     repo_url: yup.string().when('repo_enabled', {
         is: true,
-        then: yup.string().url(urlFormatError).required(requiredFieldError),
+        then: yup
+            .string()
+            .matches(/^(https?):\/\/([^\s\/?#]+)((?:\/[^\s?#]*)*)(?::\/(.*))?$/i, urlFormatError)
+            .required(requiredFieldError),
     }),
 });
 
@@ -109,6 +112,8 @@ export const CreateDevEnvironment: React.FC = () => {
         () => searchParams.get('project_name') ?? null,
     );
 
+    const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: selectedProject });
+
     const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
 
     const loading = isApplying;
@@ -129,7 +134,7 @@ export const CreateDevEnvironment: React.FC = () => {
         resolver,
         defaultValues: {
             ide: 'cursor',
-            docker: true,
+            docker: false,
             repo_enabled: false,
         },
     });
@@ -218,16 +223,8 @@ export const CreateDevEnvironment: React.FC = () => {
 
         try {
             runSpec = await getRunSpecFromYaml(config_yaml);
-        } catch (error) {
-            pushNotification({
-                type: 'error',
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                content: error?.message,
-            });
-
-            window.scrollTo(0, 0);
-
+        } catch (e) {
+            console.log('parse transaction error:', e);
             return;
         }
 
@@ -336,22 +333,6 @@ export const CreateDevEnvironment: React.FC = () => {
                                         onChange={onChangeTab}
                                         tabs={[
                                             {
-                                                label: t('runs.dev_env.wizard.docker'),
-                                                id: DockerPythonTabs.DOCKER,
-                                                content: (
-                                                    <div>
-                                                        <FormInput
-                                                            label={t('runs.dev_env.wizard.docker_image')}
-                                                            description={t('runs.dev_env.wizard.docker_image_description')}
-                                                            placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
-                                                            control={control}
-                                                            name="image"
-                                                            disabled={loading}
-                                                        />
-                                                    </div>
-                                                ),
-                                            },
-                                            {
                                                 label: t('runs.dev_env.wizard.python'),
                                                 id: DockerPythonTabs.PYTHON,
                                                 content: (
@@ -362,6 +343,22 @@ export const CreateDevEnvironment: React.FC = () => {
                                                             placeholder={t('runs.dev_env.wizard.python_placeholder')}
                                                             control={control}
                                                             name="python"
+                                                            disabled={loading}
+                                                        />
+                                                    </div>
+                                                ),
+                                            },
+                                            {
+                                                label: t('runs.dev_env.wizard.docker'),
+                                                id: DockerPythonTabs.DOCKER,
+                                                content: (
+                                                    <div>
+                                                        <FormInput
+                                                            label={t('runs.dev_env.wizard.docker_image')}
+                                                            description={t('runs.dev_env.wizard.docker_image_description')}
+                                                            placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
+                                                            control={control}
+                                                            name="image"
                                                             disabled={loading}
                                                         />
                                                     </div>
