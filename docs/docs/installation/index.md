@@ -15,7 +15,7 @@ Backends can be set up in `~/.dstack/server/config.yml` or through the [project 
 For more details, see [Backends](../concepts/backends.md).
 
 ??? info "SSH fleets"
-    When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh) once the server is up.
+    When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh-fleets) once the server is up.
 
 ### Start the server
 

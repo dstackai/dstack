@@ -41,8 +41,8 @@ resources:
 
 <!-- more -->
 
-> Instance volumes work with both [SSH fleets](../../docs/concepts/fleets.md#ssh)
-> and [cloud fleets](../../docs/concepts/fleets.md#cloud), and it is possible to mount any folders on the instance,
+> Instance volumes work with both [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets)
+> and [cloud fleets](../../docs/concepts/fleets.md#backend-fleets), and it is possible to mount any folders on the instance,
 > whether they are regular folders or NFS share mounts.
 
 The configuration above mounts `/root/.dstack/cache` on the instance to `/root/.cache` inside container.

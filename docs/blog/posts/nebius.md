@@ -103,7 +103,7 @@ $ dstack apply -f .dstack.yml
 The new `nebius` backend supports CPU and GPU instances, [fleets](../../docs/concepts/fleets.md), 
 [distributed tasks](../../docs/concepts/tasks.md#distributed-tasks), and more. 
  
-> Support for [network volumes](../../docs/concepts/volumes.md#network) and accelerated cluster 
+> Support for [network volumes](../../docs/concepts/volumes.md#network-volumes) and accelerated cluster 
 interconnects is coming soon.
 
 !!! info "What's next?"

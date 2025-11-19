@@ -122,7 +122,7 @@ The full, reproducible steps are available in our GitHub repository. Below is a 
 
 #### Creating a fleet
 
-We first defined a `dstack` [SSH fleet](../../docs/concepts/fleets.md#ssh) to manage the two-node cluster.
+We first defined a `dstack` [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets) to manage the two-node cluster.
 
 ```yaml
 type: fleet

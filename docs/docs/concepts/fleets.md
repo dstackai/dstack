@@ -9,7 +9,7 @@ Fleets act both as pools of instances and as templates for how those instances a
 
 When you run `dstack apply` to start a dev environment, task, or service, `dstack` will reuse idle instances from an existing fleet whenever available.
 
-## Backend fleets { #backend-fleets }
+## Backend fleets
 
 If you configured [backends](backends.md), `dstack` can provision fleets on the fly.
 However, it’s recommended to define fleets explicitly.
@@ -269,7 +269,7 @@ retry:
     [`max_price`](../reference/dstack.yml/fleet.md#max_price), and
     among [others](../reference/dstack.yml/fleet.md).
 
-## SSH fleets { #ssh-fleets }
+## SSH fleets
 
 If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet.
 
