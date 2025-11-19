@@ -129,7 +129,10 @@ def print_run_plan(
     props.add_row(th("User"), run_plan.user)
     if include_run_properties:
         props.add_row(th("Configuration"), run_spec.configuration_path)
-        props.add_row(th("Type"), run_spec.configuration.type)
+        configuration_type = run_spec.configuration.type
+        if run_spec.configuration.type == "task":
+            configuration_type += f" (nodes={run_spec.configuration.nodes})"
+        props.add_row(th("Type"), configuration_type)
     props.add_row(th("Resources"), pretty_req)
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Max price"), max_price)
