@@ -1,5 +1,6 @@
 import asyncio
 import heapq
+from collections.abc import Iterator
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -338,11 +339,13 @@ async def get_project_backend_model_by_type_or_error(
     return backend_model
 
 
-async def get_instance_offers(
-    backends: List[Backend], requirements: Requirements, exclude_not_available: bool = False
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+async def get_backend_offers(
+    backends: List[Backend],
+    requirements: Requirements,
+    exclude_not_available: bool = False,
+) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
-    Returns list of instances satisfying minimal resource requirements sorted by price
+    Yields backend offers satisfying `requirements` sorted by price.
     """
     logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
     tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
@@ -369,10 +372,9 @@ async def get_instance_offers(
                 if not exclude_not_available or offer.availability.is_available()
             ]
         )
-    # Merge preserving order for every backend
+    # Merge preserving order for every backend.
     offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)
-    # Put NOT_AVAILABLE, NO_QUOTA, and BUSY instances at the end, do not sort by price
-    return sorted(offers, key=lambda i: not i[1].availability.is_available())
+    return offers
 
 
 def check_backend_type_available(backend_type: BackendType):

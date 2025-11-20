@@ -1,3 +1,5 @@
+import itertools
+from collections.abc import Iterable, Iterator
 from typing import List, Literal, Optional, Tuple, Union
 
 import gpuhunt
@@ -36,16 +38,9 @@ async def get_offers_by_requirements(
     instance_mounts: bool = False,
     placement_group: Optional[PlacementGroup] = None,
     blocks: Union[int, Literal["auto"]] = 1,
+    max_offers: Optional[int] = None,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
-
-    # For backward-compatibility to show offers if users set `backends: [dstack]`
-    if (
-        profile.backends is not None
-        and len(profile.backends) == 1
-        and BackendType.DSTACK in profile.backends
-    ):
-        profile.backends = None
 
     backend_types = profile.backends
     regions = profile.regions
@@ -98,13 +93,13 @@ async def get_offers_by_requirements(
     if backend_types is not None:
         backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
 
-    offers = await backends_services.get_instance_offers(
+    offers = await backends_services.get_backend_offers(
         backends=backends,
         requirements=requirements,
         exclude_not_available=exclude_not_available,
     )
 
-    offers = filter_offers(
+    offers = _filter_offers(
         offers=offers,
         # Double filtering by backends if backend returns offers for other backend.
         backend_types=backend_types,
@@ -114,67 +109,14 @@ async def get_offers_by_requirements(
         placement_group=placement_group,
     )
 
-    if blocks == 1:
-        return offers
+    if blocks != 1:
+        offers = _get_shareable_offers(offers, blocks)
 
-    shareable_offers = []
-    for backend, offer in offers:
-        resources = offer.instance.resources
-        cpu_count = resources.cpus
-        gpu_count = len(resources.gpus)
-        if gpu_count > 0 and resources.gpus[0].vendor == gpuhunt.AcceleratorVendor.GOOGLE:
-            # TPUs cannot be shared
-            gpu_count = 1
-        divisible, _blocks = is_divisible_into_blocks(cpu_count, gpu_count, blocks)
-        if not divisible:
-            continue
-        offer.total_blocks = _blocks
-        shareable_offers.append((backend, offer))
-    return shareable_offers
+    if max_offers is not None:
+        offers = itertools.islice(offers, max_offers)
 
-
-def filter_offers(
-    offers: List[Tuple[Backend, InstanceOfferWithAvailability]],
-    backend_types: Optional[List[BackendType]] = None,
-    regions: Optional[List[str]] = None,
-    availability_zones: Optional[List[str]] = None,
-    instance_types: Optional[List[str]] = None,
-    placement_group: Optional[PlacementGroup] = None,
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
-    if backend_types is not None:
-        offers = [(b, o) for b, o in offers if o.backend in backend_types]
-
-    if regions is not None:
-        regions = [r.lower() for r in regions]
-        offers = [(b, o) for b, o in offers if o.region.lower() in regions]
-
-    if availability_zones is not None:
-        new_offers = []
-        for b, o in offers:
-            if o.availability_zones is not None:
-                new_offer = o.copy()
-                new_offer.availability_zones = [
-                    z for z in o.availability_zones if z in availability_zones
-                ]
-                if new_offer.availability_zones:
-                    new_offers.append((b, new_offer))
-        offers = new_offers
-
-    if instance_types is not None:
-        instance_types = [i.lower() for i in instance_types]
-        offers = [(b, o) for b, o in offers if o.instance.name.lower() in instance_types]
-
-    if placement_group is not None:
-        new_offers = []
-        for b, o in offers:
-            compute = b.compute()
-            if isinstance(
-                compute, ComputeWithPlacementGroupSupport
-            ) and compute.is_suitable_placement_group(placement_group, o):
-                new_offers.append((b, o))
-        offers = new_offers
-
-    return offers
+    # Put NOT_AVAILABLE and NO_QUOTA offers at the end.
+    return sorted(offers, key=lambda i: not i[1].availability.is_available())
 
 
 def is_divisible_into_blocks(
@@ -239,3 +181,62 @@ def get_instance_offer_with_restricted_az(
             if z == master_job_provisioning_data.availability_zone
         ]
     return instance_offer
+
+
+def _filter_offers(
+    offers: Iterable[Tuple[Backend, InstanceOfferWithAvailability]],
+    backend_types: Optional[List[BackendType]] = None,
+    regions: Optional[List[str]] = None,
+    availability_zones: Optional[List[str]] = None,
+    instance_types: Optional[List[str]] = None,
+    placement_group: Optional[PlacementGroup] = None,
+) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
+    """
+    Yields filtered offers. May change offer attributes to match the filters.
+    """
+    if regions is not None:
+        regions = [r.lower() for r in regions]
+    if instance_types is not None:
+        instance_types = [i.lower() for i in instance_types]
+
+    for b, offer in offers:
+        if backend_types is not None and offer.backend not in backend_types:
+            continue
+        if regions is not None and offer.region.lower() not in regions:
+            continue
+        if instance_types is not None and offer.instance.name.lower() not in instance_types:
+            continue
+        if placement_group is not None:
+            compute = b.compute()
+            if not isinstance(
+                compute, ComputeWithPlacementGroupSupport
+            ) or not compute.is_suitable_placement_group(placement_group, offer):
+                continue
+        if availability_zones is not None:
+            if offer.availability_zones is None:
+                continue
+            offer.availability_zones = [
+                z for z in offer.availability_zones if z in availability_zones
+            ]
+        yield (b, offer)
+
+
+def _get_shareable_offers(
+    offers: Iterable[Tuple[Backend, InstanceOfferWithAvailability]],
+    blocks: Union[int, Literal["auto"]],
+) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
+    """
+    Yields offers that can be shared with `total_blocks` set.
+    """
+    for backend, offer in offers:
+        resources = offer.instance.resources
+        cpu_count = resources.cpus
+        gpu_count = len(resources.gpus)
+        if gpu_count > 0 and resources.gpus[0].vendor == gpuhunt.AcceleratorVendor.GOOGLE:
+            # TPUs cannot be shared
+            gpu_count = 1
+        divisible, total_blocks = is_divisible_into_blocks(cpu_count, gpu_count, blocks)
+        if not divisible:
+            continue
+        offer.total_blocks = total_blocks
+        yield (backend, offer)
