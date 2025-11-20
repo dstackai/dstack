@@ -174,11 +174,6 @@ class SSHTunnel:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=SSH_TIMEOUT,
-                # We don't want the ssh process to receive SIGINT from the controlling terminal
-                # (e.g., when SSHTunnel is used via CLI->Python API's SSHAttach and the dstack CLI
-                # process is a foreground process group leader). Starting a new session ensures
-                # that we don't have the controlling terminal at all.
-                start_new_session=True,
             )
         except subprocess.TimeoutExpired as e:
             msg = f"SSH tunnel to {self.destination} did not open in {SSH_TIMEOUT} seconds"
@@ -209,6 +204,11 @@ class SSHTunnel:
         raise get_ssh_error(stderr)
 
     def close(self) -> None:
+        if not os.path.exists(self.control_sock_path):
+            logger.debug(
+                "Control socket does not exist, it seems that ssh process has already exited"
+            )
+            return
         proc = subprocess.run(
             self.close_command(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -220,6 +220,11 @@ class SSHTunnel:
             )
 
     async def aclose(self) -> None:
+        if not os.path.exists(self.control_sock_path):
+            logger.debug(
+                "Control socket does not exist, it seems that ssh process has already exited"
+            )
+            return
         proc = await asyncio.create_subprocess_exec(
             *self.close_command(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
