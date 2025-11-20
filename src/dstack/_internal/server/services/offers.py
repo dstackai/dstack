@@ -116,6 +116,8 @@ async def get_offers_by_requirements(
         offers = itertools.islice(offers, max_offers)
 
     # Put NOT_AVAILABLE and NO_QUOTA offers at the end.
+    # We have to do this after taking max_offers to avoid processing all offers
+    # if all/most offers are unavailable.
     return sorted(offers, key=lambda i: not i[1].availability.is_available())
 
 

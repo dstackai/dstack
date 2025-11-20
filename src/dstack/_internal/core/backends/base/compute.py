@@ -4,7 +4,7 @@ import re
 import string
 import threading
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
@@ -189,13 +189,13 @@ class ComputeWithAllOffersCached(ABC):
         """
         return None
 
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
-        offers = self._get_all_offers_with_availability_cached()
-        offers = self.__apply_modifiers(offers, self.get_offers_modifiers(requirements))
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
+        cached_offers = self._get_all_offers_with_availability_cached()
+        offers = self.__apply_modifiers(cached_offers, self.get_offers_modifiers(requirements))
         offers = filter_offers_by_requirements(offers, requirements)
         post_filter = self.get_offers_post_filter(requirements)
         if post_filter is not None:
-            offers = [o for o in offers if post_filter(o)]
+            offers = (o for o in offers if post_filter(o))
         return offers
 
     @cachedmethod(
@@ -208,16 +208,14 @@ class ComputeWithAllOffersCached(ABC):
     @staticmethod
     def __apply_modifiers(
         offers: Iterable[InstanceOfferWithAvailability], modifiers: Iterable[OfferModifier]
-    ) -> list[InstanceOfferWithAvailability]:
-        modified_offers = []
+    ) -> Iterator[InstanceOfferWithAvailability]:
         for offer in offers:
             for modifier in modifiers:
                 offer = modifier(offer)
                 if offer is None:
                     break
             else:
-                modified_offers.append(offer)
-        return modified_offers
+                yield offer
 
 
 class ComputeWithFilteredOffersCached(ABC):

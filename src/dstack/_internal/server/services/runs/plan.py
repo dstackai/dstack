@@ -59,6 +59,10 @@ logger = get_logger(__name__)
 
 
 DEFAULT_MAX_OFFERS = 50
+# To avoid too many offers from being processed per fleet when searching for optimal fleet.
+# Without the limit, time and peak memory usage spike since
+# they grow linearly with the number of fleets.
+PER_FLEET_MAX_OFFERS = 100
 
 
 async def get_job_plans(
@@ -309,6 +313,7 @@ async def find_optimal_fleet_with_offers(
                 volumes=volumes,
                 privileged=job.job_spec.privileged,
                 instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+                max_offers=PER_FLEET_MAX_OFFERS,
             )
 
         available_backend_offers = _exclude_non_available_backend_offers(backend_offers)
