@@ -153,9 +153,12 @@ class JobNetworkMode(Enum):
     FORCED_BRIDGE = 3
 
 
+DEFAULT_JOB_NETWORK_MODE = JobNetworkMode.HOST_WHEN_POSSIBLE
+
+
 def _get_job_network_mode() -> JobNetworkMode:
     # Current default
-    mode = JobNetworkMode.HOST_WHEN_POSSIBLE
+    mode = DEFAULT_JOB_NETWORK_MODE
     bridge_var = "DSTACK_FORCE_BRIDGE_NETWORK"
     force_bridge = environ.get_bool(bridge_var)
     mode_var = "DSTACK_SERVER_JOB_NETWORK_MODE"
