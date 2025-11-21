@@ -57,6 +57,7 @@ from dstack._internal.core.services.repos import (
     get_repo_creds_and_default_branch,
     load_repo,
 )
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
@@ -100,7 +101,9 @@ class BaseRunConfigurator(
             # Use the default working dir for the image for tasks and services if `commands`
             # is not set (emulate pre-0.19.27 JobConfigutor logic), otherwise fall back to
             # `/workflow`.
-            if isinstance(conf, DevEnvironmentConfiguration) or conf.commands:
+            if not FeatureFlags.LEGACY_REPO_DIR_DISABLED and (
+                isinstance(conf, DevEnvironmentConfiguration) or conf.commands
+            ):
                 # relative path for compatibility with pre-0.19.27 servers
                 conf.working_dir = "."
                 warn(
@@ -108,6 +111,8 @@ class BaseRunConfigurator(
                     " Future versions will default to the [code]image[/code]'s working directory."
                 )
         elif not is_absolute_posix_path(working_dir):
+            if FeatureFlags.LEGACY_REPO_DIR_DISABLED:
+                raise ConfigurationError("`working_dir` must be absolute")
             legacy_working_dir = PurePosixPath(LEGACY_REPO_DIR) / working_dir
             warn(
                 "[code]working_dir[/code] is relative."
@@ -124,6 +129,8 @@ class BaseRunConfigurator(
                 pass
 
         if conf.repos and conf.repos[0].path is None:
+            if FeatureFlags.LEGACY_REPO_DIR_DISABLED:
+                raise ConfigurationError("`repos[0].path` is not set")
             warn(
                 "[code]repos[0].path[/code] is not set,"
                 f" using legacy repo path [code]{LEGACY_REPO_DIR}[/code]\n\n"

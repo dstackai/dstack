@@ -1,8 +1,10 @@
+import inspect
 import os
 
 import pytest
 
 from dstack._internal.server.testing.conf import postgres_container, session, test_db  # noqa: F401
+from dstack._internal.settings import FeatureFlags
 
 
 def pytest_configure(config):
@@ -40,3 +42,17 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_windows)
         if not for_windows and is_windows:
             item.add_marker(skip_posix)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def disable_feature_flags():
+    """
+    Disables all feature flags once per test session.
+
+    If you need to test a feature flag, monkeypatch `FeatureFlags` class on a per-test basis.
+    """
+    for name, value in inspect.getmembers(FeatureFlags):
+        if not name.startswith("_") and name.isupper():
+            if not isinstance(value, bool):
+                raise RuntimeError(f"FeatureFlags.{name}: only bool values are supported")
+            setattr(FeatureFlags, name, False)

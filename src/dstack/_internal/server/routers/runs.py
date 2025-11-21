@@ -35,7 +35,7 @@ project_router = APIRouter(
 )
 
 
-def use_legacy_default_working_dir(request: Request) -> bool:
+def use_legacy_repo_dir(request: Request) -> bool:
     client_release = cast(Optional[tuple[int, ...]], request.state.client_release)
     return client_release is not None and client_release < (0, 19, 27)
 
@@ -110,7 +110,7 @@ async def get_plan(
     body: GetRunPlanRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
     user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
-    legacy_default_working_dir: Annotated[bool, Depends(use_legacy_default_working_dir)],
+    legacy_repo_dir: Annotated[bool, Depends(use_legacy_repo_dir)],
 ):
     """
     Returns a run plan for the given run spec.
@@ -125,7 +125,7 @@ async def get_plan(
         user=user,
         run_spec=body.run_spec,
         max_offers=body.max_offers,
-        legacy_default_working_dir=legacy_default_working_dir,
+        legacy_repo_dir=legacy_repo_dir,
     )
     return CustomORJSONResponse(run_plan)
 
@@ -138,7 +138,7 @@ async def apply_plan(
     body: ApplyRunPlanRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
     user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
-    legacy_default_working_dir: Annotated[bool, Depends(use_legacy_default_working_dir)],
+    legacy_repo_dir: Annotated[bool, Depends(use_legacy_repo_dir)],
 ):
     """
     Creates a new run or updates an existing run.
@@ -156,7 +156,7 @@ async def apply_plan(
             project=project,
             plan=body.plan,
             force=body.force,
-            legacy_default_working_dir=legacy_default_working_dir,
+            legacy_repo_dir=legacy_repo_dir,
         )
     )
 

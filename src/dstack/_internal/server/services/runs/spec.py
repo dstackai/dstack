@@ -9,6 +9,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.resources import set_resources_defaults
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -55,7 +56,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
 
 
 def validate_run_spec_and_set_defaults(
-    user: UserModel, run_spec: RunSpec, legacy_default_working_dir: bool = False
+    user: UserModel, run_spec: RunSpec, legacy_repo_dir: bool = False
 ):
     # This function may set defaults for null run_spec values,
     # although most defaults are resolved when building job_spec
@@ -111,8 +112,10 @@ def validate_run_spec_and_set_defaults(
             run_spec.ssh_key_pub = user.ssh_public_key
         else:
             raise ServerClientError("ssh_key_pub must be set if the user has no ssh_public_key")
-    if run_spec.configuration.working_dir is None and legacy_default_working_dir:
+    if run_spec.configuration.working_dir is None and legacy_repo_dir:
         run_spec.configuration.working_dir = LEGACY_REPO_DIR
+    if run_spec.repo_dir is None and FeatureFlags.LEGACY_REPO_DIR_DISABLED and not legacy_repo_dir:
+        raise ServerClientError("Repo path is not set")
 
 
 def check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
