@@ -10,6 +10,16 @@ The `gateway` configuration type allows creating and updating [gateways](../../c
       type:
         required: true
 
+### `router`
+
+=== "SGLang Model Gateway"
+
+    #SCHEMA# dstack._internal.core.models.routers.SGLangRouterConfig
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
 ### `certificate`
 
 === "Let's encrypt"
@@ -23,16 +33,6 @@ The `gateway` configuration type allows creating and updating [gateways](../../c
 === "ACM" 
 
     #SCHEMA# dstack._internal.core.models.gateways.ACMGatewayCertificate
-        overrides:
-          show_root_heading: false
-          type:
-            required: true
-
-### `router`
-
-=== "SGLang"
-
-    #SCHEMA# dstack._internal.core.models.routers.SGLangRouterConfig
         overrides:
           show_root_heading: false
           type:
