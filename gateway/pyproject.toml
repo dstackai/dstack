@@ -11,11 +11,11 @@ requires-python = ">=3.10"
 dynamic = ["version"]
 dependencies = [
     # release builds of dstack-gateway depend on a PyPI version of dstack instead
-    "dstack[gateway] @ https://github.com/Bihan/dstack/archive/refs/heads/add_sglang_router_support.tar.gz",
+    "dstack[gateway] @ https://github.com/dstackai/dstack/archive/refs/heads/master.tar.gz",
 ]
 
 [project.optional-dependencies]
-sglang = ["sglang-router==0.2.2"]
+sglang = ["sglang-router==0.2.1"]
 
 [tool.setuptools.package-data]
 "dstack.gateway" = [
