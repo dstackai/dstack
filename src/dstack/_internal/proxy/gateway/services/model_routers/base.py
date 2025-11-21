@@ -14,8 +14,8 @@ class RouterContext(BaseModel):
         frozen = True
 
     host: str = "127.0.0.1"
-    port: int = 3000
-    log_dir: Path = Path("./router_logs")
+    port: int
+    log_dir: Path
     log_level: Literal["debug", "info", "warning", "error"] = "info"
 
 
@@ -28,16 +28,16 @@ class Router(ABC):
 
     def __init__(
         self,
+        context: RouterContext,
         config: Optional[AnyRouterConfig] = None,
-        context: Optional[RouterContext] = None,
     ):
         """Initialize router with context.
 
         Args:
-            config: Optional router configuration (implementation-specific)
             context: Runtime context for the router (host, port, logging, etc.)
+            config: Optional router configuration (implementation-specific)
         """
-        self.context = context or RouterContext()
+        self.context = context
 
     @abstractmethod
     def start(self) -> None:

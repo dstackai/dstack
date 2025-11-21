@@ -6,6 +6,7 @@ import urllib.parse
 from typing import List, Optional
 
 import httpx
+import psutil
 
 from dstack._internal.core.models.routers import RouterType, SGLangRouterConfig
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
@@ -21,15 +22,25 @@ class SglangRouter(Router):
 
     TYPE = RouterType.SGLANG
 
-    def __init__(self, config: SGLangRouterConfig, context: Optional[RouterContext] = None):
+    def __init__(self, config: SGLangRouterConfig, context: RouterContext):
         """Initialize SGLang router.
 
         Args:
             config: SGLang router configuration (policy, cache_threshold, etc.)
             context: Runtime context for the router (host, port, logging, etc.)
         """
-        super().__init__(config=config, context=context)
+        super().__init__(context=context, config=config)
         self.config = config
+
+    def pid_from_tcp_ipv4_port(self, port: int) -> Optional[int]:
+        """
+        Return PID of the process listening on the given TCP IPv4 port.
+        If no process is found, return None.
+        """
+        for conn in psutil.net_connections(kind="tcp4"):
+            if conn.laddr and conn.laddr.port == port and conn.status == psutil.CONN_LISTEN:
+                return conn.pid
+        return None
 
     def start(self) -> None:
         try:
@@ -73,51 +84,42 @@ class SglangRouter(Router):
                 prometheus_port,
             )
 
-        except Exception as e:
-            logger.error(f"Failed to start sglang-router-new: {e}")
+        except Exception:
+            logger.exception("Failed to start sglang-router")
             raise
 
     def stop(self) -> None:
         try:
-            result = subprocess.run(
-                ["lsof", "-ti", f":{self.context.port}"], capture_output=True, timeout=5
-            )
-            if result.returncode == 0:
-                pids = result.stdout.decode().strip().split("\n")
-                for pid in pids:
-                    if pid:
-                        logger.info(
-                            "Stopping sglang-router-new process (PID: %s) on port %s",
-                            pid,
-                            self.context.port,
-                        )
-                        subprocess.run(["kill", pid], timeout=5)
-            else:
-                result = subprocess.run(
-                    ["pgrep", "-f", f"sglang.*--port.*{self.context.port}"],
-                    capture_output=True,
-                    timeout=5,
+            pid = self.pid_from_tcp_ipv4_port(self.context.port)
+
+            if pid:
+                logger.debug(
+                    "Stopping sglang-router process (PID: %s) on port %s",
+                    pid,
+                    self.context.port,
                 )
-                if result.returncode == 0:
-                    pids = result.stdout.decode().strip().split("\n")
-                    for pid in pids:
-                        if pid:
-                            logger.info("Stopping sglang-router-new process (PID: %s)", pid)
-                            subprocess.run(["kill", pid], timeout=5)
-                else:
-                    logger.debug(
-                        "No sglang-router-new process found on port %s", self.context.port
-                    )
+                try:
+                    proc = psutil.Process(pid)
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except psutil.TimeoutExpired:
+                        logger.warning(
+                            "Process %s did not terminate gracefully, forcing kill", pid
+                        )
+                        proc.kill()
+                except psutil.NoSuchProcess:
+                    logger.debug("sglang-router process %s already exited before stop()", pid)
+            else:
+                logger.debug("No sglang-router process found on port %s", self.context.port)
 
             # Clean up router logs
             if self.context.log_dir.exists():
                 logger.debug("Cleaning up router logs for port %s...", self.context.port)
                 shutil.rmtree(self.context.log_dir, ignore_errors=True)
-            else:
-                logger.debug("No router logs directory found to clean up")
 
-        except Exception as e:
-            logger.error(f"Failed to stop sglang-router-new: {e}")
+        except Exception:
+            logger.exception("Failed to stop sglang-router")
             raise
 
     def is_running(self) -> bool:
@@ -126,8 +128,12 @@ class SglangRouter(Router):
             with httpx.Client(timeout=5.0) as client:
                 response = client.get(f"http://{self.context.host}:{self.context.port}/workers")
                 return response.status_code == 200
-        except Exception as e:
-            logger.error(f"Error checking sglang router status on port {self.context.port}: {e}")
+        except httpx.RequestError as e:
+            logger.debug(
+                "Sglang router not responding on port %s: %s",
+                self.context.port,
+                e,
+            )
             return False
 
     def remove_replicas(self, replica_urls: List[str]) -> None:
@@ -187,8 +193,8 @@ class SglangRouter(Router):
                     workers = response_data.get("workers", [])
                     return workers
                 return []
-        except Exception as e:
-            logger.error(f"Error getting sglang router workers: {e}")
+        except Exception:
+            logger.exception("Error getting sglang router workers")
             return []
 
     def _add_worker_to_router(self, worker_url: str) -> bool:
@@ -199,17 +205,21 @@ class SglangRouter(Router):
                     f"http://{self.context.host}:{self.context.port}/workers",
                     json=payload,
                 )
-                if response.status_code == 200:
+                if response.status_code == 202:
                     response_data = response.json()
                     if response_data.get("status") == "accepted":
                         logger.info(
-                            "Added worker %s to sglang router on port %s",
+                            "Worker %s accepted by sglang router on port %s",
                             worker_url,
                             self.context.port,
                         )
                         return True
                     else:
-                        logger.error("Failed to add worker %s: %s", worker_url, response_data)
+                        logger.error(
+                            "Sglang router on port %s failed to accept worker: %s",
+                            self.context.port,
+                            response_data,
+                        )
                         return False
                 else:
                     logger.error(
@@ -219,8 +229,8 @@ class SglangRouter(Router):
                         response.text,
                     )
                     return False
-        except Exception as e:
-            logger.error(f"Error adding worker {worker_url}: {e}")
+        except Exception:
+            logger.exception("Error adding worker %s", worker_url)
             return False
 
     def _remove_worker_from_router(self, worker_url: str) -> bool:
@@ -230,7 +240,7 @@ class SglangRouter(Router):
                 response = client.delete(
                     f"http://{self.context.host}:{self.context.port}/workers/{encoded_url}"
                 )
-                if response.status_code == 200:
+                if response.status_code == 202:
                     response_data = response.json()
                     if response_data.get("status") == "accepted":
                         logger.info(
@@ -240,7 +250,11 @@ class SglangRouter(Router):
                         )
                         return True
                     else:
-                        logger.error("Failed to remove worker %s: %s", worker_url, response_data)
+                        logger.error(
+                            "Sglang router on port %s failed to remove worker: %s",
+                            self.context.port,
+                            response_data,
+                        )
                         return False
                 else:
                     logger.error(
@@ -250,6 +264,6 @@ class SglangRouter(Router):
                         response.text,
                     )
                     return False
-        except Exception as e:
-            logger.error(f"Error removing worker {worker_url}: {e}")
+        except Exception:
+            logger.exception("Error removing worker %s", worker_url)
             return False

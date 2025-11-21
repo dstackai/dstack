@@ -12,12 +12,12 @@ from typing_extensions import Literal
 
 from dstack._internal.core.models.routers import AnyRouterConfig, RouterType
 from dstack._internal.proxy.gateway.const import PROXY_PORT_ON_GATEWAY
-from dstack._internal.proxy.gateway.model_routers import (
+from dstack._internal.proxy.gateway.models import ACMESettings
+from dstack._internal.proxy.gateway.services.model_routers import (
     Router,
     RouterContext,
     get_router,
 )
-from dstack._internal.proxy.gateway.models import ACMESettings
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
@@ -135,18 +135,16 @@ class Nginx:
                         self._domain_to_router[conf.domain] = router
 
                         # Start router if not running
-                        if not await run_async(router.is_running):
-                            await run_async(router.start)
-
-                    # Discard old worker ports if domain already has allocated ports (required for scaling case)
-                    if conf.domain in self._domain_to_worker_ports:
-                        old_worker_ports = self._domain_to_worker_ports[conf.domain]
-                        for port in old_worker_ports:
-                            self._allocated_worker_ports.discard(port)
+                        try:
+                            if not await run_async(router.is_running):
+                                await run_async(router.start)
+                        except Exception:
+                            # Clean up on failure
+                            del self._router_port_to_domain[router_port]
+                            del self._domain_to_router[conf.domain]
+                            raise
 
                     allocated_ports = self._allocate_worker_ports(len(conf.replicas))
-                    self._domain_to_worker_ports[conf.domain] = allocated_ports
-
                     replica_urls = [
                         f"http://{router.context.host}:{port}" for port in allocated_ports
                     ]
@@ -155,12 +153,13 @@ class Nginx:
                     try:
                         if conf.replicas:
                             await run_async(self.write_router_workers_conf, conf, allocated_ports)
+                            # Discard old worker ports if domain already has allocated ports (required for scaling case)
+                            if conf.domain in self._domain_to_worker_ports:
+                                old_worker_ports = self._domain_to_worker_ports[conf.domain]
+                                for port in old_worker_ports:
+                                    self._allocated_worker_ports.discard(port)
+                            self._domain_to_worker_ports[conf.domain] = allocated_ports
                     except Exception as e:
-                        # Discard allocated worker ports on error
-                        for port in allocated_ports:
-                            self._allocated_worker_ports.discard(port)
-                        if conf.domain in self._domain_to_worker_ports:
-                            del self._domain_to_worker_ports[conf.domain]
                         logger.exception(
                             "write_router_workers_conf failed for domain=%s: %s", conf.domain, e
                         )
@@ -170,11 +169,6 @@ class Nginx:
                     try:
                         await run_async(router.update_replicas, replica_urls)
                     except Exception as e:
-                        # Free allocated worker ports on error
-                        for port in allocated_ports:
-                            self._allocated_worker_ports.discard(port)
-                        if conf.domain in self._domain_to_worker_ports:
-                            del self._domain_to_worker_ports[conf.domain]
                         logger.exception(
                             "Failed to add replicas to router for domain=%s: %s", conf.domain, e
                         )
@@ -307,7 +301,7 @@ class Nginx:
                     # If bind fails (e.g., Address already in use), port is not available
                     return False
         except Exception:
-            logger.debug("Error checking port %s availability", port)
+            logger.warning("Error checking port %s availability", port)
             return False
 
     def _allocate_router_port(self) -> int:
