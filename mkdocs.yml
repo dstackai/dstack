@@ -307,7 +307,7 @@ nav:
         - Plugins:
             - Python API: docs/reference/plugins/python/index.md
             - REST API: docs/reference/plugins/rest/index.md
-        - llms-full.txt: llms-full.txt
+        - llms-full.txt: https://dstack.ai/llms-full.txt
   - Examples:
     - examples.md
     - Single-node training:
