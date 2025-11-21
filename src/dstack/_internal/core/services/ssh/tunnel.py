@@ -204,6 +204,11 @@ class SSHTunnel:
         raise get_ssh_error(stderr)
 
     def close(self) -> None:
+        if not os.path.exists(self.control_sock_path):
+            logger.debug(
+                "Control socket does not exist, it seems that ssh process has already exited"
+            )
+            return
         proc = subprocess.run(
             self.close_command(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
@@ -215,6 +220,11 @@ class SSHTunnel:
             )
 
     async def aclose(self) -> None:
+        if not os.path.exists(self.control_sock_path):
+            logger.debug(
+                "Control socket does not exist, it seems that ssh process has already exited"
+            )
+            return
         proc = await asyncio.create_subprocess_exec(
             *self.close_command(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT
         )
