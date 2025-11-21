@@ -52,7 +52,7 @@ Backends can be set up in `~/.dstack/server/config.yml` or through the [project 
 
 For more details, see [Backends](https://dstack.ai/docs/concepts/backends).
 
-> When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh) once the server is up.
+> When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets) once the server is up.
 
 ##### Start the server
 

@@ -38,7 +38,7 @@ Below are some of the reasons why this might happen.
 #### Cause 1: No capacity providers
 
 Before you can run any workloads, you need to configure a [backend](../concepts/backends.md),
-create an [SSH fleet](../concepts/fleets.md#ssh), or sign up for
+create an [SSH fleet](../concepts/fleets.md#ssh-fleets), or sign up for
 [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 If you have configured a backend and still can't use it, check the output of `dstack server`
 for backend configuration errors.
@@ -93,7 +93,7 @@ Examples: `gpu: amd` (one AMD GPU), `gpu: A10:4..8` (4 to 8 A10 GPUs),
 
 #### Cause 6: Network volumes
 
-If your run configuration uses [network volumes](../concepts/volumes.md#network),
+If your run configuration uses [network volumes](../concepts/volumes.md#network-volumes),
 `dstack` will only select instances from the same backend and region as the volumes.
 For AWS, the availability zone of the volume and the instance should also match.
 
@@ -102,8 +102,8 @@ For AWS, the availability zone of the volume and the instance should also match.
 Some `dstack` features are not supported by all backends. If your configuration uses
 one of these features, `dstack` will only select offers from the backends that support it.
 
-- [Cloud fleet](../concepts/fleets.md#cloud) configurations,
-  [Instance volumes](../concepts/volumes.md#instance),
+- [Backend fleets](../concepts/fleets.md#backend-fleets) configurations,
+  [Instance volumes](../concepts/volumes.md#instance-volumes),
   and [Privileged containers](../reference/dstack.yml/dev-environment.md#privileged)
   are supported by all backends except `runpod`, `vastai`, and `kubernetes`.
 - [Clusters](../concepts/fleets.md#cloud-placement)
@@ -120,7 +120,7 @@ If you are using
 you will not see marketplace offers until you top up your balance.
 Alternatively, you can configure your own cloud accounts
 on the [project settings page](../concepts/projects.md#backends)
-or use [SSH fleets](../concepts/fleets.md#ssh).
+or use [SSH fleets](../concepts/fleets.md#ssh-fleets).
 
 ### Provisioning fails
 

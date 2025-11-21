@@ -15,8 +15,15 @@ import (
 )
 
 // setupRepo must be called from Run
+// ex.jobWorkingDir must be already set
 // TODO: change ownership to uid:gid
 func (ex *RunExecutor) setupRepo(ctx context.Context) error {
+	if ex.jobWorkingDir == "" {
+		return errors.New("setup repo: working dir is not set")
+	}
+	if !filepath.IsAbs(ex.jobWorkingDir) {
+		return fmt.Errorf("setup repo: working dir must be absolute: %s", ex.jobWorkingDir)
+	}
 	if ex.jobSpec.RepoDir == nil {
 		return errors.New("repo_dir is not set")
 	}

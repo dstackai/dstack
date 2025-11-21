@@ -111,4 +111,4 @@ For more details on clusters, see the [corresponding guide](clusters.md).
 
     If your priority is orchestrating cloud GPUs and Kubernetes isn’t a must, [VM-based](../concepts/backends.md#vm-based) backends are a better fit thanks to their native cloud integration.
 
-    For on-prem GPUs where Kubernetes is optional, [SSH fleets](../concepts/fleets.md#ssh) provide a simpler and more lightweight alternative.
+    For on-prem GPUs where Kubernetes is optional, [SSH fleets](../concepts/fleets.md#ssh-fleets) provide a simpler and more lightweight alternative.

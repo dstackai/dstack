@@ -11,7 +11,7 @@ from dstack._internal.cli.services.configurators.run import (
     get_run_exit_code,
     print_finished_message,
 )
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import console, get_start_time
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.errors import CLIError
 from dstack._internal.utils.common import get_or_error
@@ -61,6 +61,14 @@ class AttachCommand(APIBaseCommand):
             type=int,
             default=0,
         )
+        self._parser.add_argument(
+            "--since",
+            help=(
+                "Show only logs newer than the specified date."
+                " Can be a duration (e.g. 10s, 5m, 1d) or an RFC 3339 string (e.g. 2023-09-24T15:30:00Z)."
+            ),
+            type=str,
+        )
         self._parser.add_argument("run_name").completer = RunNameCompleter()  # type: ignore[attr-defined]
 
     def _command(self, args: argparse.Namespace):
@@ -86,7 +94,9 @@ class AttachCommand(APIBaseCommand):
                 job_num=args.job,
             )
             if args.logs:
+                start_time = get_start_time(args.since)
                 logs = run.logs(
+                    start_time=start_time,
                     replica_num=args.replica,
                     job_num=args.job,
                 )

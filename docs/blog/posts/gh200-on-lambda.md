@@ -11,7 +11,7 @@ categories:
 # Supporting ARM and NVIDIA GH200 on Lambda
 
 The latest update to `dstack` introduces support for NVIDIA GH200 instances on [Lambda](../../docs/concepts/backends.md#lambda)
-and enables ARM-powered hosts, including GH200 and GB200, with [SSH fleets](../../docs/concepts/fleets.md#ssh).
+and enables ARM-powered hosts, including GH200 and GB200, with [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets).
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-arm--gh200-lambda-min.png" width="630"/>
 
@@ -78,7 +78,7 @@ $ dstack apply -f .dstack.yml
 !!! info "Retry policy"
     Note, if GH200s are not  available at the moment, you can specify the [retry policy](../../docs/concepts/dev-environments.md#retry-policy) in your run configuration so that `dstack` can run the configuration once the GPU becomes available.
 
-> If you have GH200 or GB200-powered hosts already provisioned via Lambda, another cloud provider, or on-prem, you can now use them with [SSH fleets](../../docs/concepts/fleets.md#ssh).
+> If you have GH200 or GB200-powered hosts already provisioned via Lambda, another cloud provider, or on-prem, you can now use them with [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets).
 
 !!! info "What's next?"
     1. Sign up with [Lambda :material-arrow-top-right-thin:{ .external }](https://cloud.lambda.ai/sign-up?_gl=1*1qovk06*_gcl_au*MTg2MDc3OTAyOS4xNzQyOTA3Nzc0LjE3NDkwNTYzNTYuMTc0NTQxOTE2MS4xNzQ1NDE5MTYw*_ga*MTE2NDM5MzI0My4xNzQyOTA3Nzc0*_ga_43EZT1FM6Q*czE3NDY3MTczOTYkbzM0JGcxJHQxNzQ2NzE4MDU2JGo1NyRsMCRoMTU0Mzg1NTU1OQ..){:target="_blank"}

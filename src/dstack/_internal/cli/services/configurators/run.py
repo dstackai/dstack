@@ -562,8 +562,7 @@ class BaseRunConfigurator(
             local_path = Path.cwd()
             legacy_local_path = True
         if url:
-            # "master" is a dummy value, we'll fetch the actual default branch later
-            repo = RemoteRepo.from_url(repo_url=url, repo_branch="master")
+            repo = RemoteRepo.from_url(repo_url=url)
             repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
         elif local_path:
             if legacy_local_path:
@@ -628,15 +627,16 @@ class BaseRunConfigurator(
                 raise CLIError(*e.args) from e
 
             if repo_branch is None and repo_hash is None:
-                repo_branch = default_repo_branch
-                if repo_branch is None:
+                if default_repo_branch is None:
                     raise CLIError(
                         "Failed to automatically detect remote repo branch."
                         " Specify branch or hash."
                     )
-            repo = RemoteRepo.from_url(
-                repo_url=repo.repo_url, repo_branch=repo_branch, repo_hash=repo_hash
-            )
+                # TODO: remove in 0.20. Currently `default_repo_branch` is sent only for backward compatibility of `dstack-runner`.
+                repo_branch = default_repo_branch
+            repo.run_repo_data.repo_branch = repo_branch
+            if repo_hash is not None:
+                repo.run_repo_data.repo_hash = repo_hash
 
         if init:
             self.api.repos.init(

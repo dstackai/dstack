@@ -1,6 +1,6 @@
 # Quickstart
 
-> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}
+> Before using `dstack`, ensure you've [installed](installation/index.md) the server.
 
 ## Set up a directory
     

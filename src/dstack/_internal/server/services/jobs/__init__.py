@@ -202,6 +202,14 @@ def delay_job_instance_termination(job_model: JobModel):
     job_model.remove_at = common.get_current_datetime() + timedelta(seconds=15)
 
 
+def is_multinode_job(job: Job) -> bool:
+    return job.job_spec.jobs_per_replica > 1
+
+
+def is_master_job(job: Job) -> bool:
+    return job.job_spec.job_num == 0
+
+
 def _get_job_configurator(run_spec: RunSpec, secrets: Dict[str, str]) -> JobConfigurator:
     configuration_type = RunConfigurationType(run_spec.configuration.type)
     configurator_class = _configuration_type_to_configurator_class_map[configuration_type]
@@ -725,6 +733,10 @@ async def get_job_attached_volumes(
             _get_job_mount_point_attached_volume(mount_point_volumes, job_provisioning_data)
         )
     return job_volumes
+
+
+def remove_job_spec_sensitive_info(spec: JobSpec):
+    spec.ssh_key = None
 
 
 def _get_job_mount_point_attached_volume(

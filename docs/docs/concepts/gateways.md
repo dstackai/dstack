@@ -11,7 +11,7 @@ provide an HTTPS endpoint mapped to your domain, handle auto-scaling and rate li
 First, define a gateway configuration as a YAML file in your project folder.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `gateway.dstack.yml` are both acceptable).
 
-<div editor-title="gateway.dstack.yml"> 
+<div editor-title="gateway.dstack.yml">
 
 ```yaml
 type: gateway
@@ -46,6 +46,21 @@ Provisioning...
 ```
 
 </div>
+
+## Configuration options
+
+### Backend
+
+You can create gateways with the `aws`, `azure`, `gcp`, or `kubernetes` backends, but that does not limit where services run. A gateway can use one backend while services run on any other backend supported by dstack, including backends where gateways themselves cannot be created.
+
+??? info "Kubernetes"
+    Gateways in `kubernetes` backend require an external load balancer. Managed Kubernetes solutions usually include a load balancer.
+    For self-hosted Kubernetes, you must provide a load balancer by yourself.
+
+### Public IP
+
+If you don't need/want a public IP for the gateway, you can set the `public_ip` to `false` (the default value is `true`), making the gateway private.
+Private gateways are currently supported in `aws` and `gcp` backends.
 
 !!! info "Reference"
     For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).

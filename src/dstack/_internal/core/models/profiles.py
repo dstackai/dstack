@@ -146,7 +146,13 @@ class ProfileRetry(generate_dual_core_model(ProfileRetryConfig)):
     ] = None
     duration: Annotated[
         Optional[int],
-        Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
+        Field(
+            description=(
+                "The maximum period of retrying the run, e.g., `4h` or `1d`."
+                " The period is calculated as a run age for `no-capacity` event"
+                " and as a time passed since the last `interruption` and `error` for `interruption` and `error` events."
+            )
+        ),
     ] = None
 
     _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
@@ -305,7 +311,8 @@ class ProfileParams(CoreModel):
         Optional[Union[Literal["off"], int]],
         Field(
             description=(
-                "The maximum duration of a run (e.g., `2h`, `1d`, etc)."
+                "The maximum duration of a run (e.g., `2h`, `1d`, etc)"
+                " in a running state, excluding provisioning and pulling."
                 " After it elapses, the run is automatically stopped."
                 " Use `off` for unlimited duration. Defaults to `off`"
             )

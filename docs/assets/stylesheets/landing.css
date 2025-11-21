@@ -242,7 +242,7 @@
     margin-top: 0.6rem;
     margin-bottom: 1.5rem;
     font-size: 19px;
-    font-weight: 300 !important;
+    font-weight: 400 !important;
     text-align: center;
     border-radius: 3px;
     border-color: transparent;
@@ -298,7 +298,7 @@
     background: rgba(0, 0, 0, 0.87);
     border: 1.5px solid rgba(0, 0, 0, 0.87);
     border-radius: 3px;
-    font-weight: 300 !important;
+    font-weight: 400 !important;
     /*margin-right: 10px;*/
 }
 
@@ -353,7 +353,7 @@
 .md-typeset .md-button-secondary:focus {
     background: transparent;
     color: rgba(0, 0, 0, 0.87);
-    border: 0.5px solid rgba(0, 0, 0, 0.87);
+    border: 1px solid rgba(0, 0, 0, 0.87);
     border-radius: 3px;
 }
 

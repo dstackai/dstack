@@ -12,6 +12,8 @@ from urllib.parse import urlparse
 
 from typing_extensions import ParamSpec
 
+from dstack._internal.core.models.common import Duration
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -144,36 +146,28 @@ def pretty_resources(
     return " ".join(parts)
 
 
-def since(timestamp: str) -> datetime:
+def parse_since(value: str) -> datetime:
+    """
+    Returns a timestamp given an RFC 3339 string (e.g. 2023-09-24T15:30:00Z)
+    or a duration (e.g. 10s, 5m, 1d) between the timestamp and now.
+    """
     try:
-        seconds = parse_pretty_duration(timestamp)
+        seconds = Duration.parse(value)
         return get_current_datetime() - timedelta(seconds=seconds)
     except ValueError:
         pass
     try:
-        return datetime.fromisoformat(timestamp)
+        res = datetime.fromisoformat(value)
     except ValueError:
-        pass
-    try:
-        return datetime.fromtimestamp(int(timestamp))
-    except Exception:
         raise ValueError("Invalid datetime format")
+    else:
+        return check_time_offset_aware(res)
 
 
-def parse_pretty_duration(duration: str) -> int:
-    regex = re.compile(r"(?P<amount>\d+)(?P<unit>s|m|h|d|w)$")
-    re_match = regex.match(duration)
-    if not re_match:
-        raise ValueError(f"Cannot parse the duration {duration}")
-    amount, unit = int(re_match.group("amount")), re_match.group("unit")
-    multiplier = {
-        "s": 1,
-        "m": 60,
-        "h": 3600,
-        "d": 24 * 3600,
-        "w": 7 * 24 * 3600,
-    }[unit]
-    return amount * multiplier
+def check_time_offset_aware(time: datetime) -> datetime:
+    if time.tzinfo is None:
+        raise ValueError("Timestamp is not offset-aware. Specify timezone.")
+    return time
 
 
 DURATION_UNITS_DESC = [

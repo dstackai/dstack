@@ -10,7 +10,7 @@ from copy import copy
 from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO, Dict, Iterable, List, Optional, Union
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from websocket import WebSocketApp
 
@@ -136,9 +136,7 @@ class Run(ABC):
             ),
         )
 
-    def _attached_logs(
-        self,
-    ) -> Iterable[bytes]:
+    def _attached_logs(self, start_time: Optional[datetime] = None) -> Iterable[bytes]:
         q = queue.Queue()
         _done = object()
 
@@ -150,8 +148,14 @@ class Run(ABC):
                 logger.debug("WebSocket logs are done for %s", self.name)
                 q.put(_done)
 
+        url = f"ws://localhost:{self.ports[DSTACK_RUNNER_HTTP_PORT]}/logs_ws"
+        query_params = {}
+        if start_time is not None:
+            query_params["start_time"] = start_time.isoformat()
+        if query_params:
+            url = f"{url}?{urlencode(query_params)}"
         ws = WebSocketApp(
-            f"ws://localhost:{self.ports[DSTACK_RUNNER_HTTP_PORT]}/logs_ws",
+            url=url,
             on_open=lambda _: logger.debug("WebSocket logs are connected to %s", self.name),
             on_close=lambda _, status_code, msg: logger.debug(
                 "WebSocket logs are disconnected. status_code: %s; message: %s",
@@ -215,7 +219,7 @@ class Run(ABC):
             Log messages.
         """
         if diagnose is False and self._ssh_attach is not None:
-            yield from self._attached_logs()
+            yield from self._attached_logs(start_time=start_time)
         else:
             job = self._find_job(replica_num=replica_num, job_num=job_num)
             if job is None:
@@ -486,6 +490,18 @@ class RunCollection:
         if repo_dir is None and configuration.repos:
             repo_dir = configuration.repos[0].path
 
+        self._validate_configuration_files(configuration, configuration_path)
+        file_archives: list[FileArchiveMapping] = []
+        for file_mapping in configuration.files:
+            with tempfile.TemporaryFile("w+b") as fp:
+                try:
+                    archive_hash = create_file_archive(file_mapping.local_path, fp)
+                except OSError as e:
+                    raise ClientError(f"failed to archive '{file_mapping.local_path}': {e}") from e
+                fp.seek(0)
+                archive = self._api_client.files.upload_archive(hash=archive_hash, fp=fp)
+            file_archives.append(FileArchiveMapping(id=archive.id, path=file_mapping.path))
+
         if ssh_identity_file:
             ssh_key_pub = Path(ssh_identity_file).with_suffix(".pub").read_text()
         else:
@@ -509,6 +525,7 @@ class RunCollection:
             repo_data=repo.run_repo_data,
             repo_code_hash=repo_code_hash,
             repo_dir=repo_dir,
+            file_archives=file_archives,
             # Server doesn't use this field since 0.19.27, but we still send it for compatibility
             # with older servers
             working_dir=configuration.working_dir,
@@ -544,22 +561,6 @@ class RunCollection:
         if reserve_ports:
             # TODO handle multiple jobs
             ports_lock = _reserve_ports(run_plan.job_plans[0].job_spec)
-
-        run_spec = run_plan.run_spec
-        configuration = run_spec.configuration
-
-        self._validate_configuration_files(configuration, run_spec.configuration_path)
-        for file_mapping in configuration.files:
-            with tempfile.TemporaryFile("w+b") as fp:
-                try:
-                    archive_hash = create_file_archive(file_mapping.local_path, fp)
-                except OSError as e:
-                    raise ClientError(f"failed to archive '{file_mapping.local_path}': {e}") from e
-                fp.seek(0)
-                archive = self._api_client.files.upload_archive(hash=archive_hash, fp=fp)
-            run_spec.file_archives.append(
-                FileArchiveMapping(id=archive.id, path=file_mapping.path)
-            )
 
         if repo is None:
             repo = VirtualRepo()

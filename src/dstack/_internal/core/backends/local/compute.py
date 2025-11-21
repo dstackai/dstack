@@ -79,6 +79,7 @@ class LocalCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         return JobProvisioningData(
             backend=instance_offer.backend,

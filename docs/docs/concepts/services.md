@@ -821,6 +821,9 @@ retry:
 If one replica of a multi-replica service fails with retry enabled,
 `dstack` will resubmit only the failed replica while keeping active replicas running.
 
+!!! info "Retry duration"
+    The duration period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
+
 ### Spot policy
 
 By default, `dstack` uses on-demand instances. However, you can change that

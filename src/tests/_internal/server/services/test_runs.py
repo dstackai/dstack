@@ -17,7 +17,7 @@ from dstack._internal.server.models import (
     RunModel,
 )
 from dstack._internal.server.services.jobs import check_can_attach_job_volumes
-from dstack._internal.server.services.runs import scale_run_replicas
+from dstack._internal.server.services.runs.replicas import scale_run_replicas
 from dstack._internal.server.testing.common import (
     create_job,
     create_project,

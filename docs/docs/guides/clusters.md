@@ -8,14 +8,14 @@ Ensure a fleet is created before you run any distributed task. This can be eithe
 
 ### SSH fleets
 
-[SSH fleets](../concepts/fleets.md#ssh) can be used to create a fleet out of existing baremetals or VMs, e.g. if they are already pre-provisioned, or set up on-premises.
+[SSH fleets](../concepts/fleets.md#ssh-fleets) can be used to create a fleet out of existing baremetals or VMs, e.g. if they are already pre-provisioned, or set up on-premises.
 
 > For SSH fleets, fast interconnect is supported provided that the hosts are pre-configured with the appropriate interconnect drivers.
 
 ### Cloud fleets
 
-[Cloud fleets](../concepts/fleets.md#cloud) allow to provision interconnected clusters across supported backends.
-For cloud fleets, fast interconnect is currently supported only on the `aws`, `gcp`, and `nebius` backends.
+[Cloud fleets](../concepts/fleets.md#backend-fleets) allow to provision interconnected clusters across supported backends.
+For cloud fleets, fast interconnect is currently supported only on the `aws`, `gcp`, `nebius`, and `runpod` backends.
 
 === "AWS"
     When you create a cloud fleet with AWS, [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
@@ -35,6 +35,9 @@ For cloud fleets, fast interconnect is currently supported only on the `aws`, `g
 
 === "Nebius"
     When you create a cloud fleet with Nebius, [InfiniBand :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
+
+=== "Runpod"
+    When you run multinode tasks in a cluster cloud fleet with Runpod, `dstack` provisions [Runpod Instant Clusters](https://docs.runpod.io/instant-clusters) with InfiniBand networking configured.
 
 > To request fast interconnect support for other backends,
 file an [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_ blank"}.
@@ -65,7 +68,7 @@ To test the interconnect of a created fleet, ensure you run [NCCL](../../example
 
 ### Instance volumes
 
-[Instance volumes](../concepts/volumes.md#instance) enable mounting any folder from the host into the container, allowing data persistence during distributed tasks.
+[Instance volumes](../concepts/volumes.md#instance-volumes) enable mounting any folder from the host into the container, allowing data persistence during distributed tasks.
 
 Instance volumes can be used to mount:
 
@@ -74,7 +77,7 @@ Instance volumes can be used to mount:
 
 ### Network volumes
     
-Currently, no backend supports multi-attach [network volumes](../concepts/volumes.md#network) for distributed tasks. However, single-attach volumes can be used by leveraging volume name [interpolation syntax](../concepts/volumes.md#distributed-tasks). This approach mounts a separate single-attach volume to each node.
+Currently, no backend supports multi-attach [network volumes](../concepts/volumes.md#network-volumes) for distributed tasks. However, single-attach volumes can be used by leveraging volume name [interpolation syntax](../concepts/volumes.md#distributed-tasks). This approach mounts a separate single-attach volume to each node.
 
 !!! info "What's next?"
     1. Read about [distributed tasks](../concepts/tasks.md#distributed-tasks), [fleets](../concepts/fleets.md), and [volumes](../concepts/volumes.md)

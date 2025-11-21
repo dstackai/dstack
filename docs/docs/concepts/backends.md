@@ -1157,12 +1157,12 @@ Also, the `vastai` backend supports on-demand instances only. Spot instance supp
 ## On-prem
 
 In on-prem environments, the [Kubernetes](#kubernetes) backend can be used if a Kubernetes cluster is already set up and configured.  
-However, often [SSH fleets](../concepts/fleets.md#ssh) are a simpler and lighter alternative.
+However, often [SSH fleets](../concepts/fleets.md#ssh-fleets) are a simpler and lighter alternative.
 
 ### SSH fleets
 
 SSH fleets require no backend configuration. 
-All you need to do is [provide hostnames and SSH credentials](../concepts/fleets.md#ssh), and `dstack` sets up a fleet that can orchestrate container-based runs on your servers.
+All you need to do is [provide hostnames and SSH credentials](../concepts/fleets.md#ssh-fleets), and `dstack` sets up a fleet that can orchestrate container-based runs on your servers.
 
 SSH fleets support the same features as [VM-based](#vm-based) backends.
 
