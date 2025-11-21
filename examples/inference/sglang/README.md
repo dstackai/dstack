@@ -2,47 +2,9 @@
 
 This example shows how to deploy DeepSeek-R1-Distill-Llama 8B and 70B using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"} and `dstack`.
 
-??? info "Prerequisites"
-    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+## Apply a configuration
 
-    <div class="termy">
- 
-    ```shell
-    $ git clone https://github.com/dstackai/dstack
-    $ cd dstack
-    ```
- 
-    </div>
-
-## Deployment
 Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B using SgLang.
-
-=== "AMD"
-
-    <div editor-title="examples/inference/sglang/amd/.dstack.yml">
-
-    ```yaml
-    type: service
-    name: deepseek-r1-amd
-
-    image: lmsysorg/sglang:v0.4.1.post4-rocm620
-    env:
-      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-
-    commands:
-      - python3 -m sglang.launch_server
-         --model-path $MODEL_ID
-         --port 8000
-         --trust-remote-code
-
-    port: 8000
-    model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-
-    resources:
-      gpu: MI300x
-      disk: 300GB
-    ```
-    </div>
 
 === "NVIDIA"
 
@@ -70,8 +32,32 @@ Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B
     ```
     </div>
 
+=== "AMD"
 
-### Applying the configuration
+    <div editor-title="examples/inference/sglang/amd/.dstack.yml">
+
+    ```yaml
+    type: service
+    name: deepseek-r1-amd
+
+    image: lmsysorg/sglang:v0.4.1.post4-rocm620
+    env:
+      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+
+    commands:
+      - python3 -m sglang.launch_server
+         --model-path $MODEL_ID
+         --port 8000
+         --trust-remote-code
+
+    port: 8000
+    model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+
+    resources:
+      gpu: MI300x
+      disk: 300GB
+    ```
+    </div>
 
 To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
 
@@ -118,8 +104,10 @@ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 ```
 </div>
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint
-is available at `https://gateway.<gateway domain>/`.
+!!! info "SGLang Model Gateway"
+    If you'd like to use a custom routing policy, e.g. by leveraging the [SGLang Model Gateway :material-arrow-top-right-thin:{ .external }](https://docs.sglang.ai/advanced_features/router.html#){:target="_blank"}, create a gateway with `router` set to `sglang`. Check out [gateways](https://dstack.ai/docs/concepts/gateways#router) for more details.
+
+> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling or HTTPs, rate-limits, etc), the OpenAI-compatible endpoint is available at `https://gateway.<gateway domain>/`.
 
 ## Source code
 
@@ -128,5 +116,5 @@ The source-code of this example can be found in
 
 ## What's next?
 
-1. Check [services](https://dstack.ai/docs/services)
+1. Read about [services](https://dstack.ai/docs/concepts/services) and [gateways](https://dstack.ai/docs/concepts/gateways)
 2. Browse the [SgLang DeepSeek Usage](https://docs.sglang.ai/references/deepseek.html), [Supercharge DeepSeek-R1 Inference on AMD Instinct MI300X](https://rocm.blogs.amd.com/artificial-intelligence/DeepSeekR1-Part2/README.html)
