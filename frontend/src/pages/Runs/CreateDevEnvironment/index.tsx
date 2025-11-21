@@ -7,7 +7,8 @@ import * as yup from 'yup';
 import { Box, Link, WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Wizard } from 'components';
+import type { TabsProps, ToggleProps } from 'components';
+import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Tabs, Toggle, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
@@ -15,9 +16,9 @@ import { ROUTES } from 'routes';
 import { useApplyRunMutation } from 'services/run';
 
 import { OfferList } from 'pages/Offers/List';
-import { convertMiBToGB, renderRange, round } from 'pages/Offers/List/helpers';
 
-import { getRunSpecFromYaml } from './helpers/getRunSpecFromYaml';
+import { useGenerateYaml } from './hooks/useGenerateYaml';
+import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
 
 import { IRunEnvironmentFormValues } from './types';
 
@@ -25,6 +26,7 @@ import styles from './styles.module.scss';
 
 const requiredFieldError = 'This is required field';
 const namesFieldError = 'Only latin characters, dashes, and digits';
+const urlFormatError = 'Only URLs';
 
 const ideOptions = [
     {
@@ -37,11 +39,29 @@ const ideOptions = [
     },
 ];
 
+enum DockerPythonTabs {
+    DOCKER = 'docker',
+    PYTHON = 'python',
+}
+
 const envValidationSchema = yup.object({
     offer: yup.object().required(requiredFieldError),
     name: yup.string().matches(/^[a-z][a-z0-9-]{1,40}$/, namesFieldError),
     ide: yup.string().required(requiredFieldError),
     config_yaml: yup.string().required(requiredFieldError),
+
+    image: yup.string().when('docker', {
+        is: true,
+        then: yup.string().required(requiredFieldError),
+    }),
+
+    repo_url: yup.string().when('repo_enabled', {
+        is: true,
+        then: yup
+            .string()
+            .matches(/^(https?):\/\/([^\s\/?#]+)((?:\/[^\s?#]*)*)(?::\/(.*))?$/i, urlFormatError)
+            .required(requiredFieldError),
+    }),
 });
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -92,6 +112,8 @@ export const CreateDevEnvironment: React.FC = () => {
         () => searchParams.get('project_name') ?? null,
     );
 
+    const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: selectedProject });
+
     const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
 
     const loading = isApplying;
@@ -112,6 +134,8 @@ export const CreateDevEnvironment: React.FC = () => {
         resolver,
         defaultValues: {
             ide: 'cursor',
+            docker: false,
+            repo_enabled: false,
         },
     });
     const { handleSubmit, control, trigger, setValue, watch, formState, getValues } = formMethods;
@@ -125,15 +149,13 @@ export const CreateDevEnvironment: React.FC = () => {
         return await trigger(['offer']);
     };
 
-    const validateName = async () => {
-        return await trigger(['name', 'ide']);
+    const validateSecondStep = async () => {
+        return await trigger(['name', 'ide', 'docker', 'image', 'python', 'repo_enabled', 'repo_url', 'repo_local_path']);
     };
 
     const validateConfig = async () => {
         return await trigger(['config_yaml']);
     };
-
-    const emptyValidator = async () => Promise.resolve(true);
 
     const onNavigate = ({
         requestedStepIndex,
@@ -142,7 +164,7 @@ export const CreateDevEnvironment: React.FC = () => {
         requestedStepIndex: number;
         reason: WizardProps.NavigationReason;
     }) => {
-        const stepValidators = [validateOffer, validateName, validateConfig, emptyValidator];
+        const stepValidators = [validateOffer, validateSecondStep, validateConfig];
 
         if (reason === 'next') {
             stepValidators[activeStepIndex]?.().then((isValid) => {
@@ -159,6 +181,27 @@ export const CreateDevEnvironment: React.FC = () => {
 
     const onNavigateHandler: WizardProps['onNavigate'] = ({ detail: { requestedStepIndex, reason } }) => {
         onNavigate({ requestedStepIndex, reason });
+    };
+
+    const toggleRepo: ToggleProps['onChange'] = ({ detail }) => {
+        setValue('repo_enabled', detail.checked);
+
+        if (!detail.checked) {
+            setValue('repo_url', '');
+            setValue('repo_local_path', '');
+        }
+    };
+
+    const onChangeTab: TabsProps['onChange'] = ({ detail }) => {
+        if (detail.activeTabId === DockerPythonTabs.DOCKER) {
+            setValue('python', '');
+        }
+
+        if (detail.activeTabId === DockerPythonTabs.PYTHON) {
+            setValue('image', '');
+        }
+
+        setValue('docker', detail.activeTabId === DockerPythonTabs.DOCKER);
     };
 
     const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => {
@@ -180,16 +223,8 @@ export const CreateDevEnvironment: React.FC = () => {
 
         try {
             runSpec = await getRunSpecFromYaml(config_yaml);
-        } catch (error) {
-            pushNotification({
-                type: 'error',
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                content: error?.message,
-            });
-
-            window.scrollTo(0, 0);
-
+        } catch (e) {
+            console.log('parse transaction error:', e);
             return;
         }
 
@@ -227,31 +262,11 @@ export const CreateDevEnvironment: React.FC = () => {
         }
     };
 
+    const yaml = useGenerateYaml({ formValues });
+
     useEffect(() => {
-        if (!formValues.offer || !formValues.ide) {
-            return;
-        }
-
-        setValue(
-            'config_yaml',
-            `type: dev-environment
-${`${
-    formValues.name
-        ? `name: ${formValues.name}
-
-`
-        : ''
-}`}ide: ${formValues.ide}
-
-resources:
-  gpu: ${formValues.offer.name}:${round(convertMiBToGB(formValues.offer.memory_mib))}GB:${renderRange(formValues.offer.count)}
-
-backends: [${formValues.offer.backends?.join(', ')}]
-
-spot_policy: auto
-        `,
-        );
-    }, [formValues.name, formValues.ide, formValues.offer]);
+        setValue('config_yaml', yaml);
+    }, [yaml]);
 
     return (
         <form className={cn({ [styles.wizardForm]: activeStepIndex === 0 })} onSubmit={handleSubmit(onSubmit)}>
@@ -304,6 +319,7 @@ spot_policy: auto
                                         name="name"
                                         disabled={loading}
                                     />
+
                                     <FormSelect
                                         label={t('runs.dev_env.wizard.ide')}
                                         description={t('runs.dev_env.wizard.ide_description')}
@@ -312,6 +328,70 @@ spot_policy: auto
                                         options={ideOptions}
                                         disabled={loading}
                                     />
+
+                                    <Tabs
+                                        onChange={onChangeTab}
+                                        tabs={[
+                                            {
+                                                label: t('runs.dev_env.wizard.python'),
+                                                id: DockerPythonTabs.PYTHON,
+                                                content: (
+                                                    <div>
+                                                        <FormInput
+                                                            label={t('runs.dev_env.wizard.python')}
+                                                            description={t('runs.dev_env.wizard.python_description')}
+                                                            placeholder={t('runs.dev_env.wizard.python_placeholder')}
+                                                            control={control}
+                                                            name="python"
+                                                            disabled={loading}
+                                                        />
+                                                    </div>
+                                                ),
+                                            },
+                                            {
+                                                label: t('runs.dev_env.wizard.docker'),
+                                                id: DockerPythonTabs.DOCKER,
+                                                content: (
+                                                    <div>
+                                                        <FormInput
+                                                            label={t('runs.dev_env.wizard.docker_image')}
+                                                            description={t('runs.dev_env.wizard.docker_image_description')}
+                                                            placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
+                                                            control={control}
+                                                            name="image"
+                                                            disabled={loading}
+                                                        />
+                                                    </div>
+                                                ),
+                                            },
+                                        ]}
+                                    />
+
+                                    <Toggle checked={!!formValues.repo_enabled} onChange={toggleRepo}>
+                                        {t('runs.dev_env.wizard.repo')}
+                                    </Toggle>
+
+                                    {formValues.repo_enabled && (
+                                        <>
+                                            <FormInput
+                                                label={t('runs.dev_env.wizard.repo_url')}
+                                                description={t('runs.dev_env.wizard.repo_url_description')}
+                                                placeholder={t('runs.dev_env.wizard.repo_url_placeholder')}
+                                                control={control}
+                                                name="repo_url"
+                                                disabled={loading}
+                                            />
+
+                                            <FormInput
+                                                label={t('runs.dev_env.wizard.repo_local_path')}
+                                                description={t('runs.dev_env.wizard.repo_local_path_description')}
+                                                placeholder={t('runs.dev_env.wizard.repo_local_path_placeholder')}
+                                                control={control}
+                                                name="repo_local_path"
+                                                disabled={loading}
+                                            />
+                                        </>
+                                    )}
                                 </SpaceBetween>
                             </Container>
                         ),
