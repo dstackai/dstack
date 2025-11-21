@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source AI container orchestration engine working with any cloud or data center.
+  dstack is an open-source control plane for running development, training, and inference jobs on GPUs - across hyperscalers, neoclouds, or on-prem.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -60,6 +60,45 @@ theme:
 
 # Plugins
 plugins:
+  - llmstxt-md:
+      sections:
+        Getting started:
+          - docs/index.md: What dstack is
+          - docs/installation/index.md: How to set up the dstack server and the dstack CLI
+          - docs/quickstart.md: How to get started and submit your first run
+        Concepts:
+          - docs/concepts/backends.md: How to configure backends - to connect dstack to cloud providers, Kubernetes clusters, etc
+          - docs/concepts/fleets.md: How to create and manage fleets - required before submitting runs
+          - docs/concepts/dev-environments.md: How to create dev environments - for interactive development using a desktop IDE
+          - docs/concepts/tasks.md: How to run tasks - for training or fine-tuning, including distributed tasks
+          - docs/concepts/services.md: How to deploy services - for model inference or web apps
+          - docs/concepts/volumes.md: How to manage volumes - for persistent storage or caching
+          - docs/concepts/secrets.md: How to manage secrets - for API keys or other sensitive data
+          - docs/concepts/projects.md: How to manage projects - for managing separate teams
+          - docs/concepts/gateways.md: How to manage gateways - enabling auto-scaling, rate limits, and custom domains
+        Guides:
+          - docs/guides/clusters.md: How to work with clusters - for distributed tasks
+          - docs/guides/kubernetes.md: How to work with Kubernetes
+          - docs/guides/server-deployment.md: Detailed guide on how to deploy the dstack server
+          - docs/guides/troubleshooting.md: Common issues and how to troubleshoot them
+          - docs/guides/metrics.md: How to monitor metrics
+          - docs/guides/protips.md: Pro tips - tips and tricks to use dstack more efficiently
+        Examples:
+          - examples/single-node-training/trl/index.md: TRL
+          - examples/single-node-training/axolotl/index.md: Axolotl
+          - examples/distributed-training/trl/index.md: TRL
+          - examples/distributed-training/axolotl/index.md: Axolotl
+          - examples/distributed-training/ray-ragen/index.md: Ray+RAGEN
+          - examples/clusters/nccl-tests/index.md: NCCL tests
+          - examples/clusters/rccl-tests/index.md: RCCL tests
+          - examples/inference/sglang/index.md: SGLang
+          - examples/inference/vllm/index.md: vLLM
+          - examples/inference/nim/index.md: NIM
+          - examples/inference/trtllm/index.md: TensorRT-LLM
+        Accelerators:
+          - examples/accelerators/amd/index.md: AMD
+          - examples/accelerators/tpu/index.md: TPU
+          - examples/accelerators/tenstorrent/index.md: Tenstorrent
   - blog:
       blog_dir: blog
       post_url_format: "{slug}"
@@ -268,6 +307,7 @@ nav:
         - Plugins:
             - Python API: docs/reference/plugins/python/index.md
             - REST API: docs/reference/plugins/rest/index.md
+        - llms-full.txt: llms-full.txt
   - Examples:
     - examples.md
     - Single-node training:
