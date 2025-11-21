@@ -4,7 +4,7 @@ import tempfile
 import threading
 import time
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
 from kubernetes import client
@@ -50,9 +50,9 @@ from dstack._internal.core.models.instances import (
     Resources,
     SSHConnectionParams,
 )
-from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Memory
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import get_or_error, parse_memory
