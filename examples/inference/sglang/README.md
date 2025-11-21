@@ -121,6 +121,29 @@ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint
 is available at `https://gateway.<gateway domain>/`.
 
+## SGLang Router
+You can use [SGLang Router](https://docs.sglang.ai/advanced_features/router.html#) with dstack gateway to route requests using routing polices such as `cache_aware`, `power_of_two`, `round_robin`, and `random`.
+
+Here is an example configuration to enable `SGLang Router`
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: sglang-gateway
+
+backend: aws
+region: eu-west-1
+
+domain: example.com
+router:
+  type: sglang
+  policy: cache_aware
+```
+
+</div>
+
+
 ## Source code
 
 The source-code of this example can be found in

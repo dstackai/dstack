@@ -65,6 +65,29 @@ Private gateways are currently supported in `aws` and `gcp` backends.
 !!! info "Reference"
     For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).
 
+### Router
+
+You can use [SGLang Router](https://docs.sglang.ai/advanced_features/router.html#) to route requests using polices such as `cache_aware`, `power_of_two`, `round_robin`, and `random`.
+
+To enable `SGLang Router`, configure gateway as below:
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: sglang-gateway
+
+backend: aws
+region: eu-west-1
+
+domain: example.com
+router:
+  type: sglang
+  policy: cache_aware
+```
+
+</div>
+
 ## Update DNS records
 
 Once the gateway is assigned a hostname, go to your domain's DNS settings
