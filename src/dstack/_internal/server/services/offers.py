@@ -194,7 +194,7 @@ def _filter_offers(
     placement_group: Optional[PlacementGroup] = None,
 ) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
-    Yields filtered offers. May change offer attributes to match the filters.
+    Yields filtered offers. May return modified offers to match the filters.
     """
     if regions is not None:
         regions = [r.lower() for r in regions]
@@ -217,9 +217,13 @@ def _filter_offers(
         if availability_zones is not None:
             if offer.availability_zones is None:
                 continue
-            offer.availability_zones = [
+            new_offer = offer.copy()
+            new_offer.availability_zones = [
                 z for z in offer.availability_zones if z in availability_zones
             ]
+            if not new_offer.availability_zones:
+                continue
+            offer = new_offer
         yield (b, offer)
 
 
@@ -240,5 +244,6 @@ def _get_shareable_offers(
         divisible, total_blocks = is_divisible_into_blocks(cpu_count, gpu_count, blocks)
         if not divisible:
             continue
-        offer.total_blocks = total_blocks
-        yield (backend, offer)
+        new_offer = offer.copy()
+        new_offer.total_blocks = total_blocks
+        yield (backend, new_offer)
