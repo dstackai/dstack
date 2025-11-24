@@ -1,6 +1,6 @@
 import asyncio
 import heapq
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -347,6 +347,15 @@ async def get_backend_offers(
     """
     Yields backend offers satisfying `requirements` sorted by price.
     """
+
+    def get_filtered_offers_with_backends(
+        backend: Backend,
+        offers: Iterable[InstanceOfferWithAvailability],
+    ) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
+        for offer in offers:
+            if not exclude_not_available or offer.availability.is_available():
+                yield (backend, offer)
+
     logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
     tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
     offers_by_backend = []
@@ -365,13 +374,7 @@ async def get_backend_offers(
                 exc_info=result,
             )
             continue
-        offers_by_backend.append(
-            (
-                (backend, offer)
-                for offer in result
-                if not exclude_not_available or offer.availability.is_available()
-            )
-        )
+        offers_by_backend.append(get_filtered_offers_with_backends(backend, result))
     # Merge preserving order for every backend.
     offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)
     return offers
