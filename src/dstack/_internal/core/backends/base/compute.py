@@ -94,7 +94,7 @@ class Compute(ABC):
     """
 
     @abstractmethod
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
         If the provider is added to gpuhunt, typically gets offers using `base.offers.get_catalog_offers()`
@@ -239,8 +239,8 @@ class ComputeWithFilteredOffersCached(ABC):
         """
         pass
 
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
-        return self._get_offers_cached(requirements)
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
+        return iter(self._get_offers_cached(requirements))
 
     def _get_offers_cached_key(self, requirements: Requirements) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
