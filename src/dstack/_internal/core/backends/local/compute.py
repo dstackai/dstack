@@ -37,16 +37,20 @@ class LocalCompute(
     Compute,
 ):
     def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
-        yield InstanceOfferWithAvailability(
-            backend=BackendType.LOCAL,
-            instance=InstanceType(
-                name="local",
-                resources=Resources(cpus=4, memory_mib=8192, gpus=[], spot=False),
-            ),
-            region="local",
-            price=0.00,
-            availability=InstanceAvailability.AVAILABLE,
-            instance_runtime=InstanceRuntime.RUNNER,
+        return iter(
+            [
+                InstanceOfferWithAvailability(
+                    backend=BackendType.LOCAL,
+                    instance=InstanceType(
+                        name="local",
+                        resources=Resources(cpus=4, memory_mib=8192, gpus=[], spot=False),
+                    ),
+                    region="local",
+                    price=0.00,
+                    availability=InstanceAvailability.AVAILABLE,
+                    instance_runtime=InstanceRuntime.RUNNER,
+                )
+            ]
         )
 
     def terminate_instance(
