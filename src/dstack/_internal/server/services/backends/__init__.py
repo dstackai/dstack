@@ -366,11 +366,11 @@ async def get_backend_offers(
             )
             continue
         offers_by_backend.append(
-            [
+            (
                 (backend, offer)
                 for offer in result
                 if not exclude_not_available or offer.availability.is_available()
-            ]
+            )
         )
     # Merge preserving order for every backend.
     offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)

@@ -97,8 +97,9 @@ class Compute(ABC):
     def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
-        If the provider is added to gpuhunt, typically gets offers using `base.offers.get_catalog_offers()`
-        and extends them with availability info.
+        If the provider is added to gpuhunt, typically gets offers using
+        `base.offers.get_catalog_offers()` and extends them with availability info.
+        It is called from async code in executor. It can block on call but not between yields.
         """
         pass
 
