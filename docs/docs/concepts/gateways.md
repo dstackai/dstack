@@ -85,8 +85,7 @@ router:
 </div>
 
 !!! info "Policy"
-
-    The `router` property allows you to configure the routing `policy`:
+    The `policy` property allows you to configure the routing policy:
 
     * `cache_aware` &mdash; Default policy; combines cache locality with load balancing, falling back to shortest queue. 
     * `power_of_two` &mdash; Samples two workers and picks the lighter one.                                               
