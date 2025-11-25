@@ -1,5 +1,6 @@
 import asyncio
 import heapq
+from collections.abc import Iterable, Iterator
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -338,12 +339,23 @@ async def get_project_backend_model_by_type_or_error(
     return backend_model
 
 
-async def get_instance_offers(
-    backends: List[Backend], requirements: Requirements, exclude_not_available: bool = False
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+async def get_backend_offers(
+    backends: List[Backend],
+    requirements: Requirements,
+    exclude_not_available: bool = False,
+) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
-    Returns list of instances satisfying minimal resource requirements sorted by price
+    Yields backend offers satisfying `requirements` sorted by price.
     """
+
+    def get_filtered_offers_with_backends(
+        backend: Backend,
+        offers: Iterable[InstanceOfferWithAvailability],
+    ) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
+        for offer in offers:
+            if not exclude_not_available or offer.availability.is_available():
+                yield (backend, offer)
+
     logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
     tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
     offers_by_backend = []
@@ -362,17 +374,10 @@ async def get_instance_offers(
                 exc_info=result,
             )
             continue
-        offers_by_backend.append(
-            [
-                (backend, offer)
-                for offer in result
-                if not exclude_not_available or offer.availability.is_available()
-            ]
-        )
-    # Merge preserving order for every backend
+        offers_by_backend.append(get_filtered_offers_with_backends(backend, result))
+    # Merge preserving order for every backend.
     offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)
-    # Put NOT_AVAILABLE, NO_QUOTA, and BUSY instances at the end, do not sort by price
-    return sorted(offers, key=lambda i: not i[1].availability.is_available())
+    return offers
 
 
 def check_backend_type_available(backend_type: BackendType):

@@ -4,7 +4,7 @@ import re
 import string
 import threading
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
@@ -95,11 +95,12 @@ class Compute(ABC):
     """
 
     @abstractmethod
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
-        If the provider is added to gpuhunt, typically gets offers using `base.offers.get_catalog_offers()`
-        and extends them with availability info.
+        If the provider is added to gpuhunt, typically gets offers using
+        `base.offers.get_catalog_offers()` and extends them with availability info.
+        It is called from async code in executor. It can block on call but not between yields.
         """
         pass
 
@@ -190,13 +191,13 @@ class ComputeWithAllOffersCached(ABC):
         """
         return None
 
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
-        offers = self._get_all_offers_with_availability_cached()
-        offers = self.__apply_modifiers(offers, self.get_offers_modifiers(requirements))
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
+        cached_offers = self._get_all_offers_with_availability_cached()
+        offers = self.__apply_modifiers(cached_offers, self.get_offers_modifiers(requirements))
         offers = filter_offers_by_requirements(offers, requirements)
         post_filter = self.get_offers_post_filter(requirements)
         if post_filter is not None:
-            offers = [o for o in offers if post_filter(o)]
+            offers = (o for o in offers if post_filter(o))
         return offers
 
     @cachedmethod(
@@ -209,16 +210,14 @@ class ComputeWithAllOffersCached(ABC):
     @staticmethod
     def __apply_modifiers(
         offers: Iterable[InstanceOfferWithAvailability], modifiers: Iterable[OfferModifier]
-    ) -> list[InstanceOfferWithAvailability]:
-        modified_offers = []
+    ) -> Iterator[InstanceOfferWithAvailability]:
         for offer in offers:
             for modifier in modifiers:
                 offer = modifier(offer)
                 if offer is None:
                     break
             else:
-                modified_offers.append(offer)
-        return modified_offers
+                yield offer
 
 
 class ComputeWithFilteredOffersCached(ABC):
@@ -242,8 +241,8 @@ class ComputeWithFilteredOffersCached(ABC):
         """
         pass
 
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
-        return self._get_offers_cached(requirements)
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
+        return iter(self._get_offers_cached(requirements))
 
     def _get_offers_cached_key(self, requirements: Requirements) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
