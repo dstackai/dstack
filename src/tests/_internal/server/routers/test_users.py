@@ -383,6 +383,27 @@ class TestDeleteUsers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_users_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(name="admin", session=session)
+        user1 = await create_user(name="test1", session=session)
+        user2 = await create_user(name="test2", session=session)
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user1.name, "non_existing_user"]},
+        )
+        assert response.status_code == 400
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user1.name, user2.name]},
+        )
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.usefixtures("image_config_mock")
     async def test_deletes_user_with_resources(
         self, test_db, session: AsyncSession, client: AsyncClient

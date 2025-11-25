@@ -173,6 +173,14 @@ async def delete_users(
     user: UserModel,
     usernames: List[str],
 ):
+    res = await session.execute(
+        select(UserModel.id).where(
+            UserModel.name.in_(usernames),
+        )
+    )
+    user_ids = res.scalars().all()
+    if len(user_ids) != len(usernames):
+        raise ServerClientError("Failed to delete non-existent users")
     await session.execute(delete(UserModel).where(UserModel.name.in_(usernames)))
     await session.commit()
     logger.info("Deleted users %s by user %s", usernames, user.name)
