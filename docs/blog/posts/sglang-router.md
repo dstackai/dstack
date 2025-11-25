@@ -160,7 +160,7 @@ With this integration, K/V cache reuse across replicas becomes possible — a ke
 Looking ahead, this integration also shapes our roadmap. Over the coming releases, we plan to expand support in several key areas:
 
 * Enabling prefill and decode worker separation for full disaggregation (today, only standard workers are supported).
-* Introducing auto-scaling based on inter-token latency, rather than relying solely on request-per-second metrics.
+* Introducing auto-scaling based on TTFT (Time to First Token) and ITL (Inter-Token Latency), complementing the current requests-per-second scaling metric.
 * Extending native support to more emerging inference stacks.
 
 ## What's next?
