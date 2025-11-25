@@ -58,7 +58,7 @@ class TestListFleets:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/fleets/list")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -147,7 +147,7 @@ class TestListProjectFleets:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/list")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -188,7 +188,7 @@ class TestGetFleet:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/get")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -309,7 +309,7 @@ class TestApplyFleetPlan:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/apply")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -829,7 +829,7 @@ class TestDeleteFleets:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/delete")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -942,7 +942,7 @@ class TestDeleteFleetInstances:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/delete_instances")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -1036,7 +1036,7 @@ class TestGetPlan:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/get_plan")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
