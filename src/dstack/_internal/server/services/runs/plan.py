@@ -301,8 +301,6 @@ async def find_optimal_fleet_with_offers(
         )
 
         available_backend_offers = _exclude_non_available_backend_offers(backend_offers)
-        if exclude_not_available:
-            backend_offers = available_backend_offers
         min_backend_offer_price = _get_min_instance_or_backend_offer_price(
             available_backend_offers
         )
@@ -338,7 +336,7 @@ async def find_optimal_fleet_with_offers(
         return None, [], []
 
     candidate_fleets_with_offers.sort(key=lambda t: t[-1])
-    optimal_fleet_model, instance_offers, backend_offers = candidate_fleets_with_offers[0][:3]
+    optimal_fleet_model, instance_offers = candidate_fleets_with_offers[0][:2]
     # Refetch backend offers without limit to return all offers for the optimal fleet.
     backend_offers = await _get_backend_offers_in_fleet(
         project=project,
@@ -348,6 +346,8 @@ async def find_optimal_fleet_with_offers(
         volumes=volumes,
         max_offers=None,
     )
+    if exclude_not_available:
+        backend_offers = _exclude_non_available_backend_offers(backend_offers)
     return optimal_fleet_model, instance_offers, backend_offers
 
 
