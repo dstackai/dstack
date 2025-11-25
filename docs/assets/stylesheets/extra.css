@@ -1585,7 +1585,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 .md-typeset.md-banner__inner a {
     color: var(--md-default-bg-color);
-    border-bottom: 1.5px dotted;
+    /* border-bottom: 1.5px dotted; */
     font-weight: 600;
 }
 
@@ -1804,10 +1804,14 @@ img.border {
 
 /* External link indicator */
 a[href^="http"]:not(:where(
+  /* skip if marked with external-skip */
+  .external-skip,
   /* exclude http:// dstack links */
   [href^="http://dstack.ai"],
   /* exclude https://dstack.ai links */
   [href^="https://dstack.ai"],
+  /* exclude md-content__button links */
+  .md-content__button,
 )):after {
   content: '';
   display: inline-block;
