@@ -7,6 +7,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.utils.tags import tags_validator
 
 
@@ -50,6 +51,10 @@ class GatewayConfiguration(CoreModel):
     default: Annotated[bool, Field(description="Make the gateway default")] = False
     backend: Annotated[BackendType, Field(description="The gateway backend")]
     region: Annotated[str, Field(description="The gateway region")]
+    router: Annotated[
+        Optional[AnyRouterConfig],
+        Field(description="The router configuration"),
+    ] = None
     domain: Annotated[
         Optional[str], Field(description="The gateway domain, e.g. `example.com`")
     ] = None
@@ -113,6 +118,7 @@ class GatewayComputeConfiguration(CoreModel):
     ssh_key_pub: str
     certificate: Optional[AnyGatewayCertificate] = None
     tags: Optional[Dict[str, str]] = None
+    router: Optional[AnyRouterConfig] = None
 
 
 class GatewayProvisioningData(CoreModel):

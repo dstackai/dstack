@@ -9,6 +9,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.resources import set_resources_defaults
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -55,7 +56,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
 
 
 def validate_run_spec_and_set_defaults(
-    user: UserModel, run_spec: RunSpec, legacy_default_working_dir: bool = False
+    user: UserModel, run_spec: RunSpec, legacy_repo_dir: bool = False
 ):
     # This function may set defaults for null run_spec values,
     # although most defaults are resolved when building job_spec
@@ -111,8 +112,15 @@ def validate_run_spec_and_set_defaults(
             run_spec.ssh_key_pub = user.ssh_public_key
         else:
             raise ServerClientError("ssh_key_pub must be set if the user has no ssh_public_key")
-    if run_spec.configuration.working_dir is None and legacy_default_working_dir:
+    if run_spec.configuration.working_dir is None and legacy_repo_dir:
         run_spec.configuration.working_dir = LEGACY_REPO_DIR
+    if (
+        run_spec.configuration.repos
+        and run_spec.repo_dir is None
+        and FeatureFlags.LEGACY_REPO_DIR_DISABLED
+        and not legacy_repo_dir
+    ):
+        raise ServerClientError("Repo path is not set")
 
 
 def check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
@@ -127,7 +135,13 @@ def check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
                 f"Failed to update fields {changed_spec_fields}."
                 f" Can only update {updatable_spec_fields}."
             )
-    _check_can_update_configuration(current_run_spec.configuration, new_run_spec.configuration)
+    # We don't allow update if the order of archives has been changed, as even if the archives
+    # are the same (the same id => hash => content and the same container path), the order of
+    # unpacking matters when one path is a subpath of another.
+    ignore_files = current_run_spec.file_archives == new_run_spec.file_archives
+    _check_can_update_configuration(
+        current_run_spec.configuration, new_run_spec.configuration, ignore_files
+    )
 
 
 def can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bool:
@@ -159,7 +173,7 @@ def check_run_spec_requires_instance_mounts(run_spec: RunSpec) -> bool:
 
 
 def _check_can_update_configuration(
-    current: AnyRunConfiguration, new: AnyRunConfiguration
+    current: AnyRunConfiguration, new: AnyRunConfiguration, ignore_files: bool
 ) -> None:
     if current.type != new.type:
         raise ServerClientError(
@@ -168,6 +182,13 @@ def _check_can_update_configuration(
     updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
         new.type, []
     )
+    if ignore_files:
+        # We ignore files diff if the file archives are the same. It allows the user to move
+        # local files/dirs as long as their name(*), content, and the container path stay the same.
+        # (*) We could also ignore local name changes if the names didn't change in the tarballs.
+        # Currently, the client preserves the original file/dir name it the tarball, but it could
+        # use some generic names like "file"/"directory" instead.
+        updatable_fields.append("files")
     diff = diff_models(current, new)
     changed_fields = list(diff.keys())
     for key in changed_fields:

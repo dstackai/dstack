@@ -313,6 +313,9 @@ class JobConfigurator(ABC):
         Returns absolute or relative path
         """
         repo_dir = self.run_spec.repo_dir
+        # We need this fallback indefinitely, as there may be RunSpecs submitted before
+        # repos[].path became required, and JobSpec is regenerated from RunSpec on each retry
+        # and in-place update.
         if repo_dir is None:
             return LEGACY_REPO_DIR
         return repo_dir

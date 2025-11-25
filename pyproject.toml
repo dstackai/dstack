@@ -32,7 +32,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.12",
+    "gpuhunt==0.1.13",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "orjson",
@@ -107,7 +107,7 @@ dev = [
     "requests-mock>=1.12.1",
     "openai>=1.68.2",
     "freezegun>=1.5.1",
-    "ruff==0.11.6",  # should match .pre-commit-config.yaml
+    "ruff==0.12.7",  # should match .pre-commit-config.yaml
     "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
     "pyinstrument>=5.0.0",
@@ -124,6 +124,7 @@ dev = [
     "mkdocs-gen-files; python_version >= '3.11'",
     "mkdocstrings[python]; python_version >= '3.11'", 
     "mkdocs-render-swagger-plugin; python_version >= '3.11'",
+    "mkdocs-llmstxt-md; python_version >= '3.11'"
 ]
 
 [project.optional-dependencies]

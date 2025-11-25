@@ -161,7 +161,12 @@ async def lifespan(app: FastAPI):
         logger.info("Background processing is disabled")
     PROBES_SCHEDULER.start()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
-    logger.info(
+    job_network_mode_log = (
+        logger.info
+        if settings.JOB_NETWORK_MODE != settings.DEFAULT_JOB_NETWORK_MODE
+        else logger.debug
+    )
+    job_network_mode_log(
         "Job network mode: %s (%d)",
         settings.JOB_NETWORK_MODE.name,
         settings.JOB_NETWORK_MODE.value,

@@ -4,6 +4,7 @@ from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeE
 from dstack._internal.core.models.configurations import LEGACY_REPO_DIR, ServiceConfiguration
 from dstack._internal.core.models.runs import ApplyRunPlanInput, JobSpec, JobSubmission, RunSpec
 from dstack._internal.server.schemas.runs import GetRunPlanRequest, ListRunsRequest
+from dstack._internal.settings import FeatureFlags
 
 
 def get_list_runs_excludes(list_runs_request: ListRunsRequest) -> IncludeExcludeSetType:
@@ -133,10 +134,15 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     configuration = run_spec.configuration
     profile = run_spec.profile
 
-    if run_spec.repo_dir in [None, LEGACY_REPO_DIR]:
-        spec_excludes["repo_dir"] = True
-    elif run_spec.repo_dir == "." and configuration.working_dir in [None, LEGACY_REPO_DIR, "."]:
-        spec_excludes["repo_dir"] = True
+    if not FeatureFlags.LEGACY_REPO_DIR_DISABLED:
+        if run_spec.repo_dir in [None, LEGACY_REPO_DIR]:
+            spec_excludes["repo_dir"] = True
+        elif run_spec.repo_dir == "." and configuration.working_dir in [
+            None,
+            LEGACY_REPO_DIR,
+            ".",
+        ]:
+            spec_excludes["repo_dir"] = True
 
     if configuration.fleets is None:
         configuration_excludes["fleets"] = True

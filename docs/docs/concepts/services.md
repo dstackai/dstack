@@ -100,12 +100,13 @@ If [authorization](#authorization) is not disabled, the service endpoint require
     However, you'll need a gateway in the following cases:
 
     * To use auto-scaling or rate limits
+    * To enable a support custom router, e.g. such as the [SGLang Model Gateway :material-arrow-top-right-thin:{ .external }](https://docs.sglang.ai/advanced_features/router.html#){:target="_blank"}
     * To enable HTTPS for the endpoint and map it to your domain
     * If your service requires WebSockets
     * If your service cannot work with a [path prefix](#path-prefix)
 
-    Note, if you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-    a gateway is already pre-configured for you.
+    <!-- Note, if you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+    a gateway is already pre-configured for you. -->
 
     If a [gateway](gateways.md) is configured, the service endpoint will be accessible at
     `https://<run name>.<gateway domain>/`.

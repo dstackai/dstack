@@ -14,6 +14,9 @@ dependencies = [
     "dstack[gateway] @ https://github.com/dstackai/dstack/archive/refs/heads/master.tar.gz",
 ]
 
+[project.optional-dependencies]
+sglang = ["sglang-router==0.2.1"]
+
 [tool.setuptools.package-data]
 "dstack.gateway" = [
     "resources/systemd/*",
