@@ -1,6 +1,6 @@
 # SGLang
 
-This example shows how to deploy DeepSeek-R1-Distill-Llama 8B and 70B using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"} and `dstack`.
+This example shows how to deploy DeepSeek-R1-Distill-Llama 8B and 70B using [SGLang](https://github.com/sgl-project/sglang) and `dstack`.
 
 ## Apply a configuration
 
@@ -105,14 +105,14 @@ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 </div>
 
 !!! info "SGLang Model Gateway"
-    If you'd like to use a custom routing policy, e.g. by leveraging the [SGLang Model Gateway :material-arrow-top-right-thin:{ .external }](https://docs.sglang.ai/advanced_features/router.html#){:target="_blank"}, create a gateway with `router` set to `sglang`. Check out [gateways](https://dstack.ai/docs/concepts/gateways#router) for more details.
+    If you'd like to use a custom routing policy, e.g. by leveraging the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#), create a gateway with `router` set to `sglang`. Check out [gateways](https://dstack.ai/docs/concepts/gateways#router) for more details.
 
 > If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling or HTTPs, rate-limits, etc), the OpenAI-compatible endpoint is available at `https://gateway.<gateway domain>/`.
 
 ## Source code
 
 The source-code of this example can be found in
-[`examples/llms/deepseek/sglang` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/sglang){:target="_blank"}.
+[`examples/llms/deepseek/sglang`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/sglang).
 
 ## What's next?
 

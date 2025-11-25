@@ -12,7 +12,7 @@ categories:
 
 At `dstack`, we've been adding support for AMD GPUs with [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets), 
 so we saw this as a great chance to test our integration by benchmarking AMD GPUs. Our friends at 
-[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}, who build top-tier 
+[Hot Aisle](https://hotaisle.xyz/), who build top-tier 
 bare metal compute for AMD GPUs, kindly provided the hardware for the benchmark.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v5.png" width="750" />
@@ -106,7 +106,7 @@ Here is the spec of the bare metal machine we got:
 ??? info "TGI"
     The `ghcr.io/huggingface/text-generation-inference:sha-11d7af7-rocm` Docker image was used.
 
-For conducting the tests, we've been using the [`benchmark_serving` :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_serving.py){:target="_blank"} provided by vLLM. 
+For conducting the tests, we've been using the [`benchmark_serving`](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_serving.py) provided by vLLM. 
 
 ## Observations
 
@@ -175,7 +175,7 @@ to vLLM.
 
 <img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/gpu_vram_tgi_vllm.png" width="750" />
 
-This difference may be related to how vLLM [pre-allocates GPU cache :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/models/performance.html){:target="_blank"}.
+This difference may be related to how vLLM [pre-allocates GPU cache](https://docs.vllm.ai/en/latest/models/performance.html).
 
 ## Conclusion
 
@@ -203,7 +203,7 @@ like the H100 and H200, as well as possibly Google TPU.
 ### Source code
 
 The source code used for this benchmark can be found in our 
-[GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/amd/inference){:target="_blank"}.
+[GitHub repo](https://github.com/dstackai/benchmarks/tree/main/amd/inference).
 
 If you have questions, feedback, or want to help improve the benchmark, please reach out to our team.
 
@@ -211,7 +211,7 @@ If you have questions, feedback, or want to help improve the benchmark, please r
 
 ### Hot Aisle
 
-[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} 
+[Hot Aisle](https://hotaisle.xyz/) 
 is the primary sponsor of this benchmark, and we are sincerely grateful for their hardware and support.  
 
 If you'd like to use top-tier bare metal compute with AMD GPUs, we recommend going
@@ -219,6 +219,6 @@ with Hot Aisle. Once you gain access to a cluster, it can be easily accessed via
 
 ### RunPod
 If you’d like to use on-demand compute with AMD GPUs at affordable prices, you can configure `dstack` to
-use [RunPod :material-arrow-top-right-thin:{ .external }](https://runpod.io/){:target="_blank"}. In
+use [RunPod](https://runpod.io/). In
 this case, `dstack` will be able to provision fleets automatically when you run dev environments, tasks, and
 services.

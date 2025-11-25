@@ -3,7 +3,7 @@
 ## Reporting issues
 
 When you encounter a problem, please report it as
-a [GitHub issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/new/choose){:target="_blank"}.
+a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 If you have a question or need help, feel free to ask it in our [Discord server](https://discord.gg/u8SmfwPpMd).
 
@@ -23,8 +23,8 @@ environment variable to `DEBUG`. By default, it is set to `INFO`.
 
 CLI logs are located in `~/.dstack/logs/cli`, and the default log level is `DEBUG`.
 
-> See these examples for well-reported issues: [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1640){:target="_blank"}
-and [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1551){:target="_blank"}.
+> See these examples for well-reported issues: [this](https://github.com/dstackai/dstack/issues/1640)
+and [this](https://github.com/dstackai/dstack/issues/1551).
 
 ## Typical issues
 
@@ -39,7 +39,7 @@ Below are some of the reasons why this might happen.
 
 Before you can run any workloads, you need to configure a [backend](../concepts/backends.md),
 create an [SSH fleet](../concepts/fleets.md#ssh-fleets), or sign up for
-[dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+[dstack Sky](https://sky.dstack.ai).
 If you have configured a backend and still can't use it, check the output of `dstack server`
 for backend configuration errors.
 
@@ -116,7 +116,7 @@ one of these features, `dstack` will only select offers from the backends that s
 #### Cause 8: dstack Sky balance
 
 If you are using
-[dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+[dstack Sky](https://sky.dstack.ai),
 you will not see marketplace offers until you top up your balance.
 Alternatively, you can configure your own cloud accounts
 on the [project settings page](../concepts/projects.md#backends)
@@ -188,7 +188,7 @@ If you interrupt the command, the port forwarding will be disconnected. To reatt
 
 #### Cause 2: Windows
 
-If you're using the CLI on Windows, make sure to run it through WSL by following [these instructions:material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1644#issuecomment-2321559265){:target="_blank"}. 
+If you're using the CLI on Windows, make sure to run it through WSL by following [these instructions:material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1644#issuecomment-2321559265). 
 Native support will be available soon.
 
 ### SSH fleet fails to provision

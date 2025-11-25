@@ -58,8 +58,8 @@ yourself and your experience. We’ll reach out with a starter kit and next step
     Get involved
 </a>
 
-Have questions? Reach out via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}!
+Have questions? Reach out via [Discord](https://discord.gg/u8SmfwPpMd)!
 
 > 💜 In the meantime, we’re thrilled to
-> welcome [Park Chansung :material-arrow-top-right-thin:{ .external }](https://x.com/algo_diver){:target="_blank"}, the
+> welcome [Park Chansung](https://x.com/algo_diver), the
 > first `dstack` ambassador.

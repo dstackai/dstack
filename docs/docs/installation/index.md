@@ -2,7 +2,7 @@
 
 <!-- !!! info "dstack Sky"
     If you don't want to host the `dstack` server (or want to access GPU marketplace),
-    skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}. -->
+    skip installation and proceed to [dstack Sky](https://sky.dstack.ai). -->
 
 ## Set up the server
 
@@ -110,7 +110,7 @@ Once the server is up, you can access it via the `dstack` CLI.
 
 ??? info "Windows"
     To use the CLI on Windows, ensure you've installed Git and OpenSSH via 
-    [Git for Windows:material-arrow-top-right-thin:{ .external }](https://git-scm.com/download/win){:target="_blank"}. 
+    [Git for Windows:material-arrow-top-right-thin:{ .external }](https://git-scm.com/download/win). 
 
     When installing it, ensure you've checked 
     `Git from the command line and also from 3-rd party software` 
@@ -207,4 +207,4 @@ This configuration is stored in `~/.dstack/config.yml`.
     2. See [Backends](../concepts/backends.md)
     3. Check the [server deployment](../guides/server-deployment.md) guide
     4. Browse [examples](/examples)
-    5. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
+    5. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)

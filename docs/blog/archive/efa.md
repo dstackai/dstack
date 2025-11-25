@@ -10,7 +10,7 @@ categories:
 
 # Efficient distributed training with AWS EFA
 
-[Amazon Elastic Fabric Adapter (EFA) :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"} is a high-performance network interface designed for AWS EC2 instances, enabling
+[Amazon Elastic Fabric Adapter (EFA)](https://aws.amazon.com/hpc/efa/) is a high-performance network interface designed for AWS EC2 instances, enabling
 ultra-low latency and high-throughput communication between nodes. This makes it an ideal solution for scaling
 distributed training workloads across multiple GPUs and instances.
 
@@ -39,7 +39,7 @@ network interfaces, you’ll need to disable public IPs. Note, the `dstack`
 server in this case should have access to the private subnet of the VPC.
 
 You’ll also need to specify an AMI that includes the GDRCopy drivers. For example, you can use the 
-[AWS Deep Learning Base GPU AMI :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/releasenotes/aws-deep-learning-base-gpu-ami-ubuntu-22-04/){:target="_blank"}.
+[AWS Deep Learning Base GPU AMI](https://aws.amazon.com/releasenotes/aws-deep-learning-base-gpu-ami-ubuntu-22-04/).
 
 Here’s an example backend configuration:
 
@@ -164,10 +164,10 @@ $ dstack apply -f examples/misc/efa/task.dstack.yml -R
 EFA.
 
 > Have questions? You're welcome to join
-> our [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"} or talk
-> directly to [our team :material-arrow-top-right-thin:{ .external }](https://calendly.com/dstackai/discovery-call){:target="_blank"}.
+> our [Discord](https://discord.gg/u8SmfwPpMd) or talk
+> directly to [our team](https://calendly.com/dstackai/discovery-call).
 
 !!! info "What's next?"
     1. Check [fleets](../../docs/concepts/fleets.md), [tasks](../../docs/concepts/tasks.md), and [volumes](../../docs/concepts/volumes.md)
     2. Also see [dev environments](../../docs/concepts/dev-environments.md) and [services](../../docs/concepts/services.md)
-    3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    3. Join [Discord](https://discord.gg/u8SmfwPpMd)

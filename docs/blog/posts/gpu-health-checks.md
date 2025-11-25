@@ -64,10 +64,10 @@ Passive GPU health checks work on AWS (except with custom `os_images`), Azure (e
 This update is about visibility: giving engineers real-time insight into GPU health before jobs run. Next comes automation — policies to skip GPUs with warnings, and self-healing workflows that replace unhealthy instances without manual steps.
 
 If you have experience with GPU reliability or ideas for automated recovery, join the conversation on
-[Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}.
+[Discord](https://discord.gg/u8SmfwPpMd).
 
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)
     2. Explore the [clusters](../../docs/guides/clusters.md) guide
     3. Learn more about [metrics](../../docs/guides/metrics.md)
-    4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    4. Join [Discord](https://discord.gg/u8SmfwPpMd)

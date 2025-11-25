@@ -273,7 +273,7 @@ $ dstack apply -e HF_TOKEN=... -f .dstack.yml
 
     </div>
     
-    If you install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"},
+    If you install [`direnv`](https://direnv.net/),
     it will automatically apply the environment variables from the `.envrc` file to the `dstack apply` command.
 
     Remember to add `.envrc` to `.gitignore` to avoid committing it to the repo.    
@@ -350,7 +350,7 @@ If you're using multiple `dstack` projects (e.g., from different `dstack` server
 you can switch between them using the [`dstack project`](../reference/cli/dstack/project.md) command.
 
 ??? info ".envrc"
-    Alternatively, you can install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"}  
+    Alternatively, you can install [`direnv`](https://direnv.net/)  
     to automatically apply environment variables from the `.envrc` file in your project directory.
 
     <div editor-title=".envrc"> 
@@ -490,7 +490,7 @@ If you're using your own AWS, GCP, Azure, or OCI accounts, before you can use GP
 corresponding service quotas for each type of instance in each region.
 
 ??? info "AWS"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html){:target="_blank"} on EC2 service quotas.
+    Check this [guide ](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) on EC2 service quotas.
     The relevant service quotas include:
 
     - `Running On-Demand P instances` (on-demand V100, A100 80GB x8)
@@ -501,7 +501,7 @@ corresponding service quotas for each type of instance in each region.
     - `All P5 Spot Instance Requests` (spot H100)
 
 ??? info "GCP"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/compute/resource-usage){:target="_blank"} on Compute Engine service quotas.
+    Check this [guide ](https://cloud.google.com/compute/resource-usage) on Compute Engine service quotas.
     The relevant service quotas include:
 
     - `NVIDIA V100 GPUs` (on-demand V100)
@@ -518,7 +518,7 @@ corresponding service quotas for each type of instance in each region.
     - `Preemtible H100 GPUs` (spot H100)
 
 ??? info "Azure"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/azure/quotas/quickstart-increase-quota-portal){:target="_blank"} on Azure service quotas.
+    Check this [guide ](https://learn.microsoft.com/en-us/azure/quotas/quickstart-increase-quota-portal) on Azure service quotas.
     The relevant service quotas include:
 
     - `Total Regional Spot vCPUs` (any spot instances)
@@ -531,7 +531,7 @@ corresponding service quotas for each type of instance in each region.
     - `Standard NDSH100v5 Family vCPUs` (on-demand H100 x8)
 
 ??? info "OCI"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/servicelimits.htm#Requesti){:target="_blank"} on requesting OCI service limits increase.
+    Check this [guide ](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/servicelimits.htm#Requesti) on requesting OCI service limits increase.
     The relevant service category is compute. The relevant resources include:
 
     - `GPUs for GPU.A10 based VM and BM instances` (on-demand A10)

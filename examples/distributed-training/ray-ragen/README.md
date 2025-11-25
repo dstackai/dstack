@@ -1,9 +1,9 @@
 # Ray + RAGEN
 
-This example shows how use `dstack` and [RAGEN :material-arrow-top-right-thin:{ .external }](https://github.com/RAGEN-AI/RAGEN){:target="_blank"} 
+This example shows how use `dstack` and [RAGEN](https://github.com/RAGEN-AI/RAGEN) 
 to fine-tune an agent on multiple nodes.
 
-Under the hood `RAGEN` uses [verl :material-arrow-top-right-thin:{ .external }](https://github.com/volcengine/verl){:target="_blank"} for Reinforcement Learning and [Ray :material-arrow-top-right-thin:{ .external }](https://docs.ray.io/en/latest/){:target="_blank"} for distributed training.
+Under the hood `RAGEN` uses [verl](https://github.com/volcengine/verl) for Reinforcement Learning and [Ray](https://docs.ray.io/en/latest/) for distributed training.
 
 !!! info "Prerequisites"
     Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](https://dstack.ai/docs/concepts/fleets#backend-placement) or an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh-placement)).
@@ -60,7 +60,7 @@ volumes:
 
 </div>
 
-We are using verl's docker image for vLLM with FSDP. See [Installation :material-arrow-top-right-thin:{ .external }](https://verl.readthedocs.io/en/latest/start/install.html){:target="_blank"} for more.
+We are using verl's docker image for vLLM with FSDP. See [Installation](https://verl.readthedocs.io/en/latest/start/install.html) for more.
 
 The `RAGEN` setup script `scripts/setup_ragen.sh` isolates dependencies within Conda environment.
 
@@ -127,4 +127,4 @@ Using Ray via `dstack` is a powerful way to get access to the rich Ray ecosystem
 !!! info "What's next"
     1. Check the [Clusters](https://dstack.ai/docs/guides/clusters) guide
     2. Read about [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks) and [fleets](https://dstack.ai/docs/concepts/fleets)
-    3. Browse Ray's [docs :material-arrow-top-right-thin:{ .external }](https://docs.ray.io/en/latest/train/examples.html){:target="_blank"} for other examples.
+    3. Browse Ray's [docs](https://docs.ray.io/en/latest/train/examples.html) for other examples.

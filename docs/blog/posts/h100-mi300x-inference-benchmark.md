@@ -22,8 +22,8 @@ Finally, we extrapolate performance projections for upcoming GPUs like NVIDIA H2
 <img src="https://dstack.ai/static-assets/static-assets/images/h100-mi300x-inference-benchmark-v2.png" width="630"/>
 
 This benchmark is made possible through the generous support of our friends at
-[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} and 
-[Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"},
+[Hot Aisle](https://hotaisle.xyz/) and 
+[Lambda](https://lambdalabs.com/),
 who provided high-end hardware.
 
 <!-- more -->
@@ -42,7 +42,7 @@ who provided high-end hardware.
 ### Benchmark modes
 
 1. **Online inference**: Benchmarked across QPS 16, 32, and 1000 using
-   the [ShareGPT :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered){:target="_blank"} dataset. Execution used
+   the [ShareGPT](https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered) dataset. Execution used
    vLLM’s [benchmark\_serving](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_serving.py).
 2. **Offline inference**: Benchmarked with varying input/output lengths across different batch sizes, using vLLM’s [benchmark\_throughput.py](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_throughput.py).
 
@@ -79,7 +79,7 @@ With large prompts and batch sizes, two replicas on 4xMI300x GPUs hit memory sat
 length x batch size) exceed the available memory for the KV cache. This forces the inference engine to compute KV
 tensors on-the-fly or offload them to CPU memory, degrading throughput.
 
-In [Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/blog/partner-spotlight-evaluating-nvidia-h200-gpus-for-ai-inference-with-baseten){:target="_blank"}’
+In [Lambda](https://lambdalabs.com/blog/partner-spotlight-evaluating-nvidia-h200-gpus-for-ai-inference-with-baseten)’
 benchmark, an 8xH200 setup processed 3.4 times more tokens per second than an 8xH100. Extrapolating to our
 setup, an 8xH200 would process around 2,186 tokens per second (3.4 × 643), though still lower than 8xMI300x.
 
@@ -122,7 +122,7 @@ Despite offering more memory, 4xMI300x lacks the parallelism of 8xH100, leading 
 Processing a single large prompt request with 8xMI300x takes around 11.25 seconds. This latency is mainly due to
 computational demands during the prefill phase, where KV tensors are computed.
 
-Optimizations like [automatic prefix caching :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/automatic_prefix_caching/apc.html){:target="_blank"}
+Optimizations like [automatic prefix caching](https://docs.vllm.ai/en/latest/automatic_prefix_caching/apc.html)
 could help reduce this time, but are outside the scope of this benchmark.
 
 ## Benchmark notes
@@ -139,7 +139,7 @@ with batch size 16 due to memory saturation, resulting in slower generation time
 
 ### Model checkpoints
 
-For AMD MI300x, we used [`amd/Llama-3.1-405B-Instruct-FP8-KV` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/amd/Llama-3.1-405B-Instruct-FP8-KV){:target="_blank"}
+For AMD MI300x, we used [`amd/Llama-3.1-405B-Instruct-FP8-KV`](https://huggingface.co/amd/Llama-3.1-405B-Instruct-FP8-KV)
 to achieve optimal performance, relying on AMD for quantization.
 
 ### vLLM configuration
@@ -186,20 +186,20 @@ cost-efficiency.
 ## Source code
 
 All the source code and findings to help you replicate the results are available in 
-[our GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/comparison/h100sxm5_vs_mi300x){:target="_blank"}.
+[our GitHub repo](https://github.com/dstackai/benchmarks/tree/main/comparison/h100sxm5_vs_mi300x).
 
 ## Thanks to our friends
 
 ### Hot Aisle
 
-[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} sponsored this benchmark by providing access to 8x MI300x hardware. We’re deeply grateful for their support.
+[Hot Aisle](https://hotaisle.xyz/) sponsored this benchmark by providing access to 8x MI300x hardware. We’re deeply grateful for their support.
 
 If you're looking for top-tier bare metal compute with AMD GPUs, we highly recommend Hot Aisle. With `dstack`, accessing
 your cluster via SSH is seamless and straightforward.
 
 ### Lambda
 
-[Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"} sponsored this benchmark with credits for on-demand 8x H100 instances. 
+[Lambda](https://lambdalabs.com/) sponsored this benchmark with credits for on-demand 8x H100 instances. 
 We’re truly thankful for their support.
 
 For top-tier cloud compute with NVIDIA GPUs, Lambda is an excellent choice. Once set up, you can easily provision

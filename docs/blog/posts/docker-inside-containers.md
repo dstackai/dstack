@@ -94,12 +94,12 @@ Last but not least, you can, of course, use the `docker run` command, for exampl
 
 ## Examples
 
-A few examples of using this feature can be found in [`examples/misc/docker-compose` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/docker-compose){: target="_ blank"}.
+A few examples of using this feature can be found in [`examples/misc/docker-compose`](https://github.com/dstackai/dstack/blob/master/examples/misc/docker-compose).
 
 ## Feedback
 
 If you find something not working as intended, please be sure to report it to
-our [bug tracker :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_ blank"}. 
+our [bug tracker](https://github.com/dstackai/dstack/issues){:target="_ blank"}. 
 Your feedback and feature requests are also very welcome on both 
-[Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"} and the
-[issue tracker :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_blank"}.
+[Discord](https://discord.gg/u8SmfwPpMd) and the
+[issue tracker](https://github.com/dstackai/dstack/issues).

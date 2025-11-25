@@ -26,7 +26,7 @@ Configuration is updated at ~/.dstack/config.yml
 
 ### Configure clouds
 
-By default, [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"} 
+By default, [dstack Sky](https://sky.dstack.ai) 
 uses the GPU from its marketplace, which requires a credit card to be attached in your account
 settings.
 
@@ -41,4 +41,4 @@ the [server/config.yml reference](../reference/server/config.yml.md).
 
 1. Follow [quickstart](../quickstart.md)
 2. Browse [examples](https://dstack.ai/examples)
-3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
+3. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)

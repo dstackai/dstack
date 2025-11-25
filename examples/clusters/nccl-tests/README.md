@@ -1,6 +1,6 @@
 # NCCL tests
 
-This example shows how to run [NCCL tests :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/nccl-tests){:target="_blank"} on a cluster using [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks).
+This example shows how to run [NCCL tests](https://github.com/NVIDIA/nccl-tests) on a cluster using [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks).
 
 !!! info "Prerequisites"
     Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](https://dstack.ai/docs/concepts/fleets#backend-placement) or an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh-placement)).
@@ -47,7 +47,7 @@ resources:
 </div>
 
 !!! info "Default image"
-    If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+    If you don't specify `image`, `dstack` uses its [base](https://github.com/dstackai/dstack/tree/master/docker/base) Docker image pre-configured with 
     `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
 !!! info "Privileged"
@@ -75,7 +75,7 @@ Submit the run nccl-tests? [y/n]: y
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/clusters/nccl-tests` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/clusters/nccl-tests).
+[`examples/clusters/nccl-tests`](https://github.com/dstackai/dstack/blob/master/examples/clusters/nccl-tests).
 
 ## What's next?
 

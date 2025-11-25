@@ -57,7 +57,7 @@ The minimum hardware requirements for running the server are 1 CPU and 1GB of RA
 
 ??? info "AWS CloudFormation"
     If you'd like to deploy the server to a private AWS VPC, you can use 
-    our CloudFormation [template :material-arrow-top-right-thin:{ .external }](https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https://get-dstack.s3.eu-west-1.amazonaws.com/cloudformation/template.yaml){:target="_blank"}.
+    our CloudFormation [template](https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https://get-dstack.s3.eu-west-1.amazonaws.com/cloudformation/template.yaml).
 
     First, ensure you've set up a private VPC with public and private subnets.
 
@@ -69,7 +69,7 @@ The minimum hardware requirements for running the server are 1 CPU and 1GB of RA
     To access the server URL, ensure you're connected to the VPC, e.g. via VPN client.
 
     > If you'd like to adjust anything, the source code of the template can be found at
-    [`examples/server-deployment/cloudformation/template.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/server-deployment/cloudformation/template.yaml){:target="_blank"}.
+    [`examples/server-deployment/cloudformation/template.yaml`](https://github.com/dstackai/dstack/blob/master/examples/server-deployment/cloudformation/template.yaml).
 
 ## Backend configuration
 
@@ -142,7 +142,7 @@ $ DSTACK_DATABASE_URL=postgresql+asyncpg://user:password@db-host:5432/dstack dst
       export DSTACK_DATABASE_URL="postgresql+asyncpg://..."
       alembic upgrade head
       ```
-    4. Install [pgloader :material-arrow-top-right-thin:{.external }](https://github.com/dimitri/pgloader){:target="_blank"}
+    4. Install [pgloader :material-arrow-top-right-thin:{.external }](https://github.com/dimitri/pgloader)
     5. Pass the path to the `~/.dstack/server/data/sqlite.db` file to `SOURCE_PATH` and 
        set `TARGET_PATH` with the URL of the PostgreSQL database. Example:
        ```bash
@@ -406,7 +406,7 @@ When upgrading the `dstack` server, follow these guidelines to ensure a smooth t
 
 ### Before upgrading
 
-1. **Check the changelog**: Review the [release notes :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/releases){:target="_blank"} for breaking changes, new features, and migration notes.
+1. **Check the changelog**: Review the [release notes](https://github.com/dstackai/dstack/releases) for breaking changes, new features, and migration notes.
 2. **Review backward compatibility**: Understand the [backward compatibility](#backward-compatibility) policy.
 3. **Back up your data**: Ensure you always create a backup before upgrading.
 

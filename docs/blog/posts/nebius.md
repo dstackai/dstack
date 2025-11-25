@@ -17,7 +17,7 @@ alternative to Kubernetes and Slurm.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-nebius-v2.png" width="630"/>
 
-Today, we’re announcing native integration with [Nebius :material-arrow-top-right-thin:{ .external }](https://nebius.com/){:target="_blank"},
+Today, we’re announcing native integration with [Nebius](https://nebius.com/),
 offering a streamlined developer experience for teams using GPUs for AI workloads.
 <!-- more -->
 
@@ -44,7 +44,7 @@ long-running services—without the operational overhead.
 
 To use `dstack` with Nebius, configure your `nebius` backend:
 
-1. Log in to your [Nebius AI Cloud :material-arrow-top-right-thin:{ .external }](https://console.eu.nebius.com/){:target="_blank"} account.  
+1. Log in to your [Nebius AI Cloud](https://console.eu.nebius.com/) account.  
 2. Navigate to `Access`, and select  `Service Accounts`.  
 3. Create a new service account, assign it to the `editors` group, and upload an authorized key.
 
@@ -108,8 +108,8 @@ interconnects is coming soon.
 
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)
-    2. Sign up with [Nebius AI Cloud :material-arrow-top-right-thin:{ .external }](https://console.eu.nebius.com/){:target="_blank"}
+    2. Sign up with [Nebius AI Cloud](https://console.eu.nebius.com/)
     3. Read about [dev environments](../../docs/concepts/dev-environments.md), 
         [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
         and [fleets](../../docs/concepts/fleets.md)
-    4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    4. Join [Discord](https://discord.gg/u8SmfwPpMd)

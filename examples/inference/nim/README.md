@@ -5,7 +5,7 @@ description: "This example shows how to deploy DeepSeek-R1-Distill-Llama-8B to a
 
 # NVIDIA NIM
 
-This example shows how to deploy DeepSeek-R1-Distill-Llama-8B using [NVIDIA NIM :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html){:target="_blank"} and `dstack`.
+This example shows how to deploy DeepSeek-R1-Distill-Llama-8B using [NVIDIA NIM](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html) and `dstack`.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
@@ -112,7 +112,7 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in
-[`examples/inference/nim` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/nim){:target="_blank"}.
+[`examples/inference/nim`](https://github.com/dstackai/dstack/blob/master/examples/inference/nim).
 
 ## What's next?
 

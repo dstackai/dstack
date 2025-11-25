@@ -72,4 +72,4 @@ fleets by teams.
     1. Check [dev environments](../../docs/concepts/dev-environments.md), 
        [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md),
        and [fleets](../../docs/concepts/fleets.md)
-    2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    2. Join [Discord](https://discord.gg/u8SmfwPpMd)

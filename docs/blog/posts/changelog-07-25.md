@@ -112,7 +112,7 @@ resources:
 
 #### Tenstorrent
 
-`dstack` remains committed to supporting multiple GPU vendors—including NVIDIA, AMD, TPUs, and more recently, [Tenstorrent :material-arrow-top-right-thin:{ .external }](https://tenstorrent.com/){:target="_blank"}. The latest release improves Tenstorrent support by handling hosts with multiple N300 cards and adds Docker-in-Docker support.
+`dstack` remains committed to supporting multiple GPU vendors—including NVIDIA, AMD, TPUs, and more recently, [Tenstorrent](https://tenstorrent.com/). The latest release improves Tenstorrent support by handling hosts with multiple N300 cards and adds Docker-in-Docker support.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-n300.png" width="630"/>
 
@@ -192,7 +192,7 @@ Server-side performance has been improved. With optimized handling and backgroun
 
 #### Google SSO
 
-Alongside the open-source version, `dstack` also offers [dstack Enterprise :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack-enterprise){:target="_blank"} — which adds dedicated support and extra integrations like Single Sign-On (SSO). The latest release introduces support for configuring your company’s Google account for authentication.
+Alongside the open-source version, `dstack` also offers [dstack Enterprise](https://github.com/dstackai/dstack-enterprise) — which adds dedicated support and extra integrations like Single Sign-On (SSO). The latest release introduces support for configuring your company’s Google account for authentication.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-enterprise-google-sso.png" width="630"/>
 
@@ -201,4 +201,4 @@ If you’d like to learn more about `dstack` Enterprise, [let us know](https://c
 That’s all for now. 
 
 !!! info "What's next?"
-    Give dstack a try, and share your feedback—whether it’s [GitHub :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack){:target="_blank"} issues, PRs, or questions on [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}. We’re eager to hear from you!
+    Give dstack a try, and share your feedback—whether it’s [GitHub](https://github.com/dstackai/dstack) issues, PRs, or questions on [Discord](https://discord.gg/u8SmfwPpMd). We’re eager to hear from you!

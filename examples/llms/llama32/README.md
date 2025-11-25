@@ -122,11 +122,11 @@ is available at `https://<run name>.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in
-[`examples/llms/llama32` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama32).
+[`examples/llms/llama32`](https://github.com/dstackai/dstack/blob/master/examples/llms/llama32).
 
 ## What's next?
 
 1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks),
    [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
-2. Browse [Llama 3.2 on HuggingFace :material-arrow-top-right-thin:{ .external }](https://huggingface.co/collections/meta-llama/llama-32-66f448ffc8c32f949b04c8cf)
-   and [LLama 3.2 on vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/models/supported_models.html#multimodal-language-models).
+2. Browse [Llama 3.2 on HuggingFace](https://huggingface.co/collections/meta-llama/llama-32-66f448ffc8c32f949b04c8cf)
+   and [LLama 3.2 on vLLM](https://docs.vllm.ai/en/latest/models/supported_models.html#multimodal-language-models).
