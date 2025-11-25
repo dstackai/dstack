@@ -15,7 +15,7 @@ increasingly important.
 At `dstack`, we’re committed to redefining AI container orchestration by prioritizing an AI-native, open-source-first
 approach.
 Today, we’re excited to share a new integration and partnership
-with [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/){:target="_blank"}.
+with [Vultr](https://www.vultr.com/).
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-vultr.png" width="630"/>
 
@@ -26,9 +26,9 @@ and NVIDIA GPUs with greater flexibility and efficiency–using `dstack`.
 
 ## About Vultr
 
-[Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/){:target="_blank"} provides cloud GPUs across 32 regions, supporting both NVIDIA and AMD hardware with on-demand and reserved
+[Vultr](https://www.vultr.com/) provides cloud GPUs across 32 regions, supporting both NVIDIA and AMD hardware with on-demand and reserved
 capacity. Their offerings include AMD MI300X and NVIDIA GH200, H200, H100, A100, L40S, and A40, all available at
-competitive [pricing :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/pricing/#cloud-gpu){:target="_blank"}.
+competitive [pricing](https://www.vultr.com/pricing/#cloud-gpu).
 
 ## Why dstack
 
@@ -47,7 +47,7 @@ and volumes—so you can focus on building instead of troubleshooting infrastruc
 
 To use `dstack` with your Vultr account, you need to [configure a `vultr` backend](../../docs/concepts/backends.md):
 
-Log into your [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
+Log into your [Vultr](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
 
 Then, go ahead and configure the backend:
 
@@ -71,8 +71,8 @@ For more details, refer to [Installation](../../docs/installation/index.md).
 
 !!! info "What's next?"
     1. Refer to [Quickstart](../../docs/quickstart.md)
-    2. Sign up with [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/)
+    2. Sign up with [Vultr](https://www.vultr.com/)
     3. Check [dev environments](../../docs/concepts/dev-environments.md), 
         [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
         and [fleets](../../docs/concepts/fleets.md)
-    4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    4. Join [Discord](https://discord.gg/u8SmfwPpMd)

@@ -5,7 +5,7 @@ description: "This example shows how to deploy Llama 4 Scout to any cloud or on-
 
 # HuggingFace TGI
 
-This example shows how to deploy Llama 4 Scout with `dstack` using [HuggingFace TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/index){:target="_blank"}.
+This example shows how to deploy Llama 4 Scout with `dstack` using [HuggingFace TGI](https://huggingface.co/docs/text-generation-inference/en/index).
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
@@ -21,7 +21,7 @@ This example shows how to deploy Llama 4 Scout with `dstack` using [HuggingFace 
 
 ## Deployment
 
-Here's an example of a service that deploys [`Llama-4-Scout-17B-16E-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"} using TGI.
+Here's an example of a service that deploys [`Llama-4-Scout-17B-16E-Instruct`](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct) using TGI.
 
 <div editor-title="examples/inference/tgi/.dstack.yml">
 
@@ -116,7 +116,7 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in
-[`examples/inference/tgi` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi).
+[`examples/inference/tgi`](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi).
 
 ## What's next?
 

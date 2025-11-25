@@ -55,4 +55,4 @@ metrics from `dstack`.
 !!! info "What's next?"
     1. See [Metrics](../../docs/guides/metrics.md)
     2. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)
-    3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    3. Join [Discord](https://discord.gg/u8SmfwPpMd)

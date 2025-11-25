@@ -259,7 +259,7 @@ Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
         [rate limits](concepts/services.md#rate-limits),
         or use a custom domain with HTTPS, 
         set up a [gateway](concepts/gateways.md) before running the service.
-        If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+        If you're using [dstack Sky](https://sky.dstack.ai),
         a gateway is pre-configured for you.
 
 `dstack apply` automatically provisions instances and runs the workload according to the configuration.
@@ -271,4 +271,4 @@ Something not working? See the [troubleshooting](guides/troubleshooting.md) guid
 !!! info "What's next?"
     1. Read about [backends](concepts/backends.md),  [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), [services](concepts/services.md), and [fleets](concepts/services.md)
     2. Browse [examples](../examples.md)
-    3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
+    3. Join [Discord](https://discord.gg/u8SmfwPpMd)

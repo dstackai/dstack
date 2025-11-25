@@ -14,8 +14,8 @@ If you’re using or planning to use TPUs with Google Cloud, you can now do so v
 
 Read below to find out how to use TPUs with `dstack` for fine-tuning and deploying
 LLMs, leveraging open-source tools like Hugging Face’s 
-[Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"} 
-and [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html){:target="_blank"}.
+[Optimum TPU](https://github.com/huggingface/optimum-tpu) 
+and [vLLM](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html).
 
 <!-- more -->
 
@@ -45,8 +45,8 @@ If you've configured the `gcp` backend, `dstack` will automatically provision th
 
 You can use any serving framework, such as vLLM, TGI. Here's an example of a [service](https://dstack.ai/docs/services) that deploys
 Llama 3.1 8B using 
-[Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}
-and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"}.
+[Optimum TPU](https://github.com/huggingface/optimum-tpu)
+and [vLLM](https://github.com/vllm-project/vllm).
 
 === "Optimum TPU"
 
@@ -79,7 +79,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     ```
     </div>
 
-    Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/87){:target="_blank"} is merged, 
+    Once the [pull request](https://github.com/huggingface/optimum-tpu/pull/87) is merged, 
     the official Docker image can be used instead of `dstackai/optimum-tpu:llama31`.
 
 === "vLLM"
@@ -145,7 +145,7 @@ Note, `v5litepod` is optimized for serving transformer-based models. Each core i
 | Framework | Quantization   | Note                                                                                                                                                                                                                                                                                             |
 |-----------|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **TGI**   | bfloat16       | To deploy with TGI, Optimum TPU must be used.                                                                                                                                                                                                                                                    |
-| **vLLM**  | int8, bfloat16 | int8 quantization still requires the same memory because the weights are first moved to the TPU in bfloat16, and then converted to int8. See the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm/pull/7005){:target="_blank"} for more details. |
+| **vLLM**  | int8, bfloat16 | int8 quantization still requires the same memory because the weights are first moved to the TPU in bfloat16, and then converted to int8. See the [pull request](https://github.com/vllm-project/vllm/pull/7005) for more details. |
 
 ### Running a configuration
 
@@ -154,8 +154,8 @@ cloud resources and run the configuration.
 
 ## Fine-tuning
 
-Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"} 
-and the [Abirate/english_quotes :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/Abirate/english_quotes){:target="_blank"}
+Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU](https://github.com/huggingface/optimum-tpu) 
+and the [Abirate/english_quotes](https://huggingface.co/datasets/Abirate/english_quotes)
 dataset.
 
 <div editor-title="examples/single-node-training/optimum-tpu/llama31/train.dstack.yml"> 
@@ -208,12 +208,12 @@ Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each co
 
 ## What's next?
 
-1. Browse [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"},
-   [Optimum TPU TGI :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/tree/main/text-generation-inference){:target="_blank"} and
-   [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html){:target="_blank"}.
+1. Browse [Optimum TPU](https://github.com/huggingface/optimum-tpu),
+   [Optimum TPU TGI](https://github.com/huggingface/optimum-tpu/tree/main/text-generation-inference) and
+   [vLLM](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html).
 2. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](https://dstack.ai/docs/tasks), 
    [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md).
 
 !!! info "Multi-host TPUs"
     If you’d like to use `dstack` with more than eight TPU cores, upvote the corresponding
-    [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1337){:target="_blank"}.
+    [issue](https://github.com/dstackai/dstack/issues/1337).

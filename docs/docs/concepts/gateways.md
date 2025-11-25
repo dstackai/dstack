@@ -1,8 +1,8 @@
 # Gateways
 
-Gateways manage ingress traffic for running [services](services.md), handle auto-scaling and rate limits, enable HTTPS, and allow you to configure a custom domain. They also support custom routers, such as the [SGLang Model Gateway :material-arrow-top-right-thin:{ .external }](https://docs.sglang.ai/advanced_features/router.html#){:target="_blank"}.
+Gateways manage ingress traffic for running [services](services.md), handle auto-scaling and rate limits, enable HTTPS, and allow you to configure a custom domain. They also support custom routers, such as the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#).
 
-<!-- > If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+<!-- > If you're using [dstack Sky](https://sky.dstack.ai),
 > the gateway is already set up for you. -->
 
 ## Apply a configuration
@@ -62,7 +62,7 @@ By default, the gateway uses its own load balancer to route traffic between repl
 
 #### SGLang
 
-The `sglang` router delegates routing logic to the [SGLang Model Gateway :material-arrow-top-right-thin:{ .external }](https://docs.sglang.ai/advanced_features/router.html#){:target="_blank"}.
+The `sglang` router delegates routing logic to the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#).
 
 To enable it, set `type` field under `router` to `sglang`:
 

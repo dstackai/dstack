@@ -39,7 +39,7 @@ enables optimal hardware utilization by allowing concurrent workloads to run on 
 available resources on each host.
 
 > For example, imagine you’ve reserved a cluster with multiple bare-metal nodes, each equipped with 8x MI300X GPUs from
-[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}.
+[Hot Aisle](https://hotaisle.xyz/).
 
 With `dstack`, you can define your fleet configuration like this:
 
@@ -108,7 +108,7 @@ The latest `dstack` release introduces the [`proxy_jump`](../../docs/concepts/fl
 through a login node.
 
 > For example, imagine you’ve reserved a 1-Click Cluster from
-> [Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"} with multiple nodes, each equipped with 8x H100 GPUs from.
+> [Lambda](https://lambdalabs.com/) with multiple nodes, each equipped with 8x H100 GPUs from.
 
 With `dstack`, you can define your fleet configuration like this:
 
@@ -174,8 +174,8 @@ an AI-native experience, simplicity, and vendor-agnostic orchestration for both 
 
 !!! info "Roadmap"
     We plan to further enhance `dstack`'s support for both cloud and on-premises setups. For more details on our roadmap,
-    refer to our [GitHub :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/2184){:target="_blank"}.
+    refer to our [GitHub](https://github.com/dstackai/dstack/issues/2184).
 
 > Have questions? You're welcome to join
-> our [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"} or talk
-> directly to [our team :material-arrow-top-right-thin:{ .external }](https://calendly.com/dstackai/discovery-call){:target="_blank"}.
+> our [Discord](https://discord.gg/u8SmfwPpMd) or talk
+> directly to [our team](https://calendly.com/dstackai/discovery-call).

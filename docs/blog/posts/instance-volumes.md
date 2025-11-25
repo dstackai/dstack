@@ -82,6 +82,6 @@ volumes:
 ## Feedback
 
 If you find something not working as intended, please be sure to report it to
-[GitHub issues :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_ blank"}. 
+[GitHub issues](https://github.com/dstackai/dstack/issues){:target="_ blank"}. 
 Your feedback and feature requests is also very welcome on our 
-[Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"} server.
+[Discord](https://discord.gg/u8SmfwPpMd) server.

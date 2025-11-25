@@ -55,7 +55,7 @@ To open in VS Code Desktop, use this link:
 
 ??? info "Windows"
     On Windows, `dstack` works both natively and inside WSL. But, for dev environments, 
-    it's recommended _not to use_ `dstack apply` _inside WSL_ due to a [VS Code issue :material-arrow-top-right-thin:{ .external }](https://github.com/microsoft/vscode-remote-release/issues/937){:target="_blank"}.
+    it's recommended _not to use_ `dstack apply` _inside WSL_ due to a [VS Code issue](https://github.com/microsoft/vscode-remote-release/issues/937).
 
 To open the dev environment in your desktop IDE, use the link from the output 
 (such as `vscode://vscode-remote/ssh-remote+fast-moth-1/workflow`).
@@ -159,7 +159,7 @@ If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
 
 #### Default image
 
-If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its [base](https://github.com/dstackai/dstack/tree/master/docker/base) Docker image pre-configured with 
     `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
 Set the `python` property to pre-install a specific version of Python.

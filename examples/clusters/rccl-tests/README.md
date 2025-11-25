@@ -1,6 +1,6 @@
 # RCCL tests
 
-This example shows how to run distributed [RCCL tests :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/rccl-tests){:target="_blank"} using [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks).
+This example shows how to run distributed [RCCL tests](https://github.com/ROCm/rccl-tests) using [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks).
 
 !!! info "Prerequisites"
     Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](https://dstack.ai/docs/concepts/fleets#backend-placement) or an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh-placement)).
@@ -68,7 +68,7 @@ resources:
 
     Other nodes use a `FIFO` pipe to wait for until the MPI run is finished.
 
-    There is an open [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/2467){:target="_blank"} to simplify the use of MPI with distributed tasks.
+    There is an open [issue](https://github.com/dstackai/dstack/issues/2467) to simplify the use of MPI with distributed tasks.
 
 !!! info "RoCE library"
     Broadcom RoCE drivers require the `libbnxt_re` userspace library inside the container to be compatible with the host’s Broadcom 
@@ -116,7 +116,7 @@ Submit the run rccl-tests? [y/n]: y
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/distributed-training/rccl-tests` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/rccl-tests).
+[`examples/distributed-training/rccl-tests`](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/rccl-tests).
 
 ## What's next?
 

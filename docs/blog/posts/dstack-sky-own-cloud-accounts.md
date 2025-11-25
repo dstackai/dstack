@@ -9,7 +9,7 @@ categories:
 
 # dstack Sky now supports your own cloud accounts
 
-[dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"} 
+[dstack Sky](https://sky.dstack.ai) 
 enables you to access GPUs from the global marketplace at the most
 competitive rates. However, sometimes you may want to use your own cloud accounts. 
 With today's release, both options are now supported.
@@ -30,12 +30,12 @@ CUDO, RunPod, and Vast.ai.
 Additionally, you can disable certain backends if you do not plan to use them.
 
 Typically, if you prefer using your own cloud accounts, it's recommended that you use the 
-[open-source version :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/){:target="_blank"} of `dstack`.
+[open-source version](https://github.com/dstackai/dstack/) of `dstack`.
 However, if you prefer not to host it yourself, now you can use `dstack Sky` 
 with your own cloud accounts as well.
 
 > Seeking the cheapest on-demand and spot cloud GPUs?
-> [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"} has you covered!
+> [dstack Sky](https://sky.dstack.ai) has you covered!
 
 Need help, have a question, or just want to stay updated?
 

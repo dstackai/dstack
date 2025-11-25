@@ -7,7 +7,7 @@ image: https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-m
 # Tenstorrent
 
 `dstack` supports running dev environments, tasks, and services on Tenstorrent 
-[Wormwhole :material-arrow-top-right-thin:{ .external }](https://tenstorrent.com/en/hardware/wormhole){:target="_blank"} accelerators via SSH fleets.
+[Wormwhole](https://tenstorrent.com/en/hardware/wormhole) accelerators via SSH fleets.
 
 
 ??? info "SSH fleets"
@@ -48,8 +48,8 @@ image: https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-m
 ## Services
 
 Here's an example of a service that deploys
-[`Llama-3.2-1B-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-3.2-1B){:target="_blank"} 
-using [Tenstorrent Inference Service :material-arrow-top-right-thin:{ .external }](https://github.com/tenstorrent/tt-inference-server){:target="_blank"}.
+[`Llama-3.2-1B-Instruct`](https://huggingface.co/meta-llama/Llama-3.2-1B) 
+using [Tenstorrent Inference Service](https://github.com/tenstorrent/tt-inference-server).
 
 <div editor-title="examples/acceleators/tenstorrent/tt-inference-server.dstack.yml"> 
 
@@ -195,5 +195,5 @@ If you run it via `dstack apply`, it will output the URL to access it via your d
 > Dev nevironments support many options, including inactivity and max duration, IDE configuration, etc. To learn more, refer to [Dev environments](https://dstack.ai/docs/concepts/tasks).
 
 ??? info "Feedback"
-    Found a bug, or want to request a feature? File it in the [issue tracker :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_blank"},
-    or share via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}.
+    Found a bug, or want to request a feature? File it in the [issue tracker](https://github.com/dstackai/dstack/issues),
+    or share via [Discord](https://discord.gg/u8SmfwPpMd).

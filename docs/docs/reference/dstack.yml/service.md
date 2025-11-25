@@ -64,7 +64,7 @@ The `service` configuration type allows running [services](../../concepts/servic
         2. Doesn't work if `eos_token` is defined in the model repository as a dictionary. As a workaround, set `eos_token` manually, as shown in the example above (see Chat template).
 
         If you encounter any other issues, please make sure to file a
-        [GitHub issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/new/choose){:target="_blank"}.
+        [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 ### `scaling`
 

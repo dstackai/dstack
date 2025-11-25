@@ -42,7 +42,7 @@ The GH200 Superchip’s 450 GB/s bidirectional bandwidth enables KV cache offloa
 
 ## GH200 on Lambda
 
-[Lambda :material-arrow-top-right-thin:{ .external }](https://cloud.lambda.ai/sign-up?_gl=1*1qovk06*_gcl_au*MTg2MDc3OTAyOS4xNzQyOTA3Nzc0LjE3NDkwNTYzNTYuMTc0NTQxOTE2MS4xNzQ1NDE5MTYw*_ga*MTE2NDM5MzI0My4xNzQyOTA3Nzc0*_ga_43EZT1FM6Q*czE3NDY3MTczOTYkbzM0JGcxJHQxNzQ2NzE4MDU2JGo1NyRsMCRoMTU0Mzg1NTU1OQ..){:target="_blank"} provides secure, user-friendly, reliable, and affordable cloud GPUs. Since end of last year, Lambda started to offer on-demand GH200 instances through their public cloud. Furthermore, they offer these instances at the promotional price of $1.49 per hour until June 30th 2025.
+[Lambda](https://cloud.lambda.ai/sign-up?_gl=1*1qovk06*_gcl_au*MTg2MDc3OTAyOS4xNzQyOTA3Nzc0LjE3NDkwNTYzNTYuMTc0NTQxOTE2MS4xNzQ1NDE5MTYw*_ga*MTE2NDM5MzI0My4xNzQyOTA3Nzc0*_ga_43EZT1FM6Q*czE3NDY3MTczOTYkbzM0JGcxJHQxNzQ2NzE4MDU2JGo1NyRsMCRoMTU0Mzg1NTU1OQ..) provides secure, user-friendly, reliable, and affordable cloud GPUs. Since end of last year, Lambda started to offer on-demand GH200 instances through their public cloud. Furthermore, they offer these instances at the promotional price of $1.49 per hour until June 30th 2025.
 
 With the latest `dstack` update, it’s now possible to use these instances with your Lambda account whether you’re running a dev environment, task, or service:
 
@@ -81,7 +81,7 @@ $ dstack apply -f .dstack.yml
 > If you have GH200 or GB200-powered hosts already provisioned via Lambda, another cloud provider, or on-prem, you can now use them with [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets).
 
 !!! info "What's next?"
-    1. Sign up with [Lambda :material-arrow-top-right-thin:{ .external }](https://cloud.lambda.ai/sign-up?_gl=1*1qovk06*_gcl_au*MTg2MDc3OTAyOS4xNzQyOTA3Nzc0LjE3NDkwNTYzNTYuMTc0NTQxOTE2MS4xNzQ1NDE5MTYw*_ga*MTE2NDM5MzI0My4xNzQyOTA3Nzc0*_ga_43EZT1FM6Q*czE3NDY3MTczOTYkbzM0JGcxJHQxNzQ2NzE4MDU2JGo1NyRsMCRoMTU0Mzg1NTU1OQ..){:target="_blank"}
+    1. Sign up with [Lambda](https://cloud.lambda.ai/sign-up?_gl=1*1qovk06*_gcl_au*MTg2MDc3OTAyOS4xNzQyOTA3Nzc0LjE3NDkwNTYzNTYuMTc0NTQxOTE2MS4xNzQ1NDE5MTYw*_ga*MTE2NDM5MzI0My4xNzQyOTA3Nzc0*_ga_43EZT1FM6Q*czE3NDY3MTczOTYkbzM0JGcxJHQxNzQ2NzE4MDU2JGo1NyRsMCRoMTU0Mzg1NTU1OQ..)
     2. Set up the [Lambda](../../docs/concepts/backends.md#lambda) backend
     3. Follow [Quickstart](../../docs/quickstart.md)
     4. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)

@@ -1,6 +1,6 @@
 # Axolotl
 
-This example walks you through how to run distributed fine-tune using [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/axolotl-ai-cloud/axolotl){:target="_blank"} and [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks).
+This example walks you through how to run distributed fine-tune using [Axolotl](https://github.com/axolotl-ai-cloud/axolotl) and [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks).
 
 !!! info "Prerequisites"
     Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](https://dstack.ai/docs/concepts/fleets#backend-placement) or an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh-placement)).
@@ -92,7 +92,7 @@ Provisioning...
 ## Source code
 
 The source-code of this example can be found in
-[`examples/distributed-training/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/axolotl).
+[`examples/distributed-training/axolotl`](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/axolotl).
 
 !!! info "What's next?"
     1. Read the [clusters](https://dstack.ai/docs/guides/clusters) guide

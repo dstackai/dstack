@@ -10,7 +10,7 @@ image: https://dstack.ai/static-assets/static-assets/images/nvidia-dgx-spark.png
 
 # Orchestrating workloads on NVIDIA DGX Spark
 
-With support from [Graphsignal :material-arrow-top-right-thin:{ .external }](https://x.com/GraphsignalAI/status/1986565583593197885){:target="_blank" }, our team gained access to the new [NVIDIA DGX Spark :material-arrow-top-right-thin:{ .external }](https://www.nvidia.com/en-us/products/workstations/dgx-spark/){:target="_blank"} and used it to validate how `dstack` operates on this hardware. This post walks through how to set it up with `dstack` and use it alongside existing on-prem clusters or GPU cloud environments to run workloads.
+With support from [Graphsignal](https://x.com/GraphsignalAI/status/1986565583593197885), our team gained access to the new [NVIDIA DGX Spark](https://www.nvidia.com/en-us/products/workstations/dgx-spark/) and used it to validate how `dstack` operates on this hardware. This post walks through how to set it up with `dstack` and use it alongside existing on-prem clusters or GPU cloud environments to run workloads.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/nvidia-dgx-spark.png" width="630"/>
 
@@ -121,12 +121,12 @@ To open in VS Code Desktop, use this link:
 
 > Running workloads on DGX Spark with `dstack` works the same way as on any other [backend](../../docs/concepts/backends.md) (including GPU clouds): you can run [dev environments](../../docs/concepts/dev-environments.md) for interactive development, [tasks](../../docs/concepts/tasks.md) for fine tuning, and [services](../../docs/concepts/services.md) for inference through the unified interface.
 
-1. Read the [NVIDIA DGX Spark in-depth review :material-arrow-top-right-thin:{ .external }](https://lmsys.org/blog/2025-10-13-nvidia-dgx-spark/){:target="_blank"} by the SGLang team.
+1. Read the [NVIDIA DGX Spark in-depth review](https://lmsys.org/blog/2025-10-13-nvidia-dgx-spark/) by the SGLang team.
 2. Check [dev environments](../../docs/concepts/dev-environments.md), 
     [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
     and [fleets](../../docs/concepts/fleets.md)
 3. Follow [Quickstart](../../docs/quickstart.md)
-4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+4. Join [Discord](https://discord.gg/u8SmfwPpMd)
 
 !!! info "Aknowledgement"
-    Thanks to the [Graphsignal :material-arrow-top-right-thin:{ .external }](https://graphsignal.com/){:target="_blank"} team for access to DGX Spark and for supporting testing and validation. Graphsignal provides inference observability tooling used to profile CUDA workloads during both training and inference.
+    Thanks to the [Graphsignal](https://graphsignal.com/) team for access to DGX Spark and for supporting testing and validation. Graphsignal provides inference observability tooling used to profile CUDA workloads during both training and inference.

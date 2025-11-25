@@ -135,11 +135,11 @@ This turns capacity from individual silos into one fungible pool.
     - **Next steps.** We plan to publish price normalization, hardware/network microbenchmarks, and a scheduler capability matrix; preliminary harnesses are linked in the appendix. Contributors welcome.
 
 
-> If you need a lighter, simpler orchestration and control-plane alternative to Kubernetes or Slurm, consider [dstack :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/){:target="_blank"}. 
+> If you need a lighter, simpler orchestration and control-plane alternative to Kubernetes or Slurm, consider [dstack](https://github.com/dstackai/dstack/). 
 It’s open-source and self-hosted.
 
 ??? info "dstack Sky"
-    If you want unified access to low-cost on-demand and spot GPUs across multiple clouds, try [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai/){:target="_blank"}.
+    If you want unified access to low-cost on-demand and spot GPUs across multiple clouds, try [dstack Sky](https://sky.dstack.ai/).
 
     <img src="https://dstack.ai/static-assets/static-assets/images/dstack-sky-offers.png" width="750"/>
 

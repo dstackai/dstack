@@ -1,6 +1,6 @@
 # AWS EFA
 
-In this guide, we’ll walk through how to run high-performance distributed training on AWS using [Amazon Elastic Fabric Adapter (EFA) :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"} with `dstack`.
+In this guide, we’ll walk through how to run high-performance distributed training on AWS using [Amazon Elastic Fabric Adapter (EFA)](https://aws.amazon.com/hpc/efa/) with `dstack`.
 
 ## Overview
 
@@ -71,7 +71,7 @@ Provisioning...
 
 ??? info "Instance types"
     `dstack` selects suitable instances automatically, but not
-    [all types support EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}.
+    [all types support EFA](https://aws.amazon.com/hpc/efa/).
     To enforce EFA, you can specify `instance_types` explicitly:
 
     ```yaml

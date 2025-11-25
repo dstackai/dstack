@@ -6,7 +6,7 @@ description: "This example shows how to deploy Deepseek models to any cloud or o
 # TensorRT-LLM
 
 This example shows how to deploy both DeepSeek R1 and its distilled version
-using [TensorRT-LLM :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/TensorRT-LLM){:target="_blank"} and `dstack`.
+using [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) and `dstack`.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
@@ -365,10 +365,10 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in
-[`examples/inference/trtllm` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/trtllm){:target="_blank"}.
+[`examples/inference/trtllm`](https://github.com/dstackai/dstack/blob/master/examples/inference/trtllm).
 
 ## What's next?
 
 1. Check [services](https://dstack.ai/docs/services)
-2. Browse [Tensorrt-LLM DeepSeek-R1 with PyTorch Backend :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/deepseek_v3){:target="_blank"} and [Prepare the Model Repository :material-arrow-top-right-thin:{ .external }](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#prepare-the-model-repository){:target="_blank"}
-3. See also [`trtllm-serve` :material-arrow-top-right-thin:{ .external }](https://nvidia.github.io/TensorRT-LLM/commands/trtllm-serve.html#trtllm-serve){:target="_blank"}
+2. Browse [Tensorrt-LLM DeepSeek-R1 with PyTorch Backend](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/deepseek_v3) and [Prepare the Model Repository](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#prepare-the-model-repository)
+3. See also [`trtllm-serve`](https://nvidia.github.io/TensorRT-LLM/commands/trtllm-serve.html#trtllm-serve)

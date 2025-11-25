@@ -102,14 +102,14 @@ To ensure instances are interconnected (e.g., for
 This ensures all instances are provisioned with optimal inter-node connectivity.
 
 ??? info "AWS"
-    When you create a fleet with AWS, [Elastic Fabric Adapter networking :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    When you create a fleet with AWS, [Elastic Fabric Adapter networking](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html) is automatically configured if it’s supported for the corresponding instance type.
     Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
     Otherwise, instances are only connected by the default VPC subnet.
 
     Refer to the [EFA](../../examples/clusters/efa/index.md) example for more details.
 
 ??? info "GCP"
-    When you create a fleet with GCP, `dstack` automatically configures [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking for the A3 Mega and A3 High instance types, as well as RoCE networking for the A4 instance type.
+    When you create a fleet with GCP, `dstack` automatically configures [GPUDirect-TCPXO and GPUDirect-TCPX](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot) networking for the A3 Mega and A3 High instance types, as well as RoCE networking for the A4 instance type.
 
     !!! info "Backend configuration"    
         You may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
@@ -118,7 +118,7 @@ This ensures all instances are provisioned with optimal inter-node connectivity.
         [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
 
 ??? info "Nebius"
-    When you create a fleet with Nebius, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    When you create a fleet with Nebius, [InfiniBand networking](https://docs.nebius.com/compute/clusters/gpu) is automatically configured if it’s supported for the corresponding instance type.
     Otherwise, instances are only connected by the default VPC subnet.
 
     An InfiniBand fabric for the cluster is selected automatically. If you prefer to use some specific fabrics, configure them in the
@@ -304,12 +304,12 @@ Define a fleet configuration as a YAML file in your project directory. The file 
 
     === "NVIDIA"
         2.&nbsp;Hosts with NVIDIA GPUs must also be pre-installed with CUDA 12.1 and
-        [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+        [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
     === "AMD"
         2.&nbsp;Hosts with AMD GPUs must also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
-        [native package manager :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
-        or [AMDGPU installer :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
+        [native package manager](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
+        or [AMDGPU installer](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
 
     === "Intel Gaudi"
         2.&nbsp;Hosts with Intel Gaudi accelerators must be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
