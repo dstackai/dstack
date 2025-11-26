@@ -8,5 +8,8 @@ export interface IRunEnvironmentFormValues {
     python?: string;
     repo_enabled?: boolean;
     repo_url?: string;
-    repo_local_path?: string;
+    repo_path?: string;
+    working_dir?: string;
 }
+
+export type IRunEnvironmentFormKeys = keyof Required<IRunEnvironmentFormValues>;

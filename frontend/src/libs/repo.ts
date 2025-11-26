@@ -26,6 +26,12 @@ export function getPathWithoutProtocol(url: string): string {
     return url.replace(/^https?:\/\//i, '');
 }
 
+export function getRepoUrlWithOutDir(url: string): string {
+    const parsedUrl = url.match(/^([^:]+(?::[^:]+)?)/)?.[1];
+
+    return parsedUrl ?? url;
+}
+
 export function getRepoDirFromUrl(url: string): string | undefined {
     const dirName = url.replace(/^https?:\/\//i, '').match(/:\/(\S*)/)?.[1];
 

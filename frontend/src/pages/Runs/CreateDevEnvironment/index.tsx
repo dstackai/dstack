@@ -19,14 +19,16 @@ import { OfferList } from 'pages/Offers/List';
 
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
+import { FORM_FIELD_NAMES } from './constants';
 
-import { IRunEnvironmentFormValues } from './types';
+import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
 
 import styles from './styles.module.scss';
 
 const requiredFieldError = 'This is required field';
 const namesFieldError = 'Only latin characters, dashes, and digits';
 const urlFormatError = 'Only URLs';
+const workingDirFormatError = 'Use absolute path';
 
 const ideOptions = [
     {
@@ -49,6 +51,7 @@ const envValidationSchema = yup.object({
     name: yup.string().matches(/^[a-z][a-z0-9-]{1,40}$/, namesFieldError),
     ide: yup.string().required(requiredFieldError),
     config_yaml: yup.string().required(requiredFieldError),
+    working_dir: yup.string().matches(/^\//, workingDirFormatError),
 
     image: yup.string().when('docker', {
         is: true,
@@ -150,7 +153,11 @@ export const CreateDevEnvironment: React.FC = () => {
     };
 
     const validateSecondStep = async () => {
-        return await trigger(['name', 'ide', 'docker', 'image', 'python', 'repo_enabled', 'repo_url', 'repo_local_path']);
+        const secondStepFields = Object.keys(FORM_FIELD_NAMES).filter(
+            (fieldName) => !['offer', 'config_yaml'].includes(fieldName),
+        ) as IRunEnvironmentFormKeys[];
+
+        return await trigger(secondStepFields);
     };
 
     const validateConfig = async () => {
@@ -188,7 +195,7 @@ export const CreateDevEnvironment: React.FC = () => {
 
         if (!detail.checked) {
             setValue('repo_url', '');
-            setValue('repo_local_path', '');
+            setValue('repo_path', '');
         }
     };
 
@@ -367,6 +374,15 @@ export const CreateDevEnvironment: React.FC = () => {
                                         ]}
                                     />
 
+                                    <FormInput
+                                        label={t('runs.dev_env.wizard.working_dir')}
+                                        // description={t('runs.dev_env.wizard.working_dir_description')}
+                                        placeholder={t('runs.dev_env.wizard.working_dir_placeholder')}
+                                        control={control}
+                                        name="working_dir"
+                                        disabled={loading}
+                                    />
+
                                     <Toggle checked={!!formValues.repo_enabled} onChange={toggleRepo}>
                                         {t('runs.dev_env.wizard.repo')}
                                     </Toggle>
@@ -383,11 +399,11 @@ export const CreateDevEnvironment: React.FC = () => {
                                             />
 
                                             <FormInput
-                                                label={t('runs.dev_env.wizard.repo_local_path')}
-                                                description={t('runs.dev_env.wizard.repo_local_path_description')}
-                                                placeholder={t('runs.dev_env.wizard.repo_local_path_placeholder')}
+                                                label={t('runs.dev_env.wizard.repo_path')}
+                                                description={t('runs.dev_env.wizard.repo_path_description')}
+                                                placeholder={t('runs.dev_env.wizard.repo_path_placeholder')}
                                                 control={control}
-                                                name="repo_local_path"
+                                                name="repo_path"
                                                 disabled={loading}
                                             />
                                         </>

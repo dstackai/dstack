@@ -4,7 +4,7 @@ import jsYaml from 'js-yaml';
 import { useNotifications } from 'hooks';
 import { useInitRepoMutation, useLazyGetRepoQuery } from 'services/repo';
 
-import { getPathWithoutProtocol, getRepoDirFromUrl, getRepoName, slugify } from '../../../../libs/repo';
+import { getPathWithoutProtocol, getRepoDirFromUrl, getRepoName, getRepoUrlWithOutDir, slugify } from '../../../../libs/repo';
 import { getRunSpecConfigurationResources } from '../helpers/getRunSpecConfigurationResources';
 
 // TODO add next fields: volumes, repos,
@@ -41,17 +41,18 @@ export const useGetRunSpecFromYaml = ({ projectName = '' }) => {
     const [initRepo] = useInitRepoMutation();
 
     const getRepoData = useCallback(
-        async (repos: TEnvironmentConfigurationRepo[]) => {
+        async (repos: string[]) => {
             const [firstRepo] = repos;
 
-            if (!firstRepo || !firstRepo.url) {
+            if (!firstRepo) {
                 return {};
             }
 
-            const prefix = getRepoName(firstRepo.url);
-            const uniqKey = getPathWithoutProtocol(firstRepo.url);
+            const repoUrlWithoutDir = getRepoUrlWithOutDir(firstRepo);
+            const prefix = getRepoName(repoUrlWithoutDir);
+            const uniqKey = getPathWithoutProtocol(repoUrlWithoutDir);
             const repoId = await slugify(prefix, uniqKey);
-            const repoDir = getRepoDirFromUrl(firstRepo.url);
+            const repoDir = getRepoDirFromUrl(firstRepo);
 
             try {
                 await getRepo({ project_name: projectName, repo_id: repoId, include_creds: true }).unwrap();
@@ -63,7 +64,7 @@ export const useGetRunSpecFromYaml = ({ projectName = '' }) => {
                         repo_type: 'remote',
                         repo_name: prefix,
                     },
-                    repo_creds: { clone_url: firstRepo.url, private_key: null, oauth_token: null },
+                    repo_creds: { clone_url: repoUrlWithoutDir, private_key: null, oauth_token: null },
                 })
                     .unwrap()
                     .catch(console.error);
@@ -74,8 +75,8 @@ export const useGetRunSpecFromYaml = ({ projectName = '' }) => {
                 repo_data: {
                     repo_type: 'remote',
                     repo_name: prefix,
-                    repo_branch: firstRepo.branch ?? null,
-                    repo_hash: firstRepo.hash ?? null,
+                    repo_branch: null,
+                    repo_hash: null,
                     repo_config_name: null,
                     repo_config_email: null,
                 },
