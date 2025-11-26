@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
@@ -194,31 +195,36 @@ async def delete_projects(
             raise ServerClientError("Cannot delete the only project")
 
     res = await session.execute(
-        select(ProjectModel.id).where(
+        select(ProjectModel)
+        .where(
             ProjectModel.name.in_(projects_names),
             ProjectModel.deleted == False,
         )
+        .options(load_only(ProjectModel.id, ProjectModel.name))
     )
-    project_ids = res.scalars().all()
-    if len(project_ids) != len(projects_names):
+    projects = res.scalars().all()
+    if len(projects) != len(projects_names):
         raise ServerClientError("Failed to delete non-existent projects")
 
-    for project_id in project_ids:
+    for p in projects:
         # FIXME: The checks are not under lock,
         # so there can be dangling active resources due to race conditions.
-        await _check_project_has_active_resources(session=session, project_id=project_id)
+        await _check_project_has_active_resources(session=session, project_id=p.id)
 
     timestamp = str(int(get_current_datetime().timestamp()))
-    new_project_name = f"_deleted_{timestamp}_" + ProjectModel.name
-    await session.execute(
-        update(ProjectModel)
-        .where(ProjectModel.id.in_(project_ids))
-        .values(
-            deleted=True,
-            name=new_project_name,
+    updates = []
+    for p in projects:
+        updates.append(
+            {
+                "id": p.id,
+                "name": f"_deleted_{timestamp}_{secrets.token_hex(8)}",
+                "original_name": p.name,
+                "deleted": True,
+            }
         )
-    )
+    await session.execute(update(ProjectModel), updates)
     await session.commit()
+    logger.info("Deleted projects %s by user %s", projects_names, user.name)
 
 
 async def set_project_members(
