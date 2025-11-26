@@ -46,6 +46,7 @@ export { default as HelpPanel } from '@cloudscape-design/components/help-panel';
 export type { HelpPanelProps } from '@cloudscape-design/components/help-panel';
 export { default as TextContent } from '@cloudscape-design/components/text-content';
 export { default as Toggle } from '@cloudscape-design/components/toggle';
+export type { ToggleProps } from '@cloudscape-design/components/toggle';
 export { default as Modal } from '@cloudscape-design/components/modal';
 export { default as TutorialPanel } from '@cloudscape-design/components/tutorial-panel';
 export type { TutorialPanelProps } from '@cloudscape-design/components/tutorial-panel';
