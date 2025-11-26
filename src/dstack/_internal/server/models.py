@@ -191,6 +191,8 @@ class UserModel(BaseModel):
     # deactivated users cannot access API
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    # `original_name` stores the name of a deleted user, while `name` is changed to a unique generated value.
+    original_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     # SSH keys can be null for users created before 0.19.33.
     # Keys for those users are being gradually generated on /get_my_user calls.
@@ -213,8 +215,10 @@ class ProjectModel(BaseModel):
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
-    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    # `original_name` stores the name of a deleted project, while `name` is changed to a unique generated value.
+    original_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     owner: Mapped[UserModel] = relationship(lazy="joined")

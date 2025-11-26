@@ -1,12 +1,14 @@
 import hashlib
 import os
 import re
+import secrets
 import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import func as safunc
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from dstack._internal.core.errors import ResourceExistsError, ServerClientError
 from dstack._internal.core.models.users import (
@@ -187,26 +189,30 @@ async def delete_users(
     usernames: List[str],
 ):
     res = await session.execute(
-        select(UserModel.id).where(
+        select(UserModel)
+        .where(
             UserModel.name.in_(usernames),
             UserModel.deleted == False,
         )
+        .options(load_only(UserModel.id, UserModel.name))
     )
-    user_ids = res.scalars().all()
-    if len(user_ids) != len(usernames):
+    users = res.scalars().all()
+    if len(users) != len(usernames):
         raise ServerClientError("Failed to delete non-existent users")
 
     timestamp = str(int(get_current_datetime().timestamp()))
-    new_username = f"_deleted_{timestamp}_" + UserModel.name
-    await session.execute(
-        update(UserModel)
-        .where(UserModel.id.in_(user_ids))
-        .values(
-            deleted=True,
-            active=False,
-            name=new_username,
+    updates = []
+    for u in users:
+        updates.append(
+            {
+                "id": u.id,
+                "name": f"_deleted_{timestamp}_{secrets.token_hex(8)}",
+                "original_name": u.name,
+                "deleted": True,
+                "active": False,
+            }
         )
-    )
+    await session.execute(update(UserModel), updates)
     await session.commit()
     logger.info("Deleted users %s by user %s", usernames, user.name)
 

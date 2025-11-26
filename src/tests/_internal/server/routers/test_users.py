@@ -378,9 +378,12 @@ class TestDeleteUsers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_deletes_users(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("username", ["test", "a" * 50])
+    async def test_deletes_users(
+        self, test_db, session: AsyncSession, client: AsyncClient, username: str
+    ):
         admin = await create_user(name="admin", session=session)
-        user = await create_user(name="test", session=session)
+        user = await create_user(name=username, session=session)
         response = await client.post(
             "/api/users/delete",
             headers=get_auth_headers(admin.token),
