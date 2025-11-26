@@ -188,6 +188,9 @@ async def delete_users(
     user: UserModel,
     usernames: List[str],
 ):
+    if _ADMIN_USERNAME in usernames:
+        raise ServerClientError("User 'admin' cannot be deleted")
+
     res = await session.execute(
         select(UserModel)
         .where(
