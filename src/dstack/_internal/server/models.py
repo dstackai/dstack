@@ -190,6 +190,7 @@ class UserModel(BaseModel):
     global_role: Mapped[GlobalRole] = mapped_column(EnumAsString(GlobalRole, 100))
     # deactivated users cannot access API
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
     # SSH keys can be null for users created before 0.19.33.
     # Keys for those users are being gradually generated on /get_my_user calls.

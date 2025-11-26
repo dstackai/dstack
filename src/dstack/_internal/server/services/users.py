@@ -4,8 +4,8 @@ import re
 import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from sqlalchemy import delete, select, update
 from sqlalchemy import func as safunc
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceExistsError, ServerClientError
@@ -21,7 +21,7 @@ from dstack._internal.server.models import DecryptedString, UserModel
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.utils.routers import error_forbidden
 from dstack._internal.utils import crypto
-from dstack._internal.utils.common import run_async
+from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -53,8 +53,12 @@ async def list_users_for_user(
 
 async def list_all_users(
     session: AsyncSession,
+    include_deleted: bool = False,
 ) -> List[User]:
-    res = await session.execute(select(UserModel))
+    filters = []
+    if not include_deleted:
+        filters.append(UserModel.deleted == False)
+    res = await session.execute(select(UserModel).where(*filters))
     user_models = res.scalars().all()
     user_models = sorted(user_models, key=lambda u: u.created_at)
     return [user_model_to_user(u) for u in user_models]
@@ -116,7 +120,10 @@ async def update_user(
 ) -> UserModel:
     await session.execute(
         update(UserModel)
-        .where(UserModel.name == username)
+        .where(
+            UserModel.name == username,
+            UserModel.deleted == False,
+        )
         .values(
             global_role=global_role,
             email=email,
@@ -138,7 +145,10 @@ async def refresh_ssh_key(
     private_bytes, public_bytes = await run_async(crypto.generate_rsa_key_pair_bytes, username)
     await session.execute(
         update(UserModel)
-        .where(UserModel.name == username)
+        .where(
+            UserModel.name == username,
+            UserModel.deleted == False,
+        )
         .values(
             ssh_private_key=private_bytes.decode(),
             ssh_public_key=public_bytes.decode(),
@@ -158,7 +168,10 @@ async def refresh_user_token(
     new_token = str(uuid.uuid4())
     await session.execute(
         update(UserModel)
-        .where(UserModel.name == username)
+        .where(
+            UserModel.name == username,
+            UserModel.deleted == False,
+        )
         .values(
             token=DecryptedString(plaintext=new_token),
             token_hash=get_token_hash(new_token),
@@ -176,12 +189,24 @@ async def delete_users(
     res = await session.execute(
         select(UserModel.id).where(
             UserModel.name.in_(usernames),
+            UserModel.deleted == False,
         )
     )
     user_ids = res.scalars().all()
     if len(user_ids) != len(usernames):
         raise ServerClientError("Failed to delete non-existent users")
-    await session.execute(delete(UserModel).where(UserModel.name.in_(usernames)))
+
+    timestamp = str(int(get_current_datetime().timestamp()))
+    new_username = f"_deleted_{timestamp}_" + UserModel.name
+    await session.execute(
+        update(UserModel)
+        .where(UserModel.id.in_(user_ids))
+        .values(
+            deleted=True,
+            active=False,
+            name=new_username,
+        )
+    )
     await session.commit()
     logger.info("Deleted users %s by user %s", usernames, user.name)
 
@@ -191,7 +216,7 @@ async def get_user_model_by_name(
     username: str,
     ignore_case: bool = False,
 ) -> Optional[UserModel]:
-    filters = []
+    filters = [UserModel.deleted == False]
     if ignore_case:
         filters.append(safunc.lower(UserModel.name) == safunc.lower(username))
     else:
@@ -200,9 +225,14 @@ async def get_user_model_by_name(
     return res.scalar()
 
 
-async def get_user_model_by_name_or_error(session: AsyncSession, username: str) -> UserModel:
-    res = await session.execute(select(UserModel).where(UserModel.name == username))
-    return res.scalar_one()
+async def get_user_model_by_name_or_error(
+    session: AsyncSession,
+    username: str,
+    ignore_case: bool = False,
+) -> UserModel:
+    return get_or_error(
+        await get_user_model_by_name(session=session, username=username, ignore_case=ignore_case)
+    )
 
 
 async def log_in_with_token(session: AsyncSession, token: str) -> Optional[UserModel]:
@@ -211,6 +241,7 @@ async def log_in_with_token(session: AsyncSession, token: str) -> Optional[UserM
         select(UserModel).where(
             UserModel.token_hash == token_hash,
             UserModel.active == True,
+            UserModel.deleted == False,
         )
     )
     user = res.scalar()

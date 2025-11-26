@@ -135,6 +135,7 @@ async def create_user(
     ssh_public_key: Optional[str] = None,
     ssh_private_key: Optional[str] = None,
     active: bool = True,
+    deleted: bool = False,
 ) -> UserModel:
     if token is None:
         token = str(uuid.uuid4())
@@ -148,6 +149,7 @@ async def create_user(
         ssh_public_key=ssh_public_key,
         ssh_private_key=ssh_private_key,
         active=active,
+        deleted=deleted,
     )
     session.add(user)
     await session.commit()

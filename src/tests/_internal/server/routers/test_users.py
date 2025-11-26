@@ -31,7 +31,9 @@ class TestListUsers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_admins_see_all_users(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_admins_see_all_non_deleted_users(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         admin = await create_user(
             session=session,
             name="admin",
@@ -43,6 +45,13 @@ class TestListUsers:
             name="other_user",
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
+        )
+        await create_user(
+            session=session,
+            name="deleted_user",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+            deleted=True,
         )
         response = await client.post("/api/users/list", headers=get_auth_headers(admin.token))
         assert response.status_code in [200]

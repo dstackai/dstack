@@ -194,7 +194,10 @@ async def delete_projects(
             raise ServerClientError("Cannot delete the only project")
 
     res = await session.execute(
-        select(ProjectModel.id).where(ProjectModel.name.in_(projects_names))
+        select(ProjectModel.id).where(
+            ProjectModel.name.in_(projects_names),
+            ProjectModel.deleted == False,
+        )
     )
     project_ids = res.scalars().all()
     if len(project_ids) != len(projects_names):
@@ -206,10 +209,10 @@ async def delete_projects(
         await _check_project_has_active_resources(session=session, project_id=project_id)
 
     timestamp = str(int(get_current_datetime().timestamp()))
-    new_project_name = "_deleted_" + timestamp + ProjectModel.name
+    new_project_name = f"_deleted_{timestamp}_" + ProjectModel.name
     await session.execute(
         update(ProjectModel)
-        .where(ProjectModel.name.in_(projects_names))
+        .where(ProjectModel.id.in_(project_ids))
         .values(
             deleted=True,
             name=new_project_name,
@@ -244,12 +247,16 @@ async def set_project_members(
         }
         if new_admins_members != current_admins_members:
             raise ForbiddenError("Access denied: changing project admins")
+
     # FIXME: potentially long write transaction
     # clear_project_members() issues DELETE without commit
     await clear_project_members(session=session, project=project)
     names = [m.username for m in members]
     res = await session.execute(
-        select(UserModel).where((UserModel.name.in_(names)) | (UserModel.email.in_(names)))
+        select(UserModel).where(
+            (UserModel.name.in_(names)) | (UserModel.email.in_(names)),
+            UserModel.deleted == False,
+        )
     )
     users = res.scalars().all()
     username_to_user = {user.name: user for user in users}
@@ -311,7 +318,10 @@ async def add_project_members(
             raise ForbiddenError("Access denied: can only join public projects as user role")
 
     res = await session.execute(
-        select(UserModel).where((UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)))
+        select(UserModel).where(
+            (UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)),
+            UserModel.deleted == False,
+        )
     )
     users_found = res.scalars().all()
 
@@ -700,7 +710,10 @@ async def remove_project_members(
             raise ForbiddenError("Access denied: insufficient permissions to remove members")
 
     res = await session.execute(
-        select(UserModel).where((UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)))
+        select(UserModel).where(
+            (UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)),
+            UserModel.deleted == False,
+        )
     )
     users_found = res.scalars().all()
 
