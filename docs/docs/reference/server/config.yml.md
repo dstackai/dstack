@@ -195,7 +195,9 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         type:
             required: true
 
-<!-- ##### `projects[n].backends[type=tensordock]` { #tensordock data-toc-label="tensordock" }
+<!--
+
+##### `projects[n].backends[type=tensordock]` { #tensordock data-toc-label="tensordock" }
 
 #SCHEMA# dstack._internal.core.backends.tensordock.models.TensorDockBackendConfigWithCreds
     overrides:
@@ -210,7 +212,9 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
     overrides:
         show_root_heading: false
         type:
-            required: true -->
+            required: true
+
+-->
 
 ##### `projects[n].backends[type=oci]` { #oci data-toc-label="oci" }
 
