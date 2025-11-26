@@ -26,6 +26,7 @@ from dstack._internal.server.background.tasks.process_probes import PROBES_SCHED
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
     backends,
+    events,
     files,
     fleets,
     gateways,
@@ -228,6 +229,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
     app.include_router(prometheus.router)
     app.include_router(files.router)
+    app.include_router(events.root_router)
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):

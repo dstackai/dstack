@@ -18,6 +18,7 @@ from dstack._internal.core.models.users import (
     UserWithCreds,
 )
 from dstack._internal.server.models import DecryptedString, UserModel
+from dstack._internal.server.services import events
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.utils.routers import error_forbidden
 from dstack._internal.utils import crypto
@@ -81,6 +82,7 @@ async def create_user(
     active: bool = True,
     token: Optional[str] = None,
     config: Optional[UserHookConfig] = None,
+    creator: Optional[UserModel] = None,
 ) -> UserModel:
     validate_username(username)
     user_model = await get_user_model_by_name(session=session, username=username, ignore_case=True)
@@ -101,6 +103,12 @@ async def create_user(
         ssh_public_key=public_bytes.decode(),
     )
     session.add(user)
+    events.emit(
+        session,
+        "User created",
+        actor=events.UserActor(creator.id) if creator else events.UserActor(user.id),
+        targets=[events.Target.from_model(user)],
+    )
     await session.commit()
     for func in _CREATE_USER_HOOKS:
         await func(session, user, config)

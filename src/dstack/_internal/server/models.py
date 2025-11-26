@@ -26,6 +26,7 @@ from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
 from dstack._internal.core.models.compute_groups import ComputeGroupStatus
+from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.health import HealthStatus
@@ -847,3 +848,42 @@ class SecretModel(BaseModel):
 
     name: Mapped[str] = mapped_column(String(200))
     value: Mapped[DecryptedString] = mapped_column(EncryptedString())
+
+
+class EventModel(BaseModel):
+    __tablename__ = "events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    message: Mapped[str] = mapped_column(Text)
+    recorded_at: Mapped[datetime] = mapped_column(NaiveDateTime, index=True)
+
+    actor_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    user: Mapped[Optional["UserModel"]] = relationship()
+
+    targets: Mapped[List["EventTargetModel"]] = relationship(back_populates="event")
+
+
+class EventTargetModel(BaseModel):
+    __tablename__ = "event_targets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("events.id", ondelete="CASCADE"), index=True
+    )
+    event: Mapped["EventModel"] = relationship()
+
+    entity_project_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    entity_project: Mapped[Optional["ProjectModel"]] = relationship()
+
+    entity_type: Mapped[EventTargetType] = mapped_column(EnumAsString(EventTargetType, 100))
+    entity_id: Mapped[uuid.UUID] = mapped_column(UUIDType(binary=False))
+    entity_name: Mapped[str] = mapped_column(String(200))
