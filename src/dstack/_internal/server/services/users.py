@@ -5,8 +5,8 @@ import secrets
 import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
+from sqlalchemy import delete, select, update
 from sqlalchemy import func as safunc
-from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
@@ -19,7 +19,7 @@ from dstack._internal.core.models.users import (
     UserTokenCreds,
     UserWithCreds,
 )
-from dstack._internal.server.models import DecryptedString, UserModel
+from dstack._internal.server.models import DecryptedString, MemberModel, UserModel
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.utils.routers import error_forbidden
 from dstack._internal.utils import crypto
@@ -200,6 +200,7 @@ async def delete_users(
     if len(users) != len(usernames):
         raise ServerClientError("Failed to delete non-existent users")
 
+    user_ids = [u.id for u in users]
     timestamp = str(int(get_current_datetime().timestamp()))
     updates = []
     for u in users:
@@ -213,6 +214,8 @@ async def delete_users(
             }
         )
     await session.execute(update(UserModel), updates)
+    await session.execute(delete(MemberModel).where(MemberModel.user_id.in_(user_ids)))
+    # Projects are not deleted automatically if owners are deleted.
     await session.commit()
     logger.info("Deleted users %s by user %s", usernames, user.name)
 

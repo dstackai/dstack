@@ -8,9 +8,11 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.projects import ProjectRole
 from dstack._internal.core.models.runs import JobStatus, RunStatus
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.server.models import UserModel
+from dstack._internal.server.models import MemberModel, UserModel
+from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_job,
     create_probe,
@@ -440,6 +442,29 @@ class TestDeleteUsers:
         )
         assert response.status_code == 200
         res = await session.execute(select(UserModel).where(UserModel.name == user.name))
+        assert res.scalar() is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("image_config_mock")
+    async def test_deleting_users_deletes_members(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(name="admin", session=session)
+        user = await create_user(name="temp", session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(UserModel).where(UserModel.name == user.name))
+        assert res.scalar() is None
+        res = await session.execute(select(MemberModel).where(MemberModel.user_id == user.id))
         assert res.scalar() is None
 
 
