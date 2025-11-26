@@ -30,7 +30,7 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.schemas.projects import MemberSetting
-from dstack._internal.server.services import users
+from dstack._internal.server.services import events, users
 from dstack._internal.server.services.backends import (
     get_backend_config_without_creds_from_backend_model,
 )
@@ -524,6 +524,12 @@ async def create_project_model(
         is_public=is_public,
     )
     session.add(project)
+    events.emit(
+        session,
+        "Project created",
+        actor=events.UserActor(owner.id),
+        targets=[events.Target.from_model(project)],
+    )
     await session.commit()
     return project
 

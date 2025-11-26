@@ -76,6 +76,7 @@ async def create_user(
         global_role=body.global_role,
         email=body.email,
         active=body.active,
+        creator=user,
     )
     return CustomORJSONResponse(users.user_model_to_user(res))
 

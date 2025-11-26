@@ -47,8 +47,8 @@ from dstack._internal.server.models import (
     RunModel,
     UserModel,
 )
+from dstack._internal.server.services import events, services
 from dstack._internal.server.services import repos as repos_services
-from dstack._internal.server.services import services
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     delay_job_instance_termination,
@@ -484,6 +484,12 @@ async def submit_run(
             next_triggered_at=_get_next_triggered_at(run_spec),
         )
         session.add(run_model)
+        events.emit(
+            session,
+            f"Run submitted. Status: {run_model.status.upper()}",
+            actor=events.UserActor(user.id),
+            targets=[events.Target.from_model(run_model)],
+        )
 
         if run_spec.configuration.type == "service":
             await services.register_service(session, run_model, run_spec)
@@ -501,6 +507,14 @@ async def submit_run(
                     status=JobStatus.SUBMITTED,
                 )
                 session.add(job_model)
+                events.emit(
+                    session,
+                    f"Job created on run submission. Status: {job_model.status.upper()}",
+                    actor=events.SystemActor(),
+                    targets=[
+                        events.Target.from_model(job_model),
+                    ],
+                )
         await session.commit()
         await session.refresh(run_model)
 
