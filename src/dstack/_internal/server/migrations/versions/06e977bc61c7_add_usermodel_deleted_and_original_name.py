@@ -24,8 +24,10 @@ def upgrade() -> None:
         )
         batch_op.add_column(sa.Column("original_name", sa.String(length=50), nullable=True))
 
-    with op.batch_alter_table("projects", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("original_name", sa.String(length=50), nullable=True))
+    # For postgres, this was moved to a new migration to avoid deadlocks.
+    if op.get_context().dialect.name == "sqlite":
+        with op.batch_alter_table("projects", schema=None) as batch_op:
+            batch_op.add_column(sa.Column("original_name", sa.String(length=50), nullable=True))
     # ### end Alembic commands ###
 
 
@@ -35,7 +37,9 @@ def downgrade() -> None:
         batch_op.drop_column("original_name")
         batch_op.drop_column("deleted")
 
-    with op.batch_alter_table("projects", schema=None) as batch_op:
-        batch_op.drop_column("original_name")
+    # For postgres, this was moved to a new migration to avoid deadlocks.
+    if op.get_context().dialect.name == "sqlite":
+        with op.batch_alter_table("projects", schema=None) as batch_op:
+            batch_op.drop_column("original_name")
 
     # ### end Alembic commands ###
