@@ -114,7 +114,7 @@ jobs:
       - name: Check if go.mod and go.sum are up-to-date
         run: go mod tidy -diff
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.6.2  # Should match .pre-commit-config.yaml
           args: --timeout=20m
