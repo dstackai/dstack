@@ -271,14 +271,25 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 		}
 	}
 
+	var serveErr error
+	serveErrCh := make(chan error)
+
 	go func() {
 		if err := shimServer.Serve(); err != nil {
-			log.Error(ctx, "serve", "err", err)
+			serveErrCh <- err
 		}
 	}()
 
-	<-ctx.Done()
+	select {
+	case serveErr = <-serveErrCh:
+	case <-ctx.Done():
+	}
+
 	shutdownCtx, cancelShutdown := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelShutdown()
-	return shimServer.Shutdown(shutdownCtx)
+	shutdownErr := shimServer.Shutdown(shutdownCtx)
+	if serveErr != nil {
+		return serveErr
+	}
+	return shutdownErr
 }
