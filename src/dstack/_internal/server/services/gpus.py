@@ -3,17 +3,13 @@ from typing import Dict, List, Literal, Optional, Tuple
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.gpus import BackendGpu, BackendGpus, GpuGroup
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import Requirements, RunSpec, get_policy_map
 from dstack._internal.server.models import ProjectModel
-from dstack._internal.server.schemas.gpus import (
-    BackendGpu,
-    BackendGpus,
-    GpuGroup,
-    ListGpusResponse,
-)
+from dstack._internal.server.schemas.gpus import ListGpusResponse
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.utils.common import get_or_error
 

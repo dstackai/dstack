@@ -3,11 +3,11 @@ from typing import List, Literal
 
 from rich.table import Table
 
-from dstack._internal.cli.models.offer import OfferCommandOutput
+from dstack._internal.cli.models.offers import OfferCommandGroupByGpuOutput, OfferRequirements
 from dstack._internal.cli.utils.common import console
+from dstack._internal.core.models.gpus import GpuGroup
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import Requirements, RunSpec, get_policy_map
-from dstack._internal.server.schemas.gpus import GpuGroup
 
 
 def print_gpu_json(
@@ -17,14 +17,14 @@ def print_gpu_json(
     project: str,
 ):
     """Print GPU information in JSON format."""
-    req = Requirements(
+    req = OfferRequirements(
         resources=run_spec.configuration.resources,
         max_price=run_spec.merged_profile.max_price,
         spot=get_policy_map(run_spec.merged_profile.spot_policy, default=SpotPolicy.AUTO),
         reservation=run_spec.configuration.reservation,
     )
 
-    output = OfferCommandOutput(
+    output = OfferCommandGroupByGpuOutput(
         project=project,
         requirements=req,
         group_by=group_by,

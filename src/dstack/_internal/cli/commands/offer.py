@@ -13,8 +13,8 @@ from dstack._internal.cli.utils.gpu import print_gpu_json, print_gpu_table
 from dstack._internal.cli.utils.run import print_offers_json, print_run_plan
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ApplyConfigurationType, TaskConfiguration
+from dstack._internal.core.models.gpus import GpuGroup
 from dstack._internal.core.models.runs import RunSpec
-from dstack._internal.server.schemas.gpus import GpuGroup
 from dstack.api.utils import load_profile
 
 

@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 from rich.markup import escape
 from rich.table import Table
 
+from dstack._internal.cli.models.offers import OfferCommandOutput, OfferRequirements
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
@@ -14,6 +15,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
+    SpotPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
@@ -24,6 +26,7 @@ from dstack._internal.core.models.runs import (
     ProbeSpec,
     RunPlan,
     RunStatus,
+    get_policy_map,
 )
 from dstack._internal.core.models.runs import (
     Run as CoreRun,
@@ -43,33 +46,22 @@ def print_offers_json(run_plan: RunPlan, run_spec):
     """Print offers information in JSON format."""
     job_plan = run_plan.job_plans[0]
 
-    output = {
-        "project": run_plan.project_name,
-        "user": run_plan.user,
-        "resources": job_plan.job_spec.requirements.resources.dict(),
-        "max_price": (job_plan.job_spec.requirements.max_price),
-        "spot": run_spec.configuration.spot_policy,
-        "reservation": run_plan.run_spec.configuration.reservation,
-        "offers": [],
-        "total_offers": job_plan.total_offers,
-    }
+    requirements = OfferRequirements(
+        resources=job_plan.job_spec.requirements.resources,
+        max_price=job_plan.job_spec.requirements.max_price,
+        spot=get_policy_map(run_spec.configuration.spot_policy, default=SpotPolicy.AUTO),
+        reservation=run_plan.run_spec.configuration.reservation,
+    )
 
-    for offer in job_plan.offers:
-        output["offers"].append(
-            {
-                "backend": ("ssh" if offer.backend.value == "remote" else offer.backend.value),
-                "region": offer.region,
-                "instance_type": offer.instance.name,
-                "resources": offer.instance.resources.dict(),
-                "spot": offer.instance.resources.spot,
-                "price": float(offer.price),
-                "availability": offer.availability.value,
-            }
-        )
+    output = OfferCommandOutput(
+        project=run_plan.project_name,
+        user=run_plan.user,
+        requirements=requirements,
+        offers=job_plan.offers,
+        total_offers=job_plan.total_offers,
+    )
 
-    import json
-
-    print(json.dumps(output, indent=2))
+    print(output.json())
 
 
 def print_run_plan(
