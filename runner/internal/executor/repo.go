@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/codeclysm/extract/v4"
+
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/repo"
@@ -193,7 +194,7 @@ func (ex *RunExecutor) restoreRepoDir(tmpDir string) error {
 
 func moveDir(srcDir, dstDir string) error {
 	// We cannot just move/rename files because with volumes they'll be on different devices
-	cmd := exec.Command("cp", "-a", srcDir+"/.", dstDir)
+	cmd := exec.CommandContext(context.TODO(), "cp", "-a", srcDir+"/.", dstDir)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to cp: %w, output: %s", err, string(output))
 	}

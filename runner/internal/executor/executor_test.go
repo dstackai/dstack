@@ -247,7 +247,7 @@ func TestWriteDstackProfile(t *testing.T) {
 	for _, value := range testCases {
 		env := map[string]string{"VAR": value}
 		writeDstackProfile(env, path)
-		cmd := exec.Command("/bin/sh", "-c", script)
+		cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", script)
 		out, err := cmd.Output()
 		assert.NoError(t, err)
 		assert.Equal(t, value, string(out))

@@ -54,7 +54,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	t.Parallel()
 
 	tempDir := t.TempDir()
-	require.NoError(t, exec.Command("ssh-keygen", "-t", "rsa", "-b", "2048", "-f", tempDir+"/id_rsa", "-q", "-N", "").Run())
+	require.NoError(t, exec.CommandContext(t.Context(), "ssh-keygen", "-t", "rsa", "-b", "2048", "-f", tempDir+"/id_rsa", "-q", "-N", "").Run())
 	publicBytes, err := os.ReadFile(tempDir + "/id_rsa.pub")
 	require.NoError(t, err)
 
@@ -84,7 +84,9 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	}()
 
 	for i := 0; i < timeout; i++ {
-		cmd := exec.Command("ssh",
+		cmd := exec.CommandContext(
+			t.Context(),
+			"ssh",
 			"-F", "none",
 			"-o", "StrictHostKeyChecking=no",
 			"-o", "UserKnownHostsFile=/dev/null",
