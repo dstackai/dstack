@@ -120,6 +120,32 @@ class InstanceHealthResponse(CoreModel):
     dcgm: Optional[DCGMHealthResponse] = None
 
 
+class ComponentName(str, Enum):
+    RUNNER = "dstack-runner"
+
+
+class ComponentStatus(str, Enum):
+    NOT_INSTALLED = "not-installed"
+    INSTALLED = "installed"
+    INSTALLING = "installing"
+    ERROR = "error"
+
+
+class ComponentInfo(CoreModel):
+    name: ComponentName
+    version: str
+    status: ComponentStatus
+
+
+class ComponentListResponse(CoreModel):
+    components: list[ComponentInfo]
+
+
+class ComponentInstallRequest(CoreModel):
+    name: ComponentName
+    url: str
+
+
 class GPUMetrics(CoreModel):
     gpu_memory_usage_bytes: int
     gpu_util_percent: int

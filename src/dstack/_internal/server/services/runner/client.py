@@ -15,6 +15,10 @@ from dstack._internal.core.models.runs import ClusterInfo, Job, Run
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.schemas.instances import InstanceCheck
 from dstack._internal.server.schemas.runner import (
+    ComponentInfo,
+    ComponentInstallRequest,
+    ComponentListResponse,
+    ComponentName,
     GPUDevice,
     HealthcheckResponse,
     InstanceHealthResponse,
@@ -189,9 +193,14 @@ class ShimClient:
     # `/api/instance/health`
     _INSTANCE_HEALTH_MIN_SHIM_VERSION = (0, 19, 22)
 
+    # `/api/components`
+    _COMPONENTS_RUNNER_MIN_SHIM_VERSION = (0, 19, 41)
+
     _shim_version: Optional["_Version"]
     _api_version: int
     _negotiated: bool = False
+
+    _components: Optional[dict[ComponentName, ComponentInfo]] = None
 
     def __init__(
         self,
@@ -214,6 +223,14 @@ class ShimClient:
         return (
             self._shim_version is None
             or self._shim_version >= self._INSTANCE_HEALTH_MIN_SHIM_VERSION
+        )
+
+    def is_runner_component_supported(self) -> bool:
+        if not self._negotiated:
+            self._negotiate()
+        return (
+            self._shim_version is None
+            or self._shim_version >= self._COMPONENTS_RUNNER_MIN_SHIM_VERSION
         )
 
     @overload
@@ -245,6 +262,20 @@ class ShimClient:
             return None
         self._raise_for_status(resp)
         return self._response(InstanceHealthResponse, resp)
+
+    def get_runner_info(self) -> Optional[ComponentInfo]:
+        if not self.is_runner_component_supported():
+            logger.debug("runner info is not supported: %s", self._shim_version)
+            return None
+        components = self._get_components()
+        return components.get(ComponentName.RUNNER)
+
+    def install_runner(self, url: str) -> None:
+        body = ComponentInstallRequest(
+            name=ComponentName.RUNNER,
+            url=url,
+        )
+        self._request("POST", "/api/components/install", body, raise_for_status=True)
 
     def list_tasks(self) -> TaskListResponse:
         if not self.is_api_v2_supported():
@@ -443,6 +474,15 @@ class ShimClient:
         self._shim_version = version
         self._api_version = api_version
         self._negotiated = True
+
+    def _get_components(self) -> dict[ComponentName, ComponentInfo]:
+        resp = self._request("GET", "/api/components")
+        # TODO: Remove this check after 0.19.41 release, use _request(..., raise_for_status=True)
+        if resp.status_code == HTTPStatus.NOT_FOUND and self._shim_version is None:
+            # Old dev build of shim
+            return {}
+        resp.raise_for_status()
+        return {c.name: c for c in self._response(ComponentListResponse, resp).components}
 
 
 def healthcheck_response_to_instance_check(
