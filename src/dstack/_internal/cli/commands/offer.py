@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from typing import List
+from typing import List, Literal, cast
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec
@@ -130,7 +130,12 @@ class OfferCommand(APIBaseCommand):
         else:
             if args.group_by:
                 gpus = self._list_gpus(args, run_spec)
-                print_gpu_json(gpus, run_spec, args.group_by, self.api.project)
+                print_gpu_json(
+                    gpus,
+                    run_spec,
+                    cast(List[Literal["gpu", "backend", "region", "count"]], args.group_by),
+                    self.api.project,
+                )
             else:
                 run_plan = self.api.client.runs.get_plan(
                     self.api.project,

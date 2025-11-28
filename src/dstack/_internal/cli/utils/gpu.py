@@ -1,15 +1,21 @@
 import shutil
-from typing import List
+from typing import List, Literal
 
 from rich.table import Table
 
+from dstack._internal.cli.models.offer import OfferCommandOutput
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import Requirements, RunSpec, get_policy_map
 from dstack._internal.server.schemas.gpus import GpuGroup
 
 
-def print_gpu_json(gpus, run_spec, group_by_cli, api_project):
+def print_gpu_json(
+    gpus: List[GpuGroup],
+    run_spec: RunSpec,
+    group_by: List[Literal["gpu", "backend", "region", "count"]],
+    project: str,
+):
     """Print GPU information in JSON format."""
     req = Requirements(
         resources=run_spec.configuration.resources,
@@ -18,49 +24,14 @@ def print_gpu_json(gpus, run_spec, group_by_cli, api_project):
         reservation=run_spec.configuration.reservation,
     )
 
-    if req.spot is None:
-        spot_policy = "auto"
-    elif req.spot:
-        spot_policy = "spot"
-    else:
-        spot_policy = "on-demand"
+    output = OfferCommandOutput(
+        project=project,
+        requirements=req,
+        group_by=group_by,
+        gpus=gpus,
+    )
 
-    output = {
-        "project": api_project,
-        "user": "admin",  # TODO: Get actual user name
-        "resources": req.resources.dict(),
-        "spot_policy": spot_policy,
-        "max_price": req.max_price,
-        "reservation": run_spec.configuration.reservation,
-        "group_by": group_by_cli,
-        "gpus": [],
-    }
-
-    for gpu_group in gpus:
-        gpu_data = {
-            "name": gpu_group.name,
-            "memory_mib": gpu_group.memory_mib,
-            "vendor": gpu_group.vendor.value,
-            "availability": [av.value for av in gpu_group.availability],
-            "spot": gpu_group.spot,
-            "count": {"min": gpu_group.count.min, "max": gpu_group.count.max},
-            "price": {"min": gpu_group.price.min, "max": gpu_group.price.max},
-        }
-
-        if gpu_group.backend:
-            gpu_data["backend"] = gpu_group.backend.value
-        if gpu_group.backends:
-            gpu_data["backends"] = [b.value for b in gpu_group.backends]
-        if gpu_group.region:
-            gpu_data["region"] = gpu_group.region
-        if gpu_group.regions:
-            gpu_data["regions"] = gpu_group.regions
-
-        output["gpus"].append(gpu_data)
-
-    import json
-
-    print(json.dumps(output, indent=2))
+    print(output.json())
 
 
 def print_gpu_table(gpus: List[GpuGroup], run_spec: RunSpec, group_by: List[str], project: str):
