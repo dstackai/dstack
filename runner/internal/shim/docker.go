@@ -29,13 +29,14 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
+	bytesize "github.com/inhies/go-bytesize"
+
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
 	"github.com/dstackai/dstack/runner/internal/types"
-	bytesize "github.com/inhies/go-bytesize"
 )
 
 // TODO: Allow for configuration via cli arguments or environment variables.
@@ -135,7 +136,7 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 		} else {
 			switch d.gpuVendor {
 			case common.GpuVendorNvidia:
-				deviceRequests := containerFull.HostConfig.Resources.DeviceRequests
+				deviceRequests := containerFull.HostConfig.DeviceRequests
 				if len(deviceRequests) == 1 {
 					gpuIDs = deviceRequests[0].DeviceIDs
 				} else if len(deviceRequests) != 0 {
@@ -146,13 +147,13 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 					)
 				}
 			case common.GpuVendorAmd:
-				for _, device := range containerFull.HostConfig.Resources.Devices {
+				for _, device := range containerFull.HostConfig.Devices {
 					if host.IsRenderNodePath(device.PathOnHost) {
 						gpuIDs = append(gpuIDs, device.PathOnHost)
 					}
 				}
 			case common.GpuVendorTenstorrent:
-				for _, device := range containerFull.HostConfig.Resources.Devices {
+				for _, device := range containerFull.HostConfig.Devices {
 					if strings.HasPrefix(device.PathOnHost, "/dev/tenstorrent/") {
 						// Extract the device ID from the path
 						deviceID := strings.TrimPrefix(device.PathOnHost, "/dev/tenstorrent/")
@@ -534,12 +535,12 @@ func unmountVolumes(ctx context.Context, taskConfig TaskConfig) error {
 	var failed []string
 	for _, volume := range taskConfig.Volumes {
 		mountPoint := getVolumeMountPoint(volume.Name)
-		cmd := exec.Command("mountpoint", mountPoint)
+		cmd := exec.CommandContext(ctx, "mountpoint", mountPoint)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			log.Info(ctx, "skipping", "mountpoint", mountPoint, "output", output)
 			continue
 		}
-		cmd = exec.Command("umount", "-qf", mountPoint)
+		cmd = exec.CommandContext(ctx, "umount", "-qf", mountPoint)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			log.Error(ctx, "failed to unmount", "mountpoint", mountPoint, "output", output)
 			failed = append(failed, mountPoint)
@@ -617,7 +618,7 @@ func prepareInstanceMountPoints(taskConfig TaskConfig) error {
 // Returns true if the file system is created.
 func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists bool) (bool, error) {
 	// Run the lsblk command to get filesystem type
-	cmd := exec.Command("lsblk", "-no", "FSTYPE", deviceName)
+	cmd := exec.CommandContext(ctx, "lsblk", "-no", "FSTYPE", deviceName)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -635,7 +636,7 @@ func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists boo
 	}
 
 	log.Debug(ctx, "formatting disk with ext4 filesystem...", "device", deviceName)
-	cmd = exec.Command("mkfs.ext4", "-F", deviceName)
+	cmd = exec.CommandContext(ctx, "mkfs.ext4", "-F", deviceName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return false, fmt.Errorf("failed to format disk: %w, output: %s", err, string(output))
 	}
@@ -654,7 +655,7 @@ func mountDisk(ctx context.Context, deviceName, mountPoint string, fsRootPerms o
 
 	// Mount the disk to the mount point
 	log.Debug(ctx, "mounting disk...", "device", deviceName, "mountpoint", mountPoint)
-	cmd := exec.Command("mount", deviceName, mountPoint)
+	cmd := exec.CommandContext(ctx, "mount", deviceName, mountPoint)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount disk: %w, output: %s", err, string(output))
 	}
@@ -699,7 +700,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	if err != nil {
 		return fmt.Errorf("pull image: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -848,8 +849,8 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 		ShmSize:      task.config.ShmSize,
 		Tmpfs:        tmpfs,
 	}
-	hostConfig.Resources.NanoCPUs = int64(task.config.CPU * 1000000000)
-	hostConfig.Resources.Memory = task.config.Memory
+	hostConfig.NanoCPUs = int64(task.config.CPU * 1000000000)
+	hostConfig.Memory = task.config.Memory
 	if len(task.gpuIDs) > 0 {
 		if len(task.config.GPUDevices) > 0 {
 			configureGpuDevices(hostConfig, task.config.GPUDevices)
@@ -1034,8 +1035,8 @@ func getNetworkMode(networkMode NetworkMode) container.NetworkMode {
 
 func configureGpuDevices(hostConfig *container.HostConfig, gpuDevices []GPUDevice) {
 	for _, gpuDevice := range gpuDevices {
-		hostConfig.Resources.Devices = append(
-			hostConfig.Resources.Devices,
+		hostConfig.Devices = append(
+			hostConfig.Devices,
 			container.DeviceMapping{
 				PathOnHost:        gpuDevice.PathOnHost,
 				PathInContainer:   gpuDevice.PathInContainer,
@@ -1051,8 +1052,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 	// Tenstorrent: ids are device indices to be used with /dev/tenstorrent/<id>
 	switch vendor {
 	case common.GpuVendorNvidia:
-		hostConfig.Resources.DeviceRequests = append(
-			hostConfig.Resources.DeviceRequests,
+		hostConfig.DeviceRequests = append(
+			hostConfig.DeviceRequests,
 			container.DeviceRequest{
 				// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
 				// Default capabilities: utility, compute.
@@ -1065,8 +1066,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
 		// Only --device are mandatory, other seem to be performance-related.
 		// --device=/dev/kfd
-		hostConfig.Resources.Devices = append(
-			hostConfig.Resources.Devices,
+		hostConfig.Devices = append(
+			hostConfig.Devices,
 			container.DeviceMapping{
 				PathOnHost:        "/dev/kfd",
 				PathInContainer:   "/dev/kfd",
@@ -1075,8 +1076,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		)
 		// --device=/dev/dri/renderD<N>
 		for _, renderNodePath := range ids {
-			hostConfig.Resources.Devices = append(
-				hostConfig.Resources.Devices,
+			hostConfig.Devices = append(
+				hostConfig.Devices,
 				container.DeviceMapping{
 					PathOnHost:        renderNodePath,
 					PathInContainer:   renderNodePath,
@@ -1095,8 +1096,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		// For Tenstorrent, simply add each device
 		for _, id := range ids {
 			devicePath := fmt.Sprintf("/dev/tenstorrent/%s", id)
-			hostConfig.Resources.Devices = append(
-				hostConfig.Resources.Devices,
+			hostConfig.Devices = append(
+				hostConfig.Devices,
 				container.DeviceMapping{
 					PathOnHost:        devicePath,
 					PathInContainer:   devicePath,
@@ -1131,8 +1132,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 func configureHpcNetworkingIfAvailable(hostConfig *container.HostConfig) {
 	// Although AWS EFA is not InfiniBand, EFA adapters are exposed as /dev/infiniband/uverbsN (N=0,1,...)
 	if _, err := os.Stat("/dev/infiniband"); !errors.Is(err, os.ErrNotExist) {
-		hostConfig.Resources.Devices = append(
-			hostConfig.Resources.Devices,
+		hostConfig.Devices = append(
+			hostConfig.Devices,
 			container.DeviceMapping{
 				PathOnHost:        "/dev/infiniband",
 				PathInContainer:   "/dev/infiniband",
@@ -1181,7 +1182,7 @@ func getContainerLastLogs(ctx context.Context, client docker.APIClient, containe
 	if err != nil {
 		return nil, err
 	}
-	defer muxedReader.Close()
+	defer func() { _ = muxedReader.Close() }()
 
 	demuxedBuffer := new(bytes.Buffer)
 	// Using the same Writer for both stdout and stderr should be roughly equivalent to 2>&1

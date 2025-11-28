@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/gorilla/websocket"
+
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 type logsWsRequestParams struct {
@@ -46,7 +47,7 @@ func parseRequestParams(r *http.Request) (logsWsRequestParams, error) {
 	if startTimeStr != "" {
 		t, err := time.Parse(time.RFC3339, startTimeStr)
 		if err != nil {
-			return logsWsRequestParams{}, errors.New("Failed to parse start_time value")
+			return logsWsRequestParams{}, errors.New("failed to parse start_time value")
 		}
 		startTimestamp = t.Unix()
 	}
@@ -93,7 +94,7 @@ func (s *Server) streamJobLogs(ctx context.Context, conn *websocket.Conn, params
 		for currentPos < len(jobLogsWsHistory) {
 			if err := conn.WriteMessage(websocket.BinaryMessage, jobLogsWsHistory[currentPos].Message); err != nil {
 				s.executor.RUnlock()
-				log.Error(ctx, "Failed to write message", "err", err)
+				log.Error(ctx, "failed to write message", "err", err)
 				return
 			}
 			currentPos++

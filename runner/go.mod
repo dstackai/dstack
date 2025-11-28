@@ -1,6 +1,6 @@
 module github.com/dstackai/dstack/runner
 
-go 1.23.8
+go 1.25
 
 require (
 	github.com/NVIDIA/go-dcgm v0.0.0-20250707210631-823394f2bd9b

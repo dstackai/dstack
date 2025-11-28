@@ -95,7 +95,7 @@ func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return nil, fmt.Errorf("read multipart form: %w", err)
 	}
-	defer part.Close()
+	defer func() { _ = part.Close() }()
 
 	fieldName := part.FormName()
 	if fieldName == "" {

@@ -6,9 +6,10 @@ import (
 	"net"
 	"runtime"
 
-	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/shirou/gopsutil/v4/mem"
 	"golang.org/x/sys/unix"
+
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 func GetCpuCount(ctx context.Context) int {

@@ -8,8 +8,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/golang/gddo/httputil/header"
+
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 type Error struct {

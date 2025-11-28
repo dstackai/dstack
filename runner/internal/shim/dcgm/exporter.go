@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/alexellis/go-execute/v2"
+
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
@@ -141,7 +142,7 @@ func (c *DCGMExporter) Stop(context.Context) error {
 		return errors.New("not started")
 	}
 	c.cancel()
-	os.Remove(c.configPath)
+	_ = os.Remove(c.configPath)
 	return c.cmd.Wait()
 }
 
@@ -163,7 +164,7 @@ func (c *DCGMExporter) Fetch(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("status is not OK: %d", resp.StatusCode)
 	}

@@ -11,14 +11,15 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
+
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
 	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.

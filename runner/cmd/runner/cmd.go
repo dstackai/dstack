@@ -4,8 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/dstackai/dstack/runner/consts"
 	"github.com/urfave/cli/v2"
+
+	"github.com/dstackai/dstack/runner/consts"
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.
