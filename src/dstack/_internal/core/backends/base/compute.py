@@ -787,7 +787,9 @@ def normalize_arch(arch: Optional[str] = None) -> GoArchType:
     raise ValueError(f"Unsupported architecture: {arch}")
 
 
-def get_dstack_runner_download_url(arch: Optional[str] = None) -> str:
+def get_dstack_runner_download_url(
+    arch: Optional[str] = None, version: Optional[str] = None
+) -> str:
     url_template = os.environ.get("DSTACK_RUNNER_DOWNLOAD_URL")
     if not url_template:
         if settings.DSTACK_VERSION is not None:
@@ -798,7 +800,8 @@ def get_dstack_runner_download_url(arch: Optional[str] = None) -> str:
             f"https://{bucket}.s3.eu-west-1.amazonaws.com"
             "/{version}/binaries/dstack-runner-linux-{arch}"
         )
-    version = get_dstack_runner_version()
+    if version is None:
+        version = get_dstack_runner_version()
     return url_template.format(version=version, arch=normalize_arch(arch).value)
 
 

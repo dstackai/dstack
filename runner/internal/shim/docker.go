@@ -1218,7 +1218,15 @@ func (c *CLIArgs) DockerShellCommands(publicKeys []string) []string {
 		concatinatedPublicKeys = strings.Join(publicKeys, "\n")
 	}
 	commands := getSSHShellCommands(c.Runner.SSHPort, concatinatedPublicKeys)
-	commands = append(commands, fmt.Sprintf("%s %s", consts.RunnerBinaryPath, strings.Join(c.getRunnerArgs(), " ")))
+	runnerArgs := []string{
+		"--log-level", strconv.Itoa(c.Runner.LogLevel),
+		"start",
+		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
+		"--ssh-port", strconv.Itoa(c.Runner.SSHPort),
+		"--temp-dir", consts.RunnerTempDir,
+		"--home-dir", consts.RunnerHomeDir,
+	}
+	commands = append(commands, fmt.Sprintf("%s %s", consts.RunnerBinaryPath, strings.Join(runnerArgs, " ")))
 	return commands
 }
 

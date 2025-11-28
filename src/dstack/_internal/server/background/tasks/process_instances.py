@@ -18,6 +18,8 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPlacementGroupSupport,
     GoArchType,
     get_dstack_runner_binary_path,
+    get_dstack_runner_download_url,
+    get_dstack_runner_version,
     get_dstack_shim_binary_path,
     get_dstack_working_dir,
     get_shim_env,
@@ -62,7 +64,11 @@ from dstack._internal.server.models import (
     ProjectModel,
 )
 from dstack._internal.server.schemas.instances import InstanceCheck
-from dstack._internal.server.schemas.runner import HealthcheckResponse, InstanceHealthResponse
+from dstack._internal.server.schemas.runner import (
+    ComponentStatus,
+    HealthcheckResponse,
+    InstanceHealthResponse,
+)
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
@@ -116,6 +122,7 @@ from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addr
 from dstack._internal.utils.ssh import (
     pkey_from_str,
 )
+from dstack._internal.utils.version import parse_version
 
 MIN_PROCESSING_INTERVAL = timedelta(seconds=10)
 
@@ -910,13 +917,77 @@ def _check_instance_inner(
         args = (method.__func__.__name__, e.__class__.__name__, e)
         logger.exception(template, *args)
         return InstanceCheck(reachable=False, message=template % args)
+
+    _maybe_update_runner(instance, shim_client)
+
     try:
         remove_dangling_tasks_from_instance(shim_client, instance)
     except Exception as e:
         logger.exception("%s: error removing dangling tasks: %s", fmt(instance), e)
+
     return runner_client.healthcheck_response_to_instance_check(
         healthcheck_response, instance_health_response
     )
+
+
+def _maybe_update_runner(instance: InstanceModel, shim_client: runner_client.ShimClient) -> None:
+    # To auto-update to the latest runner dev build from the CI, see DSTACK_USE_LATEST_FROM_BRANCH.
+    expected_version_str = get_dstack_runner_version()
+    try:
+        expected_version = parse_version(expected_version_str)
+    except ValueError as e:
+        logger.warning("Failed to parse expected runner version: %s", e)
+        return
+    if expected_version is None:
+        logger.debug("Cannot determine the expected runner version")
+        return
+
+    try:
+        runner_info = shim_client.get_runner_info()
+    except requests.RequestException as e:
+        logger.warning("Instance %s: shim.get_runner_info(): request error: %s", instance.name, e)
+        return
+    if runner_info is None:
+        logger.debug("Instance %s: no runner info", instance.name)
+        return
+
+    logger.debug(
+        "Instance %s: runner status=%s version=%s",
+        instance.name,
+        runner_info.status.value,
+        runner_info.version,
+    )
+    if runner_info.status == ComponentStatus.INSTALLING:
+        return
+
+    if runner_info.version:
+        try:
+            current_version = parse_version(runner_info.version)
+        except ValueError as e:
+            logger.warning("Instance %s: failed to parse runner version: %s", instance.name, e)
+            return
+
+        if current_version is None or current_version >= expected_version:
+            logger.debug("Instance %s: the latest runner version already installed", instance.name)
+            return
+
+        logger.debug(
+            "Instance %s: updating runner %s -> %s",
+            instance.name,
+            current_version,
+            expected_version,
+        )
+    else:
+        logger.debug("Instance %s: installing runner %s", instance.name, expected_version)
+
+    job_provisioning_data = get_or_error(get_instance_provisioning_data(instance))
+    url = get_dstack_runner_download_url(
+        arch=job_provisioning_data.instance_type.resources.cpu_arch, version=expected_version_str
+    )
+    try:
+        shim_client.install_runner(url)
+    except requests.RequestException as e:
+        logger.warning("Instance %s: shim.install_runner(): %s", instance.name, e)
 
 
 async def _terminate(instance: InstanceModel) -> None:
