@@ -2,6 +2,7 @@ from typing import List
 
 from rich.table import Table
 
+from dstack._internal.cli.models.gateways import GatewayCommandOutput
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.utils.common import DateFormatter, pretty_date
@@ -11,6 +12,15 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
     table = get_gateways_table(gateways, verbose=verbose)
     console.print(table)
     console.print()
+
+
+def print_gateways_json(gateways: List[Gateway], project: str) -> None:
+    """Print gateways information in JSON format."""
+    output = GatewayCommandOutput(
+        project=project,
+        gateways=gateways,
+    )
+    print(output.json())
 
 
 def get_gateways_table(
