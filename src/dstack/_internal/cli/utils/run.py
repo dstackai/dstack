@@ -5,6 +5,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.models.offers import OfferCommandOutput, OfferRequirements
+from dstack._internal.cli.models.runs import PsCommandOutput
 from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
@@ -61,6 +62,15 @@ def print_offers_json(run_plan: RunPlan, run_spec):
         total_offers=job_plan.total_offers,
     )
 
+    print(output.json())
+
+
+def print_runs_json(project: str, runs: List[Run]) -> None:
+    """Print runs information in JSON format."""
+    output = PsCommandOutput(
+        project=project,
+        runs=[r._run for r in runs],
+    )
     print(output.json())
 
 
