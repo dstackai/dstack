@@ -61,6 +61,7 @@ theme:
 # Plugins
 plugins:
   - llmstxt-md:
+      enable_copy_button: false
       sections:
         Getting started:
           - docs/index.md: What dstack is
