@@ -25,10 +25,10 @@ import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
 
 import styles from './styles.module.scss';
 
-const requiredFieldError = 'This is required field';
+const requiredFieldError = 'This is a required field';
 const namesFieldError = 'Only latin characters, dashes, and digits';
 const urlFormatError = 'Only URLs';
-const workingDirFormatError = 'Use absolute path';
+const workingDirFormatError = 'Must be an absolute path';
 
 const ideOptions = [
     {
@@ -321,6 +321,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                     <FormInput
                                         label={t('runs.dev_env.wizard.name')}
                                         description={t('runs.dev_env.wizard.name_description')}
+                                        constraintText={t('runs.dev_env.wizard.name_constraint')}
                                         placeholder={t('runs.dev_env.wizard.name_placeholder')}
                                         control={control}
                                         name="name"
@@ -363,6 +364,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                                         <FormInput
                                                             label={t('runs.dev_env.wizard.docker_image')}
                                                             description={t('runs.dev_env.wizard.docker_image_description')}
+                                                            constraintText={t('runs.dev_env.wizard.docker_image_constraint')}
                                                             placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
                                                             control={control}
                                                             name="image"
@@ -376,7 +378,8 @@ export const CreateDevEnvironment: React.FC = () => {
 
                                     <FormInput
                                         label={t('runs.dev_env.wizard.working_dir')}
-                                        // description={t('runs.dev_env.wizard.working_dir_description')}
+                                        description={t('runs.dev_env.wizard.working_dir_description')}
+                                        constraintText={t('runs.dev_env.wizard.working_dir_constraint')}
                                         placeholder={t('runs.dev_env.wizard.working_dir_placeholder')}
                                         control={control}
                                         name="working_dir"
@@ -392,6 +395,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                             <FormInput
                                                 label={t('runs.dev_env.wizard.repo_url')}
                                                 description={t('runs.dev_env.wizard.repo_url_description')}
+                                                constraintText={t('runs.dev_env.wizard.repo_url_constraint')}
                                                 placeholder={t('runs.dev_env.wizard.repo_url_placeholder')}
                                                 control={control}
                                                 name="repo_url"
@@ -401,6 +405,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                             <FormInput
                                                 label={t('runs.dev_env.wizard.repo_path')}
                                                 description={t('runs.dev_env.wizard.repo_path_description')}
+                                                constraintText={t('runs.dev_env.wizard.repo_path_constraint')}
                                                 placeholder={t('runs.dev_env.wizard.repo_path_placeholder')}
                                                 control={control}
                                                 name="repo_path"
