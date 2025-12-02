@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Cards, CardsProps, Link, MultiselectCSD, PropertyFilter, StatusIndicator } from 'components';
+import { Cards, CardsProps, MultiselectCSD, PropertyFilter, StatusIndicator } from 'components';
 
 import { useCollection } from 'hooks';
 import { useGetGpusListQuery } from 'services/gpu';
@@ -132,31 +132,31 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
     const sections = [
         {
             id: 'memory_mib',
-            header: t('offer.memory_mib'),
-            content: (gpu: IGpu) => `${round(convertMiBToGB(gpu.memory_mib))}GB`,
+            // header: t('offer.memory_mib'),
+            content: (gpu: IGpu) => `${round(convertMiBToGB(gpu.memory_mib))}GB:${renderRange(gpu.count)}`,
             width: 50,
         },
         {
             id: 'price',
-            header: t('offer.price'),
-            content: (gpu: IGpu) => <span className={styles.greenText}>{renderRange(gpu.price) ?? '-'}</span>,
+            // header: t('offer.price'),
+            content: (gpu: IGpu) => <span className={styles.greenText}>${renderRange(gpu.price) ?? '-'}</span>,
             width: 50,
         },
-        {
-            id: 'count',
-            header: t('offer.count'),
-            content: (gpu: IGpu) => renderRange(gpu.count) ?? '-',
-            width: 50,
-        },
+        // {
+        //     id: 'count',
+        //     header: t('offer.count'),
+        //     content: (gpu: IGpu) => renderRange(gpu.count) ?? '-',
+        //     width: 50,
+        // },
         !groupByBackend && {
             id: 'backends',
-            header: t('offer.backend_plural'),
+            // header: t('offer.backend_plural'),
             content: (gpu: IGpu) => gpu.backends?.join(', ') ?? '-',
             width: 50,
         },
         groupByBackend && {
             id: 'backend',
-            header: t('offer.backend'),
+            // header: t('offer.backend'),
             content: (gpu: IGpu) => gpu.backend ?? '-',
             width: 50,
         },
@@ -168,7 +168,7 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
         // },
         {
             id: 'spot',
-            header: t('offer.spot'),
+            // header: t('offer.spot'),
             content: (gpu: IGpu) => gpu.spot.join(', ') ?? '-',
             width: 50,
         },
@@ -189,9 +189,10 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
         <Cards
             {...collectionProps}
             {...props}
+            entireCardClickable
             items={items}
             cardDefinition={{
-                header: (gpu) => <Link>{gpu.name}</Link>,
+                header: (gpu) => gpu.name,
                 sections,
             }}
             loading={isLoading || isFetching}
