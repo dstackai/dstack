@@ -10,6 +10,7 @@ from dstack._internal.cli.utils.common import (
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
     console,
 )
+from dstack._internal.core.errors import CLIError
 
 
 class PsCommand(APIBaseCommand):
@@ -43,12 +44,31 @@ class PsCommand(APIBaseCommand):
             type=int,
             default=None,
         )
+        self._parser.add_argument(
+            "--format",
+            choices=["plain", "json"],
+            default="plain",
+            help="Output format (default: plain)",
+        )
+        self._parser.add_argument(
+            "--json",
+            action="store_const",
+            const="json",
+            dest="format",
+            help="Output in JSON format (equivalent to --format json)",
+        )
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
+        if args.watch and args.format == "json":
+            raise CLIError("JSON output is not supported together with --watch")
+
         runs = self.api.runs.list(all=args.all, limit=args.last)
         if not args.watch:
-            console.print(run_utils.get_runs_table(runs, verbose=args.verbose))
+            if args.format == "json":
+                run_utils.print_runs_json(self.api.project, runs)
+            else:
+                console.print(run_utils.get_runs_table(runs, verbose=args.verbose))
             return
 
         try:
