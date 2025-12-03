@@ -1,81 +1,108 @@
 # Quickstart
 
-> Before using `dstack`, ensure you've [installed](installation/index.md) the server.
-
-## Set up a directory
-    
-Set up a directory where you'll store you project files and `dstack` configurations.
-
-<div class="termy">
-
-```shell
-$ mkdir quickstart && cd quickstart
-```
-
-</div>
+??? info "Prerequsites"
+    Before using `dstack`, ensure you've [installed](installation/index.md) the server and the CLI.
 
 ## Create a fleet
 
-If [backends](concepts/backends.md) are configured, `dstack` can create a new [backend fleet](concepts/fleets.md#backend-fleets) on the fly. However, it’s recommended to create them explicitly.
+Before you can submit your first run, you have to create a [fleet](concepts/fleets.md). 
 
-<h3>Define a configuration</h3>
+=== "Backend fleet"
+    If you're using cloud providers or Kubernetes clusters and have configured the corresponding [backends](concepts/backends.md), create a fleet as follows:
 
-Create the following fleet configuration inside your project folder:
+    <div editor-title="fleet.dstack.yml"> 
 
-<div editor-title="fleet.dstack.yml"> 
+    ```yaml
+    type: fleet
+    name: default
 
-```yaml
-type: fleet
-name: default
+    # Allow to provision of up to 2 instances
+    nodes: 0..2
 
-# Allow to provision of up to 2 instances
-nodes: 0..2
+    # Deprovision instances above the minimum if they remain idle
+    idle_duration: 1h
 
-# Deprovision instances above the minimum if they remain idle
-idle_duration: 1h
+    resources:
+      # Allow to provision up to 8 GPUs
+      gpu: 0..8
+    ```
 
-resources:
-  # Allow to provision up to 8 GPUs
-  gpu: 0..8
-```
+    </div>
 
-</div>
+    Pass the fleet configuration to `dstack apply`:
 
-<h3>Apply the configuration</h3>
+    <div class="termy">
 
-Apply the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
+    ```shell
+    $ dstack apply -f fleet.dstack.yml
+        
+      #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
+      1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
+      2  azure    westeurope       2xCPU, 8GB, 100GB (disk)  yes   $0.0132
+      3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
 
-<div class="termy">
+    Create the fleet? [y/n]: y
 
-```shell
-$ dstack apply -f fleet.dstack.yml
+      FLEET    INSTANCE  BACKEND  RESOURCES  PRICE  STATUS  CREATED 
+      defalut  -         -        -          -      -       10:36
+    ```
+
+    </div>
+
+    If `nodes` is a range that starts above `0`, `dstack` pre-creates the initial number of instances up front, while any additional ones are created on demand. 
     
-     #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
-     1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
-     2  azure    westeurope       2xCPU, 8GB, 100GB (disk)  yes   $0.0132
-     3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
+    > Setting the `nodes` range to start above `0` is supported only for [VM-based backends](concepts/backends.md#vm-based).
 
-Fleet cloud-fleet does not exist yet.
-Create the fleet? [y/n]: y
- FLEET          INSTANCE  BACKEND  RESOURCES  PRICE  STATUS  CREATED 
- defalut-fleet  -         -        -          -      -       10:36
-```
+    If the fleet needs to be a cluster, the [placement](concepts/fleets.md#backend-placement) property must be set to `cluster`. 
+    
+=== "SSH fleet"
+    If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet as follows:
 
-</div>
+    <div editor-title="fleets.dstack.yml"> 
+    
+    ```yaml
+    type: fleet
+    name: my-fleet
 
-Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/id_rsa
+      hosts:
+        - 3.255.177.51
+        - 3.255.177.52
+    ```
+      
+    </div>
+
+    Pass the fleet configuration to `dstack apply`:
+
+    <div class="termy">
+
+    ```shell
+    $ dstack apply -f fleet.dstack.yml
+        
+    Provisioning...
+    ---> 100%
+
+      FLEET     INSTANCE  GPU             PRICE  STATUS  CREATED 
+      my-fleet  0         L4:24GB (spot)  $0     idle    3 mins ago      
+                1         L4:24GB (spot)  $0     idle    3 mins ago    
+    ```
+
+    </div>
+
+    > Hosts must have Docker and GPU drivers installed and meet the other [requirements](concepts/fleets.md#ssh-fleets).
+
+    If the fleet needs to be a cluster, the [placement](concepts/fleets.md#ssh-placement) property must be set to `cluster`.
 
 ## Submit your first run
 
 `dstack` supports three types of run configurations.
 
 === "Dev environment"
-
     A [dev environment](concepts/dev-environments.md) lets you provision an instance and access it with your desktop IDE.
 
-    <h3>Define a configuration</h3>
-
-    Create the following run configuration inside your project folder:
+    Create the following run configuration:
 
     <div editor-title=".dstack.yml"> 
 
@@ -96,9 +123,7 @@ Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
 
     </div>
 
-    <h3>Apply the configuration</h3>
-
-    Apply the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
+    Apply the configuration via `dstack apply`:
 
     <div class="termy">
 
@@ -121,17 +146,12 @@ Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
     
     </div>
 
-    Open the link to access the dev environment using your desktop IDE.
-
-    Alternatively, you can access it via `ssh <run name>`.
+    Open the link to access the dev environment using your desktop IDE. Alternatively, you can access it via `ssh <run name>`.
 
 === "Task"
-
     A [task](concepts/tasks.md) allows you to schedule a job or run a web app. Tasks can be distributed and can forward ports.
 
-    <h3>Define a configuration</h3>
-
-    Create the following run configuration inside your project folder:
+    Create the following run configuration:
 
     <div editor-title="task.dstack.yml"> 
 
@@ -161,9 +181,7 @@ Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
     By default, tasks run on a single instance. To run a distributed task, specify 
     [`nodes`](concepts/tasks.md#distributed-tasks), and `dstack` will run it on a cluster.
 
-    <h3>Apply the configuration</h3>
-
-    Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
+    Run the configuration via `dstack apply`:
 
     <div class="termy">
 
@@ -190,12 +208,9 @@ Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
     If you specified `ports`, they will be automatically forwarded to `localhost` for convenient access.
 
 === "Service"
-
     A [service](concepts/services.md) allows you to deploy a model or any web app as an endpoint.
 
-    <h3>Define a configuration</h3>
-
-    Create the following run configuration inside your project folder:
+    Create the following run configuration:
 
     <div editor-title="service.dstack.yml"> 
 
@@ -226,9 +241,7 @@ Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
 
     </div>
 
-    <h3>Apply the configuration</h3>
-
-    Run the configuration via [`dstack apply`](reference/cli/dstack/apply.md):
+    Run the configuration via `dstack apply`:
 
     <div class="termy">
 
@@ -254,15 +267,9 @@ Alternatively, you can create an [SSH fleet](concepts/fleets#ssh-fleets).
     
     </div>
 
-    !!! info "Gateway"
-        To enable [auto-scaling](concepts/services.md#replicas-and-scaling),
-        [rate limits](concepts/services.md#rate-limits),
-        or use a custom domain with HTTPS, 
-        set up a [gateway](concepts/gateways.md) before running the service.
-        If you're using [dstack Sky](https://sky.dstack.ai),
-        a gateway is pre-configured for you.
+    > To enable auto-scaling rate limits, or use a custom domain with HTTPS, set up a [gateway](concepts/gateways.md) before running the service.
 
-`dstack apply` automatically provisions instances and runs the workload according to the configuration.
+`dstack apply` automatically provisions instances with created fleets and runs the workload according to the configuration.
 
 ## Troubleshooting
 
