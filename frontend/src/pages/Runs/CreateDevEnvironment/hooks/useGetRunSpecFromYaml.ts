@@ -57,7 +57,7 @@ export const useGetRunSpecFromYaml = ({ projectName = '' }) => {
             try {
                 await getRepo({ project_name: projectName, repo_id: repoId, include_creds: true }).unwrap();
             } catch (_) {
-                initRepo({
+                await initRepo({
                     project_name: projectName,
                     repo_id: repoId,
                     repo_info: {

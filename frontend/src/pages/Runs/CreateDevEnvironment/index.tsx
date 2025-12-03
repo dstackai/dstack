@@ -115,7 +115,7 @@ export const CreateDevEnvironment: React.FC = () => {
         () => searchParams.get('project_name') ?? null,
     );
 
-    const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: selectedProject });
+    const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: selectedProject ?? '' });
 
     const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
 
