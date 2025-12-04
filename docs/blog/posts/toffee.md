@@ -3,7 +3,7 @@ title: "How Toffee streamlines inference and cut GPU costs with dstack"
 date: 2025-12-05
 description: "TBA"  
 slug: toffee
-image: https://dstack.ai/static-assets/static-assets/images/dstack-ea-slide-2-background-min.png
+image: https://dstack.ai/static-assets/static-assets/images/dstack-toffee.png
 categories:
   - Case studies
 links:
@@ -14,7 +14,7 @@ links:
 
 In a recent engineering [blog post](https://research.toffee.ai/blog/how-we-use-dstack-at-toffee), Toffee shared how they use `dstack` to run large-language and image-generation models across multiple GPU clouds, while keeping their core backend on AWS. This case study summarizes key insights and highlights how `dstack` became the backbone of Toffee’s multi-cloud inference stack.
 
-<img src="https://dstack.ai/static-assets/static-assets/images/dstack-ea-slide-1.png" width="630" />
+<img src="https://dstack.ai/static-assets/static-assets/images/dstack-toffee.png" width="630" />
 
 <!-- more -->
 
