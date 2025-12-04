@@ -106,9 +106,7 @@ async def get_job_plans(
         exclude_not_available=False,
     )
     if _should_force_non_fleet_offers(run_spec) or (
-        not FeatureFlags.AUTOCREATED_FLEETS_DISABLED
-        and profile.fleets is None
-        and fleet_model is None
+        FeatureFlags.AUTOCREATED_FLEETS_ENABLED and profile.fleets is None and fleet_model is None
     ):
         # Keep the old behavior returning all offers irrespective of fleets.
         # Needed for supporting offers with autocreated fleets flow (and for `dstack offer`).
@@ -325,7 +323,7 @@ async def find_optimal_fleet_with_offers(
         return None, [], []
 
     if (
-        not FeatureFlags.AUTOCREATED_FLEETS_DISABLED
+        FeatureFlags.AUTOCREATED_FLEETS_ENABLED
         and run_spec.merged_profile.fleets is None
         and all(t[3] == 0 and t[4] == 0 for t in candidate_fleets_with_offers)
     ):
