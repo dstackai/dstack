@@ -1,11 +1,13 @@
 # Tasks
 
-A task allows you to run arbitrary commands on one or more nodes.
-They are best suited for jobs like training or batch processing.
+A task allows you to run arbitrary commands on one or more nodes. They are best suited for jobs like training or batch processing.
+
+??? info "Prerequisites"
+    Before running a task, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
 
 ## Apply a configuration
 
-First, define a task configuration as a YAML file in your project folder.
+First, define a task configuration as a YAML file.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
 [//]: # (TODO: Make tabs - single machine & distributed tasks & web app)

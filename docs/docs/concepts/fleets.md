@@ -4,27 +4,31 @@ Fleets act both as pools of instances and as templates for how those instances a
 
 `dstack` supports two kinds of fleets: 
 
-* [Backend fleets](#backend-fleets) – dynamically provisioned through configured backends; they are supported with any type of backends: [VM-based](backends.md#vm-based) and [container-based](backends.md#container-based) (incl. [`kubernetes`](backends.md#kubernetes))
+* [Backend fleets](#backend-fleets) – dynamically provisioned through configured backends; they are supported with any type of backends: [VM-based](backends.md#vm-based) and [container-based](backends.md#container-based) (incl. [Kubernetes](backends.md#kubernetes))
 * [SSH fleets](#ssh-fleets) – created using on-prem servers; do not require backends
 
-When you run `dstack apply` to start a dev environment, task, or service, `dstack` will reuse idle instances from an existing fleet whenever available.
+When you submit a dev environment, task, or service, `dstack` reuses idle instances or provisions new ones based on the fleet configuration. 
+
+> You must create a fleet before submitting runs.
 
 ## Backend fleets
 
-If you configured [backends](backends.md), `dstack` can provision fleets on the fly.
-However, it’s recommended to define fleets explicitly.
+Backend fleets allow provisioning compute across cloud providers or Kubernetes clusters. 
 
-### Apply a configuration
+??? info "Prerequisites"
+    Before creating a backend fleet, make sure to configure the corresponding [backends](backends.md).
 
-To create a backend fleet, define a configuration as a YAML file in your project directory. The file must have a
+### Apply the configuration
+
+To create a backend fleet, define a configuration as a YAML file. The file must have a
 `.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
 
-<div editor-title="examples/misc/fleets/.dstack.yml">
+<div editor-title="fleet.dstack.yml">
     
     ```yaml
     type: fleet
     # The name is optional, if not specified, generated randomly
-    name: default-fleet
+    name: default
     
     # Can be a range or a fixed number
     # Allow to provision of up to 2 instances
@@ -48,7 +52,7 @@ To create or update the fleet, pass the fleet configuration to [`dstack apply`](
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/misc/fleets/.dstack.yml
+$ dstack apply -f fleet.dstack.yml
 
 Provisioning...
 ---> 100%
@@ -59,18 +63,15 @@ Provisioning...
 
 </div>
 
-`dstack` always keeps the minimum number of nodes provisioned. Additional instances, up to the maximum limit, are provisioned on demand.
+If `nodes` is a range that starts above `0`, `dstack` pre-creates the initial number of instances up front, while any additional ones are created on demand. 
 
-!!! info "Container-based backends"
-    For [container-based](backends.md#container-based) backends  (such as `kubernetes`, `runpod`, etc), `nodes` must be defined as a range starting with `0`. In these cases, instances are provisioned on demand as needed.
-
-    <!-- TODO: Ensure the user sees the error or warning otherwise -->
+> Setting the `nodes` range to start above `0` is supported only for [VM-based backends](backends.md#vm-based).
 
 ??? info "Target number of nodes"
 
     If `nodes` is defined as a range, you can start with more than the minimum number of instances by using the `target` parameter when creating the fleet.
 
-    <div editor-title=".dstack.yml"> 
+    <div editor-title="fleet.dstack.yml"> 
 
     ```yaml
     type: fleet
