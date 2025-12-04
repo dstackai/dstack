@@ -8,11 +8,7 @@
 
 ### Configure backends
 
-To orchestrate compute across cloud providers or existing Kubernetes clusters, you need to configure backends.
-
-Backends can be set up in `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI.
-
-For more details, see [Backends](../concepts/backends.md).
+To orchestrate compute across cloud providers or Kubernetes clusters, you need to configure [backends](../concepts/backends.md).
 
 ??? info "SSH fleets"
     When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh-fleets) once the server is up.
@@ -79,8 +75,7 @@ The server can run on your laptop or any environment with access to the cloud an
 To verify that backends are properly configured, use the [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list available GPU offers.
 
 !!! info "Server deployment"
-    For more details on server deployment options, see the
-    [Server deployment](../guides/server-deployment.md) guide.
+    For more details on server deployment options, see the [Server deployment](../guides/server-deployment.md) guide.
 
 ## Set up the CLI
 
@@ -206,5 +201,5 @@ This configuration is stored in `~/.dstack/config.yml`.
     1. Follow [Quickstart](../quickstart.md)
     2. See [Backends](../concepts/backends.md)
     3. Check the [server deployment](../guides/server-deployment.md) guide
-    4. Browse [examples](/examples)
+    4. Browse [examples](../../examples.md)
     5. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)

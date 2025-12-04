@@ -1,18 +1,16 @@
 # Backends
 
-Backends allow `dstack` to manage compute across various environments.
-They can be configured via `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI.
+Backends allow `dstack` to provision fleets across cloud providers or Kubernetes clusters.
 
-`dstack` supports three types of backends: 
+`dstack` supports two types of backends: 
 
   * [VM-based](#vm-based) – use `dstack`'s native integration with cloud providers to provision VMs, manage clusters, and orchestrate container-based runs.  
   * [Container-based](#container-based) – use either `dstack`'s native integration with cloud providers or Kubernetes to orchestrate container-based runs; provisioning in this case is delegated to the cloud provider or Kubernetes.  
-  * [On-prem](#on-prem) – use `dstack`'s native support for on-prem servers without needing Kubernetes.  
 
-!!! info "dstack Sky"
-    If you're using [dstack Sky](https://sky.dstack.ai), backend configuration is optional. dstack Sky lets you use pre-configured backends to access GPU marketplace.
+??? info "SSH fleets"
+    When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh-fleets) once the server is up.
 
-See the examples of backend configuration below.
+Backends can be configured via `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI. See the examples of backend configuration below.
 
 ## VM-based
 
@@ -1153,16 +1151,6 @@ projects:
 </div>
 
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
-
-## On-prem
-
-In on-prem environments, the [Kubernetes](#kubernetes) backend can be used if a Kubernetes cluster is already set up and configured.  
-However, often [SSH fleets](../concepts/fleets.md#ssh-fleets) are a simpler and lighter alternative.
-
-### SSH fleets
-
-SSH fleets require no backend configuration. 
-All you need to do is [provide hostnames and SSH credentials](../concepts/fleets.md#ssh-fleets), and `dstack` sets up a fleet that can orchestrate container-based runs on your servers.
 
 SSH fleets support the same features as [VM-based](#vm-based) backends.
 

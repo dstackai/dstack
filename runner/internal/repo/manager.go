@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitssh "github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 type Manager struct {
@@ -62,7 +63,7 @@ func (m *Manager) WithSSHAuth(pem, password string) *Manager {
 	if err != nil {
 		log.Warning(m.ctx, "fail to parse SSH private key", "err", err)
 	} else {
-		keys.HostKeyCallbackHelper.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+		keys.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 		m.clo.Auth = keys
 	}
 	return m

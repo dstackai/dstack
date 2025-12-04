@@ -4,8 +4,8 @@ date: 2025-03-11
 description: "This tutorial walks you through how dstack can be used with TensorWave's private AMD cloud using SSH fleets."
 slug: amd-on-tensorwave
 image: https://dstack.ai/static-assets/static-assets/images/dstack-tensorwave-v2.png
-categories:
-  - Case studies
+# categories:
+  # - Case studies
 ---
 
 # Using SSH fleets with TensorWave's private AMD cloud

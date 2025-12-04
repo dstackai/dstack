@@ -148,7 +148,7 @@ server = [
     "watchfiles",
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
-    "alembic>=1.10.2",
+    "alembic>=1.16.0",
     "aiosqlite",
     "docker>=6.0.0",
     "python-dxf>=12.1.1",

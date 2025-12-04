@@ -21,14 +21,15 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/dstackai/ansistrip"
+	"github.com/prometheus/procfs"
+	"golang.org/x/sys/unix"
+
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/connections"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/dstackai/dstack/runner/internal/types"
-	"github.com/prometheus/procfs"
-	"golang.org/x/sys/unix"
 )
 
 // TODO: Tune these parameters for optimal experience/performance
@@ -176,7 +177,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	}()
 
 	stripper := ansistrip.NewWriter(ex.runnerLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
-	defer stripper.Close()
+	defer func() { _ = stripper.Close() }()
 	logger := io.MultiWriter(runnerLogFile, os.Stdout, stripper)
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
@@ -408,7 +409,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 
 	// Call buildLDLibraryPathEnv and update jobEnvs if no error occurs
-	newLDPath, err := buildLDLibraryPathEnv()
+	newLDPath, err := buildLDLibraryPathEnv(ctx)
 	if err != nil {
 		log.Info(ctx, "Continuing without updating LD_LIBRARY_PATH")
 	} else {
@@ -546,7 +547,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
 	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
-	defer stripper.Close()
+	defer func() { _ = stripper.Close() }()
 	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
 	_, err = io.Copy(logger, ptm)
 	if err != nil && !isPtyError(err) {
@@ -616,9 +617,9 @@ func isPtyError(err error) bool {
 	return errors.As(err, &e) && errors.Is(e.Err, syscall.EIO)
 }
 
-func buildLDLibraryPathEnv() (string, error) {
+func buildLDLibraryPathEnv(ctx context.Context) (string, error) {
 	// Execute shell command to get Python prefix
-	cmd := exec.Command("bash", "-i", "-c", "python3-config --prefix")
+	cmd := exec.CommandContext(ctx, "bash", "-i", "-c", "python3-config --prefix")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("error executing command: %w", err)
@@ -907,7 +908,7 @@ func includeDstackProfile(profilePath string, dstackProfilePath string) error {
 		return fmt.Errorf("open profile file: %w", err)
 	}
 	defer file.Close()
-	if _, err = file.WriteString(fmt.Sprintf("\n. '%s'\n", dstackProfilePath)); err != nil {
+	if _, err = fmt.Fprintf(file, "\n. '%s'\n", dstackProfilePath); err != nil {
 		return fmt.Errorf("write profile include: %w", err)
 	}
 	if err = os.Chmod(profilePath, 0o644); err != nil {

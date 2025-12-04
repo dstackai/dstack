@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/bluekeyes/go-gitdiff/gitdiff"
+
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 

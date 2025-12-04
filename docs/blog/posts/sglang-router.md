@@ -161,6 +161,7 @@ Looking ahead, this integration also shapes our roadmap. Over the coming release
 
 * Enabling prefill and decode worker separation for full disaggregation (today, only standard workers are supported).
 * Introducing auto-scaling based on TTFT (Time to First Token) and ITL (Inter-Token Latency), complementing the current requests-per-second scaling metric.
+* Supporting multi-node replicas, enabling a single replica to span multiple nodes instead of being limited to one.
 * Extending native support to more emerging inference stacks.
 
 ## What's next?

@@ -8,9 +8,20 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.projects import ProjectRole
+from dstack._internal.core.models.runs import JobStatus, RunStatus
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.server.models import UserModel
-from dstack._internal.server.testing.common import create_user, get_auth_headers
+from dstack._internal.server.models import MemberModel, UserModel
+from dstack._internal.server.services.projects import add_project_member
+from dstack._internal.server.testing.common import (
+    create_job,
+    create_probe,
+    create_project,
+    create_repo,
+    create_run,
+    create_user,
+    get_auth_headers,
+)
 
 
 class TestListUsers:
@@ -22,7 +33,9 @@ class TestListUsers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_admins_see_all_users(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_admins_see_all_non_deleted_users(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         admin = await create_user(
             session=session,
             name="admin",
@@ -34,6 +47,13 @@ class TestListUsers:
             name="other_user",
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
+        )
+        await create_user(
+            session=session,
+            name="deleted_user",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+            deleted=True,
         )
         response = await client.post("/api/users/list", headers=get_auth_headers(admin.token))
         assert response.status_code in [200]
@@ -360,9 +380,12 @@ class TestDeleteUsers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_deletes_users(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("username", ["test", "a" * 50])
+    async def test_deletes_users(
+        self, test_db, session: AsyncSession, client: AsyncClient, username: str
+    ):
         admin = await create_user(name="admin", session=session)
-        user = await create_user(name="test", session=session)
+        user = await create_user(name=username, session=session)
         response = await client.post(
             "/api/users/delete",
             headers=get_auth_headers(admin.token),
@@ -371,6 +394,78 @@ class TestDeleteUsers:
         assert response.status_code == 200
         res = await session.execute(select(UserModel).where(UserModel.name == user.name))
         assert len(res.scalars().all()) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_users_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(name="admin", session=session)
+        user1 = await create_user(name="test1", session=session)
+        user2 = await create_user(name="test2", session=session)
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user1.name, "non_existing_user"]},
+        )
+        assert response.status_code == 400
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user1.name, user2.name]},
+        )
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("image_config_mock")
+    async def test_deletes_user_with_resources(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(name="admin", session=session)
+        user = await create_user(name="temp", session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+        )
+        job = await create_job(session=session, run=run, status=JobStatus.RUNNING)
+        await create_probe(session=session, job=job)
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(UserModel).where(UserModel.name == user.name))
+        assert res.scalar() is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("image_config_mock")
+    async def test_deleting_users_deletes_members(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(name="admin", session=session)
+        user = await create_user(name="temp", session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(UserModel).where(UserModel.name == user.name))
+        assert res.scalar() is None
+        res = await session.execute(select(MemberModel).where(MemberModel.user_id == user.id))
+        assert res.scalar() is None
 
 
 class TestRefreshToken:

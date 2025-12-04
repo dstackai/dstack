@@ -2,9 +2,12 @@
 
 A dev environment lets you provision an instance and access it with your desktop IDE.
 
+??? info "Prerequisites"
+    Before running a dev environment, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
+
 ## Apply a configuration
 
-First, define a dev environment configuration as a YAML file in your project folder.
+First, define a dev environment configuration as a YAML file.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
 <div editor-title="examples/.dstack.yml"> 

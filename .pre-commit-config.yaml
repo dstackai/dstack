@@ -7,10 +7,10 @@ repos:
         args: ['--fix']
       - id: ruff-format
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.62.0  # Should match .github/workflows/build-artifacts.yml
+    rev: v2.6.2  # Should match .github/workflows/build-artifacts.yml
     hooks:
       - id: golangci-lint-full
-        language_version: 1.23.8  # Should match runner/go.mod
+        language_version: 1.25.0  # Should match runner/go.mod
         entry: bash -c 'cd runner && golangci-lint run'
         stages: [manual]
   - repo: https://github.com/pre-commit/pre-commit-hooks

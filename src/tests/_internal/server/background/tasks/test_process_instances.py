@@ -1,9 +1,10 @@
 import datetime as dt
+import logging
 from collections import defaultdict
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Optional
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 import gpuhunt
 import pytest
@@ -44,11 +45,16 @@ from dstack._internal.server.models import InstanceHealthCheckModel, PlacementGr
 from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse, DCGMHealthResult
 from dstack._internal.server.schemas.instances import InstanceCheck
 from dstack._internal.server.schemas.runner import (
+    ComponentInfo,
+    ComponentName,
+    ComponentStatus,
+    HealthcheckResponse,
     InstanceHealthResponse,
     TaskListItem,
     TaskListResponse,
     TaskStatus,
 )
+from dstack._internal.server.services.runner.client import ShimClient
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_fleet,
@@ -385,6 +391,14 @@ class TestCheckShim:
 
 
 class TestRemoveDanglingTasks:
+    @pytest.fixture(autouse=True)
+    def disable_runner_update_check(self) -> Generator[None, None, None]:
+        with patch(
+            "dstack._internal.server.background.tasks.process_instances.get_dstack_runner_version"
+        ) as get_dstack_runner_version_mock:
+            get_dstack_runner_version_mock.return_value = "latest"
+            yield
+
     @pytest.fixture
     def ssh_tunnel_mock(self) -> Generator[Mock, None, None]:
         with patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock:
@@ -1145,3 +1159,160 @@ class TestDeleteInstanceHealthChecks:
         all_checks = res.scalars().all()
         assert len(all_checks) == 1
         assert all_checks[0] == check
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+@pytest.mark.usefixtures(
+    "test_db", "ssh_tunnel_mock", "shim_client_mock", "get_dstack_runner_version_mock"
+)
+class TestMaybeUpdateRunner:
+    @pytest.fixture
+    def ssh_tunnel_mock(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("dstack._internal.server.services.runner.ssh.SSHTunnel", MagicMock())
+
+    @pytest.fixture
+    def shim_client_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = Mock(spec_set=ShimClient)
+        mock.healthcheck.return_value = HealthcheckResponse(
+            service="dstack-shim", version="0.19.40"
+        )
+        mock.get_instance_health.return_value = InstanceHealthResponse()
+        mock.get_runner_info.return_value = ComponentInfo(
+            name=ComponentName.RUNNER, version="0.19.40", status=ComponentStatus.INSTALLED
+        )
+        mock.list_tasks.return_value = TaskListResponse(tasks=[])
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runner.client.ShimClient", Mock(return_value=mock)
+        )
+        return mock
+
+    @pytest.fixture
+    def get_dstack_runner_version_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = Mock(return_value="0.19.41")
+        monkeypatch.setattr(
+            "dstack._internal.server.background.tasks.process_instances.get_dstack_runner_version",
+            mock,
+        )
+        return mock
+
+    @pytest.fixture
+    def get_dstack_runner_download_url_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = Mock(return_value="https://example.com/runner")
+        monkeypatch.setattr(
+            "dstack._internal.server.background.tasks.process_instances.get_dstack_runner_download_url",
+            mock,
+        )
+        return mock
+
+    async def test_cannot_determine_expected_version(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        session: AsyncSession,
+        shim_client_mock: Mock,
+        get_dstack_runner_version_mock: Mock,
+    ):
+        caplog.set_level(logging.DEBUG)
+        project = await create_project(session=session)
+        await create_instance(session=session, project=project, status=InstanceStatus.IDLE)
+        get_dstack_runner_version_mock.return_value = "latest"
+
+        await process_instances()
+
+        assert "Cannot determine the expected runner version" in caplog.text
+        shim_client_mock.get_runner_info.assert_not_called()
+        shim_client_mock.install_runner.assert_not_called()
+
+    async def test_failed_to_parse_current_version(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        session: AsyncSession,
+        shim_client_mock: Mock,
+    ):
+        caplog.set_level(logging.WARNING)
+        project = await create_project(session=session)
+        await create_instance(session=session, project=project, status=InstanceStatus.IDLE)
+        shim_client_mock.get_runner_info.return_value.version = "invalid"
+
+        await process_instances()
+
+        assert "failed to parse runner version" in caplog.text
+        shim_client_mock.get_runner_info.assert_called_once()
+        shim_client_mock.install_runner.assert_not_called()
+
+    @pytest.mark.parametrize("current_version", ["latest", "0.0.0", "0.19.41", "0.19.42"])
+    async def test_latest_version_already_installed(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        session: AsyncSession,
+        shim_client_mock: Mock,
+        current_version: str,
+    ):
+        caplog.set_level(logging.DEBUG)
+        project = await create_project(session=session)
+        await create_instance(session=session, project=project, status=InstanceStatus.IDLE)
+        shim_client_mock.get_runner_info.return_value.version = current_version
+
+        await process_instances()
+
+        assert "the latest runner version already installed" in caplog.text
+        shim_client_mock.get_runner_info.assert_called_once()
+        shim_client_mock.install_runner.assert_not_called()
+
+    async def test_install_not_installed(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        session: AsyncSession,
+        shim_client_mock: Mock,
+        get_dstack_runner_download_url_mock: Mock,
+    ):
+        caplog.set_level(logging.DEBUG)
+        project = await create_project(session=session)
+        await create_instance(session=session, project=project, status=InstanceStatus.IDLE)
+        shim_client_mock.get_runner_info.return_value.version = ""
+        shim_client_mock.get_runner_info.return_value.status = ComponentStatus.NOT_INSTALLED
+
+        await process_instances()
+
+        assert "installing runner 0.19.41" in caplog.text
+        get_dstack_runner_download_url_mock.assert_called_once_with(arch=None, version="0.19.41")
+        shim_client_mock.get_runner_info.assert_called_once()
+        shim_client_mock.install_runner.assert_called_once_with(
+            get_dstack_runner_download_url_mock.return_value
+        )
+
+    async def test_update_outdated(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        session: AsyncSession,
+        shim_client_mock: Mock,
+        get_dstack_runner_download_url_mock: Mock,
+    ):
+        caplog.set_level(logging.DEBUG)
+        project = await create_project(session=session)
+        await create_instance(session=session, project=project, status=InstanceStatus.IDLE)
+        shim_client_mock.get_runner_info.return_value.version = "0.19.38"
+
+        await process_instances()
+
+        assert "updating runner 0.19.38 -> 0.19.41" in caplog.text
+        get_dstack_runner_download_url_mock.assert_called_once_with(arch=None, version="0.19.41")
+        shim_client_mock.get_runner_info.assert_called_once()
+        shim_client_mock.install_runner.assert_called_once_with(
+            get_dstack_runner_download_url_mock.return_value
+        )
+
+    async def test_already_updating(
+        self,
+        session: AsyncSession,
+        shim_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        await create_instance(session=session, project=project, status=InstanceStatus.IDLE)
+        shim_client_mock.get_runner_info.return_value.version = "0.19.38"
+        shim_client_mock.get_runner_info.return_value.status = ComponentStatus.INSTALLING
+
+        await process_instances()
+
+        shim_client_mock.get_runner_info.assert_called_once()
+        shim_client_mock.install_runner.assert_not_called()

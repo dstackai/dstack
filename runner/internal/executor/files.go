@@ -11,6 +11,7 @@ import (
 	"regexp"
 
 	"github.com/codeclysm/extract/v4"
+
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 )

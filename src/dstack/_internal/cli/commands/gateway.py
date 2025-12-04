@@ -11,7 +11,12 @@ from dstack._internal.cli.utils.common import (
     confirm_ask,
     console,
 )
-from dstack._internal.cli.utils.gateway import get_gateways_table, print_gateways_table
+from dstack._internal.cli.utils.gateway import (
+    get_gateways_table,
+    print_gateways_json,
+    print_gateways_table,
+)
+from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.utils.logging import get_logger
@@ -42,6 +47,19 @@ class GatewayCommand(APIBaseCommand):
             )
             parser.add_argument(
                 "-v", "--verbose", action="store_true", help="Show more information"
+            )
+            parser.add_argument(
+                "--format",
+                choices=["plain", "json"],
+                default="plain",
+                help="Output format (default: plain)",
+            )
+            parser.add_argument(
+                "--json",
+                action="store_const",
+                const="json",
+                dest="format",
+                help="Output in JSON format (equivalent to --format json)",
             )
 
         create_parser = subparsers.add_parser(
@@ -91,9 +109,15 @@ class GatewayCommand(APIBaseCommand):
         args.subfunc(args)
 
     def _list(self, args: argparse.Namespace):
+        if args.watch and args.format == "json":
+            raise CLIError("JSON output is not supported together with --watch")
+
         gateways = self.api.client.gateways.list(self.api.project)
         if not args.watch:
-            print_gateways_table(gateways, verbose=args.verbose)
+            if args.format == "json":
+                print_gateways_json(gateways, project=self.api.project)
+            else:
+                print_gateways_table(gateways, verbose=args.verbose)
             return
 
         try:
