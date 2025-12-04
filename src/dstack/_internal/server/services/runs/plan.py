@@ -110,7 +110,6 @@ async def get_job_plans(
     ):
         # Keep the old behavior returning all offers irrespective of fleets.
         # Needed for supporting offers with autocreated fleets flow (and for `dstack offer`).
-        # TODO: Consider dropping when autocreated fleets are dropped.
         instance_offers, backend_offers = await _get_non_fleet_offers(
             session=session,
             project=project,
@@ -246,7 +245,6 @@ async def find_optimal_fleet_with_offers(
     # the run without additional provisioning and choose the one with the cheapest pool offer.
     # Then choose a fleet with the cheapest pool offer among all fleets with pool offers.
     # If there are no fleets with pool offers, choose a fleet with a cheapest backend offer.
-    # Fallback to autocreated fleet if fleets have no pool or backend offers.
     # TODO: Consider trying all backend offers and then choosing a fleet.
     candidate_fleets_with_offers: list[
         tuple[
