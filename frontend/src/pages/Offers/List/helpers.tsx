@@ -1,4 +1,8 @@
+import React from 'react';
+
 import { RequestParam } from '../../../libs/filters';
+
+import styles from './styles.module.scss';
 
 const rangeSeparator = '..';
 
@@ -41,6 +45,20 @@ export const round = (number: number) => Math.round(number * 100) / 100;
 export const renderRange = (range: { min?: number; max?: number }) => {
     if (typeof range.min === 'number' && typeof range.max === 'number' && range.max != range.min) {
         return `${round(range.min)}${rangeSeparator}${round(range.max)}`;
+    }
+
+    return range.min?.toString() ?? range.max?.toString();
+};
+
+export const renderRangeJSX = (range: { min?: number; max?: number }) => {
+    if (typeof range.min === 'number' && typeof range.max === 'number' && range.max != range.min) {
+        return (
+            <>
+                {round(range.min)}
+                <span className={styles.greyText}>{rangeSeparator}</span>
+                {round(range.max)}
+            </>
+        );
     }
 
     return range.min?.toString() ?? range.max?.toString();

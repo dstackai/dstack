@@ -70,6 +70,8 @@ export const API = {
         // Repos
         REPOS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/repos`,
         REPOS_LIST: (projectName: IProject['project_name']) => `${API.PROJECTS.REPOS(projectName)}/list`,
+        GET_REPO: (projectName: IProject['project_name']) => `${API.PROJECTS.REPOS(projectName)}/get`,
+        INIT_REPO: (projectName: IProject['project_name']) => `${API.PROJECTS.REPOS(projectName)}/init`,
 
         // Runs
         RUNS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/runs`,
