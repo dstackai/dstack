@@ -42,7 +42,7 @@ They needed **a unified orchestration layer** that:
 
 > *Since we switched to `dstack`, we’ve cut the overhead of GPU-cloud orchestration by more than 50%. What used to take hours of custom Terraform + CLI scripting now deploys in minutes with a single declarative config — freeing us to focus on modelling, not infrastructure.*
 >
-> *— Nikita Shupeyko, AI/ML & Cloud Infrastructure Architect at Toffee*
+> *— [Nikita Shupeyko](https://www.linkedin.com/in/nikita-shupeyko/), AI/ML & Cloud Infrastructure Architect at Toffee*
 
 Toffee primarily uses these `dstack` components:
 
@@ -70,7 +70,7 @@ Beyond oechestration, Toffee relies on `dstack`’s UI as a central observabilit
 
 > *Thanks to dstack’s seamless integration with GPU neoclouds like RunPod and Vast.ai, we’ve been able to shift most workloads off hyperscalers — reducing our effective GPU spend by roughly 2–3× without changing a single line of model code.*
 >
-> *— Nikita Shupeyko, Machine Learning Platform Engineer at Toffee*
+> *— [Nikita Shupeyko](https://www.linkedin.com/in/nikita-shupeyko/), AI/ML & Cloud Infrastructure Architect at Toffee*
 
 Before adopting `dstack`, there were serious drawbacks:
 
