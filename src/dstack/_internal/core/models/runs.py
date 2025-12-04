@@ -21,6 +21,7 @@ from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     HTTPHeaderSpec,
     HTTPMethod,
+    RepoExistsAction,
     RunConfiguration,
     ServiceConfiguration,
 )
@@ -281,6 +282,8 @@ class JobSpec(CoreModel):
     repo_code_hash: Optional[str] = None
     # `repo_dir` was added in 0.19.27. Default value is set for backward compatibility
     repo_dir: str = LEGACY_REPO_DIR
+    # None for jobs without repo and any jobs submitted by pre-0.20.0 clients
+    repo_exists_action: Optional[RepoExistsAction] = None
     file_archives: list[FileArchiveMapping] = []
     # None for non-services and pre-0.19.19 services. See `get_service_port`
     service_port: Optional[int] = None

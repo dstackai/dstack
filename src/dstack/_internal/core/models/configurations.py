@@ -95,6 +95,13 @@ class PortMapping(CoreModel):
         return PortMapping(local_port=local_port, container_port=int(container_port))
 
 
+class RepoExistsAction(str, Enum):
+    # Don't try to check out, terminate the run with an error (the default action since 0.20.0)
+    ERROR = "error"
+    # Don't try to check out, skip the repo (the logic hardcoded in the pre-0.20.0 runner)
+    SKIP = "skip"
+
+
 class RepoSpec(CoreModel):
     local_path: Annotated[
         Optional[str],
@@ -132,6 +139,14 @@ class RepoSpec(CoreModel):
             )
         ),
     ] = None
+    if_exists: Annotated[
+        RepoExistsAction,
+        Field(
+            description=(
+                "The action to be taken if `path` exists and is not empty. One of: {}"
+            ).format(", ".join(f"`{action.value}`" for action in RepoExistsAction)),
+        ),
+    ] = RepoExistsAction.ERROR
 
     @classmethod
     def parse(cls, v: str) -> Self:

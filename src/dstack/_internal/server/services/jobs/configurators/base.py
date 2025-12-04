@@ -20,6 +20,7 @@ from dstack._internal.core.models.configurations import (
     PortMapping,
     ProbeConfig,
     PythonVersion,
+    RepoExistsAction,
     RunConfigurationType,
     ServiceConfiguration,
 )
@@ -169,6 +170,7 @@ class JobConfigurator(ABC):
             repo_data=self.run_spec.repo_data,
             repo_code_hash=self.run_spec.repo_code_hash,
             repo_dir=self._repo_dir(),
+            repo_exists_action=self._repo_exists_action(),
             file_archives=self.run_spec.file_archives,
             service_port=self._service_port(),
             probes=self._probes(),
@@ -319,6 +321,17 @@ class JobConfigurator(ABC):
         if repo_dir is None:
             return LEGACY_REPO_DIR
         return repo_dir
+
+    def _repo_exists_action(self) -> Optional[RepoExistsAction]:
+        if not (repos := self.run_spec.configuration.repos):
+            # One of:
+            # - The configuration without repo submitted by any client.
+            # - The configuration _with_ repo submitted by pre-0.20.0 client (the `repos` option
+            #   is always excluded by pre-0.20.0 clients for compatibility with pre-0.20.0 servers)
+            # In either case, we return None, and runner falls back to "skip" action if needed
+            # (the second case, the only action hardcoded in pre-0.20.0 runners)
+            return None
+        return repos[0].if_exists
 
     def _working_dir(self) -> Optional[str]:
         """
