@@ -8,7 +8,7 @@ import { useGetGpusListQuery } from 'services/gpu';
 
 import { useEmptyMessages } from './hooks/useEmptyMessages';
 import { useFilters } from './hooks/useFilters';
-import { convertMiBToGB, rangeToObject, renderRange, round } from './helpers';
+import { convertMiBToGB, rangeToObject, renderRange, renderRangeJSX, round } from './helpers';
 
 import styles from './styles.module.scss';
 
@@ -133,13 +133,19 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
         {
             id: 'memory_mib',
             // header: t('offer.memory_mib'),
-            content: (gpu: IGpu) => `${round(convertMiBToGB(gpu.memory_mib))}GB:${renderRange(gpu.count)}`,
+            content: (gpu: IGpu) => (
+                <div>
+                    {round(convertMiBToGB(gpu.memory_mib))}GB
+                    <span className={styles.greyText}>:</span>
+                    {renderRange(gpu.count)}
+                </div>
+            ),
             width: 50,
         },
         {
             id: 'price',
             // header: t('offer.price'),
-            content: (gpu: IGpu) => <span className={styles.greenText}>${renderRange(gpu.price) ?? '-'}</span>,
+            content: (gpu: IGpu) => <span className={styles.greenText}>${renderRangeJSX(gpu.price) ?? '-'}</span>,
             width: 50,
         },
         // {
