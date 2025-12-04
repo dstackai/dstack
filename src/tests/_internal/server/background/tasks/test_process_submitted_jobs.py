@@ -631,9 +631,8 @@ class TestProcessSubmittedJobs:
         await session.refresh(instance)
         res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
         job = res.unique().scalar_one()
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
-        assert job.instance is None
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         assert instance.total_blocks == 4
         assert instance.busy_blocks == 1
 
@@ -724,41 +723,7 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_assigns_no_fleet_when_all_fleets_occupied(self, test_db, session: AsyncSession):
-        project = await create_project(session)
-        user = await create_user(session)
-        repo = await create_repo(session=session, project_id=project.id)
-        fleet = await create_fleet(session=session, project=project)
-        instance = await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet,
-            instance_num=0,
-            status=InstanceStatus.BUSY,
-        )
-        fleet.instances.append(instance)
-        run = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-        )
-        job = await create_job(
-            session=session,
-            run=run,
-            instance_assigned=False,
-        )
-        await session.commit()
-        await process_submitted_jobs()
-        await session.refresh(job)
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
-        assert job.instance_id is None
-        assert job.fleet_id is None
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_assigns_no_fleet_if_run_cannot_fit(self, test_db, session: AsyncSession):
+    async def test_fails_if_run_cannot_fit_into_fleet(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)
         repo = await create_repo(session=session, project_id=project.id)
@@ -800,37 +765,8 @@ class TestProcessSubmittedJobs:
         await session.commit()
         await process_submitted_jobs()
         await session.refresh(job)
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
-        assert job.instance_id is None
-        assert job.fleet_id is None
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_does_not_assign_job_to_elastic_empty_fleet_without_backend_offers_if_fleets_unspecified(
-        self, test_db, session: AsyncSession
-    ):
-        project = await create_project(session)
-        user = await create_user(session)
-        repo = await create_repo(session=session, project_id=project.id)
-        fleet_spec = get_fleet_spec()
-        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
-        await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
-        run = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-        )
-        job = await create_job(
-            session=session,
-            run=run,
-            instance_assigned=False,
-        )
-        await process_submitted_jobs()
-        await session.refresh(job)
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         assert job.instance_id is None
         assert job.fleet_id is None
 
