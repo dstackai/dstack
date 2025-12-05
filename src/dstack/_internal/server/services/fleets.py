@@ -53,6 +53,7 @@ from dstack._internal.server.models import (
     ProjectModel,
     UserModel,
 )
+from dstack._internal.server.services import events
 from dstack._internal.server.services import instances as instances_services
 from dstack._internal.server.services import offers as offers_services
 from dstack._internal.server.services.instances import (
@@ -752,6 +753,12 @@ async def _create_fleet(
             instances=[],
         )
         session.add(fleet_model)
+        events.emit(
+            session,
+            f"Fleet created. Status: {fleet_model.status.upper()}",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(fleet_model)],
+        )
         if spec.configuration.ssh_config is not None:
             for i, host in enumerate(spec.configuration.ssh_config.hosts):
                 instances_model = await create_fleet_ssh_instance_model(
@@ -773,6 +780,13 @@ async def _create_fleet(
                     instance_num=i,
                 )
                 fleet_model.instances.append(instance_model)
+        for instance_model in fleet_model.instances:
+            events.emit(
+                session,
+                f"Instance created on fleet submission. Status: {instance_model.status.upper()}",
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(instance_model)],
+            )
         await session.commit()
         return fleet_model_to_fleet(fleet_model)
 
