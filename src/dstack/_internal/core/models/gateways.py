@@ -96,10 +96,11 @@ class Gateway(CoreModel):
     instance_id: Optional[str]
     wildcard_domain: Optional[str]
     default: bool
-    # TODO: configuration fields are duplicated on top-level for backward compatibility with 0.18.x
-    # Remove after 0.19
-    backend: BackendType
-    region: str
+    # TODO: Deprecated configuration fields duplicated on top-level
+    # for backward compatibility with 0.19.x clients that expect them required.
+    # Remove after 0.21
+    backend: Optional[BackendType] = None
+    region: Optional[str] = None
 
 
 class GatewayPlan(CoreModel):

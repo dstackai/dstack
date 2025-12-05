@@ -825,7 +825,7 @@ class RunCollection:
             repo_id=None,
             only_active=only_active,
             limit=limit or 100,
-            # TODO: Pass job_submissions_limit=1 in 0.20
+            job_submissions_limit=1,
         )
         if only_active and len(runs) == 0:
             runs = self._api_client.runs.list(

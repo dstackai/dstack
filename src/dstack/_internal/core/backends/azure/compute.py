@@ -420,11 +420,6 @@ _SUPPORTED_VM_SERIES_PATTERNS = [
     r"NC(\d+)ads_A100_v4",  # NC A100 v4-series [A100 80GB]
     r"ND(\d+)asr_v4",  # ND A100 v4-series [8xA100 40GB]
     r"ND(\d+)amsr_A100_v4",  # NDm A100 v4-series [8xA100 80GB]
-    # Deprecated series
-    # TODO: Remove after several releases
-    r"D(\d+)s_v3",  # Dsv3-series (general purpose)
-    r"E(\d+)i?s_v4",  # Esv4-series (memory optimized)
-    r"E(\d+)-(\d+)s_v4",  # Esv4-series (constrained vCPU)
 ]
 _SUPPORTED_VM_SERIES_PATTERN = (
     "^Standard_(" + "|".join(f"({s})" for s in _SUPPORTED_VM_SERIES_PATTERNS) + ")$"

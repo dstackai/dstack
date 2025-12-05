@@ -34,8 +34,6 @@ from dstack._internal.core.backends.kubernetes.utils import (
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
-
-# TODO: update import as KNOWN_GPUS becomes public
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,

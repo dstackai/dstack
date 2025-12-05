@@ -138,7 +138,7 @@ async def apply_plan(
     )
 
 
-@project_router.post("/create", response_model=Fleet)
+@project_router.post("/create", response_model=Fleet, deprecated=True)
 async def create_fleet(
     body: CreateFleetRequest,
     session: AsyncSession = Depends(get_session),

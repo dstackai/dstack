@@ -386,8 +386,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                         fmt(job_model),
                         job_submission.age,
                     )
-                    # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE in 0.20 or
-                    # when CLI <= 0.19.8 is no longer supported
+                    # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE for on-demand.
                     job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
                     job_model.status = JobStatus.TERMINATING
                 else:

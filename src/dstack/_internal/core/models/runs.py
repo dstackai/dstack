@@ -203,7 +203,6 @@ class JobTerminationReason(str, Enum):
 
 
 class Requirements(CoreModel):
-    # TODO: Make requirements' fields required
     resources: ResourcesSpec
     max_price: Optional[float] = None
     spot: Optional[bool] = None
