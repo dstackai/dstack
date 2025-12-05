@@ -75,7 +75,7 @@ class RemoteRepo(Repo):
     Using a remote Git repo by a URL:
 
     ```python
-    repo=RemoteRepo.from_url(
+    repo = RemoteRepo.from_url(
         repo_url="https://github.com/dstackai/dstack-examples",
         repo_branch="main"
     )

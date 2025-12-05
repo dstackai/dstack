@@ -2,15 +2,14 @@ import os
 from contextlib import suppress
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Optional, Union
+from typing import Optional
 
 import git.cmd
 import yaml
 from git.exc import GitCommandError
 
 from dstack._internal.core.errors import DstackError
-from dstack._internal.core.models.config import RepoConfig
-from dstack._internal.core.models.repos import LocalRepo, RemoteRepo, RemoteRepoCreds
+from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.repos.remote import GitRepoURL
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
@@ -235,12 +234,3 @@ def _read_private_key(identity_file: PathLike) -> str:
         )
     with open(identity_file, "r") as file:
         return file.read()
-
-
-# Used for `config.yml` only, remove it with `repos` in `config.yml`
-def load_repo(config: RepoConfig) -> Union[RemoteRepo, LocalRepo]:
-    if config.repo_type == "remote":
-        return RemoteRepo(repo_id=config.repo_id, local_repo_dir=config.path)
-    elif config.repo_type == "local":
-        return LocalRepo(repo_id=config.repo_id, repo_dir=config.path)
-    raise TypeError(f"Unknown repo_type: {config.repo_type}")

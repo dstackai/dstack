@@ -18,11 +18,12 @@ from dstack._internal.cli.services.configurators.base import (
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.services.repos import (
     get_repo_from_dir,
+    get_repo_from_url,
     init_default_virtual_repo,
     is_git_repo_url,
     register_init_repo_args,
 )
-from dstack._internal.cli.utils.common import confirm_ask, console, warn
+from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
 from dstack._internal.core.errors import (
@@ -44,17 +45,13 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.repos import RepoHeadWithCreds
-from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.core.models.repos.local import LocalRepo
 from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCreds
 from dstack._internal.core.models.resources import CPUSpec
 from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
-from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import (
     InvalidRepoCredentialsError,
     get_repo_creds_and_default_branch,
-    load_repo,
 )
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
@@ -96,8 +93,9 @@ class BaseRunConfigurator(
         if conf.working_dir is not None and not is_absolute_posix_path(conf.working_dir):
             raise ConfigurationError("working_dir must be absolute")
 
-        config_manager = ConfigManager()
-        repo = self.get_repo(conf, configuration_path, configurator_args, config_manager)
+        repo = self.get_repo(conf, configuration_path, configurator_args)
+        if repo is None:
+            repo = init_default_virtual_repo(api=self.api)
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_run_plan(
@@ -475,12 +473,11 @@ class BaseRunConfigurator(
         conf: RunConfigurationT,
         configuration_path: str,
         configurator_args: argparse.Namespace,
-        config_manager: ConfigManager,
-    ) -> Repo:
+    ) -> Optional[RemoteRepo]:
         if configurator_args.no_repo:
-            return init_default_virtual_repo(api=self.api)
+            return None
 
-        repo: Optional[Repo] = None
+        repo: Optional[RemoteRepo] = None
         repo_head: Optional[RepoHeadWithCreds] = None
         repo_branch: Optional[str] = configurator_args.repo_branch
         repo_hash: Optional[str] = configurator_args.repo_hash
@@ -497,8 +494,6 @@ class BaseRunConfigurator(
         local_path: Optional[Path] = None
         # dummy value, safe to join with any path
         root_dir = Path(".")
-        # True if no repo specified, but we found one in `config.yml`
-        legacy_local_path = False
         if repo_arg := configurator_args.repo:
             if is_git_repo_url(repo_arg):
                 url = repo_arg
@@ -521,84 +516,49 @@ class BaseRunConfigurator(
             if repo_hash is None:
                 repo_hash = repo_spec.hash
         else:
-            local_path = Path.cwd()
-            legacy_local_path = True
+            return None
+
         if url:
-            repo = RemoteRepo.from_url(repo_url=url)
+            repo = get_repo_from_url(url)
             repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
         elif local_path:
-            if legacy_local_path:
-                if repo_config := config_manager.get_repo_config(local_path):
-                    repo = load_repo(repo_config)
-                    repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
-                    if repo_head is not None:
-                        warn(
-                            "The repo is not specified but found and will be used in the run\n"
-                            "Future versions will not load repos automatically\n"
-                            "To prepare for future versions and get rid of this warning:\n"
-                            "- If you need the repo in the run, either specify [code]repos[/code]"
-                            " in the configuration or use [code]--repo .[/code]\n"
-                            "- If you don't need the repo in the run, either run"
-                            " [code]dstack init --remove[/code] once (it removes only the record"
-                            " about the repo, the repo files will remain intact)"
-                            " or use [code]--no-repo[/code]"
-                        )
-                    else:
-                        # ignore stale entries in `config.yml`
-                        repo = None
-                        init = False
-            else:
-                original_local_path = local_path
-                local_path = local_path.expanduser()
-                if not local_path.is_absolute():
-                    local_path = (root_dir / local_path).resolve()
-                if not local_path.exists():
-                    raise ConfigurationError(
-                        f"Invalid repo path: {original_local_path} -> {local_path}"
-                    )
-                local: bool = configurator_args.local
-                repo = get_repo_from_dir(local_path, local=local)
-                repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
-            if isinstance(repo, RemoteRepo):
-                repo_branch = repo.run_repo_data.repo_branch
-                repo_hash = repo.run_repo_data.repo_hash
+            original_local_path = local_path
+            local_path = local_path.expanduser()
+            if not local_path.is_absolute():
+                local_path = (root_dir / local_path).resolve()
+            if not local_path.exists():
+                raise ConfigurationError(
+                    f"Invalid repo path: {original_local_path} -> {local_path}"
+                )
+            repo = get_repo_from_dir(local_path)
+            repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
+            repo_branch = repo.run_repo_data.repo_branch
+            repo_hash = repo.run_repo_data.repo_hash
         else:
             assert False, "should not reach here"
 
-        if repo is None:
-            return init_default_virtual_repo(api=self.api)
+        assert repo.repo_url is not None
 
-        if isinstance(repo, RemoteRepo):
-            assert repo.repo_url is not None
+        if repo_head is not None and repo_head.repo_creds is not None:
+            if git_identity_file is None and oauth_token is None:
+                git_private_key = repo_head.repo_creds.private_key
+                oauth_token = repo_head.repo_creds.oauth_token
+        else:
+            init = True
 
-            if repo_head is not None and repo_head.repo_creds is not None:
-                if git_identity_file is None and oauth_token is None:
-                    git_private_key = repo_head.repo_creds.private_key
-                    oauth_token = repo_head.repo_creds.oauth_token
-            else:
-                init = True
+        try:
+            repo_creds, _ = get_repo_creds_and_default_branch(
+                repo_url=repo.repo_url,
+                identity_file=git_identity_file,
+                private_key=git_private_key,
+                oauth_token=oauth_token,
+            )
+        except InvalidRepoCredentialsError as e:
+            raise CLIError(*e.args) from e
 
-            try:
-                repo_creds, default_repo_branch = get_repo_creds_and_default_branch(
-                    repo_url=repo.repo_url,
-                    identity_file=git_identity_file,
-                    private_key=git_private_key,
-                    oauth_token=oauth_token,
-                )
-            except InvalidRepoCredentialsError as e:
-                raise CLIError(*e.args) from e
-
-            if repo_branch is None and repo_hash is None:
-                if default_repo_branch is None:
-                    raise CLIError(
-                        "Failed to automatically detect remote repo branch."
-                        " Specify branch or hash."
-                    )
-                # TODO: remove in 0.20. Currently `default_repo_branch` is sent only for backward compatibility of `dstack-runner`.
-                repo_branch = default_repo_branch
-            repo.run_repo_data.repo_branch = repo_branch
-            if repo_hash is not None:
-                repo.run_repo_data.repo_hash = repo_hash
+        repo.run_repo_data.repo_branch = repo_branch
+        if repo_hash is not None:
+            repo.run_repo_data.repo_hash = repo_hash
 
         if init:
             self.api.repos.init(
@@ -606,15 +566,6 @@ class BaseRunConfigurator(
                 git_identity_file=git_identity_file,
                 oauth_token=oauth_token,
                 creds=repo_creds,
-            )
-
-        if isinstance(repo, LocalRepo):
-            warn(
-                f"{repo.repo_dir} is a local repo\n"
-                "Local repos are deprecated since 0.19.25 and will be removed soon\n"
-                "There are two options:\n"
-                "- Migrate to [code]files[/code]: https://dstack.ai/docs/concepts/tasks/#files\n"
-                "- Specify [code]--no-repo[/code] if you don't need the repo at all"
             )
 
         return repo

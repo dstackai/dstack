@@ -3,6 +3,7 @@ from typing import Optional, Union
 from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.repos.base import Repo as Repo
 from dstack._internal.core.models.repos.local import (  # noqa: F401
     LocalRepo,
     LocalRepoInfo,
