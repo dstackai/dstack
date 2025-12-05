@@ -7,7 +7,7 @@ image: https://dstack.ai/static-assets/static-assets/images/dstack-ea-slide-2-ba
 categories:
   - Case studies
 links:
-  - NVIDIA GTC 2025 ↗: https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/
+  - NVIDIA GTC 2025: https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/
 ---
 
 # How EA uses dstack to fast-track AI development
