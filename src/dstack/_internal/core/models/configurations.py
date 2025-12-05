@@ -31,7 +31,7 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
-from dstack._internal.utils.common import has_duplicates
+from dstack._internal.utils.common import has_duplicates, list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import (
     pydantic_orjson_dumps_with_indent,
@@ -95,6 +95,13 @@ class PortMapping(CoreModel):
         return PortMapping(local_port=local_port, container_port=int(container_port))
 
 
+class RepoExistsAction(str, Enum):
+    # Don't try to check out, terminate the run with an error (the default action since 0.20.0)
+    ERROR = "error"
+    # Don't try to check out, skip the repo (the logic hardcoded in the pre-0.20.0 runner)
+    SKIP = "skip"
+
+
 class RepoSpec(CoreModel):
     local_path: Annotated[
         Optional[str],
@@ -132,6 +139,15 @@ class RepoSpec(CoreModel):
             )
         ),
     ] = None
+    if_exists: Annotated[
+        RepoExistsAction,
+        Field(
+            description=(
+                "The action to be taken if `path` exists and is not empty."
+                f" One of: {list_enum_values_for_annotation(RepoExistsAction)}"
+            ),
+        ),
+    ] = RepoExistsAction.ERROR
 
     @classmethod
     def parse(cls, v: str) -> Self:
