@@ -31,7 +31,7 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
-from dstack._internal.utils.common import has_duplicates
+from dstack._internal.utils.common import has_duplicates, list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import (
     pydantic_orjson_dumps_with_indent,
@@ -143,8 +143,9 @@ class RepoSpec(CoreModel):
         RepoExistsAction,
         Field(
             description=(
-                "The action to be taken if `path` exists and is not empty. One of: {}"
-            ).format(", ".join(f"`{action.value}`" for action in RepoExistsAction)),
+                "The action to be taken if `path` exists and is not empty."
+                f" One of: {list_enum_values_for_annotation(RepoExistsAction)}"
+            ),
         ),
     ] = RepoExistsAction.ERROR
 
