@@ -1,10 +1,9 @@
 import uuid
-from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -22,16 +21,39 @@ from dstack._internal.server.models import (
     RunModel,
     UserModel,
 )
+from dstack._internal.server.services.logging import fmt_entity
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class SystemActor:
-    pass
+    """Represents the system as the actor of an event"""
+
+    def fmt(self) -> str:
+        return "system"
 
 
 @dataclass
 class UserActor:
+    """
+    Represents a user as the actor of an event.
+
+    **NOTE**: Prefer using `UserActor.from_user` to create `UserActor` instances,
+    unless you don't have a complete `UserModel` available.
+    """
+
     user_id: uuid.UUID
+    user_name: str
+
+    @staticmethod
+    def from_user(user: UserModel) -> "UserActor":
+        return UserActor(user_id=user.id, user_name=user.name)
+
+    def fmt(self) -> str:
+        return fmt_entity("user", self.user_id, self.user_name)
 
 
 AnyActor = Union[SystemActor, UserActor]
@@ -116,13 +138,63 @@ class Target:
             )
         raise ValueError(f"Unsupported model type: {type(model)}")
 
+    def fmt(self) -> str:
+        return fmt_entity(self.type, self.id, self.name)
 
-def emit(session: AsyncSession, message: str, actor: AnyActor, targets: Iterable[Target]) -> None:
-    # TODO: docstring + best practices
-    # TODO: log each event
+
+def emit(session: AsyncSession, message: str, actor: AnyActor, targets: list[Target]) -> None:
+    """
+    Emit an event - add it to the current session without committing.
+
+    Usage guidelines:
+    - Message:
+        - Use past tense - events should describe completed actions.
+          Bad: "Creating project"
+          Good: "Project created"
+        - Do not duplicate target and actor names in the message.
+          Bad: "User John created project MyProject"
+          Good: "Project created"
+    - Actor:
+        - Pass `UserActor` for events about user actions, e.g., in API handlers.
+        - Pass `SystemActor` for system-generated events, e.g., in background jobs.
+    - Targets:
+        - Link the event to one or more entities affected by it.
+          E.g., for a "Job assigned to instance" event, link it to the job and the instance.
+        - Do not link the event to parent entities of the affected entities.
+          E.g., the "Instance created" event should be linked to the instance only,
+          not to the fleet or project. Transitive relationships with parent entities
+          are inferred automatically when listing events using the within_* filters.
+        - **Important**: If linking the event to multiple targets with different access scopes
+          (e.g., entities in different projects, or different users), ensure that this does not
+          leak sensitive information. If a user has access to at least one of the targets,
+          they will see the entire event with all targets. If this is not desired,
+          consider emitting multiple separate events instead.
+    """
+    if not FeatureFlags.EVENTS:
+        return
+
+    if not targets:
+        raise ValueError("At least one target must be specified")
+    if not message:
+        raise ValueError("Message cannot be empty")
+    if message.strip() != message:
+        raise ValueError("Message cannot have leading or trailing whitespace")
+    if "\n" in message:
+        raise ValueError("Message cannot contain newlines")
+    if message.endswith("."):
+        raise ValueError("Message cannot end with a period")
+
+    logger.info(
+        "Emitting event: %s. Event targets: %s. Actor: %s",
+        message,
+        ", ".join(target.fmt() for target in targets),
+        actor.fmt(),
+    )
+
     if settings.SERVER_EVENTS_TTL_SECONDS <= 0:
         return
     event = EventModel(
+        id=uuid.uuid4(),
         message=message,
         actor_user_id=actor.user_id if isinstance(actor, UserActor) else None,
         recorded_at=get_current_datetime(),
@@ -137,8 +209,6 @@ def emit(session: AsyncSession, message: str, actor: AnyActor, targets: Iterable
                 entity_name=target.name,
             )
         )
-    if not event.targets:
-        raise ValueError("At least one target must be specified for an event")
     session.add(event)
 
 
@@ -161,13 +231,16 @@ async def list_events(
     limit: int,
     ascending: bool,
 ) -> list[Event]:
-    filters = []
+    target_filters = []
     if user.global_role != GlobalRole.ADMIN:
-        filters.append(
+        query = select(MemberModel.project_id).where(MemberModel.user_id == user.id)
+        res = await session.execute(query)
+        # In Postgres, fetching project IDs separately is orders of magnitude faster
+        # than using a subquery.
+        project_ids = list(res.unique().scalars().all())
+        target_filters.append(
             or_(
-                EventTargetModel.entity_project_id.in_(
-                    select(MemberModel.project_id).where(MemberModel.user_id == user.id)
-                ),
+                EventTargetModel.entity_project_id.in_(project_ids),
                 and_(
                     EventTargetModel.entity_project_id.is_(None),
                     EventTargetModel.entity_type == EventTargetType.USER,
@@ -176,51 +249,56 @@ async def list_events(
             )
         )
     if target_projects is not None:
-        filters.append(
+        target_filters.append(
             and_(
                 EventTargetModel.entity_type == EventTargetType.PROJECT,
                 EventTargetModel.entity_id.in_(target_projects),
             )
         )
     if target_users is not None:
-        filters.append(
+        target_filters.append(
             and_(
                 EventTargetModel.entity_type == EventTargetType.USER,
                 EventTargetModel.entity_id.in_(target_users),
             )
         )
     if target_fleets is not None:
-        filters.append(
+        target_filters.append(
             and_(
                 EventTargetModel.entity_type == EventTargetType.FLEET,
                 EventTargetModel.entity_id.in_(target_fleets),
             )
         )
     if target_instances is not None:
-        filters.append(
+        target_filters.append(
             and_(
                 EventTargetModel.entity_type == EventTargetType.INSTANCE,
                 EventTargetModel.entity_id.in_(target_instances),
             )
         )
     if target_runs is not None:
-        filters.append(
+        target_filters.append(
             and_(
                 EventTargetModel.entity_type == EventTargetType.RUN,
                 EventTargetModel.entity_id.in_(target_runs),
             )
         )
     if target_jobs is not None:
-        filters.append(
+        target_filters.append(
             and_(
                 EventTargetModel.entity_type == EventTargetType.JOB,
                 EventTargetModel.entity_id.in_(target_jobs),
             )
         )
     if within_projects is not None:
-        filters.append(EventTargetModel.entity_project_id.in_(within_projects))
+        target_filters.append(EventTargetModel.entity_project_id.in_(within_projects))
     if within_fleets is not None:
-        filters.append(
+        query = select(InstanceModel.id).where(InstanceModel.fleet_id.in_(within_fleets))
+        res = await session.execute(query)
+        # In Postgres, fetching instance IDs separately is orders of magnitude faster
+        # than using a subquery.
+        instance_ids = list(res.unique().scalars().all())
+        target_filters.append(
             or_(
                 and_(
                     EventTargetModel.entity_type == EventTargetType.FLEET,
@@ -228,14 +306,17 @@ async def list_events(
                 ),
                 and_(
                     EventTargetModel.entity_type == EventTargetType.INSTANCE,
-                    EventTargetModel.entity_id.in_(
-                        select(InstanceModel.id).where(InstanceModel.fleet_id.in_(within_fleets))
-                    ),
+                    EventTargetModel.entity_id.in_(instance_ids),
                 ),
             )
         )
     if within_runs is not None:
-        filters.append(
+        query = select(JobModel.id).where(JobModel.run_id.in_(within_runs))
+        res = await session.execute(query)
+        # In Postgres, fetching job IDs separately is orders of magnitude faster
+        # than using a subquery.
+        job_ids = list(res.unique().scalars().all())
+        target_filters.append(
             or_(
                 and_(
                     EventTargetModel.entity_type == EventTargetType.RUN,
@@ -243,16 +324,16 @@ async def list_events(
                 ),
                 and_(
                     EventTargetModel.entity_type == EventTargetType.JOB,
-                    EventTargetModel.entity_id.in_(
-                        select(JobModel.id).where(JobModel.run_id.in_(within_runs))
-                    ),
+                    EventTargetModel.entity_id.in_(job_ids),
                 ),
             )
         )
     if include_target_types is not None:
-        filters.append(EventTargetModel.entity_type.in_(include_target_types))
+        target_filters.append(EventTargetModel.entity_type.in_(include_target_types))
+
+    event_filters = []
     if actors is not None:
-        filters.append(
+        event_filters.append(
             or_(
                 EventModel.actor_user_id.is_(None) if None in actors else False,
                 EventModel.actor_user_id.in_(
@@ -263,9 +344,9 @@ async def list_events(
     if prev_recorded_at is not None:
         if ascending:
             if prev_id is None:
-                filters.append(EventModel.recorded_at > prev_recorded_at)
+                event_filters.append(EventModel.recorded_at > prev_recorded_at)
             else:
-                filters.append(
+                event_filters.append(
                     or_(
                         EventModel.recorded_at > prev_recorded_at,
                         and_(EventModel.recorded_at == prev_recorded_at, EventModel.id < prev_id),
@@ -273,9 +354,9 @@ async def list_events(
                 )
         else:
             if prev_id is None:
-                filters.append(EventModel.recorded_at < prev_recorded_at)
+                event_filters.append(EventModel.recorded_at < prev_recorded_at)
             else:
-                filters.append(
+                event_filters.append(
                     or_(
                         EventModel.recorded_at < prev_recorded_at,
                         and_(EventModel.recorded_at == prev_recorded_at, EventModel.id > prev_id),
@@ -290,17 +371,20 @@ async def list_events(
         .limit(limit)
         .options(
             joinedload(EventModel.targets),
-            joinedload(EventModel.user).load_only(UserModel.name),
+            joinedload(EventModel.actor_user).load_only(UserModel.name),
         )
     )
-    if filters:
-        # Apply filters in a subquery, since it requires joining events with targets.
-        # Can't join in the outer query, as it results in LIMIT being applied to targets
-        # instead of events.
-        event_ids_subquery = (
-            select(EventModel.id).join(EventModel.targets).where(*filters).distinct()
+    if event_filters:
+        query = query.where(*event_filters)
+    if target_filters:
+        query = query.where(
+            exists().where(
+                and_(
+                    EventTargetModel.event_id == EventModel.id,
+                    *target_filters,
+                )
+            )
         )
-        query = query.where(EventModel.id.in_(event_ids_subquery))
     res = await session.execute(query)
     event_models = res.unique().scalars().all()
     return list(map(event_model_to_event, event_models))
@@ -322,6 +406,6 @@ def event_model_to_event(event_model: EventModel) -> Event:
         message=event_model.message,
         recorded_at=event_model.recorded_at,
         actor_user_id=event_model.actor_user_id,
-        actor_user=event_model.user.name if event_model.user else None,
+        actor_user=event_model.actor_user.name if event_model.actor_user else None,
         targets=targets,
     )

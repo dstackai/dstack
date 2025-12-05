@@ -44,3 +44,6 @@ class FeatureFlags:
     # - Makes `repos[].path` required, unless the client is older than 0.19.27,
     #   in which case `/workflow` is still used.
     LEGACY_REPO_DIR_DISABLED = os.getenv("DSTACK_FF_LEGACY_REPO_DIR_DISABLED") is not None
+
+    # Server-side flag to enable event emission and Events API
+    EVENTS = os.getenv("DSTACK_FF_EVENTS") is not None

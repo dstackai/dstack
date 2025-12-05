@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Generator
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +14,12 @@ from dstack._internal.server.services import events
 from dstack._internal.server.testing.common import create_user
 
 
+@pytest.fixture(autouse=True)
+def set_feature_flag() -> Generator[None, None, None]:
+    with patch("dstack._internal.settings.FeatureFlags.EVENTS", True):
+        yield
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 async def test_deletes_old_events(test_db, session: AsyncSession) -> None:
@@ -22,7 +29,7 @@ async def test_deletes_old_events(test_db, session: AsyncSession) -> None:
             events.emit(
                 session,
                 message=f"Event {i}",
-                actor=events.UserActor(user_id=user.id),
+                actor=events.UserActor.from_user(user),
                 targets=[events.Target.from_model(user)],
             )
     await session.commit()

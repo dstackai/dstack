@@ -543,7 +543,7 @@ async def create_project_model(
     events.emit(
         session,
         "Project created",
-        actor=events.UserActor(owner.id),
+        actor=events.UserActor.from_user(owner),
         targets=[events.Target.from_model(project)],
     )
     await session.commit()

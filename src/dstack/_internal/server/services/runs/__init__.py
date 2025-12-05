@@ -487,7 +487,7 @@ async def submit_run(
         events.emit(
             session,
             f"Run submitted. Status: {run_model.status.upper()}",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(run_model)],
         )
 

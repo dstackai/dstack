@@ -756,7 +756,7 @@ async def _create_fleet(
         events.emit(
             session,
             f"Fleet created. Status: {fleet_model.status.upper()}",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(fleet_model)],
         )
         if spec.configuration.ssh_config is not None:

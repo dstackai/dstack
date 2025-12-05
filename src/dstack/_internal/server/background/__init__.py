@@ -33,6 +33,7 @@ from dstack._internal.server.background.tasks.process_terminating_jobs import (
     process_terminating_jobs,
 )
 from dstack._internal.server.background.tasks.process_volumes import process_submitted_volumes
+from dstack._internal.settings import FeatureFlags
 
 _scheduler = AsyncIOScheduler()
 
@@ -70,7 +71,8 @@ def start_background_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(process_probes, IntervalTrigger(seconds=3, jitter=1))
     _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
     _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
-    _scheduler.add_job(delete_events, IntervalTrigger(minutes=7), max_instances=1)
+    if FeatureFlags.EVENTS:
+        _scheduler.add_job(delete_events, IntervalTrigger(minutes=7), max_instances=1)
     if settings.ENABLE_PROMETHEUS_METRICS:
         _scheduler.add_job(
             collect_prometheus_metrics, IntervalTrigger(seconds=10), max_instances=1

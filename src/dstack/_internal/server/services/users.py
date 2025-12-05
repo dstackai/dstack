@@ -112,7 +112,7 @@ async def create_user(
     events.emit(
         session,
         "User created",
-        actor=events.UserActor(creator.id) if creator else events.UserActor(user.id),
+        actor=events.UserActor.from_user(creator) if creator else events.UserActor.from_user(user),
         targets=[events.Target.from_model(user)],
     )
     await session.commit()

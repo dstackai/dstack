@@ -1,9 +1,9 @@
-# TODO: docs
-
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Annotated, Optional
+
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 
@@ -18,16 +18,50 @@ class EventTargetType(str, Enum):
 
 
 class EventTarget(CoreModel):
-    type: str  # Holds EventTargetType; str for adding new types without breaking compatibility
-    project_id: Optional[uuid.UUID]
-    id: uuid.UUID
-    name: str
+    type: Annotated[
+        str,  # not using EventTargetType to allow adding new types without breaking compatibility
+        Field(
+            description=(
+                f"Type of the target entity."
+                f" One of: {', '.join([f'`{t}`' for t in EventTargetType])}"
+            )
+        ),
+    ]
+    project_id: Annotated[
+        Optional[uuid.UUID],
+        Field(
+            description=(
+                "ID of the project the target entity belongs to,"
+                " or `null` for target types not bound to a project (e.g., users)"
+            )
+        ),
+    ]
+    id: Annotated[uuid.UUID, Field(description="ID of the target entity")]
+    name: Annotated[str, Field(description="Name of the target entity")]
 
 
 class Event(CoreModel):
     id: uuid.UUID
     message: str
     recorded_at: datetime
-    actor_user_id: Optional[uuid.UUID]
-    actor_user: Optional[str]
-    targets: list[EventTarget]
+    actor_user_id: Annotated[
+        Optional[uuid.UUID],
+        Field(
+            description=(
+                "ID of the user who performed the action that triggered the event,"
+                " or `null` if the action was performed by the system"
+            )
+        ),
+    ]
+    actor_user: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "Name of the user who performed the action that triggered the event,"
+                " or `null` if the action was performed by the system"
+            )
+        ),
+    ]
+    targets: Annotated[
+        list[EventTarget], Field(description="List of entities affected by the event")
+    ]

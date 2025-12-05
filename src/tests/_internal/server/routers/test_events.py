@@ -1,4 +1,7 @@
+import uuid
 from datetime import datetime
+from typing import Generator
+from unittest.mock import patch
 
 import pytest
 from freezegun import freeze_time
@@ -26,6 +29,93 @@ pytestmark = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def set_feature_flag() -> Generator[None, None, None]:
+    with patch("dstack._internal.settings.FeatureFlags.EVENTS", True):
+        yield
+
+
+class TestListEventsGeneral:
+    async def test_response_format(self, session: AsyncSession, client: AsyncClient) -> None:
+        user = await create_user(session=session, name="test_user")
+        project = await create_project(session=session, owner=user, name="test_project")
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.ADMIN,
+        )
+        event_ids = [uuid.uuid4() for _ in range(2)]
+        with patch("uuid.uuid4", side_effect=event_ids):
+            with freeze_time(datetime(2026, 1, 1, 12, 0, 0)):
+                events.emit(
+                    session,
+                    "User added to project",
+                    actor=events.UserActor.from_user(user),
+                    targets=[events.Target.from_model(user), events.Target.from_model(project)],
+                )
+            with freeze_time(datetime(2026, 1, 1, 12, 0, 1)):
+                events.emit(
+                    session,
+                    "Project updated",
+                    actor=events.SystemActor(),
+                    targets=[events.Target.from_model(project)],
+                )
+        await session.commit()
+
+        resp = await client.post("/api/events/list", headers=get_auth_headers(user.token), json={})
+        resp.raise_for_status()
+        resp_data = resp.json()
+        for event in resp_data:
+            event["targets"].sort(key=lambda t: t["type"])  # for consistent comparison
+        assert resp_data == [
+            {
+                "id": str(event_ids[1]),
+                "message": "Project updated",
+                "recorded_at": "2026-01-01T12:00:01+00:00",
+                "actor_user_id": None,
+                "actor_user": None,
+                "targets": [
+                    {
+                        "type": "project",
+                        "project_id": str(project.id),
+                        "id": str(project.id),
+                        "name": "test_project",
+                    },
+                ],
+            },
+            {
+                "id": str(event_ids[0]),
+                "message": "User added to project",
+                "recorded_at": "2026-01-01T12:00:00+00:00",
+                "actor_user_id": str(user.id),
+                "actor_user": "test_user",
+                "targets": [
+                    {
+                        "type": "project",
+                        "project_id": str(project.id),
+                        "id": str(project.id),
+                        "name": "test_project",
+                    },
+                    {
+                        "type": "user",
+                        "project_id": None,
+                        "id": str(user.id),
+                        "name": "test_user",
+                    },
+                ],
+            },
+        ]
+
+    async def test_empty_response_when_no_events(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session)
+        resp = await client.post("/api/events/list", headers=get_auth_headers(user.token), json={})
+        resp.raise_for_status()
+        assert resp.json() == []
+
+
 class TestListEventsAccessControl:
     async def test_user_sees_events_about_themselves(
         self, session: AsyncSession, client: AsyncClient
@@ -43,13 +133,13 @@ class TestListEventsAccessControl:
         events.emit(
             session,
             "User created",
-            actor=events.UserActor(admin_user.id),
+            actor=events.UserActor.from_user(admin_user),
             targets=[events.Target.from_model(admin_user)],
         )
         events.emit(
             session,
             "User created",
-            actor=events.UserActor(admin_user.id),
+            actor=events.UserActor.from_user(admin_user),
             targets=[events.Target.from_model(regular_user)],
         )
         await session.commit()
@@ -117,25 +207,25 @@ class TestListEventsAccessControl:
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(admin_user.id),
+            actor=events.UserActor.from_user(admin_user),
             targets=[events.Target.from_model(admin_project)],
         )
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(admin_user.id),
+            actor=events.UserActor.from_user(admin_user),
             targets=[events.Target.from_model(regular_project)],
         )
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(admin_user.id),
+            actor=events.UserActor.from_user(admin_user),
             targets=[events.Target.from_model(admin_fleet)],
         )
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(admin_user.id),
+            actor=events.UserActor.from_user(admin_user),
             targets=[events.Target.from_model(regular_fleet)],
         )
         await session.commit()
@@ -172,13 +262,13 @@ class TestListEventsAccessControl:
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(admin.id),
+            actor=events.UserActor.from_user(admin),
             targets=[events.Target.from_model(project)],
         )
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(admin.id),
+            actor=events.UserActor.from_user(admin),
             targets=[events.Target.from_model(fleet)],
         )
         await session.commit()
@@ -239,25 +329,25 @@ class TestListEventsFilters:
         events.emit(
             session,
             "User created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(user)],
         )
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(project_a)],
         )
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(project_b)],
         )
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(fleet_a)],
         )
         await session.commit()
@@ -295,19 +385,19 @@ class TestListEventsFilters:
         events.emit(
             session,
             "User created",
-            actor=events.UserActor(user_a.id),
+            actor=events.UserActor.from_user(user_a),
             targets=[events.Target.from_model(user_a)],
         )
         events.emit(
             session,
             "User created",
-            actor=events.UserActor(user_b.id),
+            actor=events.UserActor.from_user(user_b),
             targets=[events.Target.from_model(user_b)],
         )
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user_a.id),
+            actor=events.UserActor.from_user(user_a),
             targets=[events.Target.from_model(project_a)],
         )
         await session.commit()
@@ -359,19 +449,19 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(fleet_a)],
         )
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(fleet_b)],
         )
         events.emit(
             session,
             "Instance created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(instance_a)],
         )
         await session.commit()
@@ -419,19 +509,19 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(fleet)],
         )
         events.emit(
             session,
             "Instance created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(instance_a)],
         )
         events.emit(
             session,
             "Instance created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(instance_b)],
         )
         await session.commit()
@@ -487,19 +577,19 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Run created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(run_a)],
         )
         events.emit(
             session,
             "Run created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(run_b)],
         )
         events.emit(
             session,
             "Job created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(job_a)],
         )
         await session.commit()
@@ -552,19 +642,19 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Run created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(run)],
         )
         events.emit(
             session,
             "Job created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(job_a)],
         )
         events.emit(
             session,
             "Job created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(job_b)],
         )
         await session.commit()
@@ -608,31 +698,31 @@ class TestListEventsFilters:
         events.emit(
             session,
             "User created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(user)],
         )
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(project_a)],
         )
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(project_b)],
         )
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(fleet_a)],
         )
         events.emit(
             session,
             "Instance created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(instance_a)],
         )
         await session.commit()
@@ -682,25 +772,25 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(project)],
         )
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(fleet_a)],
         )
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(fleet_b)],
         )
         events.emit(
             session,
             "Instance created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(isinstance_a)],
         )
         await session.commit()
@@ -754,25 +844,25 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(project)],
         )
         events.emit(
             session,
             "Run created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(run_a)],
         )
         events.emit(
             session,
             "Run created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(run_b)],
         )
         events.emit(
             session,
             "Job created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(job_a)],
         )
         await session.commit()
@@ -813,19 +903,19 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(project)],
         )
         events.emit(
             session,
             "Fleet created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(fleet)],
         )
         events.emit(
             session,
             "Instance created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(instance)],
         )
         await session.commit()
@@ -860,6 +950,75 @@ class TestListEventsFilters:
             "fleet",
         }
 
+    async def test_within_projects_and_include_target_types(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session)
+        project_a = await create_project(session=session, name="project_a", owner=user)
+        project_b = await create_project(session=session, name="project_b", owner=user)
+        fleet_a = await create_fleet(session=session, project=project_a)
+        instance_a = await create_instance(
+            session=session,
+            project=project_a,
+            fleet=fleet_a,
+        )
+        fleet_b = await create_fleet(session=session, project=project_b)
+        instance_b = await create_instance(
+            session=session,
+            project=project_b,
+            fleet=fleet_b,
+        )
+        events.emit(
+            session,
+            "Project created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(project_a)],
+        )
+        events.emit(
+            session,
+            "Fleet created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(fleet_a)],
+        )
+        events.emit(
+            session,
+            "Instance created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(instance_a)],
+        )
+        events.emit(
+            session,
+            "Project created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(project_b)],
+        )
+        events.emit(
+            session,
+            "Fleet created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(fleet_b)],
+        )
+        events.emit(
+            session,
+            "Instance created",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(instance_b)],
+        )
+        await session.commit()
+
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(user.token),
+            json={
+                "within_projects": [str(project_a.id)],
+                "include_target_types": ["fleet"],
+            },
+        )
+        resp.raise_for_status()
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["targets"][0]["type"] == "fleet"
+        assert resp.json()[0]["targets"][0]["id"] == str(fleet_a.id)
+
     async def test_actors(self, session: AsyncSession, client: AsyncClient) -> None:
         user_a = await create_user(session=session, name="user_a")
         user_b = await create_user(session=session, name="user_b")
@@ -868,13 +1027,13 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user_a.id),
+            actor=events.UserActor.from_user(user_a),
             targets=[events.Target.from_model(project_a)],
         )
         events.emit(
             session,
             "Project created",
-            actor=events.UserActor(user_b.id),
+            actor=events.UserActor.from_user(user_b),
             targets=[events.Target.from_model(project_b)],
         )
         events.emit(
@@ -945,7 +1104,7 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Fleet instances created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[
                 events.Target.from_model(instance_a),
                 events.Target.from_model(instance_b),
@@ -959,7 +1118,7 @@ class TestListEventsFilters:
         events.emit(
             session,
             "Instance created",
-            actor=events.UserActor(user.id),
+            actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(instance_c)],
         )
         await session.commit()
@@ -1007,7 +1166,7 @@ class TestListEventsPagination:
                 events.emit(
                     session,
                     "User created",
-                    actor=events.UserActor(user.id),
+                    actor=events.UserActor.from_user(user),
                     targets=[events.Target.from_model(user)],
                 )
         await session.commit()
