@@ -18,7 +18,6 @@ from dstack._internal.cli.commands.project import ProjectCommand
 from dstack._internal.cli.commands.ps import PsCommand
 from dstack._internal.cli.commands.secrets import SecretCommand
 from dstack._internal.cli.commands.server import ServerCommand
-from dstack._internal.cli.commands.stats import StatsCommand
 from dstack._internal.cli.commands.stop import StopCommand
 from dstack._internal.cli.commands.volume import VolumeCommand
 from dstack._internal.cli.utils.common import _colors, console
@@ -73,7 +72,6 @@ def main():
     PsCommand.register(subparsers)
     SecretCommand.register(subparsers)
     ServerCommand.register(subparsers)
-    StatsCommand.register(subparsers)
     StopCommand.register(subparsers)
     VolumeCommand.register(subparsers)
     CompletionCommand.register(subparsers)
