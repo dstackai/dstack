@@ -6,6 +6,7 @@ from typing import Annotated, Optional
 from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.utils.common import list_enum_values_for_annotation
 
 
 class EventTargetType(str, Enum):
@@ -23,7 +24,7 @@ class EventTarget(CoreModel):
         Field(
             description=(
                 f"Type of the target entity."
-                f" One of: {', '.join([f'`{t}`' for t in EventTargetType])}"
+                f" One of: {list_enum_values_for_annotation(EventTargetType)}"
             )
         ),
     ]
