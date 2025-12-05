@@ -21,6 +21,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.fleets import FleetNodesSpec
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -59,6 +60,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     get_auth_headers,
+    get_fleet_spec,
     get_job_provisioning_data,
     get_run_spec,
 )
@@ -173,7 +175,7 @@ def get_dev_env_run_plan_dict(
             "stop_duration": None,
             "max_price": None,
             "retry": None,
-            "spot_policy": "spot",
+            "spot_policy": "auto",
             "idle_duration": None,
             "utilization_policy": None,
             "startup_order": None,
@@ -198,7 +200,7 @@ def get_dev_env_run_plan_dict(
             "max_price": None,
             "name": "string",
             "retry": None,
-            "spot_policy": "spot",
+            "spot_policy": "auto",
             "idle_duration": None,
             "utilization_policy": None,
             "startup_order": None,
@@ -249,7 +251,7 @@ def get_dev_env_run_plan_dict(
                             "shm_size": None,
                         },
                         "max_price": None,
-                        "spot": True,
+                        "spot": None,
                         "reservation": None,
                         "multinode": False,
                     },
@@ -387,7 +389,7 @@ def get_dev_env_run_dict(
                 "stop_duration": None,
                 "max_price": None,
                 "retry": None,
-                "spot_policy": "spot",
+                "spot_policy": "auto",
                 "idle_duration": None,
                 "utilization_policy": None,
                 "startup_order": None,
@@ -412,7 +414,7 @@ def get_dev_env_run_dict(
                 "max_price": None,
                 "name": "string",
                 "retry": None,
-                "spot_policy": "spot",
+                "spot_policy": "auto",
                 "idle_duration": None,
                 "utilization_policy": None,
                 "startup_order": None,
@@ -458,7 +460,7 @@ def get_dev_env_run_dict(
                             "shm_size": None,
                         },
                         "max_price": None,
-                        "spot": True,
+                        "spot": None,
                         "reservation": None,
                         "multinode": False,
                     },
@@ -967,12 +969,15 @@ class TestGetRunPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
         repo = await create_repo(session=session, project_id=project.id)
         offer_aws = InstanceOfferWithAvailability(
             backend=BackendType.AWS,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=1.0,
@@ -982,7 +987,7 @@ class TestGetRunPlan:
             backend=BackendType.RUNPOD,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=2.0,
@@ -1030,12 +1035,15 @@ class TestGetRunPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
         repo = await create_repo(session=session, project_id=project.id)
         offer_aws = InstanceOfferWithAvailability(
             backend=BackendType.AWS,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=1.0,
@@ -1045,7 +1053,7 @@ class TestGetRunPlan:
             backend=BackendType.RUNPOD,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=2.0,
@@ -1090,12 +1098,15 @@ class TestGetRunPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
         repo = await create_repo(session=session, project_id=project.id)
         offer_aws = InstanceOfferWithAvailability(
             backend=BackendType.AWS,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=1.0,
@@ -1105,7 +1116,7 @@ class TestGetRunPlan:
             backend=BackendType.RUNPOD,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=2.0,
@@ -1150,6 +1161,9 @@ class TestGetRunPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
         repo = await create_repo(session=session, project_id=project.id)
         offer_aws = InstanceOfferWithAvailability(
             backend=BackendType.AWS,

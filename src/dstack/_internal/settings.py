@@ -35,7 +35,9 @@ class FeatureFlags:
     development. Feature flags are environment variables of the form DSTACK_FF_*
     """
 
-    AUTOCREATED_FLEETS_DISABLED = os.getenv("DSTACK_FF_AUTOCREATED_FLEETS_DISABLED") is not None
+    # DSTACK_FF_AUTOCREATED_FLEETS_ENABLED enables legacy autocreated fleets:
+    # If there are no fleet suitable for the run, a new fleet is created automatically instead of an error.
+    AUTOCREATED_FLEETS_ENABLED = os.getenv("DSTACK_FF_AUTOCREATED_FLEETS_ENABLED") is not None
 
     # Enabling LEGACY_REPO_DIR_DISABLED does the following:
     # - Changes `working_dir` default value from `/workflow` to the image's working dir, unless

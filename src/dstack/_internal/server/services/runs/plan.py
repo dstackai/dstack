@@ -106,13 +106,10 @@ async def get_job_plans(
         exclude_not_available=False,
     )
     if _should_force_non_fleet_offers(run_spec) or (
-        not FeatureFlags.AUTOCREATED_FLEETS_DISABLED
-        and profile.fleets is None
-        and fleet_model is None
+        FeatureFlags.AUTOCREATED_FLEETS_ENABLED and profile.fleets is None and fleet_model is None
     ):
         # Keep the old behavior returning all offers irrespective of fleets.
         # Needed for supporting offers with autocreated fleets flow (and for `dstack offer`).
-        # TODO: Consider dropping when autocreated fleets are dropped.
         instance_offers, backend_offers = await _get_non_fleet_offers(
             session=session,
             project=project,
@@ -248,7 +245,6 @@ async def find_optimal_fleet_with_offers(
     # the run without additional provisioning and choose the one with the cheapest pool offer.
     # Then choose a fleet with the cheapest pool offer among all fleets with pool offers.
     # If there are no fleets with pool offers, choose a fleet with a cheapest backend offer.
-    # Fallback to autocreated fleet if fleets have no pool or backend offers.
     # TODO: Consider trying all backend offers and then choosing a fleet.
     candidate_fleets_with_offers: list[
         tuple[
@@ -325,7 +321,7 @@ async def find_optimal_fleet_with_offers(
         return None, [], []
 
     if (
-        not FeatureFlags.AUTOCREATED_FLEETS_DISABLED
+        FeatureFlags.AUTOCREATED_FLEETS_ENABLED
         and run_spec.merged_profile.fleets is None
         and all(t[3] == 0 and t[4] == 0 for t in candidate_fleets_with_offers)
     ):

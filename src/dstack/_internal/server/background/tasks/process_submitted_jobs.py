@@ -341,7 +341,7 @@ async def _process_submitted_job(
                 job_model.last_processed_at = common_utils.get_current_datetime()
                 await session.commit()
                 return
-            if FeatureFlags.AUTOCREATED_FLEETS_DISABLED:
+            if not FeatureFlags.AUTOCREATED_FLEETS_ENABLED:
                 logger.debug("%s: no fleet found", fmt(job_model))
                 job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = (
