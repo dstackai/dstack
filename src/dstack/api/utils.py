@@ -32,10 +32,6 @@ def load_profile(repo_dir: PathLike, profile_name: Optional[str]) -> Profile:
     if repo_profile is not None:
         return repo_profile
 
-    repo_profiles_path = Path(repo_dir) / ".dstack/profiles.yml"
-    if not repo_profiles_path.exists():
-        repo_profiles_path = repo_profiles_path.with_suffix(".yaml")
-
     dstack_dir = get_dstack_dir()
     global_profiles_path = dstack_dir / "profiles.yml"
     if not global_profiles_path.exists():
