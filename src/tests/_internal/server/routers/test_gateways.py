@@ -54,6 +54,7 @@ class TestListAndGetGateways:
         assert response.status_code == 200
         assert response.json() == [
             {
+                "backend": backend.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
                 "status": "submitted",
@@ -62,6 +63,7 @@ class TestListAndGetGateways:
                 "ip_address": gateway_compute.ip_address,
                 "hostname": gateway_compute.ip_address,
                 "name": gateway.name,
+                "region": gateway.region,
                 "wildcard_domain": gateway.wildcard_domain,
                 "configuration": {
                     "type": "gateway",
@@ -104,6 +106,7 @@ class TestListAndGetGateways:
         )
         assert response.status_code == 200
         assert response.json() == {
+            "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": False,
             "status": "submitted",
@@ -112,6 +115,7 @@ class TestListAndGetGateways:
             "ip_address": gateway_compute.ip_address,
             "hostname": gateway_compute.ip_address,
             "name": gateway.name,
+            "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
             "configuration": {
                 "type": "gateway",
@@ -184,6 +188,8 @@ class TestCreateGateway:
         assert response.status_code == 200
         assert response.json() == {
             "name": "test",
+            "backend": "aws",
+            "region": "us",
             "status": "submitted",
             "status_message": None,
             "instance_id": "",
@@ -235,6 +241,8 @@ class TestCreateGateway:
         assert response.status_code == 200
         assert response.json() == {
             "name": "random-name",
+            "backend": "aws",
+            "region": "us",
             "status": "submitted",
             "status_message": None,
             "instance_id": "",
@@ -335,6 +343,7 @@ class TestDefaultGateway:
         )
         assert response.status_code == 200
         assert response.json() == {
+            "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": True,
             "status": "submitted",
@@ -343,6 +352,7 @@ class TestDefaultGateway:
             "ip_address": gateway_compute.ip_address,
             "hostname": gateway_compute.ip_address,
             "name": gateway.name,
+            "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
             "configuration": {
                 "type": "gateway",
@@ -456,6 +466,7 @@ class TestDeleteGateway:
         assert response.status_code == 200
         assert response.json() == [
             {
+                "backend": backend_gcp.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
                 "status": "submitted",
@@ -464,6 +475,7 @@ class TestDeleteGateway:
                 "ip_address": gateway_compute_gcp.ip_address,
                 "hostname": gateway_compute_gcp.ip_address,
                 "name": gateway_gcp.name,
+                "region": gateway_gcp.region,
                 "wildcard_domain": gateway_gcp.wildcard_domain,
                 "configuration": {
                     "type": "gateway",
@@ -524,6 +536,7 @@ class TestUpdateGateway:
         )
         assert response.status_code == 200
         assert response.json() == {
+            "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "status": "submitted",
             "status_message": None,
@@ -532,6 +545,7 @@ class TestUpdateGateway:
             "ip_address": gateway_compute.ip_address,
             "hostname": gateway_compute.ip_address,
             "name": gateway.name,
+            "region": gateway.region,
             "wildcard_domain": "test.com",
             "configuration": {
                 "type": "gateway",
