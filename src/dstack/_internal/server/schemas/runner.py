@@ -80,6 +80,7 @@ class SubmitBody(CoreModel):
                 "working_dir",
                 "repo_dir",
                 "repo_data",
+                "repo_exists_action",
                 "file_archives",
             }
         ),

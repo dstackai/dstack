@@ -112,6 +112,17 @@ The `dev-environment` configuration type allows running [dev environments](../..
       type:
         required: true
 
+??? info "`if_exists` action"
+
+    If the `path` already exists and is a non-empty directory, by default the run is terminated with an error.
+    This can be changed with the `if_exists` option:
+
+    * `error` – do not try to check out, terminate the run with an error (the default action since `0.20.0`)
+    * `skip` – do not try to check out, skip the repo (the only action available before `0.20.0`)
+
+    Note, if the `path` exists and is _not_ a directory (e.g., a regular file), this is always an error that
+    cannot be ignored with the `skip` action.
+
 ??? info "Short syntax"
 
     The short syntax for repos is a colon-separated string in the form of `local_path_or_url:path`.

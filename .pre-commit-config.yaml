@@ -10,6 +10,12 @@ repos:
     rev: v2.6.2  # Should match .github/workflows/build-artifacts.yml
     hooks:
       - id: golangci-lint-full
+        alias: runner-fix
+        language_version: 1.25.0  # Should match runner/go.mod
+        entry: bash -c 'cd runner && golangci-lint run --fix'
+        stages: [manual]
+      - id: golangci-lint-full
+        alias: runner-lint
         language_version: 1.25.0  # Should match runner/go.mod
         entry: bash -c 'cd runner && golangci-lint run'
         stages: [manual]
