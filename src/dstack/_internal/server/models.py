@@ -637,7 +637,7 @@ class InstanceModel(BaseModel):
     termination_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     termination_reason: Mapped[Optional[str]] = mapped_column(String(4000))
     # Deprecated since 0.19.22, not used
-    health_status: Mapped[Optional[str]] = mapped_column(String(4000))
+    health_status: Mapped[Optional[str]] = mapped_column(String(4000), deferred=True)
     health: Mapped[HealthStatus] = mapped_column(
         EnumAsString(HealthStatus, 100), default=HealthStatus.HEALTHY
     )
