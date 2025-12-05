@@ -38,5 +38,4 @@ class TestProjectAdd:
                     "url": "http://127.0.0.1:31313",
                 }
             ],
-            "repos": [],
         }

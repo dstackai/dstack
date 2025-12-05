@@ -460,7 +460,7 @@ class RunCollection:
 
         Args:
             configuration (Union[Task, Service, DevEnvironment]): The run configuration.
-            repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
+            repo (Union[RemoteRepo, VirtualRepo, None]):
                 The repo to use for the run. Pass `None` if repo is not needed.
             profile: The profile to use for the run.
             configuration_path: The path to the configuration file. Omit if the configuration
@@ -539,7 +539,7 @@ class RunCollection:
 
         Args:
             run_plan: The result of `get_run_plan` call.
-            repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
+            repo (Union[RemoteRepo, VirtualRepo, None]):
                 The repo to use for the run. Should be the same repo that is passed to `get_run_plan`.
             reserve_ports: Reserve local ports before applying. Use if you'll attach to the run.
 
@@ -582,7 +582,7 @@ class RunCollection:
 
         Args:
             configuration (Union[Task, Service, DevEnvironment]): The run configuration.
-            repo (Union[LocalRepo, RemoteRepo, VirtualRepo, None]):
+            repo (Union[RemoteRepo, VirtualRepo, None]):
                 The repo to use for the run. Pass `None` if repo is not needed.
             profile: The profile to use for the run.
             configuration_path: The path to the configuration file. Omit if the configuration is not loaded from a file.
