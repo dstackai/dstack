@@ -106,6 +106,11 @@ SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS = int(
     os.getenv("DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS", 60)
 )
 
+SERVER_EVENTS_TTL_SECONDS = int(
+    # default documented in reference/environment-variables.md, keep in sync
+    os.getenv("DSTACK_SERVER_EVENTS_TTL_SECONDS", 30 * 24 * 3600)
+)
+
 SERVER_KEEP_SHIM_TASKS = os.getenv("DSTACK_SERVER_KEEP_SHIM_TASKS") is not None
 
 DEFAULT_PROJECT_NAME = "main"
