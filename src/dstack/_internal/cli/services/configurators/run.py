@@ -3,7 +3,7 @@ import shlex
 import subprocess
 import sys
 import time
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Dict, List, Optional, Set, TypeVar
 
 import gpuhunt
@@ -33,7 +33,6 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.common import ApplyAction, RegistryAuth
 from dstack._internal.core.models.configurations import (
-    LEGACY_REPO_DIR,
     AnyRunConfiguration,
     ApplyConfigurationType,
     ConfigurationWithCommandsParams,
@@ -63,7 +62,6 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
 from dstack._internal.utils.path import is_absolute_posix_path
 from dstack.api._public.runs import Run
-from dstack.api.server import APIClient
 from dstack.api.utils import load_profile
 
 _KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
@@ -95,42 +93,8 @@ class BaseRunConfigurator(
         self.validate_gpu_vendor_and_image(conf)
         self.validate_cpu_arch_and_image(conf)
 
-        working_dir = conf.working_dir
-        if working_dir is None:
-            # Use the default working dir for the image for tasks and services if `commands`
-            # is not set (emulate pre-0.19.27 JobConfigutor logic), otherwise fall back to
-            # `/workflow`.
-            if isinstance(conf, DevEnvironmentConfiguration) or conf.commands:
-                # relative path for compatibility with pre-0.19.27 servers
-                conf.working_dir = "."
-                warn(
-                    f'The [code]working_dir[/code] is not set — using legacy default [code]"{LEGACY_REPO_DIR}"[/code].'
-                    " Future versions will default to the [code]image[/code]'s working directory."
-                )
-        elif not is_absolute_posix_path(working_dir):
-            legacy_working_dir = PurePosixPath(LEGACY_REPO_DIR) / working_dir
-            warn(
-                "[code]working_dir[/code] is relative."
-                f" Using legacy working directory [code]{legacy_working_dir}[/code]\n\n"
-                "Future versions will require absolute path\n"
-                f"To keep using legacy working directory, set"
-                f" [code]working_dir[/code] to [code]{legacy_working_dir}[/code]\n"
-            )
-        else:
-            # relative path for compatibility with pre-0.19.27 servers
-            try:
-                conf.working_dir = str(PurePosixPath(working_dir).relative_to(LEGACY_REPO_DIR))
-            except ValueError:
-                pass
-
-        if conf.repos and conf.repos[0].path is None:
-            warn(
-                "[code]repos[0].path[/code] is not set,"
-                f" using legacy repo path [code]{LEGACY_REPO_DIR}[/code]\n\n"
-                "In a future version the default value will be changed."
-                f" To keep using [code]{LEGACY_REPO_DIR}[/code], explicitly set"
-                f" [code]repos[0].path[/code] to [code]{LEGACY_REPO_DIR}[/code]\n"
-            )
+        if conf.working_dir is not None and not is_absolute_posix_path(conf.working_dir):
+            raise ConfigurationError("working_dir must be absolute")
 
         config_manager = ConfigManager()
         repo = self.get_repo(conf, configuration_path, configurator_args, config_manager)
@@ -224,8 +188,6 @@ class BaseRunConfigurator(
                         format_date=local_time,
                     )
                 )
-
-                _warn_fleet_autocreated(self.api.client, run)
 
                 console.print(
                     f"\n[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
@@ -562,8 +524,7 @@ class BaseRunConfigurator(
             local_path = Path.cwd()
             legacy_local_path = True
         if url:
-            # "master" is a dummy value, we'll fetch the actual default branch later
-            repo = RemoteRepo.from_url(repo_url=url, repo_branch="master")
+            repo = RemoteRepo.from_url(repo_url=url)
             repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
         elif local_path:
             if legacy_local_path:
@@ -628,15 +589,16 @@ class BaseRunConfigurator(
                 raise CLIError(*e.args) from e
 
             if repo_branch is None and repo_hash is None:
-                repo_branch = default_repo_branch
-                if repo_branch is None:
+                if default_repo_branch is None:
                     raise CLIError(
                         "Failed to automatically detect remote repo branch."
                         " Specify branch or hash."
                     )
-            repo = RemoteRepo.from_url(
-                repo_url=repo.repo_url, repo_branch=repo_branch, repo_hash=repo_hash
-            )
+                # TODO: remove in 0.20. Currently `default_repo_branch` is sent only for backward compatibility of `dstack-runner`.
+                repo_branch = default_repo_branch
+            repo.run_repo_data.repo_branch = repo_branch
+            if repo_hash is not None:
+                repo.run_repo_data.repo_hash = repo_hash
 
         if init:
             self.api.repos.init(
@@ -932,16 +894,3 @@ def render_run_spec_diff(old_spec: RunSpec, new_spec: RunSpec) -> Optional[str]:
             item = NestedListItem(spec_field.replace("_", " ").capitalize())
         nested_list.children.append(item)
     return nested_list.render()
-
-
-def _warn_fleet_autocreated(api: APIClient, run: Run):
-    if run._run.fleet is None:
-        return
-    fleet = api.fleets.get(project_name=run._project, name=run._run.fleet.name)
-    if not fleet.spec.autocreated:
-        return
-    warn(
-        f"\nThe run is using automatically created fleet [code]{fleet.name}[/code].\n"
-        "Future dstack versions won't create fleets automatically.\n"
-        "Create a fleet explicitly: https://dstack.ai/docs/concepts/fleets/"
-    )

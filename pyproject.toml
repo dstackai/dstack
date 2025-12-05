@@ -78,6 +78,9 @@ pattern = '<picture>\s*|<source[^>]*>\s*|\s*</picture>|<video[^>]*>\s*|</video>\
 replacement = ''
 ignore-case = true
 
+[tool.uv.sources]
+dstack-plugin-server = { path = "examples/plugins/example_plugin_server", editable = true }
+
 [tool.pyright]
 include = [
     "src/dstack/plugins",
@@ -104,10 +107,24 @@ dev = [
     "requests-mock>=1.12.1",
     "openai>=1.68.2",
     "freezegun>=1.5.1",
-    "ruff==0.11.6",  # should match .pre-commit-config.yaml
+    "ruff==0.12.7",  # should match .pre-commit-config.yaml
     "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
     "pyinstrument>=5.0.0",
+    "kubernetes-stubs-elephant-fork",
+    # docs
+    "dstack[server]; python_version >= '3.11'",
+    "dstack-plugin-server; python_version >= '3.11'",
+    "pillow; python_version >= '3.11'",
+    "cairosvg; python_version >= '3.11'",
+    "mkdocs-material>=9.7.0; python_version >= '3.11'",
+    "mkdocs-material[imaging]; python_version >= '3.11'", 
+    "mkdocs-material-extensions; python_version >= '3.11'",
+    "mkdocs-redirects; python_version >= '3.11'",
+    "mkdocs-gen-files; python_version >= '3.11'",
+    "mkdocstrings[python]; python_version >= '3.11'", 
+    "mkdocs-render-swagger-plugin; python_version >= '3.11'",
+    "mkdocs-llmstxt-md; python_version >= '3.11'"
 ]
 
 [project.optional-dependencies]
@@ -131,10 +148,10 @@ server = [
     "watchfiles",
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
-    "alembic>=1.10.2",
+    "alembic>=1.16.0",
     "aiosqlite",
     "docker>=6.0.0",
-    "python-dxf==12.1.0",
+    "python-dxf>=12.1.1",
     "sentry-sdk[fastapi]>=2.27.0",
     "alembic-postgresql-enum",
     "asyncpg",
@@ -190,8 +207,7 @@ oci = [
     "dstack[server]",
 ]
 nebius = [
-    # 0.2.73 breaks sdk backward compatibility: https://github.com/dstackai/dstack/issues/3171
-    "nebius>=0.2.40,<=0.2.72; python_version >= '3.10'",
+    "nebius>=0.3.4,<0.4; python_version >= '3.10'",
     "dstack[server]",
 ]
 all = [

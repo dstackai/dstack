@@ -4,7 +4,7 @@ description: "This example shows how to deploy Llama 3.1 to any cloud or on-prem
 
 # vLLM
 
-This example shows how to deploy Llama 3.1 8B with `dstack` using [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/){:target="_blank"}.
+This example shows how to deploy Llama 3.1 8B with `dstack` using [vLLM](https://docs.vllm.ai/en/latest/).
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
@@ -112,7 +112,7 @@ is available at `https://gateway.<gateway domain>/`.
 ## Source code
 
 The source-code of this example can be found in
-[`examples/inference/vllm` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm).
+[`examples/inference/vllm`](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm).
 
 ## What's next?
 

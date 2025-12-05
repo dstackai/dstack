@@ -48,3 +48,7 @@ pyright -p .
 ## 6. Frontend
 
 See [FRONTEND.md](FRONTEND.md) for the details on how to build and develop the frontend.
+
+## 7. Documentation
+
+See [DOCS.md](DOCS.md) for the details on how to preview or build the documentation.

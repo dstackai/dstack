@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/dstackai/dstack/runner/internal/shim"
+	"github.com/dstackai/dstack/runner/internal/shim/components"
 	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
 )
 
@@ -36,4 +37,13 @@ type TaskTerminateRequest struct {
 	TerminationReason  string `json:"termination_reason"`
 	TerminationMessage string `json:"termination_message"`
 	Timeout            uint   `json:"timeout"`
+}
+
+type ComponentListResponse struct {
+	Components []components.ComponentInfo `json:"components"`
+}
+
+type ComponentInstallRequest struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }

@@ -27,7 +27,7 @@ class TestGetArchiveByHash:
             "/api/files/get_archive_by_hash",
             json={"hash": "blob_hash"},
         )
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     async def test_returns_400_if_archive_does_not_exist(
         self, session: AsyncSession, client: AsyncClient
@@ -81,7 +81,7 @@ class TestUploadArchive:
             "/api/files/upload_archive",
             files={"file": self.file},
         )
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     async def test_returns_existing_archive(
         self, session: AsyncSession, client: AsyncClient, default_storage_mock: Mock

@@ -6,6 +6,7 @@ import importlib
 import inspect
 import logging
 import re
+from enum import Enum
 from fnmatch import fnmatch
 
 import mkdocs_gen_files
@@ -63,11 +64,14 @@ def generate_schema_reference(
             ]
         )
     for name, field in cls.__fields__.items():
+        default = field.default
+        if isinstance(default, Enum):
+            default = default.value
         values = dict(
             name=name,
             description=field.field_info.description,
             type=get_type(field.annotation),
-            default=field.default,
+            default=default,
             required=field.required,
         )
         # TODO: If the field doesn't have description (e.g. BaseConfiguration.type), we could fallback to docstring

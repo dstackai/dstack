@@ -44,7 +44,7 @@ machines equipped with Intel Gaudi accelerators.
 ## Create a fleet
 
 To manage container workloads on on-prem machines with Intel Gaudi accelerators, start by configuring an 
-[SSH fleet](../../docs/concepts/fleets.md#ssh). Here’s an example configuration for your fleet:
+[SSH fleet](../../docs/concepts/fleets.md#ssh-fleets). Here’s an example configuration for your fleet:
 
 <div editor-title="examples/misc/fleets/gaudi.dstack.yml">
 
@@ -92,10 +92,10 @@ Provisioning...
 
 With your fleet provisioned, you can now run [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md). 
 
-Below is an example of a task configuration for fine-tuning the [`DeepSeek-R1-Distill-Qwen-7B` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B){:target="_blank"}
-model using [Optimum for Intel Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-habana){:target="_blank"} 
-and [DeepSpeed :material-arrow-top-right-thin:{ .external }](https://docs.habana.ai/en/latest/PyTorch/DeepSpeed/DeepSpeed_User_Guide/DeepSpeed_User_Guide.html#deepspeed-user-guide){:target="_blank"} with 
-the [`lvwerra/stack-exchange-paired` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/lvwerra/stack-exchange-paired){:target="_blank"} dataset:
+Below is an example of a task configuration for fine-tuning the [`DeepSeek-R1-Distill-Qwen-7B`](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B)
+model using [Optimum for Intel Gaudi](https://github.com/huggingface/optimum-habana) 
+and [DeepSpeed](https://docs.habana.ai/en/latest/PyTorch/DeepSpeed/DeepSpeed_User_Guide/DeepSpeed_User_Guide.html#deepspeed-user-guide) with 
+the [`lvwerra/stack-exchange-paired`](https://huggingface.co/datasets/lvwerra/stack-exchange-paired) dataset:
 
 <div editor-title="examples/single-node-training/trl/intel/.dstack.yml">
     
@@ -163,7 +163,7 @@ $ dstack apply -f examples/single-node-training/trl/intel/.dstack.yml -R
 
 !!! info "Intel Tiber AI Cloud"
     At `dstack`, we’re grateful to be part of the Intel Liftoff program, which allowed us to access Intel Gaudi AI
-    accelerators via [Intel Tiber AI Cloud :material-arrow-top-right-thin:{ .external }](https://www.intel.com/content/www/us/en/developer/tools/tiber/ai-cloud.html){:target="_blank"}.
+    accelerators via [Intel Tiber AI Cloud](https://www.intel.com/content/www/us/en/developer/tools/tiber/ai-cloud.html).
     You can sign up if you’d like to access Intel Gaudi AI accelerators via the cloud.
 
     Native integration with Intel Tiber AI Cloud is also coming soon to `dstack`.
@@ -171,4 +171,4 @@ $ dstack apply -f examples/single-node-training/trl/intel/.dstack.yml -R
 !!! info "What's next?"
     1. Refer to [Quickstart](../../docs/quickstart.md)
     2. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)
-    3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    3. Join [Discord](https://discord.gg/u8SmfwPpMd)

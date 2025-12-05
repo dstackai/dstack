@@ -108,4 +108,4 @@ See [services](../../docs/concepts/services.md#probes) and the [reference](../..
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)
     2. Learn about [services](../../docs/concepts/services.md)
-    3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    3. Join [Discord](https://discord.gg/u8SmfwPpMd)

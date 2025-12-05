@@ -86,6 +86,7 @@ func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "missing boundary"}
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, math.MaxInt64)
 	formReader := multipart.NewReader(r.Body, boundary)
 	part, err := formReader.NextPart()
 	if errors.Is(err, io.EOF) {
@@ -94,6 +95,8 @@ func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return nil, fmt.Errorf("read multipart form: %w", err)
 	}
+	defer func() { _ = part.Close() }()
+
 	fieldName := part.FormName()
 	if fieldName == "" {
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "missing field name"}

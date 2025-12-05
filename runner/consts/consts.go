@@ -28,8 +28,6 @@ const (
 	RunnerHomeDir = "/root"
 )
 
-const LegacyRepoDir = "/workflow"
-
 const (
 	RunnerHTTPPort = 10999
 	RunnerSSHPort  = 10022

@@ -2,6 +2,9 @@
 
 Services allow you to deploy models or web apps as secure and scalable endpoints.
 
+??? info "Prerequisites"
+    Before running a service, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
+
 ## Apply a configuration
 
 First, define a service configuration as a YAML file in your project folder.
@@ -100,12 +103,13 @@ If [authorization](#authorization) is not disabled, the service endpoint require
     However, you'll need a gateway in the following cases:
 
     * To use auto-scaling or rate limits
+    * To enable a support custom router, e.g. such as the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#)
     * To enable HTTPS for the endpoint and map it to your domain
     * If your service requires WebSockets
     * If your service cannot work with a [path prefix](#path-prefix)
 
-    Note, if you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-    a gateway is already pre-configured for you.
+    <!-- Note, if you're using [dstack Sky](https://sky.dstack.ai),
+    a gateway is already pre-configured for you. -->
 
     If a [gateway](gateways.md) is configured, the service endpoint will be accessible at
     `https://<run name>.<gateway domain>/`.
@@ -433,7 +437,7 @@ If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
 
 #### Default image
 
-If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its [base](https://github.com/dstackai/dstack/tree/master/docker/base) Docker image pre-configured with 
     `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
 Set the `python` property to pre-install a specific version of Python.
@@ -821,6 +825,9 @@ retry:
 If one replica of a multi-replica service fails with retry enabled,
 `dstack` will resubmit only the failed replica while keeping active replicas running.
 
+!!! info "Retry duration"
+    The duration period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
+
 ### Spot policy
 
 By default, `dstack` uses on-demand instances. However, you can change that
@@ -988,6 +995,6 @@ The rolling deployment stops when all replicas are updated or when a new deploym
     1. Read about [dev environments](dev-environments.md) and [tasks](tasks.md)
     2. Learn how to manage [fleets](fleets.md)
     3. See how to set up [gateways](gateways.md)
-    4. Check the [TGI :material-arrow-top-right-thin:{ .external }](../../examples/inference/tgi/index.md){:target="_blank"},
-       [vLLM :material-arrow-top-right-thin:{ .external }](../../examples/inference/vllm/index.md){:target="_blank"}, and 
-       [NIM :material-arrow-top-right-thin:{ .external }](../../examples/inference/nim/index.md){:target="_blank"} examples
+    4. Check the [TGI](../../examples/inference/tgi/index.md),
+       [vLLM](../../examples/inference/vllm/index.md), and 
+       [NIM](../../examples/inference/nim/index.md) examples

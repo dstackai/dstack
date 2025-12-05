@@ -8,10 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/runner/api"
-	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -28,9 +29,9 @@ func start(tempDir string, homeDir string, httpPort int, sshPort int, logLevel i
 		return fmt.Errorf("create default log file: %w", err)
 	}
 	defer func() {
-		err = defaultLogFile.Close()
-		if err != nil {
-			log.Error(context.TODO(), "Failed to close default log file", "err", err)
+		closeErr := defaultLogFile.Close()
+		if closeErr != nil {
+			log.Error(context.TODO(), "Failed to close default log file", "err", closeErr)
 		}
 	}()
 

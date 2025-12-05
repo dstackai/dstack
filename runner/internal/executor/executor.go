@@ -21,14 +21,15 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/dstackai/ansistrip"
+	"github.com/prometheus/procfs"
+	"golang.org/x/sys/unix"
+
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/connections"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/dstackai/dstack/runner/internal/types"
-	"github.com/prometheus/procfs"
-	"golang.org/x/sys/unix"
 )
 
 // TODO: Tune these parameters for optimal experience/performance
@@ -176,7 +177,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	}()
 
 	stripper := ansistrip.NewWriter(ex.runnerLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
-	defer stripper.Close()
+	defer func() { _ = stripper.Close() }()
 	logger := io.MultiWriter(runnerLogFile, os.Stdout, stripper)
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
@@ -196,7 +197,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 
 	ex.setJobCredentials(ctx)
 
-	if err := ex.prepareJobWorkingDir(ctx); err != nil {
+	if err := ex.setJobWorkingDir(ctx); err != nil {
 		ex.SetJobStateWithTerminationReason(
 			ctx,
 			types.JobStateFailed,
@@ -352,7 +353,7 @@ func (ex *RunExecutor) setJobCredentials(ctx context.Context) {
 	log.Trace(ctx, "Job credentials", "uid", ex.jobUid, "gid", ex.jobGid, "home", ex.jobHomeDir)
 }
 
-func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
+func (ex *RunExecutor) setJobWorkingDir(ctx context.Context) error {
 	var err error
 	if ex.jobSpec.WorkingDir == nil {
 		ex.jobWorkingDir, err = os.Getwd()
@@ -360,10 +361,7 @@ func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
 			return fmt.Errorf("get working directory: %w", err)
 		}
 	} else {
-		// We still support relative paths, as 0.19.27 server uses relative paths when possible
-		// for compatibility with pre-0.19.27 runners.
-		// Replace consts.LegacyRepoDir with "" eventually.
-		ex.jobWorkingDir, err = common.ExpandPath(*ex.jobSpec.WorkingDir, consts.LegacyRepoDir, ex.jobHomeDir)
+		ex.jobWorkingDir, err = common.ExpandPath(*ex.jobSpec.WorkingDir, "", ex.jobHomeDir)
 		if err != nil {
 			return fmt.Errorf("expand working dir path: %w", err)
 		}
@@ -372,9 +370,6 @@ func (ex *RunExecutor) prepareJobWorkingDir(ctx context.Context) error {
 		}
 	}
 	log.Trace(ctx, "Job working dir", "path", ex.jobWorkingDir)
-	if err := common.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUid, ex.jobGid); err != nil {
-		return fmt.Errorf("create working directory: %w", err)
-	}
 	return nil
 }
 
@@ -411,7 +406,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 
 	// Call buildLDLibraryPathEnv and update jobEnvs if no error occurs
-	newLDPath, err := buildLDLibraryPathEnv()
+	newLDPath, err := buildLDLibraryPathEnv(ctx)
 	if err != nil {
 		log.Info(ctx, "Continuing without updating LD_LIBRARY_PATH")
 	} else {
@@ -422,13 +417,16 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
 	cmd.Cancel = func() error {
 		// returns error on Windows
-		if err = cmd.Process.Signal(os.Interrupt); err != nil {
-			return fmt.Errorf("send interrupt signal: %w", err)
+		if signalErr := cmd.Process.Signal(os.Interrupt); signalErr != nil {
+			return fmt.Errorf("send interrupt signal: %w", signalErr)
 		}
 		return nil
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
+	if err := common.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUid, ex.jobGid); err != nil {
+		return fmt.Errorf("create working directory: %w", err)
+	}
 	cmd.Dir = ex.jobWorkingDir
 
 	// User must be already set
@@ -546,7 +544,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
 	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
-	defer stripper.Close()
+	defer func() { _ = stripper.Close() }()
 	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
 	_, err = io.Copy(logger, ptm)
 	if err != nil && !isPtyError(err) {
@@ -616,9 +614,9 @@ func isPtyError(err error) bool {
 	return errors.As(err, &e) && errors.Is(e.Err, syscall.EIO)
 }
 
-func buildLDLibraryPathEnv() (string, error) {
+func buildLDLibraryPathEnv(ctx context.Context) (string, error) {
 	// Execute shell command to get Python prefix
-	cmd := exec.Command("bash", "-i", "-c", "python3-config --prefix")
+	cmd := exec.CommandContext(ctx, "bash", "-i", "-c", "python3-config --prefix")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("error executing command: %w", err)
@@ -907,7 +905,7 @@ func includeDstackProfile(profilePath string, dstackProfilePath string) error {
 		return fmt.Errorf("open profile file: %w", err)
 	}
 	defer file.Close()
-	if _, err = file.WriteString(fmt.Sprintf("\n. '%s'\n", dstackProfilePath)); err != nil {
+	if _, err = fmt.Fprintf(file, "\n. '%s'\n", dstackProfilePath); err != nil {
 		return fmt.Errorf("write profile include: %w", err)
 	}
 	if err = os.Chmod(profilePath, 0o644); err != nil {

@@ -21,6 +21,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
     TaskConfiguration,
 )
+from dstack._internal.core.models.fleets import FleetNodesSpec
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -59,6 +60,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     get_auth_headers,
+    get_fleet_spec,
     get_job_provisioning_data,
     get_run_spec,
 )
@@ -97,7 +99,7 @@ def get_dev_env_run_plan_dict(
                 " && echo"
                 " && echo 'To open in VS Code Desktop, use link below:'"
                 " && echo"
-                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_REPO_DIR"'
+                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_WORKING_DIR"'
                 " && echo"
                 " && echo 'To connect via SSH, use: `ssh dry-run`'"
                 " && echo"
@@ -121,7 +123,7 @@ def get_dev_env_run_plan_dict(
                 " && echo"
                 " && echo 'To open in VS Code Desktop, use link below:'"
                 " && echo"
-                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_REPO_DIR"'
+                ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_WORKING_DIR"'
                 " && echo"
                 " && echo 'To connect via SSH, use: `ssh dry-run`'"
                 " && echo"
@@ -161,7 +163,16 @@ def get_dev_env_run_plan_dict(
                 "shm_size": None,
             },
             "volumes": [json.loads(v.json()) for v in volumes],
-            "repos": [],
+            "repos": [
+                {
+                    "url": "https://github.com/dstackai/dstack",
+                    "branch": None,
+                    "hash": None,
+                    "local_path": None,
+                    "path": "~/repo",
+                    "if_exists": "error",
+                },
+            ],
             "files": [],
             "backends": ["local", "aws", "azure", "gcp", "lambda", "runpod"],
             "regions": ["us"],
@@ -173,7 +184,7 @@ def get_dev_env_run_plan_dict(
             "stop_duration": None,
             "max_price": None,
             "retry": None,
-            "spot_policy": "spot",
+            "spot_policy": "auto",
             "idle_duration": None,
             "utilization_policy": None,
             "startup_order": None,
@@ -198,7 +209,7 @@ def get_dev_env_run_plan_dict(
             "max_price": None,
             "name": "string",
             "retry": None,
-            "spot_policy": "spot",
+            "spot_policy": "auto",
             "idle_duration": None,
             "utilization_policy": None,
             "startup_order": None,
@@ -209,12 +220,18 @@ def get_dev_env_run_plan_dict(
             "tags": None,
         },
         "repo_code_hash": None,
-        "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+        "repo_data": {
+            "repo_type": "remote",
+            "repo_name": "dstack",
+            "repo_branch": None,
+            "repo_hash": None,
+            "repo_config_name": None,
+            "repo_config_email": None,
+        },
         "repo_id": repo_id,
         "repo_dir": "~/repo",
         "run_name": run_name,
         "ssh_key_pub": "ssh_key",
-        "working_dir": None,
     }
     return {
         "project_name": project_name,
@@ -249,7 +266,7 @@ def get_dev_env_run_plan_dict(
                             "shm_size": None,
                         },
                         "max_price": None,
-                        "spot": True,
+                        "spot": None,
                         "reservation": None,
                         "multinode": False,
                     },
@@ -258,8 +275,16 @@ def get_dev_env_run_plan_dict(
                     "ssh_key": None,
                     "working_dir": None,
                     "repo_code_hash": None,
-                    "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+                    "repo_data": {
+                        "repo_type": "remote",
+                        "repo_name": "dstack",
+                        "repo_branch": None,
+                        "repo_hash": None,
+                        "repo_config_name": None,
+                        "repo_config_email": None,
+                    },
                     "repo_dir": "~/repo",
+                    "repo_exists_action": "error",
                     "file_archives": [],
                     "service_port": None,
                     "probes": [],
@@ -302,7 +327,7 @@ def get_dev_env_run_dict(
                 " && echo"
                 " && echo 'To open in VS Code Desktop, use link below:'"
                 " && echo"
-                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_REPO_DIR"'
+                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_WORKING_DIR"'
                 " && echo"
                 " && echo 'To connect via SSH, use: `ssh test-run`'"
                 " && echo"
@@ -326,7 +351,7 @@ def get_dev_env_run_dict(
                 " && echo"
                 " && echo 'To open in VS Code Desktop, use link below:'"
                 " && echo"
-                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_REPO_DIR"'
+                ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_WORKING_DIR"'
                 " && echo"
                 " && echo 'To connect via SSH, use: `ssh test-run`'"
                 " && echo"
@@ -375,7 +400,16 @@ def get_dev_env_run_dict(
                     "shm_size": None,
                 },
                 "volumes": [],
-                "repos": [],
+                "repos": [
+                    {
+                        "url": "https://github.com/dstackai/dstack",
+                        "branch": None,
+                        "hash": None,
+                        "local_path": None,
+                        "path": "~/repo",
+                        "if_exists": "error",
+                    },
+                ],
                 "files": [],
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
@@ -387,7 +421,7 @@ def get_dev_env_run_dict(
                 "stop_duration": None,
                 "max_price": None,
                 "retry": None,
-                "spot_policy": "spot",
+                "spot_policy": "auto",
                 "idle_duration": None,
                 "utilization_policy": None,
                 "startup_order": None,
@@ -412,7 +446,7 @@ def get_dev_env_run_dict(
                 "max_price": None,
                 "name": "string",
                 "retry": None,
-                "spot_policy": "spot",
+                "spot_policy": "auto",
                 "idle_duration": None,
                 "utilization_policy": None,
                 "startup_order": None,
@@ -423,12 +457,18 @@ def get_dev_env_run_dict(
                 "tags": None,
             },
             "repo_code_hash": None,
-            "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+            "repo_data": {
+                "repo_type": "remote",
+                "repo_name": "dstack",
+                "repo_branch": None,
+                "repo_hash": None,
+                "repo_config_name": None,
+                "repo_config_email": None,
+            },
             "repo_id": repo_id,
             "repo_dir": "~/repo",
             "run_name": run_name,
             "ssh_key_pub": "ssh_key",
-            "working_dir": None,
         },
         "jobs": [
             {
@@ -458,7 +498,7 @@ def get_dev_env_run_dict(
                             "shm_size": None,
                         },
                         "max_price": None,
-                        "spot": True,
+                        "spot": None,
                         "reservation": None,
                         "multinode": False,
                     },
@@ -467,8 +507,16 @@ def get_dev_env_run_dict(
                     "ssh_key": None,
                     "working_dir": None,
                     "repo_code_hash": None,
-                    "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+                    "repo_data": {
+                        "repo_type": "remote",
+                        "repo_name": "dstack",
+                        "repo_branch": None,
+                        "repo_hash": None,
+                        "repo_config_name": None,
+                        "repo_config_email": None,
+                    },
                     "repo_dir": "~/repo",
+                    "repo_exists_action": "error",
                     "file_archives": [],
                     "service_port": None,
                     "probes": [],
@@ -535,6 +583,16 @@ def get_service_run_spec(
             "port": 8000,
             "gateway": gateway,
             "model": "test-model",
+            "repos": [
+                {
+                    "url": "https://github.com/dstackai/dstack",
+                    "branch": None,
+                    "hash": None,
+                    "local_path": None,
+                    "path": "~/repo",
+                    "if_exists": "error",
+                },
+            ],
         },
         "configuration_path": "dstack.yaml",
         "file_archives": [],
@@ -542,11 +600,18 @@ def get_service_run_spec(
             "name": "string",
         },
         "repo_code_hash": None,
-        "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+        "repo_data": {
+            "repo_type": "remote",
+            "repo_name": "dstack",
+            "repo_branch": None,
+            "repo_hash": None,
+            "repo_config_name": None,
+            "repo_config_email": None,
+        },
         "repo_id": repo_id,
+        "repo_dir": "~/repo",
         "run_name": run_name,
         "ssh_key_pub": "ssh_key",
-        "working_dir": None,
     }
 
 
@@ -957,22 +1022,24 @@ class TestGetRunPlan:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("privileged", [False])
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_run_plan_privileged_false(
-        self, test_db, session: AsyncSession, client: AsyncClient, privileged: bool
+        self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
         repo = await create_repo(session=session, project_id=project.id)
         offer_aws = InstanceOfferWithAvailability(
             backend=BackendType.AWS,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=1.0,
@@ -982,7 +1049,7 @@ class TestGetRunPlan:
             backend=BackendType.RUNPOD,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=2.0,
@@ -995,12 +1062,9 @@ class TestGetRunPlan:
             offers=[offer_aws, offer_runpod],
             total_offers=2,
             max_price=2.0,
-            privileged=privileged,
+            privileged=False,
         )
-        run_spec = copy.deepcopy(run_plan_dict["run_spec"])
-        if privileged is None:
-            del run_spec["configuration"]["privileged"]
-        body = {"run_spec": run_spec}
+        body = {"run_spec": run_plan_dict["run_spec"]}
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
@@ -1030,12 +1094,15 @@ class TestGetRunPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
         repo = await create_repo(session=session, project_id=project.id)
         offer_aws = InstanceOfferWithAvailability(
             backend=BackendType.AWS,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=1.0,
@@ -1045,7 +1112,7 @@ class TestGetRunPlan:
             backend=BackendType.RUNPOD,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=2.0,
@@ -1090,12 +1157,15 @@ class TestGetRunPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
         repo = await create_repo(session=session, project_id=project.id)
         offer_aws = InstanceOfferWithAvailability(
             backend=BackendType.AWS,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=1.0,
@@ -1105,7 +1175,7 @@ class TestGetRunPlan:
             backend=BackendType.RUNPOD,
             instance=InstanceType(
                 name="instance",
-                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
             ),
             region="us",
             price=2.0,
@@ -1150,6 +1220,9 @@ class TestGetRunPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
         repo = await create_repo(session=session, project_id=project.id)
         offer_aws = InstanceOfferWithAvailability(
             backend=BackendType.AWS,

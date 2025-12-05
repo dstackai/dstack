@@ -12,8 +12,8 @@ categories:
 
 Orchestration automates provisioning, running jobs, and tearing them down. While Kubernetes and Slurm are powerful in their domains, they lack the lightweight, GPU-native focus modern teams need to move faster.
 
-`dstack` is built entirely around GPUs. Our latest update introduces native integration with [DigitalOcean :material-arrow-top-right-thin:{ .external }](https://www.digitalocean.com/products/gradient/gpu-droplets){:target="_blank"} and 
-[AMD Developer Cloud :material-arrow-top-right-thin:{ .external }](https://www.amd.com/en/developer/resources/cloud-access/amd-developer-cloud.html){:target="_blank"}, enabling teams to provision cloud GPUs and run workloads more cost-efficiently.
+`dstack` is built entirely around GPUs. Our latest update introduces native integration with [DigitalOcean](https://www.digitalocean.com/products/gradient/gpu-droplets) and 
+[AMD Developer Cloud](https://www.amd.com/en/developer/resources/cloud-access/amd-developer-cloud.html), enabling teams to provision cloud GPUs and run workloads more cost-efficiently.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/digitalocean-and-amd-dev-cloud.png" width="630"/>
 
@@ -143,9 +143,9 @@ $ dstack apply -f examples/models/gpt-oss/120b.dstack.yml
 
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)
-    2. Learn more about [DigitalOcean :material-arrow-top-right-thin:{ .external }](https://www.digitalocean.com/products/gradient/gpu-droplets){:target="_blank"} and
-         [AMD Developer Cloud :material-arrow-top-right-thin:{ .external }](https://www.amd.com/en/developer/resources/cloud-access/amd-developer-cloud.html){:target="_blank"}
+    2. Learn more about [DigitalOcean](https://www.digitalocean.com/products/gradient/gpu-droplets) and
+         [AMD Developer Cloud](https://www.amd.com/en/developer/resources/cloud-access/amd-developer-cloud.html)
     3. Explore [dev environments](../../docs/concepts/dev-environments.md), 
         [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
         and [fleets](../../docs/concepts/fleets.md)
-    4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    4. Join [Discord](https://discord.gg/u8SmfwPpMd)

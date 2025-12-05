@@ -39,7 +39,7 @@ Configuration is updated at ~/.dstack/config.yml
 ## Create SSH fleets
     
 If you want the `dstack` server to run containers on your on-prem servers,
-use [fleets](https://dstack.ai/docs/concepts/fleets#ssh).
+use [fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets).
 
 ## More information
 

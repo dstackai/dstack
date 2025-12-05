@@ -41,11 +41,11 @@ from dstack._internal.core.models.profiles import (
     SpotPolicy,
 )
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import Requirements, get_policy_map
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import ModelDiff, copy_model, diff_models
-from dstack._internal.server.db import get_db
+from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -53,6 +53,7 @@ from dstack._internal.server.models import (
     ProjectModel,
     UserModel,
 )
+from dstack._internal.server.services import events
 from dstack._internal.server.services import instances as instances_services
 from dstack._internal.server.services import offers as offers_services
 from dstack._internal.server.services.instances import (
@@ -643,6 +644,18 @@ def is_fleet_empty(fleet_model: FleetModel) -> bool:
     return len(active_instances) == 0
 
 
+def is_cloud_cluster(fleet_model: FleetModel) -> bool:
+    fleet = fleet_model_to_fleet(fleet_model)
+    return (
+        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        and fleet.spec.configuration.ssh_config is None
+    )
+
+
+def is_fleet_master_instance(instance: InstanceModel) -> bool:
+    return instance.fleet is not None and instance.id == instance.fleet.instances[0].id
+
+
 def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
     profile = fleet_spec.merged_profile
     requirements = Requirements(
@@ -668,6 +681,42 @@ def get_next_instance_num(taken_instance_nums: set[int]) -> int:
         instance_num += 1
 
 
+def get_fleet_master_instance_provisioning_data(
+    fleet_model: FleetModel,
+    fleet_spec: FleetSpec,
+) -> Optional[JobProvisioningData]:
+    master_instance_provisioning_data = None
+    if fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
+        # Offers for master jobs must be in the same cluster as existing instances.
+        fleet_instance_models = [im for im in fleet_model.instances if not im.deleted]
+        if len(fleet_instance_models) > 0:
+            master_instance_model = fleet_instance_models[0]
+            master_instance_provisioning_data = JobProvisioningData.__response__.parse_raw(
+                master_instance_model.job_provisioning_data
+            )
+    return master_instance_provisioning_data
+
+
+def can_create_new_cloud_instance_in_fleet(fleet: Fleet) -> bool:
+    if fleet.spec.configuration.ssh_config is not None:
+        return False
+    active_instances = [i for i in fleet.instances if i.status.is_active()]
+    # nodes.max is a soft limit that can be exceeded when provisioning concurrently.
+    # The fleet consolidation logic will remove redundant nodes eventually.
+    if (
+        fleet.spec.configuration.nodes is not None
+        and fleet.spec.configuration.nodes.max is not None
+        and len(active_instances) >= fleet.spec.configuration.nodes.max
+    ):
+        return False
+    return True
+
+
+def check_can_create_new_cloud_instance_in_fleet(fleet: Fleet):
+    if not can_create_new_cloud_instance_in_fleet(fleet):
+        raise ValueError("Cannot fit new cloud instance into fleet")
+
+
 async def _create_fleet(
     session: AsyncSession,
     project: ProjectModel,
@@ -675,14 +724,13 @@ async def _create_fleet(
     spec: FleetSpec,
 ) -> Fleet:
     lock_namespace = f"fleet_names_{project.name}"
-    if get_db().dialect_name == "sqlite":
+    if is_db_sqlite():
         # Start new transaction to see committed changes after lock
         await session.commit()
-    elif get_db().dialect_name == "postgresql":
+    elif is_db_postgres():
         await session.execute(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
-
     lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         if spec.configuration.name is not None:
@@ -705,6 +753,12 @@ async def _create_fleet(
             instances=[],
         )
         session.add(fleet_model)
+        events.emit(
+            session,
+            f"Fleet created. Status: {fleet_model.status.upper()}",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(fleet_model)],
+        )
         if spec.configuration.ssh_config is not None:
             for i, host in enumerate(spec.configuration.ssh_config.hosts):
                 instances_model = await create_fleet_ssh_instance_model(
@@ -726,6 +780,13 @@ async def _create_fleet(
                     instance_num=i,
                 )
                 fleet_model.instances.append(instance_model)
+        for instance_model in fleet_model.instances:
+            events.emit(
+                session,
+                f"Instance created on fleet submission. Status: {instance_model.status.upper()}",
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(instance_model)],
+            )
         await session.commit()
         return fleet_model_to_fleet(fleet_model)
 

@@ -50,17 +50,17 @@ size: { width: 1200, height: 630 }
 layers:
   - background:
       color: "black"
-  - size: { width: 44, height: 44 }
-    offset: { x: 970, y: 521 }
+  - size: { width: 50, height: 50 }
+    offset: { x: 935, y: 521 }
     background:
       image: *logo
-  - size: { width: 300, height: 42 }
-    offset: { x: 1018, y: 525 }
+  - size: { width: 340, height: 55 }
+    offset: { x: 993, y: 521 }
     typography:
       content: *site_name
       color: "white"
-  - size: { width: 850, height: 320 }
-    offset: { x: 80, y: 115 }
+  - size: { width: 1000, height: 220 }
+    offset: { x: 80, y: 280 }
     typography:
       content: *page_title
       overflow: shrink
@@ -69,15 +69,15 @@ layers:
       line:
         amount: 3
         height: 1.25
-  - size: { width: 850, height: 64 }
-    offset: { x: 80, y: 495 }
-    typography:
-      content: *page_description
-      align: start
-      color: "white"
-      line:
-        amount: 2
-        height: 1.5
+  # - size: { width: 850, height: 64 }
+  #   offset: { x: 80, y: 495 }
+  #   typography:
+  #     content: *page_description
+  #     align: start
+  #     color: "white"
+  #     line:
+  #       amount: 2
+  #       height: 1.5
 
 tags:
 

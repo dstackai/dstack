@@ -3,6 +3,7 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 import requests
+from gpuhunt.providers.runpod import RunpodProvider
 from requests import Response
 
 from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
@@ -475,6 +476,8 @@ def _generate_pod_deployment_mutation(
         )
         input_fields.append(f"allowedCudaVersions: [{allowed_cuda_versions_string}]")
 
+    input_fields.append(f'minCudaVersion: "{RunpodProvider.MIN_CUDA_VERSION}"')
+
     pod_deploy = "podFindAndDeployOnDemand" if bid_per_gpu is None else "podRentInterruptable"
     # Format input fields
     input_string = ", ".join(input_fields)
@@ -596,6 +599,8 @@ def _generate_create_cluster_mutation(
     if ports is not None:
         ports = ports.replace(" ", "")
         input_fields.append(f'ports: "{ports}"')
+
+    input_fields.append(f'minCudaVersion: "{RunpodProvider.MIN_CUDA_VERSION}"')
 
     # Format input fields
     input_string = ", ".join(input_fields)

@@ -9,14 +9,23 @@ import (
 	"path/filepath"
 
 	"github.com/codeclysm/extract/v4"
+
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/repo"
+	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
 // setupRepo must be called from Run
+// ex.jobWorkingDir must be already set
 // TODO: change ownership to uid:gid
 func (ex *RunExecutor) setupRepo(ctx context.Context) error {
+	if ex.jobWorkingDir == "" {
+		return errors.New("setup repo: working dir is not set")
+	}
+	if !filepath.IsAbs(ex.jobWorkingDir) {
+		return fmt.Errorf("setup repo: working dir must be absolute: %s", ex.jobWorkingDir)
+	}
 	if ex.jobSpec.RepoDir == nil {
 		return errors.New("repo_dir is not set")
 	}
@@ -28,13 +37,27 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 	}
 	log.Trace(ctx, "Job repo dir", "path", ex.repoDir)
 
-	shouldCheckout, err := ex.shouldCheckout(ctx)
+	repoDirIsEmpty, err := ex.prepareRepoDir(ctx)
 	if err != nil {
-		return fmt.Errorf("check if checkout needed: %w", err)
+		return fmt.Errorf("prepare repo dir: %w", err)
 	}
-	if !shouldCheckout {
-		log.Info(ctx, "skipping repo checkout: repo dir is not empty")
-		return nil
+	if !repoDirIsEmpty {
+		var repoExistsAction schemas.RepoExistsAction
+		if ex.jobSpec.RepoExistsAction != nil {
+			repoExistsAction = *ex.jobSpec.RepoExistsAction
+		} else {
+			log.Debug(ctx, "repo_exists_action is not set, using legacy 'skip' action")
+			repoExistsAction = schemas.RepoExistsActionSkip
+		}
+		switch repoExistsAction {
+		case schemas.RepoExistsActionError:
+			return fmt.Errorf("setup repo: repo dir is not empty: %s", ex.repoDir)
+		case schemas.RepoExistsActionSkip:
+			log.Info(ctx, "Skipping repo checkout: repo dir is not empty", "path", ex.repoDir)
+			return nil
+		default:
+			return fmt.Errorf("setup repo: unsupported action: %s", repoExistsAction)
+		}
 	}
 	// Move existing repo files from the repo dir and back to be able to git clone.
 	// Currently, only needed for volumes mounted inside repo with lost+found present.
@@ -135,11 +158,11 @@ func (ex *RunExecutor) prepareArchive(ctx context.Context) error {
 	return nil
 }
 
-func (ex *RunExecutor) shouldCheckout(ctx context.Context) (bool, error) {
-	log.Trace(ctx, "checking if repo checkout is needed")
+func (ex *RunExecutor) prepareRepoDir(ctx context.Context) (bool, error) {
+	log.Trace(ctx, "Preparing repo dir")
 	info, err := os.Stat(ex.repoDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			if err = common.MkdirAll(ctx, ex.repoDir, ex.jobUid, ex.jobGid); err != nil {
 				return false, fmt.Errorf("create repo dir: %w", err)
 			}
@@ -149,24 +172,22 @@ func (ex *RunExecutor) shouldCheckout(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("stat repo dir: %w", err)
 	}
 	if !info.IsDir() {
-		return false, fmt.Errorf("failed to set up repo dir: %s is not a dir", ex.repoDir)
+		return false, fmt.Errorf("stat repo dir: %s is not a dir", ex.repoDir)
 	}
 	entries, err := os.ReadDir(ex.repoDir)
 	if err != nil {
 		return false, fmt.Errorf("read repo dir: %w", err)
 	}
 	if len(entries) == 0 {
-		// Repo dir existed but was empty, e.g. a volume without repo
+		// Repo dir is empty
 		return true, nil
 	}
-	if len(entries) > 1 {
-		// Repo already checked out, e.g. a volume with repo
-		return false, nil
-	}
-	if entries[0].Name() == "lost+found" {
+	if len(entries) == 1 && entries[0].Name() == "lost+found" {
 		// lost+found may be present on a newly created volume
+		// We (but not Git, see `{move,restore}RepoDir`) consider such a dir "empty"
 		return true, nil
 	}
+	// Repo dir is not empty
 	return false, nil
 }
 
@@ -186,7 +207,7 @@ func (ex *RunExecutor) restoreRepoDir(tmpDir string) error {
 
 func moveDir(srcDir, dstDir string) error {
 	// We cannot just move/rename files because with volumes they'll be on different devices
-	cmd := exec.Command("cp", "-a", srcDir+"/.", dstDir)
+	cmd := exec.CommandContext(context.TODO(), "cp", "-a", srcDir+"/.", dstDir)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to cp: %w, output: %s", err, string(output))
 	}

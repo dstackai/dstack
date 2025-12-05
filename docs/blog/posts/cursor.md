@@ -15,7 +15,7 @@ automatic repository fetching, and streamlined access via SSH or a preferred des
 
 Previously, support was limited to VS Code. However, as developers rely on a variety of desktop IDEs,
 we’ve expanded compatibility. With this update, dev environments now offer effortless access for users of 
-[Cursor :material-arrow-top-right-thin:{ .external }](https://www.cursor.com/){:target="_blank"}.
+[Cursor](https://www.cursor.com/).
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-cursor-v2.png" width="630"/>
 
@@ -79,8 +79,8 @@ Using Cursor over VS Code offers multiple benefits, particularly when it comes t
 enhanced developer experience.
 
 !!! info "What's next?"
-    1. [Download :material-arrow-top-right-thin:{ .external }](https://www.cursor.com/){:target="_blank"} and install Cursor
+    1. [Download](https://www.cursor.com/) and install Cursor
     2. Learn more about [dev environments](../../docs/concepts/dev-environments.md), 
        [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md),
        and [fleets](../../docs/concepts/fleets.md)
-    2. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    2. Join [Discord](https://discord.gg/u8SmfwPpMd)

@@ -1015,7 +1015,3 @@ class TestRollingDeployment:
             cast(JobSpec, JobSpec.__response__.parse_raw(run.jobs[2].job_spec_data)).image_name
             == "new"
         )
-
-
-# TODO(egor-s): TestProcessRunsMultiNode
-# TODO(egor-s): TestProcessRunsAutoScaling

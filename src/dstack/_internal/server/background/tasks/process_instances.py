@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import logging
 from datetime import timedelta
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, Optional, cast
 
 import requests
 from paramiko.pkey import PKey
@@ -17,8 +17,9 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithPlacementGroupSupport,
     GoArchType,
-    generate_unique_placement_group_name,
     get_dstack_runner_binary_path,
+    get_dstack_runner_download_url,
+    get_dstack_runner_version,
     get_dstack_shim_binary_path,
     get_dstack_working_dir,
     get_shim_env,
@@ -34,23 +35,17 @@ from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import (
     BackendError,
     NotYetTerminated,
-    PlacementGroupNotSupportedError,
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
-    InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceRuntime,
     InstanceStatus,
     RemoteConnectionInfo,
     SSHKey,
-)
-from dstack._internal.core.models.placement import (
-    PlacementGroupConfiguration,
-    PlacementStrategy,
 )
 from dstack._internal.core.models.profiles import (
     TerminationPolicy,
@@ -66,15 +61,20 @@ from dstack._internal.server.models import (
     InstanceHealthCheckModel,
     InstanceModel,
     JobModel,
-    PlacementGroupModel,
     ProjectModel,
 )
 from dstack._internal.server.schemas.instances import InstanceCheck
-from dstack._internal.server.schemas.runner import HealthcheckResponse, InstanceHealthResponse
+from dstack._internal.server.schemas.runner import (
+    ComponentStatus,
+    HealthcheckResponse,
+    InstanceHealthResponse,
+)
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_create_instance_offers,
+    is_cloud_cluster,
+    is_fleet_master_instance,
 )
 from dstack._internal.server.services.instances import (
     get_instance_configuration,
@@ -86,10 +86,15 @@ from dstack._internal.server.services.instances import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.offers import is_divisible_into_blocks
+from dstack._internal.server.services.offers import (
+    get_instance_offer_with_restricted_az,
+    is_divisible_into_blocks,
+)
 from dstack._internal.server.services.placement import (
+    find_or_create_suitable_placement_group,
     get_fleet_placement_group_models,
-    placement_group_model_to_placement_group,
+    get_placement_group_model_for_instance,
+    placement_group_model_to_placement_group_optional,
     schedule_fleet_placement_groups_deletion,
 )
 from dstack._internal.server.services.runner import client as runner_client
@@ -117,6 +122,7 @@ from dstack._internal.utils.network import get_ip_from_network, is_ip_among_addr
 from dstack._internal.utils.ssh import (
     pkey_from_str,
 )
+from dstack._internal.utils.version import parse_version
 
 MIN_PROCESSING_INTERVAL = timedelta(seconds=10)
 
@@ -196,16 +202,26 @@ async def _process_next_instance():
 
 
 async def _process_instance(session: AsyncSession, instance: InstanceModel):
+    # Refetch to load related attributes.
+    # Load related attributes only for statuses that always need them.
     if instance.status in (
         InstanceStatus.PENDING,
         InstanceStatus.TERMINATING,
     ):
-        # Refetch to load related attributes.
-        # Load related attributes only for statuses that always need them.
         res = await session.execute(
             select(InstanceModel)
             .where(InstanceModel.id == instance.id)
             .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+            .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
+            .execution_options(populate_existing=True)
+        )
+        instance = res.unique().scalar_one()
+    elif instance.status == InstanceStatus.IDLE:
+        res = await session.execute(
+            select(InstanceModel)
+            .where(InstanceModel.id == instance.id)
+            .options(joinedload(InstanceModel.project))
             .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
             .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
             .execution_options(populate_existing=True)
@@ -242,6 +258,14 @@ def _check_and_mark_terminating_if_idle_duration_expired(instance: InstanceModel
         and not instance.jobs
     ):
         return False
+    if instance.fleet is not None and not _can_terminate_fleet_instances_on_idle_duration(
+        instance.fleet
+    ):
+        logger.debug(
+            "Skipping instance %s termination on idle duration. Fleet is already at `nodes.min`.",
+            instance.name,
+        )
+        return False
     idle_duration = _get_instance_idle_duration(instance)
     idle_seconds = instance.termination_idle_time
     delta = datetime.timedelta(seconds=idle_seconds)
@@ -259,6 +283,20 @@ def _check_and_mark_terminating_if_idle_duration_expired(instance: InstanceModel
         )
         return True
     return False
+
+
+def _can_terminate_fleet_instances_on_idle_duration(fleet_model: FleetModel) -> bool:
+    # Do not terminate instances on idle duration if fleet is already at `nodes.min`.
+    # This is an optimization to avoid terminate-create loop.
+    # There may be race conditions since we don't take the fleet lock.
+    # That's ok: in the worst case we go below `nodes.min`, but
+    # the fleet consolidation logic will provision new nodes.
+    fleet = fleet_model_to_fleet(fleet_model)
+    if fleet.spec.configuration.nodes is None or fleet.spec.autocreated:
+        return True
+    active_instances = [i for i in fleet_model.instances if i.status.is_active()]
+    active_instances_num = len(active_instances)
+    return active_instances_num > fleet.spec.configuration.nodes.min
 
 
 async def _add_remote(instance: InstanceModel) -> None:
@@ -517,39 +555,22 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         )
         return
 
-    placement_group_models = []
-    placement_group_model = None
-    if instance.fleet_id:
-        placement_group_models = await get_fleet_placement_group_models(
-            session=session,
-            fleet_id=instance.fleet_id,
-        )
-        # The placement group is determined when provisioning the master instance
-        # and used for all other instances in the fleet.
-        if not _is_fleet_master_instance(instance):
-            if placement_group_models:
-                placement_group_model = placement_group_models[0]
-            if len(placement_group_models) > 1:
-                logger.error(
-                    (
-                        "Expected 0 or 1 placement groups associated with fleet %s, found %s."
-                        " An incorrect placement group might have been selected for instance %s"
-                    ),
-                    instance.fleet_id,
-                    len(placement_group_models),
-                    instance.name,
-                )
-
+    # The placement group is determined when provisioning the master instance
+    # and used for all other instances in the fleet.
+    placement_group_models = await get_fleet_placement_group_models(
+        session=session,
+        fleet_id=instance.fleet_id,
+    )
+    placement_group_model = get_placement_group_model_for_instance(
+        placement_group_models=placement_group_models,
+        instance_model=instance,
+    )
     offers = await get_create_instance_offers(
         project=instance.project,
         profile=profile,
         requirements=requirements,
         fleet_model=instance.fleet,
-        placement_group=(
-            placement_group_model_to_placement_group(placement_group_model)
-            if placement_group_model
-            else None
-        ),
+        placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
         blocks="auto" if instance.total_blocks is None else instance.total_blocks,
         exclude_not_available=True,
     )
@@ -563,31 +584,26 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         assert isinstance(compute, ComputeWithCreateInstanceSupport)
         instance_offer = _get_instance_offer_for_instance(instance_offer, instance)
         if (
-            _is_fleet_master_instance(instance)
+            instance.fleet
+            and is_cloud_cluster(instance.fleet)
+            and is_fleet_master_instance(instance)
             and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
             and (
                 compute.are_placement_groups_compatible_with_reservations(instance_offer.backend)
                 or instance_configuration.reservation is None
             )
-            and instance.fleet
-            and _is_cloud_cluster(instance.fleet)
         ):
-            placement_group_model = _find_suitable_placement_group(
+            placement_group_model = await find_or_create_suitable_placement_group(
+                fleet_model=instance.fleet,
                 placement_groups=placement_group_models,
                 instance_offer=instance_offer,
                 compute=compute,
             )
-            if placement_group_model is None:
-                placement_group_model = await _create_placement_group(
-                    fleet_model=instance.fleet,
-                    master_instance_offer=instance_offer,
-                    compute=compute,
-                )
-                if placement_group_model is None:  # error occurred
-                    continue
-                session.add(placement_group_model)
-                placement_group_models.append(placement_group_model)
+            if placement_group_model is None:  # error occurred
+                continue
+            session.add(placement_group_model)
+            placement_group_models.append(placement_group_model)
         logger.debug(
             "Trying %s in %s/%s for $%0.4f per hour",
             instance_offer.instance.name,
@@ -600,11 +616,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
                 compute.create_instance,
                 instance_offer,
                 instance_configuration,
-                (
-                    placement_group_model_to_placement_group(placement_group_model)
-                    if placement_group_model
-                    else None
-                ),
+                placement_group_model_to_placement_group_optional(placement_group_model),
             )
         except BackendError as e:
             logger.warning(
@@ -643,7 +655,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
                 "instance_status": InstanceStatus.PROVISIONING.value,
             },
         )
-        if instance.fleet_id and _is_fleet_master_instance(instance):
+        if instance.fleet_id and is_fleet_master_instance(instance):
             # Clean up placement groups that did not end up being used.
             # Flush to update still uncommitted placement groups.
             await session.flush()
@@ -657,11 +669,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         return
 
     _mark_terminated(instance, "All offers failed" if offers else "No offers found")
-    if (
-        instance.fleet
-        and _is_fleet_master_instance(instance)
-        and _is_cloud_cluster(instance.fleet)
-    ):
+    if instance.fleet and is_fleet_master_instance(instance) and is_cloud_cluster(instance.fleet):
         # Do not attempt to deploy other instances, as they won't determine the correct cluster
         # backend, region, and placement group without a successfully deployed master instance
         for sibling_instance in instance.fleet.instances:
@@ -909,13 +917,77 @@ def _check_instance_inner(
         args = (method.__func__.__name__, e.__class__.__name__, e)
         logger.exception(template, *args)
         return InstanceCheck(reachable=False, message=template % args)
+
+    _maybe_update_runner(instance, shim_client)
+
     try:
         remove_dangling_tasks_from_instance(shim_client, instance)
     except Exception as e:
         logger.exception("%s: error removing dangling tasks: %s", fmt(instance), e)
+
     return runner_client.healthcheck_response_to_instance_check(
         healthcheck_response, instance_health_response
     )
+
+
+def _maybe_update_runner(instance: InstanceModel, shim_client: runner_client.ShimClient) -> None:
+    # To auto-update to the latest runner dev build from the CI, see DSTACK_USE_LATEST_FROM_BRANCH.
+    expected_version_str = get_dstack_runner_version()
+    try:
+        expected_version = parse_version(expected_version_str)
+    except ValueError as e:
+        logger.warning("Failed to parse expected runner version: %s", e)
+        return
+    if expected_version is None:
+        logger.debug("Cannot determine the expected runner version")
+        return
+
+    try:
+        runner_info = shim_client.get_runner_info()
+    except requests.RequestException as e:
+        logger.warning("Instance %s: shim.get_runner_info(): request error: %s", instance.name, e)
+        return
+    if runner_info is None:
+        logger.debug("Instance %s: no runner info", instance.name)
+        return
+
+    logger.debug(
+        "Instance %s: runner status=%s version=%s",
+        instance.name,
+        runner_info.status.value,
+        runner_info.version,
+    )
+    if runner_info.status == ComponentStatus.INSTALLING:
+        return
+
+    if runner_info.version:
+        try:
+            current_version = parse_version(runner_info.version)
+        except ValueError as e:
+            logger.warning("Instance %s: failed to parse runner version: %s", instance.name, e)
+            return
+
+        if current_version is None or current_version >= expected_version:
+            logger.debug("Instance %s: the latest runner version already installed", instance.name)
+            return
+
+        logger.debug(
+            "Instance %s: updating runner %s -> %s",
+            instance.name,
+            current_version,
+            expected_version,
+        )
+    else:
+        logger.debug("Instance %s: installing runner %s", instance.name, expected_version)
+
+    job_provisioning_data = get_or_error(get_instance_provisioning_data(instance))
+    url = get_dstack_runner_download_url(
+        arch=job_provisioning_data.instance_type.resources.cpu_arch, version=expected_version_str
+    )
+    try:
+        shim_client.install_runner(url)
+    except requests.RequestException as e:
+        logger.warning("Instance %s: shim.install_runner(): %s", instance.name, e)
 
 
 async def _terminate(instance: InstanceModel) -> None:
@@ -998,24 +1070,12 @@ def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
     if instance.fleet is None:
         return False
     if (
-        _is_fleet_master_instance(instance)
+        is_fleet_master_instance(instance)
         or instance.fleet.instances[0].job_provisioning_data is not None
         or instance.fleet.instances[0].status == InstanceStatus.TERMINATED
     ):
         return False
-    return _is_cloud_cluster(instance.fleet)
-
-
-def _is_fleet_master_instance(instance: InstanceModel) -> bool:
-    return instance.fleet is not None and instance.id == instance.fleet.instances[0].id
-
-
-def _is_cloud_cluster(fleet_model: FleetModel) -> bool:
-    fleet = fleet_model_to_fleet(fleet_model)
-    return (
-        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-        and fleet.spec.configuration.ssh_config is None
-    )
+    return is_cloud_cluster(instance.fleet)
 
 
 def _get_instance_offer_for_instance(
@@ -1024,103 +1084,15 @@ def _get_instance_offer_for_instance(
 ) -> InstanceOfferWithAvailability:
     if instance.fleet is None:
         return instance_offer
-
     fleet = fleet_model_to_fleet(instance.fleet)
     master_instance = instance.fleet.instances[0]
     master_job_provisioning_data = get_instance_provisioning_data(master_instance)
-    instance_offer = instance_offer.copy()
-    if (
-        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-        and master_job_provisioning_data is not None
-        and master_job_provisioning_data.availability_zone is not None
-    ):
-        if instance_offer.availability_zones is None:
-            instance_offer.availability_zones = [master_job_provisioning_data.availability_zone]
-        instance_offer.availability_zones = [
-            z
-            for z in instance_offer.availability_zones
-            if z == master_job_provisioning_data.availability_zone
-        ]
+    if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
+        return get_instance_offer_with_restricted_az(
+            instance_offer=instance_offer,
+            master_job_provisioning_data=master_job_provisioning_data,
+        )
     return instance_offer
-
-
-def _find_suitable_placement_group(
-    placement_groups: List[PlacementGroupModel],
-    instance_offer: InstanceOffer,
-    compute: ComputeWithPlacementGroupSupport,
-) -> Optional[PlacementGroupModel]:
-    for pg in placement_groups:
-        if compute.is_suitable_placement_group(
-            placement_group_model_to_placement_group(pg), instance_offer
-        ):
-            return pg
-    return None
-
-
-async def _create_placement_group(
-    fleet_model: FleetModel,
-    master_instance_offer: InstanceOffer,
-    compute: ComputeWithPlacementGroupSupport,
-) -> Optional[PlacementGroupModel]:
-    placement_group_model = PlacementGroupModel(
-        # TODO: generate the name in Compute.create_placement_group to allow
-        # backend-specific name length limits
-        name=generate_unique_placement_group_name(
-            project_name=fleet_model.project.name,
-            fleet_name=fleet_model.name,
-        ),
-        project=fleet_model.project,
-        fleet=fleet_model,
-        configuration=PlacementGroupConfiguration(
-            backend=master_instance_offer.backend,
-            region=master_instance_offer.region,
-            placement_strategy=PlacementStrategy.CLUSTER,
-        ).json(),
-    )
-    placement_group = placement_group_model_to_placement_group(placement_group_model)
-    logger.debug(
-        "Creating placement group %s in %s/%s",
-        placement_group.name,
-        placement_group.configuration.backend.value,
-        placement_group.configuration.region,
-    )
-    try:
-        pgpd = await run_async(
-            compute.create_placement_group,
-            placement_group_model_to_placement_group(placement_group_model),
-            master_instance_offer,
-        )
-    except PlacementGroupNotSupportedError:
-        logger.debug(
-            "Skipping offer %s because placement group not supported",
-            master_instance_offer.instance.name,
-        )
-        return None
-    except BackendError as e:
-        logger.warning(
-            "Failed to create placement group %s in %s/%s: %r",
-            placement_group.name,
-            placement_group.configuration.backend.value,
-            placement_group.configuration.region,
-            e,
-        )
-        return None
-    except Exception:
-        logger.exception(
-            "Got exception when creating placement group %s in %s/%s",
-            placement_group.name,
-            placement_group.configuration.backend.value,
-            placement_group.configuration.region,
-        )
-        return None
-    logger.info(
-        "Created placement group %s in %s/%s",
-        placement_group.name,
-        placement_group.configuration.backend.value,
-        placement_group.configuration.region,
-    )
-    placement_group_model.provisioning_data = pgpd.json()
-    return placement_group_model
 
 
 def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:

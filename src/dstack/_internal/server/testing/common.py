@@ -135,6 +135,7 @@ async def create_user(
     ssh_public_key: Optional[str] = None,
     ssh_private_key: Optional[str] = None,
     active: bool = True,
+    deleted: bool = False,
 ) -> UserModel:
     if token is None:
         token = str(uuid.uuid4())
@@ -148,6 +149,7 @@ async def create_user(
         ssh_public_key=ssh_public_key,
         ssh_private_key=ssh_private_key,
         active=active,
+        deleted=deleted,
     )
     session.add(user)
     await session.commit()
@@ -283,7 +285,6 @@ def get_run_spec(
         repo_id=repo_id,
         repo_data=LocalRunRepoData(repo_dir="/"),
         repo_code_hash=None,
-        working_dir=None,
         configuration_path=configuration_path,
         configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,

@@ -2,7 +2,7 @@
 
 This example shows how use `dstack` to spin up an [Apache Spark](https://spark.apache.org/docs/latest/index.html) cluster and run tasks on it.
 
-## Create fleet
+## Create a fleet
 
 First create a fleet for the Spark cluster. We'll use one instance as the Spark master node and one instance as the Spark worker node. We'll also provision a third instance that we'll use to submit Spark apps to the cluster so that we don't need to run anything locally:
 

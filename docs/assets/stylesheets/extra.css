@@ -1350,7 +1350,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         visibility: visible;
     }*/
 
-    .twemoji.external {
+    /* .twemoji.external {
         position: relative;
         top: 2.5px;
         height: 18.5px;
@@ -1364,7 +1364,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         position: relative;
         top: 1.5px;
         margin-right: -7px;
-    }
+    } */
 
     /*.md-tabs__item:nth-child(6) .md-tabs__link:before {
         position: relative;
@@ -1585,7 +1585,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 .md-typeset.md-banner__inner a {
     color: var(--md-default-bg-color);
-    border-bottom: 1.5px dotted;
+    /* border-bottom: 1.5px dotted; */
     font-weight: 600;
 }
 
@@ -1800,4 +1800,38 @@ img.border {
 .md-typeset .swagger-ui pre > code {
     font-size: 12px !important;;
     padding: 30px !important;
+}
+
+/* External link indicator */
+a[href^="http"]:not(:where(
+  /* skip if marked with external-skip */
+  .external-skip,
+  /* exclude http:// dstack links */
+  [href^="http://dstack.ai"],
+  /* exclude https://dstack.ai links */
+  [href^="https://dstack.ai"],
+  /* exclude md-content__button links */
+  .md-content__button,
+)):after {
+  content: '';
+  display: inline-block;
+  width: 18.5px;
+  height: 18.5px;
+  margin-left: 0.15em;
+  vertical-align: -0.2em;
+  background-color: currentColor;
+  mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="m11.93 5 2.83 2.83L5 17.59 6.42 19l9.76-9.75L19 12.07V5z"></path></svg>');
+  mask-size: 100%;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="m11.93 5 2.83 2.83L5 17.59 6.42 19l9.76-9.75L19 12.07V5z"></path></svg>');
+  -webkit-mask-size: 100%;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  text-decoration: none;
+}
+
+/* Exclude links inside .md-social */
+.md-social a[href^="http"]:after {
+  display: none;
 }

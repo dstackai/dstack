@@ -74,7 +74,7 @@ def load_plugins(enabled_plugins: list[str]):
 
     for name, import_path in _BUILTIN_PLUGINS.items():
         if name not in enabled_plugins:
-            logger.info(
+            logger.debug(
                 ("Found not enabled builtin plugin %s. Plugin will not be loaded."),
                 name,
             )

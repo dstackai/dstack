@@ -4,12 +4,12 @@ Volumes enable data persistence between runs of dev environments, tasks, and ser
 
 `dstack` supports two kinds of volumes: 
 
-* [Network volumes](#network) &mdash; provisioned via backends and mounted to specific container directories.
+* [Network volumes](#network-volumes) &mdash; provisioned via backends and mounted to specific container directories.
   Ideal for persistent storage.
-* [Instance volumes](#instance) &mdash; bind directories on the host instance to container directories.
+* [Instance volumes](#instance-volumes) &mdash; bind directories on the host instance to container directories.
 Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
-## Network volumes { #network }
+## Network volumes
 
 Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
 
@@ -222,7 +222,7 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
 ??? info "Can I attach network volumes to multiple runs or instances?"
     You can mount a volume in multiple runs. This feature is currently supported only by the `runpod` backend.
 
-## Instance volumes { #instance }
+## Instance volumes
 
 Instance volumes allow mapping any directory on the instance where the run is executed to any path inside the container.
 This means that the data in instance volumes is persisted only if the run is executed on the same instance.
@@ -257,7 +257,7 @@ Since persistence isn't guaranteed (instances may be interrupted or runs may occ
 volumes only for caching or with directories manually mounted to network storage.
 
 !!! info "Backends"
-    Instance volumes are currently supported for all backends except `runpod`, `vastai` and `kubernetes`, and can also be used with [SSH fleets](fleets.md#ssh).
+    Instance volumes are currently supported for all backends except `runpod`, `vastai` and `kubernetes`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
 
 ??? info "Optional volumes"
     If the volume is not critical for your workload, you can mark it as `optional`.
@@ -297,7 +297,7 @@ volumes:
 
 ### Use instance volumes with SSH fleets
     
-If you control the instances (e.g. they are on-prem servers configured via [SSH fleets](fleets.md#ssh)), 
+If you control the instances (e.g. they are on-prem servers configured via [SSH fleets](fleets.md#ssh-fleets)), 
 you can mount network storage (e.g., NFS or SMB) and use the mount points as instance volumes.
 
 For example, if you mount a network storage to `/mnt/nfs-storage` on all hosts of your SSH fleet,

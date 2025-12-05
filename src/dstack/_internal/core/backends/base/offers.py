@@ -1,3 +1,4 @@
+from collections.abc import Iterable, Iterator
 from dataclasses import asdict
 from typing import Callable, List, Optional, TypeVar
 
@@ -174,16 +175,14 @@ InstanceOfferT = TypeVar("InstanceOfferT", InstanceOffer, InstanceOfferWithAvail
 
 
 def filter_offers_by_requirements(
-    offers: List[InstanceOfferT],
+    offers: Iterable[InstanceOfferT],
     requirements: Optional[Requirements],
-) -> List[InstanceOfferT]:
+) -> Iterator[InstanceOfferT]:
     query_filter = requirements_to_query_filter(requirements)
-    filtered_offers = []
     for offer in offers:
         catalog_item = offer_to_catalog_item(offer)
         if gpuhunt.matches(catalog_item, q=query_filter):
-            filtered_offers.append(offer)
-    return filtered_offers
+            yield offer
 
 
 def choose_disk_size_mib(
@@ -225,6 +224,7 @@ def get_offers_disk_modifier(
         offer_copy.instance.resources.disk = Disk(
             size_mib=get_or_error(disk_size_range.min) * 1024
         )
+        offer_copy.instance.resources.update_description()
         return offer_copy
 
     return modifier

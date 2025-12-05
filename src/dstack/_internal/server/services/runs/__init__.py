@@ -18,26 +18,12 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import ApplyAction
-from dstack._internal.core.models.configurations import (
-    RUN_PRIORITY_DEFAULT,
-    AnyRunConfiguration,
-    ServiceConfiguration,
-)
-from dstack._internal.core.models.instances import (
-    InstanceAvailability,
-    InstanceOfferWithAvailability,
-    InstanceStatus,
-)
 from dstack._internal.core.models.profiles import (
-    CreationPolicy,
     RetryEvent,
 )
-from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
 from dstack._internal.core.models.runs import (
-    LEGACY_REPO_DIR,
     ApplyRunPlanInput,
     Job,
-    JobPlan,
     JobSpec,
     JobStatus,
     JobSubmission,
@@ -51,14 +37,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
     ServiceSpec,
 )
-from dstack._internal.core.models.volumes import (
-    InstanceMountPoint,
-    Volume,
-)
-from dstack._internal.core.services import validate_dstack_resource_name
-from dstack._internal.core.services.diff import diff_models
-from dstack._internal.server import settings
-from dstack._internal.server.db import get_db
+from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
     JobModel,
@@ -68,32 +47,29 @@ from dstack._internal.server.models import (
     RunModel,
     UserModel,
 )
+from dstack._internal.server.services import events, services
 from dstack._internal.server.services import repos as repos_services
-from dstack._internal.server.services import services
-from dstack._internal.server.services.docker import is_valid_docker_volume_target
-from dstack._internal.server.services.instances import (
-    filter_pool_instances,
-    get_instance_offer,
-    get_pool_instances,
-    get_shared_pool_instances_with_offers,
-)
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     delay_job_instance_termination,
-    get_instances_ids_with_detaching_volumes,
     get_job_configured_volumes,
     get_jobs_from_run_spec,
-    group_jobs_by_replica_latest,
     job_model_to_job_submission,
+    remove_job_spec_sensitive_info,
     stop_runner,
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.probes import is_probe_ready
 from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.resources import set_resources_defaults
+from dstack._internal.server.services.runs.plan import get_job_plans
+from dstack._internal.server.services.runs.spec import (
+    can_update_run_spec,
+    check_can_update_run_spec,
+    validate_run_spec_and_set_defaults,
+)
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.utils.logging import get_logger
@@ -106,8 +82,6 @@ JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
 }
-
-DEFAULT_MAX_OFFERS = 50
 
 
 async def list_user_runs(
@@ -309,7 +283,7 @@ async def get_plan(
     user: UserModel,
     run_spec: RunSpec,
     max_offers: Optional[int],
-    legacy_default_working_dir: bool = False,
+    legacy_repo_dir: bool = False,
 ) -> RunPlan:
     # Spec must be copied by parsing to calculate merged_profile
     effective_run_spec = RunSpec.parse_obj(run_spec.dict())
@@ -319,14 +293,12 @@ async def get_plan(
         spec=effective_run_spec,
     )
     effective_run_spec = RunSpec.parse_obj(effective_run_spec.dict())
-    _validate_run_spec_and_set_defaults(
+    validate_run_spec_and_set_defaults(
         user=user,
         run_spec=effective_run_spec,
-        legacy_default_working_dir=legacy_default_working_dir,
+        legacy_repo_dir=legacy_repo_dir,
     )
-
     profile = effective_run_spec.merged_profile
-    creation_policy = profile.creation_policy
 
     current_resource = None
     action = ApplyAction.CREATE
@@ -340,67 +312,18 @@ async def get_plan(
             # For backward compatibility (current_resource may has been submitted before
             # some fields, e.g., CPUSpec.arch, were added)
             set_resources_defaults(current_resource.run_spec.configuration.resources)
-            if not current_resource.status.is_finished() and _can_update_run_spec(
+            if not current_resource.status.is_finished() and can_update_run_spec(
                 current_resource.run_spec, effective_run_spec
             ):
                 action = ApplyAction.UPDATE
 
-    secrets = await get_project_secrets_mapping(session=session, project=project)
-    jobs = await get_jobs_from_run_spec(
-        run_spec=effective_run_spec,
-        secrets=secrets,
-        replica_num=0,
-    )
-
-    volumes = await get_job_configured_volumes(
+    job_plans = await get_job_plans(
         session=session,
         project=project,
-        run_spec=effective_run_spec,
-        job_num=0,
+        profile=profile,
+        run_spec=run_spec,
+        max_offers=max_offers,
     )
-
-    pool_offers = await _get_pool_offers(
-        session=session,
-        project=project,
-        run_spec=effective_run_spec,
-        job=jobs[0],
-        volumes=volumes,
-    )
-    effective_run_spec.run_name = "dry-run"  # will regenerate jobs on submission
-
-    # Get offers once for all jobs
-    offers = []
-    if creation_policy == CreationPolicy.REUSE_OR_CREATE:
-        offers = await get_offers_by_requirements(
-            project=project,
-            profile=profile,
-            requirements=jobs[0].job_spec.requirements,
-            exclude_not_available=False,
-            multinode=jobs[0].job_spec.jobs_per_replica > 1,
-            volumes=volumes,
-            privileged=jobs[0].job_spec.privileged,
-            instance_mounts=check_run_spec_requires_instance_mounts(effective_run_spec),
-        )
-
-    job_plans = []
-    for job in jobs:
-        job_offers: List[InstanceOfferWithAvailability] = []
-        job_offers.extend(pool_offers)
-        job_offers.extend(offer for _, offer in offers)
-        job_offers.sort(key=lambda offer: not offer.availability.is_available())
-
-        job_spec = job.job_spec
-        _remove_job_spec_sensitive_info(job_spec)
-
-        job_plan = JobPlan(
-            job_spec=job_spec,
-            offers=job_offers[: (max_offers or DEFAULT_MAX_OFFERS)],
-            total_offers=len(job_offers),
-            max_price=max((offer.price for offer in job_offers), default=None),
-        )
-        job_plans.append(job_plan)
-
-    effective_run_spec.run_name = run_spec.run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name,
         user=user.name,
@@ -419,7 +342,7 @@ async def apply_plan(
     project: ProjectModel,
     plan: ApplyRunPlanInput,
     force: bool,
-    legacy_default_working_dir: bool = False,
+    legacy_repo_dir: bool = False,
 ) -> Run:
     run_spec = plan.run_spec
     run_spec = await apply_plugin_policies(
@@ -429,8 +352,8 @@ async def apply_plan(
     )
     # Spec must be copied by parsing to calculate merged_profile
     run_spec = RunSpec.parse_obj(run_spec.dict())
-    _validate_run_spec_and_set_defaults(
-        user=user, run_spec=run_spec, legacy_default_working_dir=legacy_default_working_dir
+    validate_run_spec_and_set_defaults(
+        user=user, run_spec=run_spec, legacy_repo_dir=legacy_repo_dir
     )
     if run_spec.run_name is None:
         return await submit_run(
@@ -456,7 +379,7 @@ async def apply_plan(
     # some fields, e.g., CPUSpec.arch, were added)
     set_resources_defaults(current_resource.run_spec.configuration.resources)
     try:
-        _check_can_update_run_spec(current_resource.run_spec, run_spec)
+        check_can_update_run_spec(current_resource.run_spec, run_spec)
     except ServerClientError:
         # The except is only needed to raise an appropriate error if run is active
         if not current_resource.status.is_finished():
@@ -498,7 +421,7 @@ async def submit_run(
     project: ProjectModel,
     run_spec: RunSpec,
 ) -> Run:
-    _validate_run_spec_and_set_defaults(user, run_spec)
+    validate_run_spec_and_set_defaults(user, run_spec)
     repo = await _get_run_repo_or_error(
         session=session,
         project=project,
@@ -510,14 +433,13 @@ async def submit_run(
     )
 
     lock_namespace = f"run_names_{project.name}"
-    if get_db().dialect_name == "sqlite":
+    if is_db_sqlite():
         # Start new transaction to see committed changes after lock
         await session.commit()
-    elif get_db().dialect_name == "postgresql":
+    elif is_db_postgres():
         await session.execute(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
-
     lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         # FIXME: delete_runs commits, so Postgres lock is released too early.
@@ -562,6 +484,12 @@ async def submit_run(
             next_triggered_at=_get_next_triggered_at(run_spec),
         )
         session.add(run_model)
+        events.emit(
+            session,
+            f"Run submitted. Status: {run_model.status.upper()}",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(run_model)],
+        )
 
         if run_spec.configuration.type == "service":
             await services.register_service(session, run_model, run_spec)
@@ -579,6 +507,14 @@ async def submit_run(
                     status=JobStatus.SUBMITTED,
                 )
                 session.add(job_model)
+                events.emit(
+                    session,
+                    f"Job created on run submission. Status: {job_model.status.upper()}",
+                    actor=events.SystemActor(),
+                    targets=[
+                        events.Target.from_model(job_model),
+                    ],
+                )
         await session.commit()
         await session.refresh(run_model)
 
@@ -791,7 +727,7 @@ def _get_run_jobs_with_submissions(
                 # Use the spec from the latest submission. Submissions can have different specs
                 job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
                 if not include_sensitive:
-                    _remove_job_spec_sensitive_info(job_spec)
+                    remove_job_spec_sensitive_info(job_spec)
                 jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
     return jobs
 
@@ -851,51 +787,6 @@ def _get_run_fleet(run_model: RunModel) -> Optional[RunFleet]:
     )
 
 
-async def _get_pool_offers(
-    session: AsyncSession,
-    project: ProjectModel,
-    run_spec: RunSpec,
-    job: Job,
-    volumes: List[List[Volume]],
-) -> list[InstanceOfferWithAvailability]:
-    pool_offers: list[InstanceOfferWithAvailability] = []
-
-    detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
-    pool_instances = await get_pool_instances(session, project)
-    pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
-    multinode = job.job_spec.jobs_per_replica > 1
-
-    shared_instances_with_offers = get_shared_pool_instances_with_offers(
-        pool_instances=pool_instances,
-        profile=run_spec.merged_profile,
-        requirements=job.job_spec.requirements,
-        volumes=volumes,
-        multinode=multinode,
-    )
-    for _, offer in shared_instances_with_offers:
-        pool_offers.append(offer)
-
-    nonshared_instances = filter_pool_instances(
-        pool_instances=pool_instances,
-        profile=run_spec.merged_profile,
-        requirements=job.job_spec.requirements,
-        multinode=multinode,
-        volumes=volumes,
-        shared=False,
-    )
-    for instance in nonshared_instances:
-        offer = get_instance_offer(instance)
-        if offer is None:
-            continue
-        offer.availability = InstanceAvailability.BUSY
-        if instance.status == InstanceStatus.IDLE:
-            offer.availability = InstanceAvailability.IDLE
-        pool_offers.append(offer)
-
-    pool_offers.sort(key=lambda offer: offer.price)
-    return pool_offers
-
-
 async def _generate_run_name(
     session: AsyncSession,
     project: ProjectModel,
@@ -914,13 +805,6 @@ async def _generate_run_name(
         if run_model is None:
             return f"{run_name_base}-{idx}"
         idx += 1
-
-
-def check_run_spec_requires_instance_mounts(run_spec: RunSpec) -> bool:
-    return any(
-        isinstance(mp, InstanceMountPoint) and not mp.optional
-        for mp in run_spec.configuration.volumes
-    )
 
 
 async def _validate_run(
@@ -995,150 +879,6 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
     return job_submission.job_provisioning_data.price * duration_hours
 
 
-def _validate_run_spec_and_set_defaults(
-    user: UserModel, run_spec: RunSpec, legacy_default_working_dir: bool = False
-):
-    # This function may set defaults for null run_spec values,
-    # although most defaults are resolved when building job_spec
-    # so that we can keep both the original user-supplied value (null in run_spec)
-    # and the default in job_spec.
-    # If a property is stored in job_spec - resolve the default there.
-    # Server defaults are preferable over client defaults so that
-    # the defaults depend on the server version, not the client version.
-    if run_spec.run_name is not None:
-        validate_dstack_resource_name(run_spec.run_name)
-    for mount_point in run_spec.configuration.volumes:
-        if not is_valid_docker_volume_target(mount_point.path):
-            raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
-    if run_spec.repo_id is None and run_spec.repo_data is not None:
-        raise ServerClientError("repo_data must not be set if repo_id is not set")
-    if run_spec.repo_id is not None and run_spec.repo_data is None:
-        raise ServerClientError("repo_id must not be set if repo_data is not set")
-    # Some run_spec parameters have to be set here and not in the model defaults since
-    # the client may not pass them or pass null, but they must be always present, e.g. for runner.
-    if run_spec.repo_id is None:
-        run_spec.repo_id = DEFAULT_VIRTUAL_REPO_ID
-    if run_spec.repo_data is None:
-        run_spec.repo_data = VirtualRunRepoData()
-    if (
-        run_spec.merged_profile.utilization_policy is not None
-        and run_spec.merged_profile.utilization_policy.time_window
-        > settings.SERVER_METRICS_RUNNING_TTL_SECONDS
-    ):
-        raise ServerClientError(
-            f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
-        )
-    if isinstance(run_spec.configuration, ServiceConfiguration):
-        if run_spec.merged_profile.schedule and run_spec.configuration.replicas.min == 0:
-            raise ServerClientError(
-                "Scheduled services with autoscaling to zero are not supported"
-            )
-        if len(run_spec.configuration.probes) > settings.MAX_PROBES_PER_JOB:
-            raise ServerClientError(
-                f"Cannot configure more than {settings.MAX_PROBES_PER_JOB} probes"
-            )
-        if any(
-            p.timeout is not None and p.timeout > settings.MAX_PROBE_TIMEOUT
-            for p in run_spec.configuration.probes
-        ):
-            raise ServerClientError(
-                f"Probe timeout cannot be longer than {settings.MAX_PROBE_TIMEOUT}s"
-            )
-    if run_spec.configuration.priority is None:
-        run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
-    set_resources_defaults(run_spec.configuration.resources)
-    if run_spec.ssh_key_pub is None:
-        if user.ssh_public_key:
-            run_spec.ssh_key_pub = user.ssh_public_key
-        else:
-            raise ServerClientError("ssh_key_pub must be set if the user has no ssh_public_key")
-    if run_spec.configuration.working_dir is None and legacy_default_working_dir:
-        run_spec.configuration.working_dir = LEGACY_REPO_DIR
-
-
-_UPDATABLE_SPEC_FIELDS = ["configuration_path", "configuration"]
-_TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS = {
-    "service": [
-        # rolling deployment
-        "repo_data",
-        "repo_code_hash",
-        "file_archives",
-        "working_dir",
-    ],
-}
-_CONF_UPDATABLE_FIELDS = ["priority"]
-_TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
-    "dev-environment": ["inactivity_duration"],
-    "service": [
-        # in-place
-        "replicas",
-        "scaling",
-        # rolling deployment
-        # NOTE: keep this list in sync with the "Rolling deployment" section in services.md
-        "port",
-        "probes",
-        "resources",
-        "volumes",
-        "docker",
-        "files",
-        "image",
-        "user",
-        "privileged",
-        "entrypoint",
-        "working_dir",
-        "python",
-        "nvcc",
-        "single_branch",
-        "env",
-        "shell",
-        "commands",
-    ],
-}
-
-
-def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bool:
-    try:
-        _check_can_update_run_spec(current_run_spec, new_run_spec)
-    except ServerClientError as e:
-        logger.debug("Run cannot be updated: %s", repr(e))
-        return False
-    return True
-
-
-def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
-    spec_diff = diff_models(current_run_spec, new_run_spec)
-    changed_spec_fields = list(spec_diff.keys())
-    updatable_spec_fields = _UPDATABLE_SPEC_FIELDS + _TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS.get(
-        new_run_spec.configuration.type, []
-    )
-    for key in changed_spec_fields:
-        if key not in updatable_spec_fields:
-            raise ServerClientError(
-                f"Failed to update fields {changed_spec_fields}."
-                f" Can only update {updatable_spec_fields}."
-            )
-    _check_can_update_configuration(current_run_spec.configuration, new_run_spec.configuration)
-
-
-def _check_can_update_configuration(
-    current: AnyRunConfiguration, new: AnyRunConfiguration
-) -> None:
-    if current.type != new.type:
-        raise ServerClientError(
-            f"Configuration type changed from {current.type} to {new.type}, cannot update"
-        )
-    updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
-        new.type, []
-    )
-    diff = diff_models(current, new)
-    changed_fields = list(diff.keys())
-    for key in changed_fields:
-        if key not in updatable_fields:
-            raise ServerClientError(
-                f"Failed to update fields {changed_fields}. Can only update {updatable_fields}"
-            )
-
-
 async def process_terminating_run(session: AsyncSession, run_model: RunModel):
     """
     Used by both `process_runs` and `stop_run` to process a TERMINATING run.
@@ -1200,134 +940,8 @@ async def process_terminating_run(session: AsyncSession, run_model: RunModel):
         )
 
 
-async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replicas_diff: int):
-    if replicas_diff == 0:
-        # nothing to do
-        return
-
-    logger.info(
-        "%s: scaling %s %s replica(s)",
-        fmt(run_model),
-        "UP" if replicas_diff > 0 else "DOWN",
-        abs(replicas_diff),
-    )
-
-    # lists of (importance, is_out_of_date, replica_num, jobs)
-    active_replicas = []
-    inactive_replicas = []
-
-    for replica_num, replica_jobs in group_jobs_by_replica_latest(run_model.jobs):
-        statuses = set(job.status for job in replica_jobs)
-        deployment_num = replica_jobs[0].deployment_num  # same for all jobs
-        is_out_of_date = deployment_num < run_model.deployment_num
-        if {JobStatus.TERMINATING, *JobStatus.finished_statuses()} & statuses:
-            # if there are any terminating or finished jobs, the replica is inactive
-            inactive_replicas.append((0, is_out_of_date, replica_num, replica_jobs))
-        elif JobStatus.SUBMITTED in statuses:
-            # if there are any submitted jobs, the replica is active and has the importance of 0
-            active_replicas.append((0, is_out_of_date, replica_num, replica_jobs))
-        elif {JobStatus.PROVISIONING, JobStatus.PULLING} & statuses:
-            # if there are any provisioning or pulling jobs, the replica is active and has the importance of 1
-            active_replicas.append((1, is_out_of_date, replica_num, replica_jobs))
-        elif not is_replica_registered(replica_jobs):
-            # all jobs are running, but not receiving traffic, the replica is active and has the importance of 2
-            active_replicas.append((2, is_out_of_date, replica_num, replica_jobs))
-        else:
-            # all jobs are running and ready, the replica is active and has the importance of 3
-            active_replicas.append((3, is_out_of_date, replica_num, replica_jobs))
-
-    # sort by is_out_of_date (up-to-date first), importance (desc), and replica_num (asc)
-    active_replicas.sort(key=lambda r: (r[1], -r[0], r[2]))
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-
-    if replicas_diff < 0:
-        for _, _, _, replica_jobs in reversed(active_replicas[-abs(replicas_diff) :]):
-            # scale down the less important replicas first
-            for job in replica_jobs:
-                if job.status.is_finished() or job.status == JobStatus.TERMINATING:
-                    continue
-                job.status = JobStatus.TERMINATING
-                job.termination_reason = JobTerminationReason.SCALED_DOWN
-                # background task will process the job later
-    else:
-        scheduled_replicas = 0
-
-        # rerun inactive replicas
-        for _, _, _, replica_jobs in inactive_replicas:
-            if scheduled_replicas == replicas_diff:
-                break
-            await retry_run_replica_jobs(session, run_model, replica_jobs, only_failed=False)
-            scheduled_replicas += 1
-
-        secrets = await get_project_secrets_mapping(
-            session=session,
-            project=run_model.project,
-        )
-
-        for replica_num in range(
-            len(active_replicas) + scheduled_replicas, len(active_replicas) + replicas_diff
-        ):
-            # FIXME: Handle getting image configuration errors or skip it.
-            jobs = await get_jobs_from_run_spec(
-                run_spec=run_spec,
-                secrets=secrets,
-                replica_num=replica_num,
-            )
-            for job in jobs:
-                job_model = create_job_model_for_new_submission(
-                    run_model=run_model,
-                    job=job,
-                    status=JobStatus.SUBMITTED,
-                )
-                session.add(job_model)
-
-
-async def retry_run_replica_jobs(
-    session: AsyncSession, run_model: RunModel, latest_jobs: List[JobModel], *, only_failed: bool
-):
-    # FIXME: Handle getting image configuration errors or skip it.
-    secrets = await get_project_secrets_mapping(
-        session=session,
-        project=run_model.project,
-    )
-    new_jobs = await get_jobs_from_run_spec(
-        run_spec=RunSpec.__response__.parse_raw(run_model.run_spec),
-        secrets=secrets,
-        replica_num=latest_jobs[0].replica_num,
-    )
-    assert len(new_jobs) == len(latest_jobs), (
-        "Changing the number of jobs within a replica is not yet supported"
-    )
-    for job_model, new_job in zip(latest_jobs, new_jobs):
-        if not (job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING):
-            if only_failed:
-                # No need to resubmit, skip
-                continue
-            # The job is not finished, but we have to retry all jobs. Terminate it
-            job_model.status = JobStatus.TERMINATING
-            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-
-        new_job_model = create_job_model_for_new_submission(
-            run_model=run_model,
-            job=new_job,
-            status=JobStatus.SUBMITTED,
-        )
-        # dirty hack to avoid passing all job submissions
-        new_job_model.submission_num = job_model.submission_num + 1
-        session.add(new_job_model)
-
-
 def is_job_ready(probes: Iterable[ProbeModel], probe_specs: Iterable[ProbeSpec]) -> bool:
     return all(is_probe_ready(probe, probe_spec) for probe, probe_spec in zip(probes, probe_specs))
-
-
-def is_replica_registered(jobs: list[JobModel]) -> bool:
-    # Only job_num=0 is supposed to receive service requests
-    return jobs[0].registered
-
-
-def _remove_job_spec_sensitive_info(spec: JobSpec):
-    spec.ssh_key = None
 
 
 def _get_next_triggered_at(run_spec: RunSpec) -> Optional[datetime]:

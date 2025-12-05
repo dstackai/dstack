@@ -1,7 +1,7 @@
 # Deepseek
 
 This example walks you through how to deploy and
-train [Deepseek :material-arrow-top-right-thin:{ .external }](https://huggingface.co/deepseek-ai){:target="_blank"}
+train [Deepseek](https://huggingface.co/deepseek-ai)
 models with `dstack`.
 
 > We used Deepseek-R1 distilled models and Deepseek-V2-Lite, a 16B model with the same architecture as Deepseek-R1 (671B). Deepseek-V2-Lite retains MLA and DeepSeekMoE but requires less memory, making it ideal for testing and fine-tuning on smaller GPUs.
@@ -21,7 +21,7 @@ models with `dstack`.
 
 ### AMD
 
-Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} with AMD `MI300X` GPU. The below configurations also support `Deepseek-V2-Lite`.
+Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` using [SGLang](https://github.com/sgl-project/sglang) and [vLLM](https://github.com/vllm-project/vllm) with AMD `MI300X` GPU. The below configurations also support `Deepseek-V2-Lite`.
 
 === "SGLang"
 
@@ -81,13 +81,13 @@ Note, when using `Deepseek-R1-Distill-Llama-70B` with `vLLM` with a 192GB GPU, w
 ### Intel Gaudi
 
 Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B`
-using [TGI on Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi){:target="_blank"}
-and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork){:target="_blank"} (Gaudi fork) with Intel Gaudi 2.
+using [TGI on Gaudi](https://github.com/huggingface/tgi-gaudi)
+and [vLLM](https://github.com/HabanaAI/vllm-fork) (Gaudi fork) with Intel Gaudi 2.
 
-> Both [TGI on Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi){:target="_blank"}
-> and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork){:target="_blank"} do not support `Deepseek-V2-Lite`.
-> See [this :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi/issues/271)
-> and [this :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork/issues/809#issuecomment-2652454824) issues.
+> Both [TGI on Gaudi](https://github.com/huggingface/tgi-gaudi)
+> and [vLLM](https://github.com/HabanaAI/vllm-fork) do not support `Deepseek-V2-Lite`.
+> See [this](https://github.com/huggingface/tgi-gaudi/issues/271)
+> and [this](https://github.com/HabanaAI/vllm-fork/issues/809#issuecomment-2652454824) issues.
 
 === "TGI"
 
@@ -170,8 +170,8 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/Haban
 ### NVIDIA
 
 Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-8B`
-using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"}
-and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"} with NVIDIA GPUs.
+using [SGLang](https://github.com/sgl-project/sglang)
+and [vLLM](https://github.com/vllm-project/vllm) with NVIDIA GPUs.
 Both SGLang and vLLM also support `Deepseek-V2-Lite`.
 
 === "SGLang"
@@ -297,7 +297,7 @@ is available at `https://gateway.<gateway domain>/`.
 
 ### AMD
 
-Here are the examples of LoRA fine-tuning of `Deepseek-V2-Lite` and GRPO fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` on `MI300X` GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"}.
+Here are the examples of LoRA fine-tuning of `Deepseek-V2-Lite` and GRPO fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` on `MI300X` GPU using HuggingFace's [TRL](https://github.com/huggingface/trl).
 
 === "LoRA"
 
@@ -405,8 +405,8 @@ Note, the `GRPO` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` consumes up to 1
 ### Intel Gaudi
 
 Here is an example of LoRA fine-tuning of `DeepSeek-R1-Distill-Qwen-7B` on Intel Gaudi 2 GPUs using
-HuggingFace's [Optimum for Intel Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-habana){:target="_blank"}
-and [DeepSpeed :material-arrow-top-right-thin:{ .external }](https://github.com/deepspeedai/DeepSpeed){:target="_blank"}. Both also support `LoRA`
+HuggingFace's [Optimum for Intel Gaudi](https://github.com/huggingface/optimum-habana)
+and [DeepSpeed](https://github.com/deepspeedai/DeepSpeed). Both also support `LoRA`
 fine-tuning of `Deepseek-V2-Lite` with same configuration as below.
 
 === "LoRA"
@@ -464,7 +464,7 @@ fine-tuning of `Deepseek-V2-Lite` with same configuration as below.
 ### NVIDIA
 
 Here are examples of LoRA fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` and QLoRA fine-tuning of `DeepSeek-V2-Lite`
-on NVIDIA GPU using HuggingFace's [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"} library.
+on NVIDIA GPU using HuggingFace's [TRL](https://github.com/huggingface/trl) library.
 
 === "LoRA"
     <div editor-title="examples/llms/deepseek/trl/nvidia/.dstack.yml">
@@ -600,7 +600,7 @@ needs 7–10GB due to intermediate hidden states.
 ## Source code
 
 The source-code of this example can be found in
-[`examples/llms/deepseek` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek).
+[`examples/llms/deepseek`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek).
 
 !!! info "What's next?"
     1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks),

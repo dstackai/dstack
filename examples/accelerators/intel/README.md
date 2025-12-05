@@ -1,15 +1,15 @@
 # Intel Gaudi
 
 `dstack` supports running dev environments, tasks, and services on Intel Gaudi GPUs via 
-[SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh).
+[SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets).
 
 ## Deployment
 
 Serving frameworks like vLLM and TGI have Intel Gaudi support. Here's an example of
 a service that deploys
-[`DeepSeek-R1-Distill-Llama-70B` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Llama-70B){:target="_blank"} 
-using [TGI on Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/tgi-gaudi){:target="_blank"} 
-and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/HabanaAI/vllm-fork){:target="_blank"}.
+[`DeepSeek-R1-Distill-Llama-70B`](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Llama-70B) 
+using [TGI on Gaudi](https://github.com/huggingface/tgi-gaudi) 
+and [vLLM](https://github.com/HabanaAI/vllm-fork).
 
 === "TGI"
     <div editor-title="examples/inference/tgi/intel/.dstack.yml"> 
@@ -97,10 +97,10 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/Haban
 
 ## Fine-tuning
 
-Below is an example of LoRA fine-tuning of [`DeepSeek-R1-Distill-Qwen-7B` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B){:target="_blank"}
-using [Optimum for Intel Gaudi :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-habana){:target="_blank"} 
-and [DeepSpeed :material-arrow-top-right-thin:{ .external }](https://docs.habana.ai/en/latest/PyTorch/DeepSpeed/DeepSpeed_User_Guide/DeepSpeed_User_Guide.html#deepspeed-user-guide){:target="_blank"} with 
-the [`lvwerra/stack-exchange-paired` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/lvwerra/stack-exchange-paired){:target="_blank"} dataset. 
+Below is an example of LoRA fine-tuning of [`DeepSeek-R1-Distill-Qwen-7B`](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B)
+using [Optimum for Intel Gaudi](https://github.com/huggingface/optimum-habana) 
+and [DeepSpeed](https://docs.habana.ai/en/latest/PyTorch/DeepSpeed/DeepSpeed_User_Guide/DeepSpeed_User_Guide.html#deepspeed-user-guide) with 
+the [`lvwerra/stack-exchange-paired`](https://huggingface.co/datasets/lvwerra/stack-exchange-paired) dataset. 
     
 <div editor-title="examples/single-node-training/trl/intel/.dstack.yml">
     
@@ -178,11 +178,11 @@ Provisioning...
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/llms/deepseek/tgi/intel` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/tgi/intel){:target="_blank"},
-[`examples/llms/deepseek/vllm/intel` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/vllm/intel){:target="_blank"} and
-[`examples/llms/deepseek/trl/intel` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/trl/intel){:target="_blank"}.
+[`examples/llms/deepseek/tgi/intel`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/tgi/intel),
+[`examples/llms/deepseek/vllm/intel`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/vllm/intel) and
+[`examples/llms/deepseek/trl/intel`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/trl/intel).
 
 !!! info "What's next?"
     1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), and [services](https://dstack.ai/docs/services).
-    2. See also [Intel Gaudi Documentation :material-arrow-top-right-thin:{ .external }](https://docs.habana.ai/en/latest/index.html), [vLLM Inference with Gaudi](https://docs.habana.ai/en/latest/PyTorch/Inference_on_PyTorch/vLLM_Inference.html)
-      and [Optimum for Gaudi examples :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-habana/blob/main/examples/trl/README.md).
+    2. See also [Intel Gaudi Documentation](https://docs.habana.ai/en/latest/index.html), [vLLM Inference with Gaudi](https://docs.habana.ai/en/latest/PyTorch/Inference_on_PyTorch/vLLM_Inference.html)
+      and [Optimum for Gaudi examples](https://github.com/huggingface/optimum-habana/blob/main/examples/trl/README.md).

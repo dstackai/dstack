@@ -35,4 +35,9 @@ class FeatureFlags:
     development. Feature flags are environment variables of the form DSTACK_FF_*
     """
 
-    pass
+    # DSTACK_FF_AUTOCREATED_FLEETS_ENABLED enables legacy autocreated fleets:
+    # If there are no fleet suitable for the run, a new fleet is created automatically instead of an error.
+    AUTOCREATED_FLEETS_ENABLED = os.getenv("DSTACK_FF_AUTOCREATED_FLEETS_ENABLED") is not None
+
+    # Server-side flag to enable event emission and Events API
+    EVENTS = os.getenv("DSTACK_FF_EVENTS") is not None

@@ -8,11 +8,11 @@ categories:
   - Changelog
 ---
 
-# Nebius joins dstack Sky GPU marketplace, with production-ready GPU clusters
+# Nebius in dstack Sky GPU marketplace, with production-ready GPU clusters
 
-`dstack` is an [open-source :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack){:target="_blank"} control plane for orchestrating GPU workloads. It can provision cloud VMs, run on top of Kubernetes, or manage on-prem clusters. If you don’t want to self-host, you can use [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, the managed version of `dstack` that also provides access to cloud GPUs via its markfetplace.
+`dstack` is an [open-source](https://github.com/dstackai/dstack) control plane for orchestrating GPU workloads. It can provision cloud VMs, run on top of Kubernetes, or manage on-prem clusters. If you don’t want to self-host, you can use [dstack Sky](https://sky.dstack.ai), the managed version of `dstack` that also provides access to cloud GPUs via its markfetplace.
 
-With our latest release, we’re excited to announce that [Nebius :material-arrow-top-right-thin:{ .external }](https://nebius.com/){:target="_blank"}, a purpose-built AI cloud for large scale training and inference, has joined the `dstack` Sky  marketplace
+With our latest release, we’re excited to announce that [Nebius](https://nebius.com/), a purpose-built AI cloud for large scale training and inference, has joined the `dstack` Sky  marketplace
 to offer on-demand and spot GPUs, including clusters.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-sky-nebius.png" width="630"/>
@@ -26,7 +26,7 @@ Since early this year, the open-source `dstack` has supported Nebius, making it 
 
 ## About dstack Sky
 
-With this week's release, Nebius officially joins [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}. Nebius can now be used not only with your own account, but also directly via the GPU marketplace.
+With this week's release, Nebius officially joins [dstack Sky](https://sky.dstack.ai). Nebius can now be used not only with your own account, but also directly via the GPU marketplace.
 
 The marketplace lets you access Nebius GPUs without having a Nebius account. You can pay through `dstack Sky`, and switch to your own Nebius account anytime with just a few clicks.
 
@@ -39,7 +39,7 @@ With Nebius, `dstack` Sky users can orchestrate NVIDIA GPUs provisioned in hours
 
 ## Getting started
 
-After you [sign up :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"} with `dstack` Sky, 
+After you [sign up](https://sky.dstack.ai) with `dstack` Sky, 
 you’ll be prompted to create a project and choose between the GPU marketplace or your own cloud account:
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-sky-project-wizard.png" width="750"/>
@@ -118,9 +118,9 @@ Our goal is to give teams maximum flexibility while removing the complexity of m
     providing a simple, multi-cloud interface for development, training, and inference.
 
 !!! info "What's next"
-    1. Sign up with [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}
+    1. Sign up with [dstack Sky](https://sky.dstack.ai)
     2. Check [Quickstart](../../docs/quickstart.md)
-    3. Learn more about [Nebius :material-arrow-top-right-thin:{ .external }](https://nebius.com/){:target="_blank"}
+    3. Learn more about [Nebius](https://nebius.com/)
     4. Explore [dev environments](../../docs/concepts/dev-environments.md), 
         [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
         and [fleets](../../docs/concepts/fleets.md)

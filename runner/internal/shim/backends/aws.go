@@ -2,6 +2,7 @@ package backends
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,7 +27,7 @@ func NewAWSBackend() *AWSBackend {
 func (e *AWSBackend) GetRealDeviceName(volumeID, deviceName string) (string, error) {
 	// Run the lsblk command to get block device information
 	// On AWS, SERIAL contains volume id.
-	cmd := exec.Command("lsblk", "-o", "NAME,SERIAL")
+	cmd := exec.CommandContext(context.TODO(), "lsblk", "-o", "NAME,SERIAL")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -67,7 +68,7 @@ func (e *AWSBackend) GetRealDeviceName(volumeID, deviceName string) (string, err
 	}
 
 	// Run lsblk again to check for partitions on the base device
-	cmd = exec.Command("lsblk", "-ln", "-o", "NAME", baseDevice)
+	cmd = exec.CommandContext(context.TODO(), "lsblk", "-ln", "-o", "NAME", baseDevice)
 	out.Reset()
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {

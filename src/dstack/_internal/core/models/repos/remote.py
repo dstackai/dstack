@@ -3,7 +3,7 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Annotated, Any, BinaryIO, Callable, Dict, Optional
+from typing import Any, BinaryIO, Callable, Dict, Optional
 
 import git
 import pydantic
@@ -27,7 +27,7 @@ class RepoError(DstackError):
 class RemoteRepoCredsConfig(CoreConfig):
     @staticmethod
     def schema_extra(schema: Dict[str, Any]):
-        del schema["properties"]["protocol"]
+        pass
 
 
 class RemoteRepoCreds(generate_dual_core_model(RemoteRepoCredsConfig)):
@@ -35,16 +35,11 @@ class RemoteRepoCreds(generate_dual_core_model(RemoteRepoCredsConfig)):
     private_key: Optional[str] = None
     oauth_token: Optional[str] = None
 
-    # TODO: remove in 0.20. Left for compatibility with CLI <=0.18.44
-    protocol: Annotated[Optional[str], Field(exclude=True)] = None
-
 
 class RemoteRepoInfoConfig(CoreConfig):
     @staticmethod
     def schema_extra(schema: Dict[str, Any]):
-        del schema["properties"]["repo_host_name"]
-        del schema["properties"]["repo_port"]
-        del schema["properties"]["repo_user_name"]
+        pass
 
 
 class RemoteRepoInfo(
@@ -53,11 +48,6 @@ class RemoteRepoInfo(
 ):
     repo_type: Literal["remote"] = "remote"
     repo_name: str
-
-    # TODO: remove in 0.20. Left for compatibility with CLI <=0.18.44
-    repo_host_name: Annotated[Optional[str], Field(exclude=True)] = None
-    repo_port: Annotated[Optional[int], Field(exclude=True)] = None
-    repo_user_name: Annotated[Optional[str], Field(exclude=True)] = None
 
 
 class RemoteRunRepoData(RemoteRepoInfo):
@@ -135,14 +125,12 @@ class RemoteRepo(Repo):
 
         Args:
             repo_url: The URL of a remote Git repo.
-            repo_branch: The name of the remote branch. Must be specified if `hash` is not specified.
-            repo_hash: The hash of the revision. Must be specified if `branch` is not specified.
+            repo_branch: The name of the remote branch.
+            repo_hash: The hash of the revision.
 
         Returns:
             A remote repo instance.
         """
-        if repo_branch is None and repo_hash is None:
-            raise ValueError("Either `repo_branch` or `repo_hash` must be specified.")
         return RemoteRepo(
             repo_url=repo_url,
             repo_branch=repo_branch,

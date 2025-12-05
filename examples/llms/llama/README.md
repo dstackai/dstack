@@ -18,8 +18,8 @@ This example walks you through how to deploy Llama 4 Scout model with `dstack`.
 
 ### AMD
 Here's an example of a service that deploys
-[`Llama-4-Scout-17B-16E-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"}
-using [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"}
+[`Llama-4-Scout-17B-16E-Instruct`](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct)
+using [vLLM](https://github.com/vllm-project/vllm)
 with AMD `MI300X` GPUs.
 
 <div editor-title="examples/llms/llama/vllm/amd/.dstack.yml">
@@ -59,8 +59,8 @@ resources:
 
 ### NVIDIA
 Here's an example of a service that deploys
-[`Llama-4-Scout-17B-16E-Instruct` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct){:target="_blank"}
-using [SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm){:target="_blank"}
+[`Llama-4-Scout-17B-16E-Instruct`](https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct)
+using [SGLang](https://github.com/sgl-project/sglang) and [vLLM](https://github.com/vllm-project/vllm)
 with NVIDIA `H200` GPUs.
 
 === "SGLang"
@@ -128,7 +128,7 @@ with NVIDIA `H200` GPUs.
 
 !!! info "NOTE:"
     With vLLM, add `--override-generation-config='{"attn_temperature_tuning": true}'` to
-    improve accuracy for [contexts longer than 32K tokens :material-arrow-top-right-thin:{ .external }](https://blog.vllm.ai/2025/04/05/llama4.html){:target="_blank"}.
+    improve accuracy for [contexts longer than 32K tokens](https://blog.vllm.ai/2025/04/05/llama4.html).
 
 ### Memory requirements
 
@@ -201,7 +201,7 @@ is available at `https://<run name>.<gateway domain>/`.
 
 ## Fine-tuning
 
-Here's and example of FSDP and QLoRA fine-tuning of 4-bit Quantized [Llama-4-Scout-17B-16E :material-arrow-top-right-thin:{ .external }](https://huggingface.co/axolotl-quants/Llama-4-Scout-17B-16E-Linearized-bnb-nf4-bf16) on 2xH100 NVIDIA GPUs using [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}
+Here's and example of FSDP and QLoRA fine-tuning of 4-bit Quantized [Llama-4-Scout-17B-16E](https://huggingface.co/axolotl-quants/Llama-4-Scout-17B-16E-Linearized-bnb-nf4-bf16) on 2xH100 NVIDIA GPUs using [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl)
 
 <div editor-title="examples/single-node-training/axolotl/.dstack.yml">
 
@@ -279,10 +279,10 @@ $ dstack apply -f examples/single-node-training/axolotl/.dstack.yml
 ## Source code
 
 The source-code for deployment examples can be found in
-[`examples/llms/llama` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama) and the source-code for the finetuning example can be found in [`examples/single-node-training/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl){:target="_blank"}.
+[`examples/llms/llama`](https://github.com/dstackai/dstack/blob/master/examples/llms/llama) and the source-code for the finetuning example can be found in [`examples/single-node-training/axolotl`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl).
 
 ## What's next?
 
 1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks),
    [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
-2. Browse [Llama 4 with SGLang :material-arrow-top-right-thin:{ .external }](https://github.com/sgl-project/sglang/blob/main/docs/references/llama4.md), [Llama 4 with vLLM :material-arrow-top-right-thin:{ .external }](https://blog.vllm.ai/2025/04/05/llama4.html), [Llama 4 with AMD :material-arrow-top-right-thin:{ .external }](https://rocm.blogs.amd.com/artificial-intelligence/llama4-day-0-support/README.html) and [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}.
+2. Browse [Llama 4 with SGLang](https://github.com/sgl-project/sglang/blob/main/docs/references/llama4.md), [Llama 4 with vLLM](https://blog.vllm.ai/2025/04/05/llama4.html), [Llama 4 with AMD](https://rocm.blogs.amd.com/artificial-intelligence/llama4-day-0-support/README.html) and [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl).

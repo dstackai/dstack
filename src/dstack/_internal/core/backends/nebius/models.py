@@ -179,3 +179,7 @@ class NebiusConfig(NebiusStoredConfig):
     """
 
     creds: AnyNebiusCreds
+
+
+class NebiusOfferBackendData(CoreModel):
+    fabrics: set[str] = set()

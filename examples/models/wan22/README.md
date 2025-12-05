@@ -1,6 +1,6 @@
 # Wan2.2
 
-[Wan2.2 :material-arrow-top-right-thin:{ .external }](https://github.com/Wan-Video/Wan2.2){:target="_blank"} is an open-source SOTA foundational video model. This example shows how to run the T2V-A14B model variant via `dstack` for text-to-video generation.
+[Wan2.2](https://github.com/Wan-Video/Wan2.2) is an open-source SOTA foundational video model. This example shows how to run the T2V-A14B model variant via `dstack` for text-to-video generation.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
@@ -137,4 +137,4 @@ wget https://bashupload.com/fIo7l/wan22.mp4
 ## Source code
 
 The source-code of this example can be found in
-[`examples/models/wan22` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/models/wan22){:target="_blank"}.
+[`examples/models/wan22`](https://github.com/dstackai/dstack/blob/master/examples/models/wan22).

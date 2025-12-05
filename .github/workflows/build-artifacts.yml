@@ -114,9 +114,9 @@ jobs:
       - name: Check if go.mod and go.sum are up-to-date
         run: go mod tidy -diff
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.62.0  # Should match .pre-commit-config.yaml
+          version: v2.6.2  # Should match .pre-commit-config.yaml
           args: --timeout=20m
           working-directory: runner
       - name: Test
@@ -187,7 +187,7 @@ jobs:
           if [[ "${{ inputs.staging }}" == "false" ]]; then
             sed \
               -i.old \
-              "s|@ git+https://github.com/dstackai/dstack.git@master|== ${{ inputs.version }}|" \
+              "s|@ https://github.com/dstackai/dstack/archive/refs/heads/master.tar.gz|== ${{ inputs.version }}|" \
               pyproject.toml
             diff pyproject.toml pyproject.toml.old > /dev/null && echo "Could not set version" && exit 1
           fi

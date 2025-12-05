@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 from rich.console import Console
 from rich.prompt import Confirm
@@ -11,7 +11,7 @@ from rich.theme import Theme
 from dstack._internal import settings
 from dstack._internal.cli.utils.rich import DstackRichHandler
 from dstack._internal.core.errors import CLIError, DstackError
-from dstack._internal.utils.common import get_dstack_dir
+from dstack._internal.utils.common import get_dstack_dir, parse_since
 
 _colors = {
     "secondary": "grey58",
@@ -110,3 +110,12 @@ def warn(message: str):
         # Additional blank line for better visibility if there are more than one warning
         message = f"{message}\n"
     console.print(f"[warning][bold]{message}[/]")
+
+
+def get_start_time(since: Optional[str]) -> Optional[datetime]:
+    if since is None:
+        return None
+    try:
+        return parse_since(since)
+    except ValueError as e:
+        raise CLIError(e.args[0])

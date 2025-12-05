@@ -6,8 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/prometheus/procfs"
+
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 const connStateEstablished = 1
@@ -112,11 +113,11 @@ func (t *ConnectionTracker) getCurrentConnections() (map[connection]struct{}, er
 	connections := make(map[connection]struct{})
 	netTCP, err := t.cfg.Procfs.NetTCP()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to retrieve IPv4 network connections: %w", err)
+		return nil, fmt.Errorf("failed to retrieve IPv4 network connections: %w", err)
 	}
 	netTCP6, err := t.cfg.Procfs.NetTCP6()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to retrieve IPv6 network connections: %w", err)
+		return nil, fmt.Errorf("failed to retrieve IPv6 network connections: %w", err)
 	}
 	for _, conn := range append(netTCP, netTCP6...) {
 		if conn.LocalPort == t.cfg.Port && conn.St == connStateEstablished {

@@ -2,13 +2,16 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 
 	"github.com/codeclysm/extract/v4"
+
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
@@ -32,8 +35,14 @@ func (ex *RunExecutor) AddFileArchive(id string, src io.Reader) error {
 }
 
 // setupFiles must be called from Run
-// ex.jobWorkingDir must be already created
+// ex.jobWorkingDir must be already set
 func (ex *RunExecutor) setupFiles(ctx context.Context) error {
+	if ex.jobWorkingDir == "" {
+		return errors.New("setup files: working dir is not set")
+	}
+	if !filepath.IsAbs(ex.jobWorkingDir) {
+		return fmt.Errorf("setup files: working dir must be absolute: %s", ex.jobWorkingDir)
+	}
 	for _, fa := range ex.jobSpec.FileArchives {
 		archivePath := path.Join(ex.archiveDir, fa.Id)
 		if err := extractFileArchive(ctx, archivePath, fa.Path, ex.jobWorkingDir, ex.jobUid, ex.jobGid, ex.jobHomeDir); err != nil {

@@ -265,7 +265,7 @@ class TestListInstances:
 
     async def test_not_authenticated(self, client: AsyncClient, data) -> None:
         resp = await client.post("/api/instances/list", json={})
-        assert resp.status_code == 403
+        assert resp.status_code in [401, 403]
 
 
 @pytest.mark.asyncio
