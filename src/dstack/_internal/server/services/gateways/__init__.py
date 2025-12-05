@@ -551,9 +551,6 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         hostname = gateway_model.gateway_compute.hostname
         if hostname is None:
             hostname = ip_address
-    backend_type = gateway_model.backend.type
-    if gateway_model.backend.type == BackendType.DSTACK:
-        backend_type = BackendType.AWS
     configuration = get_gateway_configuration(gateway_model)
     configuration.default = gateway_model.project.default_gateway_id == gateway_model.id
     return Gateway(
@@ -561,8 +558,6 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         ip_address=ip_address,
         instance_id=instance_id,
         hostname=hostname,
-        backend=backend_type,
-        region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=gateway_model.project.default_gateway_id == gateway_model.id,
         created_at=gateway_model.created_at,
