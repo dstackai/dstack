@@ -5,7 +5,7 @@ sign up with [dstack Sky](../guides/dstack-sky.md).
 
 ### Set up the CLI
 
-If you've signed up, open your project settings, and copy the `dstack config` command to point the CLI to the project.
+If you've signed up, open your project settings, and copy the `dstack project add` command to point the CLI to the project.
 
 ![](https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-sky-project-config.png){ width=800 }
 
