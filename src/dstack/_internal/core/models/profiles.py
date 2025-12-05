@@ -242,11 +242,6 @@ class Schedule(CoreModel):
 class ProfileParamsConfig(CoreConfig):
     @staticmethod
     def schema_extra(schema: Dict[str, Any]):
-        del schema["properties"]["pool_name"]
-        del schema["properties"]["instance_name"]
-        del schema["properties"]["retry_policy"]
-        del schema["properties"]["termination_policy"]
-        del schema["properties"]["termination_idle_time"]
         add_extra_schema_types(
             schema["properties"]["max_duration"],
             extra_types=[{"type": "boolean"}, {"type": "string"}],
@@ -395,13 +390,6 @@ class ProfileParams(CoreModel):
             )
         ),
     ] = None
-
-    # Deprecated and unused. Left for compatibility with 0.18 clients.
-    pool_name: Annotated[Optional[str], Field(exclude=True)] = None
-    instance_name: Annotated[Optional[str], Field(exclude=True)] = None
-    retry_policy: Annotated[Optional[ProfileRetryPolicy], Field(exclude=True)] = None
-    termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
-    termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
