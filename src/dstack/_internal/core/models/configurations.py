@@ -131,14 +131,14 @@ class RepoSpec(CoreModel):
         Field(description="The commit hash"),
     ] = None
     path: Annotated[
-        Optional[str],
+        str,
         Field(
             description=(
                 "The repo path inside the run container. Relative paths are resolved"
-                f" relative to the working directory. Defaults to `{LEGACY_REPO_DIR}`"
+                " relative to the working directory"
             )
         ),
-    ] = None
+    ] = "."
     if_exists: Annotated[
         RepoExistsAction,
         Field(
@@ -447,8 +447,8 @@ class BaseRunConfiguration(CoreModel):
         Field(
             description=(
                 "The absolute path to the working directory inside the container."
-                f" Defaults to `{LEGACY_REPO_DIR}`"
-            )
+                " Defaults to the `image`'s default working directory"
+            ),
         ),
     ] = None
     # deprecated since 0.18.31; has no effect

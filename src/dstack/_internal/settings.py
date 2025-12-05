@@ -38,11 +38,3 @@ class FeatureFlags:
     # DSTACK_FF_AUTOCREATED_FLEETS_ENABLED enables legacy autocreated fleets:
     # If there are no fleet suitable for the run, a new fleet is created automatically instead of an error.
     AUTOCREATED_FLEETS_ENABLED = os.getenv("DSTACK_FF_AUTOCREATED_FLEETS_ENABLED") is not None
-
-    # Enabling LEGACY_REPO_DIR_DISABLED does the following:
-    # - Changes `working_dir` default value from `/workflow` to the image's working dir, unless
-    #   the client is older than 0.19.27, in which case `/workflow` is still used.
-    # - Forbids relative `working_dir` (client side only).
-    # - Makes `repos[].path` required, unless the client is older than 0.19.27,
-    #   in which case `/workflow` is still used.
-    LEGACY_REPO_DIR_DISABLED = os.getenv("DSTACK_FF_LEGACY_REPO_DIR_DISABLED") is not None
