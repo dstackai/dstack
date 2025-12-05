@@ -228,7 +228,7 @@ When using  [files](../concepts/dev-environments.md#files) or [repos](../concept
 
 ### S3
 
-To use S3 for storing uploaded files, set the `DSTACK_SERVER_S3_BUCKET` and `DSTACK_SERVER_BUCKET_REGION` environment variables.
+To use S3 for storing uploaded files, set the `DSTACK_SERVER_S3_BUCKET` and `DSTACK_SERVER_S3_BUCKET_REGION` environment variables.
 The bucket must be created beforehand. `dstack` won't try to create it.
 
 ??? info "Required permissions"
