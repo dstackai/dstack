@@ -98,26 +98,6 @@ def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[int]:
     return parse_duration(v)
 
 
-# Deprecated in favor of ProfileRetry().
-# TODO: Remove when no longer referenced.
-class ProfileRetryPolicy(CoreModel):
-    retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
-    duration: Annotated[
-        Optional[Union[int, str]],
-        Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
-    ] = None
-
-    _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
-
-    @root_validator
-    def _validate_fields(cls, values):
-        if values["retry"] and "duration" not in values:
-            values["duration"] = DEFAULT_RETRY_DURATION
-        if values.get("duration") is not None:
-            values["retry"] = True
-        return values
-
-
 class RetryEvent(str, Enum):
     NO_CAPACITY = "no-capacity"
     INTERRUPTION = "interruption"
