@@ -3,7 +3,6 @@ Environment variables read by the dstack server. Documented in reference/environ
 """
 
 import os
-import warnings
 from enum import Enum
 from pathlib import Path
 
@@ -79,31 +78,17 @@ SERVER_CLOUDWATCH_LOG_REGION = os.getenv("DSTACK_SERVER_CLOUDWATCH_LOG_REGION")
 
 SERVER_GCP_LOGGING_PROJECT = os.getenv("DSTACK_SERVER_GCP_LOGGING_PROJECT")
 
-SERVER_METRICS_RUNNING_TTL_SECONDS: int
-_SERVER_METRICS_RUNNING_TTL_SECONDS = os.getenv("DSTACK_SERVER_METRICS_RUNNING_TTL_SECONDS")
-if _SERVER_METRICS_RUNNING_TTL_SECONDS is None:
-    _SERVER_METRICS_RUNNING_TTL_SECONDS = os.getenv("DSTACK_SERVER_METRICS_TTL_SECONDS")
-    if _SERVER_METRICS_RUNNING_TTL_SECONDS is not None:
-        warnings.warn(
-            (
-                "DSTACK_SERVER_METRICS_TTL_SECONDS is deprecated,"
-                " use DSTACK_SERVER_METRICS_RUNNING_TTL_SECONDS instead"
-            ),
-            DeprecationWarning,
-        )
-    else:
-        _SERVER_METRICS_RUNNING_TTL_SECONDS = 3600
-SERVER_METRICS_RUNNING_TTL_SECONDS = int(_SERVER_METRICS_RUNNING_TTL_SECONDS)
-del _SERVER_METRICS_RUNNING_TTL_SECONDS
-SERVER_METRICS_FINISHED_TTL_SECONDS = int(
-    os.getenv("DSTACK_SERVER_METRICS_FINISHED_TTL_SECONDS", 7 * 24 * 3600)
+SERVER_METRICS_RUNNING_TTL_SECONDS = environ.get_int(
+    "DSTACK_SERVER_METRICS_RUNNING_TTL_SECONDS", default=3600
 )
-
-SERVER_INSTANCE_HEALTH_TTL_SECONDS = int(
-    os.getenv("DSTACK_SERVER_INSTANCE_HEALTH_TTL_SECONDS", 7 * 24 * 3600)
+SERVER_METRICS_FINISHED_TTL_SECONDS = environ.get_int(
+    "DSTACK_SERVER_METRICS_FINISHED_TTL_SECONDS", default=7 * 24 * 3600
 )
-SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS = int(
-    os.getenv("DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS", 60)
+SERVER_INSTANCE_HEALTH_TTL_SECONDS = environ.get_int(
+    "DSTACK_SERVER_INSTANCE_HEALTH_TTL_SECONDS", default=7 * 24 * 3600
+)
+SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS = environ.get_int(
+    "DSTACK_SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS", default=60
 )
 
 SERVER_EVENTS_TTL_SECONDS = int(
@@ -159,34 +144,9 @@ class JobNetworkMode(Enum):
 
 
 DEFAULT_JOB_NETWORK_MODE = JobNetworkMode.HOST_WHEN_POSSIBLE
-
-
-def _get_job_network_mode() -> JobNetworkMode:
-    # Current default
-    mode = DEFAULT_JOB_NETWORK_MODE
-    bridge_var = "DSTACK_FORCE_BRIDGE_NETWORK"
-    force_bridge = environ.get_bool(bridge_var)
-    mode_var = "DSTACK_SERVER_JOB_NETWORK_MODE"
-    mode_from_env = environ.get_enum(mode_var, JobNetworkMode, value_type=int)
-    if mode_from_env is not None:
-        if force_bridge is not None:
-            logger.warning(
-                f"{bridge_var} is deprecated since 0.19.27 and ignored when {mode_var} is set"
-            )
-        return mode_from_env
-    if force_bridge is not None:
-        if force_bridge:
-            mode = JobNetworkMode.FORCED_BRIDGE
-            logger.warning(
-                (
-                    f"{bridge_var} is deprecated since 0.19.27."
-                    f" Set {mode_var} to {mode.value} and remove {bridge_var}"
-                )
-            )
-        else:
-            logger.warning(f"{bridge_var} is deprecated since 0.19.27. Remove {bridge_var}")
-    return mode
-
-
-JOB_NETWORK_MODE = _get_job_network_mode()
-del _get_job_network_mode
+JOB_NETWORK_MODE = environ.get_enum(
+    "DSTACK_SERVER_JOB_NETWORK_MODE",
+    JobNetworkMode,
+    value_type=int,
+    default=DEFAULT_JOB_NETWORK_MODE,
+)
