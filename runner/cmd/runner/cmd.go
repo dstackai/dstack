@@ -49,12 +49,6 @@ func App() {
 						Value:       consts.RunnerHomeDir,
 						Destination: &homeDir,
 					},
-					// TODO: Not used, left for compatibility with old servers. Remove eventually.
-					&cli.PathFlag{
-						Name:        "working-dir",
-						Hidden:      true,
-						Destination: nil,
-					},
 					&cli.IntFlag{
 						Name:        "http-port",
 						Usage:       "Set a http port",

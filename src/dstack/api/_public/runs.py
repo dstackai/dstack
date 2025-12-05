@@ -467,13 +467,11 @@ class RunCollection:
                 is not loaded from a file.
             repo_dir: The path of the cloned repo inside the run container. If not set,
                 defaults first to the `repos[0].path` property of the configuration (for remote
-                repos only), then to `/workflow`.
+                repos only).
 
         Returns:
             Run plan.
         """
-        # XXX: not using the LEGACY_REPO_DIR const in the docstring above, as the docs generator,
-        # apparently, doesn't support f-strings (f"""...""").
         if repo is None:
             repo = VirtualRepo()
             repo_code_hash = None
@@ -520,9 +518,6 @@ class RunCollection:
             repo_code_hash=repo_code_hash,
             repo_dir=repo_dir,
             file_archives=file_archives,
-            # Server doesn't use this field since 0.19.27, but we still send it for compatibility
-            # with older servers
-            working_dir=configuration.working_dir,
             configuration_path=configuration_path,
             configuration=configuration,
             profile=profile,

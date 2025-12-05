@@ -314,9 +314,12 @@ class JobConfigurator(ABC):
         """
         Returns absolute or relative path
         """
+        if repos := self.run_spec.configuration.repos:
+            return repos[0].path
+        # `repo_dir` may be set while `repos` is empty if the RunSpec was submitted before 0.20.0
         repo_dir = self.run_spec.repo_dir
         # We need this fallback indefinitely, as there may be RunSpecs submitted before
-        # repos[].path became required, and JobSpec is regenerated from RunSpec on each retry
+        # `repos[].path` was added, and JobSpec is regenerated from RunSpec on each retry
         # and in-place update.
         if repo_dir is None:
             return LEGACY_REPO_DIR
@@ -335,23 +338,15 @@ class JobConfigurator(ABC):
 
     def _working_dir(self) -> Optional[str]:
         """
-        Returns path or None
+        Returns absolute path or None
 
         None means the default working directory taken from the image
-
-        Currently, for compatibility with pre-0.19.27 runners, the path may be relative.
-        Future versions should return only absolute paths
         """
         working_dir = self.run_spec.configuration.working_dir
-        if working_dir is None:
+        if working_dir is None or is_absolute_posix_path(working_dir):
             return working_dir
-        # Return a relative path if possible
-        if is_absolute_posix_path(working_dir):
-            try:
-                return str(PurePosixPath(working_dir).relative_to(LEGACY_REPO_DIR))
-            except ValueError:
-                pass
-        return working_dir
+        # Support for pre-0.20.0 configurations
+        return str(PurePosixPath(LEGACY_REPO_DIR) / working_dir)
 
     def _python(self) -> str:
         if self.run_spec.configuration.python is not None:

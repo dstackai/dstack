@@ -26,7 +26,6 @@ from dstack._internal.core.consts import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
-from dstack._internal.core.models.configurations import LEGACY_REPO_DIR
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -971,8 +970,6 @@ def get_docker_commands(
             f" --ssh-port {DSTACK_RUNNER_SSH_PORT}"
             " --temp-dir /tmp/runner"
             " --home-dir /root"
-            # TODO: Not used, left for compatibility with old runners. Remove eventually.
-            f" --working-dir {LEGACY_REPO_DIR}"
         ),
     ]
 

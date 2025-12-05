@@ -232,7 +232,6 @@ def get_dev_env_run_plan_dict(
         "repo_dir": "~/repo",
         "run_name": run_name,
         "ssh_key_pub": "ssh_key",
-        "working_dir": None,
     }
     return {
         "project_name": project_name,
@@ -470,7 +469,6 @@ def get_dev_env_run_dict(
             "repo_dir": "~/repo",
             "run_name": run_name,
             "ssh_key_pub": "ssh_key",
-            "working_dir": None,
         },
         "jobs": [
             {
@@ -614,7 +612,6 @@ def get_service_run_spec(
         "repo_dir": "~/repo",
         "run_name": run_name,
         "ssh_key_pub": "ssh_key",
-        "working_dir": None,
     }
 
 
