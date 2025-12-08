@@ -74,3 +74,5 @@ RUN cd /opt \
         MPI_HOME=${OPEN_MPI_PATH} \
         CUDA_HOME=${CUDA_HOME} \
         NCCL_HOME=${NCCL_HOME}
+
+WORKDIR /dstack/run

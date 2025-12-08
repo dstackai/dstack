@@ -67,7 +67,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Build and upload to DockerHub
         run: |
-         if [ "${{ matrix.flavor }}" = "base" ]; then
+          if [ "${{ matrix.flavor }}" = "base" ]; then
             FILE="base/Dockerfile"
           elif [ "${{ matrix.flavor }}" = "devel" ]; then
             FILE="base/Dockerfile"
