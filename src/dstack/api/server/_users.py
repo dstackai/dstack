@@ -1,6 +1,6 @@
 from typing import List
 
-from pydantic import ValidationError, parse_obj_as
+from pydantic import parse_obj_as
 
 from dstack._internal.core.models.users import GlobalRole, User, UserWithCreds
 from dstack._internal.server.schemas.users import (
@@ -17,24 +17,9 @@ class UsersAPIClient(APIClientGroup):
         resp = self._request("/api/users/list")
         return parse_obj_as(List[User.__response__], resp.json())
 
-    def get_my_user(self) -> User:
-        """
-        Returns `User` with pre-0.19.33 servers, or `UserWithCreds` with newer servers.
-        """
-
+    def get_my_user(self) -> UserWithCreds:
         resp = self._request("/api/users/get_my_user")
-        try:
-            return parse_obj_as(UserWithCreds.__response__, resp.json())
-        except ValidationError as e:
-            # Compatibility with pre-0.19.33 server
-            if (
-                len(e.errors()) == 1
-                and e.errors()[0]["loc"] == ("__root__", "creds")
-                and e.errors()[0]["type"] == "value_error.missing"
-            ):
-                return parse_obj_as(User.__response__, resp.json())
-            else:
-                raise
+        return parse_obj_as(UserWithCreds.__response__, resp.json())
 
     def get_user(self, username: str) -> User:
         body = GetUserRequest(username=username)

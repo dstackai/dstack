@@ -44,17 +44,6 @@ def set_mtime(path: Path, ts: float):
     os.utime(path, (ts, ts))
 
 
-def test_get_user_key_returns_none_when_no_user_creds(tmp_path: Path):
-    api_client = make_api_client(
-        user=User.__response__.parse_obj(SAMPLE_USER.dict()), token_hash=SAMPLE_USER_TOKEN_HASH
-    )
-    manager = UserSSHKeyManager(api_client, tmp_path)
-
-    assert manager.get_user_key() is None
-    assert not (tmp_path / SAMPLE_USER_TOKEN_HASH).exists()
-    assert not (tmp_path / f"{SAMPLE_USER_TOKEN_HASH}.pub").exists()
-
-
 def test_get_user_key_downloads_keys(tmp_path: Path):
     api_client = make_api_client(user=SAMPLE_USER, token_hash=SAMPLE_USER_TOKEN_HASH)
     manager = UserSSHKeyManager(api_client, tmp_path)
