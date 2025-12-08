@@ -10,7 +10,7 @@ fi
 DB_PATH="${HOME}/.dstack/server/data/sqlite.db"
 mkdir -p "$(dirname "$DB_PATH")"
 if [[ -z "${LITESTREAM_REPLICA_URL}" ]]; then
-  dstack server --host 0.0.0.0
+  exec dstack server --host 0.0.0.0
 else
   if [[ ! -f "$DB_PATH" ]]; then
     echo "Attempting Litestream restore..."
@@ -23,5 +23,5 @@ else
       fi
     fi
   fi
-  litestream replicate -exec "dstack server --host 0.0.0.0" "$DB_PATH" "$LITESTREAM_REPLICA_URL"
+  exec litestream replicate -exec "dstack server --host 0.0.0.0" "$DB_PATH" "$LITESTREAM_REPLICA_URL"
 fi

@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     git \
     sqlite3 \
+    tini \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ $(uname -m) = "aarch64" ]; then ARCH="arm64"; else ARCH="x86_64"; fi && \
@@ -19,7 +20,7 @@ RUN if [ $(uname -m) = "aarch64" ]; then ARCH="arm64"; else ARCH="x86_64"; fi &&
 
 ADD https://astral.sh/uv/install.sh /uv-installer.sh
 RUN sh /uv-installer.sh && rm /uv-installer.sh
-ENV PATH="/root/.local/bin/:$PATH" 
+ENV PATH="/root/.local/bin/:$PATH"
 
 RUN uv tool install "dstack[all]==$VERSION"
 
@@ -28,4 +29,4 @@ RUN chmod 777 entrypoint.sh
 
 EXPOSE 3000
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "./entrypoint.sh"]
