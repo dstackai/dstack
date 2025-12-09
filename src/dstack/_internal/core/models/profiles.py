@@ -98,26 +98,6 @@ def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[int]:
     return parse_duration(v)
 
 
-# Deprecated in favor of ProfileRetry().
-# TODO: Remove when no longer referenced.
-class ProfileRetryPolicy(CoreModel):
-    retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
-    duration: Annotated[
-        Optional[Union[int, str]],
-        Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
-    ] = None
-
-    _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
-
-    @root_validator
-    def _validate_fields(cls, values):
-        if values["retry"] and "duration" not in values:
-            values["duration"] = DEFAULT_RETRY_DURATION
-        if values.get("duration") is not None:
-            values["retry"] = True
-        return values
-
-
 class RetryEvent(str, Enum):
     NO_CAPACITY = "no-capacity"
     INTERRUPTION = "interruption"
@@ -146,7 +126,13 @@ class ProfileRetry(generate_dual_core_model(ProfileRetryConfig)):
     ] = None
     duration: Annotated[
         Optional[int],
-        Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
+        Field(
+            description=(
+                "The maximum period of retrying the run, e.g., `4h` or `1d`."
+                " The period is calculated as a run age for `no-capacity` event"
+                " and as a time passed since the last `interruption` and `error` for `interruption` and `error` events."
+            )
+        ),
     ] = None
 
     _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
@@ -236,11 +222,6 @@ class Schedule(CoreModel):
 class ProfileParamsConfig(CoreConfig):
     @staticmethod
     def schema_extra(schema: Dict[str, Any]):
-        del schema["properties"]["pool_name"]
-        del schema["properties"]["instance_name"]
-        del schema["properties"]["retry_policy"]
-        del schema["properties"]["termination_policy"]
-        del schema["properties"]["termination_idle_time"]
         add_extra_schema_types(
             schema["properties"]["max_duration"],
             extra_types=[{"type": "boolean"}, {"type": "string"}],
@@ -305,7 +286,8 @@ class ProfileParams(CoreModel):
         Optional[Union[Literal["off"], int]],
         Field(
             description=(
-                "The maximum duration of a run (e.g., `2h`, `1d`, etc)."
+                "The maximum duration of a run (e.g., `2h`, `1d`, etc)"
+                " in a running state, excluding provisioning and pulling."
                 " After it elapses, the run is automatically stopped."
                 " Use `off` for unlimited duration. Defaults to `off`"
             )
@@ -341,7 +323,9 @@ class ProfileParams(CoreModel):
         Field(
             description=(
                 "Time to wait before terminating idle instances."
-                " Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
+                " Instances are not terminated if the fleet is already at `nodes.min`."
+                " Defaults to `5m` for runs and `3d` for fleets."
+                " Use `off` for unlimited duration"
             )
         ),
     ] = None
@@ -386,13 +370,6 @@ class ProfileParams(CoreModel):
             )
         ),
     ] = None
-
-    # Deprecated and unused. Left for compatibility with 0.18 clients.
-    pool_name: Annotated[Optional[str], Field(exclude=True)] = None
-    instance_name: Annotated[Optional[str], Field(exclude=True)] = None
-    retry_policy: Annotated[Optional[ProfileRetryPolicy], Field(exclude=True)] = None
-    termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
-    termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration

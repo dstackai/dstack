@@ -63,7 +63,7 @@ Monitoring is a critical part of observability, and we have many more features o
 ## Feedback
 
 If you find something not working as intended, please be sure to report it to
-our [bug tracker :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_ blank"}. 
+our [bug tracker](https://github.com/dstackai/dstack/issues){:target="_ blank"}. 
 Your feedback and feature requests are also very welcome on both 
-[Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"} and the
-[issue tracker :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_blank"}.
+[Discord](https://discord.gg/u8SmfwPpMd) and the
+[issue tracker](https://github.com/dstackai/dstack/issues).

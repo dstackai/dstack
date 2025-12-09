@@ -192,4 +192,4 @@ resources:
 ## Source code
 
 The source code for this example can be found in 
-[`examples/misc/a3mega-clusters` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/a3mega-clusters).
+[`examples/misc/a3mega-clusters`](https://github.com/dstackai/dstack/blob/master/examples/misc/a3mega-clusters).

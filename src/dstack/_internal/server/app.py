@@ -5,7 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Awaitable, Callable, List
+from typing import Awaitable, Callable, List, Optional
 
 import sentry_sdk
 from fastapi import FastAPI, Request, Response, status
@@ -26,6 +26,7 @@ from dstack._internal.server.background.tasks.process_probes import PROBES_SCHED
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
     backends,
+    events,
     files,
     fleets,
     gateways,
@@ -62,9 +63,10 @@ from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     check_client_server_compatibility,
     error_detail,
+    get_client_version,
     get_server_client_error_details,
 )
-from dstack._internal.settings import DSTACK_VERSION
+from dstack._internal.settings import DSTACK_VERSION, FeatureFlags
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import check_required_ssh_version
 
@@ -160,7 +162,12 @@ async def lifespan(app: FastAPI):
         logger.info("Background processing is disabled")
     PROBES_SCHEDULER.start()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
-    logger.info(
+    job_network_mode_log = (
+        logger.info
+        if settings.JOB_NETWORK_MODE != settings.DEFAULT_JOB_NETWORK_MODE
+        else logger.debug
+    )
+    job_network_mode_log(
         "Job network mode: %s (%d)",
         settings.JOB_NETWORK_MODE.name,
         settings.JOB_NETWORK_MODE.value,
@@ -222,6 +229,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
     app.include_router(prometheus.router)
     app.include_router(files.router)
+    app.include_router(events.root_router, include_in_schema=FeatureFlags.EVENTS)
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):
@@ -319,8 +327,19 @@ def register_routes(app: FastAPI, ui: bool = True):
             or request.url.path in _NO_API_VERSION_CHECK_ROUTES
         ):
             return await call_next(request)
+        try:
+            client_version = get_client_version(request)
+        except ValueError as e:
+            return CustomORJSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"detail": [error_detail(str(e))]},
+            )
+        client_release: Optional[tuple[int, ...]] = None
+        if client_version is not None:
+            client_release = client_version.release
+        request.state.client_release = client_release
         response = check_client_server_compatibility(
-            client_version=request.headers.get("x-api-version"),
+            client_version=client_version,
             server_version=DSTACK_VERSION,
         )
         if response is not None:

@@ -38,7 +38,7 @@ from dstack._internal.core.models.gateways import (
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
-from dstack._internal.server.db import get_db
+from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     GatewayComputeModel,
     GatewayModel,
@@ -108,6 +108,7 @@ async def create_gateway_compute(
         ssh_key_pub=gateway_ssh_public_key,
         certificate=configuration.certificate,
         tags=configuration.tags,
+        router=configuration.router,
     )
 
     gpd = await run_async(
@@ -148,14 +149,13 @@ async def create_gateway(
     )
 
     lock_namespace = f"gateway_names_{project.name}"
-    if get_db().dialect_name == "sqlite":
+    if is_db_sqlite():
         # Start new transaction to see committed changes after lock
         await session.commit()
-    elif get_db().dialect_name == "postgresql":
+    elif is_db_postgres():
         await session.execute(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
-
     lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
     async with lock:
         if configuration.name is None:
@@ -449,10 +449,16 @@ async def _update_gateway(gateway_compute_model: GatewayComputeModel, build: str
         gateway_compute_model.ssh_private_key,
     )
     logger.debug("Updating gateway %s", connection.ip_address)
+    compute_config = GatewayComputeConfiguration.__response__.parse_raw(
+        gateway_compute_model.configuration
+    )
+
+    # Build package spec with extras and wheel URL
+    gateway_package = get_dstack_gateway_wheel(build, compute_config.router)
     commands = [
         # prevent update.sh from overwriting itself during execution
         "cp dstack/update.sh dstack/_update.sh",
-        f"sh dstack/_update.sh {get_dstack_gateway_wheel(build)} {build}",
+        f'sh dstack/_update.sh "{gateway_package}" {build}',
         "rm dstack/_update.sh",
     ]
     stdout = await connection.tunnel.aexec("/bin/sh -c '" + " && ".join(commands) + "'")

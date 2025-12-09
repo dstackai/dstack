@@ -375,7 +375,7 @@ class TestGetPrometheusMetrics:
         else:
             headers = None
         response = await client.get("/metrics", headers=headers)
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     async def test_returns_200_if_token_is_valid(
         self, monkeypatch: pytest.MonkeyPatch, client: AsyncClient

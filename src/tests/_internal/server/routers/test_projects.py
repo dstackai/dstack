@@ -472,9 +472,12 @@ class TestDeleteProject:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_deletes_projects(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("project_name", ["project1", "a" * 50])
+    async def test_deletes_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient, project_name: str
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project1 = await create_project(session=session, owner=user, name="project1")
+        project1 = await create_project(session=session, owner=user, name=project_name)
         await add_project_member(
             session=session, project=project1, user=user, project_role=ProjectRole.ADMIN
         )

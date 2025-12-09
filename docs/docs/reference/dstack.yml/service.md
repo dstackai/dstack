@@ -64,7 +64,7 @@ The `service` configuration type allows running [services](../../concepts/servic
         2. Doesn't work if `eos_token` is defined in the model repository as a dictionary. As a workaround, set `eos_token` manually, as shown in the example above (see Chat template).
 
         If you encounter any other issues, please make sure to file a
-        [GitHub issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/new/choose){:target="_blank"}.
+        [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 ### `scaling`
 
@@ -226,6 +226,17 @@ The `service` configuration type allows running [services](../../concepts/servic
       show_root_heading: false
       type:
         required: true
+
+??? info "`if_exists` action"
+
+    If the `path` already exists and is a non-empty directory, by default the run is terminated with an error.
+    This can be changed with the `if_exists` option:
+
+    * `error` – do not try to check out, terminate the run with an error (the default action since `0.20.0`)
+    * `skip` – do not try to check out, skip the repo (the only action available before `0.20.0`)
+
+    Note, if the `path` exists and is _not_ a directory (e.g., a regular file), this is always an error that
+    cannot be ignored with the `skip` action.
 
 ??? info "Short syntax"
 

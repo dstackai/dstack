@@ -8,6 +8,7 @@ import { ROUTES } from 'routes';
 
 import {
     getJobError,
+    getJobFinishedAt,
     getJobListItemBackend,
     getJobListItemInstance,
     getJobListItemPrice,
@@ -47,6 +48,11 @@ export const useColumnsDefinitions = ({
             id: 'submitted_at',
             header: t('projects.run.submitted_at'),
             cell: getJobSubmittedAt,
+        },
+        {
+            id: 'finished_at',
+            header: t('projects.run.finished_at'),
+            cell: getJobFinishedAt,
         },
         {
             id: 'status',

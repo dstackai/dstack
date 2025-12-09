@@ -28,7 +28,7 @@ func TestExecutor_WorkingDir_Set(t *testing.T) {
 
 	ex.jobSpec.WorkingDir = &workingDir
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
-	err = ex.prepareJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(context.TODO())
 	require.NoError(t, err)
 	require.Equal(t, workingDir, ex.jobWorkingDir)
 	err = os.MkdirAll(workingDir, 0o755)
@@ -47,7 +47,7 @@ func TestExecutor_WorkingDir_NotSet(t *testing.T) {
 	require.NoError(t, err)
 	ex.jobSpec.WorkingDir = nil
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
-	err = ex.prepareJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(context.TODO())
 	require.NoError(t, err)
 	require.Equal(t, cwd, ex.jobWorkingDir)
 
@@ -158,7 +158,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 	err := os.WriteFile(ex.codePath, []byte{}, 0o600) // empty diff
 	require.NoError(t, err)
 
-	err = ex.prepareJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(context.TODO())
 	require.NoError(t, err)
 	err = ex.setupRepo(context.TODO())
 	require.NoError(t, err)
@@ -211,6 +211,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 	ex, _ := NewRunExecutor(temp, home, 10022)
 	ex.SetJob(body)
 	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
+	ex.setJobWorkingDir(context.Background())
 	return ex
 }
 
@@ -246,7 +247,7 @@ func TestWriteDstackProfile(t *testing.T) {
 	for _, value := range testCases {
 		env := map[string]string{"VAR": value}
 		writeDstackProfile(env, path)
-		cmd := exec.Command("/bin/sh", "-c", script)
+		cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", script)
 		out, err := cmd.Output()
 		assert.NoError(t, err)
 		assert.Equal(t, value, string(out))

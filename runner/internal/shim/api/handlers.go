@@ -8,6 +8,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim"
+	"github.com/dstackai/dstack/runner/internal/shim/components"
 	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
 )
 
@@ -155,4 +156,47 @@ func (s *ShimServer) TaskMetricsHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	response := dcgm.FilterMetrics(expfmtBody, taskInfo.GpuIDs)
 	_, _ = w.Write(response)
+}
+
+func (s *ShimServer) ComponentListHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	runnerStatus := s.runnerManager.GetInfo(r.Context())
+	response := &ComponentListResponse{
+		Components: []components.ComponentInfo{runnerStatus},
+	}
+	return response, nil
+}
+
+func (s *ShimServer) ComponentInstallHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	var req ComponentInstallRequest
+	if err := api.DecodeJSONBody(w, r, &req, true); err != nil {
+		return nil, err
+	}
+
+	if req.Name == "" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty name"}
+	}
+
+	switch components.ComponentName(req.Name) {
+	case components.ComponentNameRunner:
+		if req.URL == "" {
+			return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty url"}
+		}
+
+		// There is still a small chance of time-of-check race condition, but we ignore it.
+		runnerInfo := s.runnerManager.GetInfo(r.Context())
+		if runnerInfo.Status == components.ComponentStatusInstalling {
+			return nil, &api.Error{Status: http.StatusConflict, Msg: "already installing"}
+		}
+
+		s.bgJobsGroup.Go(func() {
+			if err := s.runnerManager.Install(s.bgJobsCtx, req.URL, true); err != nil {
+				log.Error(s.bgJobsCtx, "runner background install", "err", err)
+			}
+		})
+
+	default:
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "unknown component"}
+	}
+
+	return nil, nil
 }

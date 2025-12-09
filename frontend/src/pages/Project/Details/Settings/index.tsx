@@ -224,7 +224,7 @@ export const ProjectSettings: React.FC = () => {
                                 allowSkipTo={true}
                                 steps={[
                                     {
-                                        title: 'Install CLI',
+                                        title: 'Install',
                                         // info: <InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />,
                                         description: 'To use dstack, install the CLI on your local machine.',
                                         content: (

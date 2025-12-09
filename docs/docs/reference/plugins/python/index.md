@@ -75,7 +75,7 @@ Then you can install the plugin package into your Python environment and enable 
 
 ??? info "Docker"
     If you deploy `dstack` using a Docker image you can add plugins either
-    by including them in your custom image built upon the `dstack` [server image :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/server){:target="_blank"}, or by mounting installed plugins as volumes.
+    by including them in your custom image built upon the `dstack` [server image](https://github.com/dstackai/dstack/tree/master/docker/server), or by mounting installed plugins as volumes.
 
 ## Apply policies
 
@@ -123,4 +123,4 @@ Plugins implemented as API servers have advantages over plugins implemented as P
 * You can use any programming language.
 * If you run the `dstack` server via Docker, you don't need to extend the `dstack` server image with plugins or map them via volumes.
 
-To get started, check out the [plugin server example :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples/plugins/example_plugin_server){:target="_blank"}. The `rest_plugin` server API is documented [here](../../plugins/rest/index.md).
+To get started, check out the [plugin server example](https://github.com/dstackai/dstack/tree/master/examples/plugins/example_plugin_server). The `rest_plugin` server API is documented [here](../../plugins/rest/index.md).

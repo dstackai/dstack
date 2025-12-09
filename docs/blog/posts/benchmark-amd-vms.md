@@ -18,7 +18,7 @@ This is the first in our series of benchmarks exploring the performance of AMD G
 
 Our findings reveal that for single-GPU LLM training and inference, both setups deliver comparable performance. The subtle differences we observed highlight how virtualization overhead can influence performance under specific conditions, but for most practical purposes, the performance is nearly identical.
 
-This benchmark was supported by [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"},
+This benchmark was supported by [Hot Aisle](https://hotaisle.xyz/),
 a provider of AMD GPU bare-metal and VM infrastructure.
 
 ## Benchmark 1: Inference
@@ -201,11 +201,11 @@ python3 trl/scripts/sft.py \
 
 ## Source code
 
-All source code and findings are available in our [GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/amd/single_gpu_vm_vs_bare-metal){:target="_blank"}.
+All source code and findings are available in our [GitHub repo](https://github.com/dstackai/benchmarks/tree/main/amd/single_gpu_vm_vs_bare-metal).
 
 ## References
 
-* [vLLM V1 Meets AMD Instinct GPUs: A New Era for LLM Inference Performance :material-arrow-top-right-thin:{ .external }](https://rocm.blogs.amd.com/software-tools-optimization/vllmv1-rocm-llm/README.html){:target="_blank"}
+* [vLLM V1 Meets AMD Instinct GPUs: A New Era for LLM Inference Performance](https://rocm.blogs.amd.com/software-tools-optimization/vllmv1-rocm-llm/README.html)
 
 ## What's next?
 
@@ -215,5 +215,5 @@ Our next steps are to benchmark VM vs. bare-metal performance in multi-GPU and m
 
 #### Hot Aisle
     
-Big thanks to [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} for providing the compute power behind these benchmarks. 
+Big thanks to [Hot Aisle](https://hotaisle.xyz/) for providing the compute power behind these benchmarks. 
 If you’re looking for fast AMD GPU bare-metal or VM instances, they’re definitely worth checking out.

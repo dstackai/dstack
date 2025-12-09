@@ -39,6 +39,11 @@ export const getJobSubmittedAt = (job: IJob) => {
         : '';
 };
 
+export const getJobFinishedAt = (job: IJob) => {
+    const finished_at = job.job_submissions?.[job.job_submissions.length - 1].finished_at;
+    return finished_at ? format(new Date(finished_at), DATE_TIME_FORMAT) : '';
+};
+
 export const getJobStatus = (job: IJob) => {
     return job.job_submissions?.[job.job_submissions.length - 1].status;
 };

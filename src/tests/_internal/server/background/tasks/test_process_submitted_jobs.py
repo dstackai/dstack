@@ -9,14 +9,14 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.configurations import TaskConfiguration
-from dstack._internal.core.models.fleets import FleetNodesSpec
+from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceStatus,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
@@ -31,7 +31,13 @@ from dstack._internal.server.background.tasks.process_submitted_jobs import (
     _prepare_job_runtime_data,
     process_submitted_jobs,
 )
-from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
+from dstack._internal.server.models import (
+    ComputeGroupModel,
+    InstanceModel,
+    JobModel,
+    PlacementGroupModel,
+    VolumeAttachmentModel,
+)
 from dstack._internal.server.settings import JobNetworkMode
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
@@ -43,9 +49,11 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     create_volume,
+    get_compute_group_provisioning_data,
     get_fleet_spec,
     get_instance_offer_with_availability,
     get_job_provisioning_data,
+    get_placement_group_provisioning_data,
     get_run_spec,
     get_volume_provisioning_data,
 )
@@ -540,6 +548,7 @@ class TestProcessSubmittedJobs:
         )
         offer = get_instance_offer_with_availability(gpu_count=8, cpu_count=64, memory_gib=128)
         fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
         fleet_spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=None)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
         instance = await create_instance(
@@ -622,9 +631,8 @@ class TestProcessSubmittedJobs:
         await session.refresh(instance)
         res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
         job = res.unique().scalar_one()
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
-        assert job.instance is None
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         assert instance.total_blocks == 4
         assert instance.busy_blocks == 1
 
@@ -715,41 +723,7 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_assigns_no_fleet_when_all_fleets_occupied(self, test_db, session: AsyncSession):
-        project = await create_project(session)
-        user = await create_user(session)
-        repo = await create_repo(session=session, project_id=project.id)
-        fleet = await create_fleet(session=session, project=project)
-        instance = await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet,
-            instance_num=0,
-            status=InstanceStatus.BUSY,
-        )
-        fleet.instances.append(instance)
-        run = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-        )
-        job = await create_job(
-            session=session,
-            run=run,
-            instance_assigned=False,
-        )
-        await session.commit()
-        await process_submitted_jobs()
-        await session.refresh(job)
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
-        assert job.instance_id is None
-        assert job.fleet_id is None
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_assigns_no_fleet_if_run_cannot_fit(self, test_db, session: AsyncSession):
+    async def test_fails_if_run_cannot_fit_into_fleet(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)
         repo = await create_repo(session=session, project_id=project.id)
@@ -791,48 +765,8 @@ class TestProcessSubmittedJobs:
         await session.commit()
         await process_submitted_jobs()
         await session.refresh(job)
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
-        assert job.instance_id is None
-        assert job.fleet_id is None
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_does_not_assign_job_to_elastic_empty_fleet_without_backend_offers_if_fleets_unspecified(
-        self, test_db, session: AsyncSession
-    ):
-        project = await create_project(session)
-        user = await create_user(session)
-        repo = await create_repo(session=session, project_id=project.id)
-        fleet_spec = get_fleet_spec()
-        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
-        await create_fleet(session=session, project=project, spec=fleet_spec, name="fleet")
-        # Need a second non-empty fleet to have two-stage processing
-        fleet2 = await create_fleet(
-            session=session, project=project, spec=fleet_spec, name="fleet2"
-        )
-        await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet2,
-            instance_num=0,
-            status=InstanceStatus.BUSY,
-        )
-        run = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-        )
-        job = await create_job(
-            session=session,
-            run=run,
-            instance_assigned=False,
-        )
-        await process_submitted_jobs()
-        await session.refresh(job)
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         assert job.instance_id is None
         assert job.fleet_id is None
 
@@ -848,20 +782,6 @@ class TestProcessSubmittedJobs:
         fleet_spec1.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
         fleet1 = await create_fleet(
             session=session, project=project, spec=fleet_spec1, name="fleet"
-        )
-        # Need a second non-empty fleet to have two-stage processing
-        fleet_spec2 = get_fleet_spec()
-        # Empty resources intersection to return no backend offers
-        fleet_spec2.configuration.resources = ResourcesSpec(cpu=Range(min=0, max=0))
-        fleet2 = await create_fleet(
-            session=session, project=project, spec=fleet_spec2, name="fleet2"
-        )
-        await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet2,
-            instance_num=0,
-            status=InstanceStatus.BUSY,
         )
         run = await create_run(
             session=session,
@@ -1115,6 +1035,175 @@ class TestProcessSubmittedJobs:
         await process_submitted_jobs()
         await session.refresh(job2)
         assert job2.status == JobStatus.PROVISIONING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_provisions_compute_group(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run_name = "test-run"
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name=run_name,
+        )
+        run_spec.configuration = TaskConfiguration(nodes=2, commands=["echo"])
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_name=run_name,
+            run_spec=run_spec,
+        )
+        job1 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+            job_num=0,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        job2 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+            job_num=1,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
+        )
+        offer = get_instance_offer_with_availability(
+            backend=BackendType.RUNPOD,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            compute_mock.get_offers.return_value = [offer]
+            jpds = [
+                get_job_provisioning_data(),
+                get_job_provisioning_data(),
+            ]
+            compute_mock.run_jobs.return_value = get_compute_group_provisioning_data(
+                job_provisioning_datas=jpds
+            )
+            await process_submitted_jobs()
+            m.assert_called_once()
+            compute_mock.get_offers.assert_called_once()
+            compute_mock.run_jobs.assert_called_once()
+        await session.refresh(job1)
+        await session.refresh(job2)
+        assert job1.status == JobStatus.PROVISIONING
+        assert job2.status == JobStatus.PROVISIONING
+        res = await session.execute(select(ComputeGroupModel))
+        assert res.scalar() is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_provisioning_master_job_respects_cluster_placement_in_non_empty_fleet(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            backend=BackendType.AWS,
+            job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
+        )
+        configuration = TaskConfiguration(image="debian", nodes=2)
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            fleet=fleet,
+            instance_assigned=True,
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            offer1 = get_instance_offer_with_availability(region="eu-west-2")
+            offer2 = get_instance_offer_with_availability(region="eu-west-1")
+            backend_mock.compute.return_value.get_offers.return_value = [offer1, offer2]
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data()
+            await process_submitted_jobs()
+            m.assert_called_once()
+            backend_mock.compute.return_value.get_offers.assert_called_once()
+            backend_mock.compute.return_value.run_job.assert_called_once()
+            selected_offer = backend_mock.compute.return_value.run_job.call_args[0][2]
+            assert selected_offer.region == "eu-west-1"
+        await session.refresh(job)
+        assert job.status == JobStatus.PROVISIONING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_creates_placement_group(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_name="test-run",
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+        )
+        offer = get_instance_offer_with_availability()
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.run_job.return_value = get_job_provisioning_data()
+            compute_mock.create_placement_group.return_value = (
+                get_placement_group_provisioning_data()
+            )
+            await process_submitted_jobs()
+            m.assert_called_once()
+            compute_mock.get_offers.assert_called_once()
+            compute_mock.run_job.assert_called_once()
+            compute_mock.create_placement_group.assert_called_once()
+            pg_arg = compute_mock.run_job.call_args[0][6]
+            assert isinstance(pg_arg, PlacementGroup)
+        placement_group = (await session.execute(select(PlacementGroupModel))).scalar()
+        assert placement_group is not None
+        await session.refresh(job)
+        assert job.status == JobStatus.PROVISIONING
 
 
 @pytest.mark.parametrize(

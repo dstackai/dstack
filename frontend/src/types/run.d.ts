@@ -136,6 +136,7 @@ declare type TStopRunsRequestParams = {
 declare type TJobMetricsRequestParams = {
     project_name: IProject['project_name'];
     run_name: string;
+    run_id: string;
     replica_num?: number;
     job_num: number;
     limit?: number;
@@ -227,6 +228,7 @@ declare interface IJobSubmission {
     submission_num: number;
     status: TJobStatus;
     submitted_at: number;
+    finished_at: string | null;
     termination_reason?: string | null;
     termination_reason_message?: string | null;
     exit_status?: number | null;
@@ -239,9 +241,14 @@ declare interface IJob {
     job_submissions: IJobSubmission[];
 }
 
+declare interface ISchedule {
+    cron: string[];
+}
+
 declare interface ITaskConfiguration {
     type: 'task';
     priority?: number | null;
+    schedule?: ISchedule | null;
 }
 
 declare interface IServiceConfiguration {
@@ -249,6 +256,7 @@ declare interface IServiceConfiguration {
     gateway: string | null;
     priority?: number | null;
 }
+
 declare interface IRunSpec {
     configuration: TDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;
     configuration_path: string;
@@ -276,7 +284,6 @@ declare interface IRun {
     project_name: string;
     user: string;
     submitted_at: string;
-    terminated_at: string | null;
     status: TJobStatus;
     error?: string | null;
     jobs: IJob[];
@@ -285,6 +292,7 @@ declare interface IRun {
     cost: number;
     service: IRunService | null;
     status_message?: string | null;
+    next_triggered_at?: string | null;
 }
 
 declare interface IMetricsItem {

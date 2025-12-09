@@ -6,7 +6,7 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike as PathLike
 from dstack.api._public.backends import BackendCollection
 from dstack.api._public.repos import RepoCollection
-from dstack.api._public.runs import RunCollection, warn
+from dstack.api._public.runs import RunCollection
 from dstack.api.server import APIClient
 
 logger = get_logger(__name__)
@@ -42,7 +42,7 @@ class Client:
         self._backends = BackendCollection(api_client, project_name)
         self._runs = RunCollection(api_client, project_name, self)
         if ssh_identity_file is not None:
-            warn(
+            logger.warning(
                 "[code]ssh_identity_file[/code] in [code]Client[/code] is deprecated and ignored; will be removed"
                 " since 0.19.40"
             )

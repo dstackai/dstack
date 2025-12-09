@@ -32,7 +32,14 @@ class ServerCommand(BaseCommand):
             help="Bind socket to this port. Defaults to 3000.",
             default=os.getenv("DSTACK_SERVER_PORT", 3000),
         )
-        self._parser.add_argument(
+        group = self._parser.add_mutually_exclusive_group()
+        group.add_argument(
+            "-d",
+            "--debug",
+            help="Enable debug logging level (same as [code]-l debug[/code])",
+            action="store_true",
+        )
+        group.add_argument(
             "-l",
             "--log-level",
             type=str,
@@ -64,7 +71,7 @@ class ServerCommand(BaseCommand):
 
         os.environ["DSTACK_SERVER_HOST"] = args.host
         os.environ["DSTACK_SERVER_PORT"] = str(args.port)
-        os.environ["DSTACK_SERVER_LOG_LEVEL"] = args.log_level
+        os.environ["DSTACK_SERVER_LOG_LEVEL"] = "DEBUG" if args.debug else args.log_level
         if args.yes:
             os.environ["DSTACK_UPDATE_DEFAULT_PROJECT"] = "1"
         if args.no:

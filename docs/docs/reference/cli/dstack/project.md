@@ -18,7 +18,7 @@ The `dstack project set-default` command can be used to switch between multiple 
     
     </div>
 
-    Also, you can install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"}  
+    Also, you can install [`direnv`](https://direnv.net/)  
     to automatically apply environment variables from the `.envrc` file in your project directory.
 
     <div editor-title=".envrc"> 

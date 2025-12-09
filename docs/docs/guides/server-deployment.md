@@ -57,7 +57,7 @@ The minimum hardware requirements for running the server are 1 CPU and 1GB of RA
 
 ??? info "AWS CloudFormation"
     If you'd like to deploy the server to a private AWS VPC, you can use 
-    our CloudFormation [template :material-arrow-top-right-thin:{ .external }](https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https://get-dstack.s3.eu-west-1.amazonaws.com/cloudformation/template.yaml){:target="_blank"}.
+    our CloudFormation [template](https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateURL=https://get-dstack.s3.eu-west-1.amazonaws.com/cloudformation/template.yaml).
 
     First, ensure you've set up a private VPC with public and private subnets.
 
@@ -69,7 +69,7 @@ The minimum hardware requirements for running the server are 1 CPU and 1GB of RA
     To access the server URL, ensure you're connected to the VPC, e.g. via VPN client.
 
     > If you'd like to adjust anything, the source code of the template can be found at
-    [`examples/server-deployment/cloudformation/template.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/server-deployment/cloudformation/template.yaml){:target="_blank"}.
+    [`examples/server-deployment/cloudformation/template.yaml`](https://github.com/dstackai/dstack/blob/master/examples/server-deployment/cloudformation/template.yaml).
 
 ## Backend configuration
 
@@ -80,7 +80,7 @@ The server loads this file on startup.
 Alternatively, you can configure backends on the [project settings page](../concepts/projects.md#backends) via UI.
 
 > For using `dstack` with on-prem servers, no backend configuration is required.
-> Use [SSH fleets](../concepts/fleets.md#ssh) instead.
+> Use [SSH fleets](../concepts/fleets.md#ssh-fleets) instead.
 
 ## State persistence
 
@@ -142,7 +142,7 @@ $ DSTACK_DATABASE_URL=postgresql+asyncpg://user:password@db-host:5432/dstack dst
       export DSTACK_DATABASE_URL="postgresql+asyncpg://..."
       alembic upgrade head
       ```
-    4. Install [pgloader :material-arrow-top-right-thin:{.external }](https://github.com/dimitri/pgloader){:target="_blank"}
+    4. Install [pgloader :material-arrow-top-right-thin:{.external }](https://github.com/dimitri/pgloader)
     5. Pass the path to the `~/.dstack/server/data/sqlite.db` file to `SOURCE_PATH` and 
        set `TARGET_PATH` with the URL of the PostgreSQL database. Example:
        ```bash
@@ -228,7 +228,7 @@ When using  [files](../concepts/dev-environments.md#files) or [repos](../concept
 
 ### S3
 
-To use S3 for storing uploaded files, set the `DSTACK_SERVER_S3_BUCKET` and `DSTACK_SERVER_BUCKET_REGION` environment variables.
+To use S3 for storing uploaded files, set the `DSTACK_SERVER_S3_BUCKET` and `DSTACK_SERVER_S3_BUCKET_REGION` environment variables.
 The bucket must be created beforehand. `dstack` won't try to create it.
 
 ??? info "Required permissions"
@@ -399,6 +399,28 @@ export DSTACK_DB_MAX_OVERFLOW=80
 
 You have to ensure your Postgres installation supports that many connections by
 configuring [`max_connections`](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-MAX-CONNECTIONS) and/or using connection pooler.
+
+## Server upgrades
+
+When upgrading the `dstack` server, follow these guidelines to ensure a smooth transition and minimize downtime.
+
+### Before upgrading
+
+1. **Check the changelog**: Review the [release notes](https://github.com/dstackai/dstack/releases) for breaking changes, new features, and migration notes.
+2. **Review backward compatibility**: Understand the [backward compatibility](#backward-compatibility) policy.
+3. **Back up your data**: Ensure you always create a backup before upgrading.
+
+### Best practices
+
+- **Test in staging**: Always test upgrades in a non-production environment first.
+- **Monitor logs**: Watch server logs during and after the upgrade for any errors or warnings.
+- **Keep backups**: Retain backups for at least a few days after a successful upgrade.
+
+### Troubleshooting
+
+**Deadlock when upgrading a multi-replica PostgreSQL deployment**
+
+If a deployment is stuck due to a deadlock when applying DB migrations, try scaling server replicas to 1 and retry the deployment multiple times. Some releases may not support rolling deployments, which is always noted in the release notes. If you think there is a bug, please [file an issue](https://github.com/dstackai/dstack/issues).
 
 ## FAQs
 

@@ -16,7 +16,7 @@ As the ecosystem around AMD GPUs matures, developers are looking for easier ways
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-hotaisle.png" width="630"/>
 
-Today, we’re excited to announce native integration with [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://www.hotaisle.io/){:target="_blank"}, an AMD-only GPU neocloud offering VMs and clusters at highly competitive on-demand pricing.  
+Today, we’re excited to announce native integration with [Hot Aisle](https://www.hotaisle.io/), an AMD-only GPU neocloud offering VMs and clusters at highly competitive on-demand pricing.  
 
 <!-- more -->
 
@@ -107,8 +107,8 @@ Currently, `dstack` supports 1xGPU Hot Aisle VMs. Support for 8xGPU VMs will be 
 
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)
-    2. Learn more about [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}
+    2. Learn more about [Hot Aisle](https://hotaisle.xyz/)
     3. Explore [dev environments](../../docs/concepts/dev-environments.md), 
         [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
         and [fleets](../../docs/concepts/fleets.md)
-    4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    4. Join [Discord](https://discord.gg/u8SmfwPpMd)

@@ -226,4 +226,4 @@ resources:
 ## Source code
 
 The source code for this example can be found in 
-[`examples/distributed-training/a3high-clusters` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/a3high-clusters).
+[`examples/distributed-training/a3high-clusters`](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/a3high-clusters).

@@ -38,8 +38,12 @@ async def list_users(
 
 @router.post("/get_my_user", response_model=UserWithCreds)
 async def get_my_user(
+    session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
+    if user.ssh_private_key is None or user.ssh_public_key is None:
+        # Generate keys for pre-0.19.33 users
+        await users.refresh_ssh_key(session=session, user=user)
     return CustomORJSONResponse(users.user_model_to_user_with_creds(user))
 
 
@@ -69,6 +73,7 @@ async def create_user(
         global_role=body.global_role,
         email=body.email,
         active=body.active,
+        creator=user,
     )
     return CustomORJSONResponse(users.user_model_to_user(res))
 

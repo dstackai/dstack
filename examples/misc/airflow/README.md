@@ -78,4 +78,4 @@ def pipeline(...):
 ## Source code
 
 The source code for this example can be found in
-[`examples/misc/airflow` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/airflow).
+[`examples/misc/airflow`](https://github.com/dstackai/dstack/blob/master/examples/misc/airflow).

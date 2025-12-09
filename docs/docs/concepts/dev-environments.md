@@ -2,9 +2,12 @@
 
 A dev environment lets you provision an instance and access it with your desktop IDE.
 
+??? info "Prerequisites"
+    Before running a dev environment, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
+
 ## Apply a configuration
 
-First, define a dev environment configuration as a YAML file in your project folder.
+First, define a dev environment configuration as a YAML file.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
 <div editor-title="examples/.dstack.yml"> 
@@ -55,7 +58,7 @@ To open in VS Code Desktop, use this link:
 
 ??? info "Windows"
     On Windows, `dstack` works both natively and inside WSL. But, for dev environments, 
-    it's recommended _not to use_ `dstack apply` _inside WSL_ due to a [VS Code issue :material-arrow-top-right-thin:{ .external }](https://github.com/microsoft/vscode-remote-release/issues/937){:target="_blank"}.
+    it's recommended _not to use_ `dstack apply` _inside WSL_ due to a [VS Code issue](https://github.com/microsoft/vscode-remote-release/issues/937).
 
 To open the dev environment in your desktop IDE, use the link from the output 
 (such as `vscode://vscode-remote/ssh-remote+fast-moth-1/workflow`).
@@ -159,7 +162,7 @@ If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
 
 #### Default image
 
-If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its [base](https://github.com/dstackai/dstack/tree/master/docker/base) Docker image pre-configured with 
     `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
 Set the `python` property to pre-install a specific version of Python.
@@ -457,6 +460,10 @@ retry:
 ```
 
 </div>
+
+!!! info "Retry duration"
+    The duration period is calculated as a run age for `no-capacity` event
+    and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
 
 ### Inactivity duration
 

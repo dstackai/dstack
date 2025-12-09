@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	execute "github.com/alexellis/go-execute/v2"
+
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 )

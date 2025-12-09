@@ -11,9 +11,12 @@ from dstack._internal.cli.utils.common import (
     confirm_ask,
     console,
 )
-from dstack._internal.cli.utils.gateway import get_gateways_table, print_gateways_table
-from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.gateways import GatewayConfiguration
+from dstack._internal.cli.utils.gateway import (
+    get_gateways_table,
+    print_gateways_json,
+    print_gateways_table,
+)
+from dstack._internal.core.errors import CLIError
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -43,24 +46,19 @@ class GatewayCommand(APIBaseCommand):
             parser.add_argument(
                 "-v", "--verbose", action="store_true", help="Show more information"
             )
-
-        create_parser = subparsers.add_parser(
-            "create",
-            help="Add a gateway. Deprecated in favor of `dstack apply` with gateway configuration.",
-            formatter_class=self._parser.formatter_class,
-        )
-        create_parser.set_defaults(subfunc=self._create)
-        create_parser.add_argument(
-            "--backend", choices=["aws", "azure", "gcp", "kubernetes"], required=True
-        )
-        create_parser.add_argument("--region", required=True)
-        create_parser.add_argument(
-            "--set-default", action="store_true", help="Set as default gateway for the project"
-        )
-        create_parser.add_argument("--name", help="Set a custom name for the gateway")
-        create_parser.add_argument(
-            "--domain", help="Set the domain for the gateway", required=True
-        )
+            parser.add_argument(
+                "--format",
+                choices=["plain", "json"],
+                default="plain",
+                help="Output format (default: plain)",
+            )
+            parser.add_argument(
+                "--json",
+                action="store_const",
+                const="json",
+                dest="format",
+                help="Output in JSON format (equivalent to --format json)",
+            )
 
         delete_parser = subparsers.add_parser(
             "delete", help="Delete a gateway", formatter_class=self._parser.formatter_class
@@ -91,9 +89,15 @@ class GatewayCommand(APIBaseCommand):
         args.subfunc(args)
 
     def _list(self, args: argparse.Namespace):
+        if args.watch and args.format == "json":
+            raise CLIError("JSON output is not supported together with --watch")
+
         gateways = self.api.client.gateways.list(self.api.project)
         if not args.watch:
-            print_gateways_table(gateways, verbose=args.verbose)
+            if args.format == "json":
+                print_gateways_json(gateways, project=self.api.project)
+            else:
+                print_gateways_table(gateways, verbose=args.verbose)
             return
 
         try:
@@ -104,26 +108,6 @@ class GatewayCommand(APIBaseCommand):
                     gateways = self.api.client.gateways.list(self.api.project)
         except KeyboardInterrupt:
             pass
-
-    def _create(self, args: argparse.Namespace):
-        logger.warning(
-            "`dstack gateway create` is deperecated in favor of `dstack apply` with gateway configurations."
-        )
-        with console.status("Creating gateway..."):
-            configuration = GatewayConfiguration(
-                name=args.name,
-                backend=BackendType(args.backend),
-                region=args.region,
-            )
-            gateway = self.api.client.gateways.create(self.api.project, configuration)
-            if args.set_default:
-                self.api.client.gateways.set_default(self.api.project, gateway.name)
-            if args.domain:
-                self.api.client.gateways.set_wildcard_domain(
-                    self.api.project, gateway.name, args.domain
-                )
-        gateway = self.api.client.gateways.get(self.api.project, gateway.name)
-        print_gateways_table([gateway])
 
     def _delete(self, args: argparse.Namespace):
         gateway = self.api.client.gateways.get(self.api.project, args.name)

@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import List, Optional
 
 from dstack._internal.core.backends.base.compute import (
@@ -18,7 +19,12 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
+from dstack._internal.core.models.volumes import (
+    Volume,
+    VolumeAttachmentData,
+    VolumeProvisioningData,
+)
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -30,20 +36,22 @@ class LocalCompute(
     ComputeWithVolumeSupport,
     Compute,
 ):
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
-        return [
-            InstanceOfferWithAvailability(
-                backend=BackendType.LOCAL,
-                instance=InstanceType(
-                    name="local",
-                    resources=Resources(cpus=4, memory_mib=8192, gpus=[], spot=False),
-                ),
-                region="local",
-                price=0.00,
-                availability=InstanceAvailability.AVAILABLE,
-                instance_runtime=InstanceRuntime.RUNNER,
-            )
-        ]
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
+        return iter(
+            [
+                InstanceOfferWithAvailability(
+                    backend=BackendType.LOCAL,
+                    instance=InstanceType(
+                        name="local",
+                        resources=Resources(cpus=4, memory_mib=8192, gpus=[], spot=False),
+                    ),
+                    region="local",
+                    price=0.00,
+                    availability=InstanceAvailability.AVAILABLE,
+                    instance_runtime=InstanceRuntime.RUNNER,
+                )
+            ]
+        )
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
@@ -79,6 +87,7 @@ class LocalCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         return JobProvisioningData(
             backend=instance_offer.backend,
@@ -97,7 +106,7 @@ class LocalCompute(
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
         return VolumeProvisioningData(
-            volume_id=volume.volume_id,
+            volume_id=get_or_error(volume.volume_id),
             size_gb=volume.configuration.size_gb,
         )
 
@@ -110,8 +119,10 @@ class LocalCompute(
     def delete_volume(self, volume: Volume):
         pass
 
-    def attach_volume(self, volume: Volume, provisioning_data: JobProvisioningData):
-        pass
+    def attach_volume(
+        self, volume: Volume, provisioning_data: JobProvisioningData
+    ) -> VolumeAttachmentData:
+        return VolumeAttachmentData(device_name=None)
 
     def detach_volume(
         self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False

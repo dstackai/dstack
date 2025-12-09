@@ -12,15 +12,17 @@ class ProjectConfig(CoreModel):
     default: Optional[bool]
 
 
+# Not used since 0.20.0. Can be removed when most users update their `config.yml` (it's updated
+# each time a project is added)
 class RepoConfig(CoreModel):
     path: str
     repo_id: str
     repo_type: RepoType
-    # Deprecated since 0.19.25, not used. Can be removed when most users update their `config.yml`
-    # (it's updated each time a project or repo is added)
     ssh_key_path: Annotated[Optional[str], Field(exclude=True)] = None
 
 
 class GlobalConfig(CoreModel):
     projects: Annotated[List[ProjectConfig], Field(description="The list of projects")] = []
-    repos: List[RepoConfig] = []
+    # Not used since 0.20.0. Can be removed when most users update their `config.yml` (it's updated
+    # each time a project is added)
+    repos: Annotated[list[RepoConfig], Field(exclude=True)] = []

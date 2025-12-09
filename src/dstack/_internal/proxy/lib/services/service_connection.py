@@ -19,12 +19,14 @@ from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.proxy.lib.models import Project, Replica, Service
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.utils.common import get_or_error
+from dstack._internal.utils.env import environ
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 OPEN_TUNNEL_TIMEOUT = 10
-HTTP_TIMEOUT = 60  # Same as default Nginx proxy timeout
+HTTP_TIMEOUT = environ.get_int("DSTACK_SERVICE_CLIENT_TIMEOUT", default=60)
+# Same as default Nginx proxy timeout; override via DSTACK_SERVICE_CLIENT_TIMEOUT
 
 
 class ServiceClient(httpx.AsyncClient):

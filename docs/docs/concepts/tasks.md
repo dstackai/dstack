@@ -1,11 +1,13 @@
 # Tasks
 
-A task allows you to run arbitrary commands on one or more nodes.
-They are best suited for jobs like training or batch processing.
+A task allows you to run arbitrary commands on one or more nodes. They are best suited for jobs like training or batch processing.
+
+??? info "Prerequisites"
+    Before running a task, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
 
 ## Apply a configuration
 
-First, define a task configuration as a YAML file in your project folder.
+First, define a task configuration as a YAML file.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
 [//]: # (TODO: Make tabs - single machine & distributed tasks & web app)
@@ -170,12 +172,8 @@ Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
     For convenience, `~/.ssh/config` is preconfigured with these options, so a simple `ssh <node_ip>` is enough.
     For a list of nodes IPs check the `DSTACK_NODES_IPS` environment variable.
 
-!!! info "Fleets"
-    Distributed tasks can only run on fleets with
-    [cluster placement](fleets.md#cloud-placement).
-    While `dstack` can provision such fleets automatically, it is
-    recommended to create them via a fleet configuration
-    to ensure the highest level of inter-node connectivity.
+!!! info "Cluster fleets"
+    To run distributed tasks, you need to create a fleet with [`placement: cluster`](fleets.md#cloud-placement).
 
 > See the [Clusters](../guides/clusters.md) guide for more details on how to use `dstack` on clusters.
 
@@ -257,7 +255,7 @@ If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
 
 #### Default image
 
-If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its [base](https://github.com/dstackai/dstack/tree/master/docker/base) Docker image pre-configured with 
     `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
 Set the `python` property to pre-install a specific version of Python.
@@ -721,6 +719,9 @@ retry:
 
 If one job of a multi-node task fails with retry enabled,
 `dstack` will stop all the jobs and resubmit the run.
+
+!!! info "Retry duration"
+    The duration period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
 
 ### Priority
 

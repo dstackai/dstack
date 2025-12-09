@@ -1,6 +1,6 @@
 # TRL
 
-This example walks you through how to use [TRL :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/trl){:target="_blank"} to fine-tune `Llama-3.1-8B` with `dstack` using SFT with QLoRA.
+This example walks you through how to use [TRL](https://github.com/huggingface/trl) to fine-tune `Llama-3.1-8B` with `dstack` using SFT with QLoRA.
 
 ## Define a configuration
 
@@ -106,7 +106,7 @@ Provisioning...
 ## Source code
 
 The source-code of this example can be found in 
-[`examples/llms/llama31` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31){:target="_blank"} and [`examples/single-node-training/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl){:target="_blank"}.
+[`examples/llms/llama31`](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31) and [`examples/single-node-training/trl`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl).
 
 ## What's next?
 

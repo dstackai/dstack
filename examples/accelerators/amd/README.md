@@ -1,13 +1,13 @@
 # AMD
 
 `dstack` supports running dev environments, tasks, and services on AMD GPUs.
-You can do that by setting up an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh)
+You can do that by setting up an [SSH fleet](https://dstack.ai/docs/concepts/fleets#ssh-fleets)
 with on-prem AMD GPUs or configuring a backend that offers AMD GPUs such as the `runpod` backend.
 
 ## Deployment
 
 Most serving frameworks including vLLM and TGI have AMD support. Here's an example of a [service](https://dstack.ai/docs/services) that deploys
-Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/installation_amd){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html){:target="_blank"}.
+Llama 3.1 70B in FP16 using [TGI](https://huggingface.co/docs/text-generation-inference/en/installation_amd) and [vLLM](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html).
 
 === "TGI"
 
@@ -98,7 +98,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
 
     > To speed up the `vLLM-ROCm` installation, we use a pre-built binary from S3.
     > You can find the task to build and upload the binary in
-    > [`examples/inference/vllm/amd/` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd/){:target="_blank"}.
+    > [`examples/inference/vllm/amd/`](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd/).
 
 !!! info "Docker image"
     If you want to use AMD, specifying `image` is currently required. This must be an image that includes
@@ -110,8 +110,8 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
 
 === "TRL"
 
-    Below is an example of LoRA fine-tuning Llama 3.1 8B using [TRL :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/single-gpu-fine-tuning-and-inference.html){:target="_blank"}
-    and the [`mlabonne/guanaco-llama2-1k` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/mlabonne/guanaco-llama2-1k){:target="_blank"}
+    Below is an example of LoRA fine-tuning Llama 3.1 8B using [TRL](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/single-gpu-fine-tuning-and-inference.html)
+    and the [`mlabonne/guanaco-llama2-1k`](https://huggingface.co/datasets/mlabonne/guanaco-llama2-1k)
     dataset.
 
     <div editor-title="examples/single-node-training/trl/amd/.dstack.yml">
@@ -156,8 +156,8 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     </div>
 
 === "Axolotl"
-    Below is an example of fine-tuning Llama 3.1 8B using [Axolotl :material-arrow-top-right-thin:{ .external }](https://rocm.blogs.amd.com/artificial-intelligence/axolotl/README.html){:target="_blank"}
-    and the [tatsu-lab/alpaca :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/tatsu-lab/alpaca){:target="_blank"}
+    Below is an example of fine-tuning Llama 3.1 8B using [Axolotl](https://rocm.blogs.amd.com/artificial-intelligence/axolotl/README.html)
+    and the [tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)
     dataset.
 
     <div editor-title="examples/single-node-training/axolotl/amd/.dstack.yml">
@@ -212,11 +212,11 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     ```
     </div>
 
-    Note, to support ROCm, we need to checkout to commit `d4f6c65`. This commit eliminates the need to manually modify the Axolotl source code to make xformers compatible with ROCm, as described in the [xformers workaround :material-arrow-top-right-thin:{ .external }](https://docs.axolotl.ai/docs/amd_hpc.html#apply-xformers-workaround). This installation approach is also followed for building Axolotl ROCm docker image. [(See Dockerfile) :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/rocm-blogs/blob/release/blogs/artificial-intelligence/axolotl/src/Dockerfile.rocm){:target="_blank"}.
+    Note, to support ROCm, we need to checkout to commit `d4f6c65`. This commit eliminates the need to manually modify the Axolotl source code to make xformers compatible with ROCm, as described in the [xformers workaround](https://docs.axolotl.ai/docs/amd_hpc.html#apply-xformers-workaround). This installation approach is also followed for building Axolotl ROCm docker image. [(See Dockerfile)](https://github.com/ROCm/rocm-blogs/blob/release/blogs/artificial-intelligence/axolotl/src/Dockerfile.rocm).
 
     > To speed up installation of `flash-attention` and `xformers `, we use pre-built binaries uploaded to S3.
     > You can find the tasks that build and upload the binaries
-    > in [`examples/single-node-training/axolotl/amd/` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/amd/){:target="_blank"}.
+    > in [`examples/single-node-training/axolotl/amd/`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/amd/).
 
 ## Running a configuration
 
@@ -239,17 +239,17 @@ $ dstack apply -f examples/inference/vllm/amd/.dstack.yml
 ## Source code
 
 The source-code of this example can be found in
-[`examples/inference/tgi/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi/amd){:target="_blank"},
-[`examples/inference/vllm/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd){:target="_blank"},
-[`examples/single-node-training/axolotl/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/amd){:target="_blank"} and
-[`examples/single-node-training/trl/amd` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl/amd){:target="_blank"}
+[`examples/inference/tgi/amd`](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi/amd),
+[`examples/inference/vllm/amd`](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd),
+[`examples/single-node-training/axolotl/amd`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/amd) and
+[`examples/single-node-training/trl/amd`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl/amd)
 
 ## What's next?
 
-1. Browse [TGI :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/en/latest/how-to/rocm-for-ai/deploy-your-model.html#serving-using-hugging-face-tgi),
-   [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html#build-from-source-rocm),
-   [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/rocm-blogs/tree/release/blogs/artificial-intelligence/axolotl),
-   [TRL :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/fine-tuning-and-inference.html) and
-   [ROCm Bitsandbytes :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/bitsandbytes)
+1. Browse [TGI](https://rocm.docs.amd.com/en/latest/how-to/rocm-for-ai/deploy-your-model.html#serving-using-hugging-face-tgi),
+   [vLLM](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html#build-from-source-rocm),
+   [Axolotl](https://github.com/ROCm/rocm-blogs/tree/release/blogs/artificial-intelligence/axolotl),
+   [TRL](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/fine-tuning-and-inference.html) and
+   [ROCm Bitsandbytes](https://github.com/ROCm/bitsandbytes)
 2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), and
    [services](https://dstack.ai/docs/services).

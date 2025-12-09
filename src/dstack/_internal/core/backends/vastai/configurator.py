@@ -18,7 +18,6 @@ from dstack._internal.core.models.backends.base import (
     BackendType,
 )
 
-# VastAI regions are dynamic, currently we don't offer any filtering
 REGIONS = []
 
 

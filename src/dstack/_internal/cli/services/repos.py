@@ -1,11 +1,9 @@
-import argparse
-from typing import Literal, Union, overload
+from pathlib import Path
 
 import git
 
 from dstack._internal.cli.services.configurators.base import ArgsParser
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.repos.local import LocalRepo
 from dstack._internal.core.models.repos.remote import GitRepoURL, RemoteRepo, RepoError
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.utils.path import PathLike
@@ -28,12 +26,6 @@ def register_init_repo_args(parser: ArgsParser):
         type=str,
         dest="git_identity_file",
     )
-    # Deprecated since 0.19.25
-    parser.add_argument(
-        "--local",
-        action="store_true",
-        help=argparse.SUPPRESS,
-    )
 
 
 def init_default_virtual_repo(api: Client) -> VirtualRepo:
@@ -42,17 +34,12 @@ def init_default_virtual_repo(api: Client) -> VirtualRepo:
     return repo
 
 
-@overload
-def get_repo_from_dir(repo_dir: PathLike, local: Literal[False] = False) -> RemoteRepo: ...
-
-
-@overload
-def get_repo_from_dir(repo_dir: PathLike, local: Literal[True]) -> LocalRepo: ...
-
-
-def get_repo_from_dir(repo_dir: PathLike, local: bool = False) -> Union[RemoteRepo, LocalRepo]:
-    if local:
-        return LocalRepo.from_dir(repo_dir)
+def get_repo_from_dir(repo_dir: PathLike) -> RemoteRepo:
+    repo_dir = Path(repo_dir)
+    if not repo_dir.exists():
+        raise CLIError(f"Path does not exist: {repo_dir}")
+    if not repo_dir.is_dir():
+        raise CLIError(f"Path is not a directory: {repo_dir}")
     try:
         return RemoteRepo.from_dir(repo_dir)
     except git.InvalidGitRepositoryError:
@@ -61,6 +48,17 @@ def get_repo_from_dir(repo_dir: PathLike, local: bool = False) -> Union[RemoteRe
             "Use `files` to mount an arbitrary directory:"
             " https://dstack.ai/docs/concepts/tasks/#files"
         )
+    except git.GitError as e:
+        raise CLIError(f"{e.__class__.__name__}: {e}") from e
+    except RepoError as e:
+        raise CLIError(str(e)) from e
+
+
+def get_repo_from_url(repo_url: str) -> RemoteRepo:
+    try:
+        return RemoteRepo.from_url(repo_url)
+    except git.GitError as e:
+        raise CLIError(f"{e.__class__.__name__}: {e}") from e
     except RepoError as e:
         raise CLIError(str(e)) from e
 

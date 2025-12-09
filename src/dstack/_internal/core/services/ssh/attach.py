@@ -12,6 +12,7 @@ from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh.client import get_ssh_client_info
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FilePath, PathLike
 from dstack._internal.utils.ssh import (
     default_ssh_config_path,
@@ -20,6 +21,8 @@ from dstack._internal.utils.ssh import (
     normalize_path,
     update_ssh_config,
 )
+
+logger = get_logger(__name__)
 
 # ssh -L option format: [bind_address:]port:host:hostport
 _SSH_TUNNEL_REGEX = re.compile(r"(?:[\w.-]+:)?(?P<local_port>\d+):localhost:(?P<remote_port>\d+)")
@@ -68,6 +71,7 @@ class SSHAttach:
         local_backend: bool = False,
         bind_address: Optional[str] = None,
     ):
+        self._attached = False
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
         self.run_name = run_name
@@ -209,6 +213,7 @@ class SSHAttach:
         for i in range(max_retries):
             try:
                 self.tunnel.open()
+                self._attached = True
                 atexit.register(self.detach)
                 break
             except SSHError:
@@ -219,9 +224,14 @@ class SSHAttach:
             raise SSHError("Can't connect to the remote host")
 
     def detach(self):
+        if not self._attached:
+            logger.debug("Not attached")
+            return
         self.tunnel.close()
         for host in self.hosts:
             update_ssh_config(self.ssh_config_path, host, {})
+        self._attached = False
+        logger.debug("Detached")
 
     def __enter__(self):
         self.attach()

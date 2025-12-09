@@ -8,24 +8,24 @@ Ensure a fleet is created before you run any distributed task. This can be eithe
 
 ### SSH fleets
 
-[SSH fleets](../concepts/fleets.md#ssh) can be used to create a fleet out of existing baremetals or VMs, e.g. if they are already pre-provisioned, or set up on-premises.
+[SSH fleets](../concepts/fleets.md#ssh-fleets) can be used to create a fleet out of existing baremetals or VMs, e.g. if they are already pre-provisioned, or set up on-premises.
 
 > For SSH fleets, fast interconnect is supported provided that the hosts are pre-configured with the appropriate interconnect drivers.
 
 ### Cloud fleets
 
-[Cloud fleets](../concepts/fleets.md#cloud) allow to provision interconnected clusters across supported backends.
-For cloud fleets, fast interconnect is currently supported only on the `aws`, `gcp`, and `nebius` backends.
+[Cloud fleets](../concepts/fleets.md#backend-fleets) allow to provision interconnected clusters across supported backends.
+For cloud fleets, fast interconnect is currently supported only on the `aws`, `gcp`, `nebius`, and `runpod` backends.
 
 === "AWS"
-    When you create a cloud fleet with AWS, [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
+    When you create a cloud fleet with AWS, [Elastic Fabric Adapter](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html) networking is automatically configured if it’s supported for the corresponding instance type.
     
     !!! info "Backend configuration"    
         Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
         Refer to the [EFA](../../examples/clusters/efa/index.md) example for more details.
 
 === "GCP"
-    When you create a cloud fleet with GCP, `dstack` automatically configures [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking for the A3 Mega and A3 High instance types, as well as RoCE networking for the A4 instance type.
+    When you create a cloud fleet with GCP, `dstack` automatically configures [GPUDirect-TCPXO and GPUDirect-TCPX](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot) networking for the A3 Mega and A3 High instance types, as well as RoCE networking for the A4 instance type.
 
     !!! info "Backend configuration"    
         You may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
@@ -34,10 +34,13 @@ For cloud fleets, fast interconnect is currently supported only on the `aws`, `g
         [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
 
 === "Nebius"
-    When you create a cloud fleet with Nebius, [InfiniBand :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} networking is automatically configured if it’s supported for the corresponding instance type.
+    When you create a cloud fleet with Nebius, [InfiniBand](https://docs.nebius.com/compute/clusters/gpu) networking is automatically configured if it’s supported for the corresponding instance type.
+
+=== "Runpod"
+    When you run multinode tasks in a cluster cloud fleet with Runpod, `dstack` provisions [Runpod Instant Clusters](https://docs.runpod.io/instant-clusters) with InfiniBand networking configured.
 
 > To request fast interconnect support for other backends,
-file an [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_ blank"}.
+file an [issue](https://github.com/dstackai/dstack/issues){:target="_ blank"}.
 
 ## Distributed tasks
 
@@ -65,7 +68,7 @@ To test the interconnect of a created fleet, ensure you run [NCCL](../../example
 
 ### Instance volumes
 
-[Instance volumes](../concepts/volumes.md#instance) enable mounting any folder from the host into the container, allowing data persistence during distributed tasks.
+[Instance volumes](../concepts/volumes.md#instance-volumes) enable mounting any folder from the host into the container, allowing data persistence during distributed tasks.
 
 Instance volumes can be used to mount:
 
@@ -74,7 +77,7 @@ Instance volumes can be used to mount:
 
 ### Network volumes
     
-Currently, no backend supports multi-attach [network volumes](../concepts/volumes.md#network) for distributed tasks. However, single-attach volumes can be used by leveraging volume name [interpolation syntax](../concepts/volumes.md#distributed-tasks). This approach mounts a separate single-attach volume to each node.
+Currently, no backend supports multi-attach [network volumes](../concepts/volumes.md#network-volumes) for distributed tasks. However, single-attach volumes can be used by leveraging volume name [interpolation syntax](../concepts/volumes.md#distributed-tasks). This approach mounts a separate single-attach volume to each node.
 
 !!! info "What's next?"
     1. Read about [distributed tasks](../concepts/tasks.md#distributed-tasks), [fleets](../concepts/fleets.md), and [volumes](../concepts/volumes.md)

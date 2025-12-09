@@ -21,19 +21,19 @@ We evaluate different ratios across workload profiles and concurrency levels to 
 
 ### What is Prefill–Decode disaggregation?
 
-LLM inference has two distinct phases: prefill and decode. Prefill processes all prompt tokens in parallel and is compute-intensive. Decode generates tokens one by one, repeatedly accessing the KV-cache, making it memory- and bandwidth-intensive. DistServe ([Zhong et al., 2024 :material-arrow-top-right-thin:{ .external }](https://arxiv.org/pdf/2401.09670){:target="_blank"}) introduced prefill–decode disaggregation to separate these phases across dedicated workers, reducing interference and enabling hardware to be allocated more efficiently.
+LLM inference has two distinct phases: prefill and decode. Prefill processes all prompt tokens in parallel and is compute-intensive. Decode generates tokens one by one, repeatedly accessing the KV-cache, making it memory- and bandwidth-intensive. DistServe ([Zhong et al., 2024](https://arxiv.org/pdf/2401.09670)) introduced prefill–decode disaggregation to separate these phases across dedicated workers, reducing interference and enabling hardware to be allocated more efficiently.
 
 ### What is the prefill–decode ratio?
 
 The ratio of prefill to decode workers determines how much capacity is dedicated to each phase. DistServe showed that for a workload with ISL=512 and OSL=64, a 2:1 ratio met both TTFT and TPOT targets. But this example does not answer how the ratio should be chosen more generally, or whether it needs to change at runtime.
 
 !!! info "Reasoning model example"
-    In the DeepSeek deployment ([LMSYS, 2025 :material-arrow-top-right-thin:{ .external }](https://lmsys.org/blog/2025-05-05-large-scale-ep){:target="_blank"}), the ratio was 1:3. This decode-leaning split reflects reasoning workloads, where long outputs dominate. Allocating more workers to decode reduces inter-token latency and keeps responses streaming smoothly.
+    In the DeepSeek deployment ([LMSYS, 2025](https://lmsys.org/blog/2025-05-05-large-scale-ep)), the ratio was 1:3. This decode-leaning split reflects reasoning workloads, where long outputs dominate. Allocating more workers to decode reduces inter-token latency and keeps responses streaming smoothly.
 
 ### Dynamic ratio
 
-Dynamic approaches, such as NVIDIA’s [SLA-based :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/dynamo/latest/architecture/sla_planner.html){:target="_blank"} 
-and [Load-based :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/dynamo/latest/architecture/load_planner.html){:target="_blank"} planners, adjust the ratio at runtime according to SLO targets or load. However, they do this in conjunction with auto-scaling, which increases orchestration complexity. This raises the question: does the prefill–decode ratio really need to be dynamic, or can a fixed ratio be chosen ahead of time and still provide robust performance?
+Dynamic approaches, such as NVIDIA’s [SLA-based](https://docs.nvidia.com/dynamo/latest/architecture/sla_planner.html) 
+and [Load-based](https://docs.nvidia.com/dynamo/latest/architecture/load_planner.html) planners, adjust the ratio at runtime according to SLO targets or load. However, they do this in conjunction with auto-scaling, which increases orchestration complexity. This raises the question: does the prefill–decode ratio really need to be dynamic, or can a fixed ratio be chosen ahead of time and still provide robust performance?
 
 ## Benchmark purpose
 
@@ -72,7 +72,7 @@ If a fixed ratio consistently performs well across these metrics, it would indic
 * **Model**: `openai/gpt-oss-120b`  
 * **Backend**: SGLang
 
-For full steps and raw data, see the [GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/comparison/pd_ratio){:target="_blank"}.
+For full steps and raw data, see the [GitHub repo](https://github.com/dstackai/benchmarks/tree/main/comparison/pd_ratio).
 
 ## Finding 1: Prefill-heavy workloads
 
@@ -134,8 +134,8 @@ Overall, more study on how the optimal ratio is found and what factors it depend
 
 ## References
 
-* [DistServe :material-arrow-top-right-thin:{ .external }](https://arxiv.org/pdf/2401.09670){:target="_blank"}
-* [DeepSeek deployment on 96 H100 GPUs :material-arrow-top-right-thin:{ .external }](https://lmsys.org/blog/2025-05-05-large-scale-ep/){:target="_blank"}
-* [Dynamo disaggregated serving :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/dynamo/latest/architecture/disagg_serving.html#){:target="_blank"}
-* [SGLang PD disaggregation :material-arrow-top-right-thin:{ .external }](https://docs.sglang.ai/advanced_features/pd_disaggregation.html){:target="_blank"}
-* [vLLM disaggregated prefilling :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/v0.9.2/features/disagg_prefill.html){:target="_blank"}
+* [DistServe](https://arxiv.org/pdf/2401.09670)
+* [DeepSeek deployment on 96 H100 GPUs](https://lmsys.org/blog/2025-05-05-large-scale-ep/)
+* [Dynamo disaggregated serving](https://docs.nvidia.com/dynamo/latest/architecture/disagg_serving.html#)
+* [SGLang PD disaggregation](https://docs.sglang.ai/advanced_features/pd_disaggregation.html)
+* [vLLM disaggregated prefilling](https://docs.vllm.ai/en/v0.9.2/features/disagg_prefill.html)

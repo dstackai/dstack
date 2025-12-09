@@ -13,7 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.oci import region as oci_region
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import (
+    Gpu,
+    InstanceOffer,
+    InstanceStatus,
+    InstanceType,
+    Resources,
+)
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.models import BackendModel
@@ -212,6 +218,30 @@ class TestCreateBackend:
     @pytest.mark.skipif(sys.version_info < (3, 10), reason="Nebius requires Python 3.10")
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     class TestNebius:
+        @pytest.fixture(autouse=True)
+        def patch_catalog(self):
+            with patch(
+                "dstack._internal.core.backends.nebius.resources.get_catalog_offers"
+            ) as get_catalog_offers_mock:
+                get_catalog_offers_mock.return_value = [
+                    InstanceOffer(
+                        backend=BackendType.NEBIUS,
+                        instance=InstanceType(
+                            name="gpu-h100-sxm 8gpu-128vcpu-1600gb",
+                            resources=Resources(
+                                cpus=128,
+                                memory_mib=1600 * 1024,
+                                gpus=[Gpu(name="H100", memory_mib=80 * 1024)] * 8,
+                                spot=False,
+                            ),
+                        ),
+                        region="eu-north1",
+                        price=23.6,
+                        backend_data={"fabrics": ["fabric-2", "fabric-3"]},
+                    )
+                ]
+                yield
+
         async def test_not_creates_with_invalid_creds(
             self, test_db, session: AsyncSession, client: AsyncClient
         ):
@@ -238,18 +268,16 @@ class TestCreateBackend:
             assert len(res.scalars().all()) == 0
 
         @pytest.mark.parametrize(
-            ("config_regions", "config_projects", "mocked_projects", "error"),
+            ("config_extra", "mocked_projects", "error"),
             [
                 pytest.param(
-                    None,
-                    None,
+                    {},
                     [_nebius_project()],
                     None,
                     id="default",
                 ),
                 pytest.param(
-                    ["eu-north1"],
-                    None,
+                    {"regions": ["eu-north1"]},
                     [
                         _nebius_project(
                             "project-e00test", "default-project-eu-north1", "eu-north1"
@@ -260,15 +288,13 @@ class TestCreateBackend:
                     id="with-regions",
                 ),
                 pytest.param(
-                    ["xx-xxxx1"],
-                    None,
+                    {"regions": ["xx-xxxx1"]},
                     [_nebius_project()],
                     "do not exist in this Nebius tenancy",
                     id="error-invalid-regions",
                 ),
                 pytest.param(
-                    ["eu-north1"],
-                    None,
+                    {"regions": ["eu-north1"]},
                     [
                         _nebius_project(
                             "project-e00test0", "default-project-eu-north1", "eu-north1"
@@ -279,8 +305,7 @@ class TestCreateBackend:
                     id="finds-default-project-among-many",
                 ),
                 pytest.param(
-                    ["eu-north1"],
-                    None,
+                    {"regions": ["eu-north1"]},
                     [
                         _nebius_project("project-e00test0", "non-default-project-0", "eu-north1"),
                         _nebius_project("project-e00test1", "non-default-project-1", "eu-north1"),
@@ -289,8 +314,7 @@ class TestCreateBackend:
                     id="error-no-default-project",
                 ),
                 pytest.param(
-                    None,
-                    ["project-e00test0"],
+                    {"projects": ["project-e00test0"]},
                     [
                         _nebius_project("project-e00test0", "non-default-project-0", "eu-north1"),
                         _nebius_project("project-e00test1", "non-default-project-1", "eu-north1"),
@@ -299,15 +323,13 @@ class TestCreateBackend:
                     id="with-projects",
                 ),
                 pytest.param(
-                    None,
-                    ["project-e00xxxx"],
+                    {"projects": ["project-e00xxxx"]},
                     [_nebius_project()],
                     "not found in this Nebius tenancy",
                     id="error-invalid-projects",
                 ),
                 pytest.param(
-                    None,
-                    ["project-e00test0", "project-e00test1"],
+                    {"projects": ["project-e00test0", "project-e00test1"]},
                     [
                         _nebius_project("project-e00test0", "non-default-project-0", "eu-north1"),
                         _nebius_project("project-e00test1", "non-default-project-1", "eu-north1"),
@@ -316,8 +338,10 @@ class TestCreateBackend:
                     id="error-multiple-projects-in-same-region",
                 ),
                 pytest.param(
-                    ["eu-north1"],
-                    ["project-e00test"],
+                    {
+                        "regions": ["eu-north1"],
+                        "projects": ["project-e00test"],
+                    },
                     [
                         _nebius_project(
                             "project-e00test", "default-project-eu-north1", "eu-north1"
@@ -327,6 +351,18 @@ class TestCreateBackend:
                     None,
                     id="with-regions-and-projects",
                 ),
+                pytest.param(
+                    {"fabrics": ["fabric-2", "fabric-3"]},
+                    [_nebius_project()],
+                    None,
+                    id="with-valid-fabrics",
+                ),
+                pytest.param(
+                    {"fabrics": ["fabric-2", "fabric-invalid"]},
+                    [_nebius_project()],
+                    "InfiniBand fabrics do not exist",
+                    id="with-invalid-fabrics",
+                ),
             ],
         )
         async def test_create(
@@ -334,8 +370,7 @@ class TestCreateBackend:
             test_db,
             session: AsyncSession,
             client: AsyncClient,
-            config_regions: Optional[list[str]],
-            config_projects: Optional[list[str]],
+            config_extra: dict[str, Any],
             mocked_projects: Sequence[Any],
             error: Optional[str],
         ):
@@ -347,8 +382,7 @@ class TestCreateBackend:
             body = {
                 "type": "nebius",
                 "creds": FAKE_NEBIUS_SERVICE_ACCOUNT_CREDS,
-                "regions": config_regions,
-                "projects": config_projects,
+                **config_extra,
             }
             with patch(
                 "dstack._internal.core.backends.nebius.resources.list_tenant_projects"

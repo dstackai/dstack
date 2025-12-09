@@ -21,8 +21,8 @@ determine the optimal backend and hardware pairing for DeepSeek-R1's demanding r
 <img src="https://dstack.ai/static-assets/static-assets/images/h200-mi300x-deepskeek-benchmark-v2.png" width="630"/>
 
 This benchmark was made possible through the generous support of our partners at
-[Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/){:target="_blank"} and 
-[Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"},
+[Vultr](https://www.vultr.com/) and 
+[Lambda](https://lambdalabs.com/),
 who provided access to the necessary hardware.
 
 <!-- more -->
@@ -44,7 +44,7 @@ who provided access to the necessary hardware.
 
 **Online inference**
 
-We utilized SGLang's [`Deepseek-R1/bench_serving.py` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/Deepseek-R1/bench_serving.py){:target="_blank"} 
+We utilized SGLang's [`Deepseek-R1/bench_serving.py`](https://github.com/dstackai/benchmarks/tree/main/Deepseek-R1/bench_serving.py) 
 script, modified to incorporate TensorRT-LLM. 
 
 Tests were conducted across multiple request concurrencies and output token lengths, with input token length fixed at 3200.
@@ -59,9 +59,9 @@ To test prefix caching ability, about 62.5% of each ~3200-token prompt (i.e., 20
 
 **Offline inference**
 
-For offline inference, we used vLLM’s [`benchmark_throughput.py` :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_throughput.py){:target="_blank"},
+For offline inference, we used vLLM’s [`benchmark_throughput.py`](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_throughput.py),
 modified for SGLang. TensorRT-LLM was tested using a custom 
-[`benchmark_throughput_trt.py` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/blob/deepseek-r1-benchmark/Deepseek-R1/benchmark_throughput_trt.py){:target="_blank"}. 
+[`benchmark_throughput_trt.py`](https://github.com/dstackai/benchmarks/blob/deepseek-r1-benchmark/Deepseek-R1/benchmark_throughput_trt.py). 
 The benchmark examined performance across various batch sizes and output token lengths.
 
 | Batch Sizes        | Output Token Lengths |
@@ -129,7 +129,7 @@ TensorRT-LLM maintained the lowest and most consistent TTFT up to concurrency 64
 
 vLLM achieved the lowest TTFT at concurrency 128. Below 128, vLLM and SGLang had similar TTFT.
 
-TTFT, being compute-intensive, highlights H200's advantage, aligning with [SemiAnalysis’s MI300X vs. H200 TFLOPS benchmark :material-arrow-top-right-thin:{ .external }](https://semianalysis.com/2024/12/22/mi300x-vs-h100-vs-h200-benchmark-part-1-training/){:target="_blank"}.
+TTFT, being compute-intensive, highlights H200's advantage, aligning with [SemiAnalysis’s MI300X vs. H200 TFLOPS benchmark](https://semianalysis.com/2024/12/22/mi300x-vs-h100-vs-h200-benchmark-part-1-training/).
 However, at 128 concurrent requests, MI300X's memory capacity and bandwidth advantages become evident.
 
 ### Time Per Output Token (TPOT)
@@ -194,10 +194,10 @@ TPOT increased after prefix caching, which requires further investigation.
 ## Limitations
 
 1. The offline benchmark results for TensorRT-LLM were obtained using the DeepSeek-R1 model engine built from the
-   [`deepseek` branch :material-arrow-top-right-thin:{ .external }](https://github.com/NVIDIA/TensorRT-LLM/tree/deepseek){:target="_blank"}.
+   [`deepseek` branch](https://github.com/NVIDIA/TensorRT-LLM/tree/deepseek).
    However, the TensorRT-LLM team recommends using the TorchFlow-based approach for deployment.
 2. The impact of dynamic batching on inference efficiency was not tested.
-3. vLLM's prefix caching support for MI300X is a work in progress and can be tracked [here :material-arrow-top-right-thin:{ .external }](https://github.com/ROCm/vllm/issues/457){:target="_blank"}.
+3. vLLM's prefix caching support for MI300X is a work in progress and can be tracked [here](https://github.com/ROCm/vllm/issues/457).
 4. The inference backends are being optimized for the DeepSeek-R1 model. Given these continuous updates, the current
    results reflect only the performance tested at the time of the benchmark. Overall, performance for all backends is
    expected to improve as more optimizations are made by the backend teams.
@@ -205,27 +205,27 @@ TPOT increased after prefix caching, which requires further investigation.
 ## Source code
 
 All source code and findings are available in
-[our GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/deepseek-r1-benchmark/Deepseek-R1){:target="_blank"}.
+[our GitHub repo](https://github.com/dstackai/benchmarks/tree/deepseek-r1-benchmark/Deepseek-R1).
 
 ## References
 
-* [Unlock DeepSeek-R1 Inference Performance on AMD Instinct MI300X GPU :material-arrow-top-right-thin:{ .external }](https://rocm.blogs.amd.com/artificial-intelligence/DeepSeekR1_Perf/README.html){:target="_blank"}
-* [Deploy DeepSeek-R1 671B on 8x NVIDIA H200 with SGLang :material-arrow-top-right-thin:{ .external }](https://datacrunch.io/blog/deploy-deepseek-r1-on-8x-nvidia-h200){:target="_blank"}
-* [vLLM Prefix Caching :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/design/automatic_prefix_caching.html#design-automatic-prefix-caching){:target="_blank"}
-* [SgLang Prefix Caching :material-arrow-top-right-thin:{ .external }](https://lmsys.org/blog/2024-01-17-sglang/){:target="_blank"}
+* [Unlock DeepSeek-R1 Inference Performance on AMD Instinct MI300X GPU](https://rocm.blogs.amd.com/artificial-intelligence/DeepSeekR1_Perf/README.html)
+* [Deploy DeepSeek-R1 671B on 8x NVIDIA H200 with SGLang](https://datacrunch.io/blog/deploy-deepseek-r1-on-8x-nvidia-h200)
+* [vLLM Prefix Caching](https://docs.vllm.ai/en/latest/design/automatic_prefix_caching.html#design-automatic-prefix-caching)
+* [SgLang Prefix Caching](https://lmsys.org/blog/2024-01-17-sglang/)
 
 ## Acknowledgments
 
 ### Vultr
 
-[Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/){:target="_blank"} provided access to 8x AMD MI300X GPUs. We are truly thankful for their support.
+[Vultr](https://www.vultr.com/) provided access to 8x AMD MI300X GPUs. We are truly thankful for their support.
 
 If you're looking for top-tier bare metal compute with AMD GPUs, we highly recommend Vultr. With `dstack`, provisioning
 and accessing compute via `dstack` is seamless and straightforward.
 
 ### Lambda
 
-[Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"} provided access to 8x
+[Lambda](https://lambdalabs.com/) provided access to 8x
 NVIDIA H200 GPUs. We are truly thankful for their support
 
 Both Vultr and Lambda are natively supported and can be seamlessly integrated with `dstack`. 

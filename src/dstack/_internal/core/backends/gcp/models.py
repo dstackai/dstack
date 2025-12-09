@@ -92,7 +92,10 @@ class GCPBackendConfig(CoreModel):
     preview_features: Annotated[
         Optional[List[Literal["g4"]]],
         Field(
-            description=("The list of preview GCP features to enable. Supported values: `g4`"),
+            description=(
+                "The list of preview GCP features to enable."
+                " There are currently no preview features"
+            ),
             max_items=1,
         ),
     ] = None

@@ -96,20 +96,42 @@ def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
     )
 
 
+def find_jobs(
+    jobs: List[Job],
+    replica_num: Optional[int] = None,
+    job_num: Optional[int] = None,
+) -> list[Job]:
+    res = jobs
+    if replica_num is not None:
+        res = [j for j in res if j.job_spec.replica_num == replica_num]
+    if job_num is not None:
+        res = [j for j in res if j.job_spec.job_num == job_num]
+    return res
+
+
 async def get_run_job_model(
-    session: AsyncSession, project: ProjectModel, run_name: str, replica_num: int, job_num: int
+    session: AsyncSession,
+    project: ProjectModel,
+    run_name: str,
+    run_id: Optional[UUID],
+    replica_num: int,
+    job_num: int,
 ) -> Optional[JobModel]:
+    filters = [
+        RunModel.project_id == project.id,
+        RunModel.run_name == run_name,
+        JobModel.replica_num == replica_num,
+        JobModel.job_num == job_num,
+    ]
+    if run_id is not None:
+        filters.append(RunModel.id == run_id)
+    else:
+        # Assuming run_name is unique for non-deleted runs
+        filters.append(RunModel.deleted == False)
     res = await session.execute(
         select(JobModel)
         .join(JobModel.run)
-        .where(
-            RunModel.project_id == project.id,
-            # assuming run_name is unique for non-deleted runs
-            RunModel.run_name == run_name,
-            RunModel.deleted == False,
-            JobModel.replica_num == replica_num,
-            JobModel.job_num == job_num,
-        )
+        .where(*filters)
         .order_by(JobModel.submission_num.desc())
         .limit(1)
     )
@@ -178,6 +200,14 @@ def get_job_runtime_data(job_model: JobModel) -> Optional[JobRuntimeData]:
 
 def delay_job_instance_termination(job_model: JobModel):
     job_model.remove_at = common.get_current_datetime() + timedelta(seconds=15)
+
+
+def is_multinode_job(job: Job) -> bool:
+    return job.job_spec.jobs_per_replica > 1
+
+
+def is_master_job(job: Job) -> bool:
+    return job.job_spec.job_num == 0
 
 
 def _get_job_configurator(run_spec: RunSpec, secrets: Dict[str, str]) -> JobConfigurator:
@@ -703,6 +733,10 @@ async def get_job_attached_volumes(
             _get_job_mount_point_attached_volume(mount_point_volumes, job_provisioning_data)
         )
     return job_volumes
+
+
+def remove_job_spec_sensitive_info(spec: JobSpec):
+    spec.ssh_key = None
 
 
 def _get_job_mount_point_attached_volume(

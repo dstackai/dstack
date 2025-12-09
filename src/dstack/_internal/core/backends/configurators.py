@@ -119,14 +119,6 @@ try:
 except ImportError:
     pass
 
-try:
-    from dstack._internal.core.backends.tensordock.configurator import (
-        TensorDockConfigurator,
-    )
-
-    _CONFIGURATOR_CLASSES.append(TensorDockConfigurator)
-except ImportError:
-    pass
 
 try:
     from dstack._internal.core.backends.vastai.configurator import VastAIConfigurator

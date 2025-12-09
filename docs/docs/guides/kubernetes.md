@@ -41,7 +41,7 @@ No additional setup is required — `dstack` configures and manages the proxy au
 ### NVIDIA GPU Operator
 
 > For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
-[NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html){:target="_blank"} pre-installed.
+[NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html) pre-installed.
 
 After the backend is set up, you interact with `dstack` just as you would with other backends or SSH fleets. You can run dev environments, tasks, and services.
 
@@ -102,7 +102,7 @@ For more details on clusters, see the [corresponding guide](clusters.md).
 
 ??? info "Is managed Kubernetes with auto-scaling supported?"
     Managed Kubernetes is supported. However, the `kubernetes` backend can only run on pre-provisioned nodes.  
-    Support for auto-scalable Kubernetes clusters is coming soon—you can track progress in the corresponding [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/3126){:target="_blank"}.
+    Support for auto-scalable Kubernetes clusters is coming soon—you can track progress in the corresponding [issue](https://github.com/dstackai/dstack/issues/3126).
 
     If on-demand provisioning is important, we recommend using [VM-based](../concepts/backends.md#vm-based) backends as they already support auto-scaling.
     
@@ -111,4 +111,4 @@ For more details on clusters, see the [corresponding guide](clusters.md).
 
     If your priority is orchestrating cloud GPUs and Kubernetes isn’t a must, [VM-based](../concepts/backends.md#vm-based) backends are a better fit thanks to their native cloud integration.
 
-    For on-prem GPUs where Kubernetes is optional, [SSH fleets](../concepts/fleets.md#ssh) provide a simpler and more lightweight alternative.
+    For on-prem GPUs where Kubernetes is optional, [SSH fleets](../concepts/fleets.md#ssh-fleets) provide a simpler and more lightweight alternative.

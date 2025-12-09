@@ -11,6 +11,4 @@ def get_poll_logs_excludes(request: PollLogsRequest) -> Optional[IncludeExcludeD
     clients backward-compatibility with older servers.
     """
     excludes: IncludeExcludeDictType = {}
-    if request.next_token is None:
-        excludes["next_token"] = True
     return excludes if excludes else None

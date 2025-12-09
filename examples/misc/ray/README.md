@@ -2,7 +2,7 @@
 
 This example shows how use `dstack` to spin up a [Ray](https://docs.ray.io/en/latest/ray-overview/index.html) cluster and run Ray jobs on it.
 
-## Create fleet
+## Create a fleet
 
 First create a fleet for the Ray cluster. We'll use one instance for a master node and three instances for worker nodes:
 

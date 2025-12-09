@@ -33,14 +33,14 @@ One of the main advantages of the `MI300X` is its VRAM. For example, with the `H
 version of Llama 3.1 405B into a single node with 8 GPUs—you'd have to use FP8 instead. However, with the `MI300X`, you
 can fit FP16 into a single node with 8 GPUs, and for FP8, you'd only need 4 GPUs.
 
-With the [latest update :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/releases/0.18.11rc1){:target="_blank"},
+With the [latest update](https://github.com/dstackai/dstack/releases/0.18.11rc1),
 you can now specify an AMD GPU under `resources`. Below are a few examples.
 
 ## Configuration
 
 === "Service"
     Here's an example of a [service](../../docs/concepts/services.md) that deploys
-    Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/installation_amd){:target="_blank"}.
+    Llama 3.1 70B in FP16 using [TGI](https://huggingface.co/docs/text-generation-inference/en/installation_amd).
     
     <div editor-title="examples/inference/tgi/amd/service.dstack.yml"> 
     
@@ -72,7 +72,7 @@ you can now specify an AMD GPU under `resources`. Below are a few examples.
 
 === "Dev environment"
     Here's an example of a [dev environment](../../docs/concepts/dev-environments.md) using
-    [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/installation_amd){:target="_blank"}'s
+    [TGI](https://huggingface.co/docs/text-generation-inference/en/installation_amd)'s
     Docker image:
 
     ```yaml
@@ -111,11 +111,11 @@ cloud resources and run the configuration.
 ## What's next?
 
 1. The examples above demonstrate the use of
-[TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/installation_amd){:target="_blank"}. 
+[TGI](https://huggingface.co/docs/text-generation-inference/en/installation_amd). 
 AMD accelerators can also be used with other frameworks like vLLM, Ollama, etc., and we'll be adding more examples soon.
 2. RunPod is the first cloud provider where dstack supports AMD. More cloud providers will be supported soon as well.
-3. Want to give RunPod and `dstack` a try? Make sure you've signed up for [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/){:target="_blank"}, 
+3. Want to give RunPod and `dstack` a try? Make sure you've signed up for [RunPod](https://www.runpod.io/), 
    then [set up](../../docs/reference/server/config.yml.md#runpod) the `dstack server`. 
 
-> Have questioned or feedback? Join our [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"} 
+> Have questioned or feedback? Join our [Discord](https://discord.gg/u8SmfwPpMd) 
 server.

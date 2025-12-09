@@ -100,11 +100,17 @@ jobs:
           VERSION=${{ needs.compute-version.outputs.version }}
           docker buildx build --platform linux/arm64/v8 --build-arg VERSION=$VERSION --push --provenance=false --tag dstackai/dstack:$VERSION-arm64 -f release/Dockerfile .
           docker buildx build --platform linux/amd64 --build-arg VERSION=$VERSION --push --provenance=false --tag dstackai/dstack:$VERSION-amd64 -f release/Dockerfile .
+          docker buildx build --platform linux/arm64/v8 --build-arg BASE_IMAGE=dstackai/dstack:$VERSION-arm64 --push --provenance=false --tag dstackai/dstack:nebius-$VERSION-arm64 -f Dockerfile.nebius .
+          docker buildx build --platform linux/amd64 --build-arg BASE_IMAGE=dstackai/dstack:$VERSION-amd64 --push --provenance=false --tag dstackai/dstack:nebius-$VERSION-amd64 -f Dockerfile.nebius .
           docker manifest create dstackai/dstack:$VERSION --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
           docker manifest push dstackai/dstack:$VERSION
+          docker manifest create dstackai/dstack:nebius-$VERSION --amend dstackai/dstack:nebius-$VERSION-arm64 --amend dstackai/dstack:nebius-$VERSION-amd64
+          docker manifest push dstackai/dstack:nebius-$VERSION
           if [ -n "${{ needs.compute-version.outputs.latest }}" ]; then
             docker manifest create dstackai/dstack:latest --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
             docker manifest push dstackai/dstack:latest
+            docker manifest create dstackai/dstack:nebius-latest --amend dstackai/dstack:nebius-$VERSION-arm64 --amend dstackai/dstack:nebius-$VERSION-amd64
+            docker manifest push dstackai/dstack:nebius-latest
           fi
       - name: Docker Hub Description
         uses: peter-evans/dockerhub-description@v4
