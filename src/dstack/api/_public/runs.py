@@ -504,10 +504,6 @@ class RunCollection:
             ssh_key_pub = Path(ssh_identity_file).with_suffix(".pub").read_text()
         else:
             ssh_key_pub = None  # using the server-managed user key
-            config_manager = ConfigManager()
-            key_manager = UserSSHKeyManager(self._api_client, config_manager.dstack_ssh_dir)
-            # Ensure we have a fresh key locally
-            key_manager.get_user_key()
         run_spec = RunSpec(
             run_name=configuration.name,
             repo_id=repo.repo_id,

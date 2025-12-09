@@ -147,8 +147,10 @@ async def update_user(
 async def refresh_ssh_key(
     session: AsyncSession,
     user: UserModel,
-    username: str,
+    username: Optional[str] = None,
 ) -> Optional[UserModel]:
+    if username is None:
+        username = user.name
     logger.debug("Refreshing SSH key for user [code]%s[/code]", username)
     if user.global_role != GlobalRole.ADMIN and user.name != username:
         raise error_forbidden()

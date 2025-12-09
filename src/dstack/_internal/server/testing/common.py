@@ -277,6 +277,7 @@ def get_run_spec(
     configuration_path: str = "dstack.yaml",
     profile: Union[Profile, Callable[[], Profile], None] = lambda: Profile(name="default"),
     configuration: Optional[AnyRunConfiguration] = None,
+    ssh_key_pub: Optional[str] = "user_ssh_key",
 ) -> RunSpec:
     if callable(profile):
         profile = profile()
@@ -288,7 +289,7 @@ def get_run_spec(
         configuration_path=configuration_path,
         configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
-        ssh_key_pub="user_ssh_key",
+        ssh_key_pub=ssh_key_pub,
     )
 
 

@@ -43,10 +43,7 @@ async def get_my_user(
 ):
     if user.ssh_private_key is None or user.ssh_public_key is None:
         # Generate keys for pre-0.19.33 users
-        updated_user = await users.refresh_ssh_key(session=session, user=user, username=user.name)
-        if updated_user is None:
-            raise ResourceNotExistsError()
-        user = updated_user
+        await users.refresh_ssh_key(session=session, user=user)
     return CustomORJSONResponse(users.user_model_to_user_with_creds(user))
 
 

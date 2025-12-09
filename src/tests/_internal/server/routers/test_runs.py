@@ -1364,6 +1364,32 @@ class TestGetRunPlan:
         assert response_json["action"] == action
         assert response_json["current_resource"] == json.loads(run.json())
 
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("test_db")
+    async def test_generates_user_ssh_key(self, session: AsyncSession, client: AsyncClient):
+        user = await create_user(
+            session=session, global_role=GlobalRole.USER, ssh_public_key=None, ssh_private_key=None
+        )
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name, ssh_key_pub=None)
+
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get_plan",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec.dict()},
+        )
+
+        assert response.status_code == 200, response.json()
+        run_spec_ssh_public_key = response.json()["effective_run_spec"]["ssh_key_pub"]
+        assert run_spec_ssh_public_key is not None
+        await session.refresh(user)
+        assert user.ssh_public_key == run_spec_ssh_public_key
+        assert user.ssh_private_key is not None
+
 
 class TestApplyPlan:
     @pytest.mark.asyncio
@@ -1516,6 +1542,38 @@ class TestApplyPlan:
         assert run is not None
         assert run.status == RunStatus.PENDING
         assert run.next_triggered_at == datetime(2023, 1, 2, 3, 10, tzinfo=timezone.utc)
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("test_db")
+    async def test_generates_user_ssh_key(self, session: AsyncSession, client: AsyncClient):
+        user = await create_user(
+            session=session, global_role=GlobalRole.USER, ssh_public_key=None, ssh_private_key=None
+        )
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name, ssh_key_pub=None)
+
+        response = await client.post(
+            f"/api/project/{project.name}/runs/apply",
+            headers=get_auth_headers(user.token),
+            json={
+                "plan": {
+                    "run_spec": run_spec.dict(),
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+        )
+
+        assert response.status_code == 200, response.json()
+        run_spec_ssh_public_key = response.json()["run_spec"]["ssh_key_pub"]
+        assert run_spec_ssh_public_key is not None
+        await session.refresh(user)
+        assert user.ssh_public_key == run_spec_ssh_public_key
+        assert user.ssh_private_key is not None
 
 
 class TestSubmitRun:
