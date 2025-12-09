@@ -1,4 +1,7 @@
+import sys
 from unittest.mock import patch
+
+import pytest
 
 from dstack._internal.core.backends.verda.configurator import (
     VerdaConfigurator,
@@ -9,6 +12,7 @@ from dstack._internal.core.backends.verda.models import (
 )
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="Verda requires Python 3.10")
 class TestVerdaConfigurator:
     def test_validate_config_valid(self):
         config = VerdaBackendConfigWithCreds(
