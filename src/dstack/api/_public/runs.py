@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from copy import copy
 from datetime import datetime
 from pathlib import Path
-from typing import BinaryIO, Dict, Iterable, List, Optional
+from typing import BinaryIO, Dict, Iterable, List, Optional, Union
 from urllib.parse import urlencode, urlparse
 
 from websocket import WebSocketApp
@@ -46,10 +46,10 @@ from dstack._internal.core.services.ssh.key_manager import UserSSHKeyManager
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.common import get_or_error, make_proxy_url
-from dstack._internal.utils.crypto import generate_rsa_key_pair
 from dstack._internal.utils.files import create_file_archive
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
+from dstack.api._public.common import Deprecated
 from dstack.api.server import APIClient
 
 logger = get_logger(__name__)
@@ -278,13 +278,11 @@ class Run(ABC):
         if not ssh_identity_file:
             config_manager = ConfigManager()
             key_manager = UserSSHKeyManager(self._api_client, config_manager.dstack_ssh_dir)
-            if (
-                user_key := key_manager.get_user_key()
-            ) and user_key.public_key == self._run.run_spec.ssh_key_pub:
+            user_key = key_manager.get_user_key()
+            if user_key.public_key == self._run.run_spec.ssh_key_pub:
                 ssh_identity_file = user_key.private_key_path
             else:
                 if config_manager.dstack_key_path.exists():
-                    # TODO: Remove since 0.19.40
                     logger.debug(f"Using legacy [code]{config_manager.dstack_key_path}[/code].")
                     ssh_identity_file = config_manager.dstack_key_path
                 else:
@@ -451,7 +449,7 @@ class RunCollection:
         repo: Optional[Repo] = None,
         profile: Optional[Profile] = None,
         configuration_path: Optional[str] = None,
-        repo_dir: Optional[str] = None,
+        repo_dir: Union[Deprecated, str, None] = Deprecated.PLACEHOLDER,
         ssh_identity_file: Optional[PathLike] = None,
     ) -> RunPlan:
         """
@@ -465,9 +463,10 @@ class RunCollection:
             profile: The profile to use for the run.
             configuration_path: The path to the configuration file. Omit if the configuration
                 is not loaded from a file.
-            repo_dir: The path of the cloned repo inside the run container. If not set,
-                defaults first to the `repos[0].path` property of the configuration (for remote
-                repos only).
+            ssh_identity_file: Path to the private SSH key file. The corresponding public key
+                (`.pub` file) is read and included in the run plan, allowing SSH access to the instances.
+                If the `.pub` file does not exist, it is generated automatically.
+                If ssh_identity_file is not specified, the user key is used.
 
         Returns:
             Run plan.
@@ -479,8 +478,15 @@ class RunCollection:
             with _prepare_code_file(repo) as (_, repo_code_hash):
                 pass
 
-        if repo_dir is None and configuration.repos:
+        if repo_dir is not Deprecated.PLACEHOLDER:
+            logger.warning(
+                "The repo_dir argument is deprecated, ignored, and will be removed soon."
+                " Remove it and use the repos[].path configuration property instead."
+            )
+        if configuration.repos:
             repo_dir = configuration.repos[0].path
+        else:
+            repo_dir = None
 
         self._validate_configuration_files(configuration, configuration_path)
         file_archives: list[FileArchiveMapping] = []
@@ -497,20 +503,7 @@ class RunCollection:
         if ssh_identity_file:
             ssh_key_pub = Path(ssh_identity_file).with_suffix(".pub").read_text()
         else:
-            config_manager = ConfigManager()
-            key_manager = UserSSHKeyManager(self._api_client, config_manager.dstack_ssh_dir)
-            if key_manager.get_user_key():
-                ssh_key_pub = None  # using the server-managed user key
-            else:
-                if not config_manager.dstack_key_path.exists():
-                    generate_rsa_key_pair(private_key_path=config_manager.dstack_key_path)
-                logger.warning(
-                    f"Using legacy [code]{config_manager.dstack_key_path.with_suffix('.pub')}[/code]."
-                    " You will only be able to attach to the run from this client."
-                    " Update the [code]dstack[/] server to [code]0.19.34[/]+ to switch to user keys"
-                    " automatically replicated to all clients.",
-                )
-                ssh_key_pub = config_manager.dstack_key_path.with_suffix(".pub").read_text()
+            ssh_key_pub = None  # using the server-managed user key
         run_spec = RunSpec(
             run_name=configuration.name,
             repo_id=repo.repo_id,
@@ -587,6 +580,10 @@ class RunCollection:
             profile: The profile to use for the run.
             configuration_path: The path to the configuration file. Omit if the configuration is not loaded from a file.
             reserve_ports: Reserve local ports before applying. Use if you'll attach to the run.
+            ssh_identity_file: Path to the private SSH key file. The corresponding public key
+                (`.pub` file) is read and included in the run plan, allowing SSH access to the instances.
+                If the `.pub` file does not exist, it is generated automatically.
+                If ssh_identity_file is not specified, the user key is used.
 
         Returns:
             Submitted run.

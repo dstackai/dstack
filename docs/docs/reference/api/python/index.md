@@ -44,7 +44,7 @@ finally:
 !!! info "NOTE:"
     1. The `configuration` argument in the `apply_configuration` method can be either `dstack.api.Task`, `dstack.api.Service`, or `dstack.api.DevEnvironment`.
     2. When you create `dstack.api.Task`, `dstack.api.Service`, or `dstack.api.DevEnvironment`, you can specify the `image` argument. If `image` isn't specified, the default image will be used. For a private Docker registry, ensure you also pass the `registry_auth` argument.
-    3. The `repo` argument in the `apply_configuration` method allows the mounting of a local folder, a remote repo, or a
+    3. The `repo` argument in the `apply_configuration` method allows the mounting of a remote repo or a
        programmatically created repo. In this case, the `commands` argument can refer to the files within this repo.
     4. The `attach` method waits for the run to start and, for `dstack.api.Task` sets up an SSH tunnel and forwards
     configured `ports` to `localhost`.

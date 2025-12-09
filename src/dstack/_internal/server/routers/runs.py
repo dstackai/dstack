@@ -118,7 +118,7 @@ async def get_plan(
     """
     user, project = user_project
     if not user.ssh_public_key and not body.run_spec.ssh_key_pub:
-        await users.refresh_ssh_key(session=session, user=user, username=user.name)
+        await users.refresh_ssh_key(session=session, user=user)
     run_plan = await runs.get_plan(
         session=session,
         project=project,
@@ -148,7 +148,7 @@ async def apply_plan(
     """
     user, project = user_project
     if not user.ssh_public_key and not body.plan.run_spec.ssh_key_pub:
-        await users.refresh_ssh_key(session=session, user=user, username=user.name)
+        await users.refresh_ssh_key(session=session, user=user)
     return CustomORJSONResponse(
         await runs.apply_plan(
             session=session,
