@@ -854,9 +854,9 @@ There are two ways to configure OCI: using client credentials or using the defau
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
 
-### DataCrunch
+### Verda (formerly DataCrunch)
 
-Log into your [DataCrunch](https://cloud.datacrunch.io/) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
+Log into your [Verda](https://console.verda.com/signin) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
 Then, go ahead and configure the backend:
 
@@ -866,7 +866,7 @@ Then, go ahead and configure the backend:
 projects:
   - name: main
     backends:
-      - type: datacrunch
+      - type: verda
         creds:
           type: api_key
           client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T

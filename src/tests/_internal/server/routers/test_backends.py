@@ -88,7 +88,7 @@ class TestListBackendTypes:
             "azure",
             "cloudrift",
             "cudo",
-            "datacrunch",
+            *(["datacrunch"] if sys.version_info >= (3, 10) else []),
             "digitalocean",
             "gcp",
             "hotaisle",
@@ -98,6 +98,7 @@ class TestListBackendTypes:
             "oci",
             "runpod",
             "vastai",
+            *(["verda"] if sys.version_info >= (3, 10) else []),
             "vultr",
         ]
 

@@ -128,6 +128,15 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.verda.configurator import (
+        VerdaConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(VerdaConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.vultr.configurator import VultrConfigurator
 
     _CONFIGURATOR_CLASSES.append(VultrConfigurator)

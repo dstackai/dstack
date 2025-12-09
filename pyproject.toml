@@ -186,7 +186,11 @@ gcp = [
     "dstack[server]",
 ]
 datacrunch = [
-    "datacrunch",
+    "verda; python_version >= '3.10'",
+    "dstack[server]",
+]
+verda = [
+    "verda; python_version >= '3.10'",
     "dstack[server]",
 ]
 kubernetes = [
@@ -211,5 +215,5 @@ nebius = [
     "dstack[server]",
 ]
 all = [
-    "dstack[gateway,server,aws,azure,gcp,datacrunch,kubernetes,lambda,nebius,oci]",
+    "dstack[gateway,server,aws,azure,gcp,verda,kubernetes,lambda,nebius,oci]",
 ]

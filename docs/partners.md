@@ -95,9 +95,9 @@ hide:
     </span> -->
 
     <span class="feature-cell" target="_blank">
-        <img width="52" style="margin: 10px -4px;" src="/assets/images/datacrunch-logo.svg">
+        <img width="42" src="/assets/images/verda-logo.svg">
         <h3>
-            DataCrunch
+            Verda
         </h3>
     </span>
 </div>
