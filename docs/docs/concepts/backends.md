@@ -854,7 +854,9 @@ There are two ways to configure OCI: using client credentials or using the defau
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
 
-### Verda (formerly DataCrunch)
+<span id="datacrunch"></span>
+
+### Verda (formerly DataCrunch) { #verda }
 
 Log into your [Verda](https://console.verda.com/signin) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
