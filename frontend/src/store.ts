@@ -4,6 +4,7 @@ import notificationsReducer from 'components/Notifications/slice';
 
 import { artifactApi } from 'services/artifact';
 import { authApi } from 'services/auth';
+import { eventApi } from 'services/events';
 import { fleetApi } from 'services/fleet';
 import { gatewayApi } from 'services/gateway';
 import { instanceApi } from 'services/instance';
@@ -36,6 +37,7 @@ export const store = configureStore({
         [secretApi.reducerPath]: secretApi.reducer,
         [gpuApi.reducerPath]: gpuApi.reducer,
         [mainApi.reducerPath]: mainApi.reducer,
+        [eventApi.reducerPath]: eventApi.reducer,
     },
 
     middleware: (getDefaultMiddleware) =>
@@ -54,6 +56,7 @@ export const store = configureStore({
             .concat(volumeApi.middleware)
             .concat(secretApi.middleware)
             .concat(gpuApi.middleware)
+            .concat(eventApi.middleware)
             .concat(mainApi.middleware),
 });
 

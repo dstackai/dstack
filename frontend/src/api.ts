@@ -54,6 +54,11 @@ export const API = {
         PORTAL_SESSION: (username: string) => `${API.USER_BILLING.BASE(username)}/portal_session`,
     },
 
+    EVENTS: {
+        BASE: () => `${API.BASE()}/events`,
+        LIST: () => `${API.EVENTS.BASE()}/list`,
+    },
+
     PROJECTS: {
         BASE: () => `${API.BASE()}/projects`,
         LIST: () => `${API.PROJECTS.BASE()}/list`,
