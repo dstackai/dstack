@@ -370,7 +370,12 @@ async def list_events(
         .order_by(*order_by)
         .limit(limit)
         .options(
-            joinedload(EventModel.targets),
+            (
+                joinedload(EventModel.targets)
+                .joinedload(EventTargetModel.entity_project)
+                .load_only(ProjectModel.name)
+                .noload(ProjectModel.owner)
+            ),
             joinedload(EventModel.actor_user).load_only(UserModel.name),
         )
     )
@@ -395,6 +400,7 @@ def event_model_to_event(event_model: EventModel) -> Event:
         EventTarget(
             type=target.entity_type,
             project_id=target.entity_project_id,
+            project_name=target.entity_project.name if target.entity_project else None,
             id=target.entity_id,
             name=target.entity_name,
         )

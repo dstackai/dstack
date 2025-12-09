@@ -79,6 +79,7 @@ class TestListEventsGeneral:
                     {
                         "type": "project",
                         "project_id": str(project.id),
+                        "project_name": "test_project",
                         "id": str(project.id),
                         "name": "test_project",
                     },
@@ -94,12 +95,14 @@ class TestListEventsGeneral:
                     {
                         "type": "project",
                         "project_id": str(project.id),
+                        "project_name": "test_project",
                         "id": str(project.id),
                         "name": "test_project",
                     },
                     {
                         "type": "user",
                         "project_id": None,
+                        "project_name": None,
                         "id": str(user.id),
                         "name": "test_user",
                     },
