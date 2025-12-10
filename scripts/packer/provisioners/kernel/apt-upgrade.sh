@@ -40,4 +40,9 @@ apt_update_with_retry() {
 }
 
 apt_update_with_retry
-sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=60 dist-upgrade -y -q
+# See https://man7.org/linux/man-pages/man1/dpkg.1.html#OPTIONS for confold/confdef
+sudo DEBIAN_FRONTEND=noninteractive apt-get \
+    -o DPkg::Lock::Timeout=60 \
+    -o Dpkg::Options::=--force-confold \
+    -o Dpkg::Options::=--force-confdef \
+    dist-upgrade -y -q
