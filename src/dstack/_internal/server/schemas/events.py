@@ -10,6 +10,7 @@ from dstack._internal.core.models.events import EventTargetType
 
 MIN_FILTER_ITEMS = 1
 MAX_FILTER_ITEMS = 16  # Conservative limit to prevent overly complex db queries
+LIST_EVENTS_DEFAULT_LIMIT = 100
 
 
 class ListEventsRequest(CoreModel):
@@ -142,7 +143,7 @@ class ListEventsRequest(CoreModel):
     ] = None
     prev_recorded_at: Optional[datetime] = None
     prev_id: Optional[UUID] = None
-    limit: int = Field(100, ge=1, le=100)
+    limit: int = Field(LIST_EVENTS_DEFAULT_LIMIT, ge=1, le=100)
     ascending: bool = False
 
     @root_validator
