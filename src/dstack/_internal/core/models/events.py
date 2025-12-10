@@ -37,6 +37,15 @@ class EventTarget(CoreModel):
             )
         ),
     ]
+    project_name: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "Name of the project the target entity belongs to,"
+                " or `null` for target types not bound to a project (e.g., users)"
+            )
+        ),
+    ]
     id: Annotated[uuid.UUID, Field(description="ID of the target entity")]
     name: Annotated[str, Field(description="Name of the target entity")]
 
