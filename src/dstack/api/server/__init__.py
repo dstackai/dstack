@@ -15,6 +15,7 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.utils.logging import get_logger
 from dstack.api.server._backends import BackendsAPIClient
+from dstack.api.server._events import EventsAPIClient
 from dstack.api.server._files import FilesAPIClient
 from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
@@ -121,6 +122,10 @@ class APIClient:
     @property
     def files(self) -> FilesAPIClient:
         return FilesAPIClient(self._request, self._logger)
+
+    @property
+    def events(self) -> EventsAPIClient:
+        return EventsAPIClient(self._request, self._logger)
 
     def get_token_hash(self) -> str:
         return hashlib.sha1(self._token.encode()).hexdigest()[:8]
