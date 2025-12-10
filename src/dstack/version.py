@@ -5,5 +5,5 @@
 
 __version__ = "0.0.0"
 __is_release__ = False
-base_image = "0.11"
+base_image = "0.12"
 base_image_ubuntu_version = "22.04"
