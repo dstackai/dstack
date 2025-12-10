@@ -12,6 +12,7 @@ declare type TProjectBackend = {
     config: IBackendAWS | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal | IBackendDstack;
 };
 declare interface IProject {
+    project_id: string;
     project_name: string;
     members: IProjectMember[];
     backends: TProjectBackend[];

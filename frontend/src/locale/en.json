@@ -82,7 +82,8 @@
     "resources": "Resources",
     "volumes": "Volumes",
     "instances": "Instances",
-    "offers": "Offers"
+    "offers": "Offers",
+    "events": "Events"
   },
 
   "backend": {
@@ -638,6 +639,13 @@
       "active":  "Active",
       "deleted":  "Deleted"
     }
+  },
+
+  "events": {
+    "recorded_at": "Recorded At",
+    "actor": "Actor",
+    "targets": "Targets",
+    "message": "Message"
   },
 
   "users": {

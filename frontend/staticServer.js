@@ -13,6 +13,12 @@ const proxy = {
 };
 
 const port = parseInt(process.env.PORT, 10) || 3001;
+//
+// app.use('/api/events/list', (req, res) => {
+//     console.log('test');
+//
+//     res.status(200).json([]).send();
+// });
 
 if (proxy) {
     Object.keys(proxy).forEach(function (context) {
