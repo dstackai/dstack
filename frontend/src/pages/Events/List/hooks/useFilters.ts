@@ -73,22 +73,27 @@ export const useFilters = () => {
     const filteringOptions = useMemo(() => {
         const options: PropertyFilterProps.FilteringOption[] = [];
 
-        projectsData?.forEach(({ project_id }) => {
+        projectsData?.forEach(({ project_name }) => {
             options.push({
                 propertyKey: filterKeys.TARGET_PROJECTS,
-                value: project_id,
+                value: project_name,
             });
 
             options.push({
                 propertyKey: filterKeys.WITHIN_PROJECTS,
-                value: project_id,
+                value: project_name,
             });
         });
 
-        usersData?.forEach(({ id }) => {
+        usersData?.forEach(({ username }) => {
             options.push({
                 propertyKey: filterKeys.TARGET_USERS,
-                value: id,
+                value: username,
+            });
+
+            options.push({
+                propertyKey: filterKeys.ACTORS,
+                value: username,
             });
         });
 
@@ -204,10 +209,44 @@ export const useFilters = () => {
             arrayFieldKeys: multipleChoiseKeys,
         });
 
+        const mappedFields = {
+            ...(params[filterKeys.TARGET_PROJECTS] && Array.isArray(params[filterKeys.TARGET_PROJECTS])
+                ? {
+                      [filterKeys.TARGET_PROJECTS]: params[filterKeys.TARGET_PROJECTS]?.map(
+                          (name: string) => projectsData?.find(({ project_name }) => project_name === name)?.['project_id'],
+                      ),
+                  }
+                : {}),
+            ...(params[filterKeys.WITHIN_PROJECTS] && Array.isArray(params[filterKeys.WITHIN_PROJECTS])
+                ? {
+                      [filterKeys.WITHIN_PROJECTS]: params[filterKeys.WITHIN_PROJECTS]?.map(
+                          (name: string) => projectsData?.find(({ project_name }) => project_name === name)?.['project_id'],
+                      ),
+                  }
+                : {}),
+
+            ...(params[filterKeys.TARGET_USERS] && Array.isArray(params[filterKeys.TARGET_USERS])
+                ? {
+                      [filterKeys.TARGET_USERS]: params[filterKeys.TARGET_USERS]?.map(
+                          (name: string) => usersData?.find(({ username }) => username === name)?.['id'],
+                      ),
+                  }
+                : {}),
+
+            ...(params[filterKeys.ACTORS] && Array.isArray(params[filterKeys.ACTORS])
+                ? {
+                      [filterKeys.ACTORS]: params[filterKeys.ACTORS]?.map(
+                          (name: string) => usersData?.find(({ username }) => username === name)?.['id'],
+                      ),
+                  }
+                : {}),
+        };
+
         return {
             ...params,
+            ...mappedFields,
         } as Partial<TRunsRequestParams>;
-    }, [propertyFilterQuery]);
+    }, [propertyFilterQuery, usersData, projectsData]);
 
     return {
         filteringRequestParams,
