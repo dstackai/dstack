@@ -77,3 +77,5 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && echo "${NCCL_HOME}/lib" >> /etc/ld.so.conf.d/nccl.conf \
     && ldconfig
+
+WORKDIR /dstack/run

@@ -24,12 +24,21 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && dpkg-reconfigure --frontend noninteractive tzdata \
     && apt-get install -y bzip2 ca-certificates curl build-essential git libglib2.0-0 libsm6 libxext6 libxrender1 mercurial openssh-server subversion wget \
         libibverbs1 ibverbs-providers ibverbs-utils libibverbs-dev infiniband-diags \
-    && rm -rf /var/lib/apt/lists/* \
     && sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config \
     && mkdir /run/sshd \
     && mkdir ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys \
     && chmod 600 ~/.ssh/authorized_keys \
-    && rm /etc/ssh/ssh_host_*
+    && rm /etc/ssh/ssh_host_* \
+    # User
+    && apt-get install -y sudo \
+    && groupadd -g 1000 dstack \
+    && useradd -u 1000 -g 1000 -G sudo -s /bin/bash -m dstack \
+    && echo 'dstack ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/dstack \
+    # Default working dir
+    && mkdir -p /dstack/run \
+    && chmod a+rwx /dstack/run \
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/*
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | INSTALLER_NO_MODIFY_PATH=1 sh \
     && uv python install --preview --default

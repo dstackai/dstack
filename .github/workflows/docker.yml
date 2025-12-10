@@ -65,9 +65,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+      - name: Free up some space
+        run: |
+          df -h /
+          du -hs /usr/share/dotnet
+          rm -rf /usr/share/dotnet
+          df -h /
       - name: Build and upload to DockerHub
         run: |
-         if [ "${{ matrix.flavor }}" = "base" ]; then
+          if [ "${{ matrix.flavor }}" = "base" ]; then
             FILE="base/Dockerfile"
           elif [ "${{ matrix.flavor }}" = "devel" ]; then
             FILE="base/Dockerfile"
