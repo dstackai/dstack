@@ -35,7 +35,7 @@ export const useColumnsDefinitions = () => {
                         case 'project':
                             return (
                                 <div>
-                                    project{' '}
+                                    Project{' '}
                                     {target.project_name && (
                                         <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(target.project_name)}>
                                             {target.project_name}
@@ -47,7 +47,7 @@ export const useColumnsDefinitions = () => {
                         case 'fleet':
                             return (
                                 <div>
-                                    fleet{' '}
+                                    Fleet{' '}
                                     {target.project_name && (
                                         <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(target.project_name)}>
                                             {target.project_name}
@@ -63,7 +63,7 @@ export const useColumnsDefinitions = () => {
                         case 'user':
                             return (
                                 <div>
-                                    user{' '}
+                                    User{' '}
                                     <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(target.name)}>{target.name}</NavigateLink>
                                 </div>
                             );
@@ -71,7 +71,7 @@ export const useColumnsDefinitions = () => {
                         case 'instance':
                             return (
                                 <div>
-                                    instance{' '}
+                                    Instance{' '}
                                     {target.project_name && (
                                         <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(target.project_name)}>
                                             {target.project_name}
@@ -84,7 +84,7 @@ export const useColumnsDefinitions = () => {
                         case 'run':
                             return (
                                 <div>
-                                    run{' '}
+                                    Run{' '}
                                     {target.project_name && (
                                         <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(target.project_name)}>
                                             {target.project_name}
@@ -102,7 +102,7 @@ export const useColumnsDefinitions = () => {
                         case 'job':
                             return (
                                 <div>
-                                    job{' '}
+                                    Job{' '}
                                     {target.project_name && (
                                         <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(target.project_name)}>
                                             {target.project_name}
