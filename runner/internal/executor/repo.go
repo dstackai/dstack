@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,9 +18,9 @@ import (
 )
 
 // setupRepo must be called from Run
-// ex.jobWorkingDir must be already set
-// TODO: change ownership to uid:gid
+// Must be called after setJobWorkingDir and setJobCredentials
 func (ex *RunExecutor) setupRepo(ctx context.Context) error {
+	log.Trace(ctx, "Setting up repo")
 	if ex.jobWorkingDir == "" {
 		return errors.New("setup repo: working dir is not set")
 	}
@@ -37,7 +38,7 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 	}
 	log.Trace(ctx, "Job repo dir", "path", ex.repoDir)
 
-	repoDirIsEmpty, err := ex.prepareRepoDir(ctx)
+	repoDirIsEmpty, repoDirMustBeMoved, err := ex.checkRepoDir(ctx)
 	if err != nil {
 		return fmt.Errorf("prepare repo dir: %w", err)
 	}
@@ -59,23 +60,27 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 			return fmt.Errorf("setup repo: unsupported action: %s", repoExistsAction)
 		}
 	}
-	// Move existing repo files from the repo dir and back to be able to git clone.
-	// Currently, only needed for volumes mounted inside repo with lost+found present.
-	tmpRepoDir, err := os.MkdirTemp(ex.tempDir, "repo_dir_copy")
-	if err != nil {
-		return fmt.Errorf("create temp repo dir: %w", err)
-	}
-	defer func() { _ = os.RemoveAll(tmpRepoDir) }()
-	err = ex.moveRepoDir(tmpRepoDir)
-	if err != nil {
-		return fmt.Errorf("move repo dir: %w", err)
-	}
-	defer func() {
-		err_ := ex.restoreRepoDir(tmpRepoDir)
-		if err == nil {
-			err = fmt.Errorf("restore repo dir: %w", err_)
+
+	if repoDirMustBeMoved {
+		// Move existing repo files from the repo dir and back to be able to git clone.
+		// Currently, only needed for volumes mounted inside repo with lost+found present.
+		tmpRepoDir, err := os.MkdirTemp(ex.tempDir, "repo_dir_copy")
+		if err != nil {
+			return fmt.Errorf("create temp repo dir: %w", err)
 		}
-	}()
+		defer func() { _ = os.RemoveAll(tmpRepoDir) }()
+		err = ex.moveRepoDir(ctx, tmpRepoDir)
+		if err != nil {
+			return fmt.Errorf("move repo dir: %w", err)
+		}
+		defer func() {
+			err_ := ex.restoreRepoDir(ctx, tmpRepoDir)
+			if err == nil {
+				err = fmt.Errorf("restore repo dir: %w", err_)
+			}
+		}()
+	}
+
 	switch ex.getRepoData().RepoType {
 	case "remote":
 		log.Trace(ctx, "Fetching git repository")
@@ -90,6 +95,11 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 	default:
 		return fmt.Errorf("unknown RepoType: %s", ex.getRepoData().RepoType)
 	}
+
+	if err := ex.chownRepoDir(ctx); err != nil {
+		return fmt.Errorf("chown repo dir: %w", err)
+	}
+
 	return err
 }
 
@@ -125,7 +135,7 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 	}
 
 	log.Trace(ctx, "Checking out remote repo", "GIT URL", repoManager.URL())
-	if err := repoManager.Checkout(); err != nil {
+	if err := repoManager.Checkout(ctx); err != nil {
 		return fmt.Errorf("checkout repo: %w", err)
 	}
 	if err := repoManager.SetConfig(ex.getRepoData().RepoConfigName, ex.getRepoData().RepoConfigEmail); err != nil {
@@ -158,56 +168,74 @@ func (ex *RunExecutor) prepareArchive(ctx context.Context) error {
 	return nil
 }
 
-func (ex *RunExecutor) prepareRepoDir(ctx context.Context) (bool, error) {
-	log.Trace(ctx, "Preparing repo dir")
+func (ex *RunExecutor) checkRepoDir(ctx context.Context) (isEmpty bool, mustBeMoved bool, err error) {
+	log.Trace(ctx, "Checking repo dir")
 	info, err := os.Stat(ex.repoDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			if err = common.MkdirAll(ctx, ex.repoDir, ex.jobUid, ex.jobGid); err != nil {
-				return false, fmt.Errorf("create repo dir: %w", err)
-			}
-			// No repo dir - created a new one
-			return true, nil
+			// No repo dir
+			return true, false, nil
 		}
-		return false, fmt.Errorf("stat repo dir: %w", err)
+		return false, false, fmt.Errorf("stat repo dir: %w", err)
 	}
 	if !info.IsDir() {
-		return false, fmt.Errorf("stat repo dir: %s is not a dir", ex.repoDir)
+		return false, false, fmt.Errorf("stat repo dir: %s is not a dir", ex.repoDir)
 	}
 	entries, err := os.ReadDir(ex.repoDir)
 	if err != nil {
-		return false, fmt.Errorf("read repo dir: %w", err)
+		return false, false, fmt.Errorf("read repo dir: %w", err)
 	}
 	if len(entries) == 0 {
 		// Repo dir is empty
-		return true, nil
+		return true, false, nil
 	}
 	if len(entries) == 1 && entries[0].Name() == "lost+found" {
 		// lost+found may be present on a newly created volume
-		// We (but not Git, see `{move,restore}RepoDir`) consider such a dir "empty"
-		return true, nil
+		// We (but not Git, thus mustBeMoved = true) consider such a dir "empty"
+		return true, true, nil
 	}
 	// Repo dir is not empty
-	return false, nil
+	return false, false, nil
 }
 
-func (ex *RunExecutor) moveRepoDir(tmpDir string) error {
-	if err := moveDir(ex.repoDir, tmpDir); err != nil {
+func (ex *RunExecutor) moveRepoDir(ctx context.Context, tmpDir string) error {
+	if err := moveDir(ctx, ex.repoDir, tmpDir); err != nil {
 		return fmt.Errorf("move directory: %w", err)
 	}
 	return nil
 }
 
-func (ex *RunExecutor) restoreRepoDir(tmpDir string) error {
-	if err := moveDir(tmpDir, ex.repoDir); err != nil {
+func (ex *RunExecutor) restoreRepoDir(ctx context.Context, tmpDir string) error {
+	if err := moveDir(ctx, tmpDir, ex.repoDir); err != nil {
 		return fmt.Errorf("move directory: %w", err)
 	}
 	return nil
 }
 
-func moveDir(srcDir, dstDir string) error {
+func (ex *RunExecutor) chownRepoDir(ctx context.Context) error {
+	log.Trace(ctx, "Chowning repo dir")
+	if ex.jobUid == -1 && ex.jobGid == -1 {
+		return nil
+	}
+	return filepath.WalkDir(
+		ex.repoDir,
+		func(p string, d fs.DirEntry, err error) error {
+			// We consider walk/chown errors non-fatal
+			if err != nil {
+				log.Debug(ctx, "Error while walking repo dir", "path", p, "err", err)
+				return nil
+			}
+			if err := os.Chown(p, ex.jobUid, ex.jobGid); err != nil {
+				log.Debug(ctx, "Error while chowning repo dir", "path", p, "err", err)
+			}
+			return nil
+		},
+	)
+}
+
+func moveDir(ctx context.Context, srcDir, dstDir string) error {
 	// We cannot just move/rename files because with volumes they'll be on different devices
-	cmd := exec.CommandContext(context.TODO(), "cp", "-a", srcDir+"/.", dstDir)
+	cmd := exec.CommandContext(ctx, "cp", "-a", srcDir+"/.", dstDir)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to cp: %w, output: %s", err, string(output))
 	}

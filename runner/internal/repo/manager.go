@@ -69,9 +69,9 @@ func (m *Manager) WithSSHAuth(pem, password string) *Manager {
 	return m
 }
 
-func (m *Manager) Checkout() error {
-	log.Info(m.ctx, "git checkout", "auth", fmt.Sprintf("%T", (&m.clo).Auth))
-	ref, err := git.PlainClone(m.localPath, false, &m.clo)
+func (m *Manager) Checkout(ctx context.Context) error {
+	log.Info(m.ctx, "git checkout", "auth", fmt.Sprintf("%T", m.clo.Auth))
+	ref, err := git.PlainCloneContext(ctx, m.localPath, false, &m.clo)
 	if err != nil {
 		return fmt.Errorf("clone repo: %w", err)
 	}
