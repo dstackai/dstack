@@ -19,6 +19,7 @@ export const LoginByGithubCallback: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const code = searchParams.get('code');
+    const state = searchParams.get('state');
     const [isInvalidCode, setIsInvalidCode] = useState(false);
     const dispatch = useAppDispatch();
 
@@ -26,8 +27,8 @@ export const LoginByGithubCallback: React.FC = () => {
     const [getProjects] = useLazyGetProjectsQuery();
 
     const checkCode = () => {
-        if (code) {
-            githubCallback({ code })
+        if (code && state) {
+            githubCallback({ code, state })
                 .unwrap()
                 .then(async ({ creds: { token } }) => {
                     dispatch(setAuthData({ token }));
