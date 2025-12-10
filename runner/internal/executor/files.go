@@ -35,8 +35,9 @@ func (ex *RunExecutor) AddFileArchive(id string, src io.Reader) error {
 }
 
 // setupFiles must be called from Run
-// ex.jobWorkingDir must be already set
+// Must be called after setJobWorkingDir and setJobCredentials
 func (ex *RunExecutor) setupFiles(ctx context.Context) error {
+	log.Trace(ctx, "Setting up files")
 	if ex.jobWorkingDir == "" {
 		return errors.New("setup files: working dir is not set")
 	}
