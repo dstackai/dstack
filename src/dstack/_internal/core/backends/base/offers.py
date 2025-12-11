@@ -39,6 +39,8 @@ def get_catalog_offers(
     catalog: Optional[gpuhunt.Catalog] = None,
 ) -> List[InstanceOffer]:
     provider = backend.value
+    if backend == BackendType.DATACRUNCH:
+        provider = BackendType.VERDA.value  # Backward compatibility
     if backend == BackendType.LAMBDA:
         provider = "lambdalabs"
     if backend == BackendType.AMDDEVCLOUD:
