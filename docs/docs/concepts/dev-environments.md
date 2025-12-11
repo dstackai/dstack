@@ -301,11 +301,11 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
 
 ### Working directory
 
-If `working_dir` is not specified, it defaults to `/workflow`.
+If `working_dir` is not specified, it defaults to the working directory set in the Docker image. For example, the [default image](#default-image) uses `/dstack/run` as its working directory.
+
+If the Docker image does not have a working directory set, `dstack` uses `/` as the `working_dir`.
 
 The `working_dir` must be an absolute path. The tilde (`~`) is supported (e.g., `~/my-working-dir`).
-
-<!-- TODO: In a future version, the default working directory will be taken from `image`. -->
 
 <!-- TODO: Elaborate on `entrypoint` -->
 
@@ -320,7 +320,7 @@ type: dev-environment
 name: vscode    
 
 files:
-  - .:examples  # Maps the directory where `.dstack.yml` to `/workflow/examples`
+  - .:examples  # Maps the directory with `.dstack.yml` to `<working dir>/examples`
   - ~/.ssh/id_rsa:/root/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rsa`
 
 ide: vscode
@@ -329,7 +329,7 @@ ide: vscode
 </div>
 
 If the local path is relative, it’s resolved relative to the configuration file.
-If the container path is relative, it’s resolved relative to `/workflow`.
+If the container path is relative, it’s resolved relative to the [working directory](#working-directory).
 
 The container path is optional. If not specified, it will be automatically calculated:
 
@@ -340,7 +340,7 @@ type: dev-environment
 name: vscode    
 
 files:
-  - ../examples  # Maps `examples` (the parent directory of `.dstack.yml`) to `/workflow/examples`
+  - ../examples  # Maps the parent directory of `.dstack.yml` to `<working dir>/../examples`
   - ~/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rsa`
 
 ide: vscode
@@ -355,9 +355,9 @@ ide: vscode
 
 ### Repos
 
-Sometimes, you may want to mount an entire Git repo inside the container.
+Sometimes, you may want to clone an entire Git repo inside the container.
 
-Imagine you have a cloned Git repo containing an `examples` subdirectory with a `.dstack.yml` file:
+Imagine you have a Git repo (clonned locally) containing an `examples` subdirectory with a `.dstack.yml` file:
 
 <div editor-title="examples/.dstack.yml"> 
 
@@ -366,8 +366,7 @@ type: dev-environment
 name: vscode    
 
 repos:
-  # Mounts the parent directory of `examples` (must be a Git repo)
-  #   to `/workflow` (the default working directory)
+  # Clones the repo from the parent directory (`examples/..`) to `<working dir>`
   - ..
 
 ide: vscode
@@ -375,15 +374,13 @@ ide: vscode
 
 </div>
 
-When you run it, `dstack` fetches the repo on the instance, applies your local changes, and mounts it—so the container matches your local repo.
+When you run it, `dstack` clones the repo on the instance, applies your local changes, and mounts it—so the container matches your local repo.
 
 The local path can be either relative to the configuration file or absolute.
 
 ??? info "Repo directory"
-    By default, `dstack` mounts the repo to `/workflow` (the default working directory).
+    By default, `dstack` clones the repo to the [working directory](#working-directory).
 
-    <!-- TODO: In a future version, the default working directory will come from the image, so this should be revisited. -->
-    
     You can override the repo directory using either a relative or an absolute path:
 
     <div editor-title="examples/.dstack.yml"> 
@@ -393,8 +390,7 @@ The local path can be either relative to the configuration file or absolute.
     name: vscode    
 
     repos:
-      # Mounts the parent directory of `examples` (must be a Git repo)
-      #   to `/my-repo`
+      # Clones the repo in the parent directory (`examples/..`) to `/my-repo`
       - ..:/my-repo
 
     ide: vscode
@@ -402,7 +398,22 @@ The local path can be either relative to the configuration file or absolute.
     
     </div>
 
-    If the path is relative, it is resolved against [working directory](#working-directory).
+    > If the repo directory is relative, it is resolved against [working directory](#working-directory).
+
+    If the repo directory is not empty, the run will fail with a runner error.  
+    To override this behavior, you can set `if_exists` to `skip`:
+  
+    ```yaml
+    type: dev-environment
+    name: vscode    
+  
+    repos:
+      - local_path: ..
+        path: /my-repo
+        if_exists: skip
+  
+    ide: vscode
+    ```
 
 
 ??? info "Repo size"
@@ -411,7 +422,7 @@ The local path can be either relative to the configuration file or absolute.
     You can increase the 2MB limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
 
 ??? info "Repo URL"
-    Sometimes you may want to mount a Git repo without cloning it locally. In this case, simply provide a URL in `repos`:
+    Sometimes you may want to clone a Git repo within the container without cloning it locally. In this case, simply provide a URL in `repos`:
 
     <div editor-title="examples/.dstack.yml"> 
 
@@ -420,7 +431,7 @@ The local path can be either relative to the configuration file or absolute.
     name: vscode    
 
     repos:
-      # Clone the specified repo to `/workflow` (the default working directory)
+      # Clone the repo to `<working dir>`
       - https://github.com/dstackai/dstack
 
     ide: vscode
@@ -432,9 +443,9 @@ The local path can be either relative to the configuration file or absolute.
     If a Git repo is private, `dstack` will automatically try to use your default Git credentials (from
     `~/.ssh/config` or `~/.config/gh/hosts.yml`).
 
-    If you want to use custom credentials, you can provide them with [`dstack init`](../reference/cli/dstack/init.md).
+    > If you want to use custom credentials, ensure to pass them via [`dstack init`](../reference/cli/dstack/init.md) before submitting a run.
 
-> Currently, you can configure up to one repo per run configuration.
+Currently, you can configure up to one repo per run configuration.
 
 ### Retry policy
 
