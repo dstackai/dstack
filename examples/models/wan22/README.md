@@ -99,9 +99,9 @@ cloud resources and run the configuration.
 $ dstack apply -f examples/models/wan22/.dstack.yml
 
  #  BACKEND         RESOURCES                                        INSTANCE TYPE   PRICE
- 1  verda (FIN-01)  cpu=30 mem=120GB disk=200GB H100:80GB:1 (spot)   1H100.80S.30V   $0.99
- 2  verda (FIN-01)  cpu=30 mem=120GB disk=200GB H100:80GB:1 (spot)   1H100.80S.30V   $0.99
- 3  verda (FIN-02)  cpu=44 mem=182GB disk=200GB H200:141GB:1 (spot)  1H200.141S.44V  $0.99
+ 1  datacrunch (FIN-01)  cpu=30 mem=120GB disk=200GB H100:80GB:1 (spot)   1H100.80S.30V   $0.99
+ 2  datacrunch (FIN-01)  cpu=30 mem=120GB disk=200GB H100:80GB:1 (spot)   1H100.80S.30V   $0.99
+ 3  datacrunch (FIN-02)  cpu=44 mem=182GB disk=200GB H200:141GB:1 (spot)  1H200.141S.44V  $0.99
 
 ---> 100%
 
