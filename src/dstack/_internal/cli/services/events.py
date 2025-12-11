@@ -52,11 +52,13 @@ def print_event(event: Event) -> None:
     targets = ", ".join(f"{target.type} {target.name}" for target in event.targets)
     message = [
         Text(f"[{recorded_at}]", style="log.time"),
-        Text(event.message, style="log.message"),
-        Text(f"[{targets}]", style="secondary"),
     ]
     if event.actor_user:
-        message.append(Text(f"👤 {event.actor_user}"))
+        message.append(Text(f"[👤{event.actor_user}]", style="secondary"))
+    message += [
+        Text(f"[{targets}]", style="secondary"),
+        Text(event.message, style="log.message"),
+    ]
     console.print(
         *message,
         soft_wrap=True,  # Strictly one line per event. Allows for grepping
