@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-from typing import Generator
 from unittest.mock import patch
 
 import pytest
@@ -27,12 +26,6 @@ pytestmark = [
     pytest.mark.usefixtures("test_db", "image_config_mock"),
     pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True),
 ]
-
-
-@pytest.fixture(autouse=True)
-def set_feature_flag() -> Generator[None, None, None]:
-    with patch("dstack._internal.settings.FeatureFlags.EVENTS", True):
-        yield
 
 
 class TestListEventsGeneral:

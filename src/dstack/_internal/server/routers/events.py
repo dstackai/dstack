@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.events as events_services
-from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.events import Event
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import UserModel
@@ -12,7 +11,6 @@ from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
 )
-from dstack._internal.settings import FeatureFlags
 
 root_router = APIRouter(
     prefix="/api/events",
@@ -36,8 +34,6 @@ async def list_events(
     The results are paginated. To get the next page, pass `recorded_at` and `id` of
     the last event from the previous page as `prev_recorded_at` and `prev_id`.
     """
-    if not FeatureFlags.EVENTS:
-        raise ServerClientError("Events are disabled on this server")
     return CustomORJSONResponse(
         await events_services.list_events(
             session=session,

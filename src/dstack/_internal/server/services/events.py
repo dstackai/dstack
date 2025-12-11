@@ -22,7 +22,6 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services.logging import fmt_entity
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -170,9 +169,6 @@ def emit(session: AsyncSession, message: str, actor: AnyActor, targets: list[Tar
           they will see the entire event with all targets. If this is not desired,
           consider emitting multiple separate events instead.
     """
-    if not FeatureFlags.EVENTS:
-        return
-
     if not targets:
         raise ValueError("At least one target must be specified")
     if not message:
