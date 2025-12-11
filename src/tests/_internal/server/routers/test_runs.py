@@ -64,6 +64,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_run_spec,
 )
+from dstack._internal.server.testing.matchers import SomeUUID4Str
 from tests._internal.server.background.tasks.test_process_running_jobs import settings
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
@@ -301,8 +302,8 @@ def get_dev_env_run_plan_dict(
 
 
 def get_dev_env_run_dict(
-    run_id: str = "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
-    job_id: str = "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+    run_id: Union[str, SomeUUID4Str] = "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+    job_id: Union[str, SomeUUID4Str] = "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
     project_name: str = "test_project",
     username: str = "test_user",
     run_name: Optional[str] = "run_name",
@@ -1418,14 +1419,13 @@ class TestApplyPlan:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        run_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
         submitted_at_formatted = "2023-01-02T03:04:00+00:00"
         last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(
-            run_id=str(run_id),
-            job_id=str(run_id),
+            run_id=SomeUUID4Str(),
+            job_id=SomeUUID4Str(),
             project_name=project.name,
             username=user.name,
             submitted_at=submitted_at_formatted,
@@ -1434,11 +1434,7 @@ class TestApplyPlan:
             run_name="test-run",
             repo_id=repo.name,
         )
-        with (
-            patch("uuid.uuid4") as uuid_mock,
-            patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
-        ):
-            uuid_mock.return_value = run_id
+        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = submitted_at
             response = await client.post(
                 f"/api/project/{project.name}/runs/apply",
@@ -1604,14 +1600,13 @@ class TestSubmitRun:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        run_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
         submitted_at_formatted = "2023-01-02T03:04:00+00:00"
         last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(
-            run_id=str(run_id),
-            job_id=str(run_id),
+            run_id=SomeUUID4Str(),
+            job_id=SomeUUID4Str(),
             project_name=project.name,
             username=user.name,
             submitted_at=submitted_at_formatted,
@@ -1625,11 +1620,7 @@ class TestSubmitRun:
         if privileged is None:
             del run_spec["configuration"]["privileged"]
         body = {"run_spec": run_spec}
-        with (
-            patch("uuid.uuid4") as uuid_mock,
-            patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
-        ):
-            uuid_mock.return_value = run_id
+        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = submitted_at
             response = await client.post(
                 f"/api/project/{project.name}/runs/submit",
@@ -1655,14 +1646,13 @@ class TestSubmitRun:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        run_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
         submitted_at_formatted = "2023-01-02T03:04:00+00:00"
         last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(
-            run_id=str(run_id),
-            job_id=str(run_id),
+            run_id=SomeUUID4Str(),
+            job_id=SomeUUID4Str(),
             project_name=project.name,
             username=user.name,
             submitted_at=submitted_at_formatted,
@@ -1674,11 +1664,7 @@ class TestSubmitRun:
             privileged=True,  # docker=True automatically enables privileged mode
         )
         body = {"run_spec": run_dict["run_spec"]}
-        with (
-            patch("uuid.uuid4") as uuid_mock,
-            patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
-        ):
-            uuid_mock.return_value = run_id
+        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = submitted_at
             response = await client.post(
                 f"/api/project/{project.name}/runs/submit",
@@ -1712,13 +1698,11 @@ class TestSubmitRun:
             repo_id=repo.name,
         )
         body = {"run_spec": run_dict["run_spec"]}
-        with patch("uuid.uuid4") as uuid_mock:
-            uuid_mock.return_value = UUID(run_dict["id"])
-            response = await client.post(
-                f"/api/project/{project.name}/runs/submit",
-                headers=get_auth_headers(user.token),
-                json=body,
-            )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/submit",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
         assert response.status_code == 200
         assert response.json()["run_spec"]["run_name"] is not None
         res = await session.execute(select(RunModel))
