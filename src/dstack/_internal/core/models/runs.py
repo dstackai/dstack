@@ -443,6 +443,9 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
         list[FileArchiveMapping],
         Field(description="The list of file archive ID to container path mappings."),
     ] = []
+    # Server uses configuration.working_dir since 0.19.27 and ignores this field, but the field
+    # still exists for compatibility with old clients that send it.
+    working_dir: Optional[str] = None
     configuration_path: Annotated[
         Optional[str],
         Field(
