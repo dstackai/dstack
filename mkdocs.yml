@@ -275,6 +275,7 @@ nav:
           - Troubleshooting: docs/guides/troubleshooting.md
           - Metrics: docs/guides/metrics.md
           - Protips: docs/guides/protips.md
+          - Migration: docs/guides/migration.md
       - Reference:
         - .dstack.yml:
             - dev-environment: docs/reference/dstack.yml/dev-environment.md
