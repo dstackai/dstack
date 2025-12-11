@@ -99,6 +99,7 @@ def upgrade() -> None:
             "AWS",
             "AZURE",
             "CUDO",
+            "DATACRUNCH",
             "DSTACK",
             "GCP",
             "KUBERNETES",
@@ -110,7 +111,6 @@ def upgrade() -> None:
             "RUNPOD",
             "TENSORDOCK",
             "VASTAI",
-            "VERDA",
         ],
         [
             TableReference(table_schema="public", table_name="instances", column_name="backend"),
