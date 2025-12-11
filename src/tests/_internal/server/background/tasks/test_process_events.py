@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Generator
 from unittest.mock import patch
 
 import pytest
@@ -12,12 +11,6 @@ from dstack._internal.server.background.tasks.process_events import delete_event
 from dstack._internal.server.models import EventModel
 from dstack._internal.server.services import events
 from dstack._internal.server.testing.common import create_user
-
-
-@pytest.fixture(autouse=True)
-def set_feature_flag() -> Generator[None, None, None]:
-    with patch("dstack._internal.settings.FeatureFlags.EVENTS", True):
-        yield
 
 
 @pytest.mark.asyncio
