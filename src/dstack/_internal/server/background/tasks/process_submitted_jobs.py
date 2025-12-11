@@ -69,6 +69,7 @@ from dstack._internal.server.models import (
     VolumeAttachmentModel,
     VolumeModel,
 )
+from dstack._internal.server.services import events
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
@@ -79,6 +80,7 @@ from dstack._internal.server.services.fleets import (
     is_cloud_cluster,
 )
 from dstack._internal.server.services.instances import (
+    format_instance_status_for_event,
     get_instance_provisioning_data,
 )
 from dstack._internal.server.services.jobs import (
@@ -90,6 +92,7 @@ from dstack._internal.server.services.jobs import (
     get_job_runtime_data,
     is_master_job,
     is_multinode_job,
+    switch_job_status,
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
@@ -273,9 +276,9 @@ async def _process_submitted_job(
         check_can_attach_job_volumes(volumes)
     except ServerClientError as e:
         logger.warning("%s: failed to prepare run volumes: %s", fmt(job_model), repr(e))
-        job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
         job_model.termination_reason_message = e.msg
+        switch_job_status(session, job_model, JobStatus.TERMINATING)
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
         return
@@ -333,21 +336,21 @@ async def _process_submitted_job(
             if run_spec.merged_profile.fleets is not None:
                 # Run cannot create new fleets when fleets are specified
                 logger.debug("%s: failed to use specified fleets", fmt(job_model))
-                job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = (
                     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
                 )
                 job_model.termination_reason_message = "Failed to use specified fleets"
+                switch_job_status(session, job_model, JobStatus.TERMINATING)
                 job_model.last_processed_at = common_utils.get_current_datetime()
                 await session.commit()
                 return
             if not FeatureFlags.AUTOCREATED_FLEETS_ENABLED:
                 logger.debug("%s: no fleet found", fmt(job_model))
-                job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = (
                     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
                 )
                 job_model.termination_reason_message = "Failed to find fleet"
+                switch_job_status(session, job_model, JobStatus.TERMINATING)
                 job_model.last_processed_at = common_utils.get_current_datetime()
                 await session.commit()
                 return
@@ -375,12 +378,13 @@ async def _process_submitted_job(
             .execution_options(populate_existing=True)
         )
         instance = res.unique().scalar_one()
-        job_model.status = JobStatus.PROVISIONING
+        switch_job_status(session, job_model, JobStatus.PROVISIONING)
     else:
         if run_profile.creation_policy == CreationPolicy.REUSE:
             logger.debug("%s: reuse instance failed", fmt(job_model))
-            job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+            job_model.termination_reason_message = "Could not reuse any instances for this job"
+            switch_job_status(session, job_model, JobStatus.TERMINATING)
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
@@ -410,8 +414,8 @@ async def _process_submitted_job(
         )
         if run_job_result is None:
             logger.debug("%s: provisioning failed", fmt(job_model))
-            job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+            switch_job_status(session, job_model, JobStatus.TERMINATING)
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
@@ -424,6 +428,15 @@ async def _process_submitted_job(
                 run=run,
             )
             session.add(fleet_model)
+            events.emit(
+                session,
+                f"Fleet created for job. Fleet status: {fleet_model.status.upper()}",
+                actor=events.SystemActor(),
+                targets=[
+                    events.Target.from_model(fleet_model),
+                    events.Target.from_model(job_model),
+                ],
+            )
 
         provisioning_data, offer, effective_profile, _ = run_job_result
         compute_group_model = None
@@ -448,7 +461,7 @@ async def _process_submitted_job(
         instance = None  # Instance for attaching volumes in case of single job provisioned
         for provisioned_job_model, jpd in zip(provisioned_job_models, jpds):
             provisioned_job_model.job_provisioning_data = jpd.json()
-            provisioned_job_model.status = JobStatus.PROVISIONING
+            switch_job_status(session, provisioned_job_model, JobStatus.PROVISIONING)
             # FIXME: Fleet is not locked which may lead to duplicate instance_num.
             # This is currently hard to fix without locking the fleet for entire provisioning duration.
             # Processing should be done in multiple steps so that
@@ -470,16 +483,16 @@ async def _process_submitted_job(
             provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
                 offer, multinode
             ).json()
-            logger.info(
-                "Created a new instance %s for job %s",
-                instance.name,
-                provisioned_job_model.job_name,
-                extra={
-                    "instance_name": instance.name,
-                    "instance_status": InstanceStatus.PROVISIONING.value,
-                },
-            )
             session.add(instance)
+            events.emit(
+                session,
+                f"Instance created for job. Instance status: {format_instance_status_for_event(instance)}",
+                actor=events.SystemActor(),
+                targets=[
+                    events.Target.from_model(instance),
+                    events.Target.from_model(provisioned_job_model),
+                ],
+            )
             provisioned_job_model.used_instance_id = instance.id
             provisioned_job_model.last_processed_at = common_utils.get_current_datetime()
 
@@ -615,20 +628,22 @@ async def _assign_job_to_fleet_instance(
     instance.status = InstanceStatus.BUSY
     instance.busy_blocks += offer.blocks
 
-    logger.info(
-        "The job %s switched instance %s status to BUSY",
-        job_model.job_name,
-        instance.name,
-        extra={
-            "instance_name": instance.name,
-            "instance_status": InstanceStatus.BUSY.value,
-        },
-    )
-    logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
     job_model.instance = instance
     job_model.used_instance_id = instance.id
     job_model.job_provisioning_data = instance.job_provisioning_data
     job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
+    events.emit(
+        session,
+        (
+            "Job assigned to instance."
+            f" Instance status: {format_instance_status_for_event(instance)}"
+        ),
+        actor=events.SystemActor(),
+        targets=[
+            events.Target.from_model(job_model),
+            events.Target.from_model(instance),
+        ],
+    )
     return instance
 
 
@@ -1014,17 +1029,17 @@ async def _attach_volumes(
                     break  # attach next mount point
             except (ServerClientError, BackendError) as e:
                 logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
-                job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
                 job_model.termination_reason_message = "Failed to attach volume"
+                switch_job_status(session, job_model, JobStatus.TERMINATING)
             except Exception:
                 logger.exception(
                     "%s: got exception when attaching volume",
                     fmt(job_model),
                 )
-                job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
                 job_model.termination_reason_message = "Failed to attach volume"
+                switch_job_status(session, job_model, JobStatus.TERMINATING)
             finally:
                 job_model.job_runtime_data = job_runtime_data.json()
 

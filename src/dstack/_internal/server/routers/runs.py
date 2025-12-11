@@ -170,9 +170,10 @@ async def stop_runs(
     """
     Stop one or more runs.
     """
-    _, project = user_project
+    user, project = user_project
     await runs.stop_runs(
         session=session,
+        user=user,
         project=project,
         runs_names=body.runs_names,
         abort=body.abort,
@@ -188,8 +189,8 @@ async def delete_runs(
     """
     Delete one or more runs. The runs must be stopped before they can be deleted.
     """
-    _, project = user_project
-    await runs.delete_runs(session=session, project=project, runs_names=body.runs_names)
+    user, project = user_project
+    await runs.delete_runs(session=session, user=user, project=project, runs_names=body.runs_names)
 
 
 # apply_plan replaces submit_run since it can create new runs.

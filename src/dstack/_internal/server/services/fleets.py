@@ -57,6 +57,7 @@ from dstack._internal.server.services import events
 from dstack._internal.server.services import instances as instances_services
 from dstack._internal.server.services import offers as offers_services
 from dstack._internal.server.services.instances import (
+    format_instance_status_for_event,
     get_instance_remote_connection_info,
     list_active_remote_instances,
 )
@@ -76,6 +77,25 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import pkey_from_str
 
 logger = get_logger(__name__)
+
+
+def switch_fleet_status(
+    session: AsyncSession,
+    fleet_model: FleetModel,
+    new_status: FleetStatus,
+    actor: events.AnyActor = events.SystemActor(),
+):
+    """
+    Switch fleet status.
+    """
+    old_status = fleet_model.status
+    if old_status == new_status:
+        return
+
+    fleet_model.status = new_status
+
+    msg = f"Fleet status changed {old_status.upper()} -> {new_status.upper()}"
+    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(fleet_model)])
 
 
 async def list_fleets(
@@ -414,6 +434,7 @@ async def apply_plan(
         if fleet_model is not None:
             return await _update_fleet(
                 session=session,
+                user=user,
                 project=project,
                 spec=spec,
                 current_resource=plan.current_resource,
@@ -588,7 +609,12 @@ async def delete_fleets(
             _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
             # TERMINATING fleets are deleted by process_fleets after instances are terminated
             if instance_nums is None:
-                fleet_model.status = FleetStatus.TERMINATING
+                switch_fleet_status(
+                    session,
+                    fleet_model,
+                    FleetStatus.TERMINATING,
+                    actor=events.UserActor.from_user(user),
+                )
         await session.commit()
 
 
@@ -761,7 +787,7 @@ async def _create_fleet(
         )
         if spec.configuration.ssh_config is not None:
             for i, host in enumerate(spec.configuration.ssh_config.hosts):
-                instances_model = await create_fleet_ssh_instance_model(
+                instance_model = await create_fleet_ssh_instance_model(
                     project=project,
                     spec=spec,
                     ssh_params=spec.configuration.ssh_config,
@@ -769,7 +795,16 @@ async def _create_fleet(
                     instance_num=i,
                     host=host,
                 )
-                fleet_model.instances.append(instances_model)
+                events.emit(
+                    session,
+                    (
+                        "Instance created on fleet submission."
+                        f" Status: {format_instance_status_for_event(instance_model)}"
+                    ),
+                    actor=events.UserActor.from_user(user),
+                    targets=[events.Target.from_model(instance_model)],
+                )
+                fleet_model.instances.append(instance_model)
         else:
             for i in range(_get_fleet_nodes_to_provision(spec)):
                 instance_model = create_fleet_instance_model(
@@ -779,20 +814,27 @@ async def _create_fleet(
                     spec=spec,
                     instance_num=i,
                 )
+                events.emit(
+                    session,
+                    (
+                        "Instance created on fleet submission."
+                        f" Status: {format_instance_status_for_event(instance_model)}"
+                    ),
+                    # Set `SystemActor` for consistency with other places where cloud instances can be
+                    # created (fleet spec consolidation, job provisioning, etc). Think of the fleet as being
+                    # created by the user, while the cloud instance is created by the system to satisfy the
+                    # fleet spec.
+                    actor=events.SystemActor(),
+                    targets=[events.Target.from_model(instance_model)],
+                )
                 fleet_model.instances.append(instance_model)
-        for instance_model in fleet_model.instances:
-            events.emit(
-                session,
-                f"Instance created on fleet submission. Status: {instance_model.status.upper()}",
-                actor=events.SystemActor(),
-                targets=[events.Target.from_model(instance_model)],
-            )
         await session.commit()
         return fleet_model_to_fleet(fleet_model)
 
 
 async def _update_fleet(
     session: AsyncSession,
+    user: UserModel,
     project: ProjectModel,
     spec: FleetSpec,
     current_resource: Optional[Fleet],
@@ -859,6 +901,15 @@ async def _update_fleet(
                     env=spec.configuration.env,
                     instance_num=instance_num,
                     host=host,
+                )
+                events.emit(
+                    session,
+                    (
+                        "Instance created on fleet update."
+                        f" Status: {format_instance_status_for_event(instance_model)}"
+                    ),
+                    actor=events.UserActor.from_user(user),
+                    targets=[events.Target.from_model(instance_model)],
                 )
                 fleet_model.instances.append(instance_model)
                 active_instance_nums.add(instance_num)

@@ -4,9 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunSpec
 from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.services import events
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
+    switch_job_status,
 )
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import create_job_model_for_new_submission, logger
@@ -35,8 +37,9 @@ async def retry_run_replica_jobs(
                 # No need to resubmit, skip
                 continue
             # The job is not finished, but we have to retry all jobs. Terminate it
-            job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = "Replica is to be retried"
+            switch_job_status(session, job_model, JobStatus.TERMINATING)
 
         new_job_model = create_job_model_for_new_submission(
             run_model=run_model,
@@ -46,6 +49,12 @@ async def retry_run_replica_jobs(
         # dirty hack to avoid passing all job submissions
         new_job_model.submission_num = job_model.submission_num + 1
         session.add(new_job_model)
+        events.emit(
+            session,
+            f"Job created when re-running replica. Status: {new_job_model.status.upper()}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(new_job_model)],
+        )
 
 
 def is_replica_registered(jobs: list[JobModel]) -> bool:
@@ -133,3 +142,9 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
                     status=JobStatus.SUBMITTED,
                 )
                 session.add(job_model)
+                events.emit(
+                    session,
+                    f"Job created on new replica submission. Status: {job_model.status.upper()}",
+                    actor=events.SystemActor(),
+                    targets=[events.Target.from_model(job_model)],
+                )
