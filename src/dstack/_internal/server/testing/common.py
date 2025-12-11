@@ -690,7 +690,7 @@ async def create_instance(
     instance_id: Optional[UUID] = None,
     job: Optional[JobModel] = None,
     instance_num: int = 0,
-    backend: BackendType = BackendType.DATACRUNCH,
+    backend: BackendType = BackendType.VERDA,
     termination_policy: Optional[TerminationPolicy] = None,
     termination_idle_time: int = DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     region: str = "eu-west",

@@ -9,7 +9,7 @@ class BackendType(str, enum.Enum):
         AZURE (BackendType): Microsoft Azure
         CLOUDRIFT (BackendType): CloudRift
         CUDO (BackendType): Cudo
-        DATACRUNCH (BackendType): DataCrunch
+        DATACRUNCH (BackendType): DataCrunch (for backward compatibility)
         DIGITALOCEAN (BackendType): DigitalOcean
         DSTACK (BackendType): dstack Sky
         GCP (BackendType): Google Cloud Platform
@@ -21,6 +21,7 @@ class BackendType(str, enum.Enum):
         RUNPOD (BackendType): Runpod Cloud
         TENSORDOCK (BackendType): TensorDock Marketplace
         VASTAI (BackendType): Vast.ai Marketplace
+        VERDA (BackendType): Verda Cloud
         VULTR (BackendType): Vultr
     """
 
@@ -29,7 +30,7 @@ class BackendType(str, enum.Enum):
     AZURE = "azure"
     CLOUDRIFT = "cloudrift"
     CUDO = "cudo"
-    DATACRUNCH = "datacrunch"
+    DATACRUNCH = "datacrunch"  # BackendType for backward compatibility
     DIGITALOCEAN = "digitalocean"
     DSTACK = "dstack"
     GCP = "gcp"
@@ -43,4 +44,5 @@ class BackendType(str, enum.Enum):
     RUNPOD = "runpod"
     TENSORDOCK = "tensordock"
     VASTAI = "vastai"
+    VERDA = "verda"
     VULTR = "vultr"

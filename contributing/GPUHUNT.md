@@ -65,7 +65,7 @@ Some providers offer extreme flexibility in possible configurations, but not all
 - Filters out if: outdated family, not supported family
 - Queries configuration details to fill CPU, RAM, and GPU information
 
-### DataCrunch
+### Verda
 
 - Just queries all offers via API
 

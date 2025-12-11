@@ -258,18 +258,18 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         type:
             required: true
 
-##### `projects[n].backends[type=datacrunch]` { #datacrunch data-toc-label="datacrunch" }
+##### `projects[n].backends[type=verda]` { #verda data-toc-label="verda" }
 
-#SCHEMA# dstack._internal.core.backends.datacrunch.models.DataCrunchBackendConfigWithCreds
+#SCHEMA# dstack._internal.core.backends.verda.models.VerdaBackendConfigWithCreds
     overrides:
         show_root_heading: false
         type:
             required: true
-        item_id_prefix: datacrunch-
+        item_id_prefix: verda-
 
-###### `projects[n].backends[type=datacrunch].creds` { #datacrunch-creds data-toc-label="creds" }
+###### `projects[n].backends[type=verda].creds` { #verda-creds data-toc-label="creds" }
 
-#SCHEMA# dstack._internal.core.backends.datacrunch.models.DataCrunchAPIKeyCreds
+#SCHEMA# dstack._internal.core.backends.verda.models.VerdaAPIKeyCreds
     overrides:
         show_root_heading: false
         type:

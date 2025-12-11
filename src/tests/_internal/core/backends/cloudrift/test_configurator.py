@@ -12,7 +12,7 @@ from dstack._internal.core.backends.cloudrift.models import (
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 
-class TestDataCrunchConfigurator:
+class TestCloudRiftConfigurator:
     def test_validate_config_valid(self):
         config = CloudRiftBackendConfigWithCreds(creds=CloudRiftCreds(api_key="valid"))
         with patch(

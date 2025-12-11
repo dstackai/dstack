@@ -553,7 +553,7 @@ class TestTerminate:
     @contextmanager
     def mock_terminate_in_backend(error: Optional[Exception] = None):
         backend = Mock()
-        backend.TYPE = BackendType.DATACRUNCH
+        backend.TYPE = BackendType.VERDA
         terminate_instance = backend.compute.return_value.terminate_instance
         if error is not None:
             terminate_instance.side_effect = error
