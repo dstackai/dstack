@@ -59,6 +59,13 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+def format_instance_status_for_event(instance_model: InstanceModel) -> str:
+    msg = instance_model.status.upper()
+    if instance_model.total_blocks is not None:
+        msg += f" ({instance_model.busy_blocks}/{instance_model.total_blocks} blocks busy)"
+    return msg
+
+
 async def get_instance_health_checks(
     session: AsyncSession,
     project: ProjectModel,

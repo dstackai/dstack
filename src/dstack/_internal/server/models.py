@@ -373,6 +373,7 @@ class RunModel(BaseModel):
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    # NOTE: `status` must be changed only via `switch_run_status()`
     status: Mapped[RunStatus] = mapped_column(EnumAsString(RunStatus, 100), index=True)
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
         EnumAsString(RunTerminationReason, 100)
@@ -424,6 +425,7 @@ class JobModel(BaseModel):
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    # NOTE: `status` must be changed only via `switch_job_status()`
     status: Mapped[JobStatus] = mapped_column(EnumAsString(JobStatus, 100), index=True)
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
         EnumAsString(JobTerminationReason, 100)
@@ -564,6 +566,7 @@ class FleetModel(BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
+    # NOTE: `status` must be changed only via `switch_fleet_status()`
     status: Mapped[FleetStatus] = mapped_column(EnumAsString(FleetStatus, 100), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 

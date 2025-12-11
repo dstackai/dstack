@@ -57,6 +57,7 @@ from dstack._internal.server.services.jobs import (
     job_model_to_job_submission,
     remove_job_spec_sensitive_info,
     stop_runner,
+    switch_job_status,
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
@@ -82,6 +83,29 @@ JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
 }
+
+
+def switch_run_status(
+    session: AsyncSession,
+    run_model: RunModel,
+    new_status: RunStatus,
+    actor: events.AnyActor = events.SystemActor(),
+):
+    """
+    Switch run status.
+    """
+    old_status = run_model.status
+    if old_status == new_status:
+        return
+
+    run_model.status = new_status
+
+    msg = f"Run status changed {old_status.upper()} -> {new_status.upper()}"
+    if new_status == RunStatus.TERMINATING:
+        if run_model.termination_reason is None:
+            raise ValueError("termination_reason must be set when switching to TERMINATING status")
+        msg += f". Termination reason: {run_model.termination_reason.upper()}"
+    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(run_model)])
 
 
 async def list_user_runs(
@@ -449,7 +473,9 @@ async def submit_run(
                 project=project,
             )
         else:
-            await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
+            await delete_runs(
+                session=session, user=user, project=project, runs_names=[run_spec.run_name]
+            )
 
         await _validate_run(
             session=session,
@@ -510,6 +536,10 @@ async def submit_run(
                 events.emit(
                     session,
                     f"Job created on run submission. Status: {job_model.status.upper()}",
+                    # Set `SystemActor` for consistency with all other places where jobs can be
+                    # created (retry, scaling, rolling deployments, etc). Think of the run as being
+                    # created by the user, while the job is created by the system to satisfy the
+                    # run spec.
                     actor=events.SystemActor(),
                     targets=[
                         events.Target.from_model(job_model),
@@ -527,6 +557,11 @@ def create_job_model_for_new_submission(
     job: Job,
     status: JobStatus,
 ) -> JobModel:
+    """
+    Create a new job.
+
+    **NOTE**: don't forget to emit an event when writing the new job to the database.
+    """
     now = common_utils.get_current_datetime()
     return JobModel(
         id=uuid.uuid4(),
@@ -551,6 +586,7 @@ def create_job_model_for_new_submission(
 
 async def stop_runs(
     session: AsyncSession,
+    user: UserModel,
     project: ProjectModel,
     runs_names: List[str],
     abort: bool,
@@ -582,11 +618,13 @@ async def stop_runs(
         for run_model in run_models:
             if run_model.status.is_finished():
                 continue
-            run_model.status = RunStatus.TERMINATING
             if abort:
                 run_model.termination_reason = RunTerminationReason.ABORTED_BY_USER
             else:
                 run_model.termination_reason = RunTerminationReason.STOPPED_BY_USER
+            switch_run_status(
+                session, run_model, RunStatus.TERMINATING, actor=events.UserActor.from_user(user)
+            )
             run_model.last_processed_at = now
             # The run will be terminated by process_runs.
             # Terminating synchronously is problematic since it may take a long time.
@@ -595,6 +633,7 @@ async def stop_runs(
 
 async def delete_runs(
     session: AsyncSession,
+    user: UserModel,
     project: ProjectModel,
     runs_names: List[str],
 ):
@@ -620,14 +659,15 @@ async def delete_runs(
             raise ServerClientError(
                 msg=f"Cannot delete active runs: {[r.run_name for r in active_runs]}"
             )
-        await session.execute(
-            update(RunModel)
-            .where(
-                RunModel.project_id == project.id,
-                RunModel.run_name.in_(runs_names),
-            )
-            .values(deleted=True)
-        )
+        for run_model in run_models:
+            if not run_model.deleted:
+                run_model.deleted = True
+                events.emit(
+                    session,
+                    "Run deleted",
+                    actor=events.UserActor.from_user(user),
+                    targets=[events.Target.from_model(run_model)],
+                )
         await session.commit()
 
 
@@ -910,8 +950,8 @@ async def process_terminating_run(session: AsyncSession, run_model: RunModel):
             # Send a signal to stop the job gracefully
             await stop_runner(session, job_model)
             delay_job_instance_termination(job_model)
-        job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = job_termination_reason
+        switch_job_status(session, job_model, JobStatus.TERMINATING)
         job_model.last_processed_at = common_utils.get_current_datetime()
 
     if unfinished_jobs_count == 0:
@@ -926,18 +966,11 @@ async def process_terminating_run(session: AsyncSession, run_model: RunModel):
             not in [RunTerminationReason.ABORTED_BY_USER, RunTerminationReason.STOPPED_BY_USER]
         ):
             run_model.next_triggered_at = _get_next_triggered_at(run.run_spec)
-            run_model.status = RunStatus.PENDING
+            switch_run_status(session, run_model, RunStatus.PENDING)
             # Unassign run from fleet so that the new fleet can be chosen on the next submission
             run_model.fleet = None
         else:
-            run_model.status = run_model.termination_reason.to_status()
-
-        logger.info(
-            "%s: run status has changed TERMINATING -> %s, reason: %s",
-            fmt(run_model),
-            run_model.status.name,
-            run_model.termination_reason.name,
-        )
+            switch_run_status(session, run_model, run_model.termination_reason.to_status())
 
 
 def is_job_ready(probes: Iterable[ProbeModel], probe_specs: Iterable[ProbeSpec]) -> bool:

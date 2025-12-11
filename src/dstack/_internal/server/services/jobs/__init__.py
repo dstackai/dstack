@@ -41,9 +41,12 @@ from dstack._internal.server.models import (
     RunModel,
     VolumeModel,
 )
-from dstack._internal.server.services import services
+from dstack._internal.server.services import events, services
 from dstack._internal.server.services import volumes as volumes_services
-from dstack._internal.server.services.instances import get_instance_ssh_private_keys
+from dstack._internal.server.services.instances import (
+    format_instance_status_for_event,
+    get_instance_ssh_private_keys,
+)
 from dstack._internal.server.services.jobs.configurators.base import (
     JobConfigurator,
     interpolate_job_volumes,
@@ -64,6 +67,34 @@ from dstack._internal.utils.common import get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def switch_job_status(
+    session: AsyncSession,
+    job_model: JobModel,
+    new_status: JobStatus,
+    actor: events.AnyActor = events.SystemActor(),
+):
+    """
+    Switch job status.
+
+    **NOTE**: When switching to `TERMINATING`, set `termination_reason` and preferably
+              `termination_reason_message` before calling this function.
+    """
+    old_status = job_model.status
+    if old_status == new_status:
+        return
+
+    job_model.status = new_status
+
+    msg = f"Job status changed {old_status.upper()} -> {new_status.upper()}"
+    if new_status == JobStatus.TERMINATING:
+        if job_model.termination_reason is None:
+            raise ValueError("termination_reason must be set when switching to TERMINATING status")
+        msg += f". Termination reason: {job_model.termination_reason.upper()}"
+        if job_model.termination_reason_message:
+            msg += f" ({job_model.termination_reason_message})"
+    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(job_model)])
 
 
 async def get_jobs_from_run_spec(
@@ -277,7 +308,7 @@ async def process_terminating_job(
     if instance_model is None:
         # Possible if the job hasn't been assigned an instance yet
         await services.unregister_replica(session, job_model)
-        _set_job_termination_status(job_model)
+        _set_job_termination_status(session, job_model)
         return
 
     all_volumes_detached: bool = True
@@ -339,6 +370,19 @@ async def process_terminating_job(
     job_model.instance_id = None
     instance_model.last_job_processed_at = common.get_current_datetime()
 
+    events.emit(
+        session,
+        (
+            "Job unassigned from instance."
+            f" Instance status: {format_instance_status_for_event(instance_model)}"
+        ),
+        actor=events.SystemActor(),
+        targets=[
+            events.Target.from_model(job_model),
+            events.Target.from_model(instance_model),
+        ],
+    )
+
     volume_names = (
         jrd.volume_names
         if jrd and jrd.volume_names
@@ -351,16 +395,10 @@ async def process_terminating_job(
         for volume in volumes:
             volume.last_job_processed_at = common.get_current_datetime()
 
-    logger.info(
-        "%s: instance '%s' has been released, new status is %s",
-        fmt(job_model),
-        instance_model.name,
-        instance_model.status.name,
-    )
     await services.unregister_replica(session, job_model)
     if all_volumes_detached:
         # Do not terminate while some volumes are not detached.
-        _set_job_termination_status(job_model)
+        _set_job_termination_status(session, job_model)
 
 
 async def process_volumes_detaching(
@@ -395,22 +433,15 @@ async def process_volumes_detaching(
         # Do not terminate the job while some volumes are not detached.
         # If force detach never succeeds, the job will be stuck terminating.
         # The job releases the instance when soft detaching, so the instance won't be stuck.
-        _set_job_termination_status(job_model)
+        _set_job_termination_status(session, job_model)
 
 
-def _set_job_termination_status(job_model: JobModel):
+def _set_job_termination_status(session: AsyncSession, job_model: JobModel):
     if job_model.termination_reason is not None:
-        job_model.status = job_model.termination_reason.to_status()
-        termination_reason_name = job_model.termination_reason.name
+        status = job_model.termination_reason.to_status()
     else:
-        job_model.status = JobStatus.FAILED
-        termination_reason_name = None
-    logger.info(
-        "%s: job status is %s, reason: %s",
-        fmt(job_model),
-        job_model.status.name,
-        termination_reason_name,
-    )
+        status = JobStatus.FAILED
+    switch_job_status(session, job_model, status)
 
 
 async def stop_container(
