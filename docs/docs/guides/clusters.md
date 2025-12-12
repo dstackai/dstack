@@ -29,9 +29,7 @@ For cloud fleets, fast interconnect is currently supported only on the `aws`, `g
 
     !!! info "Backend configuration"    
         You may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
-        Refer to the [A4](../../examples/clusters/a4/index.md),
-        [A3 Mega](../../examples/clusters/a3mega/index.md), and 
-        [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
+        Refer to the [GCP](../../examples/clusters/gcp/index.md) examples for more details.
 
 === "Nebius"
     When you create a cloud fleet with Nebius, [InfiniBand](https://docs.nebius.com/compute/clusters/gpu) networking is automatically configured if it’s supported for the corresponding instance type.
