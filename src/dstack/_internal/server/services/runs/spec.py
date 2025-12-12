@@ -50,6 +50,7 @@ _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS = {
         "env",
         "shell",
         "commands",
+        "replica_groups",
     ],
 }
 

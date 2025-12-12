@@ -612,6 +612,11 @@ class ConfigurationWithCommandsParams(CoreModel):
 
     @root_validator
     def check_image_or_commands_present(cls, values):
+        # If replica_groups is present, skip validation - commands come from replica groups
+        replica_groups = values.get("replica_groups")
+        if replica_groups:
+            return values
+
         if not values.get("commands") and not values.get("image"):
             raise ValueError("Either `commands` or `image` must be set")
         return values
@@ -714,6 +719,85 @@ class ServiceConfigurationParamsConfig(CoreConfig):
         )
 
 
+class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
+    name: Annotated[
+        str,
+        Field(description="The name of the replica group"),
+    ]
+    replicas: Annotated[
+        Range[int],
+        Field(
+            description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
+            "If it's a range, the `scaling` property is required"
+        ),
+    ]
+    scaling: Annotated[
+        Optional[ScalingSpec],
+        Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
+    ] = None
+    probes: Annotated[
+        list[ProbeConfig],
+        Field(description="List of probes used to determine job health for this replica group"),
+    ] = []
+    rate_limits: Annotated[
+        list[RateLimit],
+        Field(description="Rate limiting rules for this replica group"),
+    ] = []
+    # TODO: Extract to ConfigurationWithResourcesParams mixin
+    resources: Annotated[
+        ResourcesSpec,
+        Field(description="The resources requirements for replicas in this group"),
+    ] = ResourcesSpec()
+
+    @validator("replicas")
+    def convert_replicas(cls, v: Range[int]) -> Range[int]:
+        if v.max is None:
+            raise ValueError("The maximum number of replicas is required")
+        if v.min is None:
+            v.min = 0
+        if v.min < 0:
+            raise ValueError("The minimum number of replicas must be greater than or equal to 0")
+        return v
+
+    @root_validator()
+    def override_commands_validation(cls, values):
+        """
+        Override parent validator from ConfigurationWithCommandsParams.
+        ReplicaGroup always requires commands (no image option).
+        """
+        commands = values.get("commands", [])
+        if not commands:
+            raise ValueError("`commands` must be set for replica groups")
+        return values
+
+    @root_validator()
+    def validate_scaling(cls, values):
+        scaling = values.get("scaling")
+        replicas = values.get("replicas")
+        if replicas and replicas.min != replicas.max and not scaling:
+            raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
+        if replicas and replicas.min == replicas.max and scaling:
+            raise ValueError("To use `scaling`, `replicas` must be set to a range.")
+        return values
+
+    @validator("rate_limits")
+    def validate_rate_limits(cls, v: list[RateLimit]) -> list[RateLimit]:
+        counts = Counter(limit.prefix for limit in v)
+        duplicates = [prefix for prefix, count in counts.items() if count > 1]
+        if duplicates:
+            raise ValueError(
+                f"Prefixes {duplicates} are used more than once."
+                " Each rate limit should have a unique path prefix"
+            )
+        return v
+
+    @validator("probes")
+    def validate_probes(cls, v: list[ProbeConfig]) -> list[ProbeConfig]:
+        if has_duplicates(v):
+            raise ValueError("Probes must be unique")
+        return v
+
+
 class ServiceConfigurationParams(CoreModel):
     port: Annotated[
         # NOTE: it's a PortMapping for historical reasons. Only `port.container_port` is used.
@@ -771,6 +855,19 @@ class ServiceConfigurationParams(CoreModel):
         Field(description="List of probes used to determine job health"),
     ] = []
 
+    replica_groups: Annotated[
+        Optional[List[ReplicaGroup]],
+        Field(
+            description=(
+                "List of replica groups. Each group defines replicas with shared configuration "
+                "(commands, port, resources, scaling, probes, rate_limits). "
+                "When specified, the top-level `replicas`, `commands`, `port`, `resources`, "
+                "`scaling`, `probes`, and `rate_limits` are ignored. "
+                "Each replica group must have a unique name."
+            )
+        ),
+    ] = None
+
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
         if isinstance(v, int):
@@ -807,12 +904,54 @@ class ServiceConfigurationParams(CoreModel):
 
     @root_validator()
     def validate_scaling(cls, values):
+        replica_groups = values.get("replica_groups")
+        # If replica_groups are set, we don't need to validate scaling.
+        # Each replica group has its own scaling.
+        if replica_groups:
+            return values
+
         scaling = values.get("scaling")
         replicas = values.get("replicas")
         if replicas and replicas.min != replicas.max and not scaling:
             raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
         if replicas and replicas.min == replicas.max and scaling:
             raise ValueError("To use `scaling`, `replicas` must be set to a range.")
+        return values
+
+    @root_validator()
+    def normalize_to_replica_groups(cls, values):
+        replica_groups = values.get("replica_groups")
+        if replica_groups:
+            return values
+
+        # TEMP: prove we’re here and see the inputs
+        print(
+            "[normalize_to_replica_groups]",
+            "commands:",
+            values.get("commands"),
+            "replicas:",
+            values.get("replicas"),
+            "resources:",
+            values.get("resources"),
+            "scaling:",
+            values.get("scaling"),
+            "probes:",
+            values.get("probes"),
+            "rate_limits:",
+            values.get("rate_limits"),
+        )
+        # If replica_groups is not set, we need to normalize the configuration to replica groups.
+        values["replica_groups"] = [
+            ReplicaGroup(
+                name="default",
+                replicas=values.get("replicas"),
+                commands=values.get("commands"),
+                resources=values.get("resources"),
+                scaling=values.get("scaling"),
+                probes=values.get("probes"),
+                rate_limits=values.get("rate_limits"),
+            )
+        ]
         return values
 
     @validator("rate_limits")
@@ -834,6 +973,24 @@ class ServiceConfigurationParams(CoreModel):
             # Because of the bug, our gen_schema_reference.py fails to determine the type of
             # ServiceConfiguration.probes and insert the correct hyperlink.
             raise ValueError("Probes must be unique")
+        return v
+
+    @validator("replica_groups")
+    def validate_replica_groups(
+        cls, v: Optional[List[ReplicaGroup]]
+    ) -> Optional[List[ReplicaGroup]]:
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("`replica_groups` cannot be an empty list")
+        # Check for duplicate names
+        names = [group.name for group in v]
+        if len(names) != len(set(names)):
+            duplicates = [name for name in set(names) if names.count(name) > 1]
+            raise ValueError(
+                f"Duplicate replica group names found: {duplicates}. "
+                "Each replica group must have a unique name."
+            )
         return v
 
 

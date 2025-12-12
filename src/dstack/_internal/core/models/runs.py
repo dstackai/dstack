@@ -253,6 +253,7 @@ class JobSpec(CoreModel):
     job_num: int
     job_name: str
     jobs_per_replica: int = 1  # default value for backward compatibility
+    replica_group: Optional[str] = "default"
     app_specs: Optional[List[AppSpec]]
     user: Optional[UnixUser] = None  # default value for backward compatibility
     commands: List[str]

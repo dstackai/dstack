@@ -281,16 +281,38 @@ def _format_job_name(
     show_deployment_num: bool,
     show_replica: bool,
     show_job: bool,
+    group_index: Optional[int] = None,
+    last_shown_group_index: Optional[int] = None,
 ) -> str:
     name_parts = []
+    prefix = ""
     if show_replica:
-        name_parts.append(f"replica={job.job_spec.replica_num}")
+        # Show group information if replica groups are used
+        if group_index is not None:
+            # Show group=X replica=Y when group changes, or just replica=Y when same group
+            if group_index != last_shown_group_index:
+                # First job in group: use 3 spaces indent
+                prefix = "   "
+                name_parts.append(f"group={group_index} replica={job.job_spec.replica_num}")
+            else:
+                # Subsequent job in same group: align "replica=" with first job's "replica="
+                # Calculate padding: width of "   group={last_shown_group_index} "
+                padding_width = 3 + len(f"group={last_shown_group_index}") + 1
+                prefix = " " * padding_width
+                name_parts.append(f"replica={job.job_spec.replica_num}")
+        else:
+            # Legacy behavior: no replica groups
+            prefix = "   "
+            name_parts.append(f"replica={job.job_spec.replica_num}")
+    else:
+        prefix = "   "
+
     if show_job:
         name_parts.append(f"job={job.job_spec.job_num}")
     name_suffix = (
         f" deployment={latest_job_submission.deployment_num}" if show_deployment_num else ""
     )
-    name_value = "  " + (" ".join(name_parts) if name_parts else "")
+    name_value = prefix + (" ".join(name_parts) if name_parts else "")
     name_value += name_suffix
     return name_value
 
@@ -359,6 +381,14 @@ def get_runs_table(
         )
         merge_job_rows = len(run.jobs) == 1 and not show_deployment_num
 
+        # Replica Group Changes: Build mapping from replica group names to indices
+        group_name_to_index: Dict[str, int] = {}
+        # Replica Group Changes: Check if replica_groups attribute exists (only available for ServiceConfiguration)
+        replica_groups = getattr(run.run_spec.configuration, "replica_groups", None)
+        if replica_groups:
+            for idx, group in enumerate(replica_groups):
+                group_name_to_index[group.name] = idx
+
         run_row: Dict[Union[str, int], Any] = {
             "NAME": _format_run_name(run, show_deployment_num),
             "SUBMITTED": format_date(run.submitted_at),
@@ -372,13 +402,35 @@ def get_runs_table(
         if not merge_job_rows:
             add_row_from_dict(table, run_row)
 
-        for job in run.jobs:
+        # Sort jobs by group index first, then by replica_num within each group
+        def get_job_sort_key(job: Job) -> tuple:
+            group_index = None
+            if group_name_to_index and job.job_spec.replica_group:
+                group_index = group_name_to_index.get(job.job_spec.replica_group)
+            # Use a large number for jobs without groups to put them at the end
+            return (group_index if group_index is not None else 999999, job.job_spec.replica_num)
+
+        sorted_jobs = sorted(run.jobs, key=get_job_sort_key)
+
+        last_shown_group_index: Optional[int] = None
+        for job in sorted_jobs:
             latest_job_submission = job.job_submissions[-1]
             status_formatted = _format_job_submission_status(latest_job_submission, verbose)
 
+            # Get group index for this job
+            group_index: Optional[int] = None
+            if group_name_to_index and job.job_spec.replica_group:
+                group_index = group_name_to_index.get(job.job_spec.replica_group)
+
             job_row: Dict[Union[str, int], Any] = {
                 "NAME": _format_job_name(
-                    job, latest_job_submission, show_deployment_num, show_replica, show_job
+                    job,
+                    latest_job_submission,
+                    show_deployment_num,
+                    show_replica,
+                    show_job,
+                    group_index=group_index,
+                    last_shown_group_index=last_shown_group_index,
                 ),
                 "STATUS": status_formatted,
                 "PROBES": _format_job_probes(
@@ -390,6 +442,9 @@ def get_runs_table(
                 "GPU": "-",
                 "PRICE": "-",
             }
+            # Update last shown group index for next iteration
+            if group_index is not None:
+                last_shown_group_index = group_index
             jpd = latest_job_submission.job_provisioning_data
             if jpd is not None:
                 shared_offer: Optional[InstanceOfferWithAvailability] = None

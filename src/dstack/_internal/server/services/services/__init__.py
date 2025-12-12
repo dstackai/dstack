@@ -2,6 +2,7 @@
 Application logic related to `type: service` runs.
 """
 
+import json
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -299,13 +300,39 @@ async def update_service_desired_replica_count(
     configuration: ServiceConfiguration,
     last_scaled_at: Optional[datetime],
 ) -> None:
-    scaler = get_service_scaler(configuration)
     stats = None
     if run_model.gateway_id is not None:
         conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
         stats = await conn.get_stats(run_model.project.name, run_model.run_name)
-    run_model.desired_replica_count = scaler.get_desired_count(
-        current_desired_count=run_model.desired_replica_count,
-        stats=stats,
-        last_scaled_at=last_scaled_at,
-    )
+    if configuration.replica_groups:
+        desired_replica_counts = {}
+        total = 0
+        prev_counts = (
+            json.loads(run_model.desired_replica_counts)
+            if run_model.desired_replica_counts
+            else {}
+        )
+        for group in configuration.replica_groups:
+            # temp group_wise config to get the group_wise desired replica count.
+            group_config = configuration.copy(
+                exclude={"replica_groups"},
+                update={"replicas": group.replicas, "scaling": group.scaling},
+            )
+            scaler = get_service_scaler(group_config)
+            group_desired = scaler.get_desired_count(
+                current_desired_count=prev_counts.get(group.name, group.replicas.min or 0),
+                stats=stats,
+                last_scaled_at=last_scaled_at,
+            )
+            desired_replica_counts[group.name] = group_desired
+            total += group_desired
+        run_model.desired_replica_counts = json.dumps(desired_replica_counts)
+        run_model.desired_replica_count = total
+    else:
+        # Todo Not required as single replica is normalized to replica_groups.
+        scaler = get_service_scaler(configuration)
+        run_model.desired_replica_count = scaler.get_desired_count(
+            current_desired_count=run_model.desired_replica_count,
+            stats=stats,
+            last_scaled_at=last_scaled_at,
+        )
