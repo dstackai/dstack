@@ -383,7 +383,7 @@ Use a distributed task that runs NCCL tests to validate cluster network bandwidt
         The source code of the task can be found at [examples/clusters/gcp/a3mega-nccl-tests.dstack.yml](https://github.com/dstackai/dstack/blob/master/examples/clusters/gcp/a3mega-nccl-tests.dstack.yml).
 
 === "A3 High/Edge"
-    > To fully use GPUDirect-TCPX, properly set the required [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl).
+    > To fully use GPUDirect-TCPX, properly set the required [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl). Since we use a ready-to-use Docker image, these environment variables are already preconfigured.
     
     Pass the configuration to `dstack apply`:
 
@@ -417,3 +417,9 @@ Use a distributed task that runs NCCL tests to validate cluster network bandwidt
 
     !!! info "Source code"
         The source code of the task can be found at [examples/clusters/gcp/a3high-nccl-tests.dstack.yml](https://github.com/dstackai/dstack/blob/master/examples/clusters/gcp/a3high-nccl-tests.dstack.yml).
+
+## What's new
+
+1. Learn about [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), [services](https://dstack.ai/docs/concepts/services)
+2. Read the [Clusters](https://dstack.ai/docs/guides/clusters) guide
+3. Check GCP's docs on using [A4](https://docs.cloud.google.com/compute/docs/gpus/create-gpu-vm-a3u-a4), and [A3 Mega/High/Edge](https://docs.cloud.google.com/compute/docs/gpus/gpudirect) instances
