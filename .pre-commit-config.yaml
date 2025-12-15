@@ -30,3 +30,4 @@ repos:
         entry: bash -c "cd frontend && npm install && npm run pre-commit"
         language: system
         pass_filenames: false
+        files: ^frontend/
