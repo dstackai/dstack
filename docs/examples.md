@@ -140,6 +140,16 @@ hide:
             Set up AWS EFA clusters with optimized networking
         </p>
     </a>
+    <a href="/examples/clusters/crusoe"
+       class="feature-cell sky">
+        <h3>
+            Crusoe
+        </h3>
+
+        <p>
+            Set up Crusoe clusters with optimized networking
+        </p>
+    </a>
 </div>
 
 ## Inference

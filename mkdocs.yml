@@ -326,6 +326,7 @@ nav:
         - GCP A3 Mega: examples/clusters/a3mega/index.md
         - GCP A3 High: examples/clusters/a3high/index.md
         - AWS EFA: examples/clusters/efa/index.md
+        - Crusoe: examples/clusters/crusoe/index.md
     - Inference:
         - SGLang: examples/inference/sglang/index.md
         - vLLM: examples/inference/vllm/index.md
