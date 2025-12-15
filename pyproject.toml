@@ -82,6 +82,7 @@ ignore-case = true
 dstack-plugin-server = { path = "examples/plugins/example_plugin_server", editable = true }
 
 [tool.pyright]
+typeCheckingMode = "standard"
 include = [
     "src/dstack/plugins",
     "src/dstack/_internal/server",
@@ -118,11 +119,11 @@ dev = [
     "pillow; python_version >= '3.11'",
     "cairosvg; python_version >= '3.11'",
     "mkdocs-material>=9.7.0; python_version >= '3.11'",
-    "mkdocs-material[imaging]; python_version >= '3.11'", 
+    "mkdocs-material[imaging]; python_version >= '3.11'",
     "mkdocs-material-extensions; python_version >= '3.11'",
     "mkdocs-redirects; python_version >= '3.11'",
     "mkdocs-gen-files; python_version >= '3.11'",
-    "mkdocstrings[python]; python_version >= '3.11'", 
+    "mkdocstrings[python]; python_version >= '3.11'",
     "mkdocs-render-swagger-plugin; python_version >= '3.11'",
     "mkdocs-llmstxt-md; python_version >= '3.11'"
 ]
