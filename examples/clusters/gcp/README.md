@@ -307,7 +307,9 @@ Once you've configured the `gcp` backend, create the fleet configuration:
 
 Once the fleet is created, you can run distributed tasks, in addition to dev environments, services, and regular tasks.
 
-## Run NCCL tests
+## Run tasks
+
+### NCCL tests
 
 Use a distributed task that runs NCCL tests to validate cluster network bandwidth.
 
@@ -343,11 +345,9 @@ Use a distributed task that runs NCCL tests to validate cluster network bandwidt
 
     </div>
 
-    !!! info "Source code"
-        The source code of the task can be found at [examples/clusters/nccl-tests/.dstack.yml](https://github.com/dstackai/dstack/blob/master/examples/clusters/nccl-tests/.dstack.yml).
-
 === "A3 Mega"
-    > To fully use GPUDirect-TCPX0, properly set the required [NCCL environment variables]([NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl)).
+    !!! info "Source code"
+        The source code of the task can be found at [examples/clusters/gcp/a3mega-nccl-tests.dstack.yml](https://github.com/dstackai/dstack/blob/master/examples/clusters/gcp/a3mega-nccl-tests.dstack.yml).
 
     Pass the configuration to `dstack apply`:
 
@@ -379,11 +379,9 @@ Use a distributed task that runs NCCL tests to validate cluster network bandwidt
 
     </div>
 
-    !!! info "Source code"
-        The source code of the task can be found at [examples/clusters/gcp/a3mega-nccl-tests.dstack.yml](https://github.com/dstackai/dstack/blob/master/examples/clusters/gcp/a3mega-nccl-tests.dstack.yml).
-
 === "A3 High/Edge"
-    > To fully use GPUDirect-TCPX, properly set the required [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl). Since we use a ready-to-use Docker image, these environment variables are already preconfigured.
+    !!! info "Source code"
+        The source code of the task can be found at [examples/clusters/nccl-tests/.dstack.yml](https://github.com/dstackai/dstack/blob/master/examples/clusters/nccl-tests/.dstack.yml).
     
     Pass the configuration to `dstack apply`:
 
@@ -417,6 +415,66 @@ Use a distributed task that runs NCCL tests to validate cluster network bandwidt
 
     !!! info "Source code"
         The source code of the task can be found at [examples/clusters/gcp/a3high-nccl-tests.dstack.yml](https://github.com/dstackai/dstack/blob/master/examples/clusters/gcp/a3high-nccl-tests.dstack.yml).
+
+### Distributed training
+
+=== "A4"
+    You can use the standard [distributed task](https://dstack.ai/docs/concepts/tasks#distributed-tasks) example to run distributed training on A4 instances.
+
+=== "A3 Mega"
+    You can use the standard [distributed task](https://dstack.ai/docs/concepts/tasks#distributed-tasks) example to run distributed training on A3 Mega instances. To enable GPUDirect-TCPX, make sure the required [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl) are properly set, for example by adding the following commands at the beginning:
+
+    ```shell
+    # ...
+
+    commands: 
+    - | 
+      NCCL_LIB_DIR="/var/lib/tcpxo/lib64"
+      source ${NCCL_LIB_DIR}/nccl-env-profile-ll128.sh
+      export NCCL_FASTRAK_CTRL_DEV=enp0s12
+      export NCCL_FASTRAK_IFNAME=enp6s0,enp7s0,enp13s0,enp14s0,enp134s0,enp135s0,enp141s0,enp142s0
+      export NCCL_SOCKET_IFNAME=enp0s12
+      export NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY="/dev/aperture_devices"
+      export LD_LIBRARY_PATH="${NCCL_LIB_DIR}:${LD_LIBRARY_PATH}"
+    
+    # ...
+    ```
+
+=== "A3 High/Edge"
+    You can use the standard [distributed task](https://dstack.ai/docs/concepts/tasks#distributed-tasks) example to run distributed training on A3 High/Edge instances. To enable GPUDirect-TCPX0, make sure the required [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl) are properly set, for example by adding the following commands at the beginning:
+
+    ```shell
+    # ...
+
+    commands: 
+    - | 
+      export NCCL_DEBUG=INFO
+      NCCL_LIB_DIR="/usr/local/tcpx/lib64"
+      export LD_LIBRARY_PATH="${NCCL_LIB_DIR}:${LD_LIBRARY_PATH}"
+      export NCCL_SOCKET_IFNAME=eth0
+      export NCCL_CROSS_NIC=0
+      export NCCL_ALGO=Ring
+      export NCCL_PROTO=Simple
+      export NCCL_NSOCKS_PERTHREAD=4
+      export NCCL_SOCKET_NTHREADS=1
+      export NCCL_NET_GDR_LEVEL=PIX
+      export NCCL_P2P_PXN_LEVEL=0
+      export NCCL_GPUDIRECTTCPX_SOCKET_IFNAME=eth1,eth2,eth3,eth4
+      export NCCL_GPUDIRECTTCPX_CTRL_DEV=eth0
+      export NCCL_DYNAMIC_CHUNK_SIZE=524288
+      export NCCL_P2P_NET_CHUNKSIZE=524288
+      export NCCL_P2P_PCI_CHUNKSIZE=524288
+      export NCCL_P2P_NVL_CHUNKSIZE=1048576
+      export NCCL_BUFFSIZE=4194304
+      export NCCL_GPUDIRECTTCPX_TX_BINDINGS="eth1:8-21,112-125;eth2:8-21,112-125;eth3:60-73,164-177;eth4:60-73,164-177"
+      export NCCL_GPUDIRECTTCPX_RX_BINDINGS="eth1:22-35,126-139;eth2:22-35,126-139;eth3:74-87,178-191;eth4:74-87,178-191"
+      export NCCL_GPUDIRECTTCPX_PROGRAM_FLOW_STEERING_WAIT_MICROS=50000
+      export NCCL_GPUDIRECTTCPX_UNIX_CLIENT_PREFIX="/run/tcpx"
+    
+    # ...
+    ```
+
+In addition to distributed training, you can of course run regular tasks, dev environments, and services.
 
 ## What's new
 
