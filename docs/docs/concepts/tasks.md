@@ -144,7 +144,7 @@ Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
 
 !!! info "MPI"
     If want to use MPI, you can set `startup_order` to `workers-first` and `stop_criteria` to `master-done`, and use `DSTACK_MPI_HOSTFILE`.
-    See the [NCCL](../../examples/clusters/nccl-tests/index.md) or [RCCL](../../examples/clusters/rccl-tests/index.md) examples.
+    See the [NCCL/RCCL tests](../../examples/clusters/nccl-rccl-tests/index.md) examples.
 
 > For detailed examples, see [distributed training](../../examples.md#distributed-training) examples.
 
