@@ -18,11 +18,11 @@ projects:
 - name: main
     backends:
     - type: kubernetes
-        kubeconfig:
-            filename: ~/.kube/config
-        proxy_jump:
-            hostname: 204.12.171.137
-            port: 32000
+      kubeconfig:
+        filename: ~/.kube/config
+      proxy_jump:
+        hostname: 204.12.171.137
+        port: 32000
 ```
 
 </div>
