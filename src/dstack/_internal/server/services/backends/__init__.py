@@ -4,6 +4,7 @@ from collections.abc import Iterable, Iterator
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 from uuid import UUID
 
+from cachetools import TTLCache
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -187,8 +188,8 @@ async def delete_backends(
 BackendTuple = Tuple[BackendModel, Backend]
 
 
-_BACKENDS_CACHE_LOCKS = {}
-_BACKENDS_CACHE: Dict[UUID, Dict[BackendType, BackendTuple]] = {}
+_BACKENDS_CACHE_LOCKS: Dict[UUID, asyncio.Lock] = {}
+_BACKENDS_CACHE = TTLCache[UUID, Dict[BackendType, BackendTuple]](maxsize=1000, ttl=300)
 
 
 def _get_project_cache_lock(project_id: UUID) -> asyncio.Lock:
@@ -196,18 +197,16 @@ def _get_project_cache_lock(project_id: UUID) -> asyncio.Lock:
 
 
 async def get_project_backends_with_models(project: ProjectModel) -> List[BackendTuple]:
-    backends = []
     async with _get_project_cache_lock(project.id):
         key = project.id
-        project_backends_cache = _BACKENDS_CACHE.setdefault(key, {})
+        project_backends = _BACKENDS_CACHE.get(key, {})
         for backend_model in project.backends:
-            cached_backend = project_backends_cache.get(backend_model.type)
+            cached_backend = project_backends.get(backend_model.type)
             if (
                 cached_backend is not None
                 and cached_backend[0].config == backend_model.config
                 and cached_backend[0].auth == backend_model.auth
             ):
-                backends.append(cached_backend)
                 continue
             configurator = get_configurator(backend_model.type)
             if configurator is None:
@@ -231,9 +230,13 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
                     backend_model.type.value,
                 )
                 continue
-            backends.append((backend_model, backend))
-            _BACKENDS_CACHE[key][backend_model.type] = (backend_model, backend)
-    return backends
+            project_backends[backend_model.type] = (backend_model, backend)
+        # `__setitem__()` will also expire the cache.
+        # Note that there is no global cache lock so a race condition is possible:
+        # one coroutine updates/re-assigns backends expired by another coroutine.
+        # This is ok since the only effect is that project's cache gets restored.
+        _BACKENDS_CACHE[key] = project_backends
+    return list(project_backends.values())
 
 
 _get_project_backend_with_model_by_type = None
