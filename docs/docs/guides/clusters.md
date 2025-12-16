@@ -22,7 +22,7 @@ For cloud fleets, fast interconnect is currently supported only on the `aws`, `g
     
     !!! info "Backend configuration"    
         Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
-        Refer to the [EFA](../../examples/clusters/efa/index.md) example for more details.
+        Refer to the [AWS](../../examples/clusters/aws/index.md) example for more details.
 
 === "GCP"
     When you create a cloud fleet with GCP, `dstack` automatically configures [GPUDirect-TCPXO and GPUDirect-TCPX](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot) networking for the A3 Mega and A3 High instance types, as well as RoCE networking for the A4 instance type.

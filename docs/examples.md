@@ -113,7 +113,7 @@ hide:
     <a href="/examples/clusters/efa"
        class="feature-cell sky">
         <h3>
-            AWS EFA
+            AWS
         </h3>
 
         <p>

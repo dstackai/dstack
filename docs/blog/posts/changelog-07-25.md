@@ -144,7 +144,7 @@ resources:
 
 #### AWS EFA
 
-EFA is a network interface for EC2 that enables low-latency, high-bandwidth communication between nodes—crucial for scaling distributed deep learning. With `dstack`, EFA is automatically enabled when using supported instance types in fleets. Check out our [example](../../examples/clusters/efa/index.md)
+EFA is a network interface for EC2 that enables low-latency, high-bandwidth communication between nodes—crucial for scaling distributed deep learning. With `dstack`, EFA is automatically enabled when using supported instance types in fleets. Check out our [example](../../examples/clusters/aws/index.md)
 
 #### Default Docker images
 
