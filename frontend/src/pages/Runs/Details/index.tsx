@@ -22,6 +22,7 @@ enum CodeTab {
     Details = 'details',
     Metrics = 'metrics',
     Logs = 'logs',
+    Events = 'events',
 }
 
 export const RunDetailsPage: React.FC = () => {
@@ -188,6 +189,11 @@ export const RunDetailsPage: React.FC = () => {
                                     label: 'Metrics',
                                     id: CodeTab.Metrics,
                                     href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.METRICS.FORMAT(paramProjectName, paramRunId),
+                                },
+                                {
+                                    label: 'Events',
+                                    id: CodeTab.Events,
+                                    href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.EVENTS.FORMAT(paramProjectName, paramRunId),
                                 },
                             ]}
                         />
