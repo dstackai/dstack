@@ -297,6 +297,7 @@ nav:
             - dstack attach: docs/reference/cli/dstack/attach.md
             - dstack logs: docs/reference/cli/dstack/logs.md
             - dstack metrics: docs/reference/cli/dstack/metrics.md
+            - dstack event: docs/reference/cli/dstack/event.md
             - dstack project: docs/reference/cli/dstack/project.md
             - dstack fleet: docs/reference/cli/dstack/fleet.md
             - dstack offer: docs/reference/cli/dstack/offer.md
