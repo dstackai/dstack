@@ -145,7 +145,6 @@ plugins:
         'docs/examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
         'providers.md': 'partners.md'
         'backends.md': 'partners.md'
-        'blog/ambassador-program.md': 'blog/archive/ambassador-program.md'
         'blog/monitoring-gpu-usage.md': 'blog/posts/dstack-metrics.md'
         'blog/inactive-dev-environments-auto-shutdown.md': 'blog/posts/inactivity-duration.md'
         'blog/data-centers-and-private-clouds.md': 'blog/posts/gpu-blocks-and-proxy-jump.md'
