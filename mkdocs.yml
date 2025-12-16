@@ -90,8 +90,7 @@ plugins:
           - examples/distributed-training/trl/index.md: TRL
           - examples/distributed-training/axolotl/index.md: Axolotl
           - examples/distributed-training/ray-ragen/index.md: Ray+RAGEN
-          - examples/clusters/nccl-tests/index.md: NCCL tests
-          - examples/clusters/rccl-tests/index.md: RCCL tests
+          - examples/clusters/nccl-rccl-tests/index.md: NCCL/RCCL tests
           - examples/inference/sglang/index.md: SGLang
           - examples/inference/vllm/index.md: vLLM
           - examples/inference/nim/index.md: NIM
@@ -153,11 +152,11 @@ plugins:
         'docs/concepts/metrics.md': 'docs/guides/metrics.md'
         'docs/guides/monitoring.md': 'docs/guides/metrics.md'
         'blog/nvidia-and-amd-on-vultr.md.md': 'blog/posts/nvidia-and-amd-on-vultr.md'
-        'examples/misc/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
+        'examples/misc/nccl-tests/index.md': 'examples/clusters/nccl-rccl-tests/index.md'
         'examples/misc/a3high-clusters/index.md': 'examples/clusters/gcp/index.md'
         'examples/misc/a3mega-clusters/index.md': 'examples/clusters/gcp/index.md'
-        'examples/distributed-training/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
-        'examples/distributed-training/rccl-tests/index.md': 'examples/clusters/rccl-tests/index.md'
+        'examples/distributed-training/nccl-tests/index.md': 'examples/clusters/nccl-rccl-tests/index.md'
+        'examples/distributed-training/rccl-tests/index.md': 'examples/clusters/nccl-rccl-tests/index.md'
         'examples/deployment/nim/index.md': 'examples/inference/nim/index.md'
         'examples/deployment/vllm/index.md': 'examples/inference/vllm/index.md'
         'examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
@@ -323,11 +322,10 @@ nav:
         - Axolotl: examples/distributed-training/axolotl/index.md
         - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
     - Clusters:
-        - NCCL tests: examples/clusters/nccl-tests/index.md
-        - RCCL tests: examples/clusters/rccl-tests/index.md
-        - GCP: examples/clusters/gcp/index.md
         - AWS: examples/clusters/aws/index.md
+        - GCP: examples/clusters/gcp/index.md
         - Crusoe: examples/clusters/crusoe/index.md
+        - NCCL/RCCL tests: examples/clusters/nccl-rccl-tests/index.md
     - Inference:
         - SGLang: examples/inference/sglang/index.md
         - vLLM: examples/inference/vllm/index.md
