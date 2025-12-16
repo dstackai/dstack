@@ -155,8 +155,8 @@ plugins:
         'docs/guides/monitoring.md': 'docs/guides/metrics.md'
         'blog/nvidia-and-amd-on-vultr.md.md': 'blog/posts/nvidia-and-amd-on-vultr.md'
         'examples/misc/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
-        'examples/misc/a3high-clusters/index.md': 'examples/clusters/a3high/index.md'
-        'examples/misc/a3mega-clusters/index.md': 'examples/clusters/a3mega/index.md'
+        'examples/misc/a3high-clusters/index.md': 'examples/clusters/gcp/index.md'
+        'examples/misc/a3mega-clusters/index.md': 'examples/clusters/gcp/index.md'
         'examples/distributed-training/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
         'examples/distributed-training/rccl-tests/index.md': 'examples/clusters/rccl-tests/index.md'
         'examples/deployment/nim/index.md': 'examples/inference/nim/index.md'
@@ -168,6 +168,9 @@ plugins:
         'examples/fine-tuning/axolotl/index.md': 'examples/single-node-training/axolotl/index.md'
         'blog/efa.md': 'examples/clusters/efa/index.md'
         'docs/concepts/repos.md': 'docs/concepts/dev-environments.md#repos'
+        'examples/clusters/a3high/index.md': 'examples/clusters/gcp/index.md'
+        'examples/clusters/a3mega/index.md': 'examples/clusters/gcp/index.md'
+        'examples/clusters/a4/index.md': 'examples/clusters/gcp/index.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -322,9 +325,7 @@ nav:
     - Clusters:
         - NCCL tests: examples/clusters/nccl-tests/index.md
         - RCCL tests: examples/clusters/rccl-tests/index.md
-        - GCP A4: examples/clusters/a4/index.md
-        - GCP A3 Mega: examples/clusters/a3mega/index.md
-        - GCP A3 High: examples/clusters/a3high/index.md
+        - GCP: examples/clusters/gcp/index.md
         - AWS EFA: examples/clusters/efa/index.md
         - Crusoe: examples/clusters/crusoe/index.md
     - Inference:

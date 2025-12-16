@@ -100,37 +100,17 @@ hide:
             Run multi-node RCCL tests with MPI
         </p>
     </a>
-    <a href="/examples/clusters/a4"
+    <a href="/examples/clusters/gcp"
        class="feature-cell sky">
         <h3>
-            GCP A4
+            GCP
         </h3>
 
         <p>
-            Set up GCP A4 clusters with optimized networking
+            Set up GCP A4 and A3 clusters with optimized networking
         </p>
     </a>
-    <a href="/examples/clusters/a3mega"
-       class="feature-cell sky">
-        <h3>
-            GCP A3 Mega
-        </h3>
-
-        <p>
-            Set up GCP A3 Mega clusters with optimized networking
-        </p>
-    </a>
-    <a href="/examples/clusters/a3high"
-       class="feature-cell sky">
-        <h3>
-            GCP A3 High
-        </h3>
-
-        <p>
-            Set up GCP A3 High clusters with optimized networking
-        </p>
-    </a>
-        <a href="/examples/clusters/efa"
+    <a href="/examples/clusters/efa"
        class="feature-cell sky">
         <h3>
             AWS EFA
