@@ -189,7 +189,7 @@ BackendTuple = Tuple[BackendModel, Backend]
 
 
 _BACKENDS_CACHE_LOCKS: Dict[UUID, asyncio.Lock] = {}
-_BACKENDS_CACHE = TTLCache[UUID, Dict[BackendType, BackendTuple]](maxsize=1000, ttl=600)
+_BACKENDS_CACHE = TTLCache[UUID, Dict[BackendType, BackendTuple]](maxsize=1000, ttl=300)
 
 
 def _get_project_cache_lock(project_id: UUID) -> asyncio.Lock:
