@@ -1,3 +1,7 @@
+---
+title: Distributed workload orchestration on Crusoe with dstack
+---
+
 # Crusoe
 
 Crusoe offers two ways to use clusters with fast interconnect:
