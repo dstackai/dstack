@@ -370,6 +370,11 @@ class KubernetesCompute(
         # TODO: By default EKS creates a Classic Load Balancer for Load Balancer services.
         # Consider deploying an NLB. It seems it requires some extra configuration on the cluster:
         # https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
+        if configuration.instance_type is not None:
+            raise ComputeError(
+                "The `kubernetes` backend does not support the `instance_type`"
+                " gateway configuration property"
+            )
         instance_name = generate_unique_gateway_instance_name(configuration)
         commands = _get_gateway_commands(
             authorized_keys=[configuration.ssh_key_pub], router=configuration.router

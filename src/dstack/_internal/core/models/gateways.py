@@ -51,6 +51,16 @@ class GatewayConfiguration(CoreModel):
     default: Annotated[bool, Field(description="Make the gateway default")] = False
     backend: Annotated[BackendType, Field(description="The gateway backend")]
     region: Annotated[str, Field(description="The gateway region")]
+    instance_type: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "Backend-specific instance type to use for the gateway instance."
+                " Omit to use the backend's default, which is typically a small non-GPU instance"
+            ),
+            min_length=1,
+        ),
+    ] = None
     router: Annotated[
         Optional[AnyRouterConfig],
         Field(description="The router configuration"),
@@ -115,6 +125,7 @@ class GatewayComputeConfiguration(CoreModel):
     instance_name: str
     backend: BackendType
     region: str
+    instance_type: Optional[str] = None
     public_ip: bool
     ssh_key_pub: str
     certificate: Optional[AnyGatewayCertificate] = None

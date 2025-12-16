@@ -104,6 +104,7 @@ async def create_gateway_compute(
         instance_name=configuration.name,
         backend=configuration.backend,
         region=configuration.region,
+        instance_type=configuration.instance_type,
         public_ip=configuration.public_ip,
         ssh_key_pub=gateway_ssh_public_key,
         certificate=configuration.certificate,
