@@ -88,6 +88,7 @@ RESERVATION_PATTERN = re.compile(
 )
 RESOURCE_NAME_PATTERN = re.compile(r"[a-z0-9-]+")
 TPU_VERSIONS = [tpu.name for tpu in KNOWN_TPUS]
+DEFAULT_GATEWAY_INSTANCE_TYPE = "e2-medium"
 
 
 class GCPOfferBackendData(CoreModel):
@@ -596,7 +597,7 @@ class GCPCompute(
         request.instance_resource = gcp_resources.create_instance_struct(
             disk_size=10,
             image_id=_get_gateway_image_id(),
-            machine_type="e2-medium",
+            machine_type=configuration.instance_type or DEFAULT_GATEWAY_INSTANCE_TYPE,
             accelerators=[],
             spot=False,
             user_data=get_gateway_user_data(
@@ -612,8 +613,14 @@ class GCPCompute(
             subnetwork=subnetwork,
             allocate_public_ip=configuration.public_ip,
         )
-        operation = self.instances_client.insert(request=request)
-        gcp_resources.wait_for_extended_operation(operation, "instance creation")
+        try:
+            operation = self.instances_client.insert(request=request)
+            gcp_resources.wait_for_extended_operation(operation, "instance creation")
+        except (
+            google.api_core.exceptions.ServiceUnavailable,
+            google.api_core.exceptions.ClientError,
+        ) as e:
+            raise ComputeError(f"GCP error: {e.message}")
         instance = self.instances_client.get(
             project=self.config.project_id, zone=zone, instance=instance_name
         )

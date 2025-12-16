@@ -56,6 +56,27 @@ You can create gateways with the `aws`, `azure`, `gcp`, or `kubernetes` backends
     Gateways in `kubernetes` backend require an external load balancer. Managed Kubernetes solutions usually include a load balancer.
     For self-hosted Kubernetes, you must provide a load balancer by yourself.
 
+### Instance type
+
+By default, `dstack` provisions a small, low-cost instance for the gateway. If you expect to run high-traffic services, you can configure a larger instance type using the `instance_type` property.
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: example-gateway
+
+backend: aws
+region: eu-west-1
+
+# (Optional) Override the gateway instance type
+instance_type: t3.large
+
+domain: example.com
+```
+
+</div>
+
 ### Router
 
 By default, the gateway uses its own load balancer to route traffic between replicas. However, you can delegate this responsibility to a specific router by setting the `router` property. Currently, the only supported external router is `sglang`.

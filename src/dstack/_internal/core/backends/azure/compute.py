@@ -79,6 +79,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 # OS disks can be 1GB-4095GB, dstack images are 30GB
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.parse("4095GB"))
+DEFAULT_GATEWAY_INSTANCE_TYPE = "Standard_B1ms"
 
 
 class AzureCompute(
@@ -230,6 +231,13 @@ class AzureCompute(
         self,
         configuration: GatewayComputeConfiguration,
     ) -> GatewayProvisioningData:
+        if configuration.instance_type is not None:
+            # TODO: support instance_type. Requires selecting a VM image to avoid errors like this:
+            # > The selected VM size 'Standard_E4s_v6' cannot boot Hypervisor Generation '1'
+            raise ComputeError(
+                "The `azure` backend does not support the `instance_type`"
+                " gateway configuration property"
+            )
         logger.info(
             "Launching %s gateway instance in %s...",
             configuration.instance_name,
@@ -275,7 +283,7 @@ class AzureCompute(
             managed_identity_name=None,
             managed_identity_resource_group=None,
             image_reference=_get_gateway_image_ref(),
-            vm_size="Standard_B1ms",
+            vm_size=DEFAULT_GATEWAY_INSTANCE_TYPE,
             instance_name=instance_name,
             user_data=get_gateway_user_data(
                 configuration.ssh_key_pub, router=configuration.router
