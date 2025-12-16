@@ -1,8 +1,0 @@
-type: fleet
-name: cluster-fleet
-
-nodes: 2
-placement: cluster
-
-resources:
-  gpu: MI300X:8

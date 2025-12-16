@@ -80,26 +80,6 @@ hide:
 ## Clusters
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/clusters/nccl-tests"
-       class="feature-cell sky">
-        <h3>
-            NCCL tests
-        </h3>
-
-        <p>
-            Run multi-node NCCL tests with MPI
-        </p>
-    </a>
-    <a href="/examples/clusters/rccl-tests"
-       class="feature-cell sky">
-        <h3>
-            RCCL tests
-        </h3>
-
-        <p>
-            Run multi-node RCCL tests with MPI
-        </p>
-    </a>
     <a href="/examples/clusters/gcp"
        class="feature-cell sky">
         <h3>
@@ -128,6 +108,16 @@ hide:
 
         <p>
             Set up Crusoe clusters with optimized networking
+        </p>
+    </a>
+    <a href="/examples/clusters/nccl-rccl-tests"
+       class="feature-cell sky">
+        <h3>
+            NCCL/RCCL tests
+        </h3>
+
+        <p>
+            Run multi-node NCCL tests with MPI
         </p>
     </a>
 </div>
