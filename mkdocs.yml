@@ -171,6 +171,7 @@ plugins:
         'examples/clusters/a3high/index.md': 'examples/clusters/gcp/index.md'
         'examples/clusters/a3mega/index.md': 'examples/clusters/gcp/index.md'
         'examples/clusters/a4/index.md': 'examples/clusters/gcp/index.md'
+        'examples/clusters/efa/index.md': 'examples/clusters/aws/index.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
