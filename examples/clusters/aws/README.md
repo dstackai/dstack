@@ -1,4 +1,4 @@
-# AWS EFA
+# AWS
 
 In this guide, we’ll walk through how to run high-performance distributed training on AWS using [Amazon Elastic Fabric Adapter (EFA)](https://aws.amazon.com/hpc/efa/) with `dstack`.
 
@@ -37,11 +37,11 @@ projects:
 
 Once your backend is ready, define a fleet configuration.
 
-<div editor-title="examples/clusters/efa/fleet.dstack.yml">
+<div editor-title="examples/clusters/aws/efa-fleet.dstack.yml">
     
     ```yaml
     type: fleet
-    name: my-efa-fleet
+    name: efa-fleet
     
     nodes: 2
     placement: cluster
@@ -57,14 +57,14 @@ Provision the fleet with `dstack apply`:
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/clusters/efa/fleet.dstack.yml
+$ dstack apply -f examples/clusters/aws/efa-fleet.dstack.yml
 
 Provisioning...
 ---> 100%
 
- FLEET         INSTANCE  BACKEND          INSTANCE TYPE  GPU          PRICE   STATUS  CREATED 
- my-efa-fleet  0         aws (us-west-2)  p4d.24xlarge   H100:8:80GB  $98.32  idle    3 mins ago      
-               1         aws (us-west-2)  p4d.24xlarge   H100:8:80GB  $98.32  idle    3 mins ago    
+ FLEET      INSTANCE  BACKEND          INSTANCE TYPE  GPU          PRICE   STATUS  CREATED 
+ efa-fleet  0         aws (us-west-2)  p4d.24xlarge   H100:8:80GB  $98.32  idle    3 mins ago      
+            1         aws (us-west-2)  p4d.24xlarge   H100:8:80GB  $98.32  idle    3 mins ago    
 ```
 
 </div>
@@ -76,7 +76,7 @@ Provisioning...
 
     ```yaml
     type: fleet
-    name: my-efa-fleet
+    name: efa-fleet
     
     nodes: 2
     placement: cluster
