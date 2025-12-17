@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-type RunnerManager struct {
+type ShimManager struct {
 	path    string
 	version string
 	status  ComponentStatus
@@ -14,8 +14,8 @@ type RunnerManager struct {
 	mu *sync.RWMutex
 }
 
-func NewRunnerManager(ctx context.Context, pth string) (*RunnerManager, error) {
-	m := RunnerManager{
+func NewShimManager(ctx context.Context, pth string) (*ShimManager, error) {
+	m := ShimManager{
 		path: pth,
 		mu:   &sync.RWMutex{},
 	}
@@ -23,21 +23,21 @@ func NewRunnerManager(ctx context.Context, pth string) (*RunnerManager, error) {
 	return &m, err
 }
 
-func (m *RunnerManager) GetInfo(ctx context.Context) ComponentInfo {
+func (m *ShimManager) GetInfo(ctx context.Context) ComponentInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return ComponentInfo{
-		Name:    ComponentNameRunner,
+		Name:    ComponentNameShim,
 		Version: m.version,
 		Status:  m.status,
 	}
 }
 
-func (m *RunnerManager) Install(ctx context.Context, url string, force bool) error {
+func (m *ShimManager) Install(ctx context.Context, url string, force bool) error {
 	m.mu.Lock()
 	if m.status == ComponentStatusInstalling {
 		m.mu.Unlock()
-		return fmt.Errorf("install %s: already installing", ComponentNameRunner)
+		return fmt.Errorf("install %s: already installing", ComponentNameShim)
 	}
 	m.status = ComponentStatusInstalling
 	m.version = ""
@@ -52,10 +52,10 @@ func (m *RunnerManager) Install(ctx context.Context, url string, force bool) err
 	return checkErr
 }
 
-func (m *RunnerManager) check(ctx context.Context) (err error) {
+func (m *ShimManager) check(ctx context.Context) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.status, m.version, err = checkDstackComponent(ctx, ComponentNameRunner, m.path)
+	m.status, m.version, err = checkDstackComponent(ctx, ComponentNameShim, m.path)
 	return err
 }

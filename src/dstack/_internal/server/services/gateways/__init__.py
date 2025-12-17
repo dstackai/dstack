@@ -412,7 +412,7 @@ async def init_gateways(session: AsyncSession):
         if settings.SKIP_GATEWAY_UPDATE:
             logger.debug("Skipping gateways update due to DSTACK_SKIP_GATEWAY_UPDATE env variable")
         else:
-            build = get_dstack_runner_version()
+            build = get_dstack_runner_version() or "latest"
 
             for gateway_compute, res in await gather_map_async(
                 gateway_computes,

@@ -8,7 +8,11 @@ from typing import Any, Dict, Generator, List, Optional
 import paramiko
 from gpuhunt import AcceleratorVendor, correct_gpu_memory_gib
 
-from dstack._internal.core.backends.base.compute import GoArchType, normalize_arch
+from dstack._internal.core.backends.base.compute import (
+    DSTACK_SHIM_RESTART_INTERVAL_SECONDS,
+    GoArchType,
+    normalize_arch,
+)
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 
 # FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
@@ -116,16 +120,23 @@ def run_pre_start_commands(
 def run_shim_as_systemd_service(
     client: paramiko.SSHClient, binary_path: str, working_dir: str, dev: bool
 ) -> None:
+    # Stop restart attempts after ≈ 1 hour
+    start_limit_interval_seconds = 3600
+    start_limit_burst = int(
+        start_limit_interval_seconds / DSTACK_SHIM_RESTART_INTERVAL_SECONDS * 0.9
+    )
     shim_service = dedent(f"""\
         [Unit]
         Description=dstack-shim
         After=network-online.target
+        StartLimitIntervalSec={start_limit_interval_seconds}
+        StartLimitBurst={start_limit_burst}
 
         [Service]
         Type=simple
         User=root
         Restart=always
-        RestartSec=10
+        RestartSec={DSTACK_SHIM_RESTART_INTERVAL_SECONDS}
         WorkingDirectory={working_dir}
         EnvironmentFile={working_dir}/{DSTACK_SHIM_ENV_FILE}
         ExecStart={binary_path}

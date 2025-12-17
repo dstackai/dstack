@@ -99,7 +99,7 @@ class TestShimClientNegotiate(BaseShimClientTest):
 
         client._negotiate()
 
-        assert client._shim_version == expected_shim_version
+        assert client._shim_version_tuple == expected_shim_version
         assert client._api_version == expected_api_version
         assert adapter.call_count == 1
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
@@ -129,7 +129,7 @@ class TestShimClientV1(BaseShimClientTest):
         assert adapter.call_count == 1
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
         # healthcheck() method also performs negotiation to save API calls
-        assert client._shim_version == (0, 18, 30)
+        assert client._shim_version_tuple == (0, 18, 30)
         assert client._api_version == 1
 
     def test_submit(self, client: ShimClient, adapter: requests_mock.Adapter):
@@ -262,8 +262,93 @@ class TestShimClientV2(BaseShimClientTest):
         assert adapter.call_count == 1
         self.assert_request(adapter, 0, "GET", "/api/healthcheck")
         # healthcheck() method also performs negotiation to save API calls
-        assert client._shim_version == (0, 18, 40)
+        assert client._shim_version_tuple == (0, 18, 40)
         assert client._api_version == 2
+
+    def test_is_safe_to_restart_false_old_shim(
+        self, client: ShimClient, adapter: requests_mock.Adapter
+    ):
+        adapter.register_uri(
+            "GET",
+            "/api/tasks",
+            json={
+                # pre-0.19.26 shim returns ids instead of tasks
+                "tasks": None,
+                "ids": [],
+            },
+        )
+
+        res = client.is_safe_to_restart()
+
+        assert res is False
+        assert adapter.call_count == 2
+        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
+        self.assert_request(adapter, 1, "GET", "/api/tasks")
+
+    @pytest.mark.parametrize(
+        "task_status",
+        [
+            TaskStatus.PENDING,
+            TaskStatus.PREPARING,
+            TaskStatus.PULLING,
+            TaskStatus.CREATING,
+            TaskStatus.RUNNING,
+        ],
+    )
+    def test_is_safe_to_restart_false_status_not_safe(
+        self, client: ShimClient, adapter: requests_mock.Adapter, task_status: TaskStatus
+    ):
+        adapter.register_uri(
+            "GET",
+            "/api/tasks",
+            json={
+                "tasks": [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "status": "terminated",
+                    },
+                    {
+                        "id": str(uuid.uuid4()),
+                        "status": task_status.value,
+                    },
+                ],
+                "ids": None,
+            },
+        )
+
+        res = client.is_safe_to_restart()
+
+        assert res is False
+        assert adapter.call_count == 2
+        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
+        self.assert_request(adapter, 1, "GET", "/api/tasks")
+
+    def test_is_safe_to_restart_true(self, client: ShimClient, adapter: requests_mock.Adapter):
+        adapter.register_uri(
+            "GET",
+            "/api/tasks",
+            json={
+                "tasks": [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "status": "terminated",
+                    },
+                    {
+                        "id": str(uuid.uuid4()),
+                        # TODO: replace with "running" once it's safe
+                        "status": "terminated",
+                    },
+                ],
+                "ids": None,
+            },
+        )
+
+        res = client.is_safe_to_restart()
+
+        assert res is True
+        assert adapter.call_count == 2
+        self.assert_request(adapter, 0, "GET", "/api/healthcheck")
+        self.assert_request(adapter, 1, "GET", "/api/tasks")
 
     def test_get_task(self, client: ShimClient, adapter: requests_mock.Adapter):
         task_id = "d35b6e24-b556-4d6e-81e3-5982d2c34449"

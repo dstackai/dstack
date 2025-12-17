@@ -7,9 +7,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
@@ -84,4 +87,30 @@ func downloadFile(ctx context.Context, url string, path string, mode os.FileMode
 	}
 
 	return nil
+}
+
+func checkDstackComponent(ctx context.Context, name ComponentName, pth string) (status ComponentStatus, version string, err error) {
+	exists, err := common.PathExists(pth)
+	if err != nil {
+		return ComponentStatusError, "", fmt.Errorf("check %s: %w", name, err)
+	}
+	if !exists {
+		return ComponentStatusNotInstalled, "", nil
+	}
+
+	cmd := exec.CommandContext(ctx, pth, "--version")
+	output, err := cmd.Output()
+	if err != nil {
+		return ComponentStatusError, "", fmt.Errorf("check %s: %w", name, err)
+	}
+
+	rawVersion := string(output) // dstack-{shim,runner} version 0.19.38
+	versionFields := strings.Fields(rawVersion)
+	if len(versionFields) != 3 {
+		return ComponentStatusError, "", fmt.Errorf("check %s: unexpected version output: %s", name, rawVersion)
+	}
+	if versionFields[0] != string(name) {
+		return ComponentStatusError, "", fmt.Errorf("check %s: unexpected component name: %s", name, versionFields[0])
+	}
+	return ComponentStatusInstalled, versionFields[2], nil
 }
