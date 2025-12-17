@@ -23,6 +23,7 @@ from dstack._internal.core.backends.models import (
     AnyBackendConfigWithoutCreds,
 )
 from dstack._internal.core.errors import (
+    BackendAuthError,
     BackendError,
     BackendInvalidCredentialsError,
     BackendNotAvailable,
@@ -224,7 +225,7 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
             try:
                 backend_record = get_stored_backend_record(backend_model)
                 backend = await run_async(configurator.get_backend, backend_record)
-            except BackendInvalidCredentialsError:
+            except (BackendInvalidCredentialsError, BackendAuthError):
                 logger.warning(
                     "Credentials for %s backend are invalid. Backend will be ignored.",
                     backend_model.type.value,
