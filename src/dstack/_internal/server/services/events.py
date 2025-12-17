@@ -171,14 +171,9 @@ def emit(session: AsyncSession, message: str, actor: AnyActor, targets: list[Tar
     """
     if not targets:
         raise ValueError("At least one target must be specified")
+    message = message.strip().rstrip(".").replace("\n", " ")
     if not message:
         raise ValueError("Message cannot be empty")
-    if message.strip() != message:
-        raise ValueError("Message cannot have leading or trailing whitespace")
-    if "\n" in message:
-        raise ValueError("Message cannot contain newlines")
-    if message.endswith("."):
-        raise ValueError("Message cannot end with a period")
 
     logger.info(
         "Emitting event: %s. Event targets: %s. Actor: %s",
