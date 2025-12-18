@@ -1,10 +1,12 @@
 import uuid
+from collections.abc import Generator
 from http import HTTPStatus
 from typing import BinaryIO, Dict, List, Literal, Optional, TypeVar, Union, overload
 
 import packaging.version
 import requests
 import requests.exceptions
+from typing_extensions import Self
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.common import CoreModel, NetworkMode
@@ -28,9 +30,11 @@ from dstack._internal.server.schemas.runner import (
     MetricsResponse,
     PullResponse,
     ShimVolumeInfo,
+    ShutdownRequest,
     SubmitBody,
     TaskInfoResponse,
     TaskListResponse,
+    TaskStatus,
     TaskSubmitRequest,
     TaskTerminateRequest,
 )
@@ -143,7 +147,7 @@ class ShimError(DstackError):
     pass
 
 
-class ShimHTTPError(DstackError):
+class ShimHTTPError(ShimError):
     """
     An HTTP error wrapper for `requests.exceptions.HTTPError`. Should be used as follows:
 
@@ -185,6 +189,47 @@ class ShimAPIVersionError(ShimError):
     pass
 
 
+class ComponentList:
+    _items: dict[ComponentName, ComponentInfo]
+
+    def __init__(self) -> None:
+        self._items = {}
+
+    def __iter__(self) -> Generator[ComponentInfo, None, None]:
+        for component_info in self._items.values():
+            yield component_info
+
+    @classmethod
+    def from_response(cls, response: ComponentListResponse) -> Self:
+        components = cls()
+        for component_info in response.components:
+            try:
+                components.add(component_info)
+            except ValueError as e:
+                logger.warning("Error processing ComponentInfo: %s", e)
+        return components
+
+    @property
+    def runner(self) -> Optional[ComponentInfo]:
+        return self.get(ComponentName.RUNNER)
+
+    @property
+    def shim(self) -> Optional[ComponentInfo]:
+        return self.get(ComponentName.SHIM)
+
+    def get(self, name: ComponentName) -> Optional[ComponentInfo]:
+        return self._items.get(name)
+
+    def add(self, component_info: ComponentInfo) -> None:
+        try:
+            name = ComponentName(component_info.name)
+        except ValueError as e:
+            raise ValueError(f"Unknown component: {component_info.name}") from e
+        if name in self._items:
+            raise ValueError(f"Duplicate component: {component_info.name}")
+        self._items[name] = component_info
+
+
 class ShimClient:
     # API v2 (a.k.a. Future API) — `/api/tasks/[:id[/{terminate,remove}]]`
     # API v1 (a.k.a. Legacy API) — `/api/{submit,pull,stop}`
@@ -194,13 +239,15 @@ class ShimClient:
     _INSTANCE_HEALTH_MIN_SHIM_VERSION = (0, 19, 22)
 
     # `/api/components`
-    _COMPONENTS_RUNNER_MIN_SHIM_VERSION = (0, 19, 41)
+    _COMPONENTS_MIN_SHIM_VERSION = (0, 20, 0)
 
-    _shim_version: Optional["_Version"]
+    # `/api/shutdown`
+    _SHUTDOWN_MIN_SHIM_VERSION = (0, 20, 1)
+
+    _shim_version_string: str
+    _shim_version_tuple: Optional["_Version"]
     _api_version: int
     _negotiated: bool = False
-
-    _components: Optional[dict[ComponentName, ComponentInfo]] = None
 
     def __init__(
         self,
@@ -212,6 +259,16 @@ class ShimClient:
 
     # Methods shared by all API versions
 
+    def get_version_string(self) -> str:
+        if not self._negotiated:
+            self._negotiate()
+        return self._shim_version_string
+
+    def get_version_tuple(self) -> Optional["_Version"]:
+        if not self._negotiated:
+            self._negotiate()
+        return self._shim_version_tuple
+
     def is_api_v2_supported(self) -> bool:
         if not self._negotiated:
             self._negotiate()
@@ -221,16 +278,24 @@ class ShimClient:
         if not self._negotiated:
             self._negotiate()
         return (
-            self._shim_version is None
-            or self._shim_version >= self._INSTANCE_HEALTH_MIN_SHIM_VERSION
+            self._shim_version_tuple is None
+            or self._shim_version_tuple >= self._INSTANCE_HEALTH_MIN_SHIM_VERSION
         )
 
-    def is_runner_component_supported(self) -> bool:
+    def are_components_supported(self) -> bool:
         if not self._negotiated:
             self._negotiate()
         return (
-            self._shim_version is None
-            or self._shim_version >= self._COMPONENTS_RUNNER_MIN_SHIM_VERSION
+            self._shim_version_tuple is None
+            or self._shim_version_tuple >= self._COMPONENTS_MIN_SHIM_VERSION
+        )
+
+    def is_shutdown_supported(self) -> bool:
+        if not self._negotiated:
+            self._negotiate()
+        return (
+            self._shim_version_tuple is None
+            or self._shim_version_tuple >= self._SHUTDOWN_MIN_SHIM_VERSION
         )
 
     @overload
@@ -254,7 +319,7 @@ class ShimClient:
 
     def get_instance_health(self) -> Optional[InstanceHealthResponse]:
         if not self.is_instance_health_supported():
-            logger.debug("instance health is not supported: %s", self._shim_version)
+            logger.debug("instance health is not supported: %s", self._shim_version_string)
             return None
         resp = self._request("GET", "/api/instance/health")
         if resp.status_code == HTTPStatus.NOT_FOUND:
@@ -263,16 +328,48 @@ class ShimClient:
         self._raise_for_status(resp)
         return self._response(InstanceHealthResponse, resp)
 
-    def get_runner_info(self) -> Optional[ComponentInfo]:
-        if not self.is_runner_component_supported():
-            logger.debug("runner info is not supported: %s", self._shim_version)
+    def shutdown(self, *, force: bool) -> bool:
+        if not self.is_shutdown_supported():
+            logger.debug("shim shutdown is not supported: %s", self._shim_version_string)
+            return False
+        body = ShutdownRequest(force=force)
+        resp = self._request("POST", "/api/shutdown", body)
+        # TODO: Remove this check after 0.20.1 release, use _request(..., raise_for_status=True)
+        if resp.status_code == HTTPStatus.NOT_FOUND and self._shim_version_tuple is None:
+            # Old dev build of shim
+            logger.debug("shim shutdown is not supported: %s", self._shim_version_string)
+            return False
+        self._raise_for_status(resp)
+        return True
+
+    def is_safe_to_restart(self) -> bool:
+        if not self.is_api_v2_supported():
+            # old shim, `/api/shutdown` is not supported anyway
+            return False
+        task_list = self.list_tasks()
+        if (tasks := task_list.tasks) is None:
+            # old shim, `/api/shutdown` is not supported anyway
+            return False
+        restart_safe_task_statuses = self._get_restart_safe_task_statuses()
+        return all(t.status in restart_safe_task_statuses for t in tasks)
+
+    def get_components(self) -> Optional[ComponentList]:
+        if not self.are_components_supported():
+            logger.debug("components are not supported: %s", self._shim_version_string)
             return None
-        components = self._get_components()
-        return components.get(ComponentName.RUNNER)
+        resp = self._request("GET", "/api/components", raise_for_status=True)
+        return ComponentList.from_response(self._response(ComponentListResponse, resp))
 
     def install_runner(self, url: str) -> None:
         body = ComponentInstallRequest(
             name=ComponentName.RUNNER,
+            url=url,
+        )
+        self._request("POST", "/api/components/install", body, raise_for_status=True)
+
+    def install_shim(self, url: str) -> None:
+        body = ComponentInstallRequest(
+            name=ComponentName.SHIM,
             url=url,
         )
         self._request("POST", "/api/components/install", body, raise_for_status=True)
@@ -459,30 +556,23 @@ class ShimClient:
     def _negotiate(self, healthcheck_response: Optional[requests.Response] = None) -> None:
         if healthcheck_response is None:
             healthcheck_response = self._request("GET", "/api/healthcheck", raise_for_status=True)
-        raw_version = self._response(HealthcheckResponse, healthcheck_response).version
-        version = _parse_version(raw_version)
-        if version is None or version >= self._API_V2_MIN_SHIM_VERSION:
+        version_string = self._response(HealthcheckResponse, healthcheck_response).version
+        version_tuple = _parse_version(version_string)
+        if version_tuple is None or version_tuple >= self._API_V2_MIN_SHIM_VERSION:
             api_version = 2
         else:
             api_version = 1
-        logger.debug(
-            "shim version: %s %s (API v%s)",
-            raw_version,
-            version or "(latest)",
-            api_version,
-        )
-        self._shim_version = version
+        self._shim_version_string = version_string
+        self._shim_version_tuple = version_tuple
         self._api_version = api_version
         self._negotiated = True
 
-    def _get_components(self) -> dict[ComponentName, ComponentInfo]:
-        resp = self._request("GET", "/api/components")
-        # TODO: Remove this check after 0.19.41 release, use _request(..., raise_for_status=True)
-        if resp.status_code == HTTPStatus.NOT_FOUND and self._shim_version is None:
-            # Old dev build of shim
-            return {}
-        resp.raise_for_status()
-        return {c.name: c for c in self._response(ComponentListResponse, resp).components}
+    def _get_restart_safe_task_statuses(self) -> list[TaskStatus]:
+        # TODO: Rework shim's DockerRunner.Run() so that it does not wait for container termination
+        # (this at least requires replacing .waitContainer() with periodic polling of container
+        # statuses and moving some cleanup defer calls to .Terminate() and/or .Remove()) and add
+        # TaskStatus.RUNNING to the list of restart-safe task statuses for supported shim versions.
+        return [TaskStatus.TERMINATED]
 
 
 def healthcheck_response_to_instance_check(

@@ -51,6 +51,7 @@ from dstack._internal.utils.path import PathLike
 logger = get_logger(__name__)
 
 DSTACK_SHIM_BINARY_NAME = "dstack-shim"
+DSTACK_SHIM_RESTART_INTERVAL_SECONDS = 3
 DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
 DEFAULT_PRIVATE_SUBNETS = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
 NVIDIA_GPUS_REQUIRING_PROPRIETARY_KERNEL_MODULES = frozenset(
@@ -758,13 +759,35 @@ def get_shim_commands(
     return commands
 
 
-def get_dstack_runner_version() -> str:
-    if settings.DSTACK_VERSION is not None:
-        return settings.DSTACK_VERSION
-    version = os.environ.get("DSTACK_RUNNER_VERSION", None)
-    if version is None and settings.DSTACK_USE_LATEST_FROM_BRANCH:
-        version = get_latest_runner_build()
-    return version or "latest"
+def get_dstack_runner_version() -> Optional[str]:
+    if version := settings.DSTACK_VERSION:
+        return version
+    if version := settings.DSTACK_RUNNER_VERSION:
+        return version
+    if version_url := settings.DSTACK_RUNNER_VERSION_URL:
+        return _fetch_version(version_url)
+    if settings.DSTACK_USE_LATEST_FROM_BRANCH:
+        return get_latest_runner_build()
+    return None
+
+
+def get_dstack_shim_version() -> Optional[str]:
+    if version := settings.DSTACK_VERSION:
+        return version
+    if version := settings.DSTACK_SHIM_VERSION:
+        return version
+    if version := settings.DSTACK_RUNNER_VERSION:
+        logger.warning(
+            "DSTACK_SHIM_VERSION is not set, using DSTACK_RUNNER_VERSION."
+            " Future versions will not fall back to DSTACK_RUNNER_VERSION."
+            " Set DSTACK_SHIM_VERSION to supress this warning."
+        )
+        return version
+    if version_url := settings.DSTACK_SHIM_VERSION_URL:
+        return _fetch_version(version_url)
+    if settings.DSTACK_USE_LATEST_FROM_BRANCH:
+        return get_latest_runner_build()
+    return None
 
 
 def normalize_arch(arch: Optional[str] = None) -> GoArchType:
@@ -789,7 +812,7 @@ def normalize_arch(arch: Optional[str] = None) -> GoArchType:
 def get_dstack_runner_download_url(
     arch: Optional[str] = None, version: Optional[str] = None
 ) -> str:
-    url_template = os.environ.get("DSTACK_RUNNER_DOWNLOAD_URL")
+    url_template = settings.DSTACK_RUNNER_DOWNLOAD_URL
     if not url_template:
         if settings.DSTACK_VERSION is not None:
             bucket = "dstack-runner-downloads"
@@ -800,12 +823,12 @@ def get_dstack_runner_download_url(
             "/{version}/binaries/dstack-runner-linux-{arch}"
         )
     if version is None:
-        version = get_dstack_runner_version()
-    return url_template.format(version=version, arch=normalize_arch(arch).value)
+        version = get_dstack_runner_version() or "latest"
+    return _format_download_url(url_template, version, arch)
 
 
-def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
-    url_template = os.environ.get("DSTACK_SHIM_DOWNLOAD_URL")
+def get_dstack_shim_download_url(arch: Optional[str] = None, version: Optional[str] = None) -> str:
+    url_template = settings.DSTACK_SHIM_DOWNLOAD_URL
     if not url_template:
         if settings.DSTACK_VERSION is not None:
             bucket = "dstack-runner-downloads"
@@ -815,8 +838,9 @@ def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
             f"https://{bucket}.s3.eu-west-1.amazonaws.com"
             "/{version}/binaries/dstack-shim-linux-{arch}"
         )
-    version = get_dstack_runner_version()
-    return url_template.format(version=version, arch=normalize_arch(arch).value)
+    if version is None:
+        version = get_dstack_shim_version() or "latest"
+    return _format_download_url(url_template, version, arch)
 
 
 def get_setup_cloud_instance_commands(
@@ -878,8 +902,16 @@ def get_run_shim_script(
     dstack_shim_binary_path = get_dstack_shim_binary_path(bin_path)
     privileged_flag = "--privileged" if is_privileged else ""
     pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
+    # TODO: Use a proper process supervisor?
     return [
-        f"nohup {dstack_shim_binary_path} {privileged_flag} {pjrt_device_env} &",
+        f"""
+        nohup sh -c '
+            while true; do
+                {dstack_shim_binary_path} {privileged_flag} {pjrt_device_env}
+                sleep {DSTACK_SHIM_RESTART_INTERVAL_SECONDS}
+            done
+        ' &
+        """,
     ]
 
 
@@ -1022,9 +1054,7 @@ def get_dstack_gateway_wheel(build: str, router: Optional[AnyRouterConfig] = Non
     channel = "release" if settings.DSTACK_RELEASE else "stgn"
     base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
     if build == "latest":
-        r = requests.get(f"{base_url}/latest-version", timeout=5)
-        r.raise_for_status()
-        build = r.text.strip()
+        build = _fetch_version(f"{base_url}/latest-version") or "latest"
         logger.debug("Found the latest gateway build: %s", build)
     wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
     # Build package spec with extras if router is specified
@@ -1034,7 +1064,7 @@ def get_dstack_gateway_wheel(build: str, router: Optional[AnyRouterConfig] = Non
 
 
 def get_dstack_gateway_commands(router: Optional[AnyRouterConfig] = None) -> List[str]:
-    build = get_dstack_runner_version()
+    build = get_dstack_runner_version() or "latest"
     gateway_package = get_dstack_gateway_wheel(build, router)
     return [
         "mkdir -p /home/ubuntu/dstack",
@@ -1069,3 +1099,17 @@ def requires_nvidia_proprietary_kernel_modules(gpu_name: str) -> bool:
         instead of open kernel modules.
     """
     return gpu_name.lower() in NVIDIA_GPUS_REQUIRING_PROPRIETARY_KERNEL_MODULES
+
+
+def _fetch_version(url: str) -> Optional[str]:
+    r = requests.get(url, timeout=5)
+    r.raise_for_status()
+    version = r.text.strip()
+    if not version:
+        logger.warning("Empty version response from URL: %s", url)
+        return None
+    return version
+
+
+def _format_download_url(template: str, version: str, arch: Optional[str]) -> str:
+    return template.format(version=version, arch=normalize_arch(arch).value)

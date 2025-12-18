@@ -40,6 +40,11 @@ func mainInner() int {
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(defaultLogLevel))
 	log.DefaultEntry.Logger.SetOutput(os.Stderr)
 
+	shimBinaryPath, err := os.Executable()
+	if err != nil {
+		shimBinaryPath = consts.ShimBinaryPath
+	}
+
 	cmd := &cli.Command{
 		Name:    "dstack-shim",
 		Usage:   "Starts dstack-runner or docker container.",
@@ -53,6 +58,14 @@ func mainInner() int {
 				TakesFile:   true,
 				DefaultText: path.Join("~", consts.DstackDirPath),
 				Sources:     cli.EnvVars("DSTACK_SHIM_HOME"),
+			},
+			&cli.StringFlag{
+				Name:        "shim-binary-path",
+				Usage:       "Path to shim's binary",
+				Value:       shimBinaryPath,
+				Destination: &args.Shim.BinaryPath,
+				TakesFile:   true,
+				Sources:     cli.EnvVars("DSTACK_SHIM_BINARY_PATH"),
 			},
 			&cli.IntFlag{
 				Name:        "shim-http-port",
@@ -172,6 +185,7 @@ func mainInner() int {
 
 func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error) {
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(args.Shim.LogLevel))
+	log.Info(ctx, "Starting dstack-shim", "version", Version)
 
 	shimHomeDir := args.Shim.HomeDir
 	if shimHomeDir == "" {
@@ -210,6 +224,10 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 		}
 	} else if runnerErr != nil {
 		return runnerErr
+	}
+	shimManager, shimErr := components.NewShimManager(ctx, args.Shim.BinaryPath)
+	if shimErr != nil {
+		return shimErr
 	}
 
 	log.Debug(ctx, "Shim", "args", args.Shim)
@@ -259,7 +277,11 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 	}
 
 	address := fmt.Sprintf("localhost:%d", args.Shim.HTTPPort)
-	shimServer := api.NewShimServer(ctx, address, Version, dockerRunner, dcgmExporter, dcgmWrapper, runnerManager)
+	shimServer := api.NewShimServer(
+		ctx, address, Version,
+		dockerRunner, dcgmExporter, dcgmWrapper,
+		runnerManager, shimManager,
+	)
 
 	if serviceMode {
 		if err := shim.WriteHostInfo(shimHomeDir, dockerRunner.Resources(ctx)); err != nil {
@@ -278,6 +300,7 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 		if err := shimServer.Serve(); err != nil {
 			serveErrCh <- err
 		}
+		close(serveErrCh)
 	}()
 
 	select {
@@ -287,7 +310,7 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 
 	shutdownCtx, cancelShutdown := context.WithTimeout(ctx, 5*time.Second)
 	defer cancelShutdown()
-	shutdownErr := shimServer.Shutdown(shutdownCtx)
+	shutdownErr := shimServer.Shutdown(shutdownCtx, false)
 	if serveErr != nil {
 		return serveErr
 	}

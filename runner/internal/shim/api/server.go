@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/dstackai/dstack/runner/internal/api"
+	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/components"
 	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
@@ -26,8 +27,11 @@ type TaskRunner interface {
 }
 
 type ShimServer struct {
-	httpServer *http.Server
-	mu         sync.RWMutex
+	httpServer      *http.Server
+	mu              sync.RWMutex
+	ctx             context.Context
+	inShutdown      bool
+	inForceShutdown bool
 
 	bgJobsCtx    context.Context
 	bgJobsCancel context.CancelFunc
@@ -38,7 +42,8 @@ type ShimServer struct {
 	dcgmExporter *dcgm.DCGMExporter
 	dcgmWrapper  dcgm.DCGMWrapperInterface // interface with nil value normalized to plain nil
 
-	runnerManager *components.RunnerManager
+	runnerManager components.ComponentManager
+	shimManager   components.ComponentManager
 
 	version string
 }
@@ -46,7 +51,7 @@ type ShimServer struct {
 func NewShimServer(
 	ctx context.Context, address string, version string,
 	runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, dcgmWrapper dcgm.DCGMWrapperInterface,
-	runnerManager *components.RunnerManager,
+	runnerManager components.ComponentManager, shimManager components.ComponentManager,
 ) *ShimServer {
 	bgJobsCtx, bgJobsCancel := context.WithCancel(ctx)
 	if dcgmWrapper != nil && reflect.ValueOf(dcgmWrapper).IsNil() {
@@ -59,6 +64,7 @@ func NewShimServer(
 			Handler:     r,
 			BaseContext: func(l net.Listener) context.Context { return ctx },
 		},
+		ctx: ctx,
 
 		bgJobsCtx:    bgJobsCtx,
 		bgJobsCancel: bgJobsCancel,
@@ -70,12 +76,14 @@ func NewShimServer(
 		dcgmWrapper:  dcgmWrapper,
 
 		runnerManager: runnerManager,
+		shimManager:   shimManager,
 
 		version: version,
 	}
 
 	// The healthcheck endpoint should stay backward compatible, as it is used for negotiation
 	r.AddHandler("GET", "/api/healthcheck", s.HealthcheckHandler)
+	r.AddHandler("POST", "/api/shutdown", s.ShutdownHandler)
 	r.AddHandler("GET", "/api/instance/health", s.InstanceHealthHandler)
 	r.AddHandler("GET", "/api/components", s.ComponentListHandler)
 	r.AddHandler("POST", "/api/components/install", s.ComponentInstallHandler)
@@ -96,8 +104,26 @@ func (s *ShimServer) Serve() error {
 	return nil
 }
 
-func (s *ShimServer) Shutdown(ctx context.Context) error {
+func (s *ShimServer) Shutdown(ctx context.Context, force bool) error {
+	s.mu.Lock()
+
+	if s.inForceShutdown || s.inShutdown && !force {
+		log.Info(ctx, "Already shutting down, ignoring request")
+		s.mu.Unlock()
+		return nil
+	}
+
+	s.inShutdown = true
+	if force {
+		s.inForceShutdown = true
+	}
+	s.mu.Unlock()
+
+	log.Info(ctx, "Shutting down", "force", force)
 	s.bgJobsCancel()
+	if force {
+		return s.httpServer.Close()
+	}
 	err := s.httpServer.Shutdown(ctx)
 	s.bgJobsGroup.Wait()
 	return err

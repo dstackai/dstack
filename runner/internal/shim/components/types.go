@@ -1,8 +1,13 @@
 package components
 
+import "context"
+
 type ComponentName string
 
-const ComponentNameRunner ComponentName = "dstack-runner"
+const (
+	ComponentNameRunner ComponentName = "dstack-runner"
+	ComponentNameShim   ComponentName = "dstack-shim"
+)
 
 type ComponentStatus string
 
@@ -17,4 +22,9 @@ type ComponentInfo struct {
 	Name    ComponentName   `json:"name"`
 	Version string          `json:"version"`
 	Status  ComponentStatus `json:"status"`
+}
+
+type ComponentManager interface {
+	GetInfo(ctx context.Context) ComponentInfo
+	Install(ctx context.Context, url string, force bool) error
 }

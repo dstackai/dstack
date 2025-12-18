@@ -1,6 +1,7 @@
 import re
 from typing import Optional
 
+import gpuhunt
 import pytest
 
 from dstack._internal.core.backends.base.compute import (
@@ -62,11 +63,13 @@ class TestGenerateUniqueBackendName:
 
 
 class TestNormalizeArch:
-    @pytest.mark.parametrize("arch", [None, "", "X86", "x86_64", "AMD64"])
+    @pytest.mark.parametrize(
+        "arch", [None, "", "X86", "x86_64", "AMD64", gpuhunt.CPUArchitecture.X86]
+    )
     def test_amd64(self, arch: Optional[str]):
         assert normalize_arch(arch) is GoArchType.AMD64
 
-    @pytest.mark.parametrize("arch", ["arm", "ARM64", "AArch64"])
+    @pytest.mark.parametrize("arch", ["arm", "ARM64", "AArch64", gpuhunt.CPUArchitecture.ARM])
     def test_arm64(self, arch: str):
         assert normalize_arch(arch) is GoArchType.ARM64
 

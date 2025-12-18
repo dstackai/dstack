@@ -15,9 +15,10 @@ type DockerParameters interface {
 
 type CLIArgs struct {
 	Shim struct {
-		HTTPPort int
-		HomeDir  string
-		LogLevel int
+		HTTPPort   int
+		HomeDir    string
+		BinaryPath string
+		LogLevel   int
 	}
 
 	Runner struct {
