@@ -1,8 +1,8 @@
-"""instance.termination_reason_message
+"""Add instances.termination_reason_message
 
-Revision ID: a16a05249504
-Revises: 2498ab323443
-Create Date: 2025-10-13 15:29:56.691164
+Revision ID: c3de3e67c693
+Revises: 22d74df9897e
+Create Date: 2025-12-18 20:41:20.376056
 
 """
 
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "a16a05249504"
-down_revision = "2498ab323443"
+revision = "c3de3e67c693"
+down_revision = "22d74df9897e"
 branch_labels = None
 depends_on = None
 
