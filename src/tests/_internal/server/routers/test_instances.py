@@ -6,6 +6,7 @@ from itertools import count
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.instances import InstanceStatus
@@ -372,3 +373,24 @@ class TestGetInstanceHealthChecks:
                 {"collected_at": "2025-01-01T12:00:00+00:00", "status": "healthy", "events": []},
             ]
         }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+@pytest.mark.usefixtures("test_db")
+class TestCompatibility:
+    async def test_converts_legacy_termination_reason_string(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session)
+        project = await create_project(session, owner=user)
+        fleet = await create_fleet(session, project)
+        await create_instance(session=session, project=project, fleet=fleet)
+        await session.execute(
+            text("UPDATE instances SET termination_reason = 'Fleet has too many instances'")
+        )
+        resp = await client.post(
+            "/api/instances/list", headers=get_auth_headers(user.token), json={}
+        )
+        # Must convert legacy "Fleet has too many instances" to "max_instances_limit"
+        assert resp.json()[0]["termination_reason"] == "max_instances_limit"

@@ -393,7 +393,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     if (
                         job_model.instance is not None
                         and job_model.instance.termination_reason
-                        == InstanceTerminationReason.NO_BALANCE.value
+                        == InstanceTerminationReason.NO_BALANCE
                     ):
                         # if instance was terminated due to no balance, set job termination reason accodingly
                         job_model.termination_reason = JobTerminationReason.NO_BALANCE
