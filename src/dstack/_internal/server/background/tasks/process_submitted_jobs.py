@@ -349,7 +349,10 @@ async def _process_submitted_job(
                 job_model.termination_reason = (
                     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
                 )
-                job_model.termination_reason_message = "Failed to find fleet"
+                job_model.termination_reason_message = (
+                    "No fleet found. Create it before submitting a run: "
+                    "https://dstack.ai/docs/concepts/fleets"
+                )
                 switch_job_status(session, job_model, JobStatus.TERMINATING)
                 job_model.last_processed_at = common_utils.get_current_datetime()
                 await session.commit()
