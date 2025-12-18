@@ -814,8 +814,6 @@ def _get_job_status_message(job_model: JobModel) -> str:
             return "stopped"
         elif job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER:
             return "aborted"
-        elif job_model.termination_reason == JobTerminationReason.NO_BALANCE:
-            return "no balance"
     return job_model.status.value
 
 

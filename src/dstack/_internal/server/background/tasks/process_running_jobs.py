@@ -18,7 +18,6 @@ from dstack._internal.core.models.configurations import DevEnvironmentConfigurat
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
     InstanceStatus,
-    InstanceTerminationReason,
     RemoteConnectionInfo,
     SSHConnectionParams,
 )
@@ -59,7 +58,6 @@ from dstack._internal.server.services.instances import get_instance_ssh_private_
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_attached_volumes,
-    get_job_provisioning_data,
     get_job_runtime_data,
     is_master_job,
     job_model_to_job_submission,
@@ -390,22 +388,9 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 if job_model.disconnected_at is None:
                     job_model.disconnected_at = common_utils.get_current_datetime()
                 if _should_terminate_job_due_to_disconnect(job_model):
-                    if (
-                        job_model.instance is not None
-                        and job_model.instance.termination_reason
-                        == InstanceTerminationReason.NO_BALANCE
-                    ):
-                        # if instance was terminated due to no balance, set job termination reason accodingly
-                        job_model.termination_reason = JobTerminationReason.NO_BALANCE
-                    else:
-                        job_provisioning_data = get_job_provisioning_data(job_model)
-                        # use JobTerminationReason.INSTANCE_UNREACHABLE for on-demand instances only
-                        job_model.termination_reason = (
-                            JobTerminationReason.INSTANCE_UNREACHABLE
-                            if job_provisioning_data
-                            and not job_provisioning_data.instance_type.resources.spot
-                            else JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-                        )
+                    # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE for on-demand.
+                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+                    job_model.termination_reason_message = "Instance is unreachable"
                     switch_job_status(session, job_model, JobStatus.TERMINATING)
                 else:
                     logger.warning(
