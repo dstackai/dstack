@@ -262,8 +262,7 @@ class InstanceTerminationReason(str, Enum):
     PROVISIONING_TIMEOUT = "provisioning_timeout"
     ERROR = "error"
     JOB_FINISHED = "job_finished"
-    TERMINATION_TIMEOUT = "termination_timeout"
-    STARTING_TIMEOUT = "starting_timeout"
+    UNREACHABLE = "unreachable"
     NO_OFFERS = "no_offers"
     MASTER_FAILED = "master_failed"
     MAX_INSTANCES_LIMIT = "max_instances_limit"
@@ -281,6 +280,7 @@ class InstanceTerminationReason(str, Enum):
         if v == "Idle timeout":
             return cls.IDLE_TIMEOUT
         if v in (
+            "Instance has not become running in time",
             "Provisioning timeout expired",
             "Proivisioning timeout expired",  # typo is intentional
             "The proivisioning timeout expired",  # typo is intentional
@@ -312,9 +312,7 @@ class InstanceTerminationReason(str, Enum):
         if v == "Instance job finished":
             return cls.JOB_FINISHED
         if v == "Termination deadline":
-            return cls.TERMINATION_TIMEOUT
-        if v == "Instance has not become running in time":
-            return cls.STARTING_TIMEOUT
+            return cls.UNREACHABLE
         if v == "Fleet has too many instances":
             return cls.MAX_INSTANCES_LIMIT
         if v == "Low account balance":

@@ -263,7 +263,7 @@ class TestCheckShim:
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATING
         assert instance.termination_deadline == termination_deadline_time
-        assert instance.termination_reason == InstanceTerminationReason.TERMINATION_TIMEOUT
+        assert instance.termination_reason == InstanceTerminationReason.UNREACHABLE
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

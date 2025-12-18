@@ -679,7 +679,11 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             )
         return
 
-    _mark_terminated(instance, InstanceTerminationReason.NO_OFFERS)
+    _mark_terminated(
+        instance,
+        InstanceTerminationReason.NO_OFFERS,
+        "All offers failed" if offers else "No offers found",
+    )
     if instance.fleet and is_fleet_master_instance(instance) and is_cloud_cluster(instance.fleet):
         # Do not attempt to deploy other instances, as they won't determine the correct cluster
         # backend, region, and placement group without a successfully deployed master instance
@@ -690,10 +694,13 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
 
 
 def _mark_terminated(
-    instance: InstanceModel, termination_reason: InstanceTerminationReason
+    instance: InstanceModel,
+    termination_reason: InstanceTerminationReason,
+    termination_reason_message: Optional[str] = None,
 ) -> None:
     instance.status = InstanceStatus.TERMINATED
     instance.termination_reason = termination_reason
+    instance.termination_reason_message = termination_reason_message
     logger.info(
         "Terminated instance %s: %s",
         instance.name,
@@ -842,7 +849,7 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
         deadline = instance.termination_deadline
         if get_current_datetime() > deadline:
             instance.status = InstanceStatus.TERMINATING
-            instance.termination_reason = InstanceTerminationReason.TERMINATION_TIMEOUT
+            instance.termination_reason = InstanceTerminationReason.UNREACHABLE
             logger.warning(
                 "Instance %s shim waiting timeout. Marked as TERMINATING",
                 instance.name,
@@ -871,7 +878,8 @@ async def _wait_for_instance_provisioning_data(
             "Instance %s failed because instance has not become running in time", instance.name
         )
         instance.status = InstanceStatus.TERMINATING
-        instance.termination_reason = InstanceTerminationReason.STARTING_TIMEOUT
+        instance.termination_reason = InstanceTerminationReason.PROVISIONING_TIMEOUT
+        instance.termination_reason_message = "Backend did not complete provisioning in time"
         return
 
     backend = await backends_services.get_project_backend_by_type(
