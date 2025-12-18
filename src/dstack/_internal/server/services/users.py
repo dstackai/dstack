@@ -3,14 +3,19 @@ import os
 import re
 import secrets
 import uuid
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select
 from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
-from dstack._internal.core.errors import ResourceExistsError, ServerClientError
+from dstack._internal.core.errors import (
+    ResourceExistsError,
+    ServerClientError,
+)
 from dstack._internal.core.models.users import (
     GlobalRole,
     User,
@@ -19,8 +24,10 @@ from dstack._internal.core.models.users import (
     UserTokenCreds,
     UserWithCreds,
 )
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import DecryptedString, MemberModel, UserModel
 from dstack._internal.server.services import events
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.utils.routers import error_forbidden
 from dstack._internal.utils import crypto
@@ -123,114 +130,128 @@ async def create_user(
 
 async def update_user(
     session: AsyncSession,
+    actor: UserModel,
     username: str,
     global_role: GlobalRole,
     email: Optional[str] = None,
     active: bool = True,
-) -> UserModel:
-    await session.execute(
-        update(UserModel)
-        .where(
-            UserModel.name == username,
-            UserModel.deleted == False,
+) -> Optional[UserModel]:
+    async with get_user_model_by_name_for_update(session, username) as user:
+        if user is None:
+            return None
+        updated_fields = []
+        if global_role != user.global_role:
+            user.global_role = global_role
+            updated_fields.append(f"global_role={global_role}")
+        if email != user.email:
+            user.email = email
+            updated_fields.append("email")  # do not include potentially sensitive new value
+        if active != user.active:
+            user.active = active
+            updated_fields.append(f"active={active}")
+        events.emit(
+            session,
+            f"User updated. Updated fields: {', '.join(updated_fields) or '<none>'}",
+            actor=events.UserActor.from_user(actor),
+            targets=[events.Target.from_model(user)],
         )
-        .values(
-            global_role=global_role,
-            email=email,
-            active=active,
-        )
-    )
-    await session.commit()
-    return await get_user_model_by_name_or_error(session=session, username=username)
+        await session.commit()
+    return user
 
 
 async def refresh_ssh_key(
     session: AsyncSession,
-    user: UserModel,
+    actor: UserModel,
     username: Optional[str] = None,
 ) -> Optional[UserModel]:
     if username is None:
-        username = user.name
-    logger.debug("Refreshing SSH key for user [code]%s[/code]", username)
-    if user.global_role != GlobalRole.ADMIN and user.name != username:
+        username = actor.name
+    if actor.global_role != GlobalRole.ADMIN and actor.name != username:
         raise error_forbidden()
-    private_bytes, public_bytes = await run_async(crypto.generate_rsa_key_pair_bytes, username)
-    await session.execute(
-        update(UserModel)
-        .where(
-            UserModel.name == username,
-            UserModel.deleted == False,
+    async with get_user_model_by_name_for_update(session, username) as user:
+        if user is None:
+            return None
+        private_bytes, public_bytes = await run_async(crypto.generate_rsa_key_pair_bytes, username)
+        user.ssh_private_key = private_bytes.decode()
+        user.ssh_public_key = public_bytes.decode()
+        events.emit(
+            session,
+            "User SSH key refreshed",
+            actor=events.UserActor.from_user(actor),
+            targets=[events.Target.from_model(user)],
         )
-        .values(
-            ssh_private_key=private_bytes.decode(),
-            ssh_public_key=public_bytes.decode(),
-        )
-    )
-    await session.commit()
-    return await get_user_model_by_name(session=session, username=username)
+        await session.commit()
+    return user
 
 
 async def refresh_user_token(
     session: AsyncSession,
-    user: UserModel,
+    actor: UserModel,
     username: str,
 ) -> Optional[UserModel]:
-    if user.global_role != GlobalRole.ADMIN and user.name != username:
+    if actor.global_role != GlobalRole.ADMIN and actor.name != username:
         raise error_forbidden()
-    new_token = str(uuid.uuid4())
-    await session.execute(
-        update(UserModel)
-        .where(
-            UserModel.name == username,
-            UserModel.deleted == False,
+    async with get_user_model_by_name_for_update(session, username) as user:
+        if user is None:
+            return None
+        new_token = str(uuid.uuid4())
+        user.token = DecryptedString(plaintext=new_token)
+        user.token_hash = get_token_hash(new_token)
+        events.emit(
+            session,
+            "User token refreshed",
+            actor=events.UserActor.from_user(actor),
+            targets=[events.Target.from_model(user)],
         )
-        .values(
-            token=DecryptedString(plaintext=new_token),
-            token_hash=get_token_hash(new_token),
-        )
-    )
-    await session.commit()
-    return await get_user_model_by_name(session=session, username=username)
+        await session.commit()
+    return user
 
 
 async def delete_users(
     session: AsyncSession,
-    user: UserModel,
+    actor: UserModel,
     usernames: List[str],
 ):
     if _ADMIN_USERNAME in usernames:
-        raise ServerClientError("User 'admin' cannot be deleted")
+        raise ServerClientError(f"User {_ADMIN_USERNAME!r} cannot be deleted")
 
-    res = await session.execute(
-        select(UserModel)
-        .where(
-            UserModel.name.in_(usernames),
-            UserModel.deleted == False,
-        )
-        .options(load_only(UserModel.id, UserModel.name))
-    )
-    users = res.scalars().all()
-    if len(users) != len(usernames):
-        raise ServerClientError("Failed to delete non-existent users")
+    filters = [
+        UserModel.name.in_(usernames),
+        UserModel.deleted == False,
+    ]
+    res = await session.execute(select(UserModel.id).where(*filters))
+    user_ids = list(res.scalars().all())
+    user_ids.sort()
 
-    user_ids = [u.id for u in users]
-    timestamp = str(int(get_current_datetime().timestamp()))
-    updates = []
-    for u in users:
-        updates.append(
-            {
-                "id": u.id,
-                "name": f"_deleted_{timestamp}_{secrets.token_hex(8)}",
-                "original_name": u.name,
-                "deleted": True,
-                "active": False,
-            }
+    async with get_locker(get_db().dialect_name).lock_ctx(UserModel.__tablename__, user_ids):
+        # Refetch after lock
+        res = await session.execute(
+            select(UserModel)
+            .where(UserModel.id.in_(user_ids), *filters)
+            .order_by(UserModel.id)  # take locks in order
+            .options(load_only(UserModel.id, UserModel.name))
+            .with_for_update(key_share=True)
         )
-    await session.execute(update(UserModel), updates)
-    await session.execute(delete(MemberModel).where(MemberModel.user_id.in_(user_ids)))
-    # Projects are not deleted automatically if owners are deleted.
-    await session.commit()
-    logger.info("Deleted users %s by user %s", usernames, user.name)
+        users = list(res.scalars().all())
+        if len(users) != len(usernames):
+            raise ServerClientError("Failed to delete non-existent users")
+        user_ids = [u.id for u in users]
+        timestamp = str(int(get_current_datetime().timestamp()))
+        for u in users:
+            event_target = events.Target.from_model(u)  # build target before renaming the user
+            u.deleted = True
+            u.active = False
+            u.original_name = u.name
+            u.name = f"_deleted_{timestamp}_{secrets.token_hex(8)}"
+            events.emit(
+                session,
+                "User deleted",
+                actor=events.UserActor.from_user(actor),
+                targets=[event_target],
+            )
+        await session.execute(delete(MemberModel).where(MemberModel.user_id.in_(user_ids)))
+        # Projects are not deleted automatically if owners are deleted.
+        await session.commit()
 
 
 async def get_user_model_by_name(
@@ -255,6 +276,36 @@ async def get_user_model_by_name_or_error(
     return get_or_error(
         await get_user_model_by_name(session=session, username=username, ignore_case=ignore_case)
     )
+
+
+@asynccontextmanager
+async def get_user_model_by_name_for_update(
+    session: AsyncSession, username: str
+) -> AsyncGenerator[Optional[UserModel], None]:
+    """
+    Fetch the user from the database and lock it for update.
+
+    **NOTE**: commit changes to the database before exiting from this context manager,
+              so that in-memory locks are only released after commit.
+    """
+
+    filters = [
+        UserModel.name == username,
+        UserModel.deleted == False,
+    ]
+    res = await session.execute(select(UserModel.id).where(*filters))
+    user_id = res.scalar_one_or_none()
+    if user_id is None:
+        yield None
+    else:
+        async with get_locker(get_db().dialect_name).lock_ctx(UserModel.__tablename__, [user_id]):
+            # Refetch after lock
+            res = await session.execute(
+                select(UserModel)
+                .where(UserModel.id.in_([user_id]), *filters)
+                .with_for_update(key_share=True)
+            )
+            yield res.scalar_one_or_none()
 
 
 async def log_in_with_token(session: AsyncSession, token: str) -> Optional[UserModel]:

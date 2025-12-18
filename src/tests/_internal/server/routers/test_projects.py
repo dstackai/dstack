@@ -495,6 +495,16 @@ class TestDeleteProject:
         await session.refresh(project2)
         assert project1.deleted
         assert not project2.deleted
+        # Validate an event is emitted
+        response = await client.post(
+            "/api/events/list", headers=get_auth_headers(user.token), json={}
+        )
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+        assert response.json()[0]["message"] == "Project deleted"
+        assert len(response.json()[0]["targets"]) == 1
+        assert response.json()[0]["targets"][0]["id"] == str(project1.id)
+        assert response.json()[0]["targets"][0]["name"] == project_name
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

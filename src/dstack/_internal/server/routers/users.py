@@ -43,7 +43,7 @@ async def get_my_user(
 ):
     if user.ssh_private_key is None or user.ssh_public_key is None:
         # Generate keys for pre-0.19.33 users
-        await users.refresh_ssh_key(session=session, user=user)
+        await users.refresh_ssh_key(session=session, actor=user)
     return CustomORJSONResponse(users.user_model_to_user_with_creds(user))
 
 
@@ -86,6 +86,7 @@ async def update_user(
 ):
     res = await users.update_user(
         session=session,
+        actor=user,
         username=body.username,
         global_role=body.global_role,
         email=body.email,
@@ -102,7 +103,7 @@ async def refresh_ssh_key(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
-    res = await users.refresh_ssh_key(session=session, user=user, username=body.username)
+    res = await users.refresh_ssh_key(session=session, actor=user, username=body.username)
     if res is None:
         raise ResourceNotExistsError()
     return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
@@ -114,7 +115,7 @@ async def refresh_token(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
-    res = await users.refresh_user_token(session=session, user=user, username=body.username)
+    res = await users.refresh_user_token(session=session, actor=user, username=body.username)
     if res is None:
         raise ResourceNotExistsError()
     return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
@@ -128,6 +129,6 @@ async def delete_users(
 ):
     await users.delete_users(
         session=session,
-        user=user,
+        actor=user,
         usernames=body.users,
     )

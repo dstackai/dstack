@@ -169,8 +169,16 @@ async def update_project(
     project: ProjectModel,
     is_public: bool,
 ):
-    """Update project visibility (public/private)."""
-    project.is_public = is_public
+    updated_fields = []
+    if is_public != project.is_public:
+        project.is_public = is_public
+        updated_fields.append(f"is_public={is_public}")
+    events.emit(
+        session,
+        f"Project updated. Updated fields: {', '.join(updated_fields) or '<none>'}",
+        actor=events.UserActor.from_user(user),
+        targets=[events.Target.from_model(project)],
+    )
     await session.commit()
 
 
@@ -222,9 +230,14 @@ async def delete_projects(
                 "deleted": True,
             }
         )
+        events.emit(
+            session,
+            "Project deleted",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(p)],
+        )
     await session.execute(update(ProjectModel), updates)
     await session.commit()
-    logger.info("Deleted projects %s by user %s", projects_names, user.name)
 
 
 async def set_project_members(
