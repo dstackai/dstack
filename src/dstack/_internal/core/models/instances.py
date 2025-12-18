@@ -335,6 +335,8 @@ class Instance(CoreModel):
     status: InstanceStatus
     unreachable: bool = False
     health_status: HealthStatus = HealthStatus.HEALTHY
+    # termination_reason stores InstanceTerminationReason.
+    # str allows adding new enum members without breaking compatibility with old clients.
     termination_reason: Optional[str] = None
     termination_reason_message: Optional[str] = None
     created: datetime.datetime
