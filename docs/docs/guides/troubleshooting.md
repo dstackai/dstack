@@ -3,7 +3,7 @@
 ## Reporting issues
 
 When you encounter a problem, please report it as
-a [GitHub issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/new/choose){:target="_blank"}.
+a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 If you have a question or need help, feel free to ask it in our [Discord server](https://discord.gg/u8SmfwPpMd).
 
@@ -23,30 +23,33 @@ environment variable to `DEBUG`. By default, it is set to `INFO`.
 
 CLI logs are located in `~/.dstack/logs/cli`, and the default log level is `DEBUG`.
 
-> See these examples for well-reported issues: [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1640){:target="_blank"}
-and [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1551){:target="_blank"}.
+> See these examples for well-reported issues: [this](https://github.com/dstackai/dstack/issues/1640)
+and [this](https://github.com/dstackai/dstack/issues/1551).
 
 ## Typical issues
 
-### No instance offers { #no-offers }
+### No offers { #no-offers }
 [//]: # (NOTE: This section is referenced in the CLI. Do not change its URL.)
 
 If you run `dstack apply` and don't see any instance offers, it means that
 `dstack` could not find instances that match the requirements in your configuration.
 Below are some of the reasons why this might happen.
 
-#### Cause 1: No capacity providers
+> Feel free to use `dstack offer` to view available offers.
 
-Before you can run any workloads, you need to configure a [backend](../concepts/backends.md),
-create an [SSH fleet](../concepts/fleets.md#ssh), or sign up for
-[dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
-If you have configured a backend and still can't use it, check the output of `dstack server`
-for backend configuration errors.
+#### Cause 1: No fleets
 
-> **Tip**: You can find a list of successfully configured backends
-> on the [project settings page](../concepts/projects.md#backends) in the UI.
+Make sure you've created a [fleet](../concepts/fleets.md) before submitting any runs.
 
-#### Cause 2: Requirements mismatch
+#### Cause 2: No backends
+
+If you are not using [SSH fleets](../concepts/fleets.md#ssh-fleets), make sure you have configured at least one [backends](../concepts/backends.md).
+
+If you have configured a backend but still cannot use it, check the output of `dstack server` for backend configuration errors.
+
+> You can find a list of successfully configured backends on the [project settings page](../concepts/projects.md#backends) in the UI.
+
+#### Cause 3: Requirements mismatch
 
 When you apply a configuration, `dstack` tries to find instances that match the
 [`resources`](../reference/dstack.yml/task.md#resources),
@@ -63,7 +66,7 @@ Make sure your configuration doesn't set any conflicting requirements, such as
 `regions` that don't exist in the specified `backends`, or `instance_types` that
 don't match the specified `resources`.
 
-#### Cause 3: Too specific resources
+#### Cause 4: Too specific resources
 
 If you set a resource requirement to an exact value, `dstack` will only select instances
 that have exactly that amount of resources. For example, `cpu: 5` and `memory: 10GB` will only
@@ -73,14 +76,14 @@ Typically, you will want to set resource ranges to match more instances.
 For example, `cpu: 4..8` and `memory: 10GB..` will match instances with 4 to 8 CPUs
 and at least 10GB of memory.
 
-#### Cause 4: Default resources
+#### Cause 5: Default resources
 
 By default, `dstack` uses these resource requirements:
 `cpu: 2..`, `memory: 8GB..`, `disk: 100GB..`.
 If you want to use smaller instances, override the `cpu`, `memory`, or `disk`
 properties in your configuration.
 
-#### Cause 5: GPU requirements
+#### Cause 6: GPU requirements
 
 By default, `dstack` only selects instances with no GPUs or a single NVIDIA GPU.
 If you want to use non-NVIDIA GPUs or multi-GPU instances, set the `gpu` property
@@ -91,19 +94,19 @@ Examples: `gpu: amd` (one AMD GPU), `gpu: A10:4..8` (4 to 8 A10 GPUs),
 
 > If you don't specify the number of GPUs, `dstack` will only select single-GPU instances.
 
-#### Cause 6: Network volumes
+#### Cause 7: Network volumes
 
-If your run configuration uses [network volumes](../concepts/volumes.md#network),
+If your run configuration uses [network volumes](../concepts/volumes.md#network-volumes),
 `dstack` will only select instances from the same backend and region as the volumes.
 For AWS, the availability zone of the volume and the instance should also match.
 
-#### Cause 7: Feature support
+#### Cause 8: Feature support
 
 Some `dstack` features are not supported by all backends. If your configuration uses
 one of these features, `dstack` will only select offers from the backends that support it.
 
-- [Cloud fleet](../concepts/fleets.md#cloud) configurations,
-  [Instance volumes](../concepts/volumes.md#instance),
+- [Backend fleets](../concepts/fleets.md#backend-fleets) configurations,
+  [Instance volumes](../concepts/volumes.md#instance-volumes),
   and [Privileged containers](../reference/dstack.yml/dev-environment.md#privileged)
   are supported by all backends except `runpod`, `vastai`, and `kubernetes`.
 - [Clusters](../concepts/fleets.md#cloud-placement)
@@ -111,16 +114,16 @@ one of these features, `dstack` will only select offers from the backends that s
   are only supported by the `aws`, `azure`, `gcp`, `nebius`, `oci`, and `vultr` backends,
   as well as SSH fleets.
 - [Reservations](../reference/dstack.yml/fleet.md#reservation)
-  are only supported by the `aws` backend.
+  are only supported by the `aws` and `gcp` backends.
 
-#### Cause 8: dstack Sky balance
+#### Cause 9: dstack Sky balance
 
 If you are using
-[dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+[dstack Sky](https://sky.dstack.ai),
 you will not see marketplace offers until you top up your balance.
 Alternatively, you can configure your own cloud accounts
 on the [project settings page](../concepts/projects.md#backends)
-or use [SSH fleets](../concepts/fleets.md#ssh).
+or use [SSH fleets](../concepts/fleets.md#ssh-fleets).
 
 ### Provisioning fails
 
@@ -188,7 +191,7 @@ If you interrupt the command, the port forwarding will be disconnected. To reatt
 
 #### Cause 2: Windows
 
-If you're using the CLI on Windows, make sure to run it through WSL by following [these instructions:material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1644#issuecomment-2321559265){:target="_blank"}. 
+If you're using the CLI on Windows, make sure to run it through WSL by following [these instructions:material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1644#issuecomment-2321559265). 
 Native support will be available soon.
 
 ### SSH fleet fails to provision

@@ -32,15 +32,20 @@ from dstack._internal.server.services.jobs import (
     find_job,
     get_job_specs_from_run_spec,
     group_jobs_by_replica_latest,
+    is_master_job,
+    switch_job_status,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import (
     fmt,
-    is_replica_registered,
     process_terminating_run,
-    retry_run_replica_jobs,
     run_model_to_run,
+    switch_run_status,
+)
+from dstack._internal.server.services.runs.replicas import (
+    is_replica_registered,
+    retry_run_replica_jobs,
     scale_run_replicas,
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
@@ -165,12 +170,12 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
             await process_terminating_run(session, run_model)
         else:
             logger.error("%s: unexpected status %s", fmt(run_model), run_model.status.name)
-            run_model.status = RunStatus.TERMINATING
             run_model.termination_reason = RunTerminationReason.SERVER_ERROR
+            switch_run_status(session, run_model, RunStatus.TERMINATING)
     except ServerError as e:
         logger.error("%s: run processing error: %s", fmt(run_model), e)
-        run_model.status = RunStatus.TERMINATING
         run_model.termination_reason = RunTerminationReason.SERVER_ERROR
+        switch_run_status(session, run_model, RunStatus.TERMINATING)
 
     run_model.last_processed_at = common.get_current_datetime()
     await session.commit()
@@ -203,9 +208,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
         return
 
     await scale_run_replicas(session, run_model, replicas_diff=run_model.desired_replica_count)
-
-    run_model.status = RunStatus.SUBMITTED
-    logger.info("%s: run status has changed PENDING -> SUBMITTED", fmt(run_model))
+    switch_run_status(session, run_model, RunStatus.SUBMITTED)
 
 
 def _retrying_run_ready_for_resubmission(run_model: RunModel, run: Run) -> bool:
@@ -353,8 +356,9 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                 if not (
                     job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING
                 ):
-                    job_model.status = JobStatus.TERMINATING
                     job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+                    job_model.termination_reason_message = "Run is to be resubmitted"
+                    switch_job_status(session, job_model, JobStatus.TERMINATING)
 
     if new_status not in {RunStatus.TERMINATING, RunStatus.PENDING}:
         # No need to retry, scale, or redeploy replicas if the run is terminating,
@@ -364,12 +368,6 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
         )
 
     if run_model.status != new_status:
-        logger.info(
-            "%s: run status has changed %s -> %s",
-            fmt(run_model),
-            run_model.status.name,
-            new_status.name,
-        )
         if run_model.status == RunStatus.SUBMITTED and new_status == RunStatus.PROVISIONING:
             current_time = common.get_current_datetime()
             submit_to_provision_duration = (current_time - run_model.submitted_at).total_seconds()
@@ -388,8 +386,8 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             # Unassign run from fleet so that the new fleet can be chosen when retrying
             run_model.fleet = None
 
-        run_model.status = new_status
         run_model.termination_reason = termination_reason
+        switch_run_status(session, run_model, new_status)
         # While a run goes to pending without provisioning, resubmission_attempt increases.
         if new_status == RunStatus.PROVISIONING:
             run_model.resubmission_attempt = 0
@@ -606,6 +604,6 @@ def _should_stop_on_master_done(run: Run) -> bool:
     if run.run_spec.merged_profile.stop_criteria != StopCriteria.MASTER_DONE:
         return False
     for job in run.jobs:
-        if job.job_spec.job_num == 0 and job.job_submissions[-1].status == JobStatus.DONE:
+        if is_master_job(job) and job.job_submissions[-1].status == JobStatus.DONE:
             return True
     return False

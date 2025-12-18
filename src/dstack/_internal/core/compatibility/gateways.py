@@ -30,6 +30,10 @@ def _get_gateway_configuration_excludes(
     configuration: GatewayConfiguration,
 ) -> IncludeExcludeDictType:
     configuration_excludes: IncludeExcludeDictType = {}
-    if configuration.tags is None:
-        configuration_excludes["tags"] = True
+
+    # Add excludes like this:
+    #
+    # if configuration.tags is None:
+    #     configuration_excludes["tags"] = True
+
     return configuration_excludes

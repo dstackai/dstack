@@ -80,6 +80,7 @@ class SubmitBody(CoreModel):
                 "working_dir",
                 "repo_dir",
                 "repo_data",
+                "repo_exists_action",
                 "file_archives",
             }
         ),
@@ -118,6 +119,37 @@ class HealthcheckResponse(CoreModel):
 
 class InstanceHealthResponse(CoreModel):
     dcgm: Optional[DCGMHealthResponse] = None
+
+
+class ShutdownRequest(CoreModel):
+    force: bool
+
+
+class ComponentName(str, Enum):
+    RUNNER = "dstack-runner"
+    SHIM = "dstack-shim"
+
+
+class ComponentStatus(str, Enum):
+    NOT_INSTALLED = "not-installed"
+    INSTALLED = "installed"
+    INSTALLING = "installing"
+    ERROR = "error"
+
+
+class ComponentInfo(CoreModel):
+    name: str  # Not using ComponentName enum for compatibility of newer shim with older server
+    version: str
+    status: ComponentStatus
+
+
+class ComponentListResponse(CoreModel):
+    components: list[ComponentInfo]
+
+
+class ComponentInstallRequest(CoreModel):
+    name: ComponentName
+    url: str
 
 
 class GPUMetrics(CoreModel):

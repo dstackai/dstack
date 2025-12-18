@@ -4,3 +4,4 @@ export { RunDetails } from './Details/RunDetails';
 export { JobMetrics } from './Details/Jobs/Metrics';
 export { JobLogs } from './Details/Logs';
 export { Artifacts } from './Details/Artifacts';
+export { CreateDevEnvironment } from './CreateDevEnvironment';

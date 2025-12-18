@@ -7,8 +7,8 @@ from rich_argparse import RichHelpFormatter
 from dstack._internal.cli.commands.apply import ApplyCommand
 from dstack._internal.cli.commands.attach import AttachCommand
 from dstack._internal.cli.commands.completion import CompletionCommand
-from dstack._internal.cli.commands.config import ConfigCommand
 from dstack._internal.cli.commands.delete import DeleteCommand
+from dstack._internal.cli.commands.event import EventCommand
 from dstack._internal.cli.commands.fleet import FleetCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
@@ -19,7 +19,6 @@ from dstack._internal.cli.commands.project import ProjectCommand
 from dstack._internal.cli.commands.ps import PsCommand
 from dstack._internal.cli.commands.secrets import SecretCommand
 from dstack._internal.cli.commands.server import ServerCommand
-from dstack._internal.cli.commands.stats import StatsCommand
 from dstack._internal.cli.commands.stop import StopCommand
 from dstack._internal.cli.commands.volume import VolumeCommand
 from dstack._internal.cli.utils.common import _colors, console
@@ -63,8 +62,8 @@ def main():
     subparsers = parser.add_subparsers(metavar="COMMAND")
     ApplyCommand.register(subparsers)
     AttachCommand.register(subparsers)
-    ConfigCommand.register(subparsers)
     DeleteCommand.register(subparsers)
+    EventCommand.register(subparsers)
     FleetCommand.register(subparsers)
     GatewayCommand.register(subparsers)
     InitCommand.register(subparsers)
@@ -75,7 +74,6 @@ def main():
     PsCommand.register(subparsers)
     SecretCommand.register(subparsers)
     ServerCommand.register(subparsers)
-    StatsCommand.register(subparsers)
     StopCommand.register(subparsers)
     VolumeCommand.register(subparsers)
     CompletionCommand.register(subparsers)

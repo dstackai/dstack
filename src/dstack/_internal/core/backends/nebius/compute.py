@@ -2,8 +2,9 @@ import json
 import random
 import shlex
 import time
+from collections.abc import Iterable
 from functools import cached_property
-from typing import Callable, List, Optional
+from typing import List, Optional
 
 from nebius.aio.operation import Operation as SDKOperation
 from nebius.aio.service_error import RequestError, StatusCode
@@ -21,10 +22,17 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
     merge_tags,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
+from dstack._internal.core.backends.base.offers import (
+    OfferModifier,
+    get_catalog_offers,
+    get_offers_disk_modifier,
+)
 from dstack._internal.core.backends.nebius import resources
-from dstack._internal.core.backends.nebius.fabrics import get_suitable_infiniband_fabrics
-from dstack._internal.core.backends.nebius.models import NebiusConfig, NebiusServiceAccountCreds
+from dstack._internal.core.backends.nebius.models import (
+    NebiusConfig,
+    NebiusOfferBackendData,
+    NebiusServiceAccountCreds,
+)
 from dstack._internal.core.errors import (
     BackendError,
     NotYetTerminated,
@@ -125,10 +133,8 @@ class NebiusCompute(
             for offer in offers
         ]
 
-    def get_offers_modifier(
-        self, requirements: Requirements
-    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
-        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
 
     def create_instance(
         self,
@@ -278,12 +284,16 @@ class NebiusCompute(
         master_instance_offer: InstanceOffer,
     ) -> PlacementGroupProvisioningData:
         assert placement_group.configuration.placement_strategy == PlacementStrategy.CLUSTER
-        backend_data = NebiusPlacementGroupBackendData(cluster=None)
+        master_instance_offer_backend_data: NebiusOfferBackendData = (
+            NebiusOfferBackendData.__response__.parse_obj(master_instance_offer.backend_data)
+        )
+        fabrics = list(master_instance_offer_backend_data.fabrics)
+        if self.config.fabrics is not None:
+            fabrics = [f for f in fabrics if f in self.config.fabrics]
+        placement_group_backend_data = NebiusPlacementGroupBackendData(cluster=None)
         # Only create a Nebius cluster if the instance supports it.
         # For other instances, return dummy PlacementGroupProvisioningData.
-        if fabrics := get_suitable_infiniband_fabrics(
-            master_instance_offer, allowed_fabrics=self.config.fabrics
-        ):
+        if fabrics:
             fabric = random.choice(fabrics)
             op = resources.create_cluster(
                 self._sdk,
@@ -291,10 +301,13 @@ class NebiusCompute(
                 project_id=self._region_to_project_id[placement_group.configuration.region],
                 fabric=fabric,
             )
-            backend_data.cluster = NebiusClusterBackendData(id=op.resource_id, fabric=fabric)
+            placement_group_backend_data.cluster = NebiusClusterBackendData(
+                id=op.resource_id,
+                fabric=fabric,
+            )
         return PlacementGroupProvisioningData(
             backend=BackendType.NEBIUS,
-            backend_data=backend_data.json(),
+            backend_data=placement_group_backend_data.json(),
         )
 
     def delete_placement_group(self, placement_group: PlacementGroup) -> None:
@@ -314,16 +327,15 @@ class NebiusCompute(
         if placement_group.configuration.region != instance_offer.region:
             return False
         assert placement_group.provisioning_data is not None
-        backend_data = NebiusPlacementGroupBackendData.load(
+        placement_group_backend_data = NebiusPlacementGroupBackendData.load(
             placement_group.provisioning_data.backend_data
         )
+        instance_offer_backend_data: NebiusOfferBackendData = (
+            NebiusOfferBackendData.__response__.parse_obj(instance_offer.backend_data)
+        )
         return (
-            backend_data.cluster is None
-            or backend_data.cluster.fabric
-            in get_suitable_infiniband_fabrics(
-                instance_offer,
-                allowed_fabrics=None,  # enforced at cluster creation time, no need to enforce here
-            )
+            placement_group_backend_data.cluster is None
+            or placement_group_backend_data.cluster.fabric in instance_offer_backend_data.fabrics
         )
 
 
@@ -377,7 +389,10 @@ def _wait_for_instance(sdk: SDK, op: SDKOperation[Operation]) -> None:
         )
         time.sleep(WAIT_FOR_INSTANCE_UPDATE_INTERVAL)
         resources.LOOP.await_(
-            op.update(per_retry_timeout=resources.REQUEST_TIMEOUT, metadata=resources.REQUEST_MD)
+            op.update(
+                per_retry_timeout=resources.REQUEST_TIMEOUT,
+                auth_options=resources.REQUEST_AUTH_OPTIONS,
+            )
         )
 
 

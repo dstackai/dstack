@@ -16,10 +16,6 @@ from dstack._internal.core.backends.cudo.models import (
     CudoBackendConfig,
     CudoBackendConfigWithCreds,
 )
-from dstack._internal.core.backends.datacrunch.models import (
-    DataCrunchBackendConfig,
-    DataCrunchBackendConfigWithCreds,
-)
 from dstack._internal.core.backends.digitalocean_base.models import (
     BaseDigitalOceanBackendConfig,
     BaseDigitalOceanBackendConfigWithCreds,
@@ -68,6 +64,10 @@ from dstack._internal.core.backends.vastai.models import (
     VastAIBackendConfig,
     VastAIBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.verda.models import (
+    VerdaBackendConfig,
+    VerdaBackendConfigWithCreds,
+)
 from dstack._internal.core.backends.vultr.models import (
     VultrBackendConfig,
     VultrBackendConfigWithCreds,
@@ -80,7 +80,6 @@ AnyBackendConfigWithoutCreds = Union[
     AzureBackendConfig,
     CloudRiftBackendConfig,
     CudoBackendConfig,
-    DataCrunchBackendConfig,
     BaseDigitalOceanBackendConfig,
     GCPBackendConfig,
     HotAisleBackendConfig,
@@ -91,6 +90,7 @@ AnyBackendConfigWithoutCreds = Union[
     RunpodBackendConfig,
     TensorDockBackendConfig,
     VastAIBackendConfig,
+    VerdaBackendConfig,
     VultrBackendConfig,
     DstackBackendConfig,
     DstackBaseBackendConfig,
@@ -104,7 +104,7 @@ AnyBackendConfigWithCreds = Union[
     AzureBackendConfigWithCreds,
     CloudRiftBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
-    DataCrunchBackendConfigWithCreds,
+    VerdaBackendConfigWithCreds,
     BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendConfigWithCreds,
     HotAisleBackendConfigWithCreds,
@@ -127,7 +127,7 @@ AnyBackendFileConfigWithCreds = Union[
     AzureBackendConfigWithCreds,
     CloudRiftBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
-    DataCrunchBackendConfigWithCreds,
+    VerdaBackendConfigWithCreds,
     BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendFileConfigWithCreds,
     HotAisleBackendFileConfigWithCreds,

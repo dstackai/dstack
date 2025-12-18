@@ -9,6 +9,7 @@ import { useGetRunQuery } from 'services/run';
 
 import {
     getJobError,
+    getJobFinishedAt,
     getJobListItemBackend,
     getJobListItemInstance,
     getJobListItemPrice,
@@ -57,6 +58,11 @@ export const JobDetails = () => {
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.submitted_at')}</Box>
                         <div>{getJobSubmittedAt(jobData)}</div>
+                    </div>
+
+                    <div>
+                        <Box variant="awsui-key-label">{t('projects.run.finished_at')}</Box>
+                        <div>{getJobFinishedAt(jobData)}</div>
                     </div>
 
                     <div>

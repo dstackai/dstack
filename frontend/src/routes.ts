@@ -94,8 +94,13 @@ export const ROUTES = {
         },
     },
 
+    EVENTS: {
+        LIST: '/events',
+    },
+
     RUNS: {
         LIST: '/runs',
+        CREATE_DEV_ENV: '/runs/create-dev-environment',
     },
 
     OFFERS: {

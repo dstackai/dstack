@@ -13,7 +13,7 @@ func TestHealthcheck(t *testing.T) {
 	request := httptest.NewRequest("GET", "/api/healthcheck", nil)
 	responseRecorder := httptest.NewRecorder()
 
-	server := NewShimServer(context.Background(), ":12345", "0.0.1.dev2", NewDummyRunner(), nil, nil)
+	server := NewShimServer(context.Background(), ":12345", "0.0.1.dev2", NewDummyRunner(), nil, nil, nil, nil)
 
 	f := common.JSONResponseHandler(server.HealthcheckHandler)
 	f(responseRecorder, request)
@@ -30,7 +30,7 @@ func TestHealthcheck(t *testing.T) {
 }
 
 func TestTaskSubmit(t *testing.T) {
-	server := NewShimServer(context.Background(), ":12340", "0.0.1.dev2", NewDummyRunner(), nil, nil)
+	server := NewShimServer(context.Background(), ":12340", "0.0.1.dev2", NewDummyRunner(), nil, nil, nil, nil)
 	requestBody := `{
 		"id": "dummy-id",
 		"name": "dummy-name",

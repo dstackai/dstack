@@ -17,13 +17,16 @@ from dstack._internal.server.models import (
     PlacementGroupModel,
     RunModel,
 )
+from dstack._internal.server.services import events
 from dstack._internal.server.services.fleets import (
     create_fleet_instance_model,
     get_fleet_spec,
     get_next_instance_num,
     is_fleet_empty,
     is_fleet_in_use,
+    switch_fleet_status,
 )
+from dstack._internal.server.services.instances import format_instance_status_for_event
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime
@@ -121,7 +124,7 @@ async def _process_fleets(session: AsyncSession, fleet_models: List[FleetModel])
     deleted_fleets_ids = []
     for fleet_model in fleet_models:
         _consolidate_fleet_state_with_spec(session, fleet_model)
-        deleted = _autodelete_fleet(fleet_model)
+        deleted = _autodelete_fleet(session, fleet_model)
         if deleted:
             deleted_fleets_ids.append(fleet_model.id)
         fleet_model.last_processed_at = get_current_datetime()
@@ -228,17 +231,26 @@ def _maintain_fleet_nodes_in_min_max_range(
             spec=fleet_spec,
             instance_num=get_next_instance_num({i.instance_num for i in active_instances}),
         )
+        events.emit(
+            session,
+            (
+                "Instance created to meet target fleet node count."
+                f" Status: {format_instance_status_for_event(instance_model)}"
+            ),
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(instance_model)],
+        )
         active_instances.append(instance_model)
         fleet_model.instances.append(instance_model)
     logger.info("Added %s instances to fleet %s", nodes_missing, fleet_model.name)
     return True
 
 
-def _autodelete_fleet(fleet_model: FleetModel) -> bool:
+def _autodelete_fleet(session: AsyncSession, fleet_model: FleetModel) -> bool:
     if fleet_model.project.deleted:
         # It used to be possible to delete project with active resources:
         # https://github.com/dstackai/dstack/issues/3077
-        fleet_model.status = FleetStatus.TERMINATED
+        switch_fleet_status(session, fleet_model, FleetStatus.TERMINATED)
         fleet_model.deleted = True
         logger.info("Fleet %s deleted due to deleted project", fleet_model.name)
         return True
@@ -256,7 +268,7 @@ def _autodelete_fleet(fleet_model: FleetModel) -> bool:
         return False
 
     logger.info("Automatic cleanup of an empty fleet %s", fleet_model.name)
-    fleet_model.status = FleetStatus.TERMINATED
+    switch_fleet_status(session, fleet_model, FleetStatus.TERMINATED)
     fleet_model.deleted = True
     logger.info("Fleet %s deleted", fleet_model.name)
     return True

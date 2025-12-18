@@ -47,6 +47,7 @@ from dstack._internal.server.testing.common import (
     get_remote_connection_info,
     get_ssh_fleet_configuration,
 )
+from dstack._internal.server.testing.matchers import SomeUUID4Str
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
 
@@ -58,7 +59,7 @@ class TestListFleets:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/fleets/list")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -147,7 +148,7 @@ class TestListProjectFleets:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/list")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -188,7 +189,7 @@ class TestGetFleet:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/get")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -309,7 +310,7 @@ class TestApplyFleetPlan:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/apply")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -321,16 +322,14 @@ class TestApplyFleetPlan:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         spec = get_fleet_spec(conf=get_fleet_configuration())
-        with patch("uuid.uuid4") as m:
-            m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
-            response = await client.post(
-                f"/api/project/{project.name}/fleets/apply",
-                headers=get_auth_headers(user.token),
-                json={"plan": {"spec": spec.dict()}, "force": False},
-            )
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/apply",
+            headers=get_auth_headers(user.token),
+            json={"plan": {"spec": spec.dict()}, "force": False},
+        )
         assert response.status_code == 200
         assert response.json() == {
-            "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+            "id": SomeUUID4Str(),
             "name": spec.configuration.name,
             "project_name": project.name,
             "spec": {
@@ -390,10 +389,10 @@ class TestApplyFleetPlan:
             "status_message": None,
             "instances": [
                 {
-                    "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "id": SomeUUID4Str(),
                     "project_name": project.name,
                     "name": f"{spec.configuration.name}-0",
-                    "fleet_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "fleet_id": SomeUUID4Str(),
                     "fleet_name": spec.configuration.name,
                     "instance_num": 0,
                     "job_name": None,
@@ -414,6 +413,8 @@ class TestApplyFleetPlan:
                 }
             ],
         }
+        for instance in response.json()["instances"]:
+            assert instance["fleet_id"] == response.json()["id"]
         res = await session.execute(select(FleetModel))
         assert res.scalar_one()
         res = await session.execute(select(InstanceModel))
@@ -436,16 +437,14 @@ class TestApplyFleetPlan:
             network=None,
         )
         spec = get_fleet_spec(conf=conf)
-        with patch("uuid.uuid4") as m:
-            m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
-            response = await client.post(
-                f"/api/project/{project.name}/fleets/apply",
-                headers=get_auth_headers(user.token),
-                json={"plan": {"spec": spec.dict()}, "force": False},
-            )
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/apply",
+            headers=get_auth_headers(user.token),
+            json={"plan": {"spec": spec.dict()}, "force": False},
+        )
         assert response.status_code == 200, response.json()
         assert response.json() == {
-            "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+            "id": SomeUUID4Str(),
             "name": spec.configuration.name,
             "project_name": project.name,
             "spec": {
@@ -513,7 +512,7 @@ class TestApplyFleetPlan:
             "status_message": None,
             "instances": [
                 {
-                    "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "id": SomeUUID4Str(),
                     "project_name": project.name,
                     "backend": "remote",
                     "instance_type": {
@@ -529,7 +528,7 @@ class TestApplyFleetPlan:
                         },
                     },
                     "name": f"{spec.configuration.name}-0",
-                    "fleet_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "fleet_id": SomeUUID4Str(),
                     "fleet_name": spec.configuration.name,
                     "instance_num": 0,
                     "job_name": None,
@@ -548,6 +547,8 @@ class TestApplyFleetPlan:
                 }
             ],
         }
+        for instance in response.json()["instances"]:
+            assert instance["fleet_id"] == response.json()["id"]
         res = await session.execute(select(FleetModel))
         assert res.scalar_one()
         res = await session.execute(select(InstanceModel))
@@ -833,7 +834,7 @@ class TestDeleteFleets:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/delete")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -946,7 +947,7 @@ class TestDeleteFleetInstances:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/delete_instances")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -1040,7 +1041,7 @@ class TestGetPlan:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/fleets/get_plan")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

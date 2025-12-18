@@ -8,9 +8,20 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.projects import ProjectRole
+from dstack._internal.core.models.runs import JobStatus, RunStatus
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.server.models import UserModel
-from dstack._internal.server.testing.common import create_user, get_auth_headers
+from dstack._internal.server.models import MemberModel, UserModel
+from dstack._internal.server.services.projects import add_project_member
+from dstack._internal.server.testing.common import (
+    create_job,
+    create_probe,
+    create_project,
+    create_repo,
+    create_run,
+    create_user,
+    get_auth_headers,
+)
 
 
 class TestListUsers:
@@ -22,7 +33,9 @@ class TestListUsers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_admins_see_all_users(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_admins_see_all_non_deleted_users(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         admin = await create_user(
             session=session,
             name="admin",
@@ -34,6 +47,13 @@ class TestListUsers:
             name="other_user",
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             global_role=GlobalRole.USER,
+        )
+        await create_user(
+            session=session,
+            name="deleted_user",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+            deleted=True,
         )
         response = await client.post("/api/users/list", headers=get_auth_headers(admin.token))
         assert response.status_code in [200]
@@ -48,6 +68,7 @@ class TestListUsers:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": None,
             },
             {
                 "id": str(other_user.id),
@@ -59,6 +80,7 @@ class TestListUsers:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": None,
             },
         ]
 
@@ -92,6 +114,7 @@ class TestListUsers:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": None,
             }
         ]
 
@@ -128,6 +151,8 @@ class TestGetMyUser:
         user = await create_user(
             session=session,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            ssh_public_key="public-key",
+            ssh_private_key="private-key",
         )
         response = await client.post(
             "/api/users/get_my_user", headers=get_auth_headers(user.token)
@@ -139,11 +164,37 @@ class TestGetMyUser:
             "created_at": "2023-01-02T03:04:00+00:00",
             "global_role": user.global_role,
             "email": None,
+            "creds": {"token": user.token.get_plaintext_or_error()},
             "active": True,
             "permissions": {
                 "can_create_projects": True,
             },
+            "ssh_private_key": "private-key",
+            "ssh_public_key": "public-key",
         }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_generates_ssh_key_if_missing(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(
+            session=session,
+            ssh_public_key=None,
+            ssh_private_key=None,
+        )
+        with patch("dstack._internal.utils.crypto.generate_rsa_key_pair_bytes") as gen_mock:
+            gen_mock.return_value = (b"private-key", b"ssh-rsa AAA.public-key user\n")
+            response = await client.post(
+                "/api/users/get_my_user", headers=get_auth_headers(user.token)
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ssh_private_key"] == "private-key"
+        assert data["ssh_public_key"] == "ssh-rsa AAA.public-key user\n"
+        await session.refresh(user)
+        assert user.ssh_private_key == data["ssh_private_key"]
+        assert user.ssh_public_key == data["ssh_public_key"]
 
 
 class TestGetUser:
@@ -196,6 +247,8 @@ class TestGetUser:
             "permissions": {
                 "can_create_projects": True,
             },
+            "ssh_private_key": None,
+            "ssh_public_key": None,
         }
 
 
@@ -224,7 +277,9 @@ class TestCreateUser:
                 },
             )
         assert response.status_code == 200
-        assert response.json() == {
+        user_data = response.json()
+        ssh_public_key = user_data["ssh_public_key"]
+        assert user_data == {
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "test",
             "created_at": "2023-01-02T03:04:00+00:00",
@@ -234,6 +289,7 @@ class TestCreateUser:
             "permissions": {
                 "can_create_projects": True,
             },
+            "ssh_public_key": ssh_public_key,
         }
         res = await session.execute(select(UserModel).where(UserModel.name == "test"))
         assert len(res.scalars().all()) == 1
@@ -259,7 +315,9 @@ class TestCreateUser:
                 },
             )
         assert response.status_code == 200
-        assert response.json() == {
+        user_data = response.json()
+        ssh_public_key = user_data["ssh_public_key"]
+        assert user_data == {
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "Test",
             "created_at": "2023-01-02T03:04:00+00:00",
@@ -269,6 +327,7 @@ class TestCreateUser:
             "permissions": {
                 "can_create_projects": True,
             },
+            "ssh_public_key": ssh_public_key,
         }
         # Username uniqueness check should be case insensitive
         for username in ["test", "Test", "TesT"]:
@@ -321,9 +380,74 @@ class TestDeleteUsers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_deletes_users(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("username", ["test", "a" * 50])
+    async def test_deletes_users(
+        self, test_db, session: AsyncSession, client: AsyncClient, username: str
+    ):
         admin = await create_user(name="admin", session=session)
-        user = await create_user(name="test", session=session)
+        user = await create_user(name=username, session=session)
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user.name]},
+        )
+        assert response.status_code == 200
+
+        # Validate the user is deleted
+        res = await session.execute(select(UserModel).where(UserModel.name == user.name))
+        assert len(res.scalars().all()) == 0
+
+        # Validate an event is emitted
+        response = await client.post(
+            "/api/events/list", headers=get_auth_headers(admin.token), json={}
+        )
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+        assert response.json()[0]["message"] == "User deleted"
+        assert len(response.json()[0]["targets"]) == 1
+        assert response.json()[0]["targets"][0]["id"] == str(user.id)
+        assert response.json()[0]["targets"][0]["name"] == user.name
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_users_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(name="admin", session=session)
+        user1 = await create_user(name="test1", session=session)
+        user2 = await create_user(name="test2", session=session)
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user1.name, "non_existing_user"]},
+        )
+        assert response.status_code == 400
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user1.name, user2.name]},
+        )
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("image_config_mock")
+    async def test_deletes_user_with_resources(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(name="admin", session=session)
+        user = await create_user(name="temp", session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            status=RunStatus.RUNNING,
+        )
+        job = await create_job(session=session, run=run, status=JobStatus.RUNNING)
+        await create_probe(session=session, job=job)
         response = await client.post(
             "/api/users/delete",
             headers=get_auth_headers(admin.token),
@@ -331,7 +455,30 @@ class TestDeleteUsers:
         )
         assert response.status_code == 200
         res = await session.execute(select(UserModel).where(UserModel.name == user.name))
-        assert len(res.scalars().all()) == 0
+        assert res.scalar() is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("image_config_mock")
+    async def test_deleting_users_deletes_members(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(name="admin", session=session)
+        user = await create_user(name="temp", session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        response = await client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(UserModel).where(UserModel.name == user.name))
+        assert res.scalar() is None
+        res = await session.execute(select(MemberModel).where(MemberModel.user_id == user.id))
+        assert res.scalar() is None
 
 
 class TestRefreshToken:

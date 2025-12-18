@@ -10,6 +10,17 @@ import (
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
+func PathExists(pth string) (bool, error) {
+	_, err := os.Stat(pth)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
+}
+
 func ExpandPath(pth string, base string, home string) (string, error) {
 	pth = path.Clean(pth)
 	if pth == "~" {
@@ -31,7 +42,7 @@ func MkdirAll(ctx context.Context, pth string, uid int, gid int) error {
 	paths := []string{pth}
 	for {
 		pth = path.Dir(pth)
-		if pth == "/" {
+		if pth == "/" || pth == "." {
 			break
 		}
 		paths = append(paths, pth)

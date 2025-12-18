@@ -17,12 +17,13 @@ import { ModelDetails } from 'pages/Models/Details';
 import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
-import { JobLogs, JobMetrics, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
+import { CreateDevEnvironment, JobLogs, JobMetrics, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
 import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 import { UserBilling, UserProjects, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
+import { EventList } from './pages/Events';
 import { OfferList } from './pages/Offers';
 import { JobDetails } from './pages/Runs/Details/Jobs/Details/JobDetails';
 import { VolumeList } from './pages/Volumes';
@@ -144,6 +145,11 @@ export const router = createBrowserRouter([
                 element: <RunList />,
             },
 
+            {
+                path: ROUTES.RUNS.CREATE_DEV_ENV,
+                element: <CreateDevEnvironment />,
+            },
+
             // Offers
             {
                 path: ROUTES.OFFERS.LIST,
@@ -158,6 +164,12 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.MODELS.DETAILS.TEMPLATE,
                 element: <ModelDetails />,
+            },
+
+            // Events
+            {
+                path: ROUTES.EVENTS.LIST,
+                element: <EventList />,
             },
 
             // Fleets

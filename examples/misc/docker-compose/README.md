@@ -2,10 +2,10 @@
 
 All backends except `runpod`, `vastai`, and `kubernetes` allow using [Docker and Docker Compose](https://dstack.ai/docs/guides/protips#docker-and-docker-compose) inside `dstack` runs.
 
-This example shows how to deploy Hugging Face [Chat UI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/chat-ui/index){:target="_blank"}
-with [TGI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/text-generation-inference/en/index){:target="_blank"}
-serving [Llama-3.2-3B-Instruct :material-arrow-top-right-thin:{ .external }](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct){:target="_blank"}
-using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs.docker.com/compose/){:target="_blank"}.
+This example shows how to deploy Hugging Face [Chat UI](https://huggingface.co/docs/chat-ui/index)
+with [TGI](https://huggingface.co/docs/text-generation-inference/en/index)
+serving [Llama-3.2-3B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct)
+using [Docker Compose](https://docs.docker.com/compose/).
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
@@ -103,7 +103,7 @@ using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs
 ### Deploying as a service
 
 If you'd like to deploy Chat UI as an auto-scalable and secure endpoint,
-use the service configuration. You can find it at [`examples/misc/docker-compose/service.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/docker-compose/service.dstack.yml)
+use the service configuration. You can find it at [`examples/misc/docker-compose/service.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/misc/docker-compose/service.dstack.yml)
 
 ### Running a configuration
 
@@ -172,7 +172,7 @@ be persisted.
 ## Source code
 
 The source-code of this example can be found in
-[`examples/misc/docker-compose` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/misc/docker-compose).
+[`examples/misc/docker-compose`](https://github.com/dstackai/dstack/blob/master/examples/misc/docker-compose).
 
 ## What's next?
 

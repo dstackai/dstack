@@ -1,13 +1,16 @@
 from typing import Optional
 
+import packaging.version
 import pytest
 
 from dstack._internal.server.utils.routers import check_client_server_compatibility
 
 
 class TestCheckClientServerCompatibility:
-    @pytest.mark.parametrize("client_version", ["12.12.12", None])
-    def test_returns_none_if_server_version_is_none(self, client_version: Optional[str]):
+    @pytest.mark.parametrize("client_version", [packaging.version.parse("12.12.12"), None])
+    def test_returns_none_if_server_version_is_none(
+        self, client_version: Optional[packaging.version.Version]
+    ):
         assert (
             check_client_server_compatibility(
                 client_version=client_version,
@@ -27,12 +30,10 @@ class TestCheckClientServerCompatibility:
             ("1.0.5", "1.0.6"),
         ],
     )
-    def test_returns_none_if_compatible(
-        self, client_version: Optional[str], server_version: Optional[str]
-    ):
+    def test_returns_none_if_compatible(self, client_version: str, server_version: str):
         assert (
             check_client_server_compatibility(
-                client_version=client_version,
+                client_version=packaging.version.parse(client_version),
                 server_version=server_version,
             )
             is None
@@ -46,10 +47,10 @@ class TestCheckClientServerCompatibility:
         ],
     )
     def test_returns_error_if_client_version_larger(
-        self, client_version: Optional[str], server_version: Optional[str]
+        self, client_version: str, server_version: str
     ):
         res = check_client_server_compatibility(
-            client_version=client_version,
+            client_version=packaging.version.parse(client_version),
             server_version=server_version,
         )
         assert res is not None
@@ -63,7 +64,7 @@ class TestCheckClientServerCompatibility:
     )
     def test_returns_none_if_client_version_is_latest(self, server_version: Optional[str]):
         res = check_client_server_compatibility(
-            client_version="latest",
+            client_version=None,
             server_version=server_version,
         )
         assert res is None

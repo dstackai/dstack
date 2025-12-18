@@ -35,6 +35,7 @@ export const JobMetrics: React.FC = () => {
     const { cpuChartProps, memoryChartProps, eachGPUChartProps, eachGPUMemoryChartProps, isLoading } = useMetricsData({
         project_name: paramProjectName,
         run_name: runData?.run_spec.run_name ?? '',
+        run_id: runData?.id ?? '',
         job_num: jobData?.job_spec.job_num ?? 0,
         limit: 1000,
     });

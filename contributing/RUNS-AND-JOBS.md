@@ -30,6 +30,8 @@ A run can spawn one or multiple jobs, depending on the configuration. A task tha
 - STEP 4: Once all jobs are finished, the run becomes `TERMINATED`, `DONE`, or `FAILED` based on `RunTerminationReason`.
 - STEP 0: If the run is `PENDING`, `background.tasks.process_runs` will resubmit jobs. The run becomes `SUBMITTED` again.
 
+> Use `switch_run_status()` for all status transitions. Do not set `RunModel.status` directly.
+
 > No one must assign the finished status to the run, except `services.runs.process_terminating_run`. To terminate the run, assign `TERMINATING` status and `RunTerminationReason`.
 
 ### Services
@@ -67,6 +69,8 @@ Services' lifecycle has some modifications:
 	- If the job has `remove_at` in the future, nothing happens. This is to give the job some time for a graceful stop.
 	- Once `remove_at` is in the past, it stops the container via `dstack-shim`, detaches instance volumes, and releases the instance. The job becomes `TERMINATED`, `DONE`, `FAILED`, or `ABORTED` based on `JobTerminationReason`.
 	- If some volumes fail to detach, it keeps the job `TERMINATING` and checks volumes attachment status.
+
+> Use `switch_job_status()` for all status transitions. Do not set `JobModel.status` directly.
 
 > No one must assign the finished status to the job, except `services.jobs.process_terminating_job`. To terminate the job, assign `TERMINATING` status and `JobTerminationReason`.
 

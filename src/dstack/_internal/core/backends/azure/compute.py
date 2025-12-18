@@ -1,8 +1,9 @@
 import base64
 import enum
 import re
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
@@ -51,7 +52,11 @@ from dstack._internal.core.backends.base.compute import (
     merge_tags,
     requires_nvidia_proprietary_kernel_modules,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
+from dstack._internal.core.backends.base.offers import (
+    OfferModifier,
+    get_catalog_offers,
+    get_offers_disk_modifier,
+)
 from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
@@ -74,6 +79,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 # OS disks can be 1GB-4095GB, dstack images are 30GB
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.parse("4095GB"))
+DEFAULT_GATEWAY_INSTANCE_TYPE = "Standard_B1ms"
 
 
 class AzureCompute(
@@ -108,10 +114,8 @@ class AzureCompute(
         )
         return offers_with_availability
 
-    def get_offers_modifier(
-        self, requirements: Requirements
-    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
-        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
 
     def create_instance(
         self,
@@ -227,6 +231,13 @@ class AzureCompute(
         self,
         configuration: GatewayComputeConfiguration,
     ) -> GatewayProvisioningData:
+        if configuration.instance_type is not None:
+            # TODO: support instance_type. Requires selecting a VM image to avoid errors like this:
+            # > The selected VM size 'Standard_E4s_v6' cannot boot Hypervisor Generation '1'
+            raise ComputeError(
+                "The `azure` backend does not support the `instance_type`"
+                " gateway configuration property"
+            )
         logger.info(
             "Launching %s gateway instance in %s...",
             configuration.instance_name,
@@ -272,9 +283,11 @@ class AzureCompute(
             managed_identity_name=None,
             managed_identity_resource_group=None,
             image_reference=_get_gateway_image_ref(),
-            vm_size="Standard_B1ms",
+            vm_size=DEFAULT_GATEWAY_INSTANCE_TYPE,
             instance_name=instance_name,
-            user_data=get_gateway_user_data(configuration.ssh_key_pub),
+            user_data=get_gateway_user_data(
+                configuration.ssh_key_pub, router=configuration.router
+            ),
             ssh_pub_keys=[configuration.ssh_key_pub],
             spot=False,
             disk_size=30,
@@ -415,11 +428,6 @@ _SUPPORTED_VM_SERIES_PATTERNS = [
     r"NC(\d+)ads_A100_v4",  # NC A100 v4-series [A100 80GB]
     r"ND(\d+)asr_v4",  # ND A100 v4-series [8xA100 40GB]
     r"ND(\d+)amsr_A100_v4",  # NDm A100 v4-series [8xA100 80GB]
-    # Deprecated series
-    # TODO: Remove after several releases
-    r"D(\d+)s_v3",  # Dsv3-series (general purpose)
-    r"E(\d+)i?s_v4",  # Esv4-series (memory optimized)
-    r"E(\d+)-(\d+)s_v4",  # Esv4-series (constrained vCPU)
 ]
 _SUPPORTED_VM_SERIES_PATTERN = (
     "^Standard_(" + "|".join(f"({s})" for s in _SUPPORTED_VM_SERIES_PATTERNS) + ")$"

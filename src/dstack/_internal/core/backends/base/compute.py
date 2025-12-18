@@ -4,7 +4,7 @@ import re
 import string
 import threading
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
@@ -17,13 +17,15 @@ from cachetools import TTLCache, cachedmethod
 from gpuhunt import CPUArchitecture
 
 from dstack._internal import settings
-from dstack._internal.core.backends.base.offers import filter_offers_by_requirements
+from dstack._internal.core.backends.base.models import JobConfiguration
+from dstack._internal.core.backends.base.offers import OfferModifier, filter_offers_by_requirements
 from dstack._internal.core.consts import (
     DSTACK_RUNNER_HTTP_PORT,
     DSTACK_RUNNER_SSH_PORT,
     DSTACK_SHIM_HTTP_PORT,
 )
-from dstack._internal.core.models.configurations import LEGACY_REPO_DIR
+from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.compute_groups import ComputeGroup, ComputeGroupProvisioningData
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -35,6 +37,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -48,6 +51,7 @@ from dstack._internal.utils.path import PathLike
 logger = get_logger(__name__)
 
 DSTACK_SHIM_BINARY_NAME = "dstack-shim"
+DSTACK_SHIM_RESTART_INTERVAL_SECONDS = 3
 DSTACK_RUNNER_BINARY_NAME = "dstack-runner"
 DEFAULT_PRIVATE_SUBNETS = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
 NVIDIA_GPUS_REQUIRING_PROPRIETARY_KERNEL_MODULES = frozenset(
@@ -91,11 +95,12 @@ class Compute(ABC):
     """
 
     @abstractmethod
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
         """
         Returns offers with availability matching `requirements`.
-        If the provider is added to gpuhunt, typically gets offers using `base.offers.get_catalog_offers()`
-        and extends them with availability info.
+        If the provider is added to gpuhunt, typically gets offers using
+        `base.offers.get_catalog_offers()` and extends them with availability info.
+        It is called from async code in executor. It can block on call but not between yields.
         """
         pass
 
@@ -108,6 +113,7 @@ class Compute(ABC):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         """
         Launches a new instance for the job. It should return `JobProvisioningData` ASAP.
@@ -168,17 +174,13 @@ class ComputeWithAllOffersCached(ABC):
         """
         pass
 
-    def get_offers_modifier(
-        self, requirements: Requirements
-    ) -> Optional[
-        Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]
-    ]:
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
         """
-        Returns a modifier function that modifies offers before they are filtered by requirements.
-        Can return `None` to exclude the offer.
+        Returns functions that modify offers before they are filtered by requirements.
+        A modifier function can return `None` to exclude the offer.
         E.g. can be used to set appropriate disk size based on requirements.
         """
-        return None
+        return []
 
     def get_offers_post_filter(
         self, requirements: Requirements
@@ -189,20 +191,13 @@ class ComputeWithAllOffersCached(ABC):
         """
         return None
 
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
-        offers = self._get_all_offers_with_availability_cached()
-        modifier = self.get_offers_modifier(requirements)
-        if modifier is not None:
-            modified_offers = []
-            for o in offers:
-                modified_offer = modifier(o)
-                if modified_offer is not None:
-                    modified_offers.append(modified_offer)
-            offers = modified_offers
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
+        cached_offers = self._get_all_offers_with_availability_cached()
+        offers = self.__apply_modifiers(cached_offers, self.get_offers_modifiers(requirements))
         offers = filter_offers_by_requirements(offers, requirements)
         post_filter = self.get_offers_post_filter(requirements)
         if post_filter is not None:
-            offers = [o for o in offers if post_filter(o)]
+            offers = (o for o in offers if post_filter(o))
         return offers
 
     @cachedmethod(
@@ -211,6 +206,18 @@ class ComputeWithAllOffersCached(ABC):
     )
     def _get_all_offers_with_availability_cached(self) -> List[InstanceOfferWithAvailability]:
         return self.get_all_offers_with_availability()
+
+    @staticmethod
+    def __apply_modifiers(
+        offers: Iterable[InstanceOfferWithAvailability], modifiers: Iterable[OfferModifier]
+    ) -> Iterator[InstanceOfferWithAvailability]:
+        for offer in offers:
+            for modifier in modifiers:
+                offer = modifier(offer)
+                if offer is None:
+                    break
+            else:
+                yield offer
 
 
 class ComputeWithFilteredOffersCached(ABC):
@@ -234,8 +241,8 @@ class ComputeWithFilteredOffersCached(ABC):
         """
         pass
 
-    def get_offers(self, requirements: Requirements) -> List[InstanceOfferWithAvailability]:
-        return self._get_offers_cached(requirements)
+    def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
+        return iter(self._get_offers_cached(requirements))
 
     def _get_offers_cached_key(self, requirements: Requirements) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
@@ -281,6 +288,7 @@ class ComputeWithCreateInstanceSupport(ABC):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         """
         The default `run_job()` implementation for all backends that support `create_instance()`.
@@ -297,7 +305,9 @@ class ComputeWithCreateInstanceSupport(ABC):
         )
         instance_offer = instance_offer.copy()
         self._restrict_instance_offer_az_to_volumes_az(instance_offer, volumes)
-        return self.create_instance(instance_offer, instance_config, placement_group=None)
+        return self.create_instance(
+            instance_offer, instance_config, placement_group=placement_group
+        )
 
     def _restrict_instance_offer_az_to_volumes_az(
         self,
@@ -318,6 +328,24 @@ class ComputeWithCreateInstanceSupport(ABC):
                 for z in instance_offer.availability_zones
                 if z == volume.provisioning_data.availability_zone
             ]
+
+
+class ComputeWithGroupProvisioningSupport(ABC):
+    @abstractmethod
+    def run_jobs(
+        self,
+        run: Run,
+        job_configurations: List[JobConfiguration],
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+        placement_group: Optional[PlacementGroup],
+    ) -> ComputeGroupProvisioningData:
+        pass
+
+    @abstractmethod
+    def terminate_compute_group(self, compute_group: ComputeGroup):
+        pass
 
 
 class ComputeWithPrivilegedSupport:
@@ -341,6 +369,15 @@ class ComputeWithMultinodeSupport:
 class ComputeWithReservationSupport:
     """
     Must be subclassed to support provisioning from reservations.
+
+    The following is expected from a backend that supports reservations:
+
+    - `get_offers` respects `Requirements.reservation` if set, and only returns
+      offers that can be provisioned in the configured reservation. It can
+      adjust some offer properties such as `availability` and
+      `availability_zones` if necessary.
+    - `create_instance` respects `InstanceConfig.reservation` if set, and
+      provisions the instance in the configured reservation.
     """
 
     pass
@@ -390,6 +427,16 @@ class ComputeWithPlacementGroupSupport(ABC):
         Should return immediately, without performing API calls.
         """
         pass
+
+    def are_placement_groups_compatible_with_reservations(self, backend_type: BackendType) -> bool:
+        """
+        Whether placement groups can be used for instances provisioned in reservations.
+
+        Arguments:
+            backend_type: matches the backend type of this compute, unless this compute is a proxy
+                for other backends (dstack Sky)
+        """
+        return True
 
 
 class ComputeWithGatewaySupport(ABC):
@@ -657,7 +704,7 @@ def get_shim_env(
     backend_shim_env: Optional[Dict[str, str]] = None,
     arch: Optional[str] = None,
 ) -> Dict[str, str]:
-    log_level = "6"  # Trace
+    log_level = "5"  # Debug
     envs = {
         "DSTACK_SHIM_HOME": get_dstack_working_dir(base_path),
         "DSTACK_SHIM_HTTP_PORT": str(DSTACK_SHIM_HTTP_PORT),
@@ -712,13 +759,35 @@ def get_shim_commands(
     return commands
 
 
-def get_dstack_runner_version() -> str:
-    if settings.DSTACK_VERSION is not None:
-        return settings.DSTACK_VERSION
-    version = os.environ.get("DSTACK_RUNNER_VERSION", None)
-    if version is None and settings.DSTACK_USE_LATEST_FROM_BRANCH:
-        version = get_latest_runner_build()
-    return version or "latest"
+def get_dstack_runner_version() -> Optional[str]:
+    if version := settings.DSTACK_VERSION:
+        return version
+    if version := settings.DSTACK_RUNNER_VERSION:
+        return version
+    if version_url := settings.DSTACK_RUNNER_VERSION_URL:
+        return _fetch_version(version_url)
+    if settings.DSTACK_USE_LATEST_FROM_BRANCH:
+        return get_latest_runner_build()
+    return None
+
+
+def get_dstack_shim_version() -> Optional[str]:
+    if version := settings.DSTACK_VERSION:
+        return version
+    if version := settings.DSTACK_SHIM_VERSION:
+        return version
+    if version := settings.DSTACK_RUNNER_VERSION:
+        logger.warning(
+            "DSTACK_SHIM_VERSION is not set, using DSTACK_RUNNER_VERSION."
+            " Future versions will not fall back to DSTACK_RUNNER_VERSION."
+            " Set DSTACK_SHIM_VERSION to supress this warning."
+        )
+        return version
+    if version_url := settings.DSTACK_SHIM_VERSION_URL:
+        return _fetch_version(version_url)
+    if settings.DSTACK_USE_LATEST_FROM_BRANCH:
+        return get_latest_runner_build()
+    return None
 
 
 def normalize_arch(arch: Optional[str] = None) -> GoArchType:
@@ -740,8 +809,10 @@ def normalize_arch(arch: Optional[str] = None) -> GoArchType:
     raise ValueError(f"Unsupported architecture: {arch}")
 
 
-def get_dstack_runner_download_url(arch: Optional[str] = None) -> str:
-    url_template = os.environ.get("DSTACK_RUNNER_DOWNLOAD_URL")
+def get_dstack_runner_download_url(
+    arch: Optional[str] = None, version: Optional[str] = None
+) -> str:
+    url_template = settings.DSTACK_RUNNER_DOWNLOAD_URL
     if not url_template:
         if settings.DSTACK_VERSION is not None:
             bucket = "dstack-runner-downloads"
@@ -751,12 +822,13 @@ def get_dstack_runner_download_url(arch: Optional[str] = None) -> str:
             f"https://{bucket}.s3.eu-west-1.amazonaws.com"
             "/{version}/binaries/dstack-runner-linux-{arch}"
         )
-    version = get_dstack_runner_version()
-    return url_template.format(version=version, arch=normalize_arch(arch).value)
+    if version is None:
+        version = get_dstack_runner_version() or "latest"
+    return _format_download_url(url_template, version, arch)
 
 
-def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
-    url_template = os.environ.get("DSTACK_SHIM_DOWNLOAD_URL")
+def get_dstack_shim_download_url(arch: Optional[str] = None, version: Optional[str] = None) -> str:
+    url_template = settings.DSTACK_SHIM_DOWNLOAD_URL
     if not url_template:
         if settings.DSTACK_VERSION is not None:
             bucket = "dstack-runner-downloads"
@@ -766,8 +838,9 @@ def get_dstack_shim_download_url(arch: Optional[str] = None) -> str:
             f"https://{bucket}.s3.eu-west-1.amazonaws.com"
             "/{version}/binaries/dstack-shim-linux-{arch}"
         )
-    version = get_dstack_runner_version()
-    return url_template.format(version=version, arch=normalize_arch(arch).value)
+    if version is None:
+        version = get_dstack_shim_version() or "latest"
+    return _format_download_url(url_template, version, arch)
 
 
 def get_setup_cloud_instance_commands(
@@ -829,12 +902,20 @@ def get_run_shim_script(
     dstack_shim_binary_path = get_dstack_shim_binary_path(bin_path)
     privileged_flag = "--privileged" if is_privileged else ""
     pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
+    # TODO: Use a proper process supervisor?
     return [
-        f"nohup {dstack_shim_binary_path} {privileged_flag} {pjrt_device_env} &",
+        f"""
+        nohup sh -c '
+            while true; do
+                {dstack_shim_binary_path} {privileged_flag} {pjrt_device_env}
+                sleep {DSTACK_SHIM_RESTART_INTERVAL_SECONDS}
+            done
+        ' &
+        """,
     ]
 
 
-def get_gateway_user_data(authorized_key: str) -> str:
+def get_gateway_user_data(authorized_key: str, router: Optional[AnyRouterConfig] = None) -> str:
     return get_cloud_config(
         package_update=True,
         packages=[
@@ -850,7 +931,7 @@ def get_gateway_user_data(authorized_key: str) -> str:
                 "s/# server_names_hash_bucket_size 64;/server_names_hash_bucket_size 128;/",
                 "/etc/nginx/nginx.conf",
             ],
-            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
+            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands(router))],
         ],
         ssh_authorized_keys=[authorized_key],
     )
@@ -921,8 +1002,6 @@ def get_docker_commands(
             f" --ssh-port {DSTACK_RUNNER_SSH_PORT}"
             " --temp-dir /tmp/runner"
             " --home-dir /root"
-            # TODO: Not used, left for compatibility with old runners. Remove eventually.
-            f" --working-dir {LEGACY_REPO_DIR}"
         ),
     ]
 
@@ -971,24 +1050,27 @@ def get_latest_runner_build() -> Optional[str]:
     return None
 
 
-def get_dstack_gateway_wheel(build: str) -> str:
+def get_dstack_gateway_wheel(build: str, router: Optional[AnyRouterConfig] = None) -> str:
     channel = "release" if settings.DSTACK_RELEASE else "stgn"
     base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
     if build == "latest":
-        r = requests.get(f"{base_url}/latest-version", timeout=5)
-        r.raise_for_status()
-        build = r.text.strip()
+        build = _fetch_version(f"{base_url}/latest-version") or "latest"
         logger.debug("Found the latest gateway build: %s", build)
-    return f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
+    wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
+    # Build package spec with extras if router is specified
+    if router:
+        return f"dstack-gateway[{router.type}] @ {wheel}"
+    return f"dstack-gateway @ {wheel}"
 
 
-def get_dstack_gateway_commands() -> List[str]:
-    build = get_dstack_runner_version()
+def get_dstack_gateway_commands(router: Optional[AnyRouterConfig] = None) -> List[str]:
+    build = get_dstack_runner_version() or "latest"
+    gateway_package = get_dstack_gateway_wheel(build, router)
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",
         "python3 -m venv /home/ubuntu/dstack/green",
-        f"/home/ubuntu/dstack/blue/bin/pip install {get_dstack_gateway_wheel(build)}",
+        f"/home/ubuntu/dstack/blue/bin/pip install '{gateway_package}'",
         "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
     ]
 
@@ -1017,3 +1099,17 @@ def requires_nvidia_proprietary_kernel_modules(gpu_name: str) -> bool:
         instead of open kernel modules.
     """
     return gpu_name.lower() in NVIDIA_GPUS_REQUIRING_PROPRIETARY_KERNEL_MODULES
+
+
+def _fetch_version(url: str) -> Optional[str]:
+    r = requests.get(url, timeout=5)
+    r.raise_for_status()
+    version = r.text.strip()
+    if not version:
+        logger.warning("Empty version response from URL: %s", url)
+        return None
+    return version
+
+
+def _format_download_url(template: str, version: str, arch: Optional[str]) -> str:
+    return template.format(version=version, arch=normalize_arch(arch).value)

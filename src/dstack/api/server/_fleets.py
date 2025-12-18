@@ -63,7 +63,7 @@ class FleetsAPIClient(APIClientGroup):
         self._request(f"/api/project/{project_name}/fleets/delete_instances", body=body.json())
 
     # Deprecated
-    # TODO: Remove in 0.20
+    # TODO: Remove in 0.21
     def create(
         self,
         project_name: str,

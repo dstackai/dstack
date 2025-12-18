@@ -77,6 +77,7 @@ class TestListProjects:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": None,
                 },
                 "created_at": "2023-01-02T03:04:00+00:00",
                 "backends": [],
@@ -244,6 +245,7 @@ class TestCreateProject:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": user.ssh_public_key,
             },
             "created_at": "2023-01-02T03:04:00+00:00",
             "backends": [],
@@ -259,6 +261,7 @@ class TestCreateProject:
                         "permissions": {
                             "can_create_projects": True,
                         },
+                        "ssh_public_key": user.ssh_public_key,
                     },
                     "project_role": ProjectRole.ADMIN,
                     "permissions": {
@@ -469,9 +472,12 @@ class TestDeleteProject:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_deletes_projects(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("project_name", ["project1", "a" * 50])
+    async def test_deletes_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient, project_name: str
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project1 = await create_project(session=session, owner=user, name="project1")
+        project1 = await create_project(session=session, owner=user, name=project_name)
         await add_project_member(
             session=session, project=project1, user=user, project_role=ProjectRole.ADMIN
         )
@@ -489,6 +495,16 @@ class TestDeleteProject:
         await session.refresh(project2)
         assert project1.deleted
         assert not project2.deleted
+        # Validate an event is emitted
+        response = await client.post(
+            "/api/events/list", headers=get_auth_headers(user.token), json={}
+        )
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+        assert response.json()[0]["message"] == "Project deleted"
+        assert len(response.json()[0]["targets"]) == 1
+        assert response.json()[0]["targets"][0]["id"] == str(project1.id)
+        assert response.json()[0]["targets"][0]["name"] == project_name
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -693,6 +709,7 @@ class TestGetProject:
                 "permissions": {
                     "can_create_projects": True,
                 },
+                "ssh_public_key": None,
             },
             "created_at": "2023-01-02T03:04:00+00:00",
             "backends": [],
@@ -708,6 +725,7 @@ class TestGetProject:
                         "permissions": {
                             "can_create_projects": True,
                         },
+                        "ssh_public_key": None,
                     },
                     "project_role": ProjectRole.ADMIN,
                     "permissions": {
@@ -937,6 +955,7 @@ class TestSetProjectMembers:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": admin.ssh_public_key,
                 },
                 "project_role": ProjectRole.ADMIN,
                 "permissions": {
@@ -954,6 +973,7 @@ class TestSetProjectMembers:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": user1.ssh_public_key,
                 },
                 "project_role": ProjectRole.ADMIN,
                 "permissions": {
@@ -971,6 +991,7 @@ class TestSetProjectMembers:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": user2.ssh_public_key,
                 },
                 "project_role": ProjectRole.USER,
                 "permissions": {
@@ -1027,6 +1048,7 @@ class TestSetProjectMembers:
                     "permissions": {
                         "can_create_projects": True,
                     },
+                    "ssh_public_key": user1.ssh_public_key,
                 },
                 "project_role": ProjectRole.ADMIN,
                 "permissions": {

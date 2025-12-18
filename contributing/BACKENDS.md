@@ -42,7 +42,7 @@ base class. See its docstrings for descriptions of the methods that your class s
 
 Refer to examples:
 - Offline providers:
-  [datacrunch.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/datacrunch.py),
+  [verda.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/verda.py),
   [aws.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/aws.py),
   [azure.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/azure.py),
   [lambdalabs.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/lambdalabs.py).
@@ -64,7 +64,7 @@ Add your provider in the following places:
 For offline providers, you can add data quality tests under `src/integrity_tests/`.
 Data quality tests are run after collecting offline catalogs to ensure their integrity.
 
-Refer to examples: [test_datacrunch.py](https://github.com/dstackai/gpuhunt/blob/main/src/integrity_tests/test_datacrunch.py),
+Refer to examples: [test_verda.py](https://github.com/dstackai/gpuhunt/blob/main/src/integrity_tests/test_verda.py),
 [test_gcp.py](https://github.com/dstackai/gpuhunt/blob/main/src/integrity_tests/test_gcp.py).
 
 ### 1.6. Submit a pull request
@@ -125,7 +125,7 @@ Then add these models to `AnyBackendConfig*` unions in [`src/dstack/_internal/co
 The script also generates `*BackendStoredConfig` that extends `*BackendConfig` to be able to store extra parameters in the DB. By the same logic, it generates `*Config` that extends `*BackendStoredConfig` with creds and uses it as the main `Backend` and `Compute` config instead of using `*BackendConfigWithCreds` directly.
 
 Refer to examples:
-[datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/models.py),
+[verda](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/verda/models.py),
 [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/models.py),
 [gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/models.py),
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/models.py), etc.
@@ -136,7 +136,7 @@ Go to `compute.py` and implement `Compute` methods.
 Optionally, extend and implement `ComputeWith*` classes to support additional features such as fleets, volumes, gateways, placement groups, etc. For example, extend `ComputeWithCreateInstanceSupport` to support fleets.
 
 Refer to examples:
-[datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/compute.py),
+[verda](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/verda/compute.py),
 [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/compute.py),
 [gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/compute.py),
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/compute.py), etc.
@@ -146,7 +146,7 @@ Refer to examples:
 Go to `configurator.py` and implement custom `Configurator` logic. At minimum, you should implement creds validation.
 You may also need to validate other config parameters if there are any.
 
-Refer to examples: [datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/configurator.py),
+Refer to examples: [verda](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/verda/configurator.py),
 [aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/configurator.py),
 [gcp](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/configurator.py),
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/configurator.py), etc.
@@ -195,7 +195,7 @@ For some VM-based backends, the `dstack` team also maintains
 [custom VM images](../scripts/packer/README.md) with the required dependencies
 and `dstack`-specific optimizations.
 
-Examples of VM-based backends include: `aws`, `azure`, `gcp`, `lambda`, `datacrunch`, `tensordock`, etc.
+Examples of VM-based backends include: `aws`, `azure`, `gcp`, `lambda`, `verda`, etc.
 
 #### 3.1.2. Container-based backend compute type
 

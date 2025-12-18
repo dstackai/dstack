@@ -94,11 +94,11 @@ With this, now you can use such a task to run both NCCL or RCCL tests on both cl
 as well as use MPI for other tasks.
 
 > The `dstackai/efa` image used in the example comes with MPI and NCCL tests pre-installed. While it is optimized for
-> [AWS EFA :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}, it can also
+> [AWS EFA](https://aws.amazon.com/hpc/efa/), it can also
 > be used with regular TCP/IP network adapters and InfiniBand. 
-> See the [source code :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/docker/efa) for the image.
+> See the [source code](https://github.com/dstackai/dstack/blob/master/docker/efa) for the image.
 
 !!! info "What's next?"
     1. Learn more about [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)
-    2. Check the [NCCL tests](../../examples/clusters/nccl-tests/index.md) example
-    3. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    2. Check the [NCCL/RCCL tests](../../examples/clusters/nccl-rccl-tests/index.md) example
+    3. Join [Discord](https://discord.gg/u8SmfwPpMd)

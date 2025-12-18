@@ -1,8 +1,8 @@
-openapi: 3.1.1
+openapi: 3.1.2
 
 info:
   title: dstack-shim API
-  version: v2/0.19.22
+  version: v2/0.20.1
   x-logo:
     url: https://avatars.githubusercontent.com/u/54146142?s=260
   description: >
@@ -41,7 +41,7 @@ paths:
 
         **Important**: Since this endpoint is used for negotiation, it should always stay
         backward/future compatible, specifically the `version` field
-
+      tags: [shim]
       responses:
         "200":
           description: ""
@@ -50,10 +50,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthcheckResponse"
 
+  /shutdown:
+    post:
+      summary: Request shim shutdown
+      description: |
+        (since [0.20.1](https://github.com/dstackai/dstack/releases/tag/0.20.1)) Request shim to shut down itself.
+        Restart must be handled by an external process supervisor, e.g., `systemd`.
+
+        **Note**: background jobs (e.g., component installation) are canceled regardless of the `force` option.
+      tags: [shim]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShutdownRequest"
+      responses:
+        "200":
+          description: Request accepted
+          $ref: "#/components/responses/PlainTextOk"
+        "400":
+          description: Malformed JSON body or validation error
+          $ref: "#/components/responses/PlainTextBadRequest"
+
   /instance/health:
     get:
       summary: Get instance health
-
       description: (since [0.19.22](https://github.com/dstackai/dstack/releases/tag/0.19.22)) Returns an object of optional passive system checks
       tags: [Instance]
       responses:
@@ -63,6 +85,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/InstanceHealthResponse"
+
+  /components:
+    get:
+      summary: Get components
+      description: (since [0.20.0](https://github.com/dstackai/dstack/releases/tag/0.20.0)) Returns a list of software components (e.g., `dstack-runner`)
+      tags: [Components]
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComponentListResponse"
+
+  /components/install:
+    post:
+      summary: Install component
+      description: >
+        (since [0.20.0](https://github.com/dstackai/dstack/releases/tag/0.20.0)) Request installing/updating the software component.
+        Components are installed asynchronously
+      tags: [Components]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComponentInstallRequest"
+      responses:
+        "200":
+          description: Request accepted
+          $ref: "#/components/responses/PlainTextOk"
+        "400":
+          description: Malformed JSON body or validation error
+          $ref: "#/components/responses/PlainTextBadRequest"
+        "409":
+          description: The component is already being installed
+          $ref: "#/components/responses/PlainTextConflict"
 
   /tasks:
     get:
@@ -104,7 +163,7 @@ paths:
       summary: Get task info
       tags: [Tasks]
       parameters:
-        - $ref: "#/parameters/taskId"
+        - $ref: "#/components/parameters/taskId"
       responses:
         "200":
           $ref: "#/components/responses/TaskInfo"
@@ -151,7 +210,7 @@ paths:
         resources: a container, logs, etc.
       tags: [Tasks]
       parameters:
-        - $ref: "#/parameters/taskId"
+        - $ref: "#/components/parameters/taskId"
       responses:
         "200":
           description: Task removed
@@ -166,15 +225,15 @@ paths:
           description: Internal error, e.g., failed to remove a container
           $ref: "#/components/responses/PlainTextInternalError"
 
-parameters:
-  taskId:
-    name: id
-    in: path
-    schema:
-      $ref: "#/components/schemas/TaskID"
-    required: true
-
 components:
+  parameters:
+    taskId:
+      name: id
+      in: path
+      schema:
+        $ref: "#/components/schemas/TaskID"
+      required: true
+
   schemas:
     TaskID:
       description: Unique task ID assigned by dstack server
@@ -369,6 +428,47 @@ components:
         - entity_id
       additionalProperties: false
 
+    ComponentName:
+      title: shim.components.ComponentName
+      type: string
+      enum:
+        - dstack-runner
+        - dstack-shim
+      description: |
+        * (since [0.20.0](https://github.com/dstackai/dstack/releases/tag/0.20.0)) `dstack-runner`
+        * (since [0.20.1](https://github.com/dstackai/dstack/releases/tag/0.20.1)) `dstack-shim`
+
+    ComponentStatus:
+      title: shim.components.ComponentStatus
+      type: string
+      enum:
+        - not-installed
+        - installed
+        - installing
+        - error
+
+    ComponentInfo:
+      title: shim.components.ComponenInfo
+      type: object
+      properties:
+        name:
+          $ref: "#/components/schemas/ComponentName"
+        version:
+          type: string
+          description: An empty string if status != installed
+          examples:
+            - 0.20.1
+        status:
+          allOf:
+            - $ref: "#/components/schemas/ComponentStatus"
+            - examples:
+              - installed
+      required:
+        - name
+        - version
+        - status
+      additionalProperties: false
+
     HealthcheckResponse:
       title: shim.api.HealthcheckResponse
       type: object
@@ -384,6 +484,18 @@ components:
         - version
       additionalProperties: false
 
+    ShutdownRequest:
+      title: shim.api.ShutdownRequest
+      type: object
+      properties:
+        force:
+          type: boolean
+          examples:
+            - false
+          description: If `true`, don't wait for background job coroutines to complete after canceling them and close HTTP server forcefully.
+      required:
+        - force
+
     InstanceHealthResponse:
       title: shim.api.InstanceHealthResponse
       type: object
@@ -391,6 +503,32 @@ components:
         dcgm:
           $ref: "#/components/schemas/DCGMHealth"
       additionalProperties: false
+
+    ComponentListResponse:
+      title: shim.api.ComponentListResponse
+      type: object
+      properties:
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentInfo"
+      required:
+        - components
+      additionalProperties: false
+
+    ComponentInstallRequest:
+      title: shim.api.ComponentInstallRequest
+      type: object
+      properties:
+        name:
+          $ref: "#/components/schemas/ComponentName"
+        url:
+          type: string
+          examples:
+            - https://dstack-runner-downloads.s3.eu-west-1.amazonaws.com/0.20.1/binaries/dstack-runner-linux-amd64
+      required:
+        - name
+        - url
 
     TaskListResponse:
       title: shim.api.TaskListResponse
@@ -535,8 +673,9 @@ components:
           examples:
             - 1073741824
         network_mode:
-          $ref: "#/components/schemas/NetworkMode"
-          default: host
+          allOf:
+          - $ref: "#/components/schemas/NetworkMode"
+          - default: host
         volumes:
           type: array
           items:

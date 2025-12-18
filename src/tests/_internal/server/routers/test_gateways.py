@@ -26,7 +26,7 @@ class TestListAndGetGateways:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         response = await client.post("/api/project/main/gateways/list")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -70,6 +70,8 @@ class TestListAndGetGateways:
                     "name": gateway.name,
                     "backend": backend.type.value,
                     "region": gateway.region,
+                    "instance_type": None,
+                    "router": None,
                     "domain": gateway.wildcard_domain,
                     "default": False,
                     "public_ip": True,
@@ -121,6 +123,8 @@ class TestListAndGetGateways:
                 "name": gateway.name,
                 "backend": backend.type.value,
                 "region": gateway.region,
+                "instance_type": None,
+                "router": None,
                 "domain": gateway.wildcard_domain,
                 "default": False,
                 "public_ip": True,
@@ -201,6 +205,8 @@ class TestCreateGateway:
                 "name": "test",
                 "backend": backend.type.value,
                 "region": "us",
+                "instance_type": None,
+                "router": None,
                 "domain": None,
                 "default": True,
                 "public_ip": True,
@@ -253,6 +259,8 @@ class TestCreateGateway:
                 "name": "random-name",
                 "backend": backend.type.value,
                 "region": "us",
+                "instance_type": None,
+                "router": None,
                 "domain": None,
                 "default": True,
                 "public_ip": True,
@@ -355,6 +363,8 @@ class TestDefaultGateway:
                 "name": gateway.name,
                 "backend": backend.type.value,
                 "region": gateway.region,
+                "instance_type": None,
+                "router": None,
                 "domain": gateway.wildcard_domain,
                 "default": True,
                 "public_ip": True,
@@ -477,6 +487,8 @@ class TestDeleteGateway:
                     "name": gateway_gcp.name,
                     "backend": backend_gcp.type.value,
                     "region": gateway_gcp.region,
+                    "instance_type": None,
+                    "router": None,
                     "domain": gateway_gcp.wildcard_domain,
                     "default": False,
                     "public_ip": True,
@@ -546,6 +558,8 @@ class TestUpdateGateway:
                 "name": gateway.name,
                 "backend": backend.type.value,
                 "region": gateway.region,
+                "instance_type": None,
+                "router": None,
                 "domain": "test.com",
                 "default": False,
                 "public_ip": True,

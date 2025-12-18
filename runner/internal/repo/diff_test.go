@@ -220,7 +220,7 @@ LcmZQzWMT#Y01f~L
 		},
 		{
 			name:    "Executable perm",
-			expMode: 0100,
+			expMode: 0o100,
 			diff:    "diff --git a/original b/original\nold mode 100644\nnew mode 100755\n",
 		},
 		{
@@ -290,8 +290,7 @@ index 9ce1261..f9c7821 100644
 		},
 	}
 
-	content :=
-		`First line.
+	content := `First line.
 Second line.
 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
 Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.

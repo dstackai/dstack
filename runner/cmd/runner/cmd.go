@@ -4,8 +4,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/dstackai/dstack/runner/consts"
 	"github.com/urfave/cli/v2"
+
+	"github.com/dstackai/dstack/runner/consts"
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.
@@ -47,12 +48,6 @@ func App() {
 						Usage:       "HomeDir directory for credentials and $HOME",
 						Value:       consts.RunnerHomeDir,
 						Destination: &homeDir,
-					},
-					// TODO: Not used, left for compatibility with old servers. Remove eventually.
-					&cli.PathFlag{
-						Name:        "working-dir",
-						Hidden:      true,
-						Destination: nil,
 					},
 					&cli.IntFlag{
 						Name:        "http-port",

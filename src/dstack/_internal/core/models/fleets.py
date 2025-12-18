@@ -21,7 +21,6 @@ from dstack._internal.core.models.profiles import (
     ProfileParams,
     ProfileRetry,
     SpotPolicy,
-    TerminationPolicy,
     parse_idle_duration,
 )
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -210,8 +209,6 @@ class FleetNodesSpec(CoreModel):
 class InstanceGroupParamsConfig(CoreConfig):
     @staticmethod
     def schema_extra(schema: Dict[str, Any]):
-        del schema["properties"]["termination_policy"]
-        del schema["properties"]["termination_idle_time"]
         add_extra_schema_types(
             schema["properties"]["nodes"],
             extra_types=[{"type": "integer"}, {"type": "string"}],
@@ -244,7 +241,7 @@ class InstanceGroupParams(CoreModel):
         Field(
             description=(
                 "The existing reservation to use for instance provisioning."
-                " Supports AWS Capacity Reservations and Capacity Blocks"
+                " Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations"
             )
         ),
     ] = None
@@ -309,13 +306,14 @@ class InstanceGroupParams(CoreModel):
     idle_duration: Annotated[
         Optional[int],
         Field(
-            description="Time to wait before terminating idle instances. Defaults to `5m` for runs and `3d` for fleets. Use `off` for unlimited duration"
+            description=(
+                "Time to wait before terminating idle instances."
+                " Instances are not terminated if the fleet is already at `nodes.min`."
+                " Defaults to `5m` for runs and `3d` for fleets."
+                " Use `off` for unlimited duration"
+            )
         ),
     ] = None
-
-    # Deprecated and unused. Left for compatibility with 0.18 clients.
-    termination_policy: Annotated[Optional[TerminationPolicy], Field(exclude=True)] = None
-    termination_idle_time: Annotated[Optional[Union[str, int]], Field(exclude=True)] = None
 
     @validator("nodes", pre=True)
     def parse_nodes(cls, v: Optional[Union[dict, str]]) -> Optional[dict]:

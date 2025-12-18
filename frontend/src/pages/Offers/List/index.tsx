@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Cards, CardsProps, Header, Link, MultiselectCSD, PropertyFilter, StatusIndicator } from 'components';
+import { Cards, CardsProps, MultiselectCSD, PropertyFilter, StatusIndicator } from 'components';
 
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { useCollection } from 'hooks';
 import { useGetGpusListQuery } from 'services/gpu';
 
 import { useEmptyMessages } from './hooks/useEmptyMessages';
 import { useFilters } from './hooks/useFilters';
-import { ROUTES } from '../../../routes';
-import { convertMiBToGB, rangeToObject, renderRange, round } from './helpers';
+import { convertMiBToGB, rangeToObject, renderRange, renderRangeJSX, round } from './helpers';
 
 import styles from './styles.module.scss';
 
@@ -67,17 +66,14 @@ const getRequestParams = ({
     };
 };
 
-export const OfferList = () => {
+type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange' | 'selectedItems' | 'selectionType'> & {
+    withSearchParams?: boolean;
+    onChangeProjectName?: (value: string) => void;
+};
+
+export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChangeProjectName, ...props }) => {
     const { t } = useTranslation();
     const [requestParams, setRequestParams] = useState<TGpusListQueryParams | undefined>();
-
-    useBreadcrumbs([
-        {
-            text: t('offer.title'),
-            href: ROUTES.OFFERS.LIST,
-        },
-    ]);
-
     const { data, isLoading, isFetching } = useGetGpusListQuery(
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
@@ -97,7 +93,7 @@ export const OfferList = () => {
         groupBy,
         groupByOptions,
         onChangeGroupBy,
-    } = useFilters({ gpus: data?.gpus ?? [] });
+    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams });
 
     useEffect(() => {
         setRequestParams(
@@ -109,6 +105,10 @@ export const OfferList = () => {
             }),
         );
     }, [JSON.stringify(filteringRequestParams), groupBy]);
+
+    useEffect(() => {
+        onChangeProjectName?.(filteringRequestParams.project_name ?? '');
+    }, [filteringRequestParams.project_name]);
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,
@@ -132,31 +132,37 @@ export const OfferList = () => {
     const sections = [
         {
             id: 'memory_mib',
-            header: t('offer.memory_mib'),
-            content: (gpu: IGpu) => `${round(convertMiBToGB(gpu.memory_mib))}GB`,
+            // header: t('offer.memory_mib'),
+            content: (gpu: IGpu) => (
+                <div>
+                    {round(convertMiBToGB(gpu.memory_mib))}GB
+                    <span className={styles.greyText}>:</span>
+                    {renderRange(gpu.count)}
+                </div>
+            ),
             width: 50,
         },
         {
             id: 'price',
-            header: t('offer.price'),
-            content: (gpu: IGpu) => <span className={styles.greenText}>{renderRange(gpu.price) ?? '-'}</span>,
+            // header: t('offer.price'),
+            content: (gpu: IGpu) => <span className={styles.greenText}>${renderRangeJSX(gpu.price) ?? '-'}</span>,
             width: 50,
         },
-        {
-            id: 'count',
-            header: t('offer.count'),
-            content: (gpu: IGpu) => renderRange(gpu.count) ?? '-',
-            width: 50,
-        },
+        // {
+        //     id: 'count',
+        //     header: t('offer.count'),
+        //     content: (gpu: IGpu) => renderRange(gpu.count) ?? '-',
+        //     width: 50,
+        // },
         !groupByBackend && {
             id: 'backends',
-            header: t('offer.backend_plural'),
+            // header: t('offer.backend_plural'),
             content: (gpu: IGpu) => gpu.backends?.join(', ') ?? '-',
             width: 50,
         },
         groupByBackend && {
             id: 'backend',
-            header: t('offer.backend'),
+            // header: t('offer.backend'),
             content: (gpu: IGpu) => gpu.backend ?? '-',
             width: 50,
         },
@@ -168,7 +174,7 @@ export const OfferList = () => {
         // },
         {
             id: 'spot',
-            header: t('offer.spot'),
+            // header: t('offer.spot'),
             content: (gpu: IGpu) => gpu.spot.join(', ') ?? '-',
             width: 50,
         },
@@ -188,16 +194,16 @@ export const OfferList = () => {
     return (
         <Cards
             {...collectionProps}
+            {...props}
+            entireCardClickable
             items={items}
             cardDefinition={{
-                header: (gpu) => <Link>{gpu.name}</Link>,
+                header: (gpu) => gpu.name,
                 sections,
             }}
             loading={isLoading || isFetching}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            header={<Header variant="awsui-h1-sticky">{t('offer.title')}</Header>}
-            variant="full-page"
             filter={
                 <div className={styles.selectFilters}>
                     <div className={styles.propertyFilter}>

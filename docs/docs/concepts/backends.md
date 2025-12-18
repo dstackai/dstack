@@ -1,19 +1,16 @@
 # Backends
 
-Backends allow `dstack` to manage compute across various environments.
-They can be configured via `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI.
+Backends allow `dstack` to provision fleets across cloud providers or Kubernetes clusters.
 
-`dstack` supports three types of backends: 
+`dstack` supports two types of backends: 
 
   * [VM-based](#vm-based) – use `dstack`'s native integration with cloud providers to provision VMs, manage clusters, and orchestrate container-based runs.  
   * [Container-based](#container-based) – use either `dstack`'s native integration with cloud providers or Kubernetes to orchestrate container-based runs; provisioning in this case is delegated to the cloud provider or Kubernetes.  
-  * [On-prem](#on-prem) – use `dstack`'s native support for on-prem servers without needing Kubernetes.  
 
-??? info "dstack Sky"
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},  
-    you can either configure your own backends or use the pre-configured backend that gives you access to compute from the GPU marketplace.
+??? info "SSH fleets"
+    When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh-fleets) once the server is up.
 
-See the examples of backend configuration below.
+Backends can be configured via `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI. See the examples of backend configuration below.
 
 ## VM-based
 
@@ -47,7 +44,7 @@ There are two ways to configure AWS: using an access key or using the default cr
 
 === "Access key"
 
-    Create an access key by following the [this guide :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get).
+    Create an access key by following the [this guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get).
     Once you've downloaded the `.csv` file with your IAM user's Access key ID and Secret access key, proceed to
     configure the backend.
 
@@ -224,7 +221,7 @@ There are two ways to configure AWS: using an access key or using the default cr
     Additionally, private subnets must have outbound internet connectivity provided by NAT Gateway, Transit Gateway, or other mechanism.
 
 ??? info "OS images"
-    By default, `dstack` uses its own [AMI :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html)
+    By default, `dstack` uses its own [AMI](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html)
     optimized for `dstack`.
     To use your own or other third-party images, set the `os_images` property:
 
@@ -283,7 +280,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
     </div>
 
-    If you don't know your `subscription_id` and `tenant_id`, use [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+    If you don't know your `subscription_id` and `tenant_id`, use [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
 
     ```shell
     az account show --query "{subscription_id: id, tenant_id: tenantId}"
@@ -291,7 +288,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
 === "Client secret"
 
-    A client secret can be created using the [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+    A client secret can be created using the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
 
     ```shell
     SUBSCRIPTION_ID=...
@@ -321,7 +318,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
     
     </div>
 
-    If you don't know your `subscription_id`, use [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+    If you don't know your `subscription_id`, use [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
     
     ```shell
     az account show --query "{subscription_id: id}"
@@ -441,7 +438,7 @@ There are two ways to configure GCP: using a service account or using the defaul
 
 === "Service account"
 
-    To create a service account, follow [this guide :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/service-accounts-create). After setting up the service account [create a key :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/keys-create-delete) for it and download the corresponding JSON file.
+    To create a service account, follow [this guide](https://cloud.google.com/iam/docs/service-accounts-create). After setting up the service account [create a key](https://cloud.google.com/iam/docs/keys-create-delete) for it and download the corresponding JSON file.
 
     Then go ahead and configure the backend by specifying the downloaded file path.
 
@@ -489,7 +486,7 @@ There are two ways to configure GCP: using a service account or using the defaul
 
         </div>
 
-If you don't know your GCP project ID, use [Google Cloud CLI :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/sdk/docs/install-sdk):
+If you don't know your GCP project ID, use [Google Cloud CLI](https://cloud.google.com/sdk/docs/install-sdk):
 
 ```shell
 gcloud projects list --format="json(projectId)"
@@ -520,6 +517,7 @@ gcloud projects list --format="json(projectId)"
     compute.networks.updatePolicy
     compute.regions.get
     compute.regions.list
+    compute.reservations.list
     compute.resourcePolicies.create
     compute.resourcePolicies.delete
     compute.routers.list
@@ -542,6 +540,9 @@ gcloud projects list --format="json(projectId)"
 
     Also, the use of TPUs requires the `serviceAccountUser` role.
     For TPU VMs, dstack will use the default service account.
+
+    If you plan to use shared reservations, the `compute.reservations.list`
+    permission is required in the project that owns the reservations.
 
 ??? info "Required APIs"
     First, ensure the required APIs are enabled in your GCP `project_id`.
@@ -626,7 +627,7 @@ gcloud projects list --format="json(projectId)"
 
 ### Lambda
 
-Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
+Log into your [Lambda Cloud](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
 button to create a new API key.
 
 Then, go ahead and configure the backend:
@@ -647,7 +648,7 @@ projects:
 
 ### Nebius
 
-Log into your [Nebius AI Cloud :material-arrow-top-right-thin:{ .external }](https://console.eu.nebius.com/) account, navigate to Access, and select Service Accounts. Create a service account, add it to the editors group, and upload its authorized key.
+Log into your [Nebius AI Cloud](https://console.eu.nebius.com/) account, navigate to Access, and select Service Accounts. Create a service account, add it to the editors group, and upload its authorized key.
 
 Then configure the backend:
 
@@ -668,7 +669,7 @@ projects:
 </div>
 
 ??? info "Credentials file"
-    It's also possible to configure the `nebius` backend using a credentials file [generated :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/iam/service-accounts/authorized-keys#create){:target="_blank"} by the `nebius` CLI:
+    It's also possible to configure the `nebius` backend using a credentials file [generated](https://docs.nebius.com/iam/service-accounts/authorized-keys#create) by the `nebius` CLI:
 
     <div class="termy">
 
@@ -740,7 +741,7 @@ projects:
 
 ### Vultr
 
-Log into your [Vultr :material-arrow-top-right-thin:{ .external }](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
+Log into your [Vultr](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
 
 Then, go ahead and configure the backend:
 
@@ -760,7 +761,7 @@ projects:
 
 ### CUDO
 
-Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
+Log into your [CUDO Compute](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
 
 Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
 
@@ -801,7 +802,7 @@ There are two ways to configure OCI: using client credentials or using the defau
 
 === "Client credentials"
 
-    Log into the [OCI Console :material-arrow-top-right-thin:{ .external }](https://cloud.oracle.com), go to `My profile`, 
+    Log into the [OCI Console](https://cloud.oracle.com), go to `My profile`, 
     select `API keys`, and click `Add API key`.
 
     Once you add a key, you'll see the configuration file. Copy its values to configure the backend as follows:
@@ -853,9 +854,11 @@ There are two ways to configure OCI: using client credentials or using the defau
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
 
-### DataCrunch
+<span id="datacrunch"></span>
 
-Log into your [DataCrunch :material-arrow-top-right-thin:{ .external }](https://cloud.datacrunch.io/) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
+### Verda (formerly DataCrunch) { #verda }
+
+Log into your [Verda](https://console.verda.com/signin) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
 Then, go ahead and configure the backend:
 
@@ -875,7 +878,7 @@ projects:
 </div>
 
 ### AMD Developer Cloud
-Log into your [AMD Developer Cloud :material-arrow-top-right-thin:{ .external }](https://amd.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
+Log into your [AMD Developer Cloud](https://amd.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
 
 Then, go ahead and configure the backend:
 
@@ -909,7 +912,7 @@ projects:
 
 
 ### Digital Ocean
-Log into your [Digital Ocean :material-arrow-top-right-thin:{ .external }](https://cloud.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
+Log into your [Digital Ocean](https://cloud.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
 
 Then, go ahead and configure the backend:
 
@@ -943,7 +946,7 @@ projects:
 
 ### Hot Aisle
 
-Log in to the SSH TUI as described in the [Hot Aisle Quick Start :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/quick-start/).
+Log in to the SSH TUI as described in the [Hot Aisle Quick Start](https://hotaisle.xyz/quick-start/).
 Create a new team and generate an API key for the member in the team.
 
 Then, go ahead and configure the backend:
@@ -972,7 +975,7 @@ projects:
 
 ### CloudRift
 
-Log into your [CloudRift :material-arrow-top-right-thin:{ .external }](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
+Log into your [CloudRift](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
 
 Ensure you've created a project with CloudRift.
 
@@ -1035,19 +1038,44 @@ projects:
 
 ??? info "NVIDIA GPU Operator"
     For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
-    [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html){:target="_blank"} pre-installed.
+    [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html) pre-installed.
 
 <!-- ??? info "Managed Kubernetes"
     While `dstack` supports both managed and on-prem Kubernetes clusters, it can only run on pre-provisioned nodes.
-    Support for auto-scalable Kubernetes clusters is coming soon—you can track progress in the corresponding [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/3126){:target="_blank"}.
+    Support for auto-scalable Kubernetes clusters is coming soon—you can track progress in the corresponding [issue](https://github.com/dstackai/dstack/issues/3126).
     
     If on-demand provisioning is important, we recommend using [VM-based](#vm-based) backends as they already support auto-scaling. -->
+
+??? info "Required permissions"
+    The following Kubernetes permissions are sufficient for `dstack` to work:
+
+    ```yaml
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: dstack-backend
+    rules:
+    - apiGroups: [""]
+      resources: ["namespaces"]
+      verbs: ["get", "create"]
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get", "create", "delete"]
+    - apiGroups: [""]
+      resources: ["services"]
+      verbs: ["get", "create", "delete"]
+    - apiGroups: [""]
+      resources: ["nodes"]
+      verbs: ["list"]
+    ```
+    
+    Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
 
 > To learn more, see the [Kubernetes](../guides/kubernetes.md) guide.
 
 ### RunPod
 
-Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
+Log into your [RunPod](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
 the button to create a Read & Write key.
 
 Then proceed to configuring the backend.
@@ -1068,7 +1096,7 @@ projects:
 
 ??? info "Community Cloud"
     By default, `dstack` considers instance offers from both the Secure Cloud and the
-    [Community Cloud :material-arrow-top-right-thin:{ .external }](https://docs.runpod.io/references/faq/#secure-cloud-vs-community-cloud).
+    [Community Cloud](https://docs.runpod.io/references/faq/#secure-cloud-vs-community-cloud).
 
     You can tell them apart by their regions.
     Secure Cloud regions contain datacenter IDs such as `CA-MTL-3`.
@@ -1105,7 +1133,7 @@ projects:
 
 ### Vast.ai
 
-Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
+Log into your [Vast.ai](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
 API Key.
 
 Then, go ahead and configure the backend:
@@ -1125,16 +1153,6 @@ projects:
 </div>
 
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
-
-## On-prem
-
-In on-prem environments, the [Kubernetes](#kubernetes) backend can be used if a Kubernetes cluster is already set up and configured.  
-However, often [SSH fleets](../concepts/fleets.md#ssh) are a simpler and lighter alternative.
-
-### SSH fleets
-
-SSH fleets require no backend configuration. 
-All you need to do is [provide hostnames and SSH credentials](../concepts/fleets.md#ssh), and `dstack` sets up a fleet that can orchestrate container-based runs on your servers.
 
 SSH fleets support the same features as [VM-based](#vm-based) backends.
 

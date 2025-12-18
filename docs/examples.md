@@ -80,64 +80,44 @@ hide:
 ## Clusters
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/clusters/nccl-tests"
+    <a href="/examples/clusters/gcp"
        class="feature-cell sky">
         <h3>
-            NCCL tests
+            GCP
         </h3>
 
         <p>
-            Run multi-node NCCL tests with MPI
+            Set up GCP A4 and A3 clusters with optimized networking
         </p>
     </a>
-    <a href="/examples/clusters/rccl-tests"
+    <a href="/examples/clusters/efa"
        class="feature-cell sky">
         <h3>
-            RCCL tests
-        </h3>
-
-        <p>
-            Run multi-node RCCL tests with MPI
-        </p>
-    </a>
-    <a href="/examples/clusters/a4"
-       class="feature-cell sky">
-        <h3>
-            GCP A4
-        </h3>
-
-        <p>
-            Set up GCP A4 clusters with optimized networking
-        </p>
-    </a>
-    <a href="/examples/clusters/a3mega"
-       class="feature-cell sky">
-        <h3>
-            GCP A3 Mega
-        </h3>
-
-        <p>
-            Set up GCP A3 Mega clusters with optimized networking
-        </p>
-    </a>
-    <a href="/examples/clusters/a3high"
-       class="feature-cell sky">
-        <h3>
-            GCP A3 High
-        </h3>
-
-        <p>
-            Set up GCP A3 High clusters with optimized networking
-        </p>
-    </a>
-        <a href="/examples/clusters/efa"
-       class="feature-cell sky">
-        <h3>
-            AWS EFA
+            AWS
         </h3>
 
         <p>
             Set up AWS EFA clusters with optimized networking
+        </p>
+    </a>
+    <a href="/examples/clusters/crusoe"
+       class="feature-cell sky">
+        <h3>
+            Crusoe
+        </h3>
+
+        <p>
+            Set up Crusoe clusters with optimized networking
+        </p>
+    </a>
+    <a href="/examples/clusters/nccl-rccl-tests"
+       class="feature-cell sky">
+        <h3>
+            NCCL/RCCL tests
+        </h3>
+
+        <p>
+            Run multi-node NCCL tests with MPI
         </p>
     </a>
 </div>

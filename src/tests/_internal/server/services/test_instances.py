@@ -58,12 +58,12 @@ class TestFilterPoolInstances:
             project=project,
             backend=BackendType.AWS,
         )
-        runpod_instance = await create_instance(
+        vastai_instance = await create_instance(
             session=session,
             project=project,
-            backend=BackendType.RUNPOD,
+            backend=BackendType.VASTAI,
         )
-        instances = [aws_instance, runpod_instance]
+        instances = [aws_instance, vastai_instance]
         res = instances_services.filter_pool_instances(
             pool_instances=instances,
             profile=Profile(name="test"),

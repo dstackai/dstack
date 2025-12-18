@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional, Tuple
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,7 @@ router = APIRouter(
 )
 async def get_job_metrics(
     run_name: str,
+    run_id: Optional[UUID] = None,
     replica_num: int = 0,
     job_num: int = 0,
     limit: int = 1,
@@ -39,8 +41,9 @@ async def get_job_metrics(
 ):
     """
     Returns job-level metrics such as hardware utilization
-    given `run_name`, `replica_num`, and `job_num`.
-    If only `run_name` is specified, returns metrics of `(replica_num=0, job_num=0)`.
+    given `run_name`, `run_id`, `replica_num`, and `job_num`.
+    If only `run_name` is specified, returns metrics of `(replica_num=0, job_num=0)`
+    of the latest run with the given name.
     By default, returns one latest sample. To control time window/number of samples, use
     `limit`, `after`, `before`.
 
@@ -61,6 +64,7 @@ async def get_job_metrics(
         session=session,
         project=project,
         run_name=run_name,
+        run_id=run_id,
         replica_num=replica_num,
         job_num=job_num,
     )

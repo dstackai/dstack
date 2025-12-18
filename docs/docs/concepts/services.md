@@ -2,6 +2,9 @@
 
 Services allow you to deploy models or web apps as secure and scalable endpoints.
 
+??? info "Prerequisites"
+    Before running a service, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
+
 ## Apply a configuration
 
 First, define a service configuration as a YAML file in your project folder.
@@ -100,12 +103,13 @@ If [authorization](#authorization) is not disabled, the service endpoint require
     However, you'll need a gateway in the following cases:
 
     * To use auto-scaling or rate limits
+    * To enable a support custom router, e.g. such as the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#)
     * To enable HTTPS for the endpoint and map it to your domain
     * If your service requires WebSockets
     * If your service cannot work with a [path prefix](#path-prefix)
 
-    Note, if you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-    a gateway is already pre-configured for you.
+    <!-- Note, if you're using [dstack Sky](https://sky.dstack.ai),
+    a gateway is already pre-configured for you. -->
 
     If a [gateway](gateways.md) is configured, the service endpoint will be accessible at
     `https://<run name>.<gateway domain>/`.
@@ -433,7 +437,7 @@ If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
 
 #### Default image
 
-If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its [base](https://github.com/dstackai/dstack/tree/master/docker/base) Docker image pre-configured with 
     `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
 Set the `python` property to pre-install a specific version of Python.
@@ -593,14 +597,11 @@ resources:
 
 ### Working directory
 
-If `working_dir` is not specified, it defaults to `/workflow`.
+If `working_dir` is not specified, it defaults to the working directory set in the Docker image. For example, the [default image](#default-image) uses `/dstack/run` as its working directory.
 
-!!! info "No commands"
-    If you’re using a custom `image` without `commands`, then `working_dir` is taken from `image`.
+If the Docker image does not have a working directory set, `dstack` uses `/` as the `working_dir`.
 
 The `working_dir` must be an absolute path. The tilde (`~`) is supported (e.g., `~/my-working-dir`).
-
-<!-- TODO: In a future version, the default working directory will be taken from `image`. -->
 
 <!-- TODO: Elaborate on `entrypoint` -->
 
@@ -617,7 +618,7 @@ type: service
 name: llama-2-7b-service
 
 files:
-  - .:examples  # Maps the directory where `.dstack.yml` to `/workflow/examples`
+  - .:examples  # Maps the directory with `.dstack.yml` to `<working dir>/examples`
   - ~/.ssh/id_rsa:/root/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rsa`
 
 python: 3.12
@@ -636,11 +637,10 @@ resources:
 
 </div>
 
-Each entry maps a local directory or file to a path inside the container. Both local and container paths can be relative or absolute.
+If the local path is relative, it’s resolved relative to the configuration file.
+If the container path is relative, it’s resolved relative to the [working directory](#working-directory).
 
-If the local path is relative, it’s resolved relative to the configuration file. If the container path is relative, it’s resolved relative to `/workflow`.
-
-The container path is optional. If not specified, it will be automatically calculated.
+The container path is optional. If not specified, it will be automatically calculated:
 
 <!-- TODO: Add a more relevant example -->
 
@@ -651,7 +651,7 @@ type: service
 name: llama-2-7b-service
 
 files:
-  - ../examples  # Maps `examples` (the parent directory of `.dstack.yml`) to `/workflow/examples`
+  - ../examples  # Maps the parent directory of `.dstack.yml` to `<working dir>/../examples`
   - ~/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rsa`
 
 python: 3.12
@@ -677,9 +677,9 @@ resources:
 
 ### Repos
 
-Sometimes, you may want to mount an entire Git repo inside the container.
+Sometimes, you may want to clone an entire Git repo inside the container.
 
-Imagine you have a cloned Git repo containing an `examples` subdirectory with a `.dstack.yml` file:
+Imagine you have a Git repo (clonned locally) containing an `examples` subdirectory with a `.dstack.yml` file:
 
 <!-- TODO: Add a more relevant example -->
 
@@ -690,8 +690,7 @@ type: service
 name: llama-2-7b-service
 
 repos:
-  # Mounts the parent directory of `examples` (must be a Git repo)
-  #   to `/workflow` (the default working directory)
+  # Clones the repo from the parent directory (`examples/..`) to `<working dir>`
   - ..
 
 python: 3.12
@@ -710,12 +709,12 @@ resources:
 
 </div>
 
-When you run it, `dstack` fetches the repo on the instance, applies your local changes, and mounts it—so the container matches your local repo.
+When you run it, `dstack` clones the repo on the instance, applies your local changes, and mounts it—so the container matches your local repo.
 
 The local path can be either relative to the configuration file or absolute.
 
 ??? info "Repo directory"
-    By default, `dstack` mounts the repo to `/workflow` (the default working directory).
+    By default, `dstack` clones the repo to the [working directory](#working-directory).
 
     <!-- TODO: In a future version, the default working directory will come from the image, so this should be revisited. -->
     
@@ -728,8 +727,7 @@ The local path can be either relative to the configuration file or absolute.
     name: llama-2-7b-service
 
     repos:
-      # Mounts the parent directory of `examples` (must be a Git repo)
-      #   to `/my-repo`
+      # Clones the repo in the parent directory (`examples/..`) to `/my-repo`
       - ..:/my-repo
 
     python: 3.12
@@ -748,7 +746,33 @@ The local path can be either relative to the configuration file or absolute.
 
     </div>
 
-    If the path is relative, it is resolved against `working_dir`.
+    > If the repo directory is relative, it is resolved against [working directory](#working-directory).
+
+    If the repo directory is not empty, the run will fail with a runner error.  
+    To override this behavior, you can set `if_exists` to `skip`:
+
+    ```yaml
+    type: service
+    name: llama-2-7b-service   
+  
+    repos:
+      - local_path: ..
+        path: /my-repo
+        if_exists: skip
+  
+    python: 3.12
+
+    env:
+      - HF_TOKEN
+      - MODEL=NousResearch/Llama-2-7b-chat-hf
+    commands:
+      - uv pip install vllm
+      - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+    port: 8000
+
+    resources:
+      gpu: 24GB
+    ```
 
 ??? info "Repo size"
     The repo size is not limited. However, local changes are limited to 2MB. 
@@ -756,8 +780,7 @@ The local path can be either relative to the configuration file or absolute.
     You can increase the 2MB limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
 
 ??? info "Repo URL"
-
-    Sometimes you may want to mount a Git repo without cloning it locally. In this case, simply provide a URL in `repos`:
+    Sometimes you may want to clone a Git repo within the container without cloning it locally. In this case, simply provide a URL in `repos`:
 
     <!-- TODO: Add a more relevant example -->
 
@@ -768,7 +791,7 @@ The local path can be either relative to the configuration file or absolute.
     name: llama-2-7b-service
 
     repos:
-      # Clone the specified repo to `/workflow` (the default working directory)
+      # Clone the repo to `<working dir>`
       - https://github.com/dstackai/dstack
 
     python: 3.12
@@ -791,9 +814,9 @@ The local path can be either relative to the configuration file or absolute.
     If a Git repo is private, `dstack` will automatically try to use your default Git credentials (from
     `~/.ssh/config` or `~/.config/gh/hosts.yml`).
 
-    If you want to use custom credentials, you can provide them with [`dstack init`](../reference/cli/dstack/init.md).
+    > If you want to use custom credentials, you can provide them with [`dstack init`](../reference/cli/dstack/init.md).
 
-> Currently, you can configure up to one repo per run configuration.
+Currently, you can configure up to one repo per run configuration.
 
 ### Retry policy
 
@@ -820,6 +843,9 @@ retry:
 
 If one replica of a multi-replica service fails with retry enabled,
 `dstack` will resubmit only the failed replica while keeping active replicas running.
+
+!!! info "Retry duration"
+    The duration period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
 
 ### Spot policy
 
@@ -988,6 +1014,6 @@ The rolling deployment stops when all replicas are updated or when a new deploym
     1. Read about [dev environments](dev-environments.md) and [tasks](tasks.md)
     2. Learn how to manage [fleets](fleets.md)
     3. See how to set up [gateways](gateways.md)
-    4. Check the [TGI :material-arrow-top-right-thin:{ .external }](../../examples/inference/tgi/index.md){:target="_blank"},
-       [vLLM :material-arrow-top-right-thin:{ .external }](../../examples/inference/vllm/index.md){:target="_blank"}, and 
-       [NIM :material-arrow-top-right-thin:{ .external }](../../examples/inference/nim/index.md){:target="_blank"} examples
+    4. Check the [TGI](../../examples/inference/tgi/index.md),
+       [vLLM](../../examples/inference/vllm/index.md), and 
+       [NIM](../../examples/inference/nim/index.md) examples

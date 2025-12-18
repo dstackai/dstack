@@ -41,9 +41,12 @@ from dstack._internal.server.models import (
     RunModel,
     VolumeModel,
 )
-from dstack._internal.server.services import services
+from dstack._internal.server.services import events, services
 from dstack._internal.server.services import volumes as volumes_services
-from dstack._internal.server.services.instances import get_instance_ssh_private_keys
+from dstack._internal.server.services.instances import (
+    format_instance_status_for_event,
+    get_instance_ssh_private_keys,
+)
 from dstack._internal.server.services.jobs.configurators.base import (
     JobConfigurator,
     interpolate_job_volumes,
@@ -64,6 +67,34 @@ from dstack._internal.utils.common import get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def switch_job_status(
+    session: AsyncSession,
+    job_model: JobModel,
+    new_status: JobStatus,
+    actor: events.AnyActor = events.SystemActor(),
+):
+    """
+    Switch job status.
+
+    **NOTE**: When switching to `TERMINATING`, set `termination_reason` and preferably
+              `termination_reason_message` before calling this function.
+    """
+    old_status = job_model.status
+    if old_status == new_status:
+        return
+
+    job_model.status = new_status
+
+    msg = f"Job status changed {old_status.upper()} -> {new_status.upper()}"
+    if new_status == JobStatus.TERMINATING:
+        if job_model.termination_reason is None:
+            raise ValueError("termination_reason must be set when switching to TERMINATING status")
+        msg += f". Termination reason: {job_model.termination_reason.upper()}"
+        if job_model.termination_reason_message:
+            msg += f" ({job_model.termination_reason_message})"
+    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(job_model)])
 
 
 async def get_jobs_from_run_spec(
@@ -96,20 +127,42 @@ def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
     )
 
 
+def find_jobs(
+    jobs: List[Job],
+    replica_num: Optional[int] = None,
+    job_num: Optional[int] = None,
+) -> list[Job]:
+    res = jobs
+    if replica_num is not None:
+        res = [j for j in res if j.job_spec.replica_num == replica_num]
+    if job_num is not None:
+        res = [j for j in res if j.job_spec.job_num == job_num]
+    return res
+
+
 async def get_run_job_model(
-    session: AsyncSession, project: ProjectModel, run_name: str, replica_num: int, job_num: int
+    session: AsyncSession,
+    project: ProjectModel,
+    run_name: str,
+    run_id: Optional[UUID],
+    replica_num: int,
+    job_num: int,
 ) -> Optional[JobModel]:
+    filters = [
+        RunModel.project_id == project.id,
+        RunModel.run_name == run_name,
+        JobModel.replica_num == replica_num,
+        JobModel.job_num == job_num,
+    ]
+    if run_id is not None:
+        filters.append(RunModel.id == run_id)
+    else:
+        # Assuming run_name is unique for non-deleted runs
+        filters.append(RunModel.deleted == False)
     res = await session.execute(
         select(JobModel)
         .join(JobModel.run)
-        .where(
-            RunModel.project_id == project.id,
-            # assuming run_name is unique for non-deleted runs
-            RunModel.run_name == run_name,
-            RunModel.deleted == False,
-            JobModel.replica_num == replica_num,
-            JobModel.job_num == job_num,
-        )
+        .where(*filters)
         .order_by(JobModel.submission_num.desc())
         .limit(1)
     )
@@ -180,6 +233,14 @@ def delay_job_instance_termination(job_model: JobModel):
     job_model.remove_at = common.get_current_datetime() + timedelta(seconds=15)
 
 
+def is_multinode_job(job: Job) -> bool:
+    return job.job_spec.jobs_per_replica > 1
+
+
+def is_master_job(job: Job) -> bool:
+    return job.job_spec.job_num == 0
+
+
 def _get_job_configurator(run_spec: RunSpec, secrets: Dict[str, str]) -> JobConfigurator:
     configuration_type = RunConfigurationType(run_spec.configuration.type)
     configurator_class = _configuration_type_to_configurator_class_map[configuration_type]
@@ -247,7 +308,7 @@ async def process_terminating_job(
     if instance_model is None:
         # Possible if the job hasn't been assigned an instance yet
         await services.unregister_replica(session, job_model)
-        _set_job_termination_status(job_model)
+        _set_job_termination_status(session, job_model)
         return
 
     all_volumes_detached: bool = True
@@ -309,6 +370,19 @@ async def process_terminating_job(
     job_model.instance_id = None
     instance_model.last_job_processed_at = common.get_current_datetime()
 
+    events.emit(
+        session,
+        (
+            "Job unassigned from instance."
+            f" Instance status: {format_instance_status_for_event(instance_model)}"
+        ),
+        actor=events.SystemActor(),
+        targets=[
+            events.Target.from_model(job_model),
+            events.Target.from_model(instance_model),
+        ],
+    )
+
     volume_names = (
         jrd.volume_names
         if jrd and jrd.volume_names
@@ -321,16 +395,10 @@ async def process_terminating_job(
         for volume in volumes:
             volume.last_job_processed_at = common.get_current_datetime()
 
-    logger.info(
-        "%s: instance '%s' has been released, new status is %s",
-        fmt(job_model),
-        instance_model.name,
-        instance_model.status.name,
-    )
     await services.unregister_replica(session, job_model)
     if all_volumes_detached:
         # Do not terminate while some volumes are not detached.
-        _set_job_termination_status(job_model)
+        _set_job_termination_status(session, job_model)
 
 
 async def process_volumes_detaching(
@@ -365,22 +433,15 @@ async def process_volumes_detaching(
         # Do not terminate the job while some volumes are not detached.
         # If force detach never succeeds, the job will be stuck terminating.
         # The job releases the instance when soft detaching, so the instance won't be stuck.
-        _set_job_termination_status(job_model)
+        _set_job_termination_status(session, job_model)
 
 
-def _set_job_termination_status(job_model: JobModel):
+def _set_job_termination_status(session: AsyncSession, job_model: JobModel):
     if job_model.termination_reason is not None:
-        job_model.status = job_model.termination_reason.to_status()
-        termination_reason_name = job_model.termination_reason.name
+        status = job_model.termination_reason.to_status()
     else:
-        job_model.status = JobStatus.FAILED
-        termination_reason_name = None
-    logger.info(
-        "%s: job status is %s, reason: %s",
-        fmt(job_model),
-        job_model.status.name,
-        termination_reason_name,
-    )
+        status = JobStatus.FAILED
+    switch_job_status(session, job_model, status)
 
 
 async def stop_container(
@@ -703,6 +764,10 @@ async def get_job_attached_volumes(
             _get_job_mount_point_attached_volume(mount_point_volumes, job_provisioning_data)
         )
     return job_volumes
+
+
+def remove_job_spec_sensitive_info(spec: JobSpec):
+    spec.ssh_key = None
 
 
 def _get_job_mount_point_attached_volume(

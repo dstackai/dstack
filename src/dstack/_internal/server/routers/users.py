@@ -36,11 +36,15 @@ async def list_users(
     return CustomORJSONResponse(await users.list_users_for_user(session=session, user=user))
 
 
-@router.post("/get_my_user", response_model=User)
+@router.post("/get_my_user", response_model=UserWithCreds)
 async def get_my_user(
+    session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
-    return CustomORJSONResponse(users.user_model_to_user(user))
+    if user.ssh_private_key is None or user.ssh_public_key is None:
+        # Generate keys for pre-0.19.33 users
+        await users.refresh_ssh_key(session=session, actor=user)
+    return CustomORJSONResponse(users.user_model_to_user_with_creds(user))
 
 
 @router.post("/get_user", response_model=UserWithCreds)
@@ -69,6 +73,7 @@ async def create_user(
         global_role=body.global_role,
         email=body.email,
         active=body.active,
+        creator=user,
     )
     return CustomORJSONResponse(users.user_model_to_user(res))
 
@@ -81,6 +86,7 @@ async def update_user(
 ):
     res = await users.update_user(
         session=session,
+        actor=user,
         username=body.username,
         global_role=body.global_role,
         email=body.email,
@@ -91,13 +97,25 @@ async def update_user(
     return CustomORJSONResponse(users.user_model_to_user(res))
 
 
+@router.post("/refresh_ssh_key", response_model=UserWithCreds)
+async def refresh_ssh_key(
+    body: RefreshTokenRequest,
+    session: AsyncSession = Depends(get_session),
+    user: UserModel = Depends(Authenticated()),
+):
+    res = await users.refresh_ssh_key(session=session, actor=user, username=body.username)
+    if res is None:
+        raise ResourceNotExistsError()
+    return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
+
+
 @router.post("/refresh_token", response_model=UserWithCreds)
 async def refresh_token(
     body: RefreshTokenRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
-    res = await users.refresh_user_token(session=session, user=user, username=body.username)
+    res = await users.refresh_user_token(session=session, actor=user, username=body.username)
     if res is None:
         raise ResourceNotExistsError()
     return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
@@ -111,6 +129,6 @@ async def delete_users(
 ):
     await users.delete_users(
         session=session,
-        user=user,
+        actor=user,
         usernames=body.users,
     )

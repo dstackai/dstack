@@ -1,11 +1,13 @@
 # Tasks
 
-A task allows you to run arbitrary commands on one or more nodes.
-They are best suited for jobs like training or batch processing.
+A task allows you to run arbitrary commands on one or more nodes. They are best suited for jobs like training or batch processing.
+
+??? info "Prerequisites"
+    Before running a task, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
 
 ## Apply a configuration
 
-First, define a task configuration as a YAML file in your project folder.
+First, define a task configuration as a YAML file.
 The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
 
 [//]: # (TODO: Make tabs - single machine & distributed tasks & web app)
@@ -30,7 +32,7 @@ commands:
   - uv pip install trl
   - | 
     trl sft \
-      --model_name_or_path $MODEL --dataset_name $DATASET
+      --model_name_or_path $MODEL --dataset_name $DATASET \
       --num_processes $DSTACK_GPUS_PER_NODE
 
 resources:
@@ -142,7 +144,7 @@ Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
 
 !!! info "MPI"
     If want to use MPI, you can set `startup_order` to `workers-first` and `stop_criteria` to `master-done`, and use `DSTACK_MPI_HOSTFILE`.
-    See the [NCCL](../../examples/clusters/nccl-tests/index.md) or [RCCL](../../examples/clusters/rccl-tests/index.md) examples.
+    See the [NCCL/RCCL tests](../../examples/clusters/nccl-rccl-tests/index.md) examples.
 
 > For detailed examples, see [distributed training](../../examples.md#distributed-training) examples.
 
@@ -170,12 +172,8 @@ Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
     For convenience, `~/.ssh/config` is preconfigured with these options, so a simple `ssh <node_ip>` is enough.
     For a list of nodes IPs check the `DSTACK_NODES_IPS` environment variable.
 
-!!! info "Fleets"
-    Distributed tasks can only run on fleets with
-    [cluster placement](fleets.md#cloud-placement).
-    While `dstack` can provision such fleets automatically, it is
-    recommended to create them via a fleet configuration
-    to ensure the highest level of inter-node connectivity.
+!!! info "Cluster fleets"
+    To run distributed tasks, you need to create a fleet with [`placement: cluster`](fleets.md#cloud-placement).
 
 > See the [Clusters](../guides/clusters.md) guide for more details on how to use `dstack` on clusters.
 
@@ -201,7 +199,7 @@ commands:
   - uv pip install trl
   - | 
     trl sft \
-      --model_name_or_path $MODEL --dataset_name $DATASET
+      --model_name_or_path $MODEL --dataset_name $DATASET \
       --num_processes $DSTACK_GPUS_PER_NODE
   
 resources:
@@ -257,7 +255,7 @@ If vendor is omitted, `dstack` infers it from the model or defaults to `nvidia`.
 
 #### Default image
 
-If you don't specify `image`, `dstack` uses its [base :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/docker/base){:target="_blank"} Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its [base](https://github.com/dstackai/dstack/tree/master/docker/base) Docker image pre-configured with 
     `uv`, `python`, `pip`, essential CUDA drivers, `mpirun`, and NCCL tests (under `/opt/nccl-tests/build`). 
 
 Set the `python` property to pre-install a specific version of Python.
@@ -278,7 +276,7 @@ commands:
   - uv pip install trl
   - | 
     trl sft \
-      --model_name_or_path $MODEL --dataset_name $DATASET
+      --model_name_or_path $MODEL --dataset_name $DATASET \
       --num_processes $DSTACK_GPUS_PER_NODE
 
 resources:
@@ -419,7 +417,7 @@ resources:
 
 ```yaml
 type: task
-name: trl-sft    
+name: trl-sft
 
 python: 3.12
 
@@ -433,7 +431,7 @@ commands:
   - uv pip install trl
   - | 
     trl sft \
-      --model_name_or_path $MODEL --dataset_name $DATASET
+      --model_name_or_path $MODEL --dataset_name $DATASET \
       --num_processes $DSTACK_GPUS_PER_NODE
 
 resources:
@@ -465,14 +463,11 @@ If you don't assign a value to an environment variable (see `HF_TOKEN` above),
 
 ### Working directory
 
-If `working_dir` is not specified, it defaults to `/workflow`.
+If `working_dir` is not specified, it defaults to the working directory set in the Docker image. For example, the [default image](#default-image) uses `/dstack/run` as its working directory.
 
-!!! info "No commands"
-    If you’re using a custom `image` without `commands`, then `working_dir` is taken from `image`.
+If the Docker image does not have a working directory set, `dstack` uses `/` as the `working_dir`.
 
 The `working_dir` must be an absolute path. The tilde (`~`) is supported (e.g., `~/my-working-dir`).
-
-<!-- TODO: In a future version, the default working directory will be taken from `image`. -->
 
 <!-- TODO: Elaborate on `entrypoint` -->
 
@@ -487,7 +482,7 @@ type: task
 name: trl-sft
 
 files:
-  - .:examples  # Maps the directory where `.dstack.yml` to `/workflow/examples`
+  - .:examples  # Maps the directory with `.dstack.yml` to `<working dir>/examples`
   - ~/.ssh/id_rsa:/root/.ssh/id_rsa  # Maps `~/.ssh/id_rsa` to `/root/.ssh/id_rs
 
 python: 3.12
@@ -502,7 +497,7 @@ commands:
   - uv pip install trl
   - | 
     trl sft \
-      --model_name_or_path $MODEL --dataset_name $DATASET
+      --model_name_or_path $MODEL --dataset_name $DATASET \
       --num_processes $DSTACK_GPUS_PER_NODE
 
 resources:
@@ -511,11 +506,10 @@ resources:
 
 </div>
 
-Each entry maps a local directory or file to a path inside the container. Both local and container paths can be relative or absolute.
+If the local path is relative, it’s resolved relative to the configuration file.
+If the container path is relative, it’s resolved relative to the [working directory](#working-directory).
 
-If the local path is relative, it’s resolved relative to the configuration file. If the container path is relative, it’s resolved relative to `/workflow`.
-
-The container path is optional. If not specified, it will be automatically calculated.
+The container path is optional. If not specified, it will be automatically calculated:
 
 <!-- TODO: Add a more elevant example -->
 
@@ -523,11 +517,11 @@ The container path is optional. If not specified, it will be automatically calcu
 
 ```yaml
 type: task
-name: trl-sft    
+name: trl-sft
 
 files:
-  - ../examples  # Maps `examples` (the parent directory of `.dstack.yml`) to `/workflow/examples`
-  - ~/.cache/huggingface/token  # Maps `~/.cache/huggingface/token` to `/root/~/.cache/huggingface/token`
+  - ../examples  # Maps the parent directory of `.dstack.yml` to `<working dir>/../examples`
+  - ~/.cache/huggingface/token  # Maps `~/.cache/huggingface/token` to `/root/.cache/huggingface/token`
 
 python: 3.12
 
@@ -541,7 +535,7 @@ commands:
   - uv pip install trl
   - | 
     trl sft \
-      --model_name_or_path $MODEL --dataset_name $DATASET
+      --model_name_or_path $MODEL --dataset_name $DATASET \
       --num_processes $DSTACK_GPUS_PER_NODE
 
 resources:
@@ -557,9 +551,9 @@ resources:
 
 ### Repos
 
-Sometimes, you may want to mount an entire Git repo inside the container.
+Sometimes, you may want to clone an entire Git repo inside the container.
 
-Imagine you have a cloned Git repo containing an `examples` subdirectory with a `.dstack.yml` file:
+Imagine you have a Git repo (clonned locally) containing an `examples` subdirectory with a `.dstack.yml` file:
 
 <!-- TODO: Add a more elevant example -->
 
@@ -567,11 +561,10 @@ Imagine you have a cloned Git repo containing an `examples` subdirectory with a 
 
 ```yaml
 type: task
-name: trl-sft    
+name: trl-sft
 
 repos:
-  # Mounts the parent directory of `examples` (must be a Git repo)
-  #   to `/workflow` (the default working directory)
+  # Clones the repo from the parent directory (`examples/..`) to `<working dir>`
   - ..
 
 python: 3.12
@@ -586,7 +579,7 @@ commands:
   - uv pip install trl
   - | 
     trl sft \
-      --model_name_or_path $MODEL --dataset_name $DATASET
+      --model_name_or_path $MODEL --dataset_name $DATASET \
       --num_processes $DSTACK_GPUS_PER_NODE
 
 resources:
@@ -595,26 +588,23 @@ resources:
 
 </div>
 
-When you run it, `dstack` fetches the repo on the instance, applies your local changes, and mounts it—so the container matches your local repo.
+When you run it, `dstack` clones the repo on the instance, applies your local changes, and mounts it—so the container matches your local repo.
 
 The local path can be either relative to the configuration file or absolute.
 
 ??? info "Repo directory"
-    By default, `dstack` mounts the repo to `/workflow` (the default working directory).
+    By default, `dstack` clones the repo to the [working directory](#working-directory).
 
-    <!-- TODO: In a future version, the default working directory will come from the image, so this should be revisited. -->
-    
     You can override the repo directory using either a relative or an absolute path:
 
     <div editor-title="examples/.dstack.yml"> 
 
     ```yaml
     type: task
-    name: trl-sft    
+    name: trl-sft
 
     repos:
-      # Mounts the parent directory of `examples` (must be a Git repo)
-      #   to `/my-repo`
+      # Clones the repo in the parent directory (`examples/..`) to `/my-repo`
       - ..:/my-repo
 
     python: 3.12
@@ -629,7 +619,7 @@ The local path can be either relative to the configuration file or absolute.
       - uv pip install trl
       - | 
         trl sft \
-          --model_name_or_path $MODEL --dataset_name $DATASET
+          --model_name_or_path $MODEL --dataset_name $DATASET \
           --num_processes $DSTACK_GPUS_PER_NODE
 
     resources:
@@ -638,7 +628,38 @@ The local path can be either relative to the configuration file or absolute.
 
     </div>
 
-    If the path is relative, it is resolved against [working directory](#working-directory).
+    > If the repo directory is relative, it is resolved against [working directory](#working-directory).
+
+    If the repo directory is not empty, the run will fail with a runner error.  
+    To override this behavior, you can set `if_exists` to `skip`:
+
+    ```yaml
+    type: task
+    name: trl-sft   
+  
+    repos:
+      - local_path: ..
+        path: /my-repo
+        if_exists: skip
+  
+    python: 3.12
+
+    env:
+      - HF_TOKEN
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+      - MODEL=Qwen/Qwen2.5-0.5B
+      - DATASET=stanfordnlp/imdb
+
+    commands:
+      - uv pip install trl
+      - | 
+        trl sft \
+          --model_name_or_path $MODEL --dataset_name $DATASET \
+          --num_processes $DSTACK_GPUS_PER_NODE
+
+    resources:
+      gpu: H100:1
+    ```
 
 ??? info "Repo size"
     The repo size is not limited. However, local changes are limited to 2MB. 
@@ -646,7 +667,7 @@ The local path can be either relative to the configuration file or absolute.
     You can increase the 2MB limit by setting the `DSTACK_SERVER_CODE_UPLOAD_LIMIT` environment variable.
 
 ??? info "Repo URL"
-    Sometimes you may want to mount a Git repo without cloning it locally. In this case, simply provide a URL in `repos`:
+    Sometimes you may want to clone a Git repo within the container without cloning it locally. In this case, simply provide a URL in `repos`:
 
     <!-- TODO: Add a more elevant example -->
 
@@ -657,7 +678,7 @@ The local path can be either relative to the configuration file or absolute.
     name: trl-sft    
 
     repos:
-      # Clone the specified repo to `/workflow` (the default working directory)
+      # Clone the repo to `<working dir>`
       - https://github.com/dstackai/dstack
 
     python: 3.12
@@ -672,7 +693,7 @@ The local path can be either relative to the configuration file or absolute.
       - uv pip install trl
       - | 
         trl sft \
-          --model_name_or_path $MODEL --dataset_name $DATASET
+          --model_name_or_path $MODEL --dataset_name $DATASET \
           --num_processes $DSTACK_GPUS_PER_NODE
 
     resources:
@@ -685,9 +706,9 @@ The local path can be either relative to the configuration file or absolute.
     If a Git repo is private, `dstack` will automatically try to use your default Git credentials (from
     `~/.ssh/config` or `~/.config/gh/hosts.yml`).
 
-    If you want to use custom credentials, you can provide them with [`dstack init`](../reference/cli/dstack/init.md).
+    > If you want to use custom credentials, you can provide them with [`dstack init`](../reference/cli/dstack/init.md).
 
-> Currently, you can configure up to one repo per run configuration.
+Currently, you can configure up to one repo per run configuration.
 
 ### Retry policy
 
@@ -721,6 +742,9 @@ retry:
 
 If one job of a multi-node task fails with retry enabled,
 `dstack` will stop all the jobs and resubmit the run.
+
+!!! info "Retry duration"
+    The duration period is calculated as a run age for `no-capacity` event and as a time passed since the last `interruption` and `error` for `interruption` and `error` events.
 
 ### Priority
 

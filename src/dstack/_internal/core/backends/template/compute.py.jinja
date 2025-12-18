@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import List, Optional
 
 from dstack._internal.core.backends.base.backend import Compute
@@ -47,7 +48,7 @@ class {{ backend_name }}Compute(
 
     def get_offers(
         self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    ) -> Iterator[InstanceOfferWithAvailability]:
         # If the provider is added to gpuhunt, you'd typically get offers
         # using `get_catalog_offers()` and extend them with availability info.
         offers = get_catalog_offers(
@@ -57,13 +58,13 @@ class {{ backend_name }}Compute(
             # configurable_disk_size=...,  TODO: set in case of boot volume size limits
         )
         # TODO: Add availability info to offers
-        return [
+        return (
             InstanceOfferWithAvailability(
                 **offer.dict(),
                 availability=InstanceAvailability.UNKNOWN,
             )
             for offer in offers
-        ]
+        )
 
     def create_instance(
         self,
@@ -83,6 +84,7 @@ class {{ backend_name }}Compute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
         volumes: List[Volume],
+        placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
         # TODO: Implement if create_instance() is not implemented. Delete otherwise.
         raise NotImplementedError()

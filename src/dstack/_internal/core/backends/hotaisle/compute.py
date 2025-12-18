@@ -2,7 +2,7 @@ import shlex
 import subprocess
 import tempfile
 from threading import Thread
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import gpuhunt
 from gpuhunt.providers.hotaisle import HotAisleProvider
@@ -22,6 +22,7 @@ from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
+    InstanceOffer,
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
@@ -31,38 +32,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-INSTANCE_TYPE_SPECS = {
-    "1x MI300X 8x Xeon Platinum 8462Y+": {
-        "cpu_model": "Xeon Platinum 8462Y+",
-        "cpu_frequency": 2800000000,
-        "cpu_manufacturer": "Intel",
-    },
-    "1x MI300X 13x Xeon Platinum 8470": {
-        "cpu_model": "Xeon Platinum 8470",
-        "cpu_frequency": 2000000000,
-        "cpu_manufacturer": "Intel",
-    },
-    "2x MI300X 26x Xeon Platinum 8470": {
-        "cpu_model": "Xeon Platinum 8470",
-        "cpu_frequency": 2000000000,
-        "cpu_manufacturer": "Intel",
-    },
-    "2x MI300X 26x Xeon Platinum 8462Y+": {
-        "cpu_model": "Xeon Platinum 8462Y+",
-        "cpu_frequency": 2800000000,
-        "cpu_manufacturer": "Intel",
-    },
-    "4x MI300X 52x Xeon Platinum 8462Y": {
-        "cpu_model": "Xeon Platinum 8470",
-        "cpu_frequency": 2000000000,
-        "cpu_manufacturer": "Intel",
-    },
-    "4x MI300X 52x Xeon Platinum 8462Y+": {
-        "cpu_model": "Xeon Platinum 8462Y+",
-        "cpu_frequency": 2800000000,
-        "cpu_manufacturer": "Intel",
-    },
-}
+SUPPORTED_GPUS = ["MI300X"]
 
 
 class HotAisleCompute(
@@ -85,45 +55,15 @@ class HotAisleCompute(
             backend=BackendType.HOTAISLE,
             locations=self.config.regions or None,
             catalog=self.catalog,
+            extra_filter=_supported_instances,
         )
-        supported_offers = []
-        for offer in offers:
-            if offer.instance.name in INSTANCE_TYPE_SPECS:
-                supported_offers.append(
-                    InstanceOfferWithAvailability(
-                        **offer.dict(), availability=InstanceAvailability.AVAILABLE
-                    )
-                )
-            else:
-                logger.warning(
-                    f"Skipping unsupported Hot Aisle instance type: {offer.instance.name}"
-                )
-        return supported_offers
-
-    def get_payload_from_offer(self, instance_type) -> dict:
-        instance_type_name = instance_type.name
-        cpu_specs = INSTANCE_TYPE_SPECS[instance_type_name]
-        cpu_cores = instance_type.resources.cpus
-
-        return {
-            "cpu_cores": cpu_cores,
-            "cpus": {
-                "count": 1,
-                "manufacturer": cpu_specs["cpu_manufacturer"],
-                "model": cpu_specs["cpu_model"],
-                "cores": cpu_cores,
-                "frequency": cpu_specs["cpu_frequency"],
-            },
-            "disk_capacity": instance_type.resources.disk.size_mib * 1024**2,
-            "ram_capacity": instance_type.resources.memory_mib * 1024**2,
-            "gpus": [
-                {
-                    "count": len(instance_type.resources.gpus),
-                    "manufacturer": instance_type.resources.gpus[0].vendor,
-                    "model": instance_type.resources.gpus[0].name,
-                }
-            ],
-        }
+        return [
+            InstanceOfferWithAvailability(
+                **offer.dict(),
+                availability=InstanceAvailability.AVAILABLE,
+            )
+            for offer in offers
+        ]
 
     def create_instance(
         self,
@@ -133,8 +73,10 @@ class HotAisleCompute(
     ) -> JobProvisioningData:
         project_ssh_key = instance_config.ssh_keys[0]
         self.api_client.upload_ssh_key(project_ssh_key.public)
-        vm_payload = self.get_payload_from_offer(instance_offer.instance)
-        vm_data = self.api_client.create_virtual_machine(vm_payload)
+        offer_backend_data: HotAisleOfferBackendData = (
+            HotAisleOfferBackendData.__response__.parse_obj(instance_offer.backend_data)
+        )
+        vm_data = self.api_client.create_virtual_machine(offer_backend_data.vm_specs)
         return JobProvisioningData(
             backend=instance_offer.backend,
             instance_type=instance_offer.instance,
@@ -230,6 +172,12 @@ def _run_ssh_command(hostname: str, ssh_private_key: str, command: str):
         )
 
 
+def _supported_instances(offer: InstanceOffer) -> bool:
+    return len(offer.instance.resources.gpus) > 0 and all(
+        gpu.name in SUPPORTED_GPUS for gpu in offer.instance.resources.gpus
+    )
+
+
 class HotAisleInstanceBackendData(CoreModel):
     ip_address: str
 
@@ -237,3 +185,7 @@ class HotAisleInstanceBackendData(CoreModel):
     def load(cls, raw: Optional[str]) -> "HotAisleInstanceBackendData":
         assert raw is not None
         return cls.__response__.parse_raw(raw)
+
+
+class HotAisleOfferBackendData(CoreModel):
+    vm_specs: dict[str, Any]

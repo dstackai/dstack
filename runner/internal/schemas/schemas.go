@@ -16,7 +16,7 @@ type JobStateEvent struct {
 
 type LogEvent struct {
 	Message   []byte `json:"message"`
-	Timestamp int64  `json:"timestamp"`
+	Timestamp int64  `json:"timestamp"` // milliseconds
 }
 
 type SubmitBody struct {
@@ -71,8 +71,9 @@ type JobSpec struct {
 	// `RepoData` is optional for compatibility with jobs submitted before 0.19.17.
 	// Use `RunExecutor.getRepoData()` to get non-nil `RepoData`.
 	// TODO: make required when supporting jobs submitted before 0.19.17 is no longer relevant.
-	RepoData     *RepoData     `json:"repo_data"`
-	FileArchives []FileArchive `json:"file_archives"`
+	RepoData         *RepoData         `json:"repo_data"`
+	RepoExistsAction *RepoExistsAction `json:"repo_exists_action"`
+	FileArchives     []FileArchive     `json:"file_archives"`
 }
 
 type ClusterInfo struct {
@@ -101,6 +102,13 @@ type RepoData struct {
 	RepoConfigName  string `json:"repo_config_name"`
 	RepoConfigEmail string `json:"repo_config_email"`
 }
+
+type RepoExistsAction string
+
+const (
+	RepoExistsActionError RepoExistsAction = "error"
+	RepoExistsActionSkip  RepoExistsAction = "skip"
+)
 
 type FileArchive struct {
 	Id   string `json:"id"`

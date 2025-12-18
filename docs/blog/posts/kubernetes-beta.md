@@ -29,11 +29,11 @@ A major advantage of Kubernetes is its portability. Whether you’re using manag
 
 !!! info "NVIDIA GPU Operator"
     For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
-    [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html){:target="_blank"} pre-installed.
+    [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html) pre-installed.
 
 ### Nebius example
 
-If you're using [Nebius :material-arrow-top-right-thin:{ .external }](https://nebius.com/){:target="_blank"}, the process of creating a Kubernetes cluster is straightforward.
+If you're using [Nebius](https://nebius.com/), the process of creating a Kubernetes cluster is straightforward.
 
 Select the region of interest and click `Create cluster`.  
 Once the cluster is created, switch to `Applications` and install the `nvidia-device-plugin` application — this can be done in one click.
@@ -299,7 +299,7 @@ VM-based backends also offer more granular control over cluster provisioning.
 
 ### SSH fleets vs Kubernetes backend
 
-If you’re using on-prem servers and Kubernetes isn’t a requirement, [SSH fleets](../../docs/concepts/fleets.md#ssh) may be simpler.
+If you’re using on-prem servers and Kubernetes isn’t a requirement, [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets) may be simpler.
 They provide a lightweight and flexible alternative.
 
 ### AMD GPUs
@@ -312,4 +312,4 @@ Support for AMD GPUs is coming soon — our team is actively working on it right
         [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
         and [fleets](../../docs/concepts/fleets.md)
     3. Read the the [clusters](../../docs/guides/clusters.md) guide
-    4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    4. Join [Discord](https://discord.gg/u8SmfwPpMd)

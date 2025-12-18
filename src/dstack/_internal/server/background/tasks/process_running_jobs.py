@@ -61,7 +61,9 @@ from dstack._internal.server.services.jobs import (
     get_job_attached_volumes,
     get_job_provisioning_data,
     get_job_runtime_data,
+    is_master_job,
     job_model_to_job_submission,
+    switch_job_status,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
@@ -165,8 +167,11 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     job_provisioning_data = job_submission.job_provisioning_data
     if job_provisioning_data is None:
         logger.error("%s: job_provisioning_data of an active job is None", fmt(job_model))
-        job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+        job_model.termination_reason_message = (
+            "Unexpected server error: job_provisioning_data of an active job is None"
+        )
+        switch_job_status(session, job_model, JobStatus.TERMINATING)
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
         return
@@ -180,12 +185,15 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
     initial_status = job_model.status
     if initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
-        # Wait until all other jobs in the replica are provisioned
         for other_job in run.jobs:
             if (
                 other_job.job_spec.replica_num == job.job_spec.replica_num
                 and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
             ):
+                logger.debug(
+                    "%s: waiting for all jobs in the replica to be provisioned",
+                    fmt(job_model),
+                )
                 job_model.last_processed_at = common_utils.get_current_datetime()
                 await session.commit()
                 return
@@ -214,10 +222,9 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         try:
             _interpolate_secrets(secrets, job.job_spec)
         except InterpolatorError as e:
-            logger.info("%s: terminating due to secrets interpolation error", fmt(job_model))
-            job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-            job_model.termination_reason_message = e.args[0]
+            job_model.termination_reason_message = f"Secrets interpolation error: {e.args[0]}"
+            switch_job_status(session, job_model, JobStatus.TERMINATING)
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
@@ -228,7 +235,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
     if initial_status == JobStatus.PROVISIONING:
         if job_provisioning_data.hostname is None:
-            await _wait_for_instance_provisioning_data(job_model=job_model)
+            await _wait_for_instance_provisioning_data(session, job_model)
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
@@ -245,6 +252,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 job_submission.age,
             )
             ssh_user = job_provisioning_data.username
+            assert run.run_spec.ssh_key_pub is not None
             user_ssh_key = run.run_spec.ssh_key_pub.strip()
             public_keys = [project.ssh_public_key.strip(), user_ssh_key]
             if job_provisioning_data.backend == BackendType.LOCAL:
@@ -255,6 +263,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 server_ssh_private_keys,
                 job_provisioning_data,
                 None,
+                session,
                 run,
                 job_model,
                 job_provisioning_data,
@@ -289,6 +298,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 server_ssh_private_keys,
                 job_provisioning_data,
                 None,
+                session,
                 run,
                 job_model,
                 job,
@@ -302,17 +312,17 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
         if not success:
             # check timeout
-            if job_submission.age > get_provisioning_timeout(
+            provisioning_timeout = get_provisioning_timeout(
                 backend_type=job_provisioning_data.get_base_backend(),
                 instance_type_name=job_provisioning_data.instance_type.name,
-            ):
-                logger.warning(
-                    "%s: failed because runner has not become available in time, age=%s",
-                    fmt(job_model),
-                    job_submission.age,
-                )
-                job_model.status = JobStatus.TERMINATING
+            )
+            if job_submission.age > provisioning_timeout:
                 job_model.termination_reason = JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+                job_model.termination_reason_message = (
+                    f"Runner did not become available within {provisioning_timeout.total_seconds()}s."
+                    f" Job submission age: {job_submission.age.total_seconds()}s)"
+                )
+                switch_job_status(session, job_model, JobStatus.TERMINATING)
                 # instance will be emptied by process_terminating_jobs
 
     else:  # fails are not acceptable
@@ -339,6 +349,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 server_ssh_private_keys,
                 job_provisioning_data,
                 None,
+                session,
                 run,
                 job_model,
                 job,
@@ -357,6 +368,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 server_ssh_private_keys,
                 job_provisioning_data,
                 job_submission.job_runtime_data,
+                session,
                 run_model,
                 job_model,
             )
@@ -371,18 +383,13 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     job_model.termination_reason.value,
                     job_submission.age,
                 )
-                job_model.status = JobStatus.TERMINATING
+                switch_job_status(session, job_model, JobStatus.TERMINATING)
                 # job will be terminated and instance will be emptied by process_terminating_jobs
             else:
                 # No job_model.termination_reason set means ssh connection failed
                 if job_model.disconnected_at is None:
                     job_model.disconnected_at = common_utils.get_current_datetime()
                 if _should_terminate_job_due_to_disconnect(job_model):
-                    logger.warning(
-                        "%s: failed because instance is unreachable, age=%s",
-                        fmt(job_model),
-                        job_submission.age,
-                    )
                     if (
                         job_model.instance is not None
                         and job_model.instance.termination_reason
@@ -399,7 +406,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                             and not job_provisioning_data.instance_type.resources.spot
                             else JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
                         )
-                    job_model.status = JobStatus.TERMINATING
+                    switch_job_status(session, job_model, JobStatus.TERMINATING)
                 else:
                     logger.warning(
                         "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
@@ -429,7 +436,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     await session.commit()
 
 
-async def _wait_for_instance_provisioning_data(job_model: JobModel):
+async def _wait_for_instance_provisioning_data(session: AsyncSession, job_model: JobModel):
     """
     This function will be called until instance IP address appears
     in `job_model.instance.job_provisioning_data` or instance is terminated on timeout.
@@ -448,8 +455,9 @@ async def _wait_for_instance_provisioning_data(job_model: JobModel):
         return
 
     if job_model.instance.status == InstanceStatus.TERMINATED:
-        job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED
+        job_model.termination_reason_message = "Instance is terminated"
+        switch_job_status(session, job_model, JobStatus.TERMINATING)
         return
 
     job_model.job_provisioning_data = job_model.instance.job_provisioning_data
@@ -480,7 +488,7 @@ def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> boo
         )
         return True
     if (
-        job.job_spec.job_num == 0
+        is_master_job(job)
         and run.run_spec.merged_profile.startup_order == StartupOrder.WORKERS_FIRST
     ):
         for other_job in run.jobs:
@@ -500,6 +508,7 @@ def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> boo
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _process_provisioning_with_shim(
     ports: Dict[int, int],
+    session: AsyncSession,
     run: Run,
     job_model: JobModel,
     job_provisioning_data: JobProvisioningData,
@@ -626,14 +635,14 @@ def _process_provisioning_with_shim(
             shim_client.stop(force=True)
             return False
 
-    job_model.status = JobStatus.PULLING
-    logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
+    switch_job_status(session, job_model, JobStatus.PULLING)
     return True
 
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
 def _process_pulling_with_shim(
     ports: Dict[int, int],
+    session: AsyncSession,
     run: Run,
     job_model: JobModel,
     job: Job,
@@ -711,6 +720,7 @@ def _process_pulling_with_shim(
         server_ssh_private_keys,
         job_provisioning_data,
         job_runtime_data,
+        session=session,
         run=run,
         job_model=job_model,
         job=job,
@@ -726,6 +736,7 @@ def _process_pulling_with_shim(
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT])
 def _process_running(
     ports: Dict[int, int],
+    session: AsyncSession,
     run_model: RunModel,
     job_model: JobModel,
 ) -> bool:
@@ -751,15 +762,13 @@ def _process_running(
         runner_logs=resp.runner_logs,
         job_logs=resp.job_logs,
     )
-    previous_status = job_model.status
     if len(resp.job_states) > 0:
         latest_state_event = resp.job_states[-1]
         latest_status = latest_state_event.state
         if latest_status == JobStatus.DONE:
-            job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.DONE_BY_RUNNER
+            switch_job_status(session, job_model, JobStatus.TERMINATING)
         elif latest_status in {JobStatus.FAILED, JobStatus.TERMINATED}:
-            job_model.status = JobStatus.TERMINATING
             job_model.termination_reason = JobTerminationReason.CONTAINER_EXITED_WITH_ERROR
             if latest_state_event.termination_reason:
                 job_model.termination_reason = JobTerminationReason(
@@ -767,19 +776,23 @@ def _process_running(
                 )
             if latest_state_event.termination_message:
                 job_model.termination_reason_message = latest_state_event.termination_message
+            switch_job_status(session, job_model, JobStatus.TERMINATING)
         if (exit_status := latest_state_event.exit_status) is not None:
             job_model.exit_status = exit_status
             if exit_status != 0:
                 logger.info("%s: non-zero exit status %s", fmt(job_model), exit_status)
     else:
-        _terminate_if_inactivity_duration_exceeded(run_model, job_model, resp.no_connections_secs)
-    if job_model.status != previous_status:
-        logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
+        _terminate_if_inactivity_duration_exceeded(
+            session, run_model, job_model, resp.no_connections_secs
+        )
     return True
 
 
 def _terminate_if_inactivity_duration_exceeded(
-    run_model: RunModel, job_model: JobModel, no_connections_secs: Optional[int]
+    session: AsyncSession,
+    run_model: RunModel,
+    job_model: JobModel,
+    no_connections_secs: Optional[int],
 ) -> None:
     conf = RunSpec.__response__.parse_raw(run_model.run_spec).configuration
     if not isinstance(conf, DevEnvironmentConfiguration) or not isinstance(
@@ -792,20 +805,20 @@ def _terminate_if_inactivity_duration_exceeded(
     job_model.inactivity_secs = no_connections_secs
     if no_connections_secs is None:
         # TODO(0.19 or earlier): make no_connections_secs required
-        job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
         job_model.termination_reason_message = (
             "The selected instance was created before dstack 0.18.41"
             " and does not support inactivity_duration"
         )
+        switch_job_status(session, job_model, JobStatus.TERMINATING)
     elif no_connections_secs >= conf.inactivity_duration:
-        job_model.status = JobStatus.TERMINATING
         # TODO(0.19 or earlier): set JobTerminationReason.INACTIVITY_DURATION_EXCEEDED
         job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
         job_model.termination_reason_message = (
             f"The job was inactive for {no_connections_secs} seconds,"
             f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
         )
+        switch_job_status(session, job_model, JobStatus.TERMINATING)
 
 
 def _should_terminate_job_due_to_disconnect(job_model: JobModel) -> bool:
@@ -862,8 +875,10 @@ async def _maybe_register_replica(
             fmt(job_model),
             e,
         )
-        job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
+        # Not including e.args[0] in the message to avoid exposing internal details
+        job_model.termination_reason_message = "Failed to register service replica"
+        switch_job_status(session, job_model, JobStatus.TERMINATING)
 
 
 async def _check_gpu_utilization(session: AsyncSession, job_model: JobModel, job: Job) -> None:
@@ -884,14 +899,14 @@ async def _check_gpu_utilization(session: AsyncSession, job_model: JobModel, job
     if _should_terminate_due_to_low_gpu_util(
         policy.min_gpu_utilization, [m.values for m in gpus_util_metrics]
     ):
-        logger.info("%s: GPU utilization check: terminating", fmt(job_model))
-        job_model.status = JobStatus.TERMINATING
+        logger.debug("%s: GPU utilization check: terminating", fmt(job_model))
         # TODO(0.19 or earlier): set JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY
         job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
         job_model.termination_reason_message = (
             f"The job GPU utilization below {policy.min_gpu_utilization}%"
             f" for {policy.time_window} seconds"
         )
+        switch_job_status(session, job_model, JobStatus.TERMINATING)
     else:
         logger.debug("%s: GPU utilization check: OK", fmt(job_model))
 
@@ -1009,6 +1024,7 @@ async def _get_job_file_archive(
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
 def _submit_job_to_runner(
     ports: Dict[int, int],
+    session: AsyncSession,
     run: Run,
     job_model: JobModel,
     job: Job,
@@ -1064,7 +1080,7 @@ def _submit_job_to_runner(
     logger.debug("%s: starting job", fmt(job_model))
     runner_client.run_job()
 
-    job_model.status = JobStatus.RUNNING
+    switch_job_status(session, job_model, JobStatus.RUNNING)
     # do not log here, because the runner will send a new status
 
     return True

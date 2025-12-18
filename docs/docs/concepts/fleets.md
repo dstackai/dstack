@@ -4,36 +4,45 @@ Fleets act both as pools of instances and as templates for how those instances a
 
 `dstack` supports two kinds of fleets: 
 
-* [Standard fleets](#standard) – dynamically provisioned through configured backends; they are supported with any type of backends: [VM-based](backends.md#vm-based), [container-based](backends.md#container-based), and [Kubernetes](backends.md#kubernetes)
-* [SSH fleets](#ssh) – created using on-prem servers; do not require backends
+* [Backend fleets](#backend-fleets) – dynamically provisioned through configured backends; they are supported with any type of backends: [VM-based](backends.md#vm-based) and [container-based](backends.md#container-based) (incl. [Kubernetes](backends.md#kubernetes))
+* [SSH fleets](#ssh-fleets) – created using on-prem servers; do not require backends
 
-## Standard fleets { #standard }
+When you submit a dev environment, task, or service, `dstack` reuses idle instances or provisions new ones based on the fleet configuration. 
 
-When you run `dstack apply` to start a dev environment, task, or service, `dstack` will reuse idle instances  
-from an existing fleet whenever available.
+> You must create a fleet before submitting runs.
 
-If no fleet meets the requirements or has idle capacity, `dstack` can create a new fleet on the fly.  
-However, it’s generally better to define fleets explicitly in configuration files for greater control.  
+## Backend fleets
 
-### Apply a configuration
+Backend fleets allow provisioning compute across cloud providers or Kubernetes clusters. 
 
-Define a fleet configuration as a YAML file in your project directory. The file must have a
+??? info "Prerequisites"
+    Before creating a backend fleet, make sure to configure the corresponding [backends](backends.md).
+
+### Apply the configuration
+
+To create a backend fleet, define a configuration as a YAML file. The file must have a
 `.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
 
-<div editor-title="examples/misc/fleets/.dstack.yml">
+<div editor-title="fleet.dstack.yml">
     
     ```yaml
     type: fleet
     # The name is optional, if not specified, generated randomly
-    name: my-fleet
+    name: default
     
     # Can be a range or a fixed number
-    nodes: 2
+    # Allow to provision of up to 2 instances
+    nodes: 0..2
+
     # Uncomment to ensure instances are inter-connected
     #placement: cluster
+
+    # Deprovision instances above the minimum if they remain idle
+    idle_duration: 1h
     
     resources:
-      gpu: 24GB
+      # Allow to provision up to 8 GPUs
+      gpu: 0..8
     ```
     
 </div>
@@ -43,91 +52,72 @@ To create or update the fleet, pass the fleet configuration to [`dstack apply`](
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/misc/fleets/.dstack.yml
+$ dstack apply -f fleet.dstack.yml
 
 Provisioning...
 ---> 100%
 
- FLEET     INSTANCE  BACKEND              GPU             PRICE    STATUS  CREATED 
- my-fleet  0         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago      
-           1         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago    
+ FLEET     INSTANCE  BACKEND  GPU  PRICE  STATUS  CREATED 
+ my-fleet  -         -        -    -      -       -
 ```
 
 </div>
 
-Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
+If `nodes` is a range that starts above `0`, `dstack` pre-creates the initial number of instances up front, while any additional ones are created on demand. 
 
-??? info "Container-based backends"
-    [Container-based](backends.md#container-based) backends don’t support pre-provisioning,
-    so `nodes` can only be set to a range starting with `0`.
-    
-    This means instances are created only when a run starts, and once it finishes, they’re terminated and released back to the provider (either a cloud service or Kubernetes).
+> Setting the `nodes` range to start above `0` is supported only for [VM-based backends](backends.md#vm-based).
 
-    <div editor-title=".dstack.yml">
+??? info "Target number of nodes"
+
+    If `nodes` is defined as a range, you can start with more than the minimum number of instances by using the `target` parameter when creating the fleet.
+
+    <div editor-title="fleet.dstack.yml"> 
 
     ```yaml
     type: fleet
-    # The name is optional, if not specified, generated randomly
+
     name: my-fleet
-    
-    # Specify the number of instances
-    nodes: 0..2
-    # Uncomment to ensure instances are inter-connected
-    #placement: cluster
-    
-    resources:
-      gpu: 24GB
+
+    nodes:
+      min: 0
+      max: 2
+
+      # Provision 2 instances initially
+      target: 2
+
+    # Deprovision instances above the minimum if they remain idle
+    idle_duration: 1h
     ```
 
     </div>
 
+By default, when you submit a [dev environment](dev-environments.md), [task](tasks.md), or [service](services.md), `dstack` tries all available fleets. However, you can explicitly specify the [`fleets`](../reference/dstack.yml/dev-environment.md#fleets) in your run configuration
+or via [`--fleet`](../reference/cli/dstack/apply.md#fleet) with `dstack apply`.
+
 ### Configuration options
 
-#### Nodes { #nodes }
-
-The `nodes` property controls how many instances to provision and maintain in the fleet:
-
-<div editor-title=".dstack.yml"> 
-
-```yaml
-type: fleet
-
-name: my-fleet
-
-nodes:
-  min: 1 # Always maintain at least 1 idle instance. Can be 0.
-  target: 2 # (Optional) Provision 2 instances initially
-  max: 3 # (Optional) Do not allow more than 3 instances
-```
-
-</div>
-
-`dstack` ensures the fleet always has at least `nodes.min` instances, creating new instances in the background if necessary. If you don't need to keep instances in the fleet forever, you can set `nodes.min` to `0`. By default, `dstack apply` also provisions `nodes.min` instances. The `nodes.target` property allows provisioning more instances initially than needs to be maintained.
-
-#### Placement { #standard-placement }
+#### Placement { #backend-placement }
 
 To ensure instances are interconnected (e.g., for
 [distributed tasks](tasks.md#distributed-tasks)), set `placement` to `cluster`. 
 This ensures all instances are provisioned with optimal inter-node connectivity.
 
 ??? info "AWS"
-    When you create a fleet with AWS, [Elastic Fabric Adapter networking :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    When you create a fleet with AWS, [Elastic Fabric Adapter networking](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html) is automatically configured if it’s supported for the corresponding instance type.
     Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
     Otherwise, instances are only connected by the default VPC subnet.
 
-    Refer to the [EFA](../../examples/clusters/efa/index.md) example for more details.
+    Refer to the [AWS](../../examples/clusters/aws/index.md) example for more details.
 
 ??? info "GCP"
-    When you create a fleet with GCP, `dstack` automatically configures [GPUDirect-TCPXO and GPUDirect-TCPX :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot){:target="_blank"} networking for the A3 Mega and A3 High instance types, as well as RoCE networking for the A4 instance type.
+    When you create a fleet with GCP, `dstack` automatically configures [GPUDirect-TCPXO and GPUDirect-TCPX](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot) networking for the A3 Mega and A3 High instance types, as well as RoCE networking for the A4 instance type.
 
     !!! info "Backend configuration"    
         You may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
-        Refer to the [A4](../../examples/clusters/a4/index.md),
-        [A3 Mega](../../examples/clusters/a3mega/index.md), and 
-        [A3 High](../../examples/clusters/a3high/index.md) examples for more details.
+        Refer to the [GCP](../../examples/clusters/gcp/index.md) examples for more details.
 
 ??? info "Nebius"
-    When you create a fleet with Nebius, [InfiniBand networking :material-arrow-top-right-thin:{ .external }](https://docs.nebius.com/compute/clusters/gpu){:target="_blank"} is automatically configured if it’s supported for the corresponding instance type.
+    When you create a fleet with Nebius, [InfiniBand networking](https://docs.nebius.com/compute/clusters/gpu) is automatically configured if it’s supported for the corresponding instance type.
     Otherwise, instances are only connected by the default VPC subnet.
 
     An InfiniBand fabric for the cluster is selected automatically. If you prefer to use some specific fabrics, configure them in the
@@ -190,9 +180,9 @@ and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10
 > If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
 > [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
 
-#### Blocks { #standard-blocks }
+#### Blocks { #backend-blocks }
 
-For standard fleets, `blocks` function the same way as in SSH fleets. 
+For backend fleets, `blocks` function the same way as in SSH fleets. 
 See the [`Blocks`](#ssh-blocks) section under SSH fleets for details on the blocks concept.
 
 <div editor-title=".dstack.yml">
@@ -214,10 +204,10 @@ blocks: 4
 #### Idle duration
 
 By default, fleet instances stay `idle` for 3 days and can be reused within that time.
-If the fleet is not reused within this period, it is automatically terminated.
+If an instance is not reused within this period, it is automatically terminated.
 
 To change the default idle duration, set
-[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the fleet configuration (e.g., `0s`, `1m`, or `off` for
 unlimited).
 
 <div editor-title="examples/misc/fleets/.dstack.yml">
@@ -272,13 +262,13 @@ retry:
 </div>
 
 !!! info "Reference"
-    Standard fleets support many more configuration options,
+    Backend fleets support many more configuration options,
     incl. [`backends`](../reference/dstack.yml/fleet.md#backends), 
     [`regions`](../reference/dstack.yml/fleet.md#regions), 
     [`max_price`](../reference/dstack.yml/fleet.md#max_price), and
     among [others](../reference/dstack.yml/fleet.md).
 
-## SSH fleets { #ssh }
+## SSH fleets
 
 If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet.
 
@@ -313,12 +303,12 @@ Define a fleet configuration as a YAML file in your project directory. The file 
 
     === "NVIDIA"
         2.&nbsp;Hosts with NVIDIA GPUs must also be pre-installed with CUDA 12.1 and
-        [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+        [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
 
     === "AMD"
         2.&nbsp;Hosts with AMD GPUs must also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
-        [native package manager :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
-        or [AMDGPU installer :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
+        [native package manager](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
+        or [AMDGPU installer](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
 
     === "Intel Gaudi"
         2.&nbsp;Hosts with Intel Gaudi accelerators must be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
@@ -392,7 +382,7 @@ By default, a job uses the entire instance—e.g., all 8 GPUs. To allow multiple
           # As many as possible, according to numbers of GPUs and CPUs
           blocks: auto
         - hostname: 3.255.177.53
-          # Do not sclice. This is the default value, may be omitted
+          # Do not slice. This is the default value, may be omitted
           blocks: 1
     ```
 

@@ -16,7 +16,7 @@ Our new benchmark explores two important areas for optimizing AI workloads on AM
 
 <!-- more -->
 
-This benchmark was supported by [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"},
+This benchmark was supported by [Hot Aisle](https://hotaisle.xyz/),
 a provider of AMD GPU bare-metal and VM infrastructure.
 
 ## Benchmark 1: Bare-metal vs containers
@@ -56,11 +56,11 @@ Our experiments consistently demonstrate that running multi-node AI workloads in
 
 ## Benchmark 2: Partition performance isolated vs mesh
 
-The AMD GPU can be [partitioned :material-arrow-top-right-thin:{ .external }](https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/overview.html){:target="_blank"} into smaller, independent units (e.g., NPS4 mode splits one GPU into four partitions). This promises better memory bandwidth utilization. Does this theoretical gain translate to better performance in practice?
+The AMD GPU can be [partitioned](https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/overview.html) into smaller, independent units (e.g., NPS4 mode splits one GPU into four partitions). This promises better memory bandwidth utilization. Does this theoretical gain translate to better performance in practice?
 
 ### Finding 1: Higher performance for isolated partitions
 
-First, we sought to reproduce and extend findings from the [official ROCm blog :material-arrow-top-right-thin:{ .external }](https://rocm.blogs.amd.com/software-tools-optimization/compute-memory-modes/README.html){:target="_blank"}. We benchmarked the memory bandwidth of a single partition (in CPX/NPS4 mode) against a full, unpartitioned GPU (in SPX/NPS1 mode).
+First, we sought to reproduce and extend findings from the [official ROCm blog](https://rocm.blogs.amd.com/software-tools-optimization/compute-memory-modes/README.html). We benchmarked the memory bandwidth of a single partition (in CPX/NPS4 mode) against a full, unpartitioned GPU (in SPX/NPS1 mode).
 
 <img src="https://dstack.ai/static-assets/static-assets/images/benchmark-amd-containers-and-partitions-chart4a.png" width="750"/>
 
@@ -100,7 +100,7 @@ GPU partitioning is only practical if used dynamically—for instance, to run mu
 #### Limitations
 
 1. **Reproducibility**: AMD’s original blog post on partitioning lacked detailed setup information, so we had to reconstruct the benchmarks independently.
-2. **Network tuning**: These benchmarks were run on a default, out-of-the-box network configuration. Our results for RCCL (~339 GB/s) and RDMA (~726 Gbps) are slightly below the peak figures [reported by Dell :material-arrow-top-right-thin:{ .external }](https://infohub.delltechnologies.com/en-us/l/generative-ai-in-the-enterprise-with-amd-accelerators/rccl-and-perftest-for-cluster-validation-1/4/){:target="_blank"}. This suggests that further performance could be unlocked with expert tuning of network topology, MTU size, and NCCL environment variables.
+2. **Network tuning**: These benchmarks were run on a default, out-of-the-box network configuration. Our results for RCCL (~339 GB/s) and RDMA (~726 Gbps) are slightly below the peak figures [reported by Dell](https://infohub.delltechnologies.com/en-us/l/generative-ai-in-the-enterprise-with-amd-accelerators/rccl-and-perftest-for-cluster-validation-1/4/). This suggests that further performance could be unlocked with expert tuning of network topology, MTU size, and NCCL environment variables.
 
 ## Benchmark setup
 
@@ -122,7 +122,7 @@ The full, reproducible steps are available in our GitHub repository. Below is a 
 
 #### Creating a fleet
 
-We first defined a `dstack` [SSH fleet](../../docs/concepts/fleets.md#ssh) to manage the two-node cluster.
+We first defined a `dstack` [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets) to manage the two-node cluster.
 
 ```yaml
 type: fleet
@@ -352,7 +352,7 @@ The `SIZE` value is `1M`, `2M`, .., `8G`.
 
 **vLLM data parallel**
 
-1. Build nginx container (see [vLLM-nginx :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/stable/deployment/nginx.html#build-nginx-container){:target="_blank"}).
+1. Build nginx container (see [vLLM-nginx](https://docs.vllm.ai/en/stable/deployment/nginx.html#build-nginx-container)).
 
 2. Create `nginx.conf`
 
@@ -471,13 +471,13 @@ HIP_VISIBLE_DEVICES=0 python3 toy_inference_benchmark.py \
 
 ## Source code
 
-All source code and findings are available in [our GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/amd/baremetal_container_partition){:target="_blank"}.
+All source code and findings are available in [our GitHub repo](https://github.com/dstackai/benchmarks/tree/main/amd/baremetal_container_partition).
 
 ## References
 
-* [AMD Instinct MI300X GPU partitioning overview :material-arrow-top-right-thin:{ .external }](https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/overview.html){:target="_blank"}
-* [Deep dive into partition modes by AMD :material-arrow-top-right-thin:{ .external }](https://rocm.blogs.amd.com/software-tools-optimization/compute-memory-modes/README.html){:target="_blank"}.
-* [RCCL and PerfTest for cluster validation by Dell :material-arrow-top-right-thin:{ .external }](https://infohub.delltechnologies.com/en-us/l/generative-ai-in-the-enterprise-with-amd-accelerators/rccl-and-perftest-for-cluster-validation-1/4/){:target="_blank"}.
+* [AMD Instinct MI300X GPU partitioning overview](https://instinct.docs.amd.com/projects/amdgpu-docs/en/latest/gpu-partitioning/mi300x/overview.html)
+* [Deep dive into partition modes by AMD](https://rocm.blogs.amd.com/software-tools-optimization/compute-memory-modes/README.html).
+* [RCCL and PerfTest for cluster validation by Dell](https://infohub.delltechnologies.com/en-us/l/generative-ai-in-the-enterprise-with-amd-accelerators/rccl-and-perftest-for-cluster-validation-1/4/).
 
 ## What's next?
 
@@ -487,5 +487,5 @@ Benchmark the performance impact of VMs vs bare-metal for inference and training
 
 #### Hot Aisle
     
-Big thanks to [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} for providing the compute power behind these benchmarks. 
+Big thanks to [Hot Aisle](https://hotaisle.xyz/) for providing the compute power behind these benchmarks. 
 If you’re looking for fast AMD GPU bare-metal or VM instances, they’re definitely worth checking out.

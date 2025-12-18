@@ -19,7 +19,7 @@ export const authApi = createApi({
             }),
         }),
 
-        githubCallback: builder.mutation<IUserWithCreds, { code: string }>({
+        githubCallback: builder.mutation<IUserWithCreds, { code: string; state: string }>({
             query: (body) => ({
                 url: API.AUTH.GITHUB.CALLBACK(),
                 method: 'POST',

@@ -20,10 +20,8 @@ from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.core.errors import (
     CLIError,
     ConfigurationError,
-    MethodNotAllowedError,
     ResourceNotExistsError,
     ServerClientError,
-    URLNotFoundError,
 )
 from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import ApplyConfigurationType
@@ -39,7 +37,6 @@ from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
-from dstack.api._public import Client
 from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
@@ -233,7 +230,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
 
         try:
             with console.status("Applying plan..."):
-                fleet = _apply_plan(self.api, plan)
+                fleet = self.api.client.fleets.apply_plan(project_name=self.api.project, plan=plan)
         except ServerClientError as e:
             raise CLIError(e.msg)
         if command_args.detach:
@@ -481,17 +478,3 @@ def _fleet_retrying(fleet: Fleet) -> bool:
         return False
     active_instances = [i for i in fleet.instances if i.status.is_active()]
     return len(active_instances) < fleet.spec.configuration.nodes.min
-
-
-def _apply_plan(api: Client, plan: FleetPlan) -> Fleet:
-    try:
-        return api.client.fleets.apply_plan(
-            project_name=api.project,
-            plan=plan,
-        )
-    except (URLNotFoundError, MethodNotAllowedError):
-        # TODO: Remove in 0.20
-        return api.client.fleets.create(
-            project_name=api.project,
-            spec=plan.spec,
-        )

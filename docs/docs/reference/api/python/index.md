@@ -14,7 +14,7 @@ from dstack.api import Task, GPU, Client, Resources
 client = Client.from_config()
 
 task = Task(
-    name="my-awesome-run",  # If not specified, a random name is assigned 
+    name="my-awesome-run",  # If not specified, a random name is assigned
     image="ghcr.io/huggingface/text-generation-inference:latest",
     env={"MODEL_ID": "TheBloke/Llama-2-13B-chat-GPTQ"},
     commands=[
@@ -42,9 +42,9 @@ finally:
 ```
 
 !!! info "NOTE:"
-    1. The `configuration` argument in the `apply_configuration` method can be either `dstack.api.Task`, `dstack.api.Service`, or `dstack.api.DevEnvironment`. 
+    1. The `configuration` argument in the `apply_configuration` method can be either `dstack.api.Task`, `dstack.api.Service`, or `dstack.api.DevEnvironment`.
     2. When you create `dstack.api.Task`, `dstack.api.Service`, or `dstack.api.DevEnvironment`, you can specify the `image` argument. If `image` isn't specified, the default image will be used. For a private Docker registry, ensure you also pass the `registry_auth` argument.
-    3. The `repo` argument in the `apply_configuration` method allows the mounting of a local folder, a remote repo, or a
+    3. The `repo` argument in the `apply_configuration` method allows the mounting of a remote repo or a
        programmatically created repo. In this case, the `commands` argument can refer to the files within this repo.
     4. The `attach` method waits for the run to start and, for `dstack.api.Task` sets up an SSH tunnel and forwards
     configured `ports` to `localhost`.
@@ -172,15 +172,6 @@ finally:
       item_id_mapping:
         memory: dstack.api.Memory
         Range: dstack.api.Range
-
-### `dstack.api.LocalRepo` { #dstack.api.LocalRepo data-toc-label="LocalRepo" }
-
-::: dstack.api.LocalRepo
-    options:
-      show_bases: false
-      show_root_heading: false
-      show_root_toc_entry: false
-      heading_level: 4
 
 ### `dstack.api.RemoteRepo` { #dstack.api.RemoteRepo data-toc-label="RemoteRepo" }
 

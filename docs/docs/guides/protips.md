@@ -190,11 +190,9 @@ See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/e
 ### Creation policy
 
 By default, when you run `dstack apply` with a dev environment, task, or service,
-`dstack` reuses `idle` instances from an existing [fleet](../concepts/fleets.md).
-If no `idle` instances match the requirements, `dstack` automatically creates a new fleet 
-using configured backends.
+if no `idle` instances from the available fleets meet the requirements, `dstack` provisions a new instance using configured backends.
 
-To ensure `dstack apply` doesn't create a new fleet but reuses an existing one,
+To ensure `dstack apply` doesn't provision a new instance but reuses an existing one,
 pass `-R` (or `--reuse`) to `dstack apply`.
 
 <div class="termy">
@@ -205,25 +203,23 @@ $ dstack apply -R -f examples/.dstack.yml
 
 </div>
 
+Or, set [`creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
+
 ### Idle duration
 
-If a fleet is created automatically, it stays `idle` for 5 minutes by default and can be reused within that time.
-If the fleet is not reused within this period, it is automatically terminated.
+If a run provisions a new instance, the instance stays `idle` for 5 minutes by default and can be reused within that time.
+If the instance is not reused within this period, it is automatically terminated.
 To change the default idle duration, set
-[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for
-unlimited).
-
-> For greater control over fleet provisioning, configuration, and lifecycle management, it is recommended to use
-> [fleets](../concepts/fleets.md) directly.
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the run configuration (e.g., `0s`, `1m`, or `off` for unlimited).
 
 ## Volumes
 
 To persist data across runs, it is recommended to use volumes.
-`dstack` supports two types of volumes: [network](../concepts/volumes.md#network) 
+`dstack` supports two types of volumes: [network](../concepts/volumes.md#network-volumes) 
 (for persisting data even if the instance is interrupted)
-and [instance](../concepts/volumes.md#instance) (useful for persisting cached data across runs while the instance remains active).
+and [instance](../concepts/volumes.md#instance-volumes) (useful for persisting cached data across runs while the instance remains active).
 
-> If you use [SSH fleets](../concepts/fleets.md#ssh), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
+> If you use [SSH fleets](../concepts/fleets.md#ssh-fleets), you can mount network storage (e.g., NFS or SMB) to the hosts and access it in runs via instance volumes.
 
 ## Environment variables
 
@@ -277,7 +273,7 @@ $ dstack apply -e HF_TOKEN=... -f .dstack.yml
 
     </div>
     
-    If you install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"},
+    If you install [`direnv`](https://direnv.net/),
     it will automatically apply the environment variables from the `.envrc` file to the `dstack apply` command.
 
     Remember to add `.envrc` to `.gitignore` to avoid committing it to the repo.    
@@ -354,7 +350,7 @@ If you're using multiple `dstack` projects (e.g., from different `dstack` server
 you can switch between them using the [`dstack project`](../reference/cli/dstack/project.md) command.
 
 ??? info ".envrc"
-    Alternatively, you can install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"}  
+    Alternatively, you can install [`direnv`](https://direnv.net/)  
     to automatically apply environment variables from the `.envrc` file in your project directory.
 
     <div editor-title=".envrc"> 
@@ -494,7 +490,7 @@ If you're using your own AWS, GCP, Azure, or OCI accounts, before you can use GP
 corresponding service quotas for each type of instance in each region.
 
 ??? info "AWS"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html){:target="_blank"} on EC2 service quotas.
+    Check this [guide ](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html) on EC2 service quotas.
     The relevant service quotas include:
 
     - `Running On-Demand P instances` (on-demand V100, A100 80GB x8)
@@ -505,7 +501,7 @@ corresponding service quotas for each type of instance in each region.
     - `All P5 Spot Instance Requests` (spot H100)
 
 ??? info "GCP"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/compute/resource-usage){:target="_blank"} on Compute Engine service quotas.
+    Check this [guide ](https://cloud.google.com/compute/resource-usage) on Compute Engine service quotas.
     The relevant service quotas include:
 
     - `NVIDIA V100 GPUs` (on-demand V100)
@@ -522,7 +518,7 @@ corresponding service quotas for each type of instance in each region.
     - `Preemtible H100 GPUs` (spot H100)
 
 ??? info "Azure"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/azure/quotas/quickstart-increase-quota-portal){:target="_blank"} on Azure service quotas.
+    Check this [guide ](https://learn.microsoft.com/en-us/azure/quotas/quickstart-increase-quota-portal) on Azure service quotas.
     The relevant service quotas include:
 
     - `Total Regional Spot vCPUs` (any spot instances)
@@ -535,7 +531,7 @@ corresponding service quotas for each type of instance in each region.
     - `Standard NDSH100v5 Family vCPUs` (on-demand H100 x8)
 
 ??? info "OCI"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/servicelimits.htm#Requesti){:target="_blank"} on requesting OCI service limits increase.
+    Check this [guide ](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/servicelimits.htm#Requesti) on requesting OCI service limits increase.
     The relevant service category is compute. The relevant resources include:
 
     - `GPUs for GPU.A10 based VM and BM instances` (on-demand A10)

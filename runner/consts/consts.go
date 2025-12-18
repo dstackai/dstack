@@ -13,6 +13,9 @@ const (
 // 2. A default path on the host unless overridden via shim CLI
 const RunnerBinaryPath = "/usr/local/bin/dstack-runner"
 
+// A fallback path on the host used if os.Executable() has failed
+const ShimBinaryPath = "/usr/local/bin/dstack-shim"
+
 // Error-containing messages will be identified by this signature
 const ExecutorFailedSignature = "Executor failed"
 
@@ -27,8 +30,6 @@ const (
 	// instead of the hardcoded value
 	RunnerHomeDir = "/root"
 )
-
-const LegacyRepoDir = "/workflow"
 
 const (
 	RunnerHTTPPort = 10999

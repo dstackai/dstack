@@ -20,7 +20,7 @@ from dstack._internal.server.testing.common import (
 )
 
 
-class TestProcessEmptyFleets:
+class TestProcessFleets:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_empty_autocreated_fleet(self, test_db, session: AsyncSession):

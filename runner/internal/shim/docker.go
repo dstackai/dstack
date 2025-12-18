@@ -29,14 +29,14 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/go-units"
+	bytesize "github.com/inhies/go-bytesize"
+
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
 	"github.com/dstackai/dstack/runner/internal/types"
-	bytesize "github.com/inhies/go-bytesize"
-	"github.com/ztrue/tracerr"
 )
 
 // TODO: Allow for configuration via cli arguments or environment variables.
@@ -63,11 +63,11 @@ type DockerRunner struct {
 func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*DockerRunner, error) {
 	client, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithAPIVersionNegotiation())
 	if err != nil {
-		return nil, tracerr.Wrap(err)
+		return nil, fmt.Errorf("create docker client: %w", err)
 	}
 	dockerInfo, err := client.Info(ctx)
 	if err != nil {
-		return nil, tracerr.Wrap(err)
+		return nil, fmt.Errorf("get docker info: %w", err)
 	}
 
 	var gpuVendor common.GpuVendor
@@ -79,7 +79,7 @@ func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*Docke
 	}
 	gpuLock, err := NewGpuLock(gpus)
 	if err != nil {
-		return nil, tracerr.Wrap(err)
+		return nil, fmt.Errorf("create GPU lock: %w", err)
 	}
 
 	runner := &DockerRunner{
@@ -93,7 +93,7 @@ func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*Docke
 	}
 
 	if err := runner.restoreStateFromContainers(ctx); err != nil {
-		return nil, tracerr.Errorf("failed to restore state from containers: %w", err)
+		return nil, fmt.Errorf("failed to restore state from containers: %w", err)
 	}
 
 	return runner, nil
@@ -136,7 +136,7 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 		} else {
 			switch d.gpuVendor {
 			case common.GpuVendorNvidia:
-				deviceRequests := containerFull.HostConfig.Resources.DeviceRequests
+				deviceRequests := containerFull.HostConfig.DeviceRequests
 				if len(deviceRequests) == 1 {
 					gpuIDs = deviceRequests[0].DeviceIDs
 				} else if len(deviceRequests) != 0 {
@@ -147,13 +147,13 @@ func (d *DockerRunner) restoreStateFromContainers(ctx context.Context) error {
 					)
 				}
 			case common.GpuVendorAmd:
-				for _, device := range containerFull.HostConfig.Resources.Devices {
+				for _, device := range containerFull.HostConfig.Devices {
 					if host.IsRenderNodePath(device.PathOnHost) {
 						gpuIDs = append(gpuIDs, device.PathOnHost)
 					}
 				}
 			case common.GpuVendorTenstorrent:
-				for _, device := range containerFull.HostConfig.Resources.Devices {
+				for _, device := range containerFull.HostConfig.Devices {
 					if strings.HasPrefix(device.PathOnHost, "/dev/tenstorrent/") {
 						// Extract the device ID from the path
 						deviceID := strings.TrimPrefix(device.PathOnHost, "/dev/tenstorrent/")
@@ -245,7 +245,7 @@ func (d *DockerRunner) TaskInfo(taskID string) TaskInfo {
 func (d *DockerRunner) Submit(ctx context.Context, cfg TaskConfig) error {
 	task := NewTaskFromConfig(cfg)
 	if ok := d.tasks.Add(task); !ok {
-		return tracerr.Errorf("%w: task %s is already submitted", ErrRequest, task.ID)
+		return fmt.Errorf("%w: task %s is already submitted", ErrRequest, task.ID)
 	}
 	log.Debug(ctx, "new task submitted", "task", task.ID)
 	return nil
@@ -273,7 +273,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 
 	task.SetStatusPreparing()
 	if err := d.tasks.Update(task); err != nil {
-		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
+		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 
 	cfg := task.config
@@ -281,7 +281,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 
 	runnerDir, err := d.dockerParams.MakeRunnerDir(task.containerName)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("make runner dir: %w", err)
 	}
 	task.runnerDir = runnerDir
 	log.Debug(ctx, "runner dir", "task", task.ID, "path", runnerDir)
@@ -291,7 +291,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		if err != nil {
 			log.Error(ctx, err.Error())
 			task.SetStatusTerminated(string(types.TerminationReasonExecutorError), err.Error())
-			return tracerr.Wrap(err)
+			return fmt.Errorf("acquire GPU: %w", err)
 		}
 		task.gpuIDs = gpuIDs
 		log.Debug(ctx, "acquired GPU(s)", "task", task.ID, "gpus", gpuIDs)
@@ -310,7 +310,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
 			log.Error(ctx, errMessage)
 			task.SetStatusTerminated(string(types.TerminationReasonExecutorError), errMessage)
-			return tracerr.Wrap(err)
+			return fmt.Errorf("append public keys: %w", err)
 		}
 		defer func(cfg TaskConfig) {
 			err := ak.RemovePublicKeys(cfg.HostSshKeys)
@@ -330,14 +330,14 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		errMessage := fmt.Sprintf("prepareVolumes error: %s", err.Error())
 		log.Error(ctx, errMessage)
 		task.SetStatusTerminated(string(types.TerminationReasonExecutorError), errMessage)
-		return tracerr.Wrap(err)
+		return fmt.Errorf("prepare volumes: %w", err)
 	}
 	err = prepareInstanceMountPoints(cfg)
 	if err != nil {
 		errMessage := fmt.Sprintf("prepareInstanceMountPoints error: %s", err.Error())
 		log.Error(ctx, errMessage)
 		task.SetStatusTerminated(string(types.TerminationReasonExecutorError), errMessage)
-		return tracerr.Wrap(err)
+		return fmt.Errorf("prepare instance mount points: %w", err)
 	}
 
 	log.Debug(ctx, "Pulling image")
@@ -345,7 +345,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	defer cancelPull()
 	task.SetStatusPulling(cancelPull)
 	if err := d.tasks.Update(task); err != nil {
-		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
+		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 	// Although it's called "runner dir", we also use it for shim task-related data.
 	// Maybe we should rename it to "task dir" (including the `/root/.dstack/runners` dir on the host).
@@ -354,31 +354,31 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
 		log.Error(ctx, errMessage)
 		task.SetStatusTerminated(string(types.TerminationReasonCreatingContainerError), errMessage)
-		return tracerr.Wrap(err)
+		return fmt.Errorf("pull image: %w", err)
 	}
 
 	log.Debug(ctx, "Creating container", "task", task.ID, "name", task.containerName)
 	task.SetStatusCreating()
 	if err := d.tasks.Update(task); err != nil {
-		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
+		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 	if err := d.createContainer(ctx, &task); err != nil {
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
 		log.Error(ctx, errMessage)
 		task.SetStatusTerminated(string(types.TerminationReasonCreatingContainerError), errMessage)
-		return tracerr.Wrap(err)
+		return fmt.Errorf("create container: %w", err)
 	}
 
 	log.Debug(ctx, "Running container", "task", task.ID, "name", task.containerName)
 	task.SetStatusRunning()
 	if err := d.tasks.Update(task); err != nil {
-		return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
+		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 	err = d.startContainer(ctx, &task)
 	if err == nil {
 		// startContainer sets `ports` field, committing update
 		if err := d.tasks.Update(task); err != nil {
-			return tracerr.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
+			return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 		}
 		err = d.waitContainer(ctx, &task)
 	}
@@ -392,7 +392,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 			errMessage = ""
 		}
 		task.SetStatusTerminated(string(types.TerminationReasonContainerExitedWithError), errMessage)
-		return tracerr.Wrap(err)
+		return fmt.Errorf("wait container: %w", err)
 	}
 
 	log.Debug(ctx, "Container finished successfully", "task", task.ID, "name", task.containerName)
@@ -521,7 +521,7 @@ func prepareVolumes(ctx context.Context, taskConfig TaskConfig) error {
 	for _, volume := range taskConfig.Volumes {
 		err := formatAndMountVolume(ctx, volume)
 		if err != nil {
-			return tracerr.Wrap(err)
+			return fmt.Errorf("format and mount volume: %w", err)
 		}
 	}
 	return nil
@@ -535,12 +535,12 @@ func unmountVolumes(ctx context.Context, taskConfig TaskConfig) error {
 	var failed []string
 	for _, volume := range taskConfig.Volumes {
 		mountPoint := getVolumeMountPoint(volume.Name)
-		cmd := exec.Command("mountpoint", mountPoint)
+		cmd := exec.CommandContext(ctx, "mountpoint", mountPoint)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			log.Info(ctx, "skipping", "mountpoint", mountPoint, "output", output)
 			continue
 		}
-		cmd = exec.Command("umount", "-qf", mountPoint)
+		cmd = exec.CommandContext(ctx, "umount", "-qf", mountPoint)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			log.Error(ctx, "failed to unmount", "mountpoint", mountPoint, "output", output)
 			failed = append(failed, mountPoint)
@@ -557,15 +557,15 @@ func unmountVolumes(ctx context.Context, taskConfig TaskConfig) error {
 func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 	backend, err := getBackend(volume.Backend)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("get backend: %w", err)
 	}
 	deviceName, err := backend.GetRealDeviceName(volume.VolumeId, volume.DeviceName)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("get real device name: %w", err)
 	}
 	fsCreated, err := initFileSystem(ctx, deviceName, !volume.InitFs)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("init file system: %w", err)
 	}
 	// Make FS root directory world-writable (0777) to give any job user
 	// a permission to create new files
@@ -582,7 +582,7 @@ func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 	}
 	err = mountDisk(ctx, deviceName, getVolumeMountPoint(volume.Name), fsRootPerms)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("mount disk: %w", err)
 	}
 	return nil
 }
@@ -602,13 +602,13 @@ func prepareInstanceMountPoints(taskConfig TaskConfig) error {
 		if _, err := os.Stat(mountPoint.InstancePath); errors.Is(err, os.ErrNotExist) {
 			// All missing parent dirs are created with 0755 permissions
 			if err = os.MkdirAll(mountPoint.InstancePath, 0o755); err != nil {
-				return tracerr.Wrap(err)
+				return fmt.Errorf("create instance mount directory: %w", err)
 			}
 			if err = os.Chmod(mountPoint.InstancePath, 0o777); err != nil {
-				return tracerr.Wrap(err)
+				return fmt.Errorf("chmod instance mount directory: %w", err)
 			}
 		} else if err != nil {
-			return tracerr.Wrap(err)
+			return fmt.Errorf("stat instance mount directory: %w", err)
 		}
 	}
 	return nil
@@ -618,7 +618,7 @@ func prepareInstanceMountPoints(taskConfig TaskConfig) error {
 // Returns true if the file system is created.
 func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists bool) (bool, error) {
 	// Run the lsblk command to get filesystem type
-	cmd := exec.Command("lsblk", "-no", "FSTYPE", deviceName)
+	cmd := exec.CommandContext(ctx, "lsblk", "-no", "FSTYPE", deviceName)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -636,7 +636,7 @@ func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists boo
 	}
 
 	log.Debug(ctx, "formatting disk with ext4 filesystem...", "device", deviceName)
-	cmd = exec.Command("mkfs.ext4", "-F", deviceName)
+	cmd = exec.CommandContext(ctx, "mkfs.ext4", "-F", deviceName)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return false, fmt.Errorf("failed to format disk: %w, output: %s", err, string(output))
 	}
@@ -655,7 +655,7 @@ func mountDisk(ctx context.Context, deviceName, mountPoint string, fsRootPerms o
 
 	// Mount the disk to the mount point
 	log.Debug(ctx, "mounting disk...", "device", deviceName, "mountpoint", mountPoint)
-	cmd := exec.Command("mount", deviceName, mountPoint)
+	cmd := exec.CommandContext(ctx, "mount", deviceName, mountPoint)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount disk: %w, output: %s", err, string(output))
 	}
@@ -678,7 +678,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 		Filters: filters.NewArgs(filters.Arg("reference", taskConfig.ImageName)),
 	})
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("list images: %w", err)
 	}
 
 	// TODO: force pull latset
@@ -698,13 +698,13 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	startTime := time.Now()
 	reader, err := client.ImagePull(ctx, taskConfig.ImageName, opts)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("pull image: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("open pull log file: %w", err)
 	}
 	defer logFile.Close()
 
@@ -775,13 +775,13 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	speed := bytesize.New(float64(currentBytes) / duration.Seconds())
 
 	if err := ctx.Err(); err != nil {
-		return tracerr.Errorf("image pull interrupted: downloaded %d bytes out of %d (%s/s): %w", currentBytes, totalBytes, speed, err)
+		return fmt.Errorf("image pull interrupted: downloaded %d bytes out of %d (%s/s): %w", currentBytes, totalBytes, speed, err)
 	}
 
 	if pullCompleted {
 		log.Debug(ctx, "image successfully pulled", "bytes", currentBytes, "bps", speed)
 	} else {
-		return tracerr.Errorf(
+		return fmt.Errorf(
 			"failed pulling %s: downloaded %d/%d bytes (%s/s), errors: %q",
 			taskConfig.ImageName, currentBytes, totalBytes, speed, pullErrors,
 		)
@@ -793,16 +793,16 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 	mounts, err := d.dockerParams.DockerMounts(task.runnerDir)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("get docker mounts: %w", err)
 	}
 	volumeMounts, err := getVolumeMounts(task.config.VolumeMounts)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("get volume mounts: %w", err)
 	}
 	mounts = append(mounts, volumeMounts...)
 	instanceMounts, err := getInstanceMounts(task.config.InstanceMounts)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("get instance mounts: %w", err)
 	}
 	mounts = append(mounts, instanceMounts...)
 
@@ -849,8 +849,8 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 		ShmSize:      task.config.ShmSize,
 		Tmpfs:        tmpfs,
 	}
-	hostConfig.Resources.NanoCPUs = int64(task.config.CPU * 1000000000)
-	hostConfig.Resources.Memory = task.config.Memory
+	hostConfig.NanoCPUs = int64(task.config.CPU * 1000000000)
+	hostConfig.Memory = task.config.Memory
 	if len(task.gpuIDs) > 0 {
 		if len(task.config.GPUDevices) > 0 {
 			configureGpuDevices(hostConfig, task.config.GPUDevices)
@@ -862,7 +862,7 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 
 	resp, err := d.client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, task.containerName)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("create container: %w", err)
 	}
 	task.containerID = resp.ID
 	return nil
@@ -870,7 +870,7 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 
 func (d *DockerRunner) startContainer(ctx context.Context, task *Task) error {
 	if err := d.client.ContainerStart(ctx, task.containerID, container.StartOptions{}); err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("start container: %w", err)
 	}
 	if getNetworkMode(task.config.NetworkMode).IsHost() {
 		task.ports = []PortMapping{}
@@ -878,7 +878,7 @@ func (d *DockerRunner) startContainer(ctx context.Context, task *Task) error {
 	}
 	container_, err := d.client.ContainerInspect(ctx, task.containerID)
 	if err != nil {
-		return tracerr.Wrap(err)
+		return fmt.Errorf("inspect container: %w", err)
 	}
 	// FIXME: container_.NetworkSettings.Ports values (bindings) are not immediately available
 	// on macOS, so ports can be empty with local backend.
@@ -897,7 +897,7 @@ func (d *DockerRunner) waitContainer(ctx context.Context, task *Task) error {
 			}
 		}
 	case err := <-errorCh:
-		return tracerr.Wrap(err)
+		return fmt.Errorf("wait for container: %w", err)
 	}
 	return nil
 }
@@ -1035,8 +1035,8 @@ func getNetworkMode(networkMode NetworkMode) container.NetworkMode {
 
 func configureGpuDevices(hostConfig *container.HostConfig, gpuDevices []GPUDevice) {
 	for _, gpuDevice := range gpuDevices {
-		hostConfig.Resources.Devices = append(
-			hostConfig.Resources.Devices,
+		hostConfig.Devices = append(
+			hostConfig.Devices,
 			container.DeviceMapping{
 				PathOnHost:        gpuDevice.PathOnHost,
 				PathInContainer:   gpuDevice.PathInContainer,
@@ -1052,8 +1052,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 	// Tenstorrent: ids are device indices to be used with /dev/tenstorrent/<id>
 	switch vendor {
 	case common.GpuVendorNvidia:
-		hostConfig.Resources.DeviceRequests = append(
-			hostConfig.Resources.DeviceRequests,
+		hostConfig.DeviceRequests = append(
+			hostConfig.DeviceRequests,
 			container.DeviceRequest{
 				// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
 				// Default capabilities: utility, compute.
@@ -1066,8 +1066,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
 		// Only --device are mandatory, other seem to be performance-related.
 		// --device=/dev/kfd
-		hostConfig.Resources.Devices = append(
-			hostConfig.Resources.Devices,
+		hostConfig.Devices = append(
+			hostConfig.Devices,
 			container.DeviceMapping{
 				PathOnHost:        "/dev/kfd",
 				PathInContainer:   "/dev/kfd",
@@ -1076,8 +1076,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		)
 		// --device=/dev/dri/renderD<N>
 		for _, renderNodePath := range ids {
-			hostConfig.Resources.Devices = append(
-				hostConfig.Resources.Devices,
+			hostConfig.Devices = append(
+				hostConfig.Devices,
 				container.DeviceMapping{
 					PathOnHost:        renderNodePath,
 					PathInContainer:   renderNodePath,
@@ -1096,8 +1096,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		// For Tenstorrent, simply add each device
 		for _, id := range ids {
 			devicePath := fmt.Sprintf("/dev/tenstorrent/%s", id)
-			hostConfig.Resources.Devices = append(
-				hostConfig.Resources.Devices,
+			hostConfig.Devices = append(
+				hostConfig.Devices,
 				container.DeviceMapping{
 					PathOnHost:        devicePath,
 					PathInContainer:   devicePath,
@@ -1132,8 +1132,8 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 func configureHpcNetworkingIfAvailable(hostConfig *container.HostConfig) {
 	// Although AWS EFA is not InfiniBand, EFA adapters are exposed as /dev/infiniband/uverbsN (N=0,1,...)
 	if _, err := os.Stat("/dev/infiniband"); !errors.Is(err, os.ErrNotExist) {
-		hostConfig.Resources.Devices = append(
-			hostConfig.Resources.Devices,
+		hostConfig.Devices = append(
+			hostConfig.Devices,
 			container.DeviceMapping{
 				PathOnHost:        "/dev/infiniband",
 				PathInContainer:   "/dev/infiniband",
@@ -1182,7 +1182,7 @@ func getContainerLastLogs(ctx context.Context, client docker.APIClient, containe
 	if err != nil {
 		return nil, err
 	}
-	defer muxedReader.Close()
+	defer func() { _ = muxedReader.Close() }()
 
 	demuxedBuffer := new(bytes.Buffer)
 	// Using the same Writer for both stdout and stderr should be roughly equivalent to 2>&1
@@ -1218,7 +1218,15 @@ func (c *CLIArgs) DockerShellCommands(publicKeys []string) []string {
 		concatinatedPublicKeys = strings.Join(publicKeys, "\n")
 	}
 	commands := getSSHShellCommands(c.Runner.SSHPort, concatinatedPublicKeys)
-	commands = append(commands, fmt.Sprintf("%s %s", consts.RunnerBinaryPath, strings.Join(c.getRunnerArgs(), " ")))
+	runnerArgs := []string{
+		"--log-level", strconv.Itoa(c.Runner.LogLevel),
+		"start",
+		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
+		"--ssh-port", strconv.Itoa(c.Runner.SSHPort),
+		"--temp-dir", consts.RunnerTempDir,
+		"--home-dir", consts.RunnerHomeDir,
+	}
+	commands = append(commands, fmt.Sprintf("%s %s", consts.RunnerBinaryPath, strings.Join(runnerArgs, " ")))
 	return commands
 }
 
@@ -1244,7 +1252,7 @@ func (c *CLIArgs) DockerPorts() []int {
 func (c *CLIArgs) MakeRunnerDir(name string) (string, error) {
 	runnerTemp := filepath.Join(c.Shim.HomeDir, "runners", name)
 	if err := os.MkdirAll(runnerTemp, 0o755); err != nil {
-		return "", tracerr.Wrap(err)
+		return "", fmt.Errorf("create runner directory: %w", err)
 	}
 	return runnerTemp, nil
 }

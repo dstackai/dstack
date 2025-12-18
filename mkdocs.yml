@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source AI container orchestration engine working with any cloud or data center.
+  dstack is an open-source control plane for running development, training, and inference jobs on GPUs - across hyperscalers, neoclouds, or on-prem.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -60,6 +60,45 @@ theme:
 
 # Plugins
 plugins:
+  - llmstxt-md:
+      enable_copy_button: false
+      sections:
+        Getting started:
+          - docs/index.md: What dstack is
+          - docs/installation/index.md: How to set up the dstack server and the dstack CLI
+          - docs/quickstart.md: How to get started and submit your first run
+        Concepts:
+          - docs/concepts/backends.md: How to configure backends - to connect dstack to cloud providers, Kubernetes clusters, etc
+          - docs/concepts/fleets.md: How to create and manage fleets - required before submitting runs
+          - docs/concepts/dev-environments.md: How to create dev environments - for interactive development using a desktop IDE
+          - docs/concepts/tasks.md: How to run tasks - for training or fine-tuning, including distributed tasks
+          - docs/concepts/services.md: How to deploy services - for model inference or web apps
+          - docs/concepts/volumes.md: How to manage volumes - for persistent storage or caching
+          - docs/concepts/secrets.md: How to manage secrets - for API keys or other sensitive data
+          - docs/concepts/projects.md: How to manage projects - for managing separate teams
+          - docs/concepts/gateways.md: How to manage gateways - enabling auto-scaling, rate limits, and custom domains
+        Guides:
+          - docs/guides/clusters.md: How to work with clusters - for distributed tasks
+          - docs/guides/kubernetes.md: How to work with Kubernetes
+          - docs/guides/server-deployment.md: Detailed guide on how to deploy the dstack server
+          - docs/guides/troubleshooting.md: Common issues and how to troubleshoot them
+          - docs/guides/metrics.md: How to monitor metrics
+          - docs/guides/protips.md: Pro tips - tips and tricks to use dstack more efficiently
+        Examples:
+          - examples/single-node-training/trl/index.md: TRL
+          - examples/single-node-training/axolotl/index.md: Axolotl
+          - examples/distributed-training/trl/index.md: TRL
+          - examples/distributed-training/axolotl/index.md: Axolotl
+          - examples/distributed-training/ray-ragen/index.md: Ray+RAGEN
+          - examples/clusters/nccl-rccl-tests/index.md: NCCL/RCCL tests
+          - examples/inference/sglang/index.md: SGLang
+          - examples/inference/vllm/index.md: vLLM
+          - examples/inference/nim/index.md: NIM
+          - examples/inference/trtllm/index.md: TensorRT-LLM
+        Accelerators:
+          - examples/accelerators/amd/index.md: AMD
+          - examples/accelerators/tpu/index.md: TPU
+          - examples/accelerators/tenstorrent/index.md: Tenstorrent
   - blog:
       blog_dir: blog
       post_url_format: "{slug}"
@@ -105,20 +144,19 @@ plugins:
         'docs/examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
         'providers.md': 'partners.md'
         'backends.md': 'partners.md'
-        'blog/ambassador-program.md': 'blog/archive/ambassador-program.md'
         'blog/monitoring-gpu-usage.md': 'blog/posts/dstack-metrics.md'
         'blog/inactive-dev-environments-auto-shutdown.md': 'blog/posts/inactivity-duration.md'
         'blog/data-centers-and-private-clouds.md': 'blog/posts/gpu-blocks-and-proxy-jump.md'
-        'blog/distributed-training-with-aws-efa.md': 'examples/clusters/efa/index.md'
+        'blog/distributed-training-with-aws-efa.md': 'examples/clusters/aws/index.md'
         'blog/dstack-stats.md': 'blog/posts/dstack-metrics.md'
         'docs/concepts/metrics.md': 'docs/guides/metrics.md'
         'docs/guides/monitoring.md': 'docs/guides/metrics.md'
         'blog/nvidia-and-amd-on-vultr.md.md': 'blog/posts/nvidia-and-amd-on-vultr.md'
-        'examples/misc/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
-        'examples/misc/a3high-clusters/index.md': 'examples/clusters/a3high/index.md'
-        'examples/misc/a3mega-clusters/index.md': 'examples/clusters/a3mega/index.md'
-        'examples/distributed-training/nccl-tests/index.md': 'examples/clusters/nccl-tests/index.md'
-        'examples/distributed-training/rccl-tests/index.md': 'examples/clusters/rccl-tests/index.md'
+        'examples/misc/nccl-tests/index.md': 'examples/clusters/nccl-rccl-tests/index.md'
+        'examples/misc/a3high-clusters/index.md': 'examples/clusters/gcp/index.md'
+        'examples/misc/a3mega-clusters/index.md': 'examples/clusters/gcp/index.md'
+        'examples/distributed-training/nccl-tests/index.md': 'examples/clusters/nccl-rccl-tests/index.md'
+        'examples/distributed-training/rccl-tests/index.md': 'examples/clusters/nccl-rccl-tests/index.md'
         'examples/deployment/nim/index.md': 'examples/inference/nim/index.md'
         'examples/deployment/vllm/index.md': 'examples/inference/vllm/index.md'
         'examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
@@ -126,8 +164,12 @@ plugins:
         'examples/deployment/trtllm/index.md': 'examples/inference/trtllm/index.md'
         'examples/fine-tuning/trl/index.md': 'examples/single-node-training/trl/index.md'
         'examples/fine-tuning/axolotl/index.md': 'examples/single-node-training/axolotl/index.md'
-        'blog/efa.md': 'examples/clusters/efa/index.md'
+        'blog/efa.md': 'examples/clusters/aws/index.md'
         'docs/concepts/repos.md': 'docs/concepts/dev-environments.md#repos'
+        'examples/clusters/a3high/index.md': 'examples/clusters/gcp/index.md'
+        'examples/clusters/a3mega/index.md': 'examples/clusters/gcp/index.md'
+        'examples/clusters/a4/index.md': 'examples/clusters/gcp/index.md'
+        'examples/clusters/efa/index.md': 'examples/clusters/aws/index.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -220,10 +262,10 @@ nav:
           - Quickstart: docs/quickstart.md
       - Concepts:
           - Backends: docs/concepts/backends.md
+          - Fleets: docs/concepts/fleets.md
           - Dev environments: docs/concepts/dev-environments.md
           - Tasks: docs/concepts/tasks.md
           - Services: docs/concepts/services.md
-          - Fleets: docs/concepts/fleets.md
           - Volumes: docs/concepts/volumes.md
           - Secrets: docs/concepts/secrets.md
           - Projects: docs/concepts/projects.md
@@ -235,6 +277,7 @@ nav:
           - Troubleshooting: docs/guides/troubleshooting.md
           - Metrics: docs/guides/metrics.md
           - Protips: docs/guides/protips.md
+          - Migration: docs/guides/migration.md
       - Reference:
         - .dstack.yml:
             - dev-environment: docs/reference/dstack.yml/dev-environment.md
@@ -254,6 +297,7 @@ nav:
             - dstack attach: docs/reference/cli/dstack/attach.md
             - dstack logs: docs/reference/cli/dstack/logs.md
             - dstack metrics: docs/reference/cli/dstack/metrics.md
+            - dstack event: docs/reference/cli/dstack/event.md
             - dstack project: docs/reference/cli/dstack/project.md
             - dstack fleet: docs/reference/cli/dstack/fleet.md
             - dstack offer: docs/reference/cli/dstack/offer.md
@@ -268,6 +312,7 @@ nav:
         - Plugins:
             - Python API: docs/reference/plugins/python/index.md
             - REST API: docs/reference/plugins/rest/index.md
+        - llms-full.txt: https://dstack.ai/llms-full.txt
   - Examples:
     - examples.md
     - Single-node training:
@@ -278,12 +323,10 @@ nav:
         - Axolotl: examples/distributed-training/axolotl/index.md
         - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
     - Clusters:
-        - NCCL tests: examples/clusters/nccl-tests/index.md
-        - RCCL tests: examples/clusters/rccl-tests/index.md
-        - GCP A4: examples/clusters/a4/index.md
-        - GCP A3 Mega: examples/clusters/a3mega/index.md
-        - GCP A3 High: examples/clusters/a3high/index.md
-        - AWS EFA: examples/clusters/efa/index.md
+        - AWS: examples/clusters/aws/index.md
+        - GCP: examples/clusters/gcp/index.md
+        - Crusoe: examples/clusters/crusoe/index.md
+        - NCCL/RCCL tests: examples/clusters/nccl-rccl-tests/index.md
     - Inference:
         - SGLang: examples/inference/sglang/index.md
         - vLLM: examples/inference/vllm/index.md

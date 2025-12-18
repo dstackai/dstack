@@ -13,6 +13,13 @@ class Name:
 
 
 class InterpolatorError(ValueError):
+    """
+    Raised when interpolation fails.
+
+    May be shown to the users, should not contain sensitive information,
+    such as variable values.
+    """
+
     pass
 
 

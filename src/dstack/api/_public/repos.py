@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Literal, Optional, Union, overload
 
 from git import InvalidGitRepositoryError
@@ -8,17 +7,14 @@ from dstack._internal.core.models.repos import (
     LocalRepo,
     RemoteRepo,
     RemoteRepoCreds,
+    Repo,
     RepoHead,
     RepoHeadWithCreds,
 )
-from dstack._internal.core.models.repos.base import Repo, RepoType
-from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.repos import (
     InvalidRepoCredentialsError,
     get_repo_creds_and_default_branch,
-    load_repo,
 )
-from dstack._internal.utils.crypto import generate_rsa_key_pair
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack.api.server import APIClient
@@ -49,7 +45,7 @@ class RepoCollection:
         Example:
 
         ```python
-        repo=RemoteRepo.from_url(
+        repo = RemoteRepo.from_url(
             repo_url="https://github.com/dstackai/dstack-examples",
             repo_branch="main",
         )
@@ -75,6 +71,11 @@ class RepoCollection:
             creds: Optional prepared repo credentials. If specified, both `git_identity_file`
                 and `oauth_token` are ignored.
         """
+        if isinstance(repo, LocalRepo):
+            raise ConfigurationError(
+                "Local repositories are not supported since 0.20.0. Use `files` to mount"
+                " an arbitrary directory: https://dstack.ai/docs/concepts/tasks/#files"
+            )
         if creds is None and isinstance(repo, RemoteRepo):
             assert repo.repo_url is not None
             try:
@@ -94,56 +95,46 @@ class RepoCollection:
         init: bool = False,
         git_identity_file: Optional[PathLike] = None,
         oauth_token: Optional[str] = None,
-    ) -> Union[RemoteRepo, LocalRepo]:
-        """
-        Loads the repo from the local directory using global config
+    ) -> RemoteRepo:
+        # """
+        # Loads the repo from the local directory using global config
 
-        Args:
-            repo_dir: Repo root directory.
-            local: Do not try to load `RemoteRepo` first.
-            init: Initialize the repo if it's not initialized.
-            git_identity_file: Path to an SSH private key to access the remote repo.
-            oauth_token: GitHub OAuth token to access the remote repo.
+        # Args:
+        #     repo_dir: Repo root directory.
+        #     local: Do not try to load `RemoteRepo` first.
+        #     init: Initialize the repo if it's not initialized.
+        #     git_identity_file: Path to an SSH private key to access the remote repo.
+        #     oauth_token: GitHub OAuth token to access the remote repo.
 
-        Raises:
-            ConfigurationError: If the repo is not initialized and `init` is `False`.
+        # Raises:
+        #     ConfigurationError: If the repo is not initialized and `init` is `False`.
 
-        Returns:
-            repo: Initialized repo.
-        """
-        config = ConfigManager()
-        if not init:
-            logger.debug("Loading repo config")
-            repo_config = config.get_repo_config(repo_dir)
-            if repo_config is None:
-                raise ConfigurationError(
-                    "The repo is not initialized."
-                    " Run `dstack init` to initialize the current directory as a repo or specify `--repo`."
-                )
-            repo = load_repo(repo_config)
-            if not self.is_initialized(repo):
-                raise ConfigurationError(
-                    "The repo is not initialized."
-                    " Run `dstack init` to initialize the current directory as a repo or specify `--repo`."
-                )
-        else:
-            logger.debug("Initializing repo")
-            if local:
-                repo = LocalRepo(repo_dir=repo_dir)
-            else:
-                try:
-                    repo = RemoteRepo.from_dir(repo_dir)
-                except InvalidGitRepositoryError:
-                    raise ConfigurationError(
-                        f"Git repo not found: {repo_dir}. Use `files` to mount an arbitrary"
-                        " directory: https://dstack.ai/docs/concepts/tasks/#files"
-                    )
-            self.init(repo, git_identity_file, oauth_token)
-            config.save_repo_config(
-                repo.get_repo_dir_or_error(),
-                repo.repo_id,
-                RepoType(repo.run_repo_data.repo_type),
+        # Returns:
+        #     repo: Initialized repo.
+        # """
+        logger.warning(
+            "The load() method is deprecated, use RemoteRepo directly:"
+            " https://dstack.ai/docs/reference/api/python/#dstack.api.RemoteRepo"
+        )
+        if local:
+            raise ConfigurationError(
+                "Local repositories are not supported since 0.20.0. Use `files` to mount"
+                " an arbitrary directory: https://dstack.ai/docs/concepts/tasks/#files"
             )
+        if not init:
+            raise ConfigurationError(
+                "Repo config has been removed in 0.20.0,"
+                " this method can now only be used with init=True"
+            )
+        logger.debug("Initializing repo")
+        try:
+            repo = RemoteRepo.from_dir(repo_dir)
+        except InvalidGitRepositoryError:
+            raise ConfigurationError(
+                f"Git repo not found: {repo_dir}. Use `files` to mount an arbitrary"
+                " directory: https://dstack.ai/docs/concepts/tasks/#files"
+            )
+        self.init(repo, git_identity_file, oauth_token)
         return repo
 
     def is_initialized(
@@ -209,22 +200,3 @@ class RepoCollection:
             return method(self._project, repo_id)
         except ResourceNotExistsError:
             return None
-
-
-def get_ssh_keypair(key_path: Optional[PathLike], dstack_key_path: Path) -> str:
-    """Returns a path to the private key"""
-    if key_path is not None:
-        key_path = Path(key_path).expanduser().resolve()
-        pub_key = (
-            key_path
-            if key_path.suffix == ".pub"
-            else key_path.with_suffix(key_path.suffix + ".pub")
-        )
-        private_key = pub_key.with_suffix("")
-        if pub_key.exists() and private_key.exists():
-            return str(private_key)
-        raise ConfigurationError(f"Make sure valid keypair exists: {private_key}(.pub)")
-
-    if not dstack_key_path.exists():
-        generate_rsa_key_pair(private_key_path=dstack_key_path)
-    return str(dstack_key_path)

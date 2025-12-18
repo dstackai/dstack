@@ -3,7 +3,7 @@ import shlex
 import subprocess
 import sys
 import time
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Dict, List, Optional, Set, TypeVar
 
 import gpuhunt
@@ -18,11 +18,12 @@ from dstack._internal.cli.services.configurators.base import (
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.services.repos import (
     get_repo_from_dir,
+    get_repo_from_url,
     init_default_virtual_repo,
     is_git_repo_url,
     register_init_repo_args,
 )
-from dstack._internal.cli.utils.common import confirm_ask, console, warn
+from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
 from dstack._internal.core.errors import (
@@ -33,7 +34,6 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.common import ApplyAction, RegistryAuth
 from dstack._internal.core.models.configurations import (
-    LEGACY_REPO_DIR,
     AnyRunConfiguration,
     ApplyConfigurationType,
     ConfigurationWithCommandsParams,
@@ -45,26 +45,20 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.repos import RepoHeadWithCreds
-from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.core.models.repos.local import LocalRepo
 from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCreds
 from dstack._internal.core.models.resources import CPUSpec
 from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
-from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.core.services.repos import (
     InvalidRepoCredentialsError,
     get_repo_creds_and_default_branch,
-    load_repo,
 )
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.nested_list import NestedList, NestedListItem
 from dstack._internal.utils.path import is_absolute_posix_path
-from dstack.api._public.repos import get_ssh_keypair
 from dstack.api._public.runs import Run
-from dstack.api.server import APIClient
 from dstack.api.utils import load_profile
 
 _KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
@@ -96,49 +90,12 @@ class BaseRunConfigurator(
         self.validate_gpu_vendor_and_image(conf)
         self.validate_cpu_arch_and_image(conf)
 
-        working_dir = conf.working_dir
-        if working_dir is None:
-            # Use the default working dir for the image for tasks and services if `commands`
-            # is not set (emulate pre-0.19.27 JobConfigutor logic), otherwise fall back to
-            # `/workflow`.
-            if isinstance(conf, DevEnvironmentConfiguration) or conf.commands:
-                # relative path for compatibility with pre-0.19.27 servers
-                conf.working_dir = "."
-                warn(
-                    f'The [code]working_dir[/code] is not set — using legacy default [code]"{LEGACY_REPO_DIR}"[/code].'
-                    " Future versions will default to the [code]image[/code]'s working directory."
-                )
-        elif not is_absolute_posix_path(working_dir):
-            legacy_working_dir = PurePosixPath(LEGACY_REPO_DIR) / working_dir
-            warn(
-                "[code]working_dir[/code] is relative."
-                f" Using legacy working directory [code]{legacy_working_dir}[/code]\n\n"
-                "Future versions will require absolute path\n"
-                f"To keep using legacy working directory, set"
-                f" [code]working_dir[/code] to [code]{legacy_working_dir}[/code]\n"
-            )
-        else:
-            # relative path for compatibility with pre-0.19.27 servers
-            try:
-                conf.working_dir = str(PurePosixPath(working_dir).relative_to(LEGACY_REPO_DIR))
-            except ValueError:
-                pass
+        if conf.working_dir is not None and not is_absolute_posix_path(conf.working_dir):
+            raise ConfigurationError("working_dir must be absolute")
 
-        if conf.repos and conf.repos[0].path is None:
-            warn(
-                "[code]repos[0].path[/code] is not set,"
-                f" using legacy repo path [code]{LEGACY_REPO_DIR}[/code]\n\n"
-                "In a future version the default value will be changed."
-                f" To keep using [code]{LEGACY_REPO_DIR}[/code], explicitly set"
-                f" [code]repos[0].path[/code] to [code]{LEGACY_REPO_DIR}[/code]\n"
-            )
-
-        config_manager = ConfigManager()
-        repo = self.get_repo(conf, configuration_path, configurator_args, config_manager)
-        self.api.ssh_identity_file = get_ssh_keypair(
-            configurator_args.ssh_identity_file,
-            config_manager.dstack_key_path,
-        )
+        repo = self.get_repo(conf, configuration_path, configurator_args)
+        if repo is None:
+            repo = init_default_virtual_repo(api=self.api)
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_run_plan(
@@ -146,6 +103,7 @@ class BaseRunConfigurator(
                 repo=repo,
                 configuration_path=configuration_path,
                 profile=profile,
+                ssh_identity_file=configurator_args.ssh_identity_file,
             )
 
         print_run_plan(run_plan, max_offers=configurator_args.max_offers)
@@ -228,8 +186,6 @@ class BaseRunConfigurator(
                         format_date=local_time,
                     )
                 )
-
-                _warn_fleet_autocreated(self.api.client, run)
 
                 console.print(
                     f"\n[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
@@ -517,12 +473,11 @@ class BaseRunConfigurator(
         conf: RunConfigurationT,
         configuration_path: str,
         configurator_args: argparse.Namespace,
-        config_manager: ConfigManager,
-    ) -> Repo:
+    ) -> Optional[RemoteRepo]:
         if configurator_args.no_repo:
-            return init_default_virtual_repo(api=self.api)
+            return None
 
-        repo: Optional[Repo] = None
+        repo: Optional[RemoteRepo] = None
         repo_head: Optional[RepoHeadWithCreds] = None
         repo_branch: Optional[str] = configurator_args.repo_branch
         repo_hash: Optional[str] = configurator_args.repo_hash
@@ -539,8 +494,6 @@ class BaseRunConfigurator(
         local_path: Optional[Path] = None
         # dummy value, safe to join with any path
         root_dir = Path(".")
-        # True if no repo specified, but we found one in `config.yml`
-        legacy_local_path = False
         if repo_arg := configurator_args.repo:
             if is_git_repo_url(repo_arg):
                 url = repo_arg
@@ -563,84 +516,49 @@ class BaseRunConfigurator(
             if repo_hash is None:
                 repo_hash = repo_spec.hash
         else:
-            local_path = Path.cwd()
-            legacy_local_path = True
+            return None
+
         if url:
-            # "master" is a dummy value, we'll fetch the actual default branch later
-            repo = RemoteRepo.from_url(repo_url=url, repo_branch="master")
+            repo = get_repo_from_url(url)
             repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
         elif local_path:
-            if legacy_local_path:
-                if repo_config := config_manager.get_repo_config(local_path):
-                    repo = load_repo(repo_config)
-                    repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
-                    if repo_head is not None:
-                        warn(
-                            "The repo is not specified but found and will be used in the run\n"
-                            "Future versions will not load repos automatically\n"
-                            "To prepare for future versions and get rid of this warning:\n"
-                            "- If you need the repo in the run, either specify [code]repos[/code]"
-                            " in the configuration or use [code]--repo .[/code]\n"
-                            "- If you don't need the repo in the run, either run"
-                            " [code]dstack init --remove[/code] once (it removes only the record"
-                            " about the repo, the repo files will remain intact)"
-                            " or use [code]--no-repo[/code]"
-                        )
-                    else:
-                        # ignore stale entries in `config.yml`
-                        repo = None
-                        init = False
-            else:
-                original_local_path = local_path
-                local_path = local_path.expanduser()
-                if not local_path.is_absolute():
-                    local_path = (root_dir / local_path).resolve()
-                if not local_path.exists():
-                    raise ConfigurationError(
-                        f"Invalid repo path: {original_local_path} -> {local_path}"
-                    )
-                local: bool = configurator_args.local
-                repo = get_repo_from_dir(local_path, local=local)
-                repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
-            if isinstance(repo, RemoteRepo):
-                repo_branch = repo.run_repo_data.repo_branch
-                repo_hash = repo.run_repo_data.repo_hash
+            original_local_path = local_path
+            local_path = local_path.expanduser()
+            if not local_path.is_absolute():
+                local_path = (root_dir / local_path).resolve()
+            if not local_path.exists():
+                raise ConfigurationError(
+                    f"Invalid repo path: {original_local_path} -> {local_path}"
+                )
+            repo = get_repo_from_dir(local_path)
+            repo_head = self.api.repos.get(repo_id=repo.repo_id, with_creds=True)
+            repo_branch = repo.run_repo_data.repo_branch
+            repo_hash = repo.run_repo_data.repo_hash
         else:
             assert False, "should not reach here"
 
-        if repo is None:
-            return init_default_virtual_repo(api=self.api)
+        assert repo.repo_url is not None
 
-        if isinstance(repo, RemoteRepo):
-            assert repo.repo_url is not None
+        if repo_head is not None and repo_head.repo_creds is not None:
+            if git_identity_file is None and oauth_token is None:
+                git_private_key = repo_head.repo_creds.private_key
+                oauth_token = repo_head.repo_creds.oauth_token
+        else:
+            init = True
 
-            if repo_head is not None and repo_head.repo_creds is not None:
-                if git_identity_file is None and oauth_token is None:
-                    git_private_key = repo_head.repo_creds.private_key
-                    oauth_token = repo_head.repo_creds.oauth_token
-            else:
-                init = True
-
-            try:
-                repo_creds, default_repo_branch = get_repo_creds_and_default_branch(
-                    repo_url=repo.repo_url,
-                    identity_file=git_identity_file,
-                    private_key=git_private_key,
-                    oauth_token=oauth_token,
-                )
-            except InvalidRepoCredentialsError as e:
-                raise CLIError(*e.args) from e
-
-            if repo_branch is None and repo_hash is None:
-                repo_branch = default_repo_branch
-                if repo_branch is None:
-                    raise CLIError(
-                        "Failed to automatically detect remote repo branch."
-                        " Specify branch or hash."
-                    )
-            repo = RemoteRepo.from_url(
-                repo_url=repo.repo_url, repo_branch=repo_branch, repo_hash=repo_hash
+        try:
+            repo_creds, _ = get_repo_creds_and_default_branch(
+                repo_url=repo.repo_url,
+                identity_file=git_identity_file,
+                private_key=git_private_key,
+                oauth_token=oauth_token,
             )
+        except InvalidRepoCredentialsError as e:
+            raise CLIError(*e.args) from e
+
+        repo.run_repo_data.repo_branch = repo_branch
+        if repo_hash is not None:
+            repo.run_repo_data.repo_hash = repo_hash
 
         if init:
             self.api.repos.init(
@@ -648,15 +566,6 @@ class BaseRunConfigurator(
                 git_identity_file=git_identity_file,
                 oauth_token=oauth_token,
                 creds=repo_creds,
-            )
-
-        if isinstance(repo, LocalRepo):
-            warn(
-                f"{repo.repo_dir} is a local repo\n"
-                "Local repos are deprecated since 0.19.25 and will be removed soon\n"
-                "There are two options:\n"
-                "- Migrate to [code]files[/code]: https://dstack.ai/docs/concepts/tasks/#files\n"
-                "- Specify [code]--no-repo[/code] if you don't need the repo at all"
             )
 
         return repo
@@ -936,16 +845,3 @@ def render_run_spec_diff(old_spec: RunSpec, new_spec: RunSpec) -> Optional[str]:
             item = NestedListItem(spec_field.replace("_", " ").capitalize())
         nested_list.children.append(item)
     return nested_list.render()
-
-
-def _warn_fleet_autocreated(api: APIClient, run: Run):
-    if run._run.fleet is None:
-        return
-    fleet = api.fleets.get(project_name=run._project, name=run._run.fleet.name)
-    if not fleet.spec.autocreated:
-        return
-    warn(
-        f"\nNo existing fleet matched, so the run created a new fleet [code]{fleet.name}[/code].\n"
-        "Future dstack versions won't create fleets automatically.\n"
-        "Create a fleet explicitly: https://dstack.ai/docs/concepts/fleets/"
-    )

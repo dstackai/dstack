@@ -10,6 +10,118 @@ declare type TRunsRequestParams = {
     job_submissions_limit?: number;
 };
 
+declare type TGPUResources = IGPUSpecRequest & {
+    name?: string | string[];
+};
+
+declare type TIde = 'cursor' | 'vscode';
+
+declare type TVolumeMountPointRequest = {
+    name: string | string[];
+    path: string;
+};
+
+declare type TInstanceMountPointRequest = {
+    instance_path: string;
+    path: string;
+    optional?: boolean;
+};
+
+declare type TEnvironmentConfigurationRepo = {
+    instance_path?: string;
+    url?: string;
+    path?: string;
+    branch?: string;
+    hash?: string;
+};
+
+declare type TFilePathMappingRequest = {
+    local_path: string;
+    path: string;
+};
+
+declare type ProfileRetryRequest = {
+    on_events?: string[];
+    duration?: string | number;
+};
+
+declare type TDevEnvironmentConfiguration = {
+    type?: 'dev-environment';
+    ide: TIde;
+    version?: string;
+    init?: string[];
+    inactivity_duration?: string | number | boolean | 'off';
+    ports?: number[] | string[];
+    name?: string;
+    image?: string;
+    user?: string;
+    privileged?: boolean;
+    entrypoint?: string;
+    working_dir?: string;
+    home_dir?: string;
+    registry_auth?: {
+        username: string;
+        password: string;
+    };
+    python?: string;
+    nvcc?: boolean;
+    single_branch?: boolean;
+    env?: string[];
+    shell?: string;
+    resources?: {
+        gpu?: TGPUResources | string | number;
+        cpu?: string | number | { min?: number; max?: number };
+        memory?: string | number | { min?: number; max?: number };
+        shm_size?: string | number;
+        disk?:
+            | string
+            | number
+            | {
+                  size?: string | number | { min?: number; max?: number };
+              };
+    };
+    priority?: number;
+    volumes?: Array<string | TVolumeMountPointRequest | TInstanceMountPointRequest>;
+    docker?: boolean;
+    repos?: TEnvironmentConfigurationRepo[];
+    files?: Array<TFilePathMappingRequest | string>;
+    setup?: string[];
+    backends?: string[];
+    regions?: string[];
+    availability_zones?: string[];
+    instance_types?: string[];
+    reservation?: string;
+    spot_policy?: TSpotPolicy;
+    retry?: ProfileRetryRequest | string;
+    max_duration?: number | string | boolean;
+    stop_duration?: number | string | boolean;
+    max_price?: number;
+    creation_policy?: 'reuse' | 'reuse-or-create';
+    idle_duration?: number | string;
+    utilization_policy?: {
+        min_gpu_utilization: number;
+        time_window: string | number;
+    };
+    startup_order?: string;
+    stop_criteria?: string;
+    schedule?: { cron: string | string[] };
+    fleets?: string[];
+    tags?: object;
+};
+
+declare type TRunSpec = {
+    run_name: string;
+    configuration: TDevEnvironmentConfiguration;
+    ssh_key_pub?: string;
+};
+declare type TRunApplyRequestParams = {
+    project_name: string;
+    plan: {
+        run_spec: TRunSpec;
+    };
+    force: boolean;
+};
+
 declare type TDeleteRunsRequestParams = {
     project_name: IProject['project_name'];
     runs_names: IRun['run_name'][];
@@ -24,6 +136,7 @@ declare type TStopRunsRequestParams = {
 declare type TJobMetricsRequestParams = {
     project_name: IProject['project_name'];
     run_name: string;
+    run_id: string;
     replica_num?: number;
     job_num: number;
     limit?: number;
@@ -115,6 +228,7 @@ declare interface IJobSubmission {
     submission_num: number;
     status: TJobStatus;
     submitted_at: number;
+    finished_at: string | null;
     termination_reason?: string | null;
     termination_reason_message?: string | null;
     exit_status?: number | null;
@@ -127,23 +241,24 @@ declare interface IJob {
     job_submissions: IJobSubmission[];
 }
 
-declare interface IDevEnvironmentConfiguration {
-    type: 'dev-environment';
-    priority?: number | null
+declare interface ISchedule {
+    cron: string[];
 }
 
 declare interface ITaskConfiguration {
     type: 'task';
-    priority?: number | null
+    priority?: number | null;
+    schedule?: ISchedule | null;
 }
 
 declare interface IServiceConfiguration {
     type: 'service';
     gateway: string | null;
-    priority?: number | null
+    priority?: number | null;
 }
+
 declare interface IRunSpec {
-    configuration: IDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;
+    configuration: TDevEnvironmentConfiguration | ITaskConfiguration | IServiceConfiguration;
     configuration_path: string;
     repo_code_hash?: string;
     repo_id: string;
@@ -169,7 +284,6 @@ declare interface IRun {
     project_name: string;
     user: string;
     submitted_at: string;
-    terminated_at: string | null;
     status: TJobStatus;
     error?: string | null;
     jobs: IJob[];
@@ -178,6 +292,7 @@ declare interface IRun {
     cost: number;
     service: IRunService | null;
     status_message?: string | null;
+    next_triggered_at?: string | null;
 }
 
 declare interface IMetricsItem {

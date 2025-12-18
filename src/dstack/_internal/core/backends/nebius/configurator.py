@@ -10,7 +10,6 @@ from dstack._internal.core.backends.base.configurator import (
 )
 from dstack._internal.core.backends.nebius import resources
 from dstack._internal.core.backends.nebius.backend import NebiusBackend
-from dstack._internal.core.backends.nebius.fabrics import get_all_infiniband_fabrics
 from dstack._internal.core.backends.nebius.models import (
     NebiusBackendConfig,
     NebiusBackendConfigWithCreds,
@@ -19,6 +18,7 @@ from dstack._internal.core.backends.nebius.models import (
     NebiusServiceAccountCreds,
     NebiusStoredConfig,
 )
+from dstack._internal.core.backends.nebius.resources import get_all_infiniband_fabrics
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 

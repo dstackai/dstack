@@ -14,7 +14,7 @@ It streamlines development, training, and inference, and is compatible with any 
 
 #### 1. Set up the server
 
-> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky](https://sky.dstack.ai).
 
 #### 2. Define configurations
 
@@ -40,4 +40,4 @@ port-forwarding, ingress, and more.
     1. Proceed to [installation](installation/index.md)
     2. See [quickstart](quickstart.md)
     3. Browse [examples](/examples)
-    4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+    4. Join [Discord](https://discord.gg/u8SmfwPpMd)

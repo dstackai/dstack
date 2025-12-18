@@ -3,12 +3,21 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 import requests
+from gpuhunt.providers.runpod import RunpodProvider
 from requests import Response
 
 from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
 from dstack._internal.utils.common import get_current_datetime
 
 API_URL = "https://api.runpod.io/graphql"
+
+
+class RunpodApiClientError(BackendError):
+    errors: List[Dict]
+
+    def __init__(self, errors: List[Dict]):
+        self.errors = errors
+        super().__init__(errors)
 
 
 class RunpodApiClient:
@@ -23,7 +32,19 @@ class RunpodApiClient:
         return True
 
     def get_user_details(self) -> Dict:
-        resp = self._make_request({"query": user_details_query, "variable": {}})
+        resp = self._make_request(
+            {
+                "query": """
+                query myself {
+                    myself {
+                        id
+                        authId
+                        email
+                    }
+                }
+                """
+            }
+        )
         return resp.json()
 
     def create_pod(
@@ -52,28 +73,28 @@ class RunpodApiClient:
     ) -> Dict:
         resp = self._make_request(
             {
-                "query": generate_pod_deployment_mutation(
-                    name,
-                    image_name,
-                    gpu_type_id,
-                    cloud_type,
-                    support_public_ip,
-                    start_ssh,
-                    data_center_id,
-                    country_code,
-                    gpu_count,
-                    volume_in_gb,
-                    container_disk_in_gb,
-                    min_vcpu_count,
-                    min_memory_in_gb,
-                    docker_args,
-                    ports,
-                    volume_mount_path,
-                    env,
-                    template_id,
-                    network_volume_id,
-                    allowed_cuda_versions,
-                    bid_per_gpu,
+                "query": _generate_pod_deployment_mutation(
+                    name=name,
+                    image_name=image_name,
+                    gpu_type_id=gpu_type_id,
+                    cloud_type=cloud_type,
+                    support_public_ip=support_public_ip,
+                    start_ssh=start_ssh,
+                    data_center_id=data_center_id,
+                    country_code=country_code,
+                    gpu_count=gpu_count,
+                    volume_in_gb=volume_in_gb,
+                    container_disk_in_gb=container_disk_in_gb,
+                    min_vcpu_count=min_vcpu_count,
+                    min_memory_in_gb=min_memory_in_gb,
+                    docker_args=docker_args,
+                    ports=ports,
+                    volume_mount_path=volume_mount_path,
+                    env=env,
+                    template_id=template_id,
+                    network_volume_id=network_volume_id,
+                    allowed_cuda_versions=allowed_cuda_versions,
+                    bid_per_gpu=bid_per_gpu,
                 )
             }
         )
@@ -86,7 +107,9 @@ class RunpodApiClient:
         image_name: str,
         container_disk_in_gb: int,
         container_registry_auth_id: str,
-        volume_in_gb: int = 0,
+        # Default pod volume is 20GB.
+        # RunPod errors if it's not specified for podEditJob.
+        volume_in_gb: int = 20,
     ) -> str:
         resp = self._make_request(
             {
@@ -108,12 +131,12 @@ class RunpodApiClient:
         return resp.json()["data"]["podEditJob"]["id"]
 
     def get_pod(self, pod_id: str) -> Dict:
-        resp = self._make_request({"query": generate_pod_query(pod_id)})
+        resp = self._make_request({"query": _generate_pod_query(pod_id)})
         data = resp.json()
         return data["data"]["pod"]
 
     def terminate_pod(self, pod_id: str) -> Dict:
-        resp = self._make_request({"query": generate_pod_terminate_mutation(pod_id)})
+        resp = self._make_request({"query": _generate_pod_terminate_mutation(pod_id)})
         data = resp.json()
         return data["data"]
 
@@ -213,7 +236,7 @@ class RunpodApiClient:
         )
         return response.json()["data"]["createNetworkVolume"]["id"]
 
-    def delete_network_volume(self, volume_id: str):
+    def delete_network_volume(self, volume_id: str) -> None:
         self._make_request(
             {
                 "query": f"""
@@ -228,7 +251,66 @@ class RunpodApiClient:
             }
         )
 
-    def _make_request(self, data: Any = None) -> Response:
+    def create_cluster(
+        self,
+        cluster_name: str,
+        gpu_type_id: str,
+        pod_count: int,
+        gpu_count_per_pod: int,
+        image_name: str,
+        deploy_cost: str,
+        template_id: Optional[str] = None,
+        cluster_type: str = "TRAINING",
+        network_volume_id: Optional[str] = None,
+        volume_in_gb: Optional[int] = None,
+        throughput: Optional[int] = None,
+        allowed_cuda_versions: Optional[List[str]] = None,
+        volume_key: Optional[str] = None,
+        data_center_id: Optional[str] = None,
+        start_jupyter: bool = False,
+        start_ssh: bool = False,
+        container_disk_in_gb: Optional[int] = None,
+        docker_args: Optional[str] = None,
+        env: Optional[Dict[str, Any]] = None,
+        volume_mount_path: Optional[str] = None,
+        ports: Optional[str] = None,
+    ) -> Dict:
+        resp = self._make_request(
+            {
+                "query": _generate_create_cluster_mutation(
+                    cluster_name=cluster_name,
+                    gpu_type_id=gpu_type_id,
+                    pod_count=pod_count,
+                    gpu_count_per_pod=gpu_count_per_pod,
+                    image_name=image_name,
+                    cluster_type=cluster_type,
+                    deploy_cost=deploy_cost,
+                    template_id=template_id,
+                    network_volume_id=network_volume_id,
+                    volume_in_gb=volume_in_gb,
+                    throughput=throughput,
+                    allowed_cuda_versions=allowed_cuda_versions,
+                    volume_key=volume_key,
+                    data_center_id=data_center_id,
+                    start_jupyter=start_jupyter,
+                    start_ssh=start_ssh,
+                    container_disk_in_gb=container_disk_in_gb,
+                    docker_args=docker_args,
+                    env=env,
+                    volume_mount_path=volume_mount_path,
+                    ports=ports,
+                )
+            }
+        )
+        data = resp.json()["data"]
+        return data["createCluster"]
+
+    def delete_cluster(self, cluster_id: str) -> bool:
+        resp = self._make_request({"query": _generate_delete_cluster_mutation(cluster_id)})
+        data = resp.json()["data"]
+        return data["deleteCluster"]
+
+    def _make_request(self, data: Optional[Dict[str, Any]] = None) -> Response:
         try:
             response = requests.request(
                 method="POST",
@@ -237,10 +319,10 @@ class RunpodApiClient:
                 timeout=120,
             )
             response.raise_for_status()
-            if "errors" in response.json():
-                if "podTerminate" in response.json()["errors"][0]["path"]:
-                    raise BackendError("Instance Not Found")
-                raise BackendError(response.json()["errors"][0]["message"])
+            response_json = response.json()
+            # RunPod returns 200 on client errors
+            if "errors" in response_json:
+                raise RunpodApiClientError(errors=response_json["errors"])
             return response
         except requests.HTTPError as e:
             if e.response is not None and e.response.status_code in (
@@ -250,7 +332,7 @@ class RunpodApiClient:
                 raise BackendInvalidCredentialsError(e.response.text)
             raise
 
-    def wait_for_instance(self, instance_id) -> Optional[Dict]:
+    def wait_for_instance(self, instance_id: str) -> Optional[Dict]:
         start = get_current_datetime()
         wait_for_instance_interval = 5
         # To change the status to "running," the image must be pulled and then started.
@@ -263,18 +345,7 @@ class RunpodApiClient:
         return
 
 
-user_details_query = """
-query myself {
-    myself {
-        id
-        authId
-        email
-    }
-}
-"""
-
-
-def generate_pod_query(pod_id: str) -> str:
+def _generate_pod_query(pod_id: str) -> str:
     """
     Generate a query for a specific GPU type
     """
@@ -283,6 +354,7 @@ def generate_pod_query(pod_id: str) -> str:
     query pod {{
         pod(input: {{podId: "{pod_id}"}}) {{
             id
+            clusterIp
             containerDiskInGb
             costPerHr
             desiredStatus
@@ -319,26 +391,26 @@ def generate_pod_query(pod_id: str) -> str:
     """
 
 
-def generate_pod_deployment_mutation(
+def _generate_pod_deployment_mutation(
     name: str,
     image_name: str,
     gpu_type_id: str,
     cloud_type: str,
     support_public_ip: bool = True,
     start_ssh: bool = True,
-    data_center_id=None,
-    country_code=None,
-    gpu_count=None,
-    volume_in_gb=None,
-    container_disk_in_gb=None,
-    min_vcpu_count=None,
-    min_memory_in_gb=None,
-    docker_args=None,
-    ports=None,
-    volume_mount_path=None,
+    data_center_id: Optional[str] = None,
+    country_code: Optional[str] = None,
+    gpu_count: Optional[int] = None,
+    volume_in_gb: Optional[int] = None,
+    container_disk_in_gb: Optional[int] = None,
+    min_vcpu_count: Optional[int] = None,
+    min_memory_in_gb: Optional[int] = None,
+    docker_args: Optional[str] = None,
+    ports: Optional[str] = None,
+    volume_mount_path: Optional[str] = None,
     env: Optional[Dict[str, Any]] = None,
-    template_id=None,
-    network_volume_id=None,
+    template_id: Optional[str] = None,
+    network_volume_id: Optional[str] = None,
     allowed_cuda_versions: Optional[List[str]] = None,
     bid_per_gpu: Optional[float] = None,
 ) -> str:
@@ -404,6 +476,8 @@ def generate_pod_deployment_mutation(
         )
         input_fields.append(f"allowedCudaVersions: [{allowed_cuda_versions_string}]")
 
+    input_fields.append(f'minCudaVersion: "{RunpodProvider.MIN_CUDA_VERSION}"')
+
     pod_deploy = "podFindAndDeployOnDemand" if bid_per_gpu is None else "podRentInterruptable"
     # Format input fields
     input_string = ", ".join(input_fields)
@@ -425,7 +499,7 @@ def generate_pod_deployment_mutation(
         """
 
 
-def generate_pod_terminate_mutation(pod_id: str) -> str:
+def _generate_pod_terminate_mutation(pod_id: str) -> str:
     """
     Generates a mutation to terminate a pod.
     """
@@ -434,3 +508,120 @@ def generate_pod_terminate_mutation(pod_id: str) -> str:
         podTerminate(input: {{ podId: "{pod_id}" }})
     }}
     """
+
+
+def _generate_delete_cluster_mutation(cluster_id: str) -> str:
+    """
+    Generates a mutation to delete a cluster.
+    """
+    return f"""
+    mutation {{
+        deleteCluster(
+            input: {{
+                id: "{cluster_id}"
+            }}
+        )
+    }}
+    """
+
+
+def _generate_create_cluster_mutation(
+    cluster_name: str,
+    gpu_type_id: str,
+    pod_count: int,
+    gpu_count_per_pod: int,
+    image_name: str,
+    cluster_type: str,
+    deploy_cost: str,
+    template_id: Optional[str] = None,
+    network_volume_id: Optional[str] = None,
+    volume_in_gb: Optional[int] = None,
+    throughput: Optional[int] = None,
+    allowed_cuda_versions: Optional[List[str]] = None,
+    volume_key: Optional[str] = None,
+    data_center_id: Optional[str] = None,
+    start_jupyter: bool = False,
+    start_ssh: bool = False,
+    container_disk_in_gb: Optional[int] = None,
+    docker_args: Optional[str] = None,
+    env: Optional[Dict[str, Any]] = None,
+    volume_mount_path: Optional[str] = None,
+    ports: Optional[str] = None,
+) -> str:
+    """
+    Generates a mutation to create a cluster.
+    """
+    input_fields = []
+
+    # ------------------------------ Required Fields ----------------------------- #
+    input_fields.append(f'clusterName: "{cluster_name}"')
+    input_fields.append(f'gpuTypeId: "{gpu_type_id}"')
+    input_fields.append(f"podCount: {pod_count}")
+    input_fields.append(f'imageName: "{image_name}"')
+    input_fields.append(f"type: {cluster_type}")
+    input_fields.append(f"gpuCountPerPod: {gpu_count_per_pod}")
+    # If deploy_cost is not specified, Runpod returns Insufficient resources error.
+    input_fields.append(f"deployCost: {deploy_cost}")
+
+    # ------------------------------ Optional Fields ----------------------------- #
+    if template_id is not None:
+        input_fields.append(f'templateId: "{template_id}"')
+    if network_volume_id is not None:
+        input_fields.append(f'networkVolumeId: "{network_volume_id}"')
+    if volume_in_gb is not None:
+        input_fields.append(f"volumeInGb: {volume_in_gb}")
+    if throughput is not None:
+        input_fields.append(f"throughput: {throughput}")
+    if allowed_cuda_versions is not None:
+        allowed_cuda_versions_string = ", ".join(
+            [f'"{version}"' for version in allowed_cuda_versions]
+        )
+        input_fields.append(f"allowedCudaVersions: [{allowed_cuda_versions_string}]")
+    if volume_key is not None:
+        input_fields.append(f'volumeKey: "{volume_key}"')
+    if data_center_id is not None:
+        input_fields.append(f'dataCenterId: "{data_center_id}"')
+    if start_jupyter:
+        input_fields.append("startJupyter: true")
+    if start_ssh:
+        input_fields.append("startSsh: true")
+    if container_disk_in_gb is not None:
+        input_fields.append(f"containerDiskInGb: {container_disk_in_gb}")
+    if docker_args is not None:
+        input_fields.append(f'dockerArgs: "{docker_args}"')
+    if env is not None:
+        env_string = ", ".join(
+            [f'{{ key: "{key}", value: "{value}" }}' for key, value in env.items()]
+        )
+        input_fields.append(f"env: [{env_string}]")
+    if volume_mount_path is not None:
+        input_fields.append(f'volumeMountPath: "{volume_mount_path}"')
+    if ports is not None:
+        ports = ports.replace(" ", "")
+        input_fields.append(f'ports: "{ports}"')
+
+    input_fields.append(f'minCudaVersion: "{RunpodProvider.MIN_CUDA_VERSION}"')
+
+    # Format input fields
+    input_string = ", ".join(input_fields)
+    return f"""
+        mutation {{
+          createCluster(
+            input: {{
+              {input_string}
+            }}
+          ) {{
+            id
+            name
+            pods {{
+              id
+              clusterIp
+              lastStatusChange
+              imageName
+              machine {{
+                podHostId
+              }}
+            }}
+          }}
+        }}
+        """

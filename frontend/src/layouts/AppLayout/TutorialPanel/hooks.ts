@@ -113,7 +113,11 @@ export const useTutorials = () => {
         dispatch(updateTutorialPanelState({ createProjectCompleted: true }));
     }, []);
 
-    const startConfigCliTutorial = useCallback(() => {}, [billingUrl]);
+    const startConfigCliTutorial = useCallback(() => {
+        if (projectData?.length) {
+            navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(projectData[0].project_name));
+        }
+    }, [projectData]);
 
     const finishConfigCliTutorial = useCallback(() => {
         dispatch(updateTutorialPanelState({ configureCLICompleted: true }));
@@ -160,6 +164,7 @@ export const useTutorials = () => {
                 completed: configureCLICompleted,
                 startCallback: startConfigCliTutorial,
                 finishCallback: finishConfigCliTutorial,
+                prerequisitesNeeded: !createProjectCompleted,
             },
 
             {

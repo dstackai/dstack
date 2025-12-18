@@ -1,12 +1,14 @@
 import datetime as dt
+import logging
 from collections import defaultdict
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Optional
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 import gpuhunt
 import pytest
+import pytest_asyncio
 from freezegun import freeze_time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,15 +43,24 @@ from dstack._internal.server.background.tasks.process_instances import (
     delete_instance_health_checks,
     process_instances,
 )
-from dstack._internal.server.models import InstanceHealthCheckModel, PlacementGroupModel
+from dstack._internal.server.models import (
+    InstanceHealthCheckModel,
+    InstanceModel,
+    PlacementGroupModel,
+)
 from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse, DCGMHealthResult
 from dstack._internal.server.schemas.instances import InstanceCheck
 from dstack._internal.server.schemas.runner import (
+    ComponentInfo,
+    ComponentName,
+    ComponentStatus,
+    HealthcheckResponse,
     InstanceHealthResponse,
     TaskListItem,
     TaskListResponse,
     TaskStatus,
 )
+from dstack._internal.server.services.runner.client import ComponentList, ShimClient
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_fleet,
@@ -385,7 +396,15 @@ class TestCheckShim:
         assert health_check.response == health_response.json()
 
 
+@pytest.mark.usefixtures("disable_maybe_install_components")
 class TestRemoveDanglingTasks:
+    @pytest.fixture
+    def disable_maybe_install_components(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "dstack._internal.server.background.tasks.process_instances._maybe_install_components",
+            Mock(return_value=None),
+        )
+
     @pytest.fixture
     def ssh_tunnel_mock(self) -> Generator[Mock, None, None]:
         with patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock:
@@ -540,7 +559,7 @@ class TestTerminate:
     @contextmanager
     def mock_terminate_in_backend(error: Optional[Exception] = None):
         backend = Mock()
-        backend.TYPE = BackendType.DATACRUNCH
+        backend.TYPE = BackendType.VERDA
         terminate_instance = backend.compute.return_value.terminate_instance
         if error is not None:
             terminate_instance.side_effect = error
@@ -1149,3 +1168,414 @@ class TestDeleteInstanceHealthChecks:
         all_checks = res.scalars().all()
         assert len(all_checks) == 1
         assert all_checks[0] == check
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+@pytest.mark.usefixtures("test_db", "instance", "ssh_tunnel_mock", "shim_client_mock")
+class BaseTestMaybeInstallComponents:
+    EXPECTED_VERSION = "0.20.1"
+
+    @pytest_asyncio.fixture
+    async def instance(self, session: AsyncSession) -> InstanceModel:
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        return instance
+
+    @pytest.fixture
+    def component_list(self) -> ComponentList:
+        return ComponentList()
+
+    @pytest.fixture
+    def debug_task_log(self, caplog: pytest.LogCaptureFixture) -> pytest.LogCaptureFixture:
+        caplog.set_level(
+            level=logging.DEBUG,
+            logger="dstack._internal.server.background.tasks.process_instances",
+        )
+        return caplog
+
+    @pytest.fixture
+    def ssh_tunnel_mock(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("dstack._internal.server.services.runner.ssh.SSHTunnel", MagicMock())
+
+    @pytest.fixture
+    def shim_client_mock(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        component_list: ComponentList,
+    ) -> Mock:
+        mock = Mock(spec_set=ShimClient)
+        mock.healthcheck.return_value = HealthcheckResponse(
+            service="dstack-shim", version=self.EXPECTED_VERSION
+        )
+        mock.get_instance_health.return_value = InstanceHealthResponse()
+        mock.get_components.return_value = component_list
+        mock.list_tasks.return_value = TaskListResponse(tasks=[])
+        mock.is_safe_to_restart.return_value = False
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runner.client.ShimClient", Mock(return_value=mock)
+        )
+        return mock
+
+
+@pytest.mark.usefixtures("get_dstack_runner_version_mock")
+class TestMaybeInstallRunner(BaseTestMaybeInstallComponents):
+    @pytest.fixture
+    def component_list(self) -> ComponentList:
+        components = ComponentList()
+        components.add(
+            ComponentInfo(
+                name=ComponentName.RUNNER,
+                version=self.EXPECTED_VERSION,
+                status=ComponentStatus.INSTALLED,
+            ),
+        )
+        return components
+
+    @pytest.fixture
+    def get_dstack_runner_version_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = Mock(return_value=self.EXPECTED_VERSION)
+        monkeypatch.setattr(
+            "dstack._internal.server.background.tasks.process_instances.get_dstack_runner_version",
+            mock,
+        )
+        return mock
+
+    @pytest.fixture
+    def get_dstack_runner_download_url_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = Mock(return_value="https://example.com/runner")
+        monkeypatch.setattr(
+            "dstack._internal.server.background.tasks.process_instances.get_dstack_runner_download_url",
+            mock,
+        )
+        return mock
+
+    async def test_cannot_determine_expected_version(
+        self,
+        debug_task_log: pytest.LogCaptureFixture,
+        shim_client_mock: Mock,
+        get_dstack_runner_version_mock: Mock,
+    ):
+        get_dstack_runner_version_mock.return_value = None
+
+        await process_instances()
+
+        assert "Cannot determine the expected runner version" in debug_task_log.text
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_runner.assert_not_called()
+
+    async def test_expected_version_already_installed(
+        self, debug_task_log: pytest.LogCaptureFixture, shim_client_mock: Mock
+    ):
+        shim_client_mock.get_components.return_value.runner.version = self.EXPECTED_VERSION
+
+        await process_instances()
+
+        assert "expected runner version already installed" in debug_task_log.text
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_runner.assert_not_called()
+
+    @pytest.mark.parametrize("status", [ComponentStatus.NOT_INSTALLED, ComponentStatus.ERROR])
+    async def test_install_not_installed_or_error(
+        self,
+        debug_task_log: pytest.LogCaptureFixture,
+        shim_client_mock: Mock,
+        get_dstack_runner_download_url_mock: Mock,
+        status: ComponentStatus,
+    ):
+        shim_client_mock.get_components.return_value.runner.version = ""
+        shim_client_mock.get_components.return_value.runner.status = status
+
+        await process_instances()
+
+        assert f"installing runner (no version) -> {self.EXPECTED_VERSION}" in debug_task_log.text
+        get_dstack_runner_download_url_mock.assert_called_once_with(
+            arch=None, version=self.EXPECTED_VERSION
+        )
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_runner.assert_called_once_with(
+            get_dstack_runner_download_url_mock.return_value
+        )
+
+    @pytest.mark.parametrize("installed_version", ["0.19.40", "0.21.0", "dev"])
+    async def test_install_installed(
+        self,
+        debug_task_log: pytest.LogCaptureFixture,
+        shim_client_mock: Mock,
+        get_dstack_runner_download_url_mock: Mock,
+        installed_version: str,
+    ):
+        shim_client_mock.get_components.return_value.runner.version = installed_version
+
+        await process_instances()
+
+        assert (
+            f"installing runner {installed_version} -> {self.EXPECTED_VERSION}"
+            in debug_task_log.text
+        )
+        get_dstack_runner_download_url_mock.assert_called_once_with(
+            arch=None, version=self.EXPECTED_VERSION
+        )
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_runner.assert_called_once_with(
+            get_dstack_runner_download_url_mock.return_value
+        )
+
+    async def test_already_installing(
+        self, debug_task_log: pytest.LogCaptureFixture, shim_client_mock: Mock
+    ):
+        shim_client_mock.get_components.return_value.runner.version = "dev"
+        shim_client_mock.get_components.return_value.runner.status = ComponentStatus.INSTALLING
+
+        await process_instances()
+
+        assert "runner is already being installed" in debug_task_log.text
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_runner.assert_not_called()
+
+
+@pytest.mark.usefixtures("get_dstack_shim_version_mock")
+class TestMaybeInstallShim(BaseTestMaybeInstallComponents):
+    @pytest.fixture
+    def component_list(self) -> ComponentList:
+        components = ComponentList()
+        components.add(
+            ComponentInfo(
+                name=ComponentName.SHIM,
+                version=self.EXPECTED_VERSION,
+                status=ComponentStatus.INSTALLED,
+            ),
+        )
+        return components
+
+    @pytest.fixture
+    def get_dstack_shim_version_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = Mock(return_value=self.EXPECTED_VERSION)
+        monkeypatch.setattr(
+            "dstack._internal.server.background.tasks.process_instances.get_dstack_shim_version",
+            mock,
+        )
+        return mock
+
+    @pytest.fixture
+    def get_dstack_shim_download_url_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = Mock(return_value="https://example.com/shim")
+        monkeypatch.setattr(
+            "dstack._internal.server.background.tasks.process_instances.get_dstack_shim_download_url",
+            mock,
+        )
+        return mock
+
+    async def test_cannot_determine_expected_version(
+        self,
+        debug_task_log: pytest.LogCaptureFixture,
+        shim_client_mock: Mock,
+        get_dstack_shim_version_mock: Mock,
+    ):
+        get_dstack_shim_version_mock.return_value = None
+
+        await process_instances()
+
+        assert "Cannot determine the expected shim version" in debug_task_log.text
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_shim.assert_not_called()
+
+    async def test_expected_version_already_installed(
+        self, debug_task_log: pytest.LogCaptureFixture, shim_client_mock: Mock
+    ):
+        shim_client_mock.get_components.return_value.shim.version = self.EXPECTED_VERSION
+
+        await process_instances()
+
+        assert "expected shim version already installed" in debug_task_log.text
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_shim.assert_not_called()
+
+    @pytest.mark.parametrize("status", [ComponentStatus.NOT_INSTALLED, ComponentStatus.ERROR])
+    async def test_install_not_installed_or_error(
+        self,
+        debug_task_log: pytest.LogCaptureFixture,
+        shim_client_mock: Mock,
+        get_dstack_shim_download_url_mock: Mock,
+        status: ComponentStatus,
+    ):
+        shim_client_mock.get_components.return_value.shim.version = ""
+        shim_client_mock.get_components.return_value.shim.status = status
+
+        await process_instances()
+
+        assert f"installing shim (no version) -> {self.EXPECTED_VERSION}" in debug_task_log.text
+        get_dstack_shim_download_url_mock.assert_called_once_with(
+            arch=None, version=self.EXPECTED_VERSION
+        )
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_shim.assert_called_once_with(
+            get_dstack_shim_download_url_mock.return_value
+        )
+
+    @pytest.mark.parametrize("installed_version", ["0.19.40", "0.21.0", "dev"])
+    async def test_install_installed(
+        self,
+        debug_task_log: pytest.LogCaptureFixture,
+        shim_client_mock: Mock,
+        get_dstack_shim_download_url_mock: Mock,
+        installed_version: str,
+    ):
+        shim_client_mock.get_components.return_value.shim.version = installed_version
+
+        await process_instances()
+
+        assert (
+            f"installing shim {installed_version} -> {self.EXPECTED_VERSION}"
+            in debug_task_log.text
+        )
+        get_dstack_shim_download_url_mock.assert_called_once_with(
+            arch=None, version=self.EXPECTED_VERSION
+        )
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_shim.assert_called_once_with(
+            get_dstack_shim_download_url_mock.return_value
+        )
+
+    async def test_already_installing(
+        self, debug_task_log: pytest.LogCaptureFixture, shim_client_mock: Mock
+    ):
+        shim_client_mock.get_components.return_value.shim.version = "dev"
+        shim_client_mock.get_components.return_value.shim.status = ComponentStatus.INSTALLING
+
+        await process_instances()
+
+        assert "shim is already being installed" in debug_task_log.text
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.install_shim.assert_not_called()
+
+
+@pytest.mark.usefixtures("maybe_install_runner_mock", "maybe_install_shim_mock")
+class TestMaybeRestartShim(BaseTestMaybeInstallComponents):
+    @pytest.fixture
+    def component_list(self) -> ComponentList:
+        components = ComponentList()
+        components.add(
+            ComponentInfo(
+                name=ComponentName.RUNNER,
+                version=self.EXPECTED_VERSION,
+                status=ComponentStatus.INSTALLED,
+            ),
+        )
+        components.add(
+            ComponentInfo(
+                name=ComponentName.SHIM,
+                version=self.EXPECTED_VERSION,
+                status=ComponentStatus.INSTALLED,
+            ),
+        )
+        return components
+
+    @pytest.fixture
+    def maybe_install_runner_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = Mock(return_value=False)
+        monkeypatch.setattr(
+            "dstack._internal.server.background.tasks.process_instances._maybe_install_runner",
+            mock,
+        )
+        return mock
+
+    @pytest.fixture
+    def maybe_install_shim_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        mock = Mock(return_value=False)
+        monkeypatch.setattr(
+            "dstack._internal.server.background.tasks.process_instances._maybe_install_shim",
+            mock,
+        )
+        return mock
+
+    async def test_up_to_date(self, shim_client_mock: Mock):
+        shim_client_mock.get_version_string.return_value = self.EXPECTED_VERSION
+        shim_client_mock.is_safe_to_restart.return_value = True
+
+        await process_instances()
+
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.shutdown.assert_not_called()
+
+    async def test_no_shim_component_info(self, shim_client_mock: Mock):
+        shim_client_mock.get_components.return_value = ComponentList()
+        shim_client_mock.get_version_string.return_value = "outdated"
+        shim_client_mock.is_safe_to_restart.return_value = True
+
+        await process_instances()
+
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.shutdown.assert_not_called()
+
+    async def test_outdated_shutdown_requested(self, shim_client_mock: Mock):
+        shim_client_mock.get_version_string.return_value = "outdated"
+        shim_client_mock.is_safe_to_restart.return_value = True
+
+        await process_instances()
+
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.shutdown.assert_called_once_with(force=False)
+
+    async def test_outdated_but_task_wont_survive_restart(self, shim_client_mock: Mock):
+        shim_client_mock.get_version_string.return_value = "outdated"
+        shim_client_mock.is_safe_to_restart.return_value = False
+
+        await process_instances()
+
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.shutdown.assert_not_called()
+
+    async def test_outdated_but_runner_installation_in_progress(
+        self, shim_client_mock: Mock, component_list: ComponentList
+    ):
+        shim_client_mock.get_version_string.return_value = "outdated"
+        shim_client_mock.is_safe_to_restart.return_value = True
+        runner_info = component_list.runner
+        assert runner_info is not None
+        runner_info.status = ComponentStatus.INSTALLING
+
+        await process_instances()
+
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.shutdown.assert_not_called()
+
+    async def test_outdated_but_shim_installation_in_progress(
+        self, shim_client_mock: Mock, component_list: ComponentList
+    ):
+        shim_client_mock.get_version_string.return_value = "outdated"
+        shim_client_mock.is_safe_to_restart.return_value = True
+        shim_info = component_list.shim
+        assert shim_info is not None
+        shim_info.status = ComponentStatus.INSTALLING
+
+        await process_instances()
+
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.shutdown.assert_not_called()
+
+    async def test_outdated_but_runner_installation_requested(
+        self, shim_client_mock: Mock, maybe_install_runner_mock: Mock
+    ):
+        shim_client_mock.get_version_string.return_value = "outdated"
+        shim_client_mock.is_safe_to_restart.return_value = True
+        maybe_install_runner_mock.return_value = True
+
+        await process_instances()
+
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.shutdown.assert_not_called()
+
+    async def test_outdated_but_shim_installation_requested(
+        self, shim_client_mock: Mock, maybe_install_shim_mock: Mock
+    ):
+        shim_client_mock.get_version_string.return_value = "outdated"
+        shim_client_mock.is_safe_to_restart.return_value = True
+        maybe_install_shim_mock.return_value = True
+
+        await process_instances()
+
+        shim_client_mock.get_components.assert_called_once()
+        shim_client_mock.shutdown.assert_not_called()

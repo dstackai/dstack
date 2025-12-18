@@ -1,4 +1,5 @@
 import threading
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -34,7 +35,11 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
     merge_tags,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers, get_offers_disk_modifier
+from dstack._internal.core.backends.base.offers import (
+    OfferModifier,
+    get_catalog_offers,
+    get_offers_disk_modifier,
+)
 from dstack._internal.core.errors import (
     ComputeError,
     NoCapacityError,
@@ -71,6 +76,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 # gp2 volumes can be 1GB-16TB, dstack AMIs are 100GB
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("100GB"), max=Memory.parse("16TB"))
+DEFAULT_GATEWAY_INSTANCE_TYPE = "t3.micro"
 
 
 class AWSGatewayBackendData(CoreModel):
@@ -159,10 +165,8 @@ class AWSCompute(
             )
         return availability_offers
 
-    def get_offers_modifier(
-        self, requirements: Requirements
-    ) -> Callable[[InstanceOfferWithAvailability], Optional[InstanceOfferWithAvailability]]:
-        return get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
 
     def _get_offers_cached_key(self, requirements: Requirements) -> int:
         # Requirements is not hashable, so we use a hack to get arguments hash
@@ -451,20 +455,27 @@ class AWSCompute(
             project_id=configuration.project_name,
             vpc_id=vpc_id,
         )
-        response = ec2_resource.create_instances(
-            **aws_resources.create_instances_struct(
-                disk_size=10,
-                image_id=aws_resources.get_gateway_image_id(ec2_client),
-                instance_type="t3.micro",
-                iam_instance_profile=None,
-                user_data=get_gateway_user_data(configuration.ssh_key_pub),
-                tags=tags,
-                security_group_id=security_group_id,
-                spot=False,
-                subnet_id=subnet_id,
-                allocate_public_ip=configuration.public_ip,
-            )
+        instance_struct = aws_resources.create_instances_struct(
+            disk_size=10,
+            image_id=aws_resources.get_gateway_image_id(ec2_client),
+            instance_type=configuration.instance_type or DEFAULT_GATEWAY_INSTANCE_TYPE,
+            iam_instance_profile=None,
+            user_data=get_gateway_user_data(
+                configuration.ssh_key_pub, router=configuration.router
+            ),
+            tags=tags,
+            security_group_id=security_group_id,
+            spot=False,
+            subnet_id=subnet_id,
+            allocate_public_ip=configuration.public_ip,
         )
+        try:
+            response = ec2_resource.create_instances(**instance_struct)
+        except botocore.exceptions.ClientError as e:
+            msg = f"AWS Error: {e.response['Error']['Code']}"
+            if e.response["Error"].get("Message"):
+                msg += f": {e.response['Error']['Message']}"
+            raise ComputeError(msg)
         instance = response[0]
         instance.wait_until_running()
         instance.reload()  # populate instance.public_ip_address

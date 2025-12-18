@@ -1,16 +1,18 @@
-from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.datacrunch.compute import DataCrunchCompute
-from dstack._internal.core.backends.datacrunch.models import DataCrunchConfig
+from dstack._internal.core.backends.verda.backend import VerdaBackend
+from dstack._internal.core.backends.verda.models import VerdaConfig
 from dstack._internal.core.models.backends.base import BackendType
 
 
-class DataCrunchBackend(Backend):
+# Deprecated
+# TODO: Remove in 0.21
+class DataCrunchBackend(VerdaBackend):
     TYPE = BackendType.DATACRUNCH
     COMPUTE_CLASS = DataCrunchCompute
 
-    def __init__(self, config: DataCrunchConfig):
+    def __init__(self, config: VerdaConfig):
         self.config = config
-        self._compute = DataCrunchCompute(self.config)
+        self._compute = DataCrunchCompute(self.config, self.TYPE)
 
     def compute(self) -> DataCrunchCompute:
         return self._compute

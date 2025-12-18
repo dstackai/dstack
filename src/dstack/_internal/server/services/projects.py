@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
@@ -30,7 +31,7 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.schemas.projects import MemberSetting
-from dstack._internal.server.services import users
+from dstack._internal.server.services import events, users
 from dstack._internal.server.services.backends import (
     get_backend_config_without_creds_from_backend_model,
 )
@@ -168,8 +169,16 @@ async def update_project(
     project: ProjectModel,
     is_public: bool,
 ):
-    """Update project visibility (public/private)."""
-    project.is_public = is_public
+    updated_fields = []
+    if is_public != project.is_public:
+        project.is_public = is_public
+        updated_fields.append(f"is_public={is_public}")
+    events.emit(
+        session,
+        f"Project updated. Updated fields: {', '.join(updated_fields) or '<none>'}",
+        actor=events.UserActor.from_user(user),
+        targets=[events.Target.from_model(project)],
+    )
     await session.commit()
 
 
@@ -194,27 +203,40 @@ async def delete_projects(
             raise ServerClientError("Cannot delete the only project")
 
     res = await session.execute(
-        select(ProjectModel.id).where(ProjectModel.name.in_(projects_names))
+        select(ProjectModel)
+        .where(
+            ProjectModel.name.in_(projects_names),
+            ProjectModel.deleted == False,
+        )
+        .options(load_only(ProjectModel.id, ProjectModel.name))
     )
-    project_ids = res.scalars().all()
-    if len(project_ids) != len(projects_names):
+    projects = res.scalars().all()
+    if len(projects) != len(projects_names):
         raise ServerClientError("Failed to delete non-existent projects")
 
-    for project_id in project_ids:
+    for p in projects:
         # FIXME: The checks are not under lock,
         # so there can be dangling active resources due to race conditions.
-        await _check_project_has_active_resources(session=session, project_id=project_id)
+        await _check_project_has_active_resources(session=session, project_id=p.id)
 
     timestamp = str(int(get_current_datetime().timestamp()))
-    new_project_name = "_deleted_" + timestamp + ProjectModel.name
-    await session.execute(
-        update(ProjectModel)
-        .where(ProjectModel.name.in_(projects_names))
-        .values(
-            deleted=True,
-            name=new_project_name,
+    updates = []
+    for p in projects:
+        updates.append(
+            {
+                "id": p.id,
+                "name": f"_deleted_{timestamp}_{secrets.token_hex(8)}",
+                "original_name": p.name,
+                "deleted": True,
+            }
         )
-    )
+        events.emit(
+            session,
+            "Project deleted",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(p)],
+        )
+    await session.execute(update(ProjectModel), updates)
     await session.commit()
 
 
@@ -244,12 +266,16 @@ async def set_project_members(
         }
         if new_admins_members != current_admins_members:
             raise ForbiddenError("Access denied: changing project admins")
+
     # FIXME: potentially long write transaction
     # clear_project_members() issues DELETE without commit
     await clear_project_members(session=session, project=project)
     names = [m.username for m in members]
     res = await session.execute(
-        select(UserModel).where((UserModel.name.in_(names)) | (UserModel.email.in_(names)))
+        select(UserModel).where(
+            (UserModel.name.in_(names)) | (UserModel.email.in_(names)),
+            UserModel.deleted == False,
+        )
     )
     users = res.scalars().all()
     username_to_user = {user.name: user for user in users}
@@ -311,7 +337,10 @@ async def add_project_members(
             raise ForbiddenError("Access denied: can only join public projects as user role")
 
     res = await session.execute(
-        select(UserModel).where((UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)))
+        select(UserModel).where(
+            (UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)),
+            UserModel.deleted == False,
+        )
     )
     users_found = res.scalars().all()
 
@@ -524,6 +553,12 @@ async def create_project_model(
         is_public=is_public,
     )
     session.add(project)
+    events.emit(
+        session,
+        "Project created",
+        actor=events.UserActor.from_user(owner),
+        targets=[events.Target.from_model(project)],
+    )
     await session.commit()
     return project
 
@@ -700,7 +735,10 @@ async def remove_project_members(
             raise ForbiddenError("Access denied: insufficient permissions to remove members")
 
     res = await session.execute(
-        select(UserModel).where((UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)))
+        select(UserModel).where(
+            (UserModel.name.in_(usernames)) | (UserModel.email.in_(usernames)),
+            UserModel.deleted == False,
+        )
     )
     users_found = res.scalars().all()
 

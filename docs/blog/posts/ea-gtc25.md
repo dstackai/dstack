@@ -7,12 +7,12 @@ image: https://dstack.ai/static-assets/static-assets/images/dstack-ea-slide-2-ba
 categories:
   - Case studies
 links:
-  - NVIDIA GTC 2025 ↗: https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/
+  - NVIDIA GTC 2025: https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/
 ---
 
 # How EA uses dstack to fast-track AI development
 
-At NVIDIA GTC 2025, Electronic Arts [shared :material-arrow-top-right-thin:{ .external }](https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/){:target="_blank"} how they’re scaling AI development and managing infrastructure across teams. They highlighted using tools like `dstack` to provision GPUs quickly, flexibly, and cost-efficiently. This case study summarizes key insights from their talk.
+At NVIDIA GTC 2025, Electronic Arts [shared](https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/) how they’re scaling AI development and managing infrastructure across teams. They highlighted using tools like `dstack` to provision GPUs quickly, flexibly, and cost-efficiently. This case study summarizes key insights from their talk.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-ea-slide-1.png" width="630" />
 
@@ -80,7 +80,7 @@ Workflows became standardized, reproducible, and easier to trace—thanks to the
 
 By adopting tools that are cloud-agnostic and developer-friendly, EA has reduced friction—from provisioning GPUs to deploying models—and enabled teams to spend more time on actual ML work.
 
-*Huge thanks to Kris and Keng from EA’s central tech team for sharing these insights. For more details, including the recording and slides, check out the full talk on the [NVIDIA GTC website :material-arrow-top-right-thin:{ .external }](https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/){:target="_blank"}.*
+*Huge thanks to Kris and Keng from EA’s central tech team for sharing these insights. For more details, including the recording and slides, check out the full talk on the [NVIDIA GTC website](https://www.nvidia.com/en-us/on-demand/session/gtc25-s73667/).*
 
 !!! info "What's next?"
     1. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)

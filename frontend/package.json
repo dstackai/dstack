@@ -16,7 +16,7 @@
     "test": "jest",
     "test:update-snapshots": "jest -u",
     "generate-api": "npx @rtk-query/codegen-openapi openapi-config.ts",
-    "precommit": "lint-staged"
+    "pre-commit": "lint-staged"
   },
   "devDependencies": {
     "@babel/cli": "^7.25.9",
@@ -40,6 +40,7 @@
     "@types/date-fns": "^2.6.0",
     "@types/enzyme": "^3.10.18",
     "@types/jest": "^29.5.14",
+    "@types/js-yaml": "^4.0.9",
     "@types/lodash": "^4.17.13",
     "@types/node": "^22.10.1",
     "@types/react": "^18.3.12",
@@ -110,6 +111,7 @@
     "css-minimizer-webpack-plugin": "^4.2.2",
     "date-fns": "^2.29.3",
     "i18next": "^24.0.2",
+    "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
     "openai": "^4.33.1",
     "prismjs": "^1.30.0",

@@ -54,6 +54,11 @@ export const API = {
         PORTAL_SESSION: (username: string) => `${API.USER_BILLING.BASE(username)}/portal_session`,
     },
 
+    EVENTS: {
+        BASE: () => `${API.BASE()}/events`,
+        LIST: () => `${API.EVENTS.BASE()}/list`,
+    },
+
     PROJECTS: {
         BASE: () => `${API.BASE()}/projects`,
         LIST: () => `${API.PROJECTS.BASE()}/list`,
@@ -70,6 +75,8 @@ export const API = {
         // Repos
         REPOS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/repos`,
         REPOS_LIST: (projectName: IProject['project_name']) => `${API.PROJECTS.REPOS(projectName)}/list`,
+        GET_REPO: (projectName: IProject['project_name']) => `${API.PROJECTS.REPOS(projectName)}/get`,
+        INIT_REPO: (projectName: IProject['project_name']) => `${API.PROJECTS.REPOS(projectName)}/init`,
 
         // Runs
         RUNS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/runs`,
@@ -79,6 +86,7 @@ export const API = {
         RUNS_DELETE: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/delete`,
         RUNS_STOP: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/stop`,
         RUNS_SUBMIT: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/submit`,
+        RUNS_APPLY: (projectName: IProject['project_name']) => `${API.PROJECTS.RUNS(projectName)}/apply`,
 
         // Logs
         LOGS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/logs/poll`,

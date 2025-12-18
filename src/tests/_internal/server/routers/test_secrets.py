@@ -171,7 +171,7 @@ class TestCreateOrUpdateSecret:
     @pytest.mark.parametrize(
         "name, value",
         [
-            ("too_long_secret_value", "a" * 3001),
+            ("too_long_secret_value", "a" * 5001),
             ("", "empty_name"),
             ("@7&.", "wierd_name_chars"),
         ],

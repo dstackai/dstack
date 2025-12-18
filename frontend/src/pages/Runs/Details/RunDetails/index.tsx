@@ -8,21 +8,25 @@ import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndic
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { getRunError, getRunPriority, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
+import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
 import { finishedRunStatuses } from 'pages/Runs/constants';
+import { runIsStopped } from 'pages/Runs/utils';
 
-import { ROUTES } from '../../../../routes';
 import {
+    getRunListFinishedAt,
     getRunListItemBackend,
     getRunListItemInstanceId,
     getRunListItemPrice,
     getRunListItemRegion,
     getRunListItemResources,
+    getRunListItemSchedule,
     getRunListItemServiceUrl,
     getRunListItemSpot,
 } from '../../List/helpers';
 import { JobList } from '../Jobs/List';
+import { ConnectToRunWithDevEnvConfiguration } from './ConnectToRunWithDevEnvConfiguration';
 
 export const RunDetails = () => {
     const { t } = useTranslation();
@@ -36,6 +40,8 @@ export const RunDetails = () => {
     });
 
     const serviceUrl = runData ? getRunListItemServiceUrl(runData) : null;
+    const schedule = runData ? getRunListItemSchedule(runData) : null;
+    const nextTriggeredAt = runData ? runData.next_triggered_at : null;
 
     if (isLoadingRun)
         return (
@@ -49,9 +55,12 @@ export const RunDetails = () => {
     const status = finishedRunStatuses.includes(runData.status)
         ? (runData.latest_job_submission?.status ?? runData.status)
         : runData.status;
+
     const terminationReason = finishedRunStatuses.includes(runData.status)
         ? runData.latest_job_submission?.termination_reason
         : null;
+
+    const finishedAt = getRunListFinishedAt(runData);
 
     return (
         <>
@@ -95,7 +104,7 @@ export const RunDetails = () => {
 
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.finished_at')}</Box>
-                        <div>{runData.terminated_at ? format(new Date(runData.terminated_at), DATE_TIME_FORMAT) : '-'}</div>
+                        <div>{finishedAt ? format(new Date(finishedAt), DATE_TIME_FORMAT) : '-'}</div>
                     </div>
 
                     <div>
@@ -112,7 +121,7 @@ export const RunDetails = () => {
 
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.error')}</Box>
-                        <div>{getRunError(runData)}</div>
+                        <div>{getRunError(runData) ?? '-'}</div>
                     </div>
 
                     <div>
@@ -136,6 +145,11 @@ export const RunDetails = () => {
                     </div>
 
                     <div>
+                        <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
+                        <div>{getRunListItemBackend(runData)}</div>
+                    </div>
+
+                    <div>
                         <Box variant="awsui-key-label">{t('projects.run.region')}</Box>
                         <div>{getRunListItemRegion(runData)}</div>
                     </div>
@@ -149,11 +163,6 @@ export const RunDetails = () => {
                         <Box variant="awsui-key-label">{t('projects.run.spot')}</Box>
                         <div>{getRunListItemSpot(runData)}</div>
                     </div>
-
-                    <div>
-                        <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
-                        <div>{getRunListItemBackend(runData)}</div>
-                    </div>
                 </ColumnLayout>
 
                 {serviceUrl && (
@@ -166,7 +175,24 @@ export const RunDetails = () => {
                         </div>
                     </ColumnLayout>
                 )}
+
+                {schedule && (
+                    <ColumnLayout columns={4} variant="text-grid">
+                        <div>
+                            <Box variant="awsui-key-label">{t('projects.run.schedule')}</Box>
+                            <div>{schedule}</div>
+                        </div>
+                        <div>
+                            <Box variant="awsui-key-label">{t('projects.run.next_run')}</Box>
+                            <div>{nextTriggeredAt ? format(new Date(nextTriggeredAt), DATE_TIME_FORMAT) : '-'}</div>
+                        </div>
+                    </ColumnLayout>
+                )}
             </Container>
+
+            {runData.run_spec.configuration.type === 'dev-environment' && !runIsStopped(runData.status) && (
+                <ConnectToRunWithDevEnvConfiguration run={runData} />
+            )}
 
             {runData.jobs.length > 1 && (
                 <JobList

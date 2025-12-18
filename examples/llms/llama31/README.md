@@ -219,7 +219,7 @@ is available at `https://gateway.<gateway domain>/`.
 ### Running on multiple GPUs
 
 Below is the task configuration file of fine-tuning Llama 3.1 8B using TRL on the
-[`OpenAssistant/oasst_top1_2023-08-25` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/OpenAssistant/oasst_top1_2023-08-25) dataset.
+[`OpenAssistant/oasst_top1_2023-08-25`](https://huggingface.co/datasets/OpenAssistant/oasst_top1_2023-08-25) dataset.
 
 <div editor-title="examples/single-node-training/trl/train.dstack.yml">
 
@@ -374,13 +374,13 @@ resources:
 ## Source code
 
 The source-code of this example can be found in
-[`examples/llms/llama31` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31) and [`examples/single-node-training/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl).
+[`examples/llms/llama31`](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31) and [`examples/single-node-training/trl`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl).
 
 ## What's next?
 
 1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks),
    [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
-2. Browse [Llama 3.1 on HuggingFace :material-arrow-top-right-thin:{ .external }](https://huggingface.co/collections/meta-llama/llama-31-669fc079a0c406a149a5738f),
-   [HuggingFace's Llama recipes :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/huggingface-llama-recipes),
-   [Meta's Llama recipes :material-arrow-top-right-thin:{ .external }](https://github.com/meta-llama/llama-recipes)
-   and [Llama Agentic System :material-arrow-top-right-thin:{ .external }](https://github.com/meta-llama/llama-agentic-system/).
+2. Browse [Llama 3.1 on HuggingFace](https://huggingface.co/collections/meta-llama/llama-31-669fc079a0c406a149a5738f),
+   [HuggingFace's Llama recipes](https://github.com/huggingface/huggingface-llama-recipes),
+   [Meta's Llama recipes](https://github.com/meta-llama/llama-recipes)
+   and [Llama Agentic System](https://github.com/meta-llama/llama-agentic-system/).

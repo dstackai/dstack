@@ -21,25 +21,25 @@ As 2024 comes to a close, we reflect on the milestones we've achieved and look a
 While `dstack` integrates with leading cloud GPU providers, we aim to expand partnerships with more providers 
 sharing our vision of simplifying AI infrastructure orchestration with a lightweight, efficient alternative to Kubernetes.
 
-This year, we’re excited to welcome our first partners: [Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"}, 
-[RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/){:target="_blank"}, 
-[CUDO Compute :material-arrow-top-right-thin:{ .external }](https://www.cudocompute.com/){:target="_blank"}, 
-and [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}.
+This year, we’re excited to welcome our first partners: [Lambda](https://lambdalabs.com/), 
+[RunPod](https://www.runpod.io/), 
+[CUDO Compute](https://www.cudocompute.com/), 
+and [Hot Aisle](https://hotaisle.xyz/).
 
-We’d also like to thank [Oracle  :material-arrow-top-right-thin:{ .external }](https://www.oracle.com/cloud/){:target="_blank"} 
+We’d also like to thank [Oracle ](https://www.oracle.com/cloud/) 
 for their collaboration, ensuring seamless integration between `dstack` and OCI.
 
-> Special thanks to [Lambda :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/){:target="_blank"} and
-> [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} for providing NVIDIA and AMD hardware, enabling us conducting 
+> Special thanks to [Lambda](https://lambdalabs.com/) and
+> [Hot Aisle](https://hotaisle.xyz/) for providing NVIDIA and AMD hardware, enabling us conducting 
 > [benchmarks](/blog/category/benchmarks/), which
 > are essential to advancing open-source inference and training stacks for all accelerator chips.
 
 ## Community
 
 Thanks to your support, the project has
-reached [1.6K stars on GitHub :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack){:target="_blank"},
+reached [1.6K stars on GitHub](https://github.com/dstackai/dstack),
 reflecting the growing interest and trust in its mission.
-Your issues, pull requests, as well as feedback on [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}, play a
+Your issues, pull requests, as well as feedback on [Discord](https://discord.gg/u8SmfwPpMd), play a
 critical role in the project's development.
 
 ## Fleets
@@ -87,7 +87,7 @@ This turns your on-prem cluster into a `dstack` fleet, ready to run dev environm
 ### GPU blocks
 
 At `dstack`, when running a job on an instance, it uses all available GPUs on that instance. In Q1 2025, we will
-introduce [GPU blocks :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1780){:target="_blank"},
+introduce [GPU blocks](https://github.com/dstackai/dstack/issues/1780),
 allowing the allocation of instance GPUs into discrete blocks that can be reused by concurrent jobs.
 
 This will enable more cost-efficient utilization of expensive instances.
@@ -112,16 +112,16 @@ for model deployment, and we continue to enhance support for the rest of NVIDIA'
 This year, we’re particularly proud of our newly added integration with AMD.
 
 `dstack` works seamlessly with any on-prem AMD clusters. For example, you can rent such servers through our partner 
-[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}.
+[Hot Aisle](https://hotaisle.xyz/).
 
-> Among cloud providers, [AMD :material-arrow-top-right-thin:{ .external }](https://www.amd.com/en/products/accelerators/instinct.html){:target="_blank"} is supported only through RunPod. In Q1 2025, we plan to extend it to
-[Nscale :material-arrow-top-right-thin:{ .external }](https://www.nscale.com/){:target="_blank"},
-> [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}, and potentially other providers open to collaboration.
+> Among cloud providers, [AMD](https://www.amd.com/en/products/accelerators/instinct.html) is supported only through RunPod. In Q1 2025, we plan to extend it to
+[Nscale](https://www.nscale.com/),
+> [Hot Aisle](https://hotaisle.xyz/), and potentially other providers open to collaboration.
 
 ### Intel
 
 In Q1 2025, our roadmap includes added integration with 
-[Intel Gaudi :material-arrow-top-right-thin:{ .external }](https://www.intel.com/content/www/us/en/products/details/processors/ai-accelerators/gaudi-overview.html){:target="_blank"}
+[Intel Gaudi](https://www.intel.com/content/www/us/en/products/details/processors/ai-accelerators/gaudi-overview.html)
 among other accelerator chips.
 
 ## Join the community
