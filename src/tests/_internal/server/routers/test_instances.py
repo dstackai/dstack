@@ -389,6 +389,7 @@ class TestCompatibility:
         await session.execute(
             text("UPDATE instances SET termination_reason = 'Fleet has too many instances'")
         )
+        await session.commit()
         resp = await client.post(
             "/api/instances/list", headers=get_auth_headers(user.token), json={}
         )
