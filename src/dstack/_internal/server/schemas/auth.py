@@ -12,6 +12,14 @@ class OAuthInfoResponse(CoreModel):
 
 
 class OAuthAuthorizeRequest(CoreModel):
+    local_port: Annotated[
+        Optional[int],
+        Field(
+            description="If specified, the user is redirected to localhost:local_port after the redirect from the provider.",
+            ge=1,
+            le=65535,
+        ),
+    ] = None
     base_url: Annotated[
         Optional[str],
         Field(
