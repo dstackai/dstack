@@ -325,6 +325,7 @@ nav:
     - Clusters:
         - AWS: examples/clusters/aws/index.md
         - GCP: examples/clusters/gcp/index.md
+        - Lambda: examples/clusters/lambda/index.md
         - Crusoe: examples/clusters/crusoe/index.md
         - NCCL/RCCL tests: examples/clusters/nccl-rccl-tests/index.md
     - Inference:
