@@ -12,6 +12,14 @@ export const authApi = createApi({
     tagTypes: ['Auth'],
 
     endpoints: (builder) => ({
+        getNextRedirect: builder.mutation<{ redirect_url?: string }, { code: string; state: string }>({
+            query: (body) => ({
+                url: API.AUTH.NEXT_REDIRECT(),
+                method: 'POST',
+                body,
+            }),
+        }),
+
         githubAuthorize: builder.mutation<{ authorization_url: string }, void>({
             query: () => ({
                 url: API.AUTH.GITHUB.AUTHORIZE(),
@@ -103,6 +111,7 @@ export const authApi = createApi({
 });
 
 export const {
+    useGetNextRedirectMutation,
     useGithubAuthorizeMutation,
     useGithubCallbackMutation,
     useGetOktaInfoQuery,
