@@ -32,6 +32,12 @@ NO_OFFERS_WARNING = (
     " https://dstack.ai/docs/guides/troubleshooting/#no-offers"
     "[/]\n"
 )
+NO_FLEETS_WARNING = (
+    "[warning]"
+    "The project has no fleets. Create one before submitting a run:"
+    " https://dstack.ai/docs/concepts/fleets"
+    "[/]\n"
+)
 
 
 def cli_error(e: DstackError) -> CLIError:

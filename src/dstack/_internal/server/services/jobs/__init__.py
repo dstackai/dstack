@@ -804,6 +804,11 @@ def _get_job_status_message(job_model: JobModel) -> str:
         elif (
             job_model.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         ):
+            if (
+                job_model.termination_reason_message
+                and "No fleet found" in job_model.termination_reason_message
+            ):
+                return "no fleets"
             return "no offers"
         elif job_model.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY:
             return "interrupted"
