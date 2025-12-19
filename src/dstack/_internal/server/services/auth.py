@@ -1,4 +1,5 @@
 import secrets
+import urllib.parse
 from base64 import b64decode, b64encode
 from typing import Optional
 
@@ -49,10 +50,21 @@ def get_validated_state(request: Request, state: str) -> OAuthState:
     state_cookie = request.cookies.get(_OAUTH_STATE_COOKIE_KEY)
     if state != state_cookie:
         raise ServerClientError("Invalid state token")
-    state_decoded = _decode_state(state)
-    if state_decoded is None:
+    decoded_state = _decode_state(state)
+    if decoded_state is None:
         raise ServerClientError("Invalid state token")
-    return state_decoded
+    return decoded_state
+
+
+def get_next_redirect_url(code: str, state: str) -> Optional[str]:
+    decoded_state = _decode_state(state)
+    if decoded_state is None:
+        raise ServerClientError("Invalid state token")
+    if decoded_state.local_port is None:
+        return None
+    params = {"code": code, "state": state}
+    redirect_url = f"http://localhost:{decoded_state.local_port}/auth/callback?{urllib.parse.urlencode(params)}"
+    return redirect_url
 
 
 def _decode_state(state: str) -> Optional[OAuthState]:

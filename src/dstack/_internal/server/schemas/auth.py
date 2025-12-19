@@ -56,3 +56,28 @@ class OAuthCallbackRequest(CoreModel):
             )
         ),
     ] = None
+
+
+class OAuthGetNextRedirectRequest(CoreModel):
+    code: Annotated[
+        str,
+        Field(
+            description="The OAuth2 authorization code received from the provider in the redirect URL."
+        ),
+    ]
+    state: Annotated[
+        str,
+        Field(description="The state parameter received from the provider in the redirect URL."),
+    ]
+
+
+class OAuthGetNextRedirectResponse(CoreModel):
+    redirect_url: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The URL that the user needs to be redirected to."
+                " If `null`, there is no next redirect."
+            )
+        ),
+    ]
