@@ -140,8 +140,12 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
         return None
 
     if res is None:
-        logger.warning(
-            "Failed to collect job %s metrics. Runner version does not support metrics API.",
+        logger.debug(
+            (
+                "Failed to collect job %s metrics."
+                " Either runner version does not support metrics API"
+                " or metrics collector is not available."
+            ),
             job_model.job_name,
         )
         return None

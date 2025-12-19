@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -17,33 +18,42 @@ import (
 )
 
 type MetricsCollector struct {
-	cgroupVersion int
-	gpuVendor     common.GpuVendor
+	cgroupMountPoint string
+	gpuVendor        common.GpuVendor
 }
 
-func NewMetricsCollector() (*MetricsCollector, error) {
-	cgroupVersion, err := getCgroupVersion()
+func NewMetricsCollector(ctx context.Context) (*MetricsCollector, error) {
+	// It's unlikely that cgroup mount point will change during container lifetime,
+	// so we detect it only once and reuse.
+	cgroupMountPoint, err := getProcessCgroupMountPoint(ctx, "/proc/self/mounts")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get cgroup mount point: %w", err)
 	}
 	gpuVendor := common.GetGpuVendor()
 	return &MetricsCollector{
-		cgroupVersion: cgroupVersion,
-		gpuVendor:     gpuVendor,
+		cgroupMountPoint: cgroupMountPoint,
+		gpuVendor:        gpuVendor,
 	}, nil
 }
 
 func (s *MetricsCollector) GetSystemMetrics(ctx context.Context) (*schemas.SystemMetrics, error) {
+	// It's possible to move a process from one control group to another (it's unlikely, but nonetheless),
+	// so we detect the current group each time.
+	cgroupPathname, err := getProcessCgroupPathname(ctx, "/proc/self/cgroup")
+	if err != nil {
+		return nil, fmt.Errorf("get cgroup pathname: %w", err)
+	}
+	cgroupPath := path.Join(s.cgroupMountPoint, cgroupPathname)
 	timestamp := time.Now()
-	cpuUsage, err := s.GetCPUUsageMicroseconds()
+	cpuUsage, err := s.GetCPUUsageMicroseconds(cgroupPath)
 	if err != nil {
 		return nil, err
 	}
-	memoryUsage, err := s.GetMemoryUsageBytes()
+	memoryUsage, err := s.GetMemoryUsageBytes(cgroupPath)
 	if err != nil {
 		return nil, err
 	}
-	memoryCache, err := s.GetMemoryCacheBytes()
+	memoryCache, err := s.GetMemoryCacheBytes(cgroupPath)
 	if err != nil {
 		return nil, err
 	}
@@ -61,28 +71,14 @@ func (s *MetricsCollector) GetSystemMetrics(ctx context.Context) (*schemas.Syste
 	}, nil
 }
 
-func (s *MetricsCollector) GetCPUUsageMicroseconds() (uint64, error) {
-	cgroupCPUUsagePath := "/sys/fs/cgroup/cpu.stat"
-	if s.cgroupVersion == 1 {
-		cgroupCPUUsagePath = "/sys/fs/cgroup/cpuacct/cpuacct.usage"
-	}
+func (s *MetricsCollector) GetCPUUsageMicroseconds(cgroupPath string) (uint64, error) {
+	cgroupCPUUsagePath := path.Join(cgroupPath, "cpu.stat")
 
 	data, err := os.ReadFile(cgroupCPUUsagePath)
 	if err != nil {
 		return 0, fmt.Errorf("could not read CPU usage: %w", err)
 	}
 
-	if s.cgroupVersion == 1 {
-		// cgroup v1 provides usage in nanoseconds
-		usageStr := strings.TrimSpace(string(data))
-		cpuUsage, err := strconv.ParseUint(usageStr, 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("could not parse CPU usage: %w", err)
-		}
-		// convert nanoseconds to microseconds
-		return cpuUsage / 1000, nil
-	}
-	// cgroup v2, we need to extract usage_usec from cpu.stat
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "usage_usec") {
@@ -100,11 +96,8 @@ func (s *MetricsCollector) GetCPUUsageMicroseconds() (uint64, error) {
 	return 0, fmt.Errorf("usage_usec not found in cpu.stat")
 }
 
-func (s *MetricsCollector) GetMemoryUsageBytes() (uint64, error) {
-	cgroupMemoryUsagePath := "/sys/fs/cgroup/memory.current"
-	if s.cgroupVersion == 1 {
-		cgroupMemoryUsagePath = "/sys/fs/cgroup/memory/memory.usage_in_bytes"
-	}
+func (s *MetricsCollector) GetMemoryUsageBytes(cgroupPath string) (uint64, error) {
+	cgroupMemoryUsagePath := path.Join(cgroupPath, "memory.current")
 
 	data, err := os.ReadFile(cgroupMemoryUsagePath)
 	if err != nil {
@@ -119,11 +112,8 @@ func (s *MetricsCollector) GetMemoryUsageBytes() (uint64, error) {
 	return usedMemory, nil
 }
 
-func (s *MetricsCollector) GetMemoryCacheBytes() (uint64, error) {
-	cgroupMemoryStatPath := "/sys/fs/cgroup/memory.stat"
-	if s.cgroupVersion == 1 {
-		cgroupMemoryStatPath = "/sys/fs/cgroup/memory/memory.stat"
-	}
+func (s *MetricsCollector) GetMemoryCacheBytes(cgroupPath string) (uint64, error) {
+	cgroupMemoryStatPath := path.Join(cgroupPath, "memory.stat")
 
 	statData, err := os.ReadFile(cgroupMemoryStatPath)
 	if err != nil {
@@ -132,8 +122,7 @@ func (s *MetricsCollector) GetMemoryCacheBytes() (uint64, error) {
 
 	lines := strings.Split(string(statData), "\n")
 	for _, line := range lines {
-		if (s.cgroupVersion == 1 && strings.HasPrefix(line, "total_inactive_file")) ||
-			(s.cgroupVersion == 2 && strings.HasPrefix(line, "inactive_file")) {
+		if strings.HasPrefix(line, "inactive_file") {
 			parts := strings.Fields(line)
 			if len(parts) != 2 {
 				return 0, fmt.Errorf("unexpected format in memory.stat")
@@ -253,23 +242,6 @@ func (s *MetricsCollector) GetIntelAcceleratorMetrics(ctx context.Context) ([]sc
 		return []schemas.GPUMetrics{}, fmt.Errorf("failed to execute hl-smi: %w", err)
 	}
 	return parseNVIDIASMILikeMetrics(out.String())
-}
-
-func getCgroupVersion() (int, error) {
-	data, err := os.ReadFile("/proc/self/mountinfo")
-	if err != nil {
-		return 0, fmt.Errorf("could not read /proc/self/mountinfo: %w", err)
-	}
-
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.Contains(line, "cgroup2") {
-			return 2, nil
-		} else if strings.Contains(line, "cgroup") {
-			return 1, nil
-		}
-	}
-
-	return 0, fmt.Errorf("could not determine cgroup version")
 }
 
 func parseNVIDIASMILikeMetrics(output string) ([]schemas.GPUMetrics, error) {

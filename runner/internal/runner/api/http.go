@@ -16,7 +16,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
-	"github.com/dstackai/dstack/runner/internal/metrics"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
@@ -28,11 +27,10 @@ func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (
 }
 
 func (s *Server) metricsGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	metricsCollector, err := metrics.NewMetricsCollector()
-	if err != nil {
-		return nil, &api.Error{Status: http.StatusInternalServerError, Err: err}
+	if s.metricsCollector == nil {
+		return nil, &api.Error{Status: http.StatusNotFound, Msg: "Metrics collector is not available"}
 	}
-	metrics, err := metricsCollector.GetSystemMetrics(r.Context())
+	metrics, err := s.metricsCollector.GetSystemMetrics(r.Context())
 	if err != nil {
 		return nil, &api.Error{Status: http.StatusInternalServerError, Err: err}
 	}
