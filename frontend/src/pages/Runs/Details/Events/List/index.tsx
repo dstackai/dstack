@@ -1,11 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import Button from '@cloudscape-design/components/button';
 
 import { Header, Loader, Table } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useCollection, useInfiniteScroll } from 'hooks';
+import { ROUTES } from 'routes';
 import { useLazyGetAllEventsQuery } from 'services/events';
 
 import { useColumnsDefinitions } from 'pages/Events/List/hooks/useColumnDefinitions';
@@ -14,10 +16,11 @@ export const EventsList = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramRunId = params.runId ?? '';
+    const navigate = useNavigate();
 
     const { data, isLoading, isLoadingMore } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
-        args: { limit: DEFAULT_TABLE_PAGE_SIZE, target_runs: [paramRunId] },
+        args: { limit: DEFAULT_TABLE_PAGE_SIZE, within_runs: [paramRunId] },
 
         getPaginationParams: (lastEvent) => ({
             prev_recorded_at: lastEvent.recorded_at,
@@ -29,6 +32,10 @@ export const EventsList = () => {
         selection: {},
     });
 
+    const goToFullView = () => {
+        navigate(ROUTES.EVENTS.LIST + `?within_runs=${paramRunId}`);
+    };
+
     const { columns } = useColumnsDefinitions();
 
     return (
@@ -38,7 +45,11 @@ export const EventsList = () => {
             items={items}
             loading={isLoading}
             loadingText={t('common.loading')}
-            header={<Header>{t('navigation.events')}</Header>}
+            header={
+                <Header actions={<Button onClick={goToFullView}>{t('common.full_view')}</Button>}>
+                    {t('navigation.events')}
+                </Header>
+            }
             footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
         />
     );

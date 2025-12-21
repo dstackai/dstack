@@ -15,15 +15,9 @@ import {
     isAvailableStoppingForRun,
     // isAvailableDeletingForRun,
 } from '../utils';
+import { CodeTab } from './constants';
 
 import styles from './styles.module.scss';
-
-enum CodeTab {
-    Details = 'details',
-    Metrics = 'metrics',
-    Logs = 'logs',
-    Events = 'events',
-}
 
 export const RunDetailsPage: React.FC = () => {
     const { t } = useTranslation();

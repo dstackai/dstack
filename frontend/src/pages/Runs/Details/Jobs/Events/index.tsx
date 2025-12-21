@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import Button from '@cloudscape-design/components/button';
 
 import { Header, Loader, Table } from 'components';
 
@@ -10,6 +11,7 @@ import { useLazyGetAllEventsQuery } from 'services/events';
 
 import { useColumnsDefinitions } from 'pages/Events/List/hooks/useColumnDefinitions';
 
+import { ROUTES } from '../../../../../routes';
 import { useGetRunQuery } from '../../../../../services/run';
 
 export const EventsList = () => {
@@ -18,6 +20,7 @@ export const EventsList = () => {
     const paramProjectName = params.projectName ?? '';
     const paramRunId = params.runId ?? '';
     const paramJobName = params.jobName ?? '';
+    const navigate = useNavigate();
 
     const { data: runData, isLoading: isLoadingRun } = useGetRunQuery({
         project_name: paramProjectName,
@@ -41,6 +44,10 @@ export const EventsList = () => {
         }),
     });
 
+    const goToFullView = () => {
+        navigate(ROUTES.EVENTS.LIST + `?target_jobs=${jobId}`);
+    };
+
     const { items, collectionProps } = useCollection<IEvent>(data, {
         selection: {},
     });
@@ -54,7 +61,17 @@ export const EventsList = () => {
             items={items}
             loading={isLoading || isLoadingRun}
             loadingText={t('common.loading')}
-            header={<Header>{t('navigation.events')}</Header>}
+            header={
+                <Header
+                    actions={
+                        <Button onClick={goToFullView} disabled={!jobId}>
+                            {t('common.full_view')}
+                        </Button>
+                    }
+                >
+                    {t('navigation.events')}
+                </Header>
+            }
             footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
         />
     );
