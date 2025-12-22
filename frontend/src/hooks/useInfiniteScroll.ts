@@ -110,7 +110,6 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
         const scrollPositionFromBottom = element.scrollHeight - (element.clientHeight + element.scrollTop);
 
         if (scrollPositionFromBottom < SCROLL_POSITION_GAP) {
-            console.log('test', element.scrollHeight);
             getMore().catch(console.log);
         }
     }, [disabledMore, getMore]);
