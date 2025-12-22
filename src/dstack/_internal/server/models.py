@@ -220,7 +220,7 @@ class UserModel(BaseModel):
     ssh_private_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ssh_public_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, index=True)
 
     projects_quota: Mapped[int] = mapped_column(
         Integer, default=settings.USER_PROJECT_DEFAULT_QUOTA

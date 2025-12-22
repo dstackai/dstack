@@ -38,7 +38,7 @@ func start(tempDir string, homeDir string, httpPort int, sshPort int, logLevel i
 	log.DefaultEntry.Logger.SetOutput(io.MultiWriter(os.Stdout, defaultLogFile))
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(logLevel))
 
-	server, err := api.NewServer(tempDir, homeDir, fmt.Sprintf(":%d", httpPort), sshPort, version)
+	server, err := api.NewServer(context.TODO(), tempDir, homeDir, fmt.Sprintf(":%d", httpPort), sshPort, version)
 	if err != nil {
 		return fmt.Errorf("create server: %w", err)
 	}

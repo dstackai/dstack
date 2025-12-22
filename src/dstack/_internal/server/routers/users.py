@@ -15,7 +15,7 @@ from dstack._internal.server.schemas.users import (
     UpdateUserRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, GlobalAdmin
-from dstack._internal.server.services import users
+from dstack._internal.server.services import events, users
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -86,7 +86,7 @@ async def update_user(
 ):
     res = await users.update_user(
         session=session,
-        actor=user,
+        actor=events.UserActor.from_user(user),
         username=body.username,
         global_role=body.global_role,
         email=body.email,
