@@ -12,6 +12,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/metrics"
 )
 
 type Server struct {
@@ -29,15 +30,23 @@ type Server struct {
 	executor  executor.Executor
 	cancelRun context.CancelFunc
 
+	metricsCollector *metrics.MetricsCollector
+
 	version string
 }
 
-func NewServer(tempDir string, homeDir string, address string, sshPort int, version string) (*Server, error) {
+func NewServer(ctx context.Context, tempDir string, homeDir string, address string, sshPort int, version string) (*Server, error) {
 	r := api.NewRouter()
 	ex, err := executor.NewRunExecutor(tempDir, homeDir, sshPort)
 	if err != nil {
 		return nil, err
 	}
+
+	metricsCollector, err := metrics.NewMetricsCollector(ctx)
+	if err != nil {
+		log.Warning(ctx, "Metrics collector is not available", "err", err)
+	}
+
 	s := &Server{
 		srv: &http.Server{
 			Addr:    address,
@@ -54,6 +63,8 @@ func NewServer(tempDir string, homeDir string, address string, sshPort int, vers
 		logsWaitDuration:   5 * time.Minute,
 
 		executor: ex,
+
+		metricsCollector: metricsCollector,
 
 		version: version,
 	}
