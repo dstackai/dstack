@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.models.fleets import FleetSpec, FleetStatus
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
@@ -213,7 +213,8 @@ def _maintain_fleet_nodes_in_min_max_range(
                 break
             if instance.status in [InstanceStatus.IDLE]:
                 instance.status = InstanceStatus.TERMINATING
-                instance.termination_reason = "Fleet has too many instances"
+                instance.termination_reason = InstanceTerminationReason.MAX_INSTANCES_LIMIT
+                instance.termination_reason_message = "Fleet has too many instances"
                 nodes_redundant -= 1
                 logger.info(
                     "Terminating instance %s: %s",

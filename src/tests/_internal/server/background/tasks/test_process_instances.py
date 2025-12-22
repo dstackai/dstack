@@ -29,6 +29,7 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceStatus,
+    InstanceTerminationReason,
     InstanceType,
     Resources,
 )
@@ -262,7 +263,7 @@ class TestCheckShim:
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATING
         assert instance.termination_deadline == termination_deadline_time
-        assert instance.termination_reason == "Termination deadline"
+        assert instance.termination_reason == InstanceTerminationReason.UNREACHABLE
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -529,7 +530,7 @@ class TestTerminateIdleTime:
         await session.refresh(instance)
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATING
-        assert instance.termination_reason == "Idle timeout"
+        assert instance.termination_reason == InstanceTerminationReason.IDLE_TIMEOUT
 
 
 class TestSSHInstanceTerminateProvisionTimeoutExpired:
@@ -550,7 +551,7 @@ class TestSSHInstanceTerminateProvisionTimeoutExpired:
 
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
-        assert instance.termination_reason == "Provisioning timeout expired"
+        assert instance.termination_reason == InstanceTerminationReason.PROVISIONING_TIMEOUT
 
 
 class TestTerminate:
@@ -575,8 +576,7 @@ class TestTerminate:
         instance = await create_instance(
             session=session, project=project, status=InstanceStatus.TERMINATING
         )
-        reason = "some reason"
-        instance.termination_reason = reason
+        instance.termination_reason = InstanceTerminationReason.IDLE_TIMEOUT
         instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
         await session.commit()
 
@@ -588,7 +588,7 @@ class TestTerminate:
 
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATED
-        assert instance.termination_reason == "some reason"
+        assert instance.termination_reason == InstanceTerminationReason.IDLE_TIMEOUT
         assert instance.deleted == True
         assert instance.deleted_at is not None
         assert instance.finished_at is not None
@@ -603,7 +603,7 @@ class TestTerminate:
         instance = await create_instance(
             session=session, project=project, status=InstanceStatus.TERMINATING
         )
-        instance.termination_reason = "some reason"
+        instance.termination_reason = InstanceTerminationReason.IDLE_TIMEOUT
         initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
         instance.last_job_processed_at = initial_time
         await session.commit()
@@ -635,7 +635,7 @@ class TestTerminate:
         instance = await create_instance(
             session=session, project=project, status=InstanceStatus.TERMINATING
         )
-        instance.termination_reason = "some reason"
+        instance.termination_reason = InstanceTerminationReason.IDLE_TIMEOUT
         initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
         instance.last_job_processed_at = initial_time
         await session.commit()
@@ -667,7 +667,7 @@ class TestTerminate:
         instance = await create_instance(
             session=session, project=project, status=InstanceStatus.TERMINATING
         )
-        instance.termination_reason = "some reason"
+        instance.termination_reason = InstanceTerminationReason.IDLE_TIMEOUT
         initial_time = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
         instance.last_job_processed_at = initial_time
         await session.commit()
@@ -819,7 +819,7 @@ class TestCreateInstance:
 
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
-        assert instance.termination_reason == "All offers failed"
+        assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS
 
     async def test_fails_if_no_offers(self, session: AsyncSession):
         project = await create_project(session=session)
@@ -832,19 +832,22 @@ class TestCreateInstance:
 
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATED
-        assert instance.termination_reason == "No offers found"
+        assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS
 
     @pytest.mark.parametrize(
         ("placement", "expected_termination_reasons"),
         [
             pytest.param(
                 InstanceGroupPlacement.CLUSTER,
-                {"No offers found": 1, "Master instance failed to start": 3},
+                {
+                    InstanceTerminationReason.NO_OFFERS: 1,
+                    InstanceTerminationReason.MASTER_FAILED: 3,
+                },
                 id="cluster",
             ),
             pytest.param(
                 None,
-                {"No offers found": 4},
+                {InstanceTerminationReason.NO_OFFERS: 4},
                 id="non-cluster",
             ),
         ],
