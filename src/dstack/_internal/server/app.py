@@ -58,6 +58,7 @@ from dstack._internal.server.settings import (
     SERVER_URL,
     UPDATE_DEFAULT_PROJECT,
 )
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
@@ -105,6 +106,7 @@ async def lifespan(app: FastAPI):
             enable_tracing=True,
             traces_sampler=_sentry_traces_sampler,
             profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+            before_send=sentry_utils.AsyncioCancelledErrorFilterEventProcessor(),
         )
     server_executor = ThreadPoolExecutor(max_workers=settings.SERVER_EXECUTOR_MAX_WORKERS)
     asyncio.get_running_loop().set_default_executor(server_executor)
