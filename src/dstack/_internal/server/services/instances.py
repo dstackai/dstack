@@ -128,7 +128,9 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         status=instance_model.status,
         unreachable=instance_model.unreachable,
         health_status=instance_model.health,
-        termination_reason=instance_model.termination_reason,
+        termination_reason=(
+            instance_model.termination_reason.value if instance_model.termination_reason else None
+        ),
         termination_reason_message=instance_model.termination_reason_message,
         created=instance_model.created_at,
         total_blocks=instance_model.total_blocks,
