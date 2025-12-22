@@ -130,7 +130,7 @@ async def create_user(
 
 async def update_user(
     session: AsyncSession,
-    actor: UserModel,
+    actor: events.AnyActor,
     username: str,
     global_role: GlobalRole,
     email: Optional[str] = None,
@@ -152,7 +152,7 @@ async def update_user(
         events.emit(
             session,
             f"User updated. Updated fields: {', '.join(updated_fields) or '<none>'}",
-            actor=events.UserActor.from_user(actor),
+            actor=actor,
             targets=[events.Target.from_model(user)],
         )
         await session.commit()
