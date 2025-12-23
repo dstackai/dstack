@@ -39,17 +39,10 @@ class LoginCommand(BaseCommand):
         base_url = args.url
         api_client = APIClient(base_url=base_url)
         provider = self._select_provider_or_error(api_client=api_client, args=args)
-        result_queue = queue.Queue[Optional[UserWithCreds]](maxsize=1)
-        handler = _make_handler(
-            result_queue=result_queue,
-            api_client=api_client,
-            provider=provider,
-        )
-        # Using built-in HTTP server to avoid extra deps.
-        server = _create_server(handler)
+        server = _LoginServer(api_client=api_client, provider=provider)
         try:
-            threading.Thread(target=server.serve_forever).start()
-            auth_resp = api_client.auth.authorize(provider=provider, local_port=server.server_port)
+            server.start()
+            auth_resp = api_client.auth.authorize(provider=provider, local_port=server.port)
             opened = webbrowser.open(auth_resp.authorization_url)
             if opened:
                 console.print(
@@ -58,7 +51,7 @@ class LoginCommand(BaseCommand):
             else:
                 console.print(f"Open the URL to log in with [code]{provider.title()}[/]:\n")
             print(f"{auth_resp.authorization_url}\n")
-            user = result_queue.get()
+            user = server.get_logged_in_user()
         finally:
             server.shutdown()
         if user is None:
@@ -123,59 +116,86 @@ class _BadRequestError(Exception):
     pass
 
 
-def _make_handler(
-    result_queue: queue.Queue[Optional[UserWithCreds]],
-    api_client: APIClient,
-    provider: str,
-) -> type[BaseHTTPRequestHandler]:
-    class _CallbackHandler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            parsed_path = urllib.parse.urlparse(self.path)
-            if parsed_path.path != "/auth/callback":
-                self.send_response(404)
+class _LoginServer:
+    def __init__(self, api_client: APIClient, provider: str):
+        self._api_client = api_client
+        self._provider = provider
+        self._result_queue: queue.Queue[Optional[UserWithCreds]] = queue.Queue()
+        # Using built-in HTTP server to avoid extra deps.
+        callback_handler = self._make_callback_handler(
+            result_queue=self._result_queue,
+            api_client=api_client,
+            provider=provider,
+        )
+        self._server = self._create_server(handler=callback_handler)
+
+    def start(self):
+        self._thread = threading.Thread(target=self._server.serve_forever)
+        self._thread.start()
+
+    def shutdown(self):
+        self._server.shutdown()
+
+    def get_logged_in_user(self) -> Optional[UserWithCreds]:
+        return self._result_queue.get()
+
+    @property
+    def port(self) -> int:
+        return self._server.server_port
+
+    def _make_callback_handler(
+        self,
+        result_queue: queue.Queue[Optional[UserWithCreds]],
+        api_client: APIClient,
+        provider: str,
+    ) -> type[BaseHTTPRequestHandler]:
+        class _CallbackHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                parsed_path = urllib.parse.urlparse(self.path)
+                if parsed_path.path != "/auth/callback":
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                try:
+                    self._handle_auth_callback(parsed_path)
+                except _BadRequestError as e:
+                    self.send_error(400, e.args[0])
+                    result_queue.put(None)
+
+            def log_message(self, format: str, *args):
+                # Do not log server requests.
+                pass
+
+            def _handle_auth_callback(self, parsed_path: urllib.parse.ParseResult):
+                try:
+                    params = urllib.parse.parse_qs(parsed_path.query, strict_parsing=True)
+                except ValueError:
+                    raise _BadRequestError("Bad query params")
+                code = params.get("code", [None])[0]
+                state = params.get("state", [None])[0]
+                if code is None or state is None:
+                    raise _BadRequestError("Missing required params")
+                try:
+                    user = api_client.auth.callback(provider=provider, code=code, state=state)
+                except ClientError:
+                    raise _BadRequestError("Authentication failed")
+                self._send_success_html()
+                result_queue.put(user)
+
+            def _send_success_html(self):
+                body = _SUCCESS_HTML.encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                return
-            try:
-                self._handle_auth_callback(parsed_path)
-            except _BadRequestError as e:
-                self.send_error(400, e.args[0])
-                result_queue.put(None)
+                self.wfile.write(body)
 
-        def log_message(self, format: str, *args):
-            # Do not log server requests.
-            pass
+        return _CallbackHandler
 
-        def _handle_auth_callback(self, parsed_path: urllib.parse.ParseResult):
-            try:
-                params = urllib.parse.parse_qs(parsed_path.query, strict_parsing=True)
-            except ValueError:
-                raise _BadRequestError("Bad query params")
-            code = params.get("code", [None])[0]
-            state = params.get("state", [None])[0]
-            if code is None or state is None:
-                raise _BadRequestError("Missing required params")
-            try:
-                user = api_client.auth.callback(provider=provider, code=code, state=state)
-            except ClientError:
-                raise _BadRequestError("Authentication failed")
-            self._send_success_html()
-            result_queue.put(user)
-
-        def _send_success_html(self):
-            body = _SUCCESS_HTML.encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-    return _CallbackHandler
-
-
-def _create_server(handler: type[BaseHTTPRequestHandler]) -> HTTPServer:
-    server_address = ("127.0.0.1", 0)
-    server = HTTPServer(server_address, handler)
-    return server
+    def _create_server(self, handler: type[BaseHTTPRequestHandler]) -> HTTPServer:
+        server_address = ("127.0.0.1", 0)
+        server = HTTPServer(server_address, handler)
+        return server
 
 
 _SUCCESS_HTML = """\
