@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +10,7 @@ from dstack._internal.server.schemas.projects import (
     AddProjectMemberRequest,
     CreateProjectRequest,
     DeleteProjectsRequest,
+    ListProjectsRequest,
     RemoveProjectMemberRequest,
     SetProjectMembersRequest,
     UpdateProjectRequest,
@@ -37,6 +38,7 @@ router = APIRouter(
 
 @router.post("/list", response_model=List[Project])
 async def list_projects(
+    body: Optional[ListProjectsRequest] = None,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
@@ -45,8 +47,13 @@ async def list_projects(
 
     `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
     """
+    if body is None:
+        # For backward compatibility
+        body = ListProjectsRequest()
     return CustomORJSONResponse(
-        await projects.list_user_accessible_projects(session=session, user=user)
+        await projects.list_user_accessible_projects(
+            session=session, user=user, include_not_joined=body.include_not_joined
+        )
     )
 
 

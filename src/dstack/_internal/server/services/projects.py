@@ -83,18 +83,22 @@ async def list_user_projects(
 async def list_user_accessible_projects(
     session: AsyncSession,
     user: UserModel,
+    include_not_joined: bool,
 ) -> List[Project]:
     """
     Returns all projects accessible to the user:
     - Projects where user is a member (public or private)
-    - Public projects where user is NOT a member
+    - if `include_not_joined`: Public projects where user is NOT a member
     """
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
     else:
-        member_projects = await list_member_project_models(session=session, user=user)
-        public_projects = await list_public_non_member_project_models(session=session, user=user)
-        projects = member_projects + public_projects
+        projects = await list_member_project_models(session=session, user=user)
+        if include_not_joined:
+            public_projects = await list_public_non_member_project_models(
+                session=session, user=user
+            )
+            projects += public_projects
 
     projects = sorted(projects, key=lambda p: p.created_at)
     return [

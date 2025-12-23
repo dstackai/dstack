@@ -6,6 +6,12 @@ from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.users import ProjectRole
 
 
+class ListProjectsRequest(CoreModel):
+    include_not_joined: Annotated[
+        bool, Field(description="Include public projects where user is not a member")
+    ] = True
+
+
 class CreateProjectRequest(CoreModel):
     project_name: str
     is_public: bool = False
