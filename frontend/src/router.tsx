@@ -11,14 +11,25 @@ import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
 import { TokenLogin } from 'App/Login/TokenLogin';
 import { Logout } from 'App/Logout';
 import { FleetDetails, FleetList } from 'pages/Fleets';
+import { EventsList as FleetEventsList } from 'pages/Fleets/Details/Events';
+import { FleetDetails as FleetDetailsGeneral } from 'pages/Fleets/Details/FleetDetails';
 import { InstanceList } from 'pages/Instances';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
 import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
-import { CreateDevEnvironment, JobLogs, JobMetrics, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
+import {
+    CreateDevEnvironment,
+    EventsList as RunEvents,
+    JobLogs,
+    JobMetrics,
+    RunDetails,
+    RunDetailsPage,
+    RunList,
+} from 'pages/Runs';
 import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
+import { EventsList as JobEvents } from 'pages/Runs/Details/Jobs/Events';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 import { UserBilling, UserProjects, UserSettings } from 'pages/User/Details';
 
@@ -107,6 +118,10 @@ export const router = createBrowserRouter([
                         path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.LOGS.TEMPLATE,
                         element: <JobLogs />,
                     },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.EVENTS.TEMPLATE,
+                        element: <RunEvents />,
+                    },
                 ],
             },
             {
@@ -124,6 +139,10 @@ export const router = createBrowserRouter([
                     {
                         path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.LOGS.TEMPLATE,
                         element: <JobLogs />,
+                    },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.EVENTS.TEMPLATE,
+                        element: <JobEvents />,
                     },
                 ],
             },
@@ -180,6 +199,16 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.FLEETS.DETAILS.TEMPLATE,
                 element: <FleetDetails />,
+                children: [
+                    {
+                        index: true,
+                        element: <FleetDetailsGeneral />,
+                    },
+                    {
+                        path: ROUTES.FLEETS.DETAILS.EVENTS.TEMPLATE,
+                        element: <FleetEventsList />,
+                    },
+                ],
             },
 
             // Instances

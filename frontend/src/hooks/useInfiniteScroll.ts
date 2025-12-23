@@ -14,6 +14,7 @@ type UseInfinityParams<DataItem, Args extends InfinityListArgs> = {
     useLazyQuery: UseLazyQuery<QueryDefinition<Args, any, any, ListResponse<DataItem>, any>>;
     args: { limit?: number } & Args;
     getPaginationParams: (listItem: DataItem) => Partial<Args>;
+    skip?: boolean;
     // options?: UseQueryStateOptions<QueryDefinition<Args, any, any, Data[], any>, Record<string, any>>;
 };
 
@@ -22,6 +23,7 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     getPaginationParams,
     // options,
     args,
+    skip,
 }: UseInfinityParams<DataItem, Args>) => {
     const [data, setData] = useState<ListResponse<DataItem>>([]);
     const scrollElement = useRef<HTMLElement>(document.documentElement);
@@ -55,14 +57,14 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     };
 
     useEffect(() => {
-        if (!isEqual(argsProp, lastArgsProps.current)) {
+        if (!isEqual(argsProp, lastArgsProps.current) && !skip) {
             getEmptyList();
             lastArgsProps.current = argsProp as Args;
         }
-    }, [argsProp, lastArgsProps]);
+    }, [argsProp, lastArgsProps, skip]);
 
     const getMore = async () => {
-        if (isLoadingRef.current || disabledMore) {
+        if (isLoadingRef.current || disabledMore || skip) {
             return;
         }
 
@@ -83,7 +85,9 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
             console.log(e);
         }
 
-        isLoadingRef.current = false;
+        setTimeout(() => {
+            isLoadingRef.current = false;
+        }, 10);
     };
 
     useLayoutEffect(() => {

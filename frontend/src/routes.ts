@@ -33,6 +33,11 @@ export const ROUTES = {
                         FORMAT: (projectName: string, runId: string) =>
                             buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.METRICS.TEMPLATE, { projectName, runId }),
                     },
+                    EVENTS: {
+                        TEMPLATE: `/projects/:projectName/runs/:runId/events`,
+                        FORMAT: (projectName: string, runId: string) =>
+                            buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.EVENTS.TEMPLATE, { projectName, runId }),
+                    },
                     LOGS: {
                         TEMPLATE: `/projects/:projectName/runs/:runId/logs`,
                         FORMAT: (projectName: string, runId: string) =>
@@ -60,6 +65,15 @@ export const ROUTES = {
                                 TEMPLATE: `/projects/:projectName/runs/:runId/jobs/:jobName/logs`,
                                 FORMAT: (projectName: string, runId: string, jobName: string) =>
                                     buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.LOGS.TEMPLATE, {
+                                        projectName,
+                                        runId,
+                                        jobName,
+                                    }),
+                            },
+                            EVENTS: {
+                                TEMPLATE: `/projects/:projectName/runs/:runId/jobs/:jobName/events`,
+                                FORMAT: (projectName: string, runId: string, jobName: string) =>
+                                    buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.EVENTS.TEMPLATE, {
                                         projectName,
                                         runId,
                                         jobName,
@@ -122,6 +136,11 @@ export const ROUTES = {
             TEMPLATE: `/projects/:projectName/fleets/:fleetId`,
             FORMAT: (projectName: string, fleetId: string) =>
                 buildRoute(ROUTES.FLEETS.DETAILS.TEMPLATE, { projectName, fleetId }),
+            EVENTS: {
+                TEMPLATE: `/projects/:projectName/fleets/:fleetId/events`,
+                FORMAT: (projectName: string, fleetId: string) =>
+                    buildRoute(ROUTES.FLEETS.DETAILS.EVENTS.TEMPLATE, { projectName, fleetId }),
+            },
         },
     },
 

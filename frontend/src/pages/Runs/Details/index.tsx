@@ -15,14 +15,9 @@ import {
     isAvailableStoppingForRun,
     // isAvailableDeletingForRun,
 } from '../utils';
+import { CodeTab } from './constants';
 
 import styles from './styles.module.scss';
-
-enum CodeTab {
-    Details = 'details',
-    Metrics = 'metrics',
-    Logs = 'logs',
-}
 
 export const RunDetailsPage: React.FC = () => {
     const { t } = useTranslation();
@@ -188,6 +183,11 @@ export const RunDetailsPage: React.FC = () => {
                                     label: 'Metrics',
                                     id: CodeTab.Metrics,
                                     href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.METRICS.FORMAT(paramProjectName, paramRunId),
+                                },
+                                {
+                                    label: 'Events',
+                                    id: CodeTab.Events,
+                                    href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.EVENTS.FORMAT(paramProjectName, paramRunId),
                                 },
                             ]}
                         />

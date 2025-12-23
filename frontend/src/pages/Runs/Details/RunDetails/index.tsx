@@ -25,6 +25,7 @@ import {
     getRunListItemServiceUrl,
     getRunListItemSpot,
 } from '../../List/helpers';
+import { EventsList } from '../Events/List';
 import { JobList } from '../Jobs/List';
 import { ConnectToRunWithDevEnvConfiguration } from './ConnectToRunWithDevEnvConfiguration';
 
@@ -202,6 +203,8 @@ export const RunDetails = () => {
                     runPriority={getRunPriority(runData)}
                 />
             )}
+
+            {runData.jobs.length > 1 && <EventsList />}
         </>
     );
 };
