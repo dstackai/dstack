@@ -144,7 +144,8 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
         )
     # Check if any group has autoscaling (min != max)
     has_autoscaling = any(
-        group.replicas.min != group.replicas.max for group in run_spec.configuration.replicas
+        group.replicas.min != group.replicas.max
+        for group in (run_spec.configuration.replica_groups or [])
     )
     if has_autoscaling:
         raise ServerClientError(
@@ -308,7 +309,8 @@ async def update_service_desired_replica_count(
     if run_model.gateway_id is not None:
         conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
         stats = await conn.get_stats(run_model.project.name, run_model.run_name)
-    if configuration.replicas:
+    replica_groups = configuration.replica_groups or []
+    if replica_groups:
         desired_replica_counts = {}
         total = 0
         prev_counts = (
@@ -316,13 +318,8 @@ async def update_service_desired_replica_count(
             if run_model.desired_replica_counts
             else {}
         )
-        for group in configuration.replicas:
-            # temp group_wise config to get the group_wise desired replica count.
-            group_config = configuration.copy(
-                exclude={"replicas"},
-                update={"replicas": group.replicas, "scaling": group.scaling},
-            )
-            scaler = get_service_scaler(group_config)
+        for group in replica_groups:
+            scaler = get_service_scaler(group.replicas, group.scaling)
             group_desired = scaler.get_desired_count(
                 current_desired_count=prev_counts.get(group.name, group.replicas.min or 0),
                 stats=stats,
@@ -334,9 +331,11 @@ async def update_service_desired_replica_count(
         run_model.desired_replica_count = total
     else:
         # Todo Not required as single replica is normalized to replicas.
-        scaler = get_service_scaler(configuration)
-        run_model.desired_replica_count = scaler.get_desired_count(
-            current_desired_count=run_model.desired_replica_count,
-            stats=stats,
-            last_scaled_at=last_scaled_at,
-        )
+        if configuration.replica_groups:
+            first_group = configuration.replica_groups[0]
+            scaler = get_service_scaler(count=first_group.replicas, scaling=first_group.scaling)
+            run_model.desired_replica_count = scaler.get_desired_count(
+                current_desired_count=run_model.desired_replica_count,
+                stats=stats,
+                last_scaled_at=last_scaled_at,
+            )

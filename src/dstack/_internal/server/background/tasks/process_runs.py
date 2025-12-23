@@ -196,10 +196,9 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
         logger.debug("%s: retrying run is not yet ready for resubmission", fmt(run_model))
         return
 
-    # run_model.desired_replica_count = 1
     if run.run_spec.configuration.type == "service":
         run_model.desired_replica_count = sum(
-            group.replicas.min or 0 for group in run.run_spec.configuration.replicas
+            group.replicas.min or 0 for group in (run.run_spec.configuration.replica_groups or [])
         )
         await update_service_desired_replica_count(
             session,
@@ -214,7 +213,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
             return
 
         # Per group scaling because single replica is also normalized to replica groups.
-        replicas = run.run_spec.configuration.replicas or []
+        replicas: List[ReplicaGroup] = run.run_spec.configuration.replica_groups or []
         counts = (
             json.loads(run_model.desired_replica_counts)
             if run_model.desired_replica_counts
@@ -461,7 +460,7 @@ async def _handle_run_replicas(
             # FIXME: should only include scaling events, not retries and deployments
             last_scaled_at=max((r.timestamp for r in replicas_info), default=None),
         )
-        replicas = run_spec.configuration.replicas or []
+        replicas: List[ReplicaGroup] = run_spec.configuration.replica_groups or []
         if replicas:
             counts = (
                 json.loads(run_model.desired_replica_counts)

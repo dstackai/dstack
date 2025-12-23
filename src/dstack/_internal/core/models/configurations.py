@@ -838,17 +838,11 @@ class ServiceConfigurationParams(CoreModel):
         SERVICE_HTTPS_DEFAULT
     )
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
-    # replicas: Annotated[
-    #     Range[int],
-    #     Field(
-    #         description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
-    #         "If it's a range, the `scaling` property is required"
-    #     ),
-    # ] = Range[int](min=1, max=1)
-    # scaling: Annotated[
-    #     Optional[ScalingSpec],
-    #     Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
-    # ] = None
+
+    scaling: Annotated[
+        Optional[ScalingSpec],
+        Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
+    ] = None
     rate_limits: Annotated[list[RateLimit], Field(description="Rate limiting rules")] = []
     probes: Annotated[
         list[ProbeConfig],
@@ -856,7 +850,7 @@ class ServiceConfigurationParams(CoreModel):
     ] = []
 
     replicas: Annotated[
-        Optional[Union[Range[int], List[ReplicaGroup], int, str]],
+        Optional[Union[Range[int], List[ReplicaGroup]]],
         Field(
             description=(
                 "List of replica groups. Each group defines replicas with shared configuration "
@@ -882,16 +876,6 @@ class ServiceConfigurationParams(CoreModel):
             return OpenAIChatModel(type="chat", name=v, format="openai")
         return v
 
-    # @validator("replicas")
-    # def convert_replicas(cls, v: Range[int]) -> Range[int]:
-    #     if v.max is None:
-    #         raise ValueError("The maximum number of replicas is required")
-    #     if v.min is None:
-    #         v.min = 0
-    #     if v.min < 0:
-    #         raise ValueError("The minimum number of replicas must be greater than or equal to 0")
-    #     return v
-
     @validator("gateway")
     def validate_gateway(
         cls, v: Optional[Union[bool, str]]
@@ -901,22 +885,6 @@ class ServiceConfigurationParams(CoreModel):
                 "The `gateway` property must be a string or boolean `false`, not boolean `true`"
             )
         return v
-
-    # @root_validator()
-    # def validate_scaling(cls, values):
-    #     replica_groups = values.get("replica_groups")
-    #     # If replica_groups are set, we don't need to validate scaling.
-    #     # Each replica group has its own scaling.
-    #     if replica_groups:
-    #         return values
-
-    #     scaling = values.get("scaling")
-    #     replicas = values.get("replicas")
-    #     if replicas and replicas.min != replicas.max and not scaling:
-    #         raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
-    #     if replicas and replicas.min == replicas.max and scaling:
-    #         raise ValueError("To use `scaling`, `replicas` must be set to a range.")
-    #     return values
 
     @root_validator()
     def normalize_replicas(cls, values):
@@ -966,10 +934,12 @@ class ServiceConfigurationParams(CoreModel):
         return v
 
     @validator("replicas")
-    def validate_replicas(cls, v: Optional[List[ReplicaGroup]]) -> Optional[List[ReplicaGroup]]:
+    def validate_replicas(
+        cls, v: Optional[Union[Range[int], List[ReplicaGroup]]]
+    ) -> Optional[Union[Range[int], List[ReplicaGroup]]]:
         if v is None:
             return v
-        if isinstance(v, (Range, int, str)):
+        if isinstance(v, Range):
             return v
 
         if isinstance(v, list):
@@ -1006,6 +976,18 @@ class ServiceConfiguration(
     generate_dual_core_model(ServiceConfigurationConfig),
 ):
     type: Literal["service"] = "service"
+
+    @property
+    def replica_groups(self) -> Optional[List[ReplicaGroup]]:
+        """
+        Get normalized replica groups. After validation, replicas is always List[ReplicaGroup] or None.
+        Use this property for type-safe access in code.
+        """
+        if self.replicas is None:
+            return None
+        if isinstance(self.replicas, list):
+            return self.replicas
+        return None
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]
