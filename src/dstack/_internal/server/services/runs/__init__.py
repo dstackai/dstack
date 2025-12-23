@@ -520,7 +520,7 @@ async def submit_run(
 
             global_replica_num = 0  # Global counter across all groups for unique replica_num
 
-            for replica_group in service_config.replica_groups:
+            for replica_group in service_config.replicas:
                 if run_spec.merged_profile.schedule is not None:
                     group_initial_replicas = 0
                 else:

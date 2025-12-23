@@ -383,10 +383,10 @@ def get_runs_table(
 
         # Replica Group Changes: Build mapping from replica group names to indices
         group_name_to_index: Dict[str, int] = {}
-        # Replica Group Changes: Check if replica_groups attribute exists (only available for ServiceConfiguration)
-        replica_groups = getattr(run.run_spec.configuration, "replica_groups", None)
-        if replica_groups:
-            for idx, group in enumerate(replica_groups):
+        # Replica Group Changes: Check if replicas attribute exists (only available for ServiceConfiguration)
+        replicas = getattr(run.run_spec.configuration, "replicas", None)
+        if replicas:
+            for idx, group in enumerate(replicas):
                 group_name_to_index[group.name] = idx
 
         run_row: Dict[Union[str, int], Any] = {

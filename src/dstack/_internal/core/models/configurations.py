@@ -612,8 +612,8 @@ class ConfigurationWithCommandsParams(CoreModel):
 
     @root_validator
     def check_image_or_commands_present(cls, values):
-        # If replica_groups is present, skip validation - commands come from replica groups
-        replica_groups = values.get("replica_groups")
+        # If replicas is present, skip validation - commands come from replica groups
+        replica_groups = values.get("replicas")
         if replica_groups:
             return values
 
@@ -838,25 +838,25 @@ class ServiceConfigurationParams(CoreModel):
         SERVICE_HTTPS_DEFAULT
     )
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
-    replicas: Annotated[
-        Range[int],
-        Field(
-            description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
-            "If it's a range, the `scaling` property is required"
-        ),
-    ] = Range[int](min=1, max=1)
-    scaling: Annotated[
-        Optional[ScalingSpec],
-        Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
-    ] = None
+    # replicas: Annotated[
+    #     Range[int],
+    #     Field(
+    #         description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
+    #         "If it's a range, the `scaling` property is required"
+    #     ),
+    # ] = Range[int](min=1, max=1)
+    # scaling: Annotated[
+    #     Optional[ScalingSpec],
+    #     Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
+    # ] = None
     rate_limits: Annotated[list[RateLimit], Field(description="Rate limiting rules")] = []
     probes: Annotated[
         list[ProbeConfig],
         Field(description="List of probes used to determine job health"),
     ] = []
 
-    replica_groups: Annotated[
-        Optional[List[ReplicaGroup]],
+    replicas: Annotated[
+        Optional[Union[Range[int], List[ReplicaGroup], int, str]],
         Field(
             description=(
                 "List of replica groups. Each group defines replicas with shared configuration "
@@ -882,15 +882,15 @@ class ServiceConfigurationParams(CoreModel):
             return OpenAIChatModel(type="chat", name=v, format="openai")
         return v
 
-    @validator("replicas")
-    def convert_replicas(cls, v: Range[int]) -> Range[int]:
-        if v.max is None:
-            raise ValueError("The maximum number of replicas is required")
-        if v.min is None:
-            v.min = 0
-        if v.min < 0:
-            raise ValueError("The minimum number of replicas must be greater than or equal to 0")
-        return v
+    # @validator("replicas")
+    # def convert_replicas(cls, v: Range[int]) -> Range[int]:
+    #     if v.max is None:
+    #         raise ValueError("The maximum number of replicas is required")
+    #     if v.min is None:
+    #         v.min = 0
+    #     if v.min < 0:
+    #         raise ValueError("The minimum number of replicas must be greater than or equal to 0")
+    #     return v
 
     @validator("gateway")
     def validate_gateway(
@@ -902,53 +902,43 @@ class ServiceConfigurationParams(CoreModel):
             )
         return v
 
-    @root_validator()
-    def validate_scaling(cls, values):
-        replica_groups = values.get("replica_groups")
-        # If replica_groups are set, we don't need to validate scaling.
-        # Each replica group has its own scaling.
-        if replica_groups:
-            return values
+    # @root_validator()
+    # def validate_scaling(cls, values):
+    #     replica_groups = values.get("replica_groups")
+    #     # If replica_groups are set, we don't need to validate scaling.
+    #     # Each replica group has its own scaling.
+    #     if replica_groups:
+    #         return values
 
-        scaling = values.get("scaling")
+    #     scaling = values.get("scaling")
+    #     replicas = values.get("replicas")
+    #     if replicas and replicas.min != replicas.max and not scaling:
+    #         raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
+    #     if replicas and replicas.min == replicas.max and scaling:
+    #         raise ValueError("To use `scaling`, `replicas` must be set to a range.")
+    #     return values
+
+    @root_validator()
+    def normalize_replicas(cls, values):
         replicas = values.get("replicas")
-        if replicas and replicas.min != replicas.max and not scaling:
-            raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
-        if replicas and replicas.min == replicas.max and scaling:
-            raise ValueError("To use `scaling`, `replicas` must be set to a range.")
-        return values
+        if isinstance(replicas, list) and len(replicas) > 0:
+            if all(isinstance(item, ReplicaGroup) for item in replicas):
+                return values
 
-    @root_validator()
-    def normalize_to_replica_groups(cls, values):
-        replica_groups = values.get("replica_groups")
-        if replica_groups:
-            return values
-
-        # TEMP: prove we’re here and see the inputs
-        print(
-            "[normalize_to_replica_groups]",
-            "commands:",
-            values.get("commands"),
-            "replicas:",
-            values.get("replicas"),
-            "resources:",
-            values.get("resources"),
-            "scaling:",
-            values.get("scaling"),
-            "probes:",
-            values.get("probes"),
-            "rate_limits:",
-            values.get("rate_limits"),
-        )
-        # If replica_groups is not set, we need to normalize the configuration to replica groups.
-        values["replica_groups"] = [
+        # Handle backward compatibility: convert old-style replica config to groups
+        old_replicas = values.get("replicas")
+        if isinstance(old_replicas, Range):
+            replica_count = old_replicas
+        else:
+            replica_count = Range[int](min=1, max=1)
+        values["replicas"] = [
             ReplicaGroup(
                 name="default",
-                replicas=values.get("replicas"),
-                commands=values.get("commands"),
+                replicas=replica_count,
+                commands=values.get("commands", []),
                 resources=values.get("resources"),
                 scaling=values.get("scaling"),
-                probes=values.get("probes"),
+                probes=values.get("probes", []),
                 rate_limits=values.get("rate_limits"),
             )
         ]
@@ -975,22 +965,24 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError("Probes must be unique")
         return v
 
-    @validator("replica_groups")
-    def validate_replica_groups(
-        cls, v: Optional[List[ReplicaGroup]]
-    ) -> Optional[List[ReplicaGroup]]:
+    @validator("replicas")
+    def validate_replicas(cls, v: Optional[List[ReplicaGroup]]) -> Optional[List[ReplicaGroup]]:
         if v is None:
             return v
-        if not v:
-            raise ValueError("`replica_groups` cannot be an empty list")
-        # Check for duplicate names
-        names = [group.name for group in v]
-        if len(names) != len(set(names)):
-            duplicates = [name for name in set(names) if names.count(name) > 1]
-            raise ValueError(
-                f"Duplicate replica group names found: {duplicates}. "
-                "Each replica group must have a unique name."
-            )
+        if isinstance(v, (Range, int, str)):
+            return v
+
+        if isinstance(v, list):
+            if not v:
+                raise ValueError("`replicas` cannot be an empty list")
+            # Check for duplicate names
+            names = [group.name for group in v]
+            if len(names) != len(set(names)):
+                duplicates = [name for name in set(names) if names.count(name) > 1]
+                raise ValueError(
+                    f"Duplicate replica group names found: {duplicates}. "
+                    "Each replica group must have a unique name."
+                )
         return v
 
 

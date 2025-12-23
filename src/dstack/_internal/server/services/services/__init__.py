@@ -142,7 +142,11 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
             "The `https` configuration property is not applicable when running services without a gateway."
             " Please configure a gateway or remove the `https` property from the service configuration"
         )
-    if run_spec.configuration.replicas.min != run_spec.configuration.replicas.max:
+    # Check if any group has autoscaling (min != max)
+    has_autoscaling = any(
+        group.replicas.min != group.replicas.max for group in run_spec.configuration.replicas
+    )
+    if has_autoscaling:
         raise ServerClientError(
             "Auto-scaling is not supported when running services without a gateway."
             " Please configure a gateway or set `replicas` to a fixed value in the service configuration"
@@ -304,7 +308,7 @@ async def update_service_desired_replica_count(
     if run_model.gateway_id is not None:
         conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
         stats = await conn.get_stats(run_model.project.name, run_model.run_name)
-    if configuration.replica_groups:
+    if configuration.replicas:
         desired_replica_counts = {}
         total = 0
         prev_counts = (
@@ -312,10 +316,10 @@ async def update_service_desired_replica_count(
             if run_model.desired_replica_counts
             else {}
         )
-        for group in configuration.replica_groups:
+        for group in configuration.replicas:
             # temp group_wise config to get the group_wise desired replica count.
             group_config = configuration.copy(
-                exclude={"replica_groups"},
+                exclude={"replicas"},
                 update={"replicas": group.replicas, "scaling": group.scaling},
             )
             scaler = get_service_scaler(group_config)
@@ -329,7 +333,7 @@ async def update_service_desired_replica_count(
         run_model.desired_replica_counts = json.dumps(desired_replica_counts)
         run_model.desired_replica_count = total
     else:
-        # Todo Not required as single replica is normalized to replica_groups.
+        # Todo Not required as single replica is normalized to replicas.
         scaler = get_service_scaler(configuration)
         run_model.desired_replica_count = scaler.get_desired_count(
             current_desired_count=run_model.desired_replica_count,

@@ -198,7 +198,9 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
 
     # run_model.desired_replica_count = 1
     if run.run_spec.configuration.type == "service":
-        run_model.desired_replica_count = run.run_spec.configuration.replicas.min or 0
+        run_model.desired_replica_count = sum(
+            group.replicas.min or 0 for group in run.run_spec.configuration.replicas
+        )
         await update_service_desired_replica_count(
             session,
             run_model,
@@ -211,15 +213,14 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
             # stay zero scaled
             return
 
-
         # Per group scaling because single replica is also normalized to replica groups.
-        replica_groups = run.run_spec.configuration.replica_groups or []
+        replicas = run.run_spec.configuration.replicas or []
         counts = (
             json.loads(run_model.desired_replica_counts)
             if run_model.desired_replica_counts
             else {}
         )
-        await scale_run_replicas_per_group(session, run_model, replica_groups, counts)
+        await scale_run_replicas_per_group(session, run_model, replicas, counts)
     else:
         run_model.desired_replica_count = 1
         await scale_run_replicas(session, run_model, replicas_diff=run_model.desired_replica_count)
@@ -460,24 +461,24 @@ async def _handle_run_replicas(
             # FIXME: should only include scaling events, not retries and deployments
             last_scaled_at=max((r.timestamp for r in replicas_info), default=None),
         )
-        replica_groups = run_spec.configuration.replica_groups or []
-        if replica_groups:
+        replicas = run_spec.configuration.replicas or []
+        if replicas:
             counts = (
                 json.loads(run_model.desired_replica_counts)
                 if run_model.desired_replica_counts
                 else {}
             )
-            await scale_run_replicas_per_group(session, run_model, replica_groups, counts)
+            await scale_run_replicas_per_group(session, run_model, replicas, counts)
 
             # Handle per-group rolling deployment
             await _update_jobs_to_new_deployment_in_place(
                 session=session,
                 run_model=run_model,
                 run_spec=run_spec,
-                replica_groups=replica_groups,
+                replicas=replicas,
             )
             # Process per-group rolling deployment
-            for group in replica_groups:
+            for group in replicas:
                 await _handle_rolling_deployment_for_group(
                     session=session,
                     run_model=run_model,
@@ -554,7 +555,7 @@ async def _update_jobs_to_new_deployment_in_place(
     session: AsyncSession,
     run_model: RunModel,
     run_spec: RunSpec,
-    replica_groups: Optional[List] = None,
+    replicas: Optional[List] = None,
 ) -> None:
     """
     Bump deployment_num for jobs that do not require redeployment.
@@ -575,11 +576,11 @@ async def _update_jobs_to_new_deployment_in_place(
         replica_group_name = None
         group_run_spec = base_run_spec
 
-        if replica_groups:
+        if replicas:
             job_spec = JobSpec.__response__.parse_raw(job_models[0].job_spec_data)
             replica_group_name = job_spec.replica_group or "default"
 
-            for group in replica_groups:
+            for group in replicas:
                 if group.name == replica_group_name:
                     group_run_spec = create_group_run_spec(base_run_spec, group)
                     break

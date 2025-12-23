@@ -36,8 +36,8 @@ async def retry_run_replica_jobs(
     replica_group = None
 
     # Find matching replica group
-    if replica_group_name and base_run_spec.configuration.replica_groups:
-        for group in base_run_spec.configuration.replica_groups:
+    if replica_group_name and base_run_spec.configuration.replicas:
+        for group in base_run_spec.configuration.replicas:
             if group.name == replica_group_name:
                 replica_group = group
                 break
@@ -245,14 +245,14 @@ async def _scale_up_replicas(
 async def scale_run_replicas_per_group(
     session: AsyncSession,
     run_model: RunModel,
-    replica_groups: List[ReplicaGroup],
+    replicas: List[ReplicaGroup],
     desired_replica_counts: Dict[str, int],
 ) -> None:
     """Scale each replica group independently"""
-    if not replica_groups:
+    if not replicas:
         return
 
-    for group in replica_groups:
+    for group in replicas:
         group_desired = desired_replica_counts.get(group.name, group.replicas.min or 0)
 
         # Build replica lists filtered by this group
