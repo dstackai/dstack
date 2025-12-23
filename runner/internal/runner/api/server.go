@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -80,21 +81,21 @@ func NewServer(ctx context.Context, tempDir string, homeDir string, address stri
 	return s, nil
 }
 
-func (s *Server) Run() error {
-	signals := []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGQUIT}
+func (s *Server) Run(ctx context.Context) error {
+	signals := []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT}
 	signalCh := make(chan os.Signal, 1)
 
 	go func() {
 		if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error(context.TODO(), "Server failed", "err", err)
+			log.Error(ctx, "Server failed", "err", err)
 		}
 	}()
-	defer func() { _ = s.srv.Shutdown(context.TODO()) }()
+	defer func() { _ = s.srv.Shutdown(ctx) }()
 
 	select {
 	case <-s.jobBarrierCh: // job started
 	case <-time.After(s.submitWaitDuration):
-		log.Error(context.TODO(), "Job didn't start in time, shutting down")
+		log.Error(ctx, "Job didn't start in time, shutting down")
 		return errors.New("no job submitted")
 	}
 
@@ -103,10 +104,10 @@ func (s *Server) Run() error {
 	signal.Notify(signalCh, signals...)
 	select {
 	case <-signalCh:
-		log.Error(context.TODO(), "Received interrupt signal, shutting down")
+		log.Error(ctx, "Received interrupt signal, shutting down")
 		s.stop()
 	case <-s.jobBarrierCh:
-		log.Info(context.TODO(), "Job finished, shutting down")
+		log.Info(ctx, "Job finished, shutting down")
 	}
 	close(s.shutdownCh)
 	signal.Reset(signals...)
@@ -123,9 +124,9 @@ loop:
 	for _, ch := range logsToWait {
 		select {
 		case <-ch.ch:
-			log.Info(context.TODO(), "Logs streaming finished", "endpoint", ch.name)
+			log.Info(ctx, "Logs streaming finished", "endpoint", ch.name)
 		case <-waitLogsDone:
-			log.Error(context.TODO(), "Logs streaming didn't finish in time")
+			log.Error(ctx, "Logs streaming didn't finish in time")
 			break loop // break the loop, not the select
 		}
 	}
