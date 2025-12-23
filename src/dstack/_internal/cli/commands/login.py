@@ -44,6 +44,7 @@ class LoginCommand(BaseCommand):
         try:
             threading.Thread(target=server.serve_forever).start()
             auth_resp = api_client.auth.authorize(provider=provider, local_port=server.server_port)
+            # TODO: Open the URL automatically.
             console.print(f"Open the URL to log in with [code]{provider.title()}[/]:\n")
             print(f"{auth_resp.authorization_url}\n")
             user = result_queue.get()
@@ -56,6 +57,7 @@ class LoginCommand(BaseCommand):
         projects = api_client.projects.list(include_not_joined=False)
         if len(projects) == 0:
             console.print("No projects configured.")
+            return
         config_manager = ConfigManager()
         default_project = config_manager.get_project_config()
         new_default_project = None
@@ -79,7 +81,9 @@ class LoginCommand(BaseCommand):
             f"Configured projects: {', '.join(f'[code]{p.project_name}[/]' for p in projects)}."
         )
         if new_default_project:
-            console.print(f"Set project {new_default_project} as default project.")
+            console.print(
+                f"Set project [code]{new_default_project.project_name}[/] as default project."
+            )
 
 
 class _BadRequestError(Exception):
@@ -97,6 +101,7 @@ def _make_handler(
             if parsed_path.path != "/auth/callback":
                 self.send_response(404)
                 self.end_headers()
+                return
             try:
                 self._handle_auth_callback(parsed_path)
             except _BadRequestError as e:
