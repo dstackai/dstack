@@ -7,7 +7,7 @@ from dstack._internal.cli.main import main
 
 
 def run_dstack_cli(
-    args: List[str],
+    cli_args: List[str],
     home_dir: Optional[Path] = None,
     repo_dir: Optional[Path] = None,
 ) -> int:
@@ -18,13 +18,14 @@ def run_dstack_cli(
     if home_dir is not None:
         prev_home_dir = os.environ["HOME"]
         os.environ["HOME"] = str(home_dir)
-    with patch("sys.argv", ["dstack"] + args):
+    with patch("sys.argv", ["dstack"] + cli_args):
         try:
             main()
         except SystemExit as e:
             exit_code = e.code
-    if home_dir is not None:
-        os.environ["HOME"] = prev_home_dir
-    if repo_dir is not None:
-        os.chdir(cwd)
+        finally:
+            if home_dir is not None:
+                os.environ["HOME"] = prev_home_dir
+            if repo_dir is not None:
+                os.chdir(cwd)
     return exit_code
