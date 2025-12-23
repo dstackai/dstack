@@ -26,14 +26,19 @@ class LoginCommand(BaseCommand):
             required=True,
         )
         self._parser.add_argument(
-            "-p", "--provider", help="The Single Sign-On provider name", required=True
+            "-p",
+            "--provider",
+            help=(
+                "The Single Sign-On provider name."
+                " Selected automatically if the server supports only one provider."
+            ),
         )
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
         base_url = args.url
         api_client = APIClient(base_url=base_url)
-        provider = args.provider
+        provider = self._select_provider_or_error(api_client=api_client, args=args)
         result_queue = queue.Queue[Optional[UserWithCreds]](maxsize=1)
         handler = _make_handler(
             result_queue=result_queue,
@@ -60,6 +65,28 @@ class LoginCommand(BaseCommand):
             raise CLIError("CLI authentication failed")
         console.print(f"Logged in as [code]{user.username}[/].")
         api_client = APIClient(base_url=base_url, token=user.creds.token)
+        self._configure_projects(api_client=api_client, user=user)
+
+    def _select_provider_or_error(self, api_client: APIClient, args: argparse.Namespace) -> str:
+        providers = api_client.auth.list_providers()
+        available_providers = [p.name for p in providers if p.enabled]
+        if len(available_providers) == 0:
+            raise CLIError("No SSO providers configured on the server.")
+        if args.provider is None:
+            if len(available_providers) > 1:
+                raise CLIError(
+                    "Specify -p/--provider to choose SSO provider"
+                    f" Available providers: {', '.join(available_providers)}"
+                )
+            return available_providers[0]
+        if args.provider not in available_providers:
+            raise CLIError(
+                f"Provider {args.provider} not configured on the server."
+                f" Available providers: {', '.join(available_providers)}"
+            )
+        return args.provider
+
+    def _configure_projects(self, api_client: APIClient, user: UserWithCreds):
         projects = api_client.projects.list(include_not_joined=False)
         if len(projects) == 0:
             console.print("No projects configured.")
@@ -78,7 +105,7 @@ class LoginCommand(BaseCommand):
                 new_default_project = project
             config_manager.configure_project(
                 name=project.project_name,
-                url=base_url,
+                url=api_client.base_url,
                 token=user.creds.token,
                 default=set_as_default,
             )
