@@ -138,7 +138,7 @@ class Target:
         raise ValueError(f"Unsupported model type: {type(model)}")
 
     def fmt(self) -> str:
-        return fmt_entity(self.type, self.id, self.name)
+        return fmt_entity(self.type.value, self.id, self.name)
 
 
 def emit(session: AsyncSession, message: str, actor: AnyActor, targets: list[Target]) -> None:
@@ -389,7 +389,7 @@ async def list_events(
 def event_model_to_event(event_model: EventModel) -> Event:
     targets = [
         EventTarget(
-            type=target.entity_type,
+            type=target.entity_type.value,
             project_id=target.entity_project_id,
             project_name=target.entity_project.name if target.entity_project else None,
             id=target.entity_id,
