@@ -2,6 +2,7 @@ import argparse
 import queue
 import threading
 import urllib.parse
+import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
 
@@ -44,8 +45,13 @@ class LoginCommand(BaseCommand):
         try:
             threading.Thread(target=server.serve_forever).start()
             auth_resp = api_client.auth.authorize(provider=provider, local_port=server.server_port)
-            # TODO: Open the URL automatically.
-            console.print(f"Open the URL to log in with [code]{provider.title()}[/]:\n")
+            opened = webbrowser.open(auth_resp.authorization_url)
+            if opened:
+                console.print(
+                    f"Your browser has been opened to log in with [code]{provider.title()}[/]:\n"
+                )
+            else:
+                console.print(f"Open the URL to log in with [code]{provider.title()}[/]:\n")
             print(f"{auth_resp.authorization_url}\n")
             user = result_queue.get()
         finally:
