@@ -36,9 +36,9 @@ class LoginCommand(BaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        base_url = args.url
+        base_url = _normalize_url_or_error(args.url)
         api_client = APIClient(base_url=base_url)
-        provider = self._select_provider_or_error(api_client=api_client, args=args)
+        provider = self._select_provider_or_error(api_client=api_client, provider=args.provider)
         server = _LoginServer(api_client=api_client, provider=provider)
         try:
             server.start()
@@ -60,24 +60,24 @@ class LoginCommand(BaseCommand):
         api_client = APIClient(base_url=base_url, token=user.creds.token)
         self._configure_projects(api_client=api_client, user=user)
 
-    def _select_provider_or_error(self, api_client: APIClient, args: argparse.Namespace) -> str:
+    def _select_provider_or_error(self, api_client: APIClient, provider: Optional[str]) -> str:
         providers = api_client.auth.list_providers()
         available_providers = [p.name for p in providers if p.enabled]
         if len(available_providers) == 0:
             raise CLIError("No SSO providers configured on the server.")
-        if args.provider is None:
+        if provider is None:
             if len(available_providers) > 1:
                 raise CLIError(
                     "Specify -p/--provider to choose SSO provider"
                     f" Available providers: {', '.join(available_providers)}"
                 )
             return available_providers[0]
-        if args.provider not in available_providers:
+        if provider not in available_providers:
             raise CLIError(
-                f"Provider {args.provider} not configured on the server."
+                f"Provider {provider} not configured on the server."
                 f" Available providers: {', '.join(available_providers)}"
             )
-        return args.provider
+        return provider
 
     def _configure_projects(self, api_client: APIClient, user: UserWithCreds):
         projects = api_client.projects.list(include_not_joined=False)
@@ -196,6 +196,23 @@ class _LoginServer:
         server_address = ("127.0.0.1", 0)
         server = HTTPServer(server_address, handler)
         return server
+
+
+def _normalize_url_or_error(url: str) -> str:
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = "http://" + url
+    parsed = urllib.parse.urlparse(url)
+    if (
+        not parsed.scheme
+        or not parsed.hostname
+        or parsed.path not in ("", "/")
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+        or (parsed.port is not None and not (1 <= parsed.port <= 65535))
+    ):
+        raise CLIError("Invalid server URL format. Format: --url https://sky.dstack.ai")
+    return url
 
 
 _SUCCESS_HTML = """\
