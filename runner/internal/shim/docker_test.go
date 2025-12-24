@@ -180,7 +180,7 @@ func (c *dockerParametersMock) DockerShellCommands(publicKeys []string) []string
 	}
 	commands := make([]string, 0)
 	if c.sshPort != 0 {
-		commands = append(commands, getSSHShellCommands(c.sshPort, userPublicKey)...)
+		commands = append(commands, getSSHShellCommands(userPublicKey)...)
 	}
 	commands = append(commands, c.commands...)
 	return commands

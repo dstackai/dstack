@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
@@ -13,6 +15,7 @@ import (
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/runner/api"
+	"github.com/dstackai/dstack/runner/internal/ssh"
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.
@@ -81,7 +84,8 @@ func mainInner() int {
 		},
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	if err := cmd.Run(ctx, os.Args); err != nil {
 		log.Error(ctx, err.Error())
@@ -114,6 +118,19 @@ func start(ctx context.Context, tempDir string, homeDir string, httpPort int, ss
 	if err != nil {
 		return fmt.Errorf("create server: %w", err)
 	}
+
+	sshd := ssh.NewSshd("/usr/sbin/sshd")
+	if err := sshd.Prepare(ctx, "/dstack/ssh/conf", "/dstack/ssh/log", sshPort); err != nil {
+		return fmt.Errorf("prepare sshd: %w", err)
+	}
+	if err := sshd.Start(ctx); err != nil {
+		return fmt.Errorf("start sshd: %w", err)
+	}
+	defer func() {
+		if err := sshd.Stop(ctx); err != nil {
+			log.Error(ctx, "Error while stopping sshd", "err", err)
+		}
+	}()
 
 	log.Trace(ctx, "Starting API server", "port", httpPort)
 	if err := server.Run(ctx); err != nil {

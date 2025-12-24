@@ -21,6 +21,17 @@ func PathExists(pth string) (bool, error) {
 	return false, err
 }
 
+func RemoveIfExists(pth string) (bool, error) {
+	err := os.Remove(pth)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
+}
+
 func ExpandPath(pth string, base string, home string) (string, error) {
 	pth = path.Clean(pth)
 	if pth == "~" {
