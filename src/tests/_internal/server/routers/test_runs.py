@@ -2015,6 +2015,13 @@ class TestSubmitService:
             ),
             pytest.param(
                 [("default-gateway", True), ("non-default-gateway", False)],
+                True,
+                "https://test-service.default-gateway.example",
+                "https://gateway.default-gateway.example",
+                id="submits-to-default-gateway-when-gateway-true",
+            ),
+            pytest.param(
+                [("default-gateway", True), ("non-default-gateway", False)],
                 "non-default-gateway",
                 "https://test-service.non-default-gateway.example",
                 "https://gateway.non-default-gateway.example",
@@ -2108,7 +2115,7 @@ class TestSubmitService:
         }
 
     @pytest.mark.asyncio
-    async def test_return_error_if_specified_gateway_is_true(
+    async def test_return_error_if_specified_gateway_is_true_and_no_gateway_exists(
         self, test_db, session: AsyncSession, client: AsyncClient
     ) -> None:
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -2123,5 +2130,12 @@ class TestSubmitService:
             headers=get_auth_headers(user.token),
             json={"run_spec": run_spec},
         )
-        assert response.status_code == 422
-        assert "must be a string or boolean `false`, not boolean `true`" in response.text
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [
+                {
+                    "msg": "The service requires a gateway, but there is no default gateway in the project",
+                    "code": "resource_not_exists",
+                }
+            ]
+        }

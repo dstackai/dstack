@@ -55,6 +55,10 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
         gateway = await get_project_default_gateway_model(
             session=session, project=run_model.project
         )
+        if gateway is None and run_spec.configuration.gateway == True:
+            raise ResourceNotExistsError(
+                "The service requires a gateway, but there is no default gateway in the project"
+            )
 
     if gateway is not None:
         service_spec = await _register_service_in_gateway(session, run_model, run_spec, gateway)

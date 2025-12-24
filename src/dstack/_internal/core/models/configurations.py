@@ -725,7 +725,8 @@ class ServiceConfigurationParams(CoreModel):
         Field(
             description=(
                 "The name of the gateway. Specify boolean `false` to run without a gateway."
-                " Omit to run with the default gateway"
+                " Specify boolean `true` to run with the default gateway."
+                " Omit to run with the default gateway if there is one, or without a gateway otherwise"
             ),
         ),
     ] = None
@@ -793,16 +794,6 @@ class ServiceConfigurationParams(CoreModel):
             v.min = 0
         if v.min < 0:
             raise ValueError("The minimum number of replicas must be greater than or equal to 0")
-        return v
-
-    @validator("gateway")
-    def validate_gateway(
-        cls, v: Optional[Union[bool, str]]
-    ) -> Optional[Union[Literal[False], str]]:
-        if v == True:
-            raise ValueError(
-                "The `gateway` property must be a string or boolean `false`, not boolean `true`"
-            )
         return v
 
     @root_validator()
