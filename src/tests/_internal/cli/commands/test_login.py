@@ -1,6 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from pytest import CaptureFixture
 
@@ -41,4 +41,63 @@ class TestLogin:
             "http://auth_url\n\n"
             "Logged in as \x1b[1;38;5;78mme\x1b[0m.\n"
             "No projects configured.\n"
+        )
+
+    def test_login_configures_projects(self, capsys: CaptureFixture, tmp_path: Path):
+        with (
+            patch("dstack._internal.cli.commands.login.webbrowser") as webbrowser_mock,
+            patch("dstack._internal.cli.commands.login.APIClient") as APIClientMock,
+            patch("dstack._internal.cli.commands.login.ConfigManager") as ConfigManagerMock,
+            patch("dstack._internal.cli.commands.login._LoginServer") as LoginServerMock,
+        ):
+            webbrowser_mock.open.return_value = True
+            APIClientMock.return_value.auth.list_providers.return_value = [
+                SimpleNamespace(name="github", enabled=True)
+            ]
+            APIClientMock.return_value.auth.authorize.return_value = SimpleNamespace(
+                authorization_url="http://auth_url"
+            )
+            APIClientMock.return_value.projects.list.return_value = [
+                SimpleNamespace(project_name="project1"),
+                SimpleNamespace(project_name="project2"),
+            ]
+            APIClientMock.return_value.base_url = "http://127.0.0.1:31313"
+            ConfigManagerMock.return_value.get_project_config.return_value = None
+            user = SimpleNamespace(username="me", creds=SimpleNamespace(token="token"))
+            LoginServerMock.return_value.get_logged_in_user.return_value = user
+            exit_code = run_dstack_cli(
+                [
+                    "login",
+                    "--url",
+                    "http://127.0.0.1:31313",
+                    "--provider",
+                    "github",
+                ],
+                home_dir=tmp_path,
+            )
+            ConfigManagerMock.return_value.configure_project.assert_has_calls(
+                [
+                    call(
+                        name="project1",
+                        url="http://127.0.0.1:31313",
+                        token=user.creds.token,
+                        default=True,
+                    ),
+                    call(
+                        name="project2",
+                        url="http://127.0.0.1:31313",
+                        token=user.creds.token,
+                        default=False,
+                    ),
+                ]
+            )
+            ConfigManagerMock.return_value.save.assert_called()
+
+        assert exit_code == 0
+        assert capsys.readouterr().out == (
+            "Your browser has been opened to log in with \x1b[1;38;5;78mGithub\x1b[0m:\n\n"
+            "http://auth_url\n\n"
+            "Logged in as \x1b[1;38;5;78mme\x1b[0m.\n"
+            "Configured projects: \x1b[1;38;5;78mproject1\x1b[0m, \x1b[1;38;5;78mproject2\x1b[0m.\n"
+            "Set project \x1b[1;38;5;78mproject1\x1b[0m as default project.\n"
         )
