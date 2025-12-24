@@ -737,14 +737,6 @@ class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
         Optional[ScalingSpec],
         Field(description="The auto-scaling rules. Required if `count` is set to a range"),
     ] = None
-    probes: Annotated[
-        list[ProbeConfig],
-        Field(description="List of probes used to determine job health for this replica group"),
-    ] = []
-    rate_limits: Annotated[
-        list[RateLimit],
-        Field(description="Rate limiting rules for this replica group"),
-    ] = []
     # TODO: Extract to ConfigurationWithResourcesParams mixin
     resources: Annotated[
         ResourcesSpec,
@@ -781,23 +773,6 @@ class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
         if count and count.min == count.max and scaling:
             raise ValueError("To use `scaling`, `count` must be set to a range.")
         return values
-
-    @validator("rate_limits")
-    def validate_rate_limits(cls, v: list[RateLimit]) -> list[RateLimit]:
-        counts = Counter(limit.prefix for limit in v)
-        duplicates = [prefix for prefix, count in counts.items() if count > 1]
-        if duplicates:
-            raise ValueError(
-                f"Prefixes {duplicates} are used more than once."
-                " Each rate limit should have a unique path prefix"
-            )
-        return v
-
-    @validator("probes")
-    def validate_probes(cls, v: list[ProbeConfig]) -> list[ProbeConfig]:
-        if has_duplicates(v):
-            raise ValueError("Probes must be unique")
-        return v
 
 
 class ServiceConfigurationParams(CoreModel):
@@ -887,14 +862,18 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError(
                 "The `gateway` property must be a string or boolean `false`, not boolean `true`"
             )
+
     @validator("replicas")
     def convert_replicas(cls, v: Range[int]) -> Range[int]:
-        if v.max is None:
-            raise ValueError("The maximum number of replicas is required")
-        if v.min is None:
-            v.min = 0
-        if v.min < 0:
-            raise ValueError("The minimum number of replicas must be greater than or equal to 0")
+        if isinstance(v, Range):
+            if v.max is None:
+                raise ValueError("The maximum number of replicas is required")
+            if v.min is None:
+                v.min = 0
+            if v.min < 0:
+                raise ValueError(
+                    "The minimum number of replicas must be greater than or equal to 0"
+                )
         return v
 
     @root_validator()
@@ -904,7 +883,6 @@ class ServiceConfigurationParams(CoreModel):
             if all(isinstance(item, ReplicaGroup) for item in replicas):
                 return values
 
-        # Handle backward compatibility: convert old-style replica config to groups
         old_replicas = values.get("replicas")
         if isinstance(old_replicas, Range):
             replica_count = old_replicas
@@ -917,8 +895,6 @@ class ServiceConfigurationParams(CoreModel):
                 commands=values.get("commands", []),
                 resources=values.get("resources"),
                 scaling=values.get("scaling"),
-                probes=values.get("probes", []),
-                rate_limits=values.get("rate_limits"),
             )
         ]
         return values
