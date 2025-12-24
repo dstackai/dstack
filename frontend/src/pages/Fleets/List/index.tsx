@@ -8,8 +8,9 @@ import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';
-import { useGetFleetsQuery, useLazyGetFleetsQuery } from 'services/fleet';
+import { useLazyGetFleetsQuery } from 'services/fleet';
 
+import { useCheckingForFleetsInProjects } from '../../../hooks/useCheckingForFleetsInProjectsOfMember';
 import { useColumnsDefinitions, useEmptyMessages, useFilters } from './hooks';
 import { useDeleteFleet } from './useDeleteFleet';
 
@@ -37,7 +38,7 @@ export const FleetList: React.FC = () => {
         isDisabledClearFilter,
     } = useFilters();
 
-    const { data: fleetsData, isLoading: isLoadingFleets } = useGetFleetsQuery({ limit: 1 });
+    const projectHavingFleetMap = useCheckingForFleetsInProjects({});
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IFleet, TFleetListRequestParams>({
         useLazyQuery: useLazyGetFleetsQuery,
@@ -71,7 +72,7 @@ export const FleetList: React.FC = () => {
         deleteFleets([...selectedItems]).catch(console.log);
     };
 
-    const noFleets = !isLoadingFleets && !fleetsData?.length;
+    const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
 
     const onCreateAFleet: ButtonProps['onClick'] = (event) => {
         event.preventDefault();
@@ -90,7 +91,7 @@ export const FleetList: React.FC = () => {
             selectionType="multi"
             header={
                 <>
-                    {noFleets && (
+                    {projectDontHasFleet && (
                         <div className={styles.alertBox}>
                             <Alert
                                 header={t('fleets.no_alert.title')}
@@ -101,7 +102,8 @@ export const FleetList: React.FC = () => {
                                     </Button>
                                 }
                             >
-                                {t('fleets.no_alert.description')}
+                                Some of the projects (e.g. <code>{projectDontHasFleet}</code>) have no fleets. Create at least
+                                one before submitting a run
                             </Alert>
                         </div>
                     )}

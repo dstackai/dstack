@@ -8,9 +8,9 @@ import { Alert, Button, ButtonDropdown, Header, Loader, PropertyFilter, SpaceBet
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
+import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';
-import { useGetFleetsQuery } from 'services/fleet';
 import { useLazyGetRunsQuery } from 'services/run';
 
 import { useRunListPreferences } from './Preferences/useRunListPreferences';
@@ -52,7 +52,7 @@ export const RunList: React.FC = () => {
         localStorePrefix: 'administration-run-list-page',
     });
 
-    const { data: fleetsData, isLoading: isLoadingFleets } = useGetFleetsQuery({ limit: 1 });
+    const projectHavingFleetMap = useCheckingForFleetsInProjects({});
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IRun, TRunsRequestParams>({
         useLazyQuery: useLazyGetRunsQuery,
@@ -122,7 +122,7 @@ export const RunList: React.FC = () => {
         }
     };
 
-    const noFleets = !isLoadingFleets && !fleetsData?.length;
+    const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
 
     const onCreateAFleet: ButtonProps['onClick'] = (event) => {
         event.preventDefault();
@@ -143,7 +143,7 @@ export const RunList: React.FC = () => {
             preferences={<Preferences />}
             header={
                 <>
-                    {noFleets && (
+                    {projectDontHasFleet && (
                         <div className={styles.alertBox}>
                             <Alert
                                 header={t('fleets.no_alert.title')}
@@ -154,7 +154,8 @@ export const RunList: React.FC = () => {
                                     </Button>
                                 }
                             >
-                                {t('fleets.no_alert.description')}
+                                Some of the projects (e.g. <code>{projectDontHasFleet}</code>) have no fleets. Create at least
+                                one before submitting a run
                             </Alert>
                         </div>
                     )}
@@ -164,7 +165,6 @@ export const RunList: React.FC = () => {
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
                                 <ButtonDropdown
-                                    disabled={!fleetsData?.length}
                                     items={[
                                         {
                                             text: 'Dev environment',
