@@ -22,14 +22,14 @@ class LoginCommand(BaseCommand):
         super()._register()
         self._parser.add_argument(
             "--url",
-            help="The server URL",
+            help="The server URL, e.g. https://sky.dstack.ai",
             required=True,
         )
         self._parser.add_argument(
             "-p",
             "--provider",
             help=(
-                "The Single Sign-On provider name."
+                "The SSO provider name."
                 " Selected automatically if the server supports only one provider."
             ),
         )
