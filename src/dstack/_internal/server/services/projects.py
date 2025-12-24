@@ -203,8 +203,6 @@ async def delete_projects(
         for project in projects_to_delete:
             if not _is_project_admin(user=user, project=project):
                 raise ForbiddenError()
-        if all(name in projects_names for name in user_project_names):
-            raise ServerClientError("Cannot delete the only project")
 
     res = await session.execute(
         select(ProjectModel)
