@@ -112,67 +112,67 @@ plugins:
         background_color: "black"
         color: "#FFFFFF"
         font_family: "Roboto"
-#      debug: true
+      #      debug: true
       cards_layout_dir: docs/layouts
       cards_layout: custom
   - search
   - redirects:
       redirect_maps:
-        'blog/2024/02/08/resources-authentication-and-more.md': 'https://github.com/dstackai/dstack/releases/0.15.0'
-        'blog/2024/01/19/openai-endpoints-preview.md': 'https://github.com/dstackai/dstack/releases/0.14.0'
-        'blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more.md': 'https://github.com/dstackai/dstack/releases/0.13.0'
-        'blog/2023/11/21/vastai.md': 'https://github.com/dstackai/dstack/releases/0.12.3'
-        'blog/2023/10/31/tensordock.md': 'https://github.com/dstackai/dstack/releases/0.12.2'
-        'blog/2023/10/18/simplified-cloud-setup.md': 'https://github.com/dstackai/dstack/releases/0.12.0'
-        'blog/2023/08/22/multiple-clouds.md': 'https://github.com/dstackai/dstack/releases/0.11'
-        'blog/2023/08/07/services-preview.md': 'https://github.com/dstackai/dstack/releases/0.10.7'
-        'blog/2023/07/14/lambda-cloud-ga-and-docker-support.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
-        'blog/2023/05/22/azure-support-better-ui-and-more.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
-        'blog/2023/03/13/gcp-support-just-landed.md': 'https://github.com/dstackai/dstack/releases/0.2'
-        'blog/dstack-research.md': 'https://dstack.ai/#get-started'
-        'docs/dev-environments.md': 'docs/concepts/dev-environments.md'
-        'docs/tasks.md': 'docs/concepts/tasks.md'
-        'docs/services.md': 'docs/concepts/services.md'
-        'docs/fleets.md': 'docs/concepts/fleets.md'
-        'docs/examples/llms/llama31.md': 'examples/llms/llama/index.md'
-        'docs/examples/llms/llama32.md': 'examples/llms/llama/index.md'
-        'examples/llms/llama31/index.md': 'examples/llms/llama/index.md'
-        'examples/llms/llama32/index.md': 'examples/llms/llama/index.md'
-        'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
-        'docs/examples/deployment/nim/index.md': 'examples/inference/nim/index.md'
-        'docs/examples/deployment/vllm/index.md': 'examples/inference/vllm/index.md'
-        'docs/examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
-        'providers.md': 'partners.md'
-        'backends.md': 'partners.md'
-        'blog/monitoring-gpu-usage.md': 'blog/posts/dstack-metrics.md'
-        'blog/inactive-dev-environments-auto-shutdown.md': 'blog/posts/inactivity-duration.md'
-        'blog/data-centers-and-private-clouds.md': 'blog/posts/gpu-blocks-and-proxy-jump.md'
-        'blog/distributed-training-with-aws-efa.md': 'examples/clusters/aws/index.md'
-        'blog/dstack-stats.md': 'blog/posts/dstack-metrics.md'
-        'docs/concepts/metrics.md': 'docs/guides/metrics.md'
-        'docs/guides/monitoring.md': 'docs/guides/metrics.md'
-        'blog/nvidia-and-amd-on-vultr.md.md': 'blog/posts/nvidia-and-amd-on-vultr.md'
-        'examples/misc/nccl-tests/index.md': 'examples/clusters/nccl-rccl-tests/index.md'
-        'examples/misc/a3high-clusters/index.md': 'examples/clusters/gcp/index.md'
-        'examples/misc/a3mega-clusters/index.md': 'examples/clusters/gcp/index.md'
-        'examples/distributed-training/nccl-tests/index.md': 'examples/clusters/nccl-rccl-tests/index.md'
-        'examples/distributed-training/rccl-tests/index.md': 'examples/clusters/nccl-rccl-tests/index.md'
-        'examples/deployment/nim/index.md': 'examples/inference/nim/index.md'
-        'examples/deployment/vllm/index.md': 'examples/inference/vllm/index.md'
-        'examples/deployment/tgi/index.md': 'examples/inference/tgi/index.md'
-        'examples/deployment/sglang/index.md': 'examples/inference/sglang/index.md'
-        'examples/deployment/trtllm/index.md': 'examples/inference/trtllm/index.md'
-        'examples/fine-tuning/trl/index.md': 'examples/single-node-training/trl/index.md'
-        'examples/fine-tuning/axolotl/index.md': 'examples/single-node-training/axolotl/index.md'
-        'blog/efa.md': 'examples/clusters/aws/index.md'
-        'docs/concepts/repos.md': 'docs/concepts/dev-environments.md#repos'
-        'examples/clusters/a3high/index.md': 'examples/clusters/gcp/index.md'
-        'examples/clusters/a3mega/index.md': 'examples/clusters/gcp/index.md'
-        'examples/clusters/a4/index.md': 'examples/clusters/gcp/index.md'
-        'examples/clusters/efa/index.md': 'examples/clusters/aws/index.md'
+        "blog/2024/02/08/resources-authentication-and-more.md": "https://github.com/dstackai/dstack/releases/0.15.0"
+        "blog/2024/01/19/openai-endpoints-preview.md": "https://github.com/dstackai/dstack/releases/0.14.0"
+        "blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more.md": "https://github.com/dstackai/dstack/releases/0.13.0"
+        "blog/2023/11/21/vastai.md": "https://github.com/dstackai/dstack/releases/0.12.3"
+        "blog/2023/10/31/tensordock.md": "https://github.com/dstackai/dstack/releases/0.12.2"
+        "blog/2023/10/18/simplified-cloud-setup.md": "https://github.com/dstackai/dstack/releases/0.12.0"
+        "blog/2023/08/22/multiple-clouds.md": "https://github.com/dstackai/dstack/releases/0.11"
+        "blog/2023/08/07/services-preview.md": "https://github.com/dstackai/dstack/releases/0.10.7"
+        "blog/2023/07/14/lambda-cloud-ga-and-docker-support.md": "https://github.com/dstackai/dstack/releases/0.10.5"
+        "blog/2023/05/22/azure-support-better-ui-and-more.md": "https://github.com/dstackai/dstack/releases/0.9.1"
+        "blog/2023/03/13/gcp-support-just-landed.md": "https://github.com/dstackai/dstack/releases/0.2"
+        "blog/dstack-research.md": "https://dstack.ai/#get-started"
+        "docs/dev-environments.md": "docs/concepts/dev-environments.md"
+        "docs/tasks.md": "docs/concepts/tasks.md"
+        "docs/services.md": "docs/concepts/services.md"
+        "docs/fleets.md": "docs/concepts/fleets.md"
+        "docs/examples/llms/llama31.md": "examples/llms/llama/index.md"
+        "docs/examples/llms/llama32.md": "examples/llms/llama/index.md"
+        "examples/llms/llama31/index.md": "examples/llms/llama/index.md"
+        "examples/llms/llama32/index.md": "examples/llms/llama/index.md"
+        "docs/examples/accelerators/amd/index.md": "examples/accelerators/amd/index.md"
+        "docs/examples/deployment/nim/index.md": "examples/inference/nim/index.md"
+        "docs/examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
+        "docs/examples/deployment/tgi/index.md": "examples/inference/tgi/index.md"
+        "providers.md": "partners.md"
+        "backends.md": "partners.md"
+        "blog/monitoring-gpu-usage.md": "blog/posts/dstack-metrics.md"
+        "blog/inactive-dev-environments-auto-shutdown.md": "blog/posts/inactivity-duration.md"
+        "blog/data-centers-and-private-clouds.md": "blog/posts/gpu-blocks-and-proxy-jump.md"
+        "blog/distributed-training-with-aws-efa.md": "examples/clusters/aws/index.md"
+        "blog/dstack-stats.md": "blog/posts/dstack-metrics.md"
+        "docs/concepts/metrics.md": "docs/guides/metrics.md"
+        "docs/guides/monitoring.md": "docs/guides/metrics.md"
+        "blog/nvidia-and-amd-on-vultr.md.md": "blog/posts/nvidia-and-amd-on-vultr.md"
+        "examples/misc/nccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
+        "examples/misc/a3high-clusters/index.md": "examples/clusters/gcp/index.md"
+        "examples/misc/a3mega-clusters/index.md": "examples/clusters/gcp/index.md"
+        "examples/distributed-training/nccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
+        "examples/distributed-training/rccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
+        "examples/deployment/nim/index.md": "examples/inference/nim/index.md"
+        "examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
+        "examples/deployment/tgi/index.md": "examples/inference/tgi/index.md"
+        "examples/deployment/sglang/index.md": "examples/inference/sglang/index.md"
+        "examples/deployment/trtllm/index.md": "examples/inference/trtllm/index.md"
+        "examples/fine-tuning/trl/index.md": "examples/single-node-training/trl/index.md"
+        "examples/fine-tuning/axolotl/index.md": "examples/single-node-training/axolotl/index.md"
+        "blog/efa.md": "examples/clusters/aws/index.md"
+        "docs/concepts/repos.md": "docs/concepts/dev-environments.md#repos"
+        "examples/clusters/a3high/index.md": "examples/clusters/gcp/index.md"
+        "examples/clusters/a3mega/index.md": "examples/clusters/gcp/index.md"
+        "examples/clusters/a4/index.md": "examples/clusters/gcp/index.md"
+        "examples/clusters/efa/index.md": "examples/clusters/aws/index.md"
   - typeset
   - gen-files:
-      scripts:  # always relative to mkdocs.yml
+      scripts: # always relative to mkdocs.yml
         - scripts/docs/gen_examples.py
         - scripts/docs/gen_cli_reference.py
         - scripts/docs/gen_openapi_reference.py
@@ -279,69 +279,70 @@ nav:
           - Protips: docs/guides/protips.md
           - Migration: docs/guides/migration.md
       - Reference:
-        - .dstack.yml:
-            - dev-environment: docs/reference/dstack.yml/dev-environment.md
-            - task: docs/reference/dstack.yml/task.md
-            - service: docs/reference/dstack.yml/service.md
-            - fleet: docs/reference/dstack.yml/fleet.md
-            - gateway: docs/reference/dstack.yml/gateway.md
-            - volume: docs/reference/dstack.yml/volume.md
-        - server/config.yml: docs/reference/server/config.yml.md
-        - CLI:
-            - dstack server: docs/reference/cli/dstack/server.md
-            - dstack init: docs/reference/cli/dstack/init.md
-            - dstack apply: docs/reference/cli/dstack/apply.md
-            - dstack delete: docs/reference/cli/dstack/delete.md
-            - dstack ps: docs/reference/cli/dstack/ps.md
-            - dstack stop: docs/reference/cli/dstack/stop.md
-            - dstack attach: docs/reference/cli/dstack/attach.md
-            - dstack logs: docs/reference/cli/dstack/logs.md
-            - dstack metrics: docs/reference/cli/dstack/metrics.md
-            - dstack event: docs/reference/cli/dstack/event.md
-            - dstack project: docs/reference/cli/dstack/project.md
-            - dstack fleet: docs/reference/cli/dstack/fleet.md
-            - dstack offer: docs/reference/cli/dstack/offer.md
-            - dstack volume: docs/reference/cli/dstack/volume.md
-            - dstack gateway: docs/reference/cli/dstack/gateway.md
-            - dstack secret: docs/reference/cli/dstack/secret.md
-        - API:
-            - Python API: docs/reference/api/python/index.md
-            - REST API: docs/reference/api/rest/index.md
-        - Environment variables: docs/reference/environment-variables.md
-        - .dstack/profiles.yml: docs/reference/profiles.yml.md
-        - Plugins:
-            - Python API: docs/reference/plugins/python/index.md
-            - REST API: docs/reference/plugins/rest/index.md
-        - llms-full.txt: https://dstack.ai/llms-full.txt
+          - .dstack.yml:
+              - dev-environment: docs/reference/dstack.yml/dev-environment.md
+              - task: docs/reference/dstack.yml/task.md
+              - service: docs/reference/dstack.yml/service.md
+              - fleet: docs/reference/dstack.yml/fleet.md
+              - gateway: docs/reference/dstack.yml/gateway.md
+              - volume: docs/reference/dstack.yml/volume.md
+          - server/config.yml: docs/reference/server/config.yml.md
+          - CLI:
+              - dstack server: docs/reference/cli/dstack/server.md
+              - dstack init: docs/reference/cli/dstack/init.md
+              - dstack apply: docs/reference/cli/dstack/apply.md
+              - dstack delete: docs/reference/cli/dstack/delete.md
+              - dstack ps: docs/reference/cli/dstack/ps.md
+              - dstack stop: docs/reference/cli/dstack/stop.md
+              - dstack attach: docs/reference/cli/dstack/attach.md
+              - dstack login: docs/reference/cli/dstack/login.md
+              - dstack logs: docs/reference/cli/dstack/logs.md
+              - dstack metrics: docs/reference/cli/dstack/metrics.md
+              - dstack event: docs/reference/cli/dstack/event.md
+              - dstack project: docs/reference/cli/dstack/project.md
+              - dstack fleet: docs/reference/cli/dstack/fleet.md
+              - dstack offer: docs/reference/cli/dstack/offer.md
+              - dstack volume: docs/reference/cli/dstack/volume.md
+              - dstack gateway: docs/reference/cli/dstack/gateway.md
+              - dstack secret: docs/reference/cli/dstack/secret.md
+          - API:
+              - Python API: docs/reference/api/python/index.md
+              - REST API: docs/reference/api/rest/index.md
+          - Environment variables: docs/reference/environment-variables.md
+          - .dstack/profiles.yml: docs/reference/profiles.yml.md
+          - Plugins:
+              - Python API: docs/reference/plugins/python/index.md
+              - REST API: docs/reference/plugins/rest/index.md
+          - llms-full.txt: https://dstack.ai/llms-full.txt
   - Examples:
-    - examples.md
-    - Single-node training:
-        - TRL: examples/single-node-training/trl/index.md
-        - Axolotl: examples/single-node-training/axolotl/index.md
-    - Distributed training:
-        - TRL: examples/distributed-training/trl/index.md
-        - Axolotl: examples/distributed-training/axolotl/index.md
-        - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
-    - Clusters:
-        - AWS: examples/clusters/aws/index.md
-        - GCP: examples/clusters/gcp/index.md
-        - Crusoe: examples/clusters/crusoe/index.md
-        - NCCL/RCCL tests: examples/clusters/nccl-rccl-tests/index.md
-    - Inference:
-        - SGLang: examples/inference/sglang/index.md
-        - vLLM: examples/inference/vllm/index.md
-        - TGI:  examples/inference/tgi/index.md
-        - NIM: examples/inference/nim/index.md
-        - TensorRT-LLM: examples/inference/trtllm/index.md
-    - Accelerators:
-        - AMD: examples/accelerators/amd/index.md
-        - TPU: examples/accelerators/tpu/index.md
-        - Intel Gaudi: examples/accelerators/intel/index.md
-        - Tenstorrent: examples/accelerators/tenstorrent/index.md
-    - Models:
-        - Wan2.2: examples/models/wan22/index.md
-  - Blog: 
-    - blog/index.md
+      - examples.md
+      - Single-node training:
+          - TRL: examples/single-node-training/trl/index.md
+          - Axolotl: examples/single-node-training/axolotl/index.md
+      - Distributed training:
+          - TRL: examples/distributed-training/trl/index.md
+          - Axolotl: examples/distributed-training/axolotl/index.md
+          - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
+      - Clusters:
+          - AWS: examples/clusters/aws/index.md
+          - GCP: examples/clusters/gcp/index.md
+          - Crusoe: examples/clusters/crusoe/index.md
+          - NCCL/RCCL tests: examples/clusters/nccl-rccl-tests/index.md
+      - Inference:
+          - SGLang: examples/inference/sglang/index.md
+          - vLLM: examples/inference/vllm/index.md
+          - TGI: examples/inference/tgi/index.md
+          - NIM: examples/inference/nim/index.md
+          - TensorRT-LLM: examples/inference/trtllm/index.md
+      - Accelerators:
+          - AMD: examples/accelerators/amd/index.md
+          - TPU: examples/accelerators/tpu/index.md
+          - Intel Gaudi: examples/accelerators/intel/index.md
+          - Tenstorrent: examples/accelerators/tenstorrent/index.md
+      - Models:
+          - Wan2.2: examples/models/wan22/index.md
+  - Blog:
+      - blog/index.md
   - Case studies: blog/case-studies.md
   - Benchmarks: blog/benchmarks.md
 #  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
