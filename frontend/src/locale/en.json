@@ -565,7 +565,7 @@
   "fleets": {
     "no_alert": {
       "title": "No fleets",
-      "description": "Please, create a fleet",
+      "description": "The project has no fleets. Create one before submitting a run.",
       "button_title": "Create a fleet"
     },
     "fleet": "Fleet",
