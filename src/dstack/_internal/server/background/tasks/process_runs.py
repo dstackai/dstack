@@ -707,7 +707,9 @@ async def _handle_rolling_deployment_for_group(
         {
             j.replica_num
             for j in run_model.jobs
-            if not j.status.is_finished() and _job_belongs_to_group(job=j, group_name=group.name)
+            if not j.status.is_finished()
+            and group.name is not None
+            and _job_belongs_to_group(job=j, group_name=group.name)
         }
     )
 

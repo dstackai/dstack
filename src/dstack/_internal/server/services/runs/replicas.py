@@ -253,6 +253,8 @@ async def scale_run_replicas_per_group(
         return
 
     for group in replicas:
+        if group.name is None:
+            continue
         group_desired = desired_replica_counts.get(group.name, group.count.min or 0)
 
         # Build replica lists filtered by this group
