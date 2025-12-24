@@ -811,7 +811,8 @@ class ServiceConfigurationParams(CoreModel):
         Field(
             description=(
                 "The name of the gateway. Specify boolean `false` to run without a gateway."
-                " Omit to run with the default gateway"
+                " Specify boolean `true` to run with the default gateway."
+                " Omit to run with the default gateway if there is one, or without a gateway otherwise"
             ),
         ),
     ] = None
@@ -886,6 +887,14 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError(
                 "The `gateway` property must be a string or boolean `false`, not boolean `true`"
             )
+    @validator("replicas")
+    def convert_replicas(cls, v: Range[int]) -> Range[int]:
+        if v.max is None:
+            raise ValueError("The maximum number of replicas is required")
+        if v.min is None:
+            v.min = 0
+        if v.min < 0:
+            raise ValueError("The minimum number of replicas must be greater than or equal to 0")
         return v
 
     @root_validator()

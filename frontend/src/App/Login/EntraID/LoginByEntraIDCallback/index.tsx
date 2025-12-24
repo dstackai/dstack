@@ -7,7 +7,7 @@ import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { useAppDispatch } from 'hooks';
 import { ROUTES } from 'routes';
-import { useEntraCallbackMutation } from 'services/auth';
+import { useEntraCallbackMutation, useGetNextRedirectMutation } from 'services/auth';
 
 import { AuthErrorMessage } from 'App/AuthErrorMessage';
 import { getBaseUrl } from 'App/helpers';
@@ -23,15 +23,27 @@ export const LoginByEntraIDCallback: React.FC = () => {
     const [isInvalidCode, setIsInvalidCode] = useState(false);
     const dispatch = useAppDispatch();
 
+    const [getNextRedirect] = useGetNextRedirectMutation();
     const [entraCallback] = useEntraCallbackMutation();
 
     const checkCode = () => {
         if (code && state) {
-            entraCallback({ code, state, base_url: getBaseUrl() })
+            getNextRedirect({ code, state })
                 .unwrap()
-                .then(({ creds: { token } }) => {
-                    dispatch(setAuthData({ token }));
-                    navigate('/');
+                .then(({ redirect_url }) => {
+                    if (redirect_url) {
+                        window.location.href = redirect_url;
+                        return;
+                    }
+                    entraCallback({ code, state, base_url: getBaseUrl() })
+                        .unwrap()
+                        .then(({ creds: { token } }) => {
+                            dispatch(setAuthData({ token }));
+                            navigate('/');
+                        })
+                        .catch(() => {
+                            setIsInvalidCode(true);
+                        });
                 })
                 .catch(() => {
                     setIsInvalidCode(true);

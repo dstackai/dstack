@@ -14,6 +14,7 @@ from dstack._internal.core.errors import (
     URLNotFoundError,
 )
 from dstack._internal.utils.logging import get_logger
+from dstack.api.server._auth import AuthAPIClient
 from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._events import EventsAPIClient
 from dstack.api.server._files import FilesAPIClient
@@ -52,16 +53,18 @@ class APIClient:
         files: operations with files
     """
 
-    def __init__(self, base_url: str, token: str):
+    def __init__(self, base_url: str, token: Optional[str] = None):
         """
         Args:
             base_url: The API endpoints prefix, e.g. `http://127.0.0.1:3000/`.
             token: The API token.
         """
         self._base_url = base_url.rstrip("/")
-        self._token = token
         self._s = requests.session()
-        self._s.headers.update({"Authorization": f"Bearer {token}"})
+        self._token = None
+        if token is not None:
+            self._token = token
+            self._s.headers.update({"Authorization": f"Bearer {token}"})
         client_api_version = os.getenv("DSTACK_CLIENT_API_VERSION", version.__version__)
         if client_api_version is not None:
             self._s.headers.update({"X-API-VERSION": client_api_version})
@@ -70,6 +73,10 @@ class APIClient:
     @property
     def base_url(self) -> str:
         return self._base_url
+
+    @property
+    def auth(self) -> AuthAPIClient:
+        return AuthAPIClient(self._request, self._logger)
 
     @property
     def users(self) -> UsersAPIClient:
@@ -128,6 +135,8 @@ class APIClient:
         return EventsAPIClient(self._request, self._logger)
 
     def get_token_hash(self) -> str:
+        if self._token is None:
+            raise ValueError("Token not set")
         return hashlib.sha1(self._token.encode()).hexdigest()[:8]
 
     def _request(

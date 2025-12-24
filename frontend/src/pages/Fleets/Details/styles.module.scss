@@ -1,0 +1,18 @@
+.page {
+    height: 100%;
+
+    & [class^="awsui_tabs-content"] {
+        display: none;
+    }
+
+    & > [class^="awsui_layout"] {
+        height: 100%;
+
+        & > [class^="awsui_content"] {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+    }
+}

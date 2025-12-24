@@ -52,7 +52,8 @@
     "refresh": "Refresh",
     "quickstart": "Quickstart",
     "ask_ai": "Ask AI",
-    "new": "New"
+    "new": "New",
+    "full_view": "Full view"
   },
 
   "auth": {

@@ -5,6 +5,7 @@ export const API = {
 
     AUTH: {
         BASE: () => `${API.BASE()}/auth`,
+        NEXT_REDIRECT: () => `${API.AUTH.BASE()}/get_next_redirect`,
         GITHUB: {
             BASE: () => `${API.AUTH.BASE()}/github`,
             AUTHORIZE: () => `${API.AUTH.GITHUB.BASE()}/authorize`,

@@ -54,7 +54,14 @@ const multipleChoiseKeys: RequestParamsKeys[] = [
     'actors',
 ];
 
-const targetTypes = ['project', 'user', 'fleet', 'instance', 'run', 'job'];
+const targetTypes = [
+    { label: 'Project', value: 'project' },
+    { label: 'User', value: 'user' },
+    { label: 'Fleet', value: 'fleet' },
+    { label: 'Instance', value: 'instance' },
+    { label: 'Run', value: 'run' },
+    { label: 'Job', value: 'job' },
+];
 
 export const useFilters = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -100,7 +107,7 @@ export const useFilters = () => {
         targetTypes?.forEach((targetType) => {
             options.push({
                 propertyKey: filterKeys.INCLUDE_TARGET_TYPES,
-                value: targetType,
+                value: targetType.label,
             });
         });
 
@@ -117,53 +124,53 @@ export const useFilters = () => {
         {
             key: filterKeys.TARGET_PROJECTS,
             operators: ['='],
-            propertyLabel: 'Target Projects',
+            propertyLabel: 'Target projects',
             groupValuesLabel: 'Project ids',
         },
         {
             key: filterKeys.TARGET_USERS,
             operators: ['='],
-            propertyLabel: 'Target Users',
+            propertyLabel: 'Target users',
             groupValuesLabel: 'Project ids',
         },
         {
             key: filterKeys.TARGET_FLEETS,
             operators: ['='],
-            propertyLabel: 'Target Fleets',
+            propertyLabel: 'Target fleets',
         },
         {
             key: filterKeys.TARGET_INSTANCES,
             operators: ['='],
-            propertyLabel: 'Target Instances',
+            propertyLabel: 'Target instances',
         },
         {
             key: filterKeys.TARGET_RUNS,
             operators: ['='],
-            propertyLabel: 'Target Runs',
+            propertyLabel: 'Target runs',
         },
         {
             key: filterKeys.TARGET_JOBS,
             operators: ['='],
-            propertyLabel: 'Target Jobs',
+            propertyLabel: 'Target jobs',
         },
 
         {
             key: filterKeys.WITHIN_PROJECTS,
             operators: ['='],
-            propertyLabel: 'Within Projects',
+            propertyLabel: 'Within projects',
             groupValuesLabel: 'Project ids',
         },
 
         {
             key: filterKeys.WITHIN_FLEETS,
             operators: ['='],
-            propertyLabel: 'Within Fleets',
+            propertyLabel: 'Within fleets',
         },
 
         {
             key: filterKeys.WITHIN_RUNS,
             operators: ['='],
-            propertyLabel: 'Within Runs',
+            propertyLabel: 'Within runs',
         },
 
         {
@@ -237,6 +244,14 @@ export const useFilters = () => {
                 ? {
                       [filterKeys.ACTORS]: params[filterKeys.ACTORS]?.map(
                           (name: string) => usersData?.find(({ username }) => username === name)?.['id'],
+                      ),
+                  }
+                : {}),
+
+            ...(params[filterKeys.INCLUDE_TARGET_TYPES] && Array.isArray(params[filterKeys.INCLUDE_TARGET_TYPES])
+                ? {
+                      [filterKeys.INCLUDE_TARGET_TYPES]: params[filterKeys.INCLUDE_TARGET_TYPES]?.map(
+                          (selectedLabel: string) => targetTypes?.find(({ label }) => label === selectedLabel)?.['value'],
                       ),
                   }
                 : {}),

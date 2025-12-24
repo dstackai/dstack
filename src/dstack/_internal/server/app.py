@@ -25,6 +25,7 @@ from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.background.tasks.process_probes import PROBES_SCHEDULER
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
+    auth,
     backends,
     events,
     files,
@@ -210,6 +211,7 @@ def add_no_api_version_check_routes(paths: List[str]):
 def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(server.router)
     app.include_router(users.router)
+    app.include_router(auth.router)
     app.include_router(projects.router)
     app.include_router(backends.root_router)
     app.include_router(backends.project_router)
