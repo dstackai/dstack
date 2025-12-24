@@ -46,6 +46,15 @@ class EventTarget(CoreModel):
             )
         ),
     ]
+    is_project_deleted: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether the project the target entity belongs to is deleted,"
+                " or `null` for target types not bound to a project (e.g., users)"
+            )
+        ),
+    ] = None  # default for client compatibility with older servers that don't return this field
     id: Annotated[uuid.UUID, Field(description="ID of the target entity")]
     name: Annotated[str, Field(description="Name of the target entity")]
 
@@ -72,6 +81,15 @@ class Event(CoreModel):
             )
         ),
     ]
+    is_actor_user_deleted: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether the user who performed the action that triggered the event is deleted,"
+                " or `null` if the action was performed by the system"
+            )
+        ),
+    ] = None  # default for client compatibility with older servers that don't return this field
     targets: Annotated[
         list[EventTarget], Field(description="List of entities affected by the event")
     ]
