@@ -22,6 +22,8 @@ def register_provider(provider_info: OAuthProviderInfo):
     """
     Registers an OAuth2 provider supported on the server.
     If the provider is supported but not configured, it should be registered with `enabled=False`.
+    The provider must register endpoints `/api/auth/{provider}/authorize` and `/api/auth/{provider}/callback`
+    as defined by the client (see `dstack.api.server._auth.AuthAPIClient`).
     """
     _OAUTH_PROVIDERS.append(provider_info)
 
