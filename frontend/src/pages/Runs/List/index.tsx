@@ -154,8 +154,8 @@ export const RunList: React.FC = () => {
                                     </Button>
                                 }
                             >
-                                Some of the projects (e.g. <code>{projectDontHasFleet}</code>) have no fleets. Create at least
-                                one before submitting a run
+                                The project <code>{projectDontHasFleet}</code> has no fleets. Create one before submitting a
+                                run.
                             </Alert>
                         </div>
                     )}

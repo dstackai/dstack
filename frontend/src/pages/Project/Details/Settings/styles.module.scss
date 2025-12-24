@@ -8,6 +8,17 @@
     width: 300px;
 }
 
+.alertBox {
+    :global {
+        & [class^="awsui_alert"] {
+            & [class^="awsui_action-slot"] {
+                display: flex;
+                align-items: center;
+            }
+        }
+    }
+}
+
 .codeWrapper {
     position: relative;
 

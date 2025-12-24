@@ -6,11 +6,11 @@ import { Alert, Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Tog
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
+import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';
 import { useLazyGetFleetsQuery } from 'services/fleet';
 
-import { useCheckingForFleetsInProjects } from '../../../hooks/useCheckingForFleetsInProjectsOfMember';
 import { useColumnsDefinitions, useEmptyMessages, useFilters } from './hooks';
 import { useDeleteFleet } from './useDeleteFleet';
 
@@ -102,8 +102,8 @@ export const FleetList: React.FC = () => {
                                     </Button>
                                 }
                             >
-                                Some of the projects (e.g. <code>{projectDontHasFleet}</code>) have no fleets. Create at least
-                                one before submitting a run
+                                The project <code>{projectDontHasFleet}</code> has no fleets. Create one before submitting a
+                                run.
                             </Alert>
                         </div>
                     )}
