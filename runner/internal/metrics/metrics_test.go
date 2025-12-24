@@ -12,7 +12,7 @@ func TestGetAMDGPUMetrics_OK(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skip("Skipping on macOS")
 	}
-	collector, err := NewMetricsCollector()
+	collector, err := NewMetricsCollector(t.Context())
 	assert.NoError(t, err)
 
 	cases := []struct {
@@ -46,7 +46,7 @@ func TestGetAMDGPUMetrics_ErrorGPUUtilNA(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skip("Skipping on macOS")
 	}
-	collector, err := NewMetricsCollector()
+	collector, err := NewMetricsCollector(t.Context())
 	assert.NoError(t, err)
 	metrics, err := collector.getAMDGPUMetrics("gpu,gfx,gfx_clock,vram_used,vram_total\n0,N/A,N/A,283,196300\n")
 	assert.ErrorContains(t, err, "GPU utilization is N/A")

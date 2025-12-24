@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import datetime, timezone
-from typing import Callable, List, Optional, Union
+from typing import Callable, Generic, List, Optional, TypeVar, Union
 
 from sqlalchemy import (
     BigInteger,
@@ -30,7 +30,7 @@ from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.health import HealthStatus
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.profiles import (
     DEFAULT_FLEET_TERMINATION_IDLE_TIME,
     TerminationPolicy,
@@ -141,7 +141,10 @@ class EncryptedString(TypeDecorator):
             return DecryptedString(plaintext=None, decrypted=False, exc=e)
 
 
-class EnumAsString(TypeDecorator):
+E = TypeVar("E", bound=enum.Enum)
+
+
+class EnumAsString(TypeDecorator, Generic[E]):
     """
     A custom type decorator that stores enums as strings in the DB.
     """
@@ -149,18 +152,34 @@ class EnumAsString(TypeDecorator):
     impl = String
     cache_ok = True
 
-    def __init__(self, enum_class: type[enum.Enum], *args, **kwargs):
+    def __init__(
+        self,
+        enum_class: type[E],
+        *args,
+        fallback_deserializer: Optional[Callable[[str], E]] = None,
+        **kwargs,
+    ):
+        """
+        Args:
+            enum_class: The enum class to be stored.
+            fallback_deserializer: An optional function used when the string
+                from the DB does not match any enum member name. If not
+                provided, an exception will be raised in such cases.
+        """
         self.enum_class = enum_class
+        self.fallback_deserializer = fallback_deserializer
         super().__init__(*args, **kwargs)
 
-    def process_bind_param(self, value: Optional[enum.Enum], dialect) -> Optional[str]:
+    def process_bind_param(self, value: Optional[E], dialect) -> Optional[str]:
         if value is None:
             return None
         return value.name
 
-    def process_result_value(self, value: Optional[str], dialect) -> Optional[enum.Enum]:
+    def process_result_value(self, value: Optional[str], dialect) -> Optional[E]:
         if value is None:
             return None
+        if value not in self.enum_class.__members__ and self.fallback_deserializer is not None:
+            return self.fallback_deserializer(value)
         return self.enum_class[value]
 
 
@@ -201,7 +220,7 @@ class UserModel(BaseModel):
     ssh_private_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ssh_public_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, index=True)
 
     projects_quota: Mapped[int] = mapped_column(
         Integer, default=settings.USER_PROJECT_DEFAULT_QUOTA
@@ -641,7 +660,17 @@ class InstanceModel(BaseModel):
 
     # instance termination handling
     termination_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    termination_reason: Mapped[Optional[str]] = mapped_column(String(4000))
+    # dstack versions prior to 0.20.1 represented instance termination reasons as raw strings.
+    # Such strings may still be stored in the database, so we are using a wide column (4000 chars)
+    # and a fallback deserializer to convert them to relevant enum members.
+    termination_reason: Mapped[Optional[InstanceTerminationReason]] = mapped_column(
+        EnumAsString(
+            InstanceTerminationReason,
+            4000,
+            fallback_deserializer=InstanceTerminationReason.from_legacy_str,
+        )
+    )
+    termination_reason_message: Mapped[Optional[str]] = mapped_column(String(4000))
     # Deprecated since 0.19.22, not used
     health_status: Mapped[Optional[str]] = mapped_column(String(4000), deferred=True)
     health: Mapped[HealthStatus] = mapped_column(

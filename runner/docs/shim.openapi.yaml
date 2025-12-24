@@ -2,7 +2,7 @@ openapi: 3.1.2
 
 info:
   title: dstack-shim API
-  version: v2/0.19.41
+  version: v2/0.20.1
   x-logo:
     url: https://avatars.githubusercontent.com/u/54146142?s=260
   description: >
@@ -41,7 +41,7 @@ paths:
 
         **Important**: Since this endpoint is used for negotiation, it should always stay
         backward/future compatible, specifically the `version` field
-
+      tags: [shim]
       responses:
         "200":
           description: ""
@@ -49,6 +49,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthcheckResponse"
+
+  /shutdown:
+    post:
+      summary: Request shim shutdown
+      description: |
+        (since [0.20.1](https://github.com/dstackai/dstack/releases/tag/0.20.1)) Request shim to shut down itself.
+        Restart must be handled by an external process supervisor, e.g., `systemd`.
+
+        **Note**: background jobs (e.g., component installation) are canceled regardless of the `force` option.
+      tags: [shim]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShutdownRequest"
+      responses:
+        "200":
+          description: Request accepted
+          $ref: "#/components/responses/PlainTextOk"
+        "400":
+          description: Malformed JSON body or validation error
+          $ref: "#/components/responses/PlainTextBadRequest"
 
   /instance/health:
     get:
@@ -66,7 +89,7 @@ paths:
   /components:
     get:
       summary: Get components
-      description: (since [0.19.41](https://github.com/dstackai/dstack/releases/tag/0.19.41)) Returns a list of software components (e.g., `dstack-runner`)
+      description: (since [0.20.0](https://github.com/dstackai/dstack/releases/tag/0.20.0)) Returns a list of software components (e.g., `dstack-runner`)
       tags: [Components]
       responses:
         "200":
@@ -80,7 +103,7 @@ paths:
     post:
       summary: Install component
       description: >
-        (since [0.19.41](https://github.com/dstackai/dstack/releases/tag/0.19.41)) Request installing/updating the software component.
+        (since [0.20.0](https://github.com/dstackai/dstack/releases/tag/0.20.0)) Request installing/updating the software component.
         Components are installed asynchronously
       tags: [Components]
       requestBody:
@@ -410,6 +433,10 @@ components:
       type: string
       enum:
         - dstack-runner
+        - dstack-shim
+      description: |
+        * (since [0.20.0](https://github.com/dstackai/dstack/releases/tag/0.20.0)) `dstack-runner`
+        * (since [0.20.1](https://github.com/dstackai/dstack/releases/tag/0.20.1)) `dstack-shim`
 
     ComponentStatus:
       title: shim.components.ComponentStatus
@@ -430,7 +457,7 @@ components:
           type: string
           description: An empty string if status != installed
           examples:
-            - 0.19.41
+            - 0.20.1
         status:
           allOf:
             - $ref: "#/components/schemas/ComponentStatus"
@@ -456,6 +483,18 @@ components:
         - service
         - version
       additionalProperties: false
+
+    ShutdownRequest:
+      title: shim.api.ShutdownRequest
+      type: object
+      properties:
+        force:
+          type: boolean
+          examples:
+            - false
+          description: If `true`, don't wait for background job coroutines to complete after canceling them and close HTTP server forcefully.
+      required:
+        - force
 
     InstanceHealthResponse:
       title: shim.api.InstanceHealthResponse
@@ -486,7 +525,7 @@ components:
         url:
           type: string
           examples:
-            - https://dstack-runner-downloads.s3.eu-west-1.amazonaws.com/0.19.41/binaries/dstack-runner-linux-amd64
+            - https://dstack-runner-downloads.s3.eu-west-1.amazonaws.com/0.20.1/binaries/dstack-runner-linux-amd64
       required:
         - name
         - url

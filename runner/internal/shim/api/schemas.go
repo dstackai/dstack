@@ -11,6 +11,10 @@ type HealthcheckResponse struct {
 	Version string `json:"version"`
 }
 
+type ShutdownRequest struct {
+	Force bool `json:"force"`
+}
+
 type InstanceHealthResponse struct {
 	DCGM *dcgm.Health `json:"dcgm"`
 }

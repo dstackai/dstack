@@ -392,8 +392,21 @@ class TestDeleteUsers:
             json={"users": [user.name]},
         )
         assert response.status_code == 200
+
+        # Validate the user is deleted
         res = await session.execute(select(UserModel).where(UserModel.name == user.name))
         assert len(res.scalars().all()) == 0
+
+        # Validate an event is emitted
+        response = await client.post(
+            "/api/events/list", headers=get_auth_headers(admin.token), json={}
+        )
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+        assert response.json()[0]["message"] == "User deleted"
+        assert len(response.json()[0]["targets"]) == 1
+        assert response.json()[0]["targets"][0]["id"] == str(user.id)
+        assert response.json()[0]["targets"][0]["name"] == user.name
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

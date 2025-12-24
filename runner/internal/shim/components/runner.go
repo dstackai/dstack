@@ -2,13 +2,8 @@ package components
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os/exec"
-	"strings"
 	"sync"
-
-	"github.com/dstackai/dstack/runner/internal/common"
 )
 
 type RunnerManager struct {
@@ -42,7 +37,7 @@ func (m *RunnerManager) Install(ctx context.Context, url string, force bool) err
 	m.mu.Lock()
 	if m.status == ComponentStatusInstalling {
 		m.mu.Unlock()
-		return errors.New("install runner: already installing")
+		return fmt.Errorf("install %s: already installing", ComponentNameRunner)
 	}
 	m.status = ComponentStatusInstalling
 	m.version = ""
@@ -57,38 +52,10 @@ func (m *RunnerManager) Install(ctx context.Context, url string, force bool) err
 	return checkErr
 }
 
-func (m *RunnerManager) check(ctx context.Context) error {
+func (m *RunnerManager) check(ctx context.Context) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	exists, err := common.PathExists(m.path)
-	if err != nil {
-		m.status = ComponentStatusError
-		m.version = ""
-		return fmt.Errorf("check runner: %w", err)
-	}
-	if !exists {
-		m.status = ComponentStatusNotInstalled
-		m.version = ""
-		return nil
-	}
-
-	cmd := exec.CommandContext(ctx, m.path, "--version")
-	output, err := cmd.Output()
-	if err != nil {
-		m.status = ComponentStatusError
-		m.version = ""
-		return fmt.Errorf("check runner: %w", err)
-	}
-
-	rawVersion := string(output) // dstack-runner version 0.19.38
-	versionFields := strings.Fields(rawVersion)
-	if len(versionFields) != 3 {
-		m.status = ComponentStatusError
-		m.version = ""
-		return fmt.Errorf("check runner: unexpected version output: %s", rawVersion)
-	}
-	m.status = ComponentStatusInstalled
-	m.version = versionFields[2]
-	return nil
+	m.status, m.version, err = checkDstackComponent(ctx, ComponentNameRunner, m.path)
+	return err
 }

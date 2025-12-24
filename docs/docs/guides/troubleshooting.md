@@ -28,25 +28,28 @@ and [this](https://github.com/dstackai/dstack/issues/1551).
 
 ## Typical issues
 
-### No instance offers { #no-offers }
+### No offers { #no-offers }
 [//]: # (NOTE: This section is referenced in the CLI. Do not change its URL.)
 
 If you run `dstack apply` and don't see any instance offers, it means that
 `dstack` could not find instances that match the requirements in your configuration.
 Below are some of the reasons why this might happen.
 
-#### Cause 1: No capacity providers
+> Feel free to use `dstack offer` to view available offers.
 
-Before you can run any workloads, you need to configure a [backend](../concepts/backends.md),
-create an [SSH fleet](../concepts/fleets.md#ssh-fleets), or sign up for
-[dstack Sky](https://sky.dstack.ai).
-If you have configured a backend and still can't use it, check the output of `dstack server`
-for backend configuration errors.
+#### Cause 1: No fleets
 
-> **Tip**: You can find a list of successfully configured backends
-> on the [project settings page](../concepts/projects.md#backends) in the UI.
+Make sure you've created a [fleet](../concepts/fleets.md) before submitting any runs.
 
-#### Cause 2: Requirements mismatch
+#### Cause 2: No backends
+
+If you are not using [SSH fleets](../concepts/fleets.md#ssh-fleets), make sure you have configured at least one [backends](../concepts/backends.md).
+
+If you have configured a backend but still cannot use it, check the output of `dstack server` for backend configuration errors.
+
+> You can find a list of successfully configured backends on the [project settings page](../concepts/projects.md#backends) in the UI.
+
+#### Cause 3: Requirements mismatch
 
 When you apply a configuration, `dstack` tries to find instances that match the
 [`resources`](../reference/dstack.yml/task.md#resources),
@@ -63,7 +66,7 @@ Make sure your configuration doesn't set any conflicting requirements, such as
 `regions` that don't exist in the specified `backends`, or `instance_types` that
 don't match the specified `resources`.
 
-#### Cause 3: Too specific resources
+#### Cause 4: Too specific resources
 
 If you set a resource requirement to an exact value, `dstack` will only select instances
 that have exactly that amount of resources. For example, `cpu: 5` and `memory: 10GB` will only
@@ -73,14 +76,14 @@ Typically, you will want to set resource ranges to match more instances.
 For example, `cpu: 4..8` and `memory: 10GB..` will match instances with 4 to 8 CPUs
 and at least 10GB of memory.
 
-#### Cause 4: Default resources
+#### Cause 5: Default resources
 
 By default, `dstack` uses these resource requirements:
 `cpu: 2..`, `memory: 8GB..`, `disk: 100GB..`.
 If you want to use smaller instances, override the `cpu`, `memory`, or `disk`
 properties in your configuration.
 
-#### Cause 5: GPU requirements
+#### Cause 6: GPU requirements
 
 By default, `dstack` only selects instances with no GPUs or a single NVIDIA GPU.
 If you want to use non-NVIDIA GPUs or multi-GPU instances, set the `gpu` property
@@ -91,13 +94,13 @@ Examples: `gpu: amd` (one AMD GPU), `gpu: A10:4..8` (4 to 8 A10 GPUs),
 
 > If you don't specify the number of GPUs, `dstack` will only select single-GPU instances.
 
-#### Cause 6: Network volumes
+#### Cause 7: Network volumes
 
 If your run configuration uses [network volumes](../concepts/volumes.md#network-volumes),
 `dstack` will only select instances from the same backend and region as the volumes.
 For AWS, the availability zone of the volume and the instance should also match.
 
-#### Cause 7: Feature support
+#### Cause 8: Feature support
 
 Some `dstack` features are not supported by all backends. If your configuration uses
 one of these features, `dstack` will only select offers from the backends that support it.
@@ -113,7 +116,7 @@ one of these features, `dstack` will only select offers from the backends that s
 - [Reservations](../reference/dstack.yml/fleet.md#reservation)
   are only supported by the `aws` and `gcp` backends.
 
-#### Cause 8: dstack Sky balance
+#### Cause 9: dstack Sky balance
 
 If you are using
 [dstack Sky](https://sky.dstack.ai),

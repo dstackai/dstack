@@ -22,6 +22,21 @@ func (s *ShimServer) HealthcheckHandler(w http.ResponseWriter, r *http.Request) 
 	}, nil
 }
 
+func (s *ShimServer) ShutdownHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	var req ShutdownRequest
+	if err := api.DecodeJSONBody(w, r, &req, true); err != nil {
+		return nil, err
+	}
+
+	go func() {
+		if err := s.Shutdown(s.ctx, req.Force); err != nil {
+			log.Error(s.ctx, "Shutdown", "err", err)
+		}
+	}()
+
+	return nil, nil
+}
+
 func (s *ShimServer) InstanceHealthHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	ctx := r.Context()
 	response := InstanceHealthResponse{}
@@ -159,9 +174,11 @@ func (s *ShimServer) TaskMetricsHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *ShimServer) ComponentListHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	runnerStatus := s.runnerManager.GetInfo(r.Context())
 	response := &ComponentListResponse{
-		Components: []components.ComponentInfo{runnerStatus},
+		Components: []components.ComponentInfo{
+			s.runnerManager.GetInfo(r.Context()),
+			s.shimManager.GetInfo(r.Context()),
+		},
 	}
 	return response, nil
 }
@@ -176,27 +193,31 @@ func (s *ShimServer) ComponentInstallHandler(w http.ResponseWriter, r *http.Requ
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty name"}
 	}
 
+	var componentManager components.ComponentManager
 	switch components.ComponentName(req.Name) {
 	case components.ComponentNameRunner:
-		if req.URL == "" {
-			return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty url"}
-		}
-
-		// There is still a small chance of time-of-check race condition, but we ignore it.
-		runnerInfo := s.runnerManager.GetInfo(r.Context())
-		if runnerInfo.Status == components.ComponentStatusInstalling {
-			return nil, &api.Error{Status: http.StatusConflict, Msg: "already installing"}
-		}
-
-		s.bgJobsGroup.Go(func() {
-			if err := s.runnerManager.Install(s.bgJobsCtx, req.URL, true); err != nil {
-				log.Error(s.bgJobsCtx, "runner background install", "err", err)
-			}
-		})
-
+		componentManager = s.runnerManager
+	case components.ComponentNameShim:
+		componentManager = s.shimManager
 	default:
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "unknown component"}
 	}
+
+	if req.URL == "" {
+		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty url"}
+	}
+
+	// There is still a small chance of time-of-check race condition, but we ignore it.
+	componentInfo := componentManager.GetInfo(r.Context())
+	if componentInfo.Status == components.ComponentStatusInstalling {
+		return nil, &api.Error{Status: http.StatusConflict, Msg: "already installing"}
+	}
+
+	s.bgJobsGroup.Go(func() {
+		if err := componentManager.Install(s.bgJobsCtx, req.URL, true); err != nil {
+			log.Error(s.bgJobsCtx, "component background install", "name", componentInfo.Name, "err", err)
+		}
+	})
 
 	return nil, nil
 }

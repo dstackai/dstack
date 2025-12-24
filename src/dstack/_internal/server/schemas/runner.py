@@ -121,8 +121,13 @@ class InstanceHealthResponse(CoreModel):
     dcgm: Optional[DCGMHealthResponse] = None
 
 
+class ShutdownRequest(CoreModel):
+    force: bool
+
+
 class ComponentName(str, Enum):
     RUNNER = "dstack-runner"
+    SHIM = "dstack-shim"
 
 
 class ComponentStatus(str, Enum):
@@ -133,7 +138,7 @@ class ComponentStatus(str, Enum):
 
 
 class ComponentInfo(CoreModel):
-    name: ComponentName
+    name: str  # Not using ComponentName enum for compatibility of newer shim with older server
     version: str
     status: ComponentStatus
 

@@ -100,6 +100,16 @@ hide:
             Set up AWS EFA clusters with optimized networking
         </p>
     </a>
+    <a href="/examples/clusters/lambda"
+       class="feature-cell sky">
+        <h3>
+            Lambda
+        </h3>
+
+        <p>
+            Set up Lambda clusters with optimized networking
+        </p>
+    </a>
     <a href="/examples/clusters/crusoe"
        class="feature-cell sky">
         <h3>

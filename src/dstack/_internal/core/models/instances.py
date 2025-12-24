@@ -15,6 +15,9 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import pretty_resources
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Gpu(CoreModel):
@@ -254,6 +257,70 @@ class InstanceStatus(str, Enum):
         return [cls.TERMINATING, cls.TERMINATED]
 
 
+class InstanceTerminationReason(str, Enum):
+    IDLE_TIMEOUT = "idle_timeout"
+    PROVISIONING_TIMEOUT = "provisioning_timeout"
+    ERROR = "error"
+    JOB_FINISHED = "job_finished"
+    UNREACHABLE = "unreachable"
+    NO_OFFERS = "no_offers"
+    MASTER_FAILED = "master_failed"
+    MAX_INSTANCES_LIMIT = "max_instances_limit"
+    NO_BALANCE = "no_balance"  # used in dstack Sky
+
+    @classmethod
+    def from_legacy_str(cls, v: str) -> "InstanceTerminationReason":
+        """
+        Convert legacy termination reason string to relevant termination reason enum.
+
+        dstack versions prior to 0.20.1 represented instance termination reasons as raw
+        strings. Such strings may still be stored in the database.
+        """
+
+        if v == "Idle timeout":
+            return cls.IDLE_TIMEOUT
+        if v in (
+            "Instance has not become running in time",
+            "Provisioning timeout expired",
+            "Proivisioning timeout expired",  # typo is intentional
+            "The proivisioning timeout expired",  # typo is intentional
+        ):
+            return cls.PROVISIONING_TIMEOUT
+        if v in (
+            "Unsupported private SSH key type",
+            "Failed to locate internal IP address on the given network",
+            "Specified internal IP not found among instance interfaces",
+            "Cannot split into blocks",
+            "Backend not available",
+            "Error while waiting for instance to become running",
+            "Empty profile, requirements or instance_configuration",
+            "Unable to locate the internal ip-address for the given network",
+            "Private SSH key is encrypted, password required",
+            "Cannot parse private key, key type is not supported",
+        ) or v.startswith("Error to parse profile, requirements or instance_configuration:"):
+            return cls.ERROR
+        if v in (
+            "All offers failed",
+            "No offers found",
+            "There were no offers found",
+            "Retry duration expired",
+            "The retry's duration expired",
+        ):
+            return cls.NO_OFFERS
+        if v == "Master instance failed to start":
+            return cls.MASTER_FAILED
+        if v == "Instance job finished":
+            return cls.JOB_FINISHED
+        if v == "Termination deadline":
+            return cls.UNREACHABLE
+        if v == "Fleet has too many instances":
+            return cls.MAX_INSTANCES_LIMIT
+        if v == "Low account balance":
+            return cls.NO_BALANCE
+        logger.warning("Unexpected instance termination reason string: %r", v)
+        return cls.ERROR
+
+
 class Instance(CoreModel):
     id: UUID
     project_name: str
@@ -268,7 +335,10 @@ class Instance(CoreModel):
     status: InstanceStatus
     unreachable: bool = False
     health_status: HealthStatus = HealthStatus.HEALTHY
+    # termination_reason stores InstanceTerminationReason.
+    # str allows adding new enum members without breaking compatibility with old clients.
     termination_reason: Optional[str] = None
+    termination_reason_message: Optional[str] = None
     created: datetime.datetime
     region: Optional[str] = None
     availability_zone: Optional[str] = None
