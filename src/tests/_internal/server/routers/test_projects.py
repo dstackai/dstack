@@ -453,7 +453,7 @@ class TestDeleteProject:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_cannot_delete_the_only_project(
+    async def test_deletes_the_only_project(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -466,9 +466,9 @@ class TestDeleteProject:
             headers=get_auth_headers(user.token),
             json={"projects_names": [project.name]},
         )
-        assert response.status_code == 400
+        assert response.status_code == 200
         await session.refresh(project)
-        assert not project.deleted
+        assert project.deleted
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
