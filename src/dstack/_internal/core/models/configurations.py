@@ -721,10 +721,12 @@ class ServiceConfigurationParamsConfig(CoreConfig):
 
 class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
     name: Annotated[
-        str,
-        Field(description="The name of the replica group"),
+        Optional[str],
+        Field(
+            description="The name of the replica group. If not provided, defaults to 'replica0', 'replica1', etc. based on position."
+        ),
     ]
-    replicas: Annotated[
+    count: Annotated[
         Range[int],
         Field(
             description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
@@ -733,7 +735,7 @@ class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
     ]
     scaling: Annotated[
         Optional[ScalingSpec],
-        Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
+        Field(description="The auto-scaling rules. Required if `count` is set to a range"),
     ] = None
     probes: Annotated[
         list[ProbeConfig],
@@ -749,8 +751,8 @@ class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
         Field(description="The resources requirements for replicas in this group"),
     ] = ResourcesSpec()
 
-    @validator("replicas")
-    def convert_replicas(cls, v: Range[int]) -> Range[int]:
+    @validator("count")
+    def convert_count(cls, v: Range[int]) -> Range[int]:
         if v.max is None:
             raise ValueError("The maximum number of replicas is required")
         if v.min is None:
@@ -773,11 +775,11 @@ class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
     @root_validator()
     def validate_scaling(cls, values):
         scaling = values.get("scaling")
-        replicas = values.get("replicas")
-        if replicas and replicas.min != replicas.max and not scaling:
-            raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
-        if replicas and replicas.min == replicas.max and scaling:
-            raise ValueError("To use `scaling`, `replicas` must be set to a range.")
+        count = values.get("count")
+        if count and count.min != count.max and not scaling:
+            raise ValueError("When you set `count` to a range, ensure to specify `scaling`.")
+        if count and count.min == count.max and scaling:
+            raise ValueError("To use `scaling`, `count` must be set to a range.")
         return values
 
     @validator("rate_limits")
@@ -902,7 +904,7 @@ class ServiceConfigurationParams(CoreModel):
         values["replicas"] = [
             ReplicaGroup(
                 name="default",
-                replicas=replica_count,
+                count=replica_count,
                 commands=values.get("commands", []),
                 resources=values.get("resources"),
                 scaling=values.get("scaling"),
@@ -945,6 +947,12 @@ class ServiceConfigurationParams(CoreModel):
         if isinstance(v, list):
             if not v:
                 raise ValueError("`replicas` cannot be an empty list")
+
+            # Assign default names to groups without names
+            for index, group in enumerate(v):
+                if group.name is None:
+                    group.name = f"replica{index}"
+
             # Check for duplicate names
             names = [group.name for group in v]
             if len(names) != len(set(names)):

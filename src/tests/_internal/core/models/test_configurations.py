@@ -21,15 +21,32 @@ class TestParseConfiguration:
                 conf["scaling"] = scaling
             return conf
 
-        assert parse_run_configuration(test_conf(1)).replicas == Range(min=1, max=1)
-        assert parse_run_configuration(test_conf("2")).replicas == Range(min=2, max=2)
-        assert parse_run_configuration(test_conf("3..3")).replicas == Range(min=3, max=3)
+        # assert parse_run_configuration(test_conf(1)).replicas == Range(min=1, max=1)
+        # assert parse_run_configuration(test_conf("2")).replicas == Range(min=2, max=2)
+        # assert parse_run_configuration(test_conf("3..3")).replicas == Range(min=3, max=3)
+
+        config = parse_run_configuration(test_conf(1))
+        assert len(config.replicas) == 1
+        assert config.replicas[0].name == "default"
+        assert config.replicas[0].count == Range(min=1, max=1)
+
+        config = parse_run_configuration(test_conf("2"))
+        assert len(config.replicas) == 1
+        assert config.replicas[0].name == "default"
+        assert config.replicas[0].count == Range(min=2, max=2)
+
+        config = parse_run_configuration(test_conf("3..3"))
+        assert len(config.replicas) == 1
+        assert config.replicas[0].name == "default"
+        assert config.replicas[0].count == Range(min=3, max=3)
+
         with pytest.raises(
             ConfigurationError,
-            match="When you set `replicas` to a range, ensure to specify `scaling`",
+            match="When you set `count` to a range, ensure to specify `scaling`",
         ):
             parse_run_configuration(test_conf("0..10"))
-        assert parse_run_configuration(
+
+        config = parse_run_configuration(
             test_conf(
                 "0..10",
                 {
@@ -37,10 +54,16 @@ class TestParseConfiguration:
                     "target": 10,
                 },
             )
-        ).replicas == Range(min=0, max=10)
+        )
+        assert len(config.replicas) == 1
+        assert config.replicas[0].name == "default"
+        assert config.replicas[0].count == Range(min=0, max=10)
+        assert config.replicas[0].scaling is not None
+        assert config.replicas[0].scaling.metric == "rps"
+
         with pytest.raises(
             ConfigurationError,
-            match="When you set `replicas` to a range, ensure to specify `scaling`",
+            match="When you set `count` to a range, ensure to specify `scaling`",
         ):
             parse_run_configuration(
                 test_conf(

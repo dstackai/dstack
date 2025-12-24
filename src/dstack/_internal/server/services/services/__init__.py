@@ -144,7 +144,7 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
         )
     # Check if any group has autoscaling (min != max)
     has_autoscaling = any(
-        group.replicas.min != group.replicas.max
+        group.count.min != group.count.max
         for group in (run_spec.configuration.replica_groups or [])
     )
     if has_autoscaling:
@@ -319,9 +319,9 @@ async def update_service_desired_replica_count(
             else {}
         )
         for group in replica_groups:
-            scaler = get_service_scaler(group.replicas, group.scaling)
+            scaler = get_service_scaler(group.count, group.scaling)
             group_desired = scaler.get_desired_count(
-                current_desired_count=prev_counts.get(group.name, group.replicas.min or 0),
+                current_desired_count=prev_counts.get(group.name, group.count.min or 0),
                 stats=stats,
                 last_scaled_at=last_scaled_at,
             )
@@ -333,7 +333,7 @@ async def update_service_desired_replica_count(
         # Todo Not required as single replica is normalized to replicas.
         if configuration.replica_groups:
             first_group = configuration.replica_groups[0]
-            scaler = get_service_scaler(count=first_group.replicas, scaling=first_group.scaling)
+            scaler = get_service_scaler(count=first_group.count, scaling=first_group.scaling)
             run_model.desired_replica_count = scaler.get_desired_count(
                 current_desired_count=run_model.desired_replica_count,
                 stats=stats,

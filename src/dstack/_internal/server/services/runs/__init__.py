@@ -524,7 +524,7 @@ async def submit_run(
                 if run_spec.merged_profile.schedule is not None:
                     group_initial_replicas = 0
                 else:
-                    group_initial_replicas = replica_group.replicas.min or 0
+                    group_initial_replicas = replica_group.count.min or 0
 
                 # Each replica in this group gets the same group-specific configuration
                 for group_replica_num in range(group_initial_replicas):

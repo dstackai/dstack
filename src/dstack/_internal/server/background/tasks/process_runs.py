@@ -198,7 +198,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
 
     if run.run_spec.configuration.type == "service":
         run_model.desired_replica_count = sum(
-            group.replicas.min or 0 for group in (run.run_spec.configuration.replica_groups or [])
+            group.count.min or 0 for group in (run.run_spec.configuration.replica_groups or [])
         )
         await update_service_desired_replica_count(
             session,
@@ -692,7 +692,7 @@ async def _handle_rolling_deployment_for_group(
         scale_run_replicas_for_group,
     )
 
-    group_desired = desired_replica_counts.get(group.name, group.replicas.min or 0)
+    group_desired = desired_replica_counts.get(group.name, group.count.min or 0)
 
     # Check if group has out-of-date replicas
     if not _has_out_of_date_replicas(run_model, group_filter=group.name):
