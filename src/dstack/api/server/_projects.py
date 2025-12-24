@@ -8,6 +8,7 @@ from dstack._internal.server.schemas.projects import (
     AddProjectMemberRequest,
     CreateProjectRequest,
     DeleteProjectsRequest,
+    ListProjectsRequest,
     MemberSetting,
     RemoveProjectMemberRequest,
     SetProjectMembersRequest,
@@ -16,8 +17,9 @@ from dstack.api.server._group import APIClientGroup
 
 
 class ProjectsAPIClient(APIClientGroup):
-    def list(self) -> List[Project]:
-        resp = self._request("/api/projects/list")
+    def list(self, include_not_joined: bool = True) -> List[Project]:
+        body = ListProjectsRequest(include_not_joined=include_not_joined)
+        resp = self._request("/api/projects/list", body=body.json())
         return parse_obj_as(List[Project.__response__], resp.json())
 
     def create(self, project_name: str, is_public: bool = False) -> Project:

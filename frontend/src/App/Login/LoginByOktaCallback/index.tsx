@@ -7,7 +7,7 @@ import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { useAppDispatch } from 'hooks';
 import { ROUTES } from 'routes';
-import { useOktaCallbackMutation } from 'services/auth';
+import { useGetNextRedirectMutation, useOktaCallbackMutation } from 'services/auth';
 
 import { AuthErrorMessage } from 'App/AuthErrorMessage';
 import { Loading } from 'App/Loading';
@@ -22,15 +22,27 @@ export const LoginByOktaCallback: React.FC = () => {
     const [isInvalidCode, setIsInvalidCode] = useState(false);
     const dispatch = useAppDispatch();
 
+    const [getNextRedirect] = useGetNextRedirectMutation();
     const [oktaCallback] = useOktaCallbackMutation();
 
     const checkCode = () => {
         if (code && state) {
-            oktaCallback({ code, state })
+            getNextRedirect({ code, state })
                 .unwrap()
-                .then(({ creds: { token } }) => {
-                    dispatch(setAuthData({ token }));
-                    navigate('/');
+                .then(({ redirect_url }) => {
+                    if (redirect_url) {
+                        window.location.href = redirect_url;
+                        return;
+                    }
+                    oktaCallback({ code, state })
+                        .unwrap()
+                        .then(({ creds: { token } }) => {
+                            dispatch(setAuthData({ token }));
+                            navigate('/');
+                        })
+                        .catch(() => {
+                            setIsInvalidCode(true);
+                        });
                 })
                 .catch(() => {
                     setIsInvalidCode(true);

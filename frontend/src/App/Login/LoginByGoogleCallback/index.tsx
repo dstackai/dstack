@@ -7,7 +7,7 @@ import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { useAppDispatch } from 'hooks';
 import { ROUTES } from 'routes';
-import { useGoogleCallbackMutation } from 'services/auth';
+import { useGetNextRedirectMutation, useGoogleCallbackMutation } from 'services/auth';
 
 import { AuthErrorMessage } from 'App/AuthErrorMessage';
 import { Loading } from 'App/Loading';
@@ -22,15 +22,27 @@ export const LoginByGoogleCallback: React.FC = () => {
     const [isInvalidCode, setIsInvalidCode] = useState(false);
     const dispatch = useAppDispatch();
 
+    const [getNextRedirect] = useGetNextRedirectMutation();
     const [googleCallback] = useGoogleCallbackMutation();
 
     const checkCode = () => {
         if (code && state) {
-            googleCallback({ code, state })
+            getNextRedirect({ code, state })
                 .unwrap()
-                .then(({ creds: { token } }) => {
-                    dispatch(setAuthData({ token }));
-                    navigate('/');
+                .then(({ redirect_url }) => {
+                    if (redirect_url) {
+                        window.location.href = redirect_url;
+                        return;
+                    }
+                    googleCallback({ code, state })
+                        .unwrap()
+                        .then(({ creds: { token } }) => {
+                            dispatch(setAuthData({ token }));
+                            navigate('/');
+                        })
+                        .catch(() => {
+                            setIsInvalidCode(true);
+                        });
                 })
                 .catch(() => {
                     setIsInvalidCode(true);

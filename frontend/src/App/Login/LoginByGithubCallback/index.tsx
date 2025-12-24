@@ -7,7 +7,7 @@ import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { useAppDispatch } from 'hooks';
 import { ROUTES } from 'routes';
-import { useGithubCallbackMutation } from 'services/auth';
+import { useGetNextRedirectMutation, useGithubCallbackMutation } from 'services/auth';
 import { useLazyGetProjectsQuery } from 'services/project';
 
 import { AuthErrorMessage } from 'App/AuthErrorMessage';
@@ -23,26 +23,35 @@ export const LoginByGithubCallback: React.FC = () => {
     const [isInvalidCode, setIsInvalidCode] = useState(false);
     const dispatch = useAppDispatch();
 
+    const [getNextRedirect] = useGetNextRedirectMutation();
     const [githubCallback] = useGithubCallbackMutation();
     const [getProjects] = useLazyGetProjectsQuery();
 
     const checkCode = () => {
         if (code && state) {
-            githubCallback({ code, state })
+            getNextRedirect({ code: code, state: state })
                 .unwrap()
-                .then(async ({ creds: { token } }) => {
-                    dispatch(setAuthData({ token }));
-
-                    if (process.env.UI_VERSION === 'sky') {
-                        const result = await getProjects().unwrap();
-
-                        if (result?.length === 0) {
-                            navigate(ROUTES.PROJECT.ADD);
-                            return;
-                        }
+                .then(async ({ redirect_url }) => {
+                    if (redirect_url) {
+                        window.location.href = redirect_url;
+                        return;
                     }
-
-                    navigate('/');
+                    githubCallback({ code, state })
+                        .unwrap()
+                        .then(async ({ creds: { token } }) => {
+                            dispatch(setAuthData({ token }));
+                            if (process.env.UI_VERSION === 'sky') {
+                                const result = await getProjects().unwrap();
+                                if (result?.length === 0) {
+                                    navigate(ROUTES.PROJECT.ADD);
+                                    return;
+                                }
+                            }
+                            navigate('/');
+                        })
+                        .catch(() => {
+                            setIsInvalidCode(true);
+                        });
                 })
                 .catch(() => {
                     setIsInvalidCode(true);
