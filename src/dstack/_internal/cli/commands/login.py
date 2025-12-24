@@ -82,7 +82,10 @@ class LoginCommand(BaseCommand):
     def _configure_projects(self, api_client: APIClient, user: UserWithCreds):
         projects = api_client.projects.list(include_not_joined=False)
         if len(projects) == 0:
-            console.print("No projects configured.")
+            console.print(
+                "No projects configured."
+                " Create your own project via the UI or contact a project manager to add you to the project."
+            )
             return
         config_manager = ConfigManager()
         default_project = config_manager.get_project_config()

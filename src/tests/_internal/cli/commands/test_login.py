@@ -36,11 +36,11 @@ class TestLogin:
             )
 
         assert exit_code == 0
-        assert capsys.readouterr().out == (
-            "Your browser has been opened to log in with \x1b[1;38;5;78mGithub\x1b[0m:\n\n"
-            "http://auth_url\n\n"
-            "Logged in as \x1b[1;38;5;78mme\x1b[0m.\n"
-            "No projects configured.\n"
+        assert capsys.readouterr().out.replace("\n", "") == (
+            "Your browser has been opened to log in with Github:"
+            "http://auth_url"
+            "Logged in as me."
+            "No projects configured. Create your own project via the UI or contact a project manager to add you to the project."
         )
 
     def test_login_configures_projects(self, capsys: CaptureFixture, tmp_path: Path):
@@ -94,10 +94,10 @@ class TestLogin:
             ConfigManagerMock.return_value.save.assert_called()
 
         assert exit_code == 0
-        assert capsys.readouterr().out == (
-            "Your browser has been opened to log in with \x1b[1;38;5;78mGithub\x1b[0m:\n\n"
-            "http://auth_url\n\n"
-            "Logged in as \x1b[1;38;5;78mme\x1b[0m.\n"
-            "Configured projects: \x1b[1;38;5;78mproject1\x1b[0m, \x1b[1;38;5;78mproject2\x1b[0m.\n"
-            "Set project \x1b[1;38;5;78mproject1\x1b[0m as default project.\n"
+        assert capsys.readouterr().out.replace("\n", "") == (
+            "Your browser has been opened to log in with Github:"
+            "http://auth_url"
+            "Logged in as me."
+            "Configured projects: project1, project2."
+            "Set project project1 as default project."
         )
