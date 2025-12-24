@@ -563,6 +563,11 @@
   },
 
   "fleets": {
+    "no_alert": {
+      "title": "No fleets",
+      "description": "Please, create a fleet",
+      "button_title": "Create a fleet"
+    },
     "fleet": "Fleet",
     "fleet_placeholder": "Filtering by fleet",
     "fleet_name": "Fleet name",

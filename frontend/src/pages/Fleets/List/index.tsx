@@ -1,12 +1,14 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { ButtonProps } from '@cloudscape-design/components/button';
 
-import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
+import { Alert, Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
+import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';
-import { useLazyGetFleetsQuery } from 'services/fleet';
+import { useGetFleetsQuery, useLazyGetFleetsQuery } from 'services/fleet';
 
 import { useColumnsDefinitions, useEmptyMessages, useFilters } from './hooks';
 import { useDeleteFleet } from './useDeleteFleet';
@@ -34,6 +36,8 @@ export const FleetList: React.FC = () => {
         onChangeOnlyActive,
         isDisabledClearFilter,
     } = useFilters();
+
+    const { data: fleetsData, isLoading: isLoadingFleets } = useGetFleetsQuery({ limit: 1 });
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IFleet, TFleetListRequestParams>({
         useLazyQuery: useLazyGetFleetsQuery,
@@ -67,6 +71,13 @@ export const FleetList: React.FC = () => {
         deleteFleets([...selectedItems]).catch(console.log);
     };
 
+    const noFleets = !isLoadingFleets && !fleetsData?.length;
+
+    const onCreateAFleet: ButtonProps['onClick'] = (event) => {
+        event.preventDefault();
+        goToUrl('https://dstack.ai/docs/quickstart/#create-a-fleet', true);
+    };
+
     return (
         <Table
             {...collectionProps}
@@ -78,25 +89,43 @@ export const FleetList: React.FC = () => {
             stickyHeader={true}
             selectionType="multi"
             header={
-                <Header
-                    variant="awsui-h1-sticky"
-                    actions={
-                        <SpaceBetween size="xs" direction="horizontal">
-                            <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
-                                {t('common.delete')}
-                            </Button>
+                <>
+                    {noFleets && (
+                        <div className={styles.alertBox}>
+                            <Alert
+                                header={t('fleets.no_alert.title')}
+                                type="info"
+                                action={
+                                    <Button iconName="external" formAction="none" onClick={onCreateAFleet}>
+                                        {t('fleets.no_alert.button_title')}
+                                    </Button>
+                                }
+                            >
+                                {t('fleets.no_alert.description')}
+                            </Alert>
+                        </div>
+                    )}
 
-                            <Button
-                                iconName="refresh"
-                                disabled={isLoading}
-                                ariaLabel={t('common.refresh')}
-                                onClick={refreshList}
-                            />
-                        </SpaceBetween>
-                    }
-                >
-                    {t('navigation.fleets')}
-                </Header>
+                    <Header
+                        variant="awsui-h1-sticky"
+                        actions={
+                            <SpaceBetween size="xs" direction="horizontal">
+                                <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
+                                    {t('common.delete')}
+                                </Button>
+
+                                <Button
+                                    iconName="refresh"
+                                    disabled={isLoading}
+                                    ariaLabel={t('common.refresh')}
+                                    onClick={refreshList}
+                                />
+                            </SpaceBetween>
+                        }
+                    >
+                        {t('navigation.fleets')}
+                    </Header>
+                </>
             }
             filter={
                 <div className={styles.filters}>

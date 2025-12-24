@@ -69,4 +69,4 @@ export const fleetApi = createApi({
     }),
 });
 
-export const { useLazyGetFleetsQuery, useDeleteFleetMutation, useGetFleetDetailsQuery } = fleetApi;
+export const { useGetFleetsQuery, useLazyGetFleetsQuery, useDeleteFleetMutation, useGetFleetDetailsQuery } = fleetApi;
