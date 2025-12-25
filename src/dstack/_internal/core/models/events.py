@@ -54,7 +54,7 @@ class EventTarget(CoreModel):
                 " or `null` for target types not bound to a project (e.g., users)"
             )
         ),
-    ] = None  # default for client compatibility with older servers that don't return this field
+    ] = None  # default for client compatibility with pre-0.20.1 servers
     id: Annotated[uuid.UUID, Field(description="ID of the target entity")]
     name: Annotated[str, Field(description="Name of the target entity")]
 
@@ -89,7 +89,7 @@ class Event(CoreModel):
                 " or `null` if the action was performed by the system"
             )
         ),
-    ] = None  # default for client compatibility with older servers that don't return this field
+    ] = None  # default for client compatibility with pre-0.20.1 servers
     targets: Annotated[
         list[EventTarget], Field(description="List of entities affected by the event")
     ]
