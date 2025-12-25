@@ -944,50 +944,28 @@ def get_docker_commands(
     dstack_runner_binary_path = get_dstack_runner_binary_path(bin_path)
     authorized_keys_content = "\n".join(authorized_keys).strip()
     commands = [
-        # save and unset ld.so variables
-        "_LD_LIBRARY_PATH=${LD_LIBRARY_PATH-} && unset LD_LIBRARY_PATH",
-        "_LD_PRELOAD=${LD_PRELOAD-} && unset LD_PRELOAD",
+        "( :",
+        # See https://github.com/dstackai/dstack/issues/1769
+        "unset LD_LIBRARY_PATH && unset LD_PRELOAD",
         # common functions
-        '_exists() { command -v "$1" > /dev/null 2>&1; }',
+        'exists() { command -v "$1" > /dev/null 2>&1; }',
         # TODO(#1535): support non-root images properly
         "mkdir -p /root && chown root:root /root && export HOME=/root",
         # package manager detection/abstraction
-        "_install() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }",
-        'if _exists apt-get; then _install() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi',
-        'if _exists yum; then _install() { yum install -y "$1"; }; fi',
-        'if _exists apk; then _install() { apk add -U "$1"; }; fi',
+        "install_pkg() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }",
+        'if exists apt-get; then install_pkg() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi',
+        'if exists yum; then install_pkg() { yum install -y "$1"; }; fi',
+        'if exists apk; then install_pkg() { apk add -U "$1"; }; fi',
         # check in sshd is here, install if not
-        "if ! _exists sshd; then _install openssh-server; fi",
+        "if ! exists sshd; then install_pkg openssh-server; fi",
         # install curl if necessary
-        "if ! _exists curl; then _install curl; fi",
+        "if ! exists curl; then install_pkg curl; fi",
         # create ssh dirs and add public key
         "mkdir -p ~/.ssh",
         "chmod 700 ~/.ssh",
         f"echo '{authorized_keys_content}' > ~/.ssh/authorized_keys",
         "chmod 600 ~/.ssh/authorized_keys",
-        # regenerate host keys
-        "rm -rf /etc/ssh/ssh_host_*",
-        "ssh-keygen -A > /dev/null",
-        # Ensure that PRIVSEP_PATH 1) exists 2) empty 3) owned by root,
-        # see https://github.com/dstackai/dstack/issues/1999
-        # /run/sshd is used in Debian-based distros, including Ubuntu:
-        # https://salsa.debian.org/ssh-team/openssh/-/blob/debian/1%259.7p1-7/debian/rules#L60
-        # /var/empty is the default path if not configured via ./configure --with-privsep-path=...
-        "rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
-        "rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
-        # start sshd
-        (
-            "/usr/sbin/sshd"
-            f" -p {DSTACK_RUNNER_SSH_PORT}"
-            " -o PidFile=none"
-            " -o PasswordAuthentication=no"
-            " -o AllowTcpForwarding=yes"
-            " -o ClientAliveInterval=30"
-            " -o ClientAliveCountMax=4"
-        ),
-        # restore ld.so variables
-        'if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi',
-        'if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi',
+        ": )",
     ]
 
     url = get_dstack_runner_download_url()

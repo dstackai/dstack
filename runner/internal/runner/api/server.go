@@ -5,9 +5,6 @@ import (
 	"errors"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/dstackai/dstack/runner/internal/api"
@@ -82,9 +79,6 @@ func NewServer(ctx context.Context, tempDir string, homeDir string, address stri
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	signals := []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT}
-	signalCh := make(chan os.Signal, 1)
-
 	go func() {
 		if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Error(ctx, "Server failed", "err", err)
@@ -97,20 +91,21 @@ func (s *Server) Run(ctx context.Context) error {
 	case <-time.After(s.submitWaitDuration):
 		log.Error(ctx, "Job didn't start in time, shutting down")
 		return errors.New("no job submitted")
+	case <-ctx.Done():
+		log.Error(ctx, "Received interrupt signal, shutting down")
+		return ctx.Err()
 	}
 
 	// todo timeout on code and run
 
-	signal.Notify(signalCh, signals...)
 	select {
-	case <-signalCh:
-		log.Error(ctx, "Received interrupt signal, shutting down")
-		s.stop()
 	case <-s.jobBarrierCh:
 		log.Info(ctx, "Job finished, shutting down")
+	case <-ctx.Done():
+		log.Error(ctx, "Received interrupt signal, shutting down")
+		s.stop()
 	}
 	close(s.shutdownCh)
-	signal.Reset(signals...)
 
 	logsToWait := []struct {
 		ch   <-chan interface{}

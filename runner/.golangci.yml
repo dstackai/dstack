@@ -155,7 +155,7 @@ linters:
       # To specify a set of rules to explicitly exclude.
       # Available rules: https://github.com/securego/gosec#available-rules
       excludes:
-        - G204
+        - G306 # Poor file permissions used when writing to a new file
       # To specify the configuration of rules.
       # The configuration of rules is not fully documented by gosec:
       # https://github.com/securego/gosec#configuration
