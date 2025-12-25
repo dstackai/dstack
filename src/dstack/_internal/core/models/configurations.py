@@ -854,15 +854,6 @@ class ServiceConfigurationParams(CoreModel):
             return OpenAIChatModel(type="chat", name=v, format="openai")
         return v
 
-    @validator("gateway")
-    def validate_gateway(
-        cls, v: Optional[Union[bool, str]]
-    ) -> Optional[Union[Literal[False], str]]:
-        if v == True:
-            raise ValueError(
-                "The `gateway` property must be a string or boolean `false`, not boolean `true`"
-            )
-
     @validator("replicas")
     def convert_replicas(cls, v: Range[int]) -> Range[int]:
         if isinstance(v, Range):
@@ -875,29 +866,6 @@ class ServiceConfigurationParams(CoreModel):
                     "The minimum number of replicas must be greater than or equal to 0"
                 )
         return v
-
-    @root_validator()
-    def normalize_replicas(cls, values):
-        replicas = values.get("replicas")
-        if isinstance(replicas, list) and len(replicas) > 0:
-            if all(isinstance(item, ReplicaGroup) for item in replicas):
-                return values
-
-        old_replicas = values.get("replicas")
-        if isinstance(old_replicas, Range):
-            replica_count = old_replicas
-        else:
-            replica_count = Range[int](min=1, max=1)
-        values["replicas"] = [
-            ReplicaGroup(
-                name="default",
-                count=replica_count,
-                commands=values.get("commands", []),
-                resources=values.get("resources"),
-                scaling=values.get("scaling"),
-            )
-        ]
-        return values
 
     @validator("rate_limits")
     def validate_rate_limits(cls, v: list[RateLimit]) -> list[RateLimit]:
@@ -977,9 +945,27 @@ class ServiceConfiguration(
         Use this property for type-safe access in code.
         """
         if self.replicas is None:
-            return None
+            return [
+                ReplicaGroup(
+                    name="default",
+                    count=Range[int](min=1, max=1),
+                    commands=self.commands or [],
+                    resources=self.resources,
+                    scaling=self.scaling,
+                )
+            ]
         if isinstance(self.replicas, list):
             return self.replicas
+        if isinstance(self.replicas, Range):
+            return [
+                ReplicaGroup(
+                    name="default",
+                    count=self.replicas,
+                    commands=self.commands or [],
+                    resources=self.resources,
+                    scaling=self.scaling,
+                )
+            ]
         return None
 
 
