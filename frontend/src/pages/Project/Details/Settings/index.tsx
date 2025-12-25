@@ -3,11 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { debounce } from 'lodash';
 import { ExpandableSection, Tabs } from '@cloudscape-design/components';
-import { ButtonProps } from '@cloudscape-design/components/button';
 import Wizard from '@cloudscape-design/components/wizard';
 
 import {
-    Alert,
     Box,
     Button,
     ButtonWithConfirmation,
@@ -24,7 +22,7 @@ import {
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
-import { goToUrl, riseRouterException } from 'libs';
+import { riseRouterException } from 'libs';
 import { copyToClipboard } from 'libs';
 import { ROUTES } from 'routes';
 import { useGetProjectQuery, useUpdateProjectMembersMutation, useUpdateProjectMutation } from 'services/project';
@@ -37,7 +35,6 @@ import { useDeleteProject } from 'pages/Project/hooks/useDeleteProject';
 import { ProjectMembers } from 'pages/Project/Members';
 import { getProjectRoleByUserName } from 'pages/Project/utils';
 
-import { useCheckingForFleetsInProjects } from '../../../../hooks/useCheckingForFleetsInProjectsOfMember';
 import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
 import { GatewaysTable } from '../../Gateways';
@@ -62,10 +59,6 @@ export const ProjectSettings: React.FC = () => {
     const [updateProject] = useUpdateProjectMutation();
     const { deleteProject, isDeleting } = useDeleteProject();
     const { data: currentUser } = useGetUserDataQuery({});
-
-    const projectNames = useMemo(() => [paramProjectName], [paramProjectName]);
-
-    const projectHavingFleetMap = useCheckingForFleetsInProjects({ projectNames });
 
     const { data, isLoading, error } = useGetProjectQuery({ name: paramProjectName });
 
@@ -187,13 +180,6 @@ export const ProjectSettings: React.FC = () => {
 
     const [activeStepIndex, setActiveStepIndex] = React.useState(0);
 
-    const projectDontHasFleet = !projectHavingFleetMap?.[paramProjectName];
-
-    const onCreateAFleet: ButtonProps['onClick'] = (event) => {
-        event.preventDefault();
-        goToUrl('https://dstack.ai/docs/quickstart/#create-a-fleet', true);
-    };
-
     if (isLoadingPage)
         return (
             <Container>
@@ -205,22 +191,6 @@ export const ProjectSettings: React.FC = () => {
         <>
             {data && backendsData && gatewaysData && (
                 <SpaceBetween size="l">
-                    {projectDontHasFleet && (
-                        <div className={styles.alertBox}>
-                            <Alert
-                                header={t('fleets.no_alert.title')}
-                                type="info"
-                                action={
-                                    <Button iconName="external" formAction="none" onClick={onCreateAFleet}>
-                                        {t('fleets.no_alert.button_title')}
-                                    </Button>
-                                }
-                            >
-                                The project <code>{paramProjectName}</code> has no fleets. Create one before submitting a run.
-                            </Alert>
-                        </div>
-                    )}
-
                     {isProjectMember && (
                         <ExpandableSection
                             variant="container"
