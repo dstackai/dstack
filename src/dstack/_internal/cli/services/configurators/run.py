@@ -106,7 +106,12 @@ class BaseRunConfigurator(
                 ssh_identity_file=configurator_args.ssh_identity_file,
             )
 
-        print_run_plan(run_plan, max_offers=configurator_args.max_offers)
+        no_fleets = False
+        if len(run_plan.job_plans[0].offers) == 0:
+            if len(self.api.client.fleets.list(self.api.project)) == 0:
+                no_fleets = True
+
+        print_run_plan(run_plan, max_offers=configurator_args.max_offers, no_fleets=no_fleets)
 
         confirm_message = "Submit a new run?"
         if conf.name:

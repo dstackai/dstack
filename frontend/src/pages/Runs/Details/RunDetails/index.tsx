@@ -63,6 +63,8 @@ export const RunDetails = () => {
 
     const finishedAt = getRunListFinishedAt(runData);
 
+    const statusMessage = getRunStatusMessage(runData);
+
     return (
         <>
             <Container header={<Header variant="h2">{t('common.general')}</Header>}>
@@ -113,9 +115,9 @@ export const RunDetails = () => {
                         <div>
                             <StatusIndicator
                                 type={getStatusIconType(status, terminationReason)}
-                                colorOverride={getStatusIconColor(status, terminationReason)}
+                                colorOverride={getStatusIconColor(status, terminationReason, statusMessage)}
                             >
-                                {getRunStatusMessage(runData)}
+                                {statusMessage}
                             </StatusIndicator>
                         </div>
                     </div>

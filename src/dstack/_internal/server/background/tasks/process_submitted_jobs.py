@@ -349,6 +349,7 @@ async def _process_submitted_job(
                 job_model.termination_reason = (
                     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
                 )
+                # Note: `_get_job_status_message` relies on the "No fleet found" substring to return "no fleets"
                 job_model.termination_reason_message = (
                     "No fleet found. Create it before submitting a run: "
                     "https://dstack.ai/docs/concepts/fleets"
