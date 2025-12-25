@@ -68,11 +68,13 @@ class TestListEventsGeneral:
                 "recorded_at": "2026-01-01T12:00:01+00:00",
                 "actor_user_id": None,
                 "actor_user": None,
+                "is_actor_user_deleted": None,
                 "targets": [
                     {
                         "type": "project",
                         "project_id": str(project.id),
                         "project_name": "test_project",
+                        "is_project_deleted": False,
                         "id": str(project.id),
                         "name": "test_project",
                     },
@@ -84,11 +86,13 @@ class TestListEventsGeneral:
                 "recorded_at": "2026-01-01T12:00:00+00:00",
                 "actor_user_id": str(user.id),
                 "actor_user": "test_user",
+                "is_actor_user_deleted": False,
                 "targets": [
                     {
                         "type": "project",
                         "project_id": str(project.id),
                         "project_name": "test_project",
+                        "is_project_deleted": False,
                         "id": str(project.id),
                         "name": "test_project",
                     },
@@ -96,12 +100,46 @@ class TestListEventsGeneral:
                         "type": "user",
                         "project_id": None,
                         "project_name": None,
+                        "is_project_deleted": None,
                         "id": str(user.id),
                         "name": "test_user",
                     },
                 ],
             },
         ]
+
+    async def test_deleted_actor_and_project(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session, name="test_user")
+        project = await create_project(session=session, owner=user, name="test_project")
+        events.emit(
+            session,
+            "Project deleted",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(project)],
+        )
+        user.original_name = user.name
+        user.name = "_deleted_user_placeholder"
+        user.deleted = True
+        project.original_name = project.name
+        project.name = "_deleted_project_placeholder"
+        project.deleted = True
+        await session.commit()
+        other_user = await create_user(session=session, name="other_user")
+
+        resp = await client.post(
+            "/api/events/list", headers=get_auth_headers(other_user.token), json={}
+        )
+        resp.raise_for_status()
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["actor_user_id"] == str(user.id)
+        assert resp.json()[0]["actor_user"] == "test_user"
+        assert resp.json()[0]["is_actor_user_deleted"] == True
+        assert len(resp.json()[0]["targets"]) == 1
+        assert resp.json()[0]["targets"][0]["project_id"] == str(project.id)
+        assert resp.json()[0]["targets"][0]["project_name"] == "test_project"
+        assert resp.json()[0]["targets"][0]["is_project_deleted"] == True
 
     async def test_empty_response_when_no_events(
         self, session: AsyncSession, client: AsyncClient
