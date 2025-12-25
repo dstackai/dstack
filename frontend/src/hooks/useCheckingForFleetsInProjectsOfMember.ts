@@ -34,6 +34,7 @@ export const useCheckingForFleetsInProjects = ({ projectNames }: Args) => {
                     getFleets({
                         limit: 1,
                         project_name: projectName,
+                        only_active: true,
                     })
                         .unwrap()
                         .then((data) => (map[projectName] = Boolean(data.length))),
