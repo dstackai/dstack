@@ -396,7 +396,7 @@ class TestCheckShim:
         assert health_check.response == health_response.json()
 
 
-@pytest.mark.usefixtures("disable_maybe_install_components")
+@pytest.mark.usefixtures("disable_maybe_install_components", "turn_off_keep_shim_tasks_setting")
 class TestRemoveDanglingTasks:
     @pytest.fixture
     def disable_maybe_install_components(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -404,6 +404,10 @@ class TestRemoveDanglingTasks:
             "dstack._internal.server.background.tasks.process_instances._maybe_install_components",
             Mock(return_value=None),
         )
+
+    @pytest.fixture
+    def turn_off_keep_shim_tasks_setting(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("dstack._internal.server.settings.SERVER_KEEP_SHIM_TASKS", False)
 
     @pytest.fixture
     def ssh_tunnel_mock(self) -> Generator[Mock, None, None]:
