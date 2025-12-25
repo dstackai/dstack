@@ -539,6 +539,9 @@ async def submit_run(
                     )
 
                     for job in jobs:
+                        assert replica_group.name is not None, (
+                            "ReplicaGroup name should be set by validator"
+                        )
                         job.job_spec.replica_group = replica_group.name
                         job_model = create_job_model_for_new_submission(
                             run_model=run_model,

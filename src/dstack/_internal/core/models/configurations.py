@@ -854,19 +854,6 @@ class ServiceConfigurationParams(CoreModel):
             return OpenAIChatModel(type="chat", name=v, format="openai")
         return v
 
-    @validator("replicas")
-    def convert_replicas(cls, v: Range[int]) -> Range[int]:
-        if isinstance(v, Range):
-            if v.max is None:
-                raise ValueError("The maximum number of replicas is required")
-            if v.min is None:
-                v.min = 0
-            if v.min < 0:
-                raise ValueError(
-                    "The minimum number of replicas must be greater than or equal to 0"
-                )
-        return v
-
     @validator("rate_limits")
     def validate_rate_limits(cls, v: list[RateLimit]) -> list[RateLimit]:
         counts = Counter(limit.prefix for limit in v)
@@ -895,6 +882,14 @@ class ServiceConfigurationParams(CoreModel):
         if v is None:
             return v
         if isinstance(v, Range):
+            if v.max is None:
+                raise ValueError("The maximum number of replicas is required")
+            if v.min is None:
+                v.min = 0
+            if v.min < 0:
+                raise ValueError(
+                    "The minimum number of replicas must be greater than or equal to 0"
+                )
             return v
 
         if isinstance(v, list):
@@ -915,6 +910,20 @@ class ServiceConfigurationParams(CoreModel):
                     "Each replica group must have a unique name."
                 )
         return v
+
+    @root_validator()
+    def validate_scaling(cls, values):
+        scaling = values.get("scaling")
+        replicas = values.get("replicas")
+
+        if isinstance(replicas, Range):
+            if replicas and replicas.min != replicas.max and not scaling:
+                raise ValueError(
+                    "When you set `replicas` to a range, ensure to specify `scaling`."
+                )
+            if replicas and replicas.min == replicas.max and scaling:
+                raise ValueError("To use `scaling`, `replicas` must be set to a range.")
+        return values
 
 
 class ServiceConfigurationConfig(

@@ -36,8 +36,12 @@ async def retry_run_replica_jobs(
     replica_group = None
 
     # Find matching replica group
-    if replica_group_name and base_run_spec.configuration.replicas:
-        for group in base_run_spec.configuration.replicas:
+    if (
+        replica_group_name
+        and base_run_spec.configuration.type == "service"
+        and base_run_spec.configuration.replica_groups
+    ):
+        for group in base_run_spec.configuration.replica_groups:
             if group.name == replica_group_name:
                 replica_group = group
                 break

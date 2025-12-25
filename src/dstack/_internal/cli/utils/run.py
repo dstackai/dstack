@@ -381,13 +381,16 @@ def get_runs_table(
         )
         merge_job_rows = len(run.jobs) == 1 and not show_deployment_num
 
-        # Replica Group Changes: Build mapping from replica group names to indices
         group_name_to_index: Dict[str, int] = {}
-        # Replica Group Changes: Check if replicas attribute exists (only available for ServiceConfiguration)
-        replicas = getattr(run.run_spec.configuration, "replicas", None)
-        if replicas:
-            for idx, group in enumerate(replicas):
-                group_name_to_index[group.name] = idx
+        if run.run_spec.configuration.type == "service" and hasattr(
+            run.run_spec.configuration, "replica_groups"
+        ):
+            replica_groups = run.run_spec.configuration.replica_groups
+            if replica_groups:
+                for idx, group in enumerate(replica_groups):
+                    # Use group name or default to "replica{idx}" if name is None
+                    group_name = group.name or f"replica{idx}"
+                    group_name_to_index[group_name] = idx
 
         run_row: Dict[Union[str, int], Any] = {
             "NAME": _format_run_name(run, show_deployment_num),

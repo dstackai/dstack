@@ -577,7 +577,7 @@ async def _update_jobs_to_new_deployment_in_place(
 
         if replicas:
             job_spec = JobSpec.__response__.parse_raw(job_models[0].job_spec_data)
-            replica_group_name = job_spec.replica_group or "default"
+            replica_group_name = job_spec.replica_group
 
             for group in replicas:
                 if group.name == replica_group_name:
