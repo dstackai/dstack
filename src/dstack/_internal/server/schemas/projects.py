@@ -10,6 +10,16 @@ class ListProjectsRequest(CoreModel):
     include_not_joined: Annotated[
         bool, Field(description="Include public projects where user is not a member")
     ] = True
+    only_no_fleets: Annotated[
+        bool,
+        Field(
+            description=(
+                "If true, returns only projects where the user is a member and that have no active fleets. "
+                "Active fleets are those with `deleted == False`. "
+                "Projects with deleted fleets (but no active fleets) are included."
+            )
+        ),
+    ] = False
 
 
 class CreateProjectRequest(CoreModel):
