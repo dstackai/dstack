@@ -1,15 +1,3 @@
-.alertBox {
-    margin-bottom: 12px;
-
-    :global {
-        & [class^="awsui_alert"] {
-            & [class^="awsui_action-slot"] {
-                display: flex;
-                align-items: center;
-            }
-        }
-    }
-}
 .filters {
     display: flex;
     flex-wrap: wrap;
