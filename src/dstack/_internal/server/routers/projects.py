@@ -23,7 +23,7 @@ from dstack._internal.server.security.permissions import (
     ProjectManagerOrSelfLeave,
     ProjectMemberOrPublicAccess,
 )
-from dstack._internal.server.services import projects
+from dstack._internal.server.services import fleets, projects
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -43,7 +43,10 @@ async def list_projects(
     user: UserModel = Depends(Authenticated()),
 ):
     """
-    Returns all projects visible to user sorted by descending `created_at`.
+    Returns projects visible to the user, sorted by ascending `created_at`.
+
+    Returns all accessible projects (member projects for regular users, all non-deleted
+    projects for global admins, plus public projects if `include_not_joined` is `True`).
 
     `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
     """
@@ -54,6 +57,25 @@ async def list_projects(
         await projects.list_user_accessible_projects(
             session=session, user=user, include_not_joined=body.include_not_joined
         )
+    )
+
+
+@router.post("/list_only_no_fleets", response_model=List[Project])
+async def list_only_no_fleets(
+    session: AsyncSession = Depends(get_session),
+    user: UserModel = Depends(Authenticated()),
+):
+    """
+    Returns only projects where the user is a member and that have no active fleets,
+    sorted by ascending `created_at`.
+
+    Active fleets are those with `deleted == False`. Projects with deleted fleets
+    (but no active fleets) are included.
+
+    `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
+    """
+    return CustomORJSONResponse(
+        await fleets.list_projects_with_no_active_fleets(session=session, user=user)
     )
 
 
