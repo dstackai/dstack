@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
 
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import console, resolve_url
 from dstack._internal.core.errors import ClientError, CLIError
 from dstack._internal.core.models.users import UserWithCreds
 from dstack.api._public.runs import ConfigManager
@@ -202,19 +202,13 @@ class _LoginServer:
 
 
 def _normalize_url_or_error(url: str) -> str:
-    if not url.startswith("http://") and not url.startswith("https://"):
-        url = "http://" + url
-    parsed = urllib.parse.urlparse(url)
-    if (
-        not parsed.scheme
-        or not parsed.hostname
-        or parsed.path not in ("", "/")
-        or parsed.params
-        or parsed.query
-        or parsed.fragment
-        or (parsed.port is not None and not (1 <= parsed.port <= 65535))
-    ):
-        raise CLIError("Invalid server URL format. Format: --url https://sky.dstack.ai")
+    try:
+        # Validate the URL and determine the URL scheme.
+        # Need to resolve the scheme before making first POST request
+        # since for some redirect codes (301), clients change POST to GET.
+        url = resolve_url(url)
+    except ValueError as e:
+        raise CLIError(e.args[0])
     return url
 
 
