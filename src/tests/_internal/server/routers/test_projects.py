@@ -36,6 +36,14 @@ class TestListProjects:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_list_only_no_fleets_returns_40x_if_not_authenticated(
+        self, test_db, client: AsyncClient
+    ):
+        response = await client.post("/api/projects/list_only_no_fleets")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_empty_list(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         response = await client.post("/api/projects/list", headers=get_auth_headers(user.token))
@@ -266,11 +274,10 @@ class TestListProjects:
         deleted_fleet.status = FleetStatus.TERMINATED
         await session.commit()
 
-        # Test with only_no_fleets=True
+        # Test with list_only_no_fleets endpoint
         response = await client.post(
-            "/api/projects/list",
+            "/api/projects/list_only_no_fleets",
             headers=get_auth_headers(user.token),
-            json={"only_no_fleets": True},
         )
         assert response.status_code == 200
         projects = response.json()
@@ -282,11 +289,10 @@ class TestListProjects:
         assert "project_with_deleted_fleet" in project_names
         assert "project_with_active_fleet" not in project_names
 
-        # Test with only_no_fleets=False (default)
+        # Test with regular list endpoint (default)
         response = await client.post(
             "/api/projects/list",
             headers=get_auth_headers(user.token),
-            json={"only_no_fleets": False},
         )
         assert response.status_code == 200
         projects = response.json()
@@ -333,9 +339,8 @@ class TestListProjects:
 
         # Project should NOT be included because it has an active fleet
         response = await client.post(
-            "/api/projects/list",
+            "/api/projects/list_only_no_fleets",
             headers=get_auth_headers(user.token),
-            json={"only_no_fleets": True},
         )
         assert response.status_code == 200
         projects = response.json()
@@ -369,9 +374,8 @@ class TestListProjects:
 
         # Should return empty list
         response = await client.post(
-            "/api/projects/list",
+            "/api/projects/list_only_no_fleets",
             headers=get_auth_headers(user.token),
-            json={"only_no_fleets": True},
         )
         assert response.status_code == 200
         projects = response.json()
@@ -426,11 +430,10 @@ class TestListProjects:
             session=session, project=private_project, user=owner, project_role=ProjectRole.ADMIN
         )
 
-        # Test with only_no_fleets=True
+        # Test with list_only_no_fleets endpoint
         response = await client.post(
-            "/api/projects/list",
+            "/api/projects/list_only_no_fleets",
             headers=get_auth_headers(user.token),
-            json={"only_no_fleets": True},
         )
         assert response.status_code == 200
         projects = response.json()
@@ -523,11 +526,10 @@ class TestListProjects:
             deleted=False,
         )
 
-        # Test with only_no_fleets=True
+        # Test with list_only_no_fleets endpoint
         response = await client.post(
-            "/api/projects/list",
+            "/api/projects/list_only_no_fleets",
             headers=get_auth_headers(user.token),
-            json={"only_no_fleets": True},
         )
         assert response.status_code == 200
         projects = response.json()
@@ -589,9 +591,8 @@ class TestListProjects:
 
         # Both should be excluded
         response = await client.post(
-            "/api/projects/list",
+            "/api/projects/list_only_no_fleets",
             headers=get_auth_headers(user.token),
-            json={"only_no_fleets": True},
         )
         assert response.status_code == 200
         projects = response.json()
@@ -640,9 +641,8 @@ class TestListProjects:
 
         # Results should be sorted by created_at ascending
         response = await client.post(
-            "/api/projects/list",
+            "/api/projects/list_only_no_fleets",
             headers=get_auth_headers(user.token),
-            json={"only_no_fleets": True},
         )
         assert response.status_code == 200
         projects = response.json()
@@ -691,11 +691,10 @@ class TestListProjects:
             project_role=ProjectRole.ADMIN,
         )
 
-        # Test with only_no_fleets=True
+        # Test with list_only_no_fleets endpoint
         response = await client.post(
-            "/api/projects/list",
+            "/api/projects/list_only_no_fleets",
             headers=get_auth_headers(admin.token),
-            json={"only_no_fleets": True},
         )
         assert response.status_code == 200
         projects = response.json()
