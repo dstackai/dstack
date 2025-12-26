@@ -261,7 +261,7 @@ class TestGetRunsTable:
                 JobStatus.FAILED,
                 JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
                 None,
-                "No matching fleet found. Possible reasons: https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
+                "No matching fleet found. Possible reasons: https://dstack.ai/docs/guides/troubleshooting/#no-fleets",
                 "no fleets",
                 "indian_red1",
             ),
