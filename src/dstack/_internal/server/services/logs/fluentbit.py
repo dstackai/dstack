@@ -21,26 +21,133 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+# Check if elasticsearch is available (optional for ship-only mode)
+ELASTICSEARCH_AVAILABLE = True
+try:
+    from elasticsearch import Elasticsearch
+    from elasticsearch.exceptions import ApiError, TransportError
+except ImportError:
+    ELASTICSEARCH_AVAILABLE = False
+else:
+
+    # Catch both API errors and transport/connection errors
+    ElasticsearchError: tuple = (ApiError, TransportError)  # type: ignore[misc]
+
+    class ElasticsearchReader:
+        """Reads logs from Elasticsearch or OpenSearch."""
+
+        def __init__(
+            self,
+            host: str,
+            index: str,
+            api_key: Optional[str] = None,
+        ) -> None:
+            if api_key:
+                self._client = Elasticsearch(hosts=[host], api_key=api_key)
+            else:
+                self._client = Elasticsearch(hosts=[host])
+            self._index = index
+            # Verify connection
+            try:
+                self._client.info()
+            except ElasticsearchError as e:
+                raise LogStorageError(
+                    f"Failed to connect to Elasticsearch/OpenSearch: {e}"
+                ) from e
+
+        def read(
+            self,
+            stream_name: str,
+            request: PollLogsRequest,
+        ) -> JobSubmissionLogs:
+            sort_order = "desc" if request.descending else "asc"
+
+            query: dict = {
+                "bool": {
+                    "must": [
+                        {"term": {"stream.keyword": stream_name}},
+                    ]
+                }
+            }
+
+            if request.start_time:
+                query["bool"].setdefault("filter", []).append(
+                    {"range": {"@timestamp": {"gt": request.start_time.isoformat()}}}
+                )
+            if request.end_time:
+                query["bool"].setdefault("filter", []).append(
+                    {"range": {"@timestamp": {"lt": request.end_time.isoformat()}}}
+                )
+
+            search_params: dict = {
+                "index": self._index,
+                "query": query,
+                "sort": [{"@timestamp": {"order": sort_order}}],
+                "size": request.limit,
+            }
+
+            if request.next_token:
+                search_params["search_after"] = [request.next_token]
+
+            try:
+                response = self._client.search(**search_params)
+            except ElasticsearchError as e:
+                logger.error("Elasticsearch/OpenSearch search error: %s", e)
+                raise LogStorageError(f"Elasticsearch/OpenSearch error: {e}") from e
+
+            hits = response.get("hits", {}).get("hits", [])
+            logs = []
+            last_sort_value = None
+
+            for hit in hits:
+                source = hit.get("_source", {})
+                timestamp_str = source.get("@timestamp")
+                message = source.get("message", "")
+
+                if timestamp_str:
+                    from datetime import datetime
+
+                    try:
+                        timestamp = datetime.fromisoformat(
+                            timestamp_str.replace("Z", "+00:00")
+                        )
+                    except ValueError:
+                        continue
+                else:
+                    continue
+
+                logs.append(
+                    LogEvent(
+                        timestamp=timestamp,
+                        log_source=LogEventSource.STDOUT,
+                        message=message,
+                    )
+                )
+
+                sort_values = hit.get("sort")
+                if sort_values:
+                    last_sort_value = sort_values[0]
+
+            next_token = None
+            if len(logs) == request.limit and last_sort_value is not None:
+                next_token = str(last_sort_value)
+
+            return JobSubmissionLogs(
+                logs=logs,
+                next_token=next_token,
+            )
+
+        def close(self) -> None:
+            self._client.close()
+
+
 FLUENTBIT_AVAILABLE = True
 try:
     import httpx
     from fluent import sender as fluent_sender
 except ImportError:
     FLUENTBIT_AVAILABLE = False
-
-# Check if elasticsearch is available (optional for ship-only mode)
-ELASTICSEARCH_AVAILABLE = True
-try:
-    from elasticsearch import Elasticsearch
-    from elasticsearch.exceptions import ApiError, TransportError
-
-    # Catch both API errors and transport/connection errors
-    ElasticsearchError: tuple = (ApiError, TransportError)  # type: ignore[misc]
-except ImportError:
-    ELASTICSEARCH_AVAILABLE = False
-    ElasticsearchError = (Exception,)  # type: ignore[misc,assignment]
-
-if FLUENTBIT_AVAILABLE:
+else:
 
     @runtime_checkable
     class FluentBitWriter(Protocol):
@@ -119,115 +226,6 @@ if FLUENTBIT_AVAILABLE:
 
         def close(self) -> None:
             pass
-
-    if ELASTICSEARCH_AVAILABLE:
-
-        class ElasticsearchReader:
-            """Reads logs from Elasticsearch or OpenSearch."""
-
-            def __init__(
-                self,
-                host: str,
-                index: str,
-                api_key: Optional[str] = None,
-            ) -> None:
-                if api_key:
-                    self._client = Elasticsearch(hosts=[host], api_key=api_key)
-                else:
-                    self._client = Elasticsearch(hosts=[host])
-                self._index = index
-                # Verify connection
-                try:
-                    self._client.info()
-                except ElasticsearchError as e:
-                    raise LogStorageError(
-                        f"Failed to connect to Elasticsearch/OpenSearch: {e}"
-                    ) from e
-
-            def read(
-                self,
-                stream_name: str,
-                request: PollLogsRequest,
-            ) -> JobSubmissionLogs:
-                sort_order = "desc" if request.descending else "asc"
-
-                query: dict = {
-                    "bool": {
-                        "must": [
-                            {"term": {"stream.keyword": stream_name}},
-                        ]
-                    }
-                }
-
-                if request.start_time:
-                    query["bool"].setdefault("filter", []).append(
-                        {"range": {"@timestamp": {"gt": request.start_time.isoformat()}}}
-                    )
-                if request.end_time:
-                    query["bool"].setdefault("filter", []).append(
-                        {"range": {"@timestamp": {"lt": request.end_time.isoformat()}}}
-                    )
-
-                search_params: dict = {
-                    "index": self._index,
-                    "query": query,
-                    "sort": [{"@timestamp": {"order": sort_order}}],
-                    "size": request.limit,
-                }
-
-                if request.next_token:
-                    search_params["search_after"] = [request.next_token]
-
-                try:
-                    response = self._client.search(**search_params)
-                except ElasticsearchError as e:
-                    logger.error("Elasticsearch/OpenSearch search error: %s", e)
-                    raise LogStorageError(f"Elasticsearch/OpenSearch error: {e}") from e
-
-                hits = response.get("hits", {}).get("hits", [])
-                logs = []
-                last_sort_value = None
-
-                for hit in hits:
-                    source = hit.get("_source", {})
-                    timestamp_str = source.get("@timestamp")
-                    message = source.get("message", "")
-
-                    if timestamp_str:
-                        from datetime import datetime
-
-                        try:
-                            timestamp = datetime.fromisoformat(
-                                timestamp_str.replace("Z", "+00:00")
-                            )
-                        except ValueError:
-                            continue
-                    else:
-                        continue
-
-                    logs.append(
-                        LogEvent(
-                            timestamp=timestamp,
-                            log_source=LogEventSource.STDOUT,
-                            message=message,
-                        )
-                    )
-
-                    sort_values = hit.get("sort")
-                    if sort_values:
-                        last_sort_value = sort_values[0]
-
-                next_token = None
-                if len(logs) == request.limit and last_sort_value is not None:
-                    next_token = str(last_sort_value)
-
-                return JobSubmissionLogs(
-                    logs=logs,
-                    next_token=next_token,
-                )
-
-            def close(self) -> None:
-                self._client.close()
 
     class FluentBitLogStorage(LogStorage):
         """
