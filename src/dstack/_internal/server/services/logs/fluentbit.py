@@ -1,4 +1,4 @@
-from typing import List, Optional, Protocol, runtime_checkable
+from typing import List, Optional, Protocol
 from uuid import UUID
 
 from dstack._internal.core.models.logs import (
@@ -21,7 +21,6 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-# Check if elasticsearch is available (optional for ship-only mode)
 ELASTICSEARCH_AVAILABLE = True
 try:
     from elasticsearch import Elasticsearch
@@ -29,8 +28,6 @@ try:
 except ImportError:
     ELASTICSEARCH_AVAILABLE = False
 else:
-
-    # Catch both API errors and transport/connection errors
     ElasticsearchError: tuple = (ApiError, TransportError)  # type: ignore[misc]
 
     class ElasticsearchReader:
@@ -51,9 +48,7 @@ else:
             try:
                 self._client.info()
             except ElasticsearchError as e:
-                raise LogStorageError(
-                    f"Failed to connect to Elasticsearch/OpenSearch: {e}"
-                ) from e
+                raise LogStorageError(f"Failed to connect to Elasticsearch/OpenSearch: {e}") from e
 
         def read(
             self,
@@ -82,12 +77,16 @@ else:
             search_params: dict = {
                 "index": self._index,
                 "query": query,
-                "sort": [{"@timestamp": {"order": sort_order}}],
+                "sort": [
+                    {"@timestamp": {"order": sort_order}},
+                    {"_id": {"order": sort_order}},
+                ],
                 "size": request.limit,
             }
 
             if request.next_token:
-                search_params["search_after"] = [request.next_token]
+                parts = request.next_token.split(":", 1)
+                search_params["search_after"] = [parts[0], parts[1]]
 
             try:
                 response = self._client.search(**search_params)
@@ -97,7 +96,7 @@ else:
 
             hits = response.get("hits", {}).get("hits", [])
             logs = []
-            last_sort_value = None
+            last_sort_values = None
 
             for hit in hits:
                 source = hit.get("_source", {})
@@ -108,9 +107,7 @@ else:
                     from datetime import datetime
 
                     try:
-                        timestamp = datetime.fromisoformat(
-                            timestamp_str.replace("Z", "+00:00")
-                        )
+                        timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
                     except ValueError:
                         continue
                 else:
@@ -125,12 +122,12 @@ else:
                 )
 
                 sort_values = hit.get("sort")
-                if sort_values:
-                    last_sort_value = sort_values[0]
+                if sort_values and len(sort_values) >= 2:
+                    last_sort_values = sort_values
 
             next_token = None
-            if len(logs) == request.limit and last_sort_value is not None:
-                next_token = str(last_sort_value)
+            if len(logs) == request.limit and last_sort_values is not None:
+                next_token = f"{last_sort_values[0]}:{last_sort_values[1]}"
 
             return JobSubmissionLogs(
                 logs=logs,
@@ -149,29 +146,13 @@ except ImportError:
     FLUENTBIT_AVAILABLE = False
 else:
 
-    @runtime_checkable
     class FluentBitWriter(Protocol):
-        """Protocol for Fluent-bit log writers."""
+        def write(self, tag: str, records: List[dict]) -> None: ...
+        def close(self) -> None: ...
 
-        def write(self, tag: str, records: List[dict]) -> None:
-            """Write log records to Fluent-bit."""
-            ...
-
-        def close(self) -> None:
-            """Close any resources."""
-            ...
-
-    @runtime_checkable
     class LogReader(Protocol):
-        """Protocol for log readers (Interface Segregation Principle)."""
-
-        def read(self, stream_name: str, request: PollLogsRequest) -> JobSubmissionLogs:
-            """Read logs from the storage backend."""
-            ...
-
-        def close(self) -> None:
-            """Close any resources."""
-            ...
+        def read(self, stream_name: str, request: PollLogsRequest) -> JobSubmissionLogs: ...
+        def close(self) -> None: ...
 
     class HTTPFluentBitWriter:
         """Writes logs to Fluent-bit via HTTP POST."""
@@ -183,11 +164,21 @@ else:
         def write(self, tag: str, records: List[dict]) -> None:
             for record in records:
                 try:
-                    self._client.post(
+                    response = self._client.post(
                         f"{self._endpoint}/{tag}",
                         json=record,
                         headers={"Content-Type": "application/json"},
                     )
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    logger.error(
+                        "Fluent-bit HTTP request failed with status %d: %s",
+                        e.response.status_code,
+                        e.response.text,
+                    )
+                    raise LogStorageError(
+                        f"Fluent-bit HTTP error: status {e.response.status_code}"
+                    ) from e
                 except httpx.HTTPError as e:
                     logger.error("Failed to write log to Fluent-bit via HTTP: %s", e)
                     raise LogStorageError(f"Fluent-bit HTTP error: {e}") from e
@@ -257,7 +248,6 @@ else:
             else:
                 raise LogStorageError(f"Unsupported Fluent-bit protocol: {protocol}")
 
-            # Initialize reader based on configuration (Dependency Inversion Principle)
             self._reader: LogReader
             if es_host:
                 if not ELASTICSEARCH_AVAILABLE:

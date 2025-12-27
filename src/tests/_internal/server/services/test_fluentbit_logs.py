@@ -83,7 +83,33 @@ class TestHTTPFluentBitWriter:
             headers={"Content-Type": "application/json"},
         )
 
-    def test_write_raises_on_http_error(self, mock_httpx_client):
+    def test_write_calls_raise_for_status(self, mock_httpx_client):
+        """Test that response.raise_for_status() is called to detect non-2xx responses."""
+        mock_response = Mock()
+        mock_httpx_client.post.return_value = mock_response
+        writer = HTTPFluentBitWriter(host="localhost", port=8080)
+
+        writer.write(tag="test-tag", records=[{"message": "test"}])
+
+        mock_response.raise_for_status.assert_called_once()
+
+    def test_write_raises_on_http_status_error(self, mock_httpx_client):
+        """Test that 4xx/5xx responses are properly detected and raise LogStorageError."""
+        import httpx
+
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        mock_httpx_client.post.return_value = mock_response
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Server Error", request=Mock(), response=mock_response
+        )
+        writer = HTTPFluentBitWriter(host="localhost", port=8080)
+
+        with pytest.raises(LogStorageError, match="Fluent-bit HTTP error: status 500"):
+            writer.write(tag="test-tag", records=[{"message": "test"}])
+
+    def test_write_raises_on_transport_error(self, mock_httpx_client):
         import httpx
 
         mock_httpx_client.post.side_effect = httpx.HTTPError("Connection failed")
@@ -468,7 +494,7 @@ class TestElasticsearchReader:
                             "message": "Hello",
                             "stream": "test-stream",
                         },
-                        "sort": [1696586513234],
+                        "sort": [1696586513234, "doc1"],
                     },
                     {
                         "_source": {
@@ -476,7 +502,7 @@ class TestElasticsearchReader:
                             "message": "World",
                             "stream": "test-stream",
                         },
-                        "sort": [1696586513235],
+                        "sort": [1696586513235, "doc2"],
                     },
                 ]
             }
@@ -499,7 +525,7 @@ class TestElasticsearchReader:
             assert len(result.logs) == 2
             assert result.logs[0].message == "Hello"
             assert result.logs[1].message == "World"
-            assert result.next_token == "1696586513235"
+            assert result.next_token == "1696586513235:doc2"
 
     def test_read_with_time_filtering(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
@@ -540,7 +566,10 @@ class TestElasticsearchReader:
             reader.read("test-stream", request)
 
             call_args = mock_es_client.search.call_args
-            assert call_args.kwargs["sort"] == [{"@timestamp": {"order": "desc"}}]
+            assert call_args.kwargs["sort"] == [
+                {"@timestamp": {"order": "desc"}},
+                {"_id": {"order": "desc"}},
+            ]
 
     def test_read_with_next_token(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
@@ -553,13 +582,13 @@ class TestElasticsearchReader:
             request = PollLogsRequest(
                 run_name="test-run",
                 job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
-                next_token="1696586513234",
+                next_token="1696586513234:doc1",
                 limit=100,
             )
             reader.read("test-stream", request)
 
             call_args = mock_es_client.search.call_args
-            assert call_args.kwargs["search_after"] == ["1696586513234"]
+            assert call_args.kwargs["search_after"] == ["1696586513234", "doc1"]
 
     def test_close_closes_client(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
