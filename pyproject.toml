@@ -216,6 +216,12 @@ nebius = [
     "nebius>=0.3.4,<0.4; python_version >= '3.10'",
     "dstack[server]",
 ]
+fluentbit = [
+    "fluent-logger>=0.10.0",
+    "elasticsearch>=8.0.0",
+    "httpx",
+    "dstack[server]",
+]
 all = [
-    "dstack[gateway,server,aws,azure,gcp,verda,kubernetes,lambda,nebius,oci]",
+    "dstack[gateway,server,aws,azure,gcp,verda,kubernetes,lambda,nebius,oci,fluentbit]",
 ]
