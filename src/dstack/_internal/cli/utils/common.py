@@ -33,13 +33,13 @@ LIVE_TABLE_PROVISION_INTERVAL_SECS = 2
 NO_OFFERS_WARNING = (
     "[warning]"
     "No matching instance offers available. Possible reasons:"
-    " https://dstack.ai/docs/guides/troubleshooting/#no-offers"
+    " [link]https://dstack.ai/docs/guides/troubleshooting/#no-offers[/link]"
     "[/]\n"
 )
 NO_FLEETS_WARNING = (
-    "[warning]"
-    "The project has no fleets. Create one before submitting a run:"
-    " https://dstack.ai/docs/concepts/fleets"
+    "[error]"
+    "The project has no fleets. Create one before submitting a run.\n"
+    "See [link]https://dstack.ai/docs/guides/troubleshooting/#no-fleets[/link]"
     "[/]\n"
 )
 
