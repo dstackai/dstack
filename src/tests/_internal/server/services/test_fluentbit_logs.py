@@ -6,6 +6,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
@@ -589,6 +590,38 @@ class TestElasticsearchReader:
 
             call_args = mock_es_client.search.call_args
             assert call_args.kwargs["search_after"] == ["1696586513234", "doc1"]
+
+    def test_read_with_malformed_next_token_raises_client_error(self, mock_es_client):
+        """Test that malformed next_token raises ServerClientError (400) instead of IndexError (500)."""
+        with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:
+            mock.return_value = mock_es_client
+            reader = ElasticsearchReader(
+                host="http://localhost:9200",
+                index="dstack-logs",
+            )
+
+            request = PollLogsRequest(
+                run_name="test-run",
+                job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
+                next_token="invalid_token_no_colon",
+                limit=100,
+            )
+            with pytest.raises(ServerClientError, match="Invalid next_token"):
+                reader.read("test-stream", request)
+
+            request.next_token = ":"
+            with pytest.raises(ServerClientError, match="Invalid next_token"):
+                reader.read("test-stream", request)
+
+            request.next_token = ":doc1"
+            with pytest.raises(ServerClientError, match="Invalid next_token"):
+                reader.read("test-stream", request)
+
+            request.next_token = "1696586513234:"
+            with pytest.raises(ServerClientError, match="Invalid next_token"):
+                reader.read("test-stream", request)
+
+            mock_es_client.search.assert_not_called()
 
     def test_close_closes_client(self, mock_es_client):
         with patch("dstack._internal.server.services.logs.fluentbit.Elasticsearch") as mock:

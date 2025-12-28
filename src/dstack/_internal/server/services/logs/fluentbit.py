@@ -1,6 +1,7 @@
 from typing import List, Optional, Protocol
 from uuid import UUID
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.logs import (
     JobSubmissionLogs,
     LogEvent,
@@ -86,6 +87,11 @@ else:
 
             if request.next_token:
                 parts = request.next_token.split(":", 1)
+                if len(parts) != 2 or not parts[0] or not parts[1]:
+                    raise ServerClientError(
+                        f"Invalid next_token: {request.next_token}. "
+                        "Must be in format 'timestamp:document_id'."
+                    )
                 search_params["search_after"] = [parts[0], parts[1]]
 
             try:
