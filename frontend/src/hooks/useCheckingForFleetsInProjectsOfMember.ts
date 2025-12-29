@@ -1,17 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
-import { useLazyGetFleetsQuery } from '../services/fleet';
 import { useGetProjectsQuery } from '../services/project';
 
 type Args = { projectNames?: IProject['project_name'][] };
 
 export const useCheckingForFleetsInProjects = ({ projectNames }: Args) => {
-    const [projectFleetMap, setProjectFleetMap] = useState<Record<IProject['project_name'], boolean>>({});
     const { data: projectsData } = useGetProjectsQuery(undefined, {
         skip: !!projectNames?.length,
     });
 
-    const [getFleets] = useLazyGetFleetsQuery();
+    const { data: noFleetsProjectsData } = useGetProjectsQuery(
+        {
+            only_no_fleets: true,
+        },
+        {
+            skip: !!projectNames?.length,
+        },
+    );
 
     const projectNameForChecking = useMemo<IProject['project_name'][]>(() => {
         if (projectNames) {
@@ -25,27 +30,15 @@ export const useCheckingForFleetsInProjects = ({ projectNames }: Args) => {
         return [];
     }, [projectNames, projectsData]);
 
-    useEffect(() => {
-        const fetchFleets = async () => {
-            const map: Record<IProject['project_name'], boolean> = {};
+    const projectHavingFleetMap = useMemo<Record<IProject['project_name'], boolean>>(() => {
+        const map: Record<IProject['project_name'], boolean> = {};
 
-            await Promise.all(
-                projectNameForChecking.map((projectName) =>
-                    getFleets({
-                        limit: 1,
-                        project_name: projectName,
-                        only_active: true,
-                    })
-                        .unwrap()
-                        .then((data) => (map[projectName] = Boolean(data.length))),
-                ),
-            );
+        projectNameForChecking.forEach((projectName) => {
+            map[projectName] = !noFleetsProjectsData?.some((i) => i.project_name === projectName);
+        });
 
-            setProjectFleetMap(map);
-        };
+        return map;
+    }, [projectNameForChecking, noFleetsProjectsData]);
 
-        fetchFleets();
-    }, [projectNameForChecking]);
-
-    return projectFleetMap;
+    return projectHavingFleetMap;
 };

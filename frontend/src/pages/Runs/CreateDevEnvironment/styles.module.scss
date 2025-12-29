@@ -1,5 +1,18 @@
 @use '@cloudscape-design/design-tokens/index' as awsui;
 
+.alertBox {
+  margin: 12px 0 0;
+
+  :global {
+    & [class^="awsui_alert"] {
+      & [class^="awsui_action-slot"] {
+        display: flex;
+        align-items: center;
+      }
+    }
+  }
+}
+
 .wizardForm {
   & [class^="awsui_wizard"] {
     & [class^="awsui_footer"] {
