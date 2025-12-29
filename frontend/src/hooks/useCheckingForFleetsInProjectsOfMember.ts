@@ -9,9 +9,7 @@ export const useCheckingForFleetsInProjects = ({ projectNames }: Args) => {
         skip: !!projectNames?.length,
     });
 
-    const { data: noFleetsProjectsData } = useGetOnlyNoFleetsProjectsQuery(undefined, {
-        skip: !!projectNames?.length,
-    });
+    const { data: noFleetsProjectsData } = useGetOnlyNoFleetsProjectsQuery();
 
     const projectNameForChecking = useMemo<IProject['project_name'][]>(() => {
         if (projectNames) {

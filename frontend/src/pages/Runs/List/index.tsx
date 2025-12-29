@@ -2,16 +2,16 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ButtonDropdownProps } from '@cloudscape-design/components';
-import { ButtonProps } from '@cloudscape-design/components/button';
 
-import { Alert, Button, ButtonDropdown, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
+import { Button, ButtonDropdown, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
-import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';
 import { useLazyGetRunsQuery } from 'services/run';
+
+import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
 import { useRunListPreferences } from './Preferences/useRunListPreferences';
 import {
@@ -124,11 +124,6 @@ export const RunList: React.FC = () => {
 
     const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
 
-    const onCreateAFleet: ButtonProps['onClick'] = (event) => {
-        event.preventDefault();
-        goToUrl('https://dstack.ai/docs/quickstart/#create-a-fleet', true);
-    };
-
     return (
         <Table
             {...collectionProps}
@@ -143,22 +138,11 @@ export const RunList: React.FC = () => {
             preferences={<Preferences />}
             header={
                 <>
-                    {projectDontHasFleet && (
-                        <div className={styles.alertBox}>
-                            <Alert
-                                header={t('fleets.no_alert.title')}
-                                type="info"
-                                action={
-                                    <Button iconName="external" formAction="none" onClick={onCreateAFleet}>
-                                        {t('fleets.no_alert.button_title')}
-                                    </Button>
-                                }
-                            >
-                                The project <code>{projectDontHasFleet}</code> has no fleets. Create one before submitting a
-                                run.
-                            </Alert>
-                        </div>
-                    )}
+                    <NoFleetProjectAlert
+                        className={styles.noFleetAlert}
+                        projectName={projectDontHasFleet ?? ''}
+                        show={!!projectDontHasFleet}
+                    />
 
                     <Header
                         variant="awsui-h1-sticky"

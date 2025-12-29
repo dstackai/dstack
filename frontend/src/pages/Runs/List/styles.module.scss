@@ -1,15 +1,7 @@
-.alertBox {
+.noFleetAlert {
     margin-bottom: 12px;
-
-    :global {
-        & [class^="awsui_alert"] {
-            & [class^="awsui_action-slot"] {
-                display: flex;
-                align-items: center;
-            }
-        }
-    }
 }
+
 .selectFilters {
     display: flex;
     flex-wrap: wrap;

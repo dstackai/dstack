@@ -5,22 +5,22 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import cn from 'classnames';
 import * as yup from 'yup';
 import { Box, Link, WizardProps } from '@cloudscape-design/components';
-import { ButtonProps } from '@cloudscape-design/components/button';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import { Alert, Button, TabsProps, ToggleProps } from 'components';
+import { TabsProps, ToggleProps } from 'components';
 import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Tabs, Toggle, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
-import { getServerError, goToUrl } from 'libs';
+import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
+import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { useApplyRunMutation } from 'services/run';
 
 import { OfferList } from 'pages/Offers/List';
+import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
-import { useCheckingForFleetsInProjects } from '../../../hooks/useCheckingForFleetsInProjectsOfMember';
 import { FORM_FIELD_NAMES } from './constants';
 
 import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
@@ -284,28 +284,13 @@ export const CreateDevEnvironment: React.FC = () => {
         setValue('config_yaml', yaml);
     }, [yaml]);
 
-    const onCreateAFleet: ButtonProps['onClick'] = (event) => {
-        event.preventDefault();
-        goToUrl('https://dstack.ai/docs/quickstart/#create-a-fleet', true);
-    };
-
     return (
         <form className={cn({ [styles.wizardForm]: activeStepIndex === 0 })} onSubmit={handleSubmit(onSubmit)}>
-            {projectDontHasFleets && (
-                <div className={styles.alertBox}>
-                    <Alert
-                        header={t('fleets.no_alert.title')}
-                        type="info"
-                        action={
-                            <Button iconName="external" formAction="none" onClick={onCreateAFleet}>
-                                {t('fleets.no_alert.button_title')}
-                            </Button>
-                        }
-                    >
-                        The project <code>{selectedProject}</code> has no fleets. Create one before submitting a run.
-                    </Alert>
-                </div>
-            )}
+            <NoFleetProjectAlert
+                className={styles.noFleetAlert}
+                projectName={selectedProject ?? ''}
+                show={projectDontHasFleets}
+            />
 
             <Wizard
                 activeStepIndex={activeStepIndex}
