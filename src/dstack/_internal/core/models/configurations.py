@@ -31,6 +31,7 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
+from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.utils.common import has_duplicates, list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import (
@@ -610,11 +611,11 @@ class ConfigurationWithPortsParams(CoreModel):
 class ConfigurationWithCommandsParams(CoreModel):
     commands: Annotated[CommandsList, Field(description="The shell commands to run")] = []
 
-    @root_validator
+    @root_validator(pre=True)
     def check_image_or_commands_present(cls, values):
-        # If replicas is present, skip validation - commands come from replica groups
-        replica_groups = values.get("replicas")
-        if replica_groups:
+        # If replicas is list, skip validation - commands come from replica groups
+        replicas = values.get("replicas")
+        if isinstance(replicas, list):
             return values
 
         if not values.get("commands") and not values.get("image"):
@@ -719,7 +720,7 @@ class ServiceConfigurationParamsConfig(CoreConfig):
         )
 
 
-class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
+class ReplicaGroup(CoreModel):
     name: Annotated[
         Optional[str],
         Field(
@@ -737,11 +738,22 @@ class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
         Optional[ScalingSpec],
         Field(description="The auto-scaling rules. Required if `count` is set to a range"),
     ] = None
-    # TODO: Extract to ConfigurationWithResourcesParams mixin
+
     resources: Annotated[
         ResourcesSpec,
         Field(description="The resources requirements for replicas in this group"),
     ] = ResourcesSpec()
+
+    commands: Annotated[
+        CommandsList,
+        Field(description="The shell commands to run for replicas in this group"),
+    ]
+
+    @validator("name")
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            validate_dstack_resource_name(v)
+        return v
 
     @validator("count")
     def convert_count(cls, v: Range[int]) -> Range[int]:
@@ -753,16 +765,11 @@ class ReplicaGroup(ConfigurationWithCommandsParams, CoreModel):
             raise ValueError("The minimum number of replicas must be greater than or equal to 0")
         return v
 
-    @root_validator()
-    def override_commands_validation(cls, values):
-        """
-        Override parent validator from ConfigurationWithCommandsParams.
-        ReplicaGroup always requires commands (no image option).
-        """
-        commands = values.get("commands", [])
-        if not commands:
+    @validator("commands")
+    def validate_commands(cls, v: CommandsList) -> CommandsList:
+        if not v:
             raise ValueError("`commands` must be set for replica groups")
-        return values
+        return v
 
     @root_validator()
     def validate_scaling(cls, values):
@@ -828,7 +835,7 @@ class ServiceConfigurationParams(CoreModel):
     ] = []
 
     replicas: Annotated[
-        Optional[Union[Range[int], List[ReplicaGroup]]],
+        Optional[Union[List[ReplicaGroup], Range[int]]],
         Field(
             description=(
                 "List of replica groups. Each group defines replicas with shared configuration "
@@ -925,6 +932,42 @@ class ServiceConfigurationParams(CoreModel):
                 raise ValueError("To use `scaling`, `replicas` must be set to a range.")
         return values
 
+    @root_validator()
+    def validate_top_level_properties_with_replica_groups(cls, values):
+        """
+        When replicas is a list of ReplicaGroup, forbid top-level scaling, commands, and resources
+        """
+        replicas = values.get("replicas")
+
+        if not isinstance(replicas, list):
+            return values
+
+        scaling = values.get("scaling")
+        if scaling is not None:
+            raise ValueError(
+                "Top-level `scaling` is not allowed when `replicas` is a list. "
+                "Specify `scaling` in each replica group instead."
+            )
+
+        commands = values.get("commands", [])
+        if commands:
+            raise ValueError(
+                "Top-level `commands` is not allowed when `replicas` is a list. "
+                "Specify `commands` in each replica group instead."
+            )
+
+        resources = values.get("resources")
+        from dstack._internal.core.models.resources import ResourcesSpec
+
+        default_resources = ResourcesSpec()
+        if resources and resources.dict() != default_resources.dict():
+            raise ValueError(
+                "Top-level `resources` is not allowed when `replicas` is a list. "
+                "Specify `resources` in each replica group instead."
+            )
+
+        return values
+
 
 class ServiceConfigurationConfig(
     ProfileParamsConfig,
@@ -948,7 +991,7 @@ class ServiceConfiguration(
     type: Literal["service"] = "service"
 
     @property
-    def replica_groups(self) -> Optional[List[ReplicaGroup]]:
+    def replica_groups(self) -> List[ReplicaGroup]:
         """
         Get normalized replica groups. After validation, replicas is always List[ReplicaGroup] or None.
         Use this property for type-safe access in code.
@@ -975,7 +1018,9 @@ class ServiceConfiguration(
                     scaling=self.scaling,
                 )
             ]
-        return None
+        raise ValueError(
+            f"Invalid replicas type: {type(self.replicas)}. Expected None, Range[int], or List[ReplicaGroup]"
+        )
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]

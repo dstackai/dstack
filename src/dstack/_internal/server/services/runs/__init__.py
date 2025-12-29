@@ -597,6 +597,11 @@ def create_group_run_spec(
     # Create a copy of the configuration as a dict
     config_dict = base_run_spec.configuration.dict()
 
+    # Remove replicas and scaling fields since we're creating a single-replica config
+    # This prevents validation errors when commands/resources are added
+    config_dict.pop("replicas", None)
+    config_dict.pop("scaling", None)
+
     # Override with group-specific values (only if provided)
     if replica_group.commands:
         config_dict["commands"] = replica_group.commands

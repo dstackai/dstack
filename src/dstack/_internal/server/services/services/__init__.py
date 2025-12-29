@@ -313,33 +313,20 @@ async def update_service_desired_replica_count(
     if run_model.gateway_id is not None:
         conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
         stats = await conn.get_stats(run_model.project.name, run_model.run_name)
-    replica_groups = configuration.replica_groups or []
-    if replica_groups:
-        desired_replica_counts = {}
-        total = 0
-        prev_counts = (
-            json.loads(run_model.desired_replica_counts)
-            if run_model.desired_replica_counts
-            else {}
+    replica_groups = configuration.replica_groups
+    desired_replica_counts = {}
+    total = 0
+    prev_counts = (
+        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
+    )
+    for group in replica_groups:
+        scaler = get_service_scaler(group.count, group.scaling)
+        group_desired = scaler.get_desired_count(
+            current_desired_count=prev_counts.get(group.name, group.count.min or 0),
+            stats=stats,
+            last_scaled_at=last_scaled_at,
         )
-        for group in replica_groups:
-            scaler = get_service_scaler(group.count, group.scaling)
-            group_desired = scaler.get_desired_count(
-                current_desired_count=prev_counts.get(group.name, group.count.min or 0),
-                stats=stats,
-                last_scaled_at=last_scaled_at,
-            )
-            desired_replica_counts[group.name] = group_desired
-            total += group_desired
-        run_model.desired_replica_counts = json.dumps(desired_replica_counts)
-        run_model.desired_replica_count = total
-    else:
-        # Todo Not required as single replica is normalized to replicas.
-        if configuration.replica_groups:
-            first_group = configuration.replica_groups[0]
-            scaler = get_service_scaler(count=first_group.count, scaling=first_group.scaling)
-            run_model.desired_replica_count = scaler.get_desired_count(
-                current_desired_count=run_model.desired_replica_count,
-                stats=stats,
-                last_scaled_at=last_scaled_at,
-            )
+        desired_replica_counts[group.name] = group_desired
+        total += group_desired
+    run_model.desired_replica_counts = json.dumps(desired_replica_counts)
+    run_model.desired_replica_count = total
