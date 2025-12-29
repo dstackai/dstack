@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { useGetProjectsQuery } from '../services/project';
+import { useGetOnlyNoFleetsProjectsQuery, useGetProjectsQuery } from 'services/project';
 
 type Args = { projectNames?: IProject['project_name'][] };
 
@@ -9,14 +9,9 @@ export const useCheckingForFleetsInProjects = ({ projectNames }: Args) => {
         skip: !!projectNames?.length,
     });
 
-    const { data: noFleetsProjectsData } = useGetProjectsQuery(
-        {
-            only_no_fleets: true,
-        },
-        {
-            skip: !!projectNames?.length,
-        },
-    );
+    const { data: noFleetsProjectsData } = useGetOnlyNoFleetsProjectsQuery(undefined, {
+        skip: !!projectNames?.length,
+    });
 
     const projectNameForChecking = useMemo<IProject['project_name'][]>(() => {
         if (projectNames) {
