@@ -503,7 +503,7 @@ def _deploy_instance(
         logger.debug("The script for installing dstack has been executed")
 
         # Upload envs
-        shim_envs = get_shim_env(authorized_keys, arch=arch)
+        shim_envs = get_shim_env(arch=arch)
         try:
             fleet_configuration_envs = remote_details.env.as_dict()
         except ValueError as e:

@@ -304,7 +304,7 @@ class GCPCompute(
         )
         if is_tpu:
             instance_id = instance_name
-            startup_script = _get_tpu_startup_script(authorized_keys)
+            startup_script = _get_tpu_startup_script()
             # GCP does not allow attaching disks while TPUs is creating,
             # so we need to attach the disks on creation.
             data_disks = _get_tpu_data_disks(self.config.project_id, instance_config.volumes)
@@ -1178,10 +1178,8 @@ def _get_volume_price(size: int) -> float:
     return size * 0.12
 
 
-def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
-    commands = get_shim_commands(
-        authorized_keys=authorized_keys, is_privileged=True, pjrt_device="TPU"
-    )
+def _get_tpu_startup_script() -> str:
+    commands = get_shim_commands(is_privileged=True, pjrt_device="TPU")
     startup_script = " ".join([" && ".join(commands)])
     startup_script = "#! /bin/bash\n" + startup_script
     return startup_script

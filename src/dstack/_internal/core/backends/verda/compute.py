@@ -112,7 +112,7 @@ class VerdaCompute(
                 )
             )
 
-        commands = get_shim_commands(authorized_keys=public_keys)
+        commands = get_shim_commands()
         startup_script = " ".join([" && ".join(commands)])
         script_name = f"dstack-{instance_config.instance_name}.sh"
         startup_script_ids = _get_or_create_startup_scrpit(

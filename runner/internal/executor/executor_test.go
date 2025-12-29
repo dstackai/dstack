@@ -208,7 +208,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 	_ = os.Mkdir(temp, 0o700)
 	home := filepath.Join(baseDir, "home")
 	_ = os.Mkdir(home, 0o700)
-	ex, _ := NewRunExecutor(temp, home, 10022)
+	ex, _ := NewRunExecutor(temp, home, new(sshdMock))
 	ex.SetJob(body)
 	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
 	ex.setJobWorkingDir(context.Background())
@@ -339,6 +339,24 @@ func TestExecutor_LogsAnsiCodeHandling(t *testing.T) {
 	for i := 1; i < len(wsLogHistory); i++ {
 		assert.GreaterOrEqual(t, wsLogHistory[i].Timestamp, wsLogHistory[i-1].Timestamp)
 	}
+}
+
+type sshdMock struct{}
+
+func (d *sshdMock) Port() int {
+	return 0
+}
+
+func (d *sshdMock) Start(context.Context) error {
+	return nil
+}
+
+func (d *sshdMock) Stop(context.Context) error {
+	return nil
+}
+
+func (d *sshdMock) AddAuthorizedKeys(context.Context, ...string) error {
+	return nil
 }
 
 func combineLogMessages(logHistory []schemas.LogEvent) string {

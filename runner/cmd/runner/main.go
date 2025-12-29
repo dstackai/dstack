@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +31,7 @@ func mainInner() int {
 	var homeDir string
 	var httpPort int
 	var sshPort int
+	var sshAuthorizedKeys []string
 	var logLevel int
 
 	cmd := &cli.Command{
@@ -76,9 +78,14 @@ func mainInner() int {
 						Value:       consts.RunnerSSHPort,
 						Destination: &sshPort,
 					},
+					&cli.StringSliceFlag{
+						Name:        "ssh-authorized-key",
+						Usage:       "dstack server or user authorized key. May be specified multiple times",
+						Destination: &sshAuthorizedKeys,
+					},
 				},
-				Action: func(cxt context.Context, cmd *cli.Command) error {
-					return start(cxt, tempDir, homeDir, httpPort, sshPort, logLevel, Version)
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					return start(ctx, tempDir, homeDir, httpPort, sshPort, sshAuthorizedKeys, logLevel, Version)
 				},
 			},
 		},
@@ -95,7 +102,7 @@ func mainInner() int {
 	return 0
 }
 
-func start(ctx context.Context, tempDir string, homeDir string, httpPort int, sshPort int, logLevel int, version string) error {
+func start(ctx context.Context, tempDir string, homeDir string, httpPort int, sshPort int, sshAuthorizedKeys []string, logLevel int, version string) error {
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return fmt.Errorf("create temp directory: %w", err)
 	}
@@ -114,14 +121,31 @@ func start(ctx context.Context, tempDir string, homeDir string, httpPort int, ss
 	log.DefaultEntry.Logger.SetOutput(io.MultiWriter(os.Stdout, defaultLogFile))
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(logLevel))
 
-	server, err := api.NewServer(ctx, tempDir, homeDir, fmt.Sprintf(":%d", httpPort), sshPort, version)
-	if err != nil {
-		return fmt.Errorf("create server: %w", err)
+	// To ensure that all components of the authorized_keys path are owned by root and no directories
+	// are group or world writable, as required by sshd with "StrictModes yes" (the default value),
+	// we fix `/dstack` ownership and permissions and remove `/dstack/ssh` (it will be (re)created
+	// in Sshd.Prepare())
+	// See: https://github.com/openssh/openssh-portable/blob/d01efaa1c9ed84fd9011201dbc3c7cb0a82bcee3/misc.c#L2257-L2272
+	if err := os.Mkdir("/dstack", 0o755); errors.Is(err, os.ErrExist) {
+		if err := os.Chown("/dstack", 0, 0); err != nil {
+			return fmt.Errorf("chown dstack dir: %w", err)
+		}
+		if err := os.Chmod("/dstack", 0o755); err != nil {
+			return fmt.Errorf("chmod dstack dir: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("create dstack dir: %w", err)
+	}
+	if err := os.RemoveAll("/dstack/ssh"); err != nil {
+		return fmt.Errorf("remove dstack ssh dir: %w", err)
 	}
 
 	sshd := ssh.NewSshd("/usr/sbin/sshd")
-	if err := sshd.Prepare(ctx, "/dstack/ssh/conf", "/dstack/ssh/log", sshPort); err != nil {
+	if err := sshd.Prepare(ctx, "/dstack/ssh", sshPort, "INFO"); err != nil {
 		return fmt.Errorf("prepare sshd: %w", err)
+	}
+	if err := sshd.AddAuthorizedKeys(ctx, sshAuthorizedKeys...); err != nil {
+		return fmt.Errorf("add authorized keys: %w", err)
 	}
 	if err := sshd.Start(ctx); err != nil {
 		return fmt.Errorf("start sshd: %w", err)
@@ -132,6 +156,10 @@ func start(ctx context.Context, tempDir string, homeDir string, httpPort int, ss
 		}
 	}()
 
+	server, err := api.NewServer(ctx, tempDir, homeDir, fmt.Sprintf(":%d", httpPort), sshd, version)
+	if err != nil {
+		return fmt.Errorf("create server: %w", err)
+	}
 	log.Trace(ctx, "Starting API server", "port", httpPort)
 	if err := server.Run(ctx); err != nil {
 		return fmt.Errorf("server failed: %w", err)

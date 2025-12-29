@@ -11,6 +11,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/metrics"
+	"github.com/dstackai/dstack/runner/internal/ssh"
 )
 
 type Server struct {
@@ -33,9 +34,9 @@ type Server struct {
 	version string
 }
 
-func NewServer(ctx context.Context, tempDir string, homeDir string, address string, sshPort int, version string) (*Server, error) {
+func NewServer(ctx context.Context, tempDir string, homeDir string, address string, sshd ssh.SshdManager, version string) (*Server, error) {
 	r := api.NewRouter()
-	ex, err := executor.NewRunExecutor(tempDir, homeDir, sshPort)
+	ex, err := executor.NewRunExecutor(tempDir, homeDir, sshd)
 	if err != nil {
 		return nil, err
 	}

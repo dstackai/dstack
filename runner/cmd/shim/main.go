@@ -148,12 +148,6 @@ func mainInner() int {
 				Sources:     cli.EnvVars("DSTACK_DOCKER_PRIVILEGED"),
 			},
 			&cli.StringFlag{
-				Name:        "ssh-key",
-				Usage:       "Public SSH key",
-				Destination: &args.Docker.ConcatinatedPublicSSHKeys,
-				Sources:     cli.EnvVars("DSTACK_PUBLIC_SSH_KEY"),
-			},
-			&cli.StringFlag{
 				Name:        "pjrt-device",
 				Usage:       "Set the PJRT_DEVICE environment variable (e.g., TPU, GPU)",
 				Destination: &args.Docker.PJRTDevice,
