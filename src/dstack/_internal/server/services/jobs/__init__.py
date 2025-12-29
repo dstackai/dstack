@@ -806,7 +806,7 @@ def _get_job_status_message(job_model: JobModel) -> str:
         ):
             if (
                 job_model.termination_reason_message
-                and "No fleet found" in job_model.termination_reason_message
+                and "No matching fleet found" in job_model.termination_reason_message
             ):
                 return "no fleets"
             return "no offers"

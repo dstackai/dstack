@@ -351,8 +351,8 @@ async def _process_submitted_job(
                 )
                 # Note: `_get_job_status_message` relies on the "No fleet found" substring to return "no fleets"
                 job_model.termination_reason_message = (
-                    "No fleet found. Create it before submitting a run: "
-                    "https://dstack.ai/docs/concepts/fleets"
+                    "No matching fleet found. Possible reasons: "
+                    "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
                 )
                 switch_job_status(session, job_model, JobStatus.TERMINATING)
                 job_model.last_processed_at = common_utils.get_current_datetime()
