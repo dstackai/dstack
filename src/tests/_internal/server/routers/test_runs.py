@@ -115,9 +115,12 @@ def get_dev_env_run_plan_dict(
             "-i",
             "-c",
             (
-                "uv venv -q --prompt dstack -p 3.13 --seed /dstack/venv"
-                " && echo '. /dstack/venv/bin/activate' >> /dstack/profile"
-                " && . /dstack/venv/bin/activate"
+                "eval $(echo 'export DSTACK_VENV_DIR=/dstack/venv' | sudo tee -a /dstack/profile)"
+                " && sudo rm -rf $DSTACK_VENV_DIR"
+                " && sudo mkdir $DSTACK_VENV_DIR"
+                " && sudo chown $(id -u):$(id -g) $DSTACK_VENV_DIR"
+                " && uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR"
+                " && eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a /dstack/profile)"
                 " && (echo 'pip install ipykernel...'"
                 " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
                 " || echo 'no pip, ipykernel was not installed'"
@@ -344,9 +347,12 @@ def get_dev_env_run_dict(
             "-i",
             "-c",
             (
-                "uv venv -q --prompt dstack -p 3.13 --seed /dstack/venv"
-                " && echo '. /dstack/venv/bin/activate' >> /dstack/profile"
-                " && . /dstack/venv/bin/activate"
+                "eval $(echo 'export DSTACK_VENV_DIR=/dstack/venv' | sudo tee -a /dstack/profile)"
+                " && sudo rm -rf $DSTACK_VENV_DIR"
+                " && sudo mkdir $DSTACK_VENV_DIR"
+                " && sudo chown $(id -u):$(id -g) $DSTACK_VENV_DIR"
+                " && uv venv -q --prompt dstack -p 3.13 --seed $DSTACK_VENV_DIR"
+                " && eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a /dstack/profile)"
                 " && (echo 'pip install ipykernel...'"
                 " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
                 " || echo 'no pip, ipykernel was not installed'"

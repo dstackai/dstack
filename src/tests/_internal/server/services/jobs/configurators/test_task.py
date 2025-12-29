@@ -98,10 +98,15 @@ class TestCommands:
             expected_shell,
             "-i",
             "-c",
-            "uv venv -q --prompt dstack -p 3.12 --seed /dstack/venv"
-            " && echo '. /dstack/venv/bin/activate' >> /dstack/profile"
-            " && . /dstack/venv/bin/activate"
-            " && sleep inf",
+            (
+                "eval $(echo 'export DSTACK_VENV_DIR=/dstack/venv' | sudo tee -a /dstack/profile)"
+                " && sudo rm -rf $DSTACK_VENV_DIR"
+                " && sudo mkdir $DSTACK_VENV_DIR"
+                " && sudo chown $(id -u):$(id -g) $DSTACK_VENV_DIR"
+                " && uv venv -q --prompt dstack -p 3.12 --seed $DSTACK_VENV_DIR"
+                " && eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a /dstack/profile)"
+                " && sleep inf"
+            ),
         ]
 
     async def test_no_commands(self, image_config_mock: ImageConfig):
