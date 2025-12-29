@@ -2,11 +2,14 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ButtonDropdownProps } from '@cloudscape-design/components';
+import { ButtonProps } from '@cloudscape-design/components/button';
 
-import { Button, ButtonDropdown, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
+import { Alert, Button, ButtonDropdown, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
+import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
+import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';
 import { useLazyGetRunsQuery } from 'services/run';
 
@@ -48,6 +51,8 @@ export const RunList: React.FC = () => {
     } = useFilters({
         localStorePrefix: 'administration-run-list-page',
     });
+
+    const projectHavingFleetMap = useCheckingForFleetsInProjects({});
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IRun, TRunsRequestParams>({
         useLazyQuery: useLazyGetRunsQuery,
@@ -117,6 +122,13 @@ export const RunList: React.FC = () => {
         }
     };
 
+    const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
+
+    const onCreateAFleet: ButtonProps['onClick'] = (event) => {
+        event.preventDefault();
+        goToUrl('https://dstack.ai/docs/quickstart/#create-a-fleet', true);
+    };
+
     return (
         <Table
             {...collectionProps}
@@ -130,50 +142,69 @@ export const RunList: React.FC = () => {
             columnDisplay={preferences.contentDisplay}
             preferences={<Preferences />}
             header={
-                <Header
-                    variant="awsui-h1-sticky"
-                    actions={
-                        <SpaceBetween size="xs" direction="horizontal">
-                            <ButtonDropdown
-                                items={[
-                                    {
-                                        text: 'Dev environment',
-                                        id: 'dev_env',
-                                        href: `${ROUTES.RUNS.CREATE_DEV_ENV}${
-                                            filteringRequestParams.project_name
-                                                ? `?project_name=${filteringRequestParams.project_name}`
-                                                : ''
-                                        }`,
-                                    },
-                                ]}
-                                onItemFollow={onFollowButtonDropdownLink}
+                <>
+                    {projectDontHasFleet && (
+                        <div className={styles.alertBox}>
+                            <Alert
+                                header={t('fleets.no_alert.title')}
+                                type="info"
+                                action={
+                                    <Button iconName="external" formAction="none" onClick={onCreateAFleet}>
+                                        {t('fleets.no_alert.button_title')}
+                                    </Button>
+                                }
                             >
-                                {t('common.new')}
-                            </ButtonDropdown>
+                                The project <code>{projectDontHasFleet}</code> has no fleets. Create one before submitting a
+                                run.
+                            </Alert>
+                        </div>
+                    )}
 
-                            <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
-                                {t('common.abort')}
-                            </Button>
+                    <Header
+                        variant="awsui-h1-sticky"
+                        actions={
+                            <SpaceBetween size="xs" direction="horizontal">
+                                <ButtonDropdown
+                                    items={[
+                                        {
+                                            text: 'Dev environment',
+                                            id: 'dev_env',
+                                            href: `${ROUTES.RUNS.CREATE_DEV_ENV}${
+                                                filteringRequestParams.project_name
+                                                    ? `?project_name=${filteringRequestParams.project_name}`
+                                                    : ''
+                                            }`,
+                                        },
+                                    ]}
+                                    onItemFollow={onFollowButtonDropdownLink}
+                                >
+                                    {t('common.new')}
+                                </ButtonDropdown>
 
-                            <Button formAction="none" onClick={stopClickHandle} disabled={isDisabledStopButton}>
-                                {t('common.stop')}
-                            </Button>
+                                <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
+                                    {t('common.abort')}
+                                </Button>
 
-                            {/*<Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>*/}
-                            {/*    {t('common.delete')}*/}
-                            {/*</Button>*/}
+                                <Button formAction="none" onClick={stopClickHandle} disabled={isDisabledStopButton}>
+                                    {t('common.stop')}
+                                </Button>
 
-                            <Button
-                                iconName="refresh"
-                                disabled={isLoading}
-                                ariaLabel={t('common.refresh')}
-                                onClick={refreshList}
-                            />
-                        </SpaceBetween>
-                    }
-                >
-                    {t('projects.runs')}
-                </Header>
+                                {/*<Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>*/}
+                                {/*    {t('common.delete')}*/}
+                                {/*</Button>*/}
+
+                                <Button
+                                    iconName="refresh"
+                                    disabled={isLoading}
+                                    ariaLabel={t('common.refresh')}
+                                    onClick={refreshList}
+                                />
+                            </SpaceBetween>
+                        }
+                    >
+                        {t('projects.runs')}
+                    </Header>
+                </>
             }
             filter={
                 <div className={styles.selectFilters}>

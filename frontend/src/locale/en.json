@@ -564,6 +564,11 @@
   },
 
   "fleets": {
+    "no_alert": {
+      "title": "No fleets",
+      "description": "The project has no fleets. Create one before submitting a run.",
+      "button_title": "Create a fleet"
+    },
     "fleet": "Fleet",
     "fleet_placeholder": "Filtering by fleet",
     "fleet_name": "Fleet name",
