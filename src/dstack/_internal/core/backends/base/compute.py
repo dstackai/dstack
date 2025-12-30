@@ -1,6 +1,7 @@
 import os
 import random
 import re
+import shlex
 import string
 import threading
 from abc import ABC, abstractmethod
@@ -683,7 +684,6 @@ def get_user_data(
     firewall_allow_from_subnets: Iterable[str] = DEFAULT_PRIVATE_SUBNETS,
 ) -> str:
     shim_commands = get_shim_commands(
-        authorized_keys=authorized_keys,
         base_path=base_path,
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
@@ -698,7 +698,6 @@ def get_user_data(
 
 
 def get_shim_env(
-    authorized_keys: List[str],
     base_path: Optional[PathLike] = None,
     bin_path: Optional[PathLike] = None,
     backend_shim_env: Optional[Dict[str, str]] = None,
@@ -714,7 +713,6 @@ def get_shim_env(
         "DSTACK_RUNNER_HTTP_PORT": str(DSTACK_RUNNER_HTTP_PORT),
         "DSTACK_RUNNER_SSH_PORT": str(DSTACK_RUNNER_SSH_PORT),
         "DSTACK_RUNNER_LOG_LEVEL": log_level,
-        "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
     }
     if backend_shim_env is not None:
         envs |= backend_shim_env
@@ -722,7 +720,6 @@ def get_shim_env(
 
 
 def get_shim_commands(
-    authorized_keys: List[str],
     *,
     is_privileged: bool = False,
     pjrt_device: Optional[str] = None,
@@ -743,7 +740,6 @@ def get_shim_commands(
         arch=arch,
     )
     shim_env = get_shim_env(
-        authorized_keys=authorized_keys,
         base_path=base_path,
         bin_path=bin_path,
         backend_shim_env=backend_shim_env,
@@ -942,7 +938,6 @@ def get_docker_commands(
     bin_path: Optional[PathLike] = None,
 ) -> list[str]:
     dstack_runner_binary_path = get_dstack_runner_binary_path(bin_path)
-    authorized_keys_content = "\n".join(authorized_keys).strip()
     commands = [
         "( :",
         # See https://github.com/dstackai/dstack/issues/1769
@@ -960,27 +955,31 @@ def get_docker_commands(
         "if ! exists sshd; then install_pkg openssh-server; fi",
         # install curl if necessary
         "if ! exists curl; then install_pkg curl; fi",
-        # create ssh dirs and add public key
-        "mkdir -p ~/.ssh",
-        "chmod 700 ~/.ssh",
-        f"echo '{authorized_keys_content}' > ~/.ssh/authorized_keys",
-        "chmod 600 ~/.ssh/authorized_keys",
         ": )",
     ]
+
+    runner_command = [
+        dstack_runner_binary_path,
+        "--log-level",
+        "6",
+        "start",
+        "--home-dir",
+        "/root",
+        "--temp-dir",
+        "/tmp/runner",
+        "--http-port",
+        str(DSTACK_RUNNER_HTTP_PORT),
+        "--ssh-port",
+        str(DSTACK_RUNNER_SSH_PORT),
+    ]
+    for authorized_key in authorized_keys:
+        runner_command += ["--ssh-authorized-key", authorized_key]
 
     url = get_dstack_runner_download_url()
     commands += [
         f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {dstack_runner_binary_path} {url}",
         f"chmod +x {dstack_runner_binary_path}",
-        (
-            f"{dstack_runner_binary_path}"
-            " --log-level 6"
-            " start"
-            f" --http-port {DSTACK_RUNNER_HTTP_PORT}"
-            f" --ssh-port {DSTACK_RUNNER_SSH_PORT}"
-            " --temp-dir /tmp/runner"
-            " --home-dir /root"
-        ),
+        shlex.join(runner_command),
     ]
 
     return commands

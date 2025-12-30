@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -112,10 +111,9 @@ func (c *dockerParametersMock) DockerPJRTDevice() string {
 }
 
 func (c *dockerParametersMock) DockerShellCommands(publicKeys []string) []string {
-	userPublicKey := strings.Join(publicKeys, "\n")
 	commands := make([]string, 0)
 	if c.sshShellCommands {
-		commands = append(commands, getSSHShellCommands(userPublicKey)...)
+		commands = append(commands, getSSHShellCommands()...)
 	}
 	commands = append(commands, c.commands...)
 	return commands

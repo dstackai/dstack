@@ -29,6 +29,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/connections"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
+	"github.com/dstackai/dstack/runner/internal/ssh"
 	"github.com/dstackai/dstack/runner/internal/types"
 )
 
@@ -54,7 +55,8 @@ type RunExecutor struct {
 	tempDir    string
 	homeDir    string
 	archiveDir string
-	sshPort    int
+	sshd       ssh.SshdManager
+
 	currentUid uint32
 
 	run             schemas.Run
@@ -89,7 +91,7 @@ func (s *stubConnectionTracker) GetNoConnectionsSecs() int64   { return 0 }
 func (s *stubConnectionTracker) Track(ticker <-chan time.Time) {}
 func (s *stubConnectionTracker) Stop()                         {}
 
-func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, error) {
+func NewRunExecutor(tempDir string, homeDir string, sshd ssh.SshdManager) (*RunExecutor, error) {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
 	user, err := osuser.Current()
@@ -110,7 +112,7 @@ func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, 
 			return nil, fmt.Errorf("initialize procfs: %w", err)
 		}
 		connectionTracker = connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
-			Port:            uint64(sshPort),
+			Port:            uint64(sshd.Port()),
 			MinConnDuration: 10 * time.Second, // shorter connections are likely from dstack-server
 			Procfs:          proc,
 		})
@@ -123,7 +125,7 @@ func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, 
 		tempDir:    tempDir,
 		homeDir:    homeDir,
 		archiveDir: filepath.Join(tempDir, "file_archives"),
-		sshPort:    sshPort,
+		sshd:       sshd,
 		currentUid: uid,
 		jobUid:     -1,
 		jobGid:     -1,
@@ -466,8 +468,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 
 	// As of 2024-11-29, ex.homeDir is always set to /root
-	rootSSHDir, err := prepareSSHDir(-1, -1, ex.homeDir)
-	if err != nil {
+	if _, err := prepareSSHDir(-1, -1, ex.homeDir); err != nil {
 		log.Warning(ctx, "failed to prepare ssh dir", "home", ex.homeDir, "err", err)
 	}
 	userSSHDir := ""
@@ -484,14 +485,6 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 			userSSHDir, err = prepareSSHDir(uid, gid, homeDir)
 			if err != nil {
 				log.Warning(ctx, "failed to prepare ssh dir", "home", homeDir, "err", err)
-			} else {
-				rootSSHKeysPath := filepath.Join(rootSSHDir, "authorized_keys")
-				userSSHKeysPath := filepath.Join(userSSHDir, "authorized_keys")
-				restoreUserSSHKeys := backupFile(ctx, userSSHKeysPath)
-				defer restoreUserSSHKeys(ctx)
-				if err := copyAuthorizedKeys(rootSSHKeysPath, uid, gid, userSSHKeysPath); err != nil {
-					log.Warning(ctx, "failed to copy authorized keys", "path", homeDir, "err", err)
-				}
 			}
 		} else {
 			log.Trace(ctx, "homeDir is not accessible, skipping provisioning", "path", homeDir)
@@ -504,9 +497,12 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 
 	if ex.jobSpec.SSHKey != nil && userSSHDir != "" {
 		err := configureSSH(
-			ex.jobSpec.SSHKey.Private, ex.jobSpec.SSHKey.Public, ex.clusterInfo.JobIPs, ex.sshPort,
+			ex.jobSpec.SSHKey.Private, ex.clusterInfo.JobIPs, ex.sshd.Port(),
 			uid, gid, userSSHDir,
 		)
+		if err == nil {
+			err = ex.sshd.AddAuthorizedKeys(ctx, ex.jobSpec.SSHKey.Public)
+		}
 		if err != nil {
 			log.Warning(ctx, "failed to configure SSH", "err", err)
 		}
@@ -914,7 +910,7 @@ func includeDstackProfile(profilePath string, dstackProfilePath string) error {
 	return nil
 }
 
-func configureSSH(private string, public string, ips []string, port int, uid int, gid int, sshDir string) error {
+func configureSSH(private string, ips []string, port int, uid int, gid int, sshDir string) error {
 	privatePath := filepath.Join(sshDir, "dstack_job")
 	privateFile, err := os.OpenFile(privatePath, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
@@ -928,19 +924,9 @@ func configureSSH(private string, public string, ips []string, port int, uid int
 		return fmt.Errorf("write private key: %w", err)
 	}
 
-	akPath := filepath.Join(sshDir, "authorized_keys")
-	akFile, err := os.OpenFile(akPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
-	if err != nil {
-		return fmt.Errorf("open authorized_keys: %w", err)
-	}
-	defer akFile.Close()
-	if err := os.Chown(akPath, uid, gid); err != nil {
-		return fmt.Errorf("chown authorized_keys: %w", err)
-	}
-	if _, err := akFile.WriteString(public); err != nil {
-		return fmt.Errorf("write public key: %w", err)
-	}
-
+	// TODO: move job hosts config to ~/.dstack/ssh/config.d/current_job
+	// and add "Include ~/.dstack/ssh/config.d/*" directive to ~/.ssh/config if not present
+	// instead of appending job hosts config directly (don't bloat user's ssh_config)
 	configPath := filepath.Join(sshDir, "config")
 	configFile, err := os.OpenFile(configPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
@@ -962,105 +948,4 @@ func configureSSH(private string, public string, ips []string, port int, uid int
 		return fmt.Errorf("write SSH config: %w", err)
 	}
 	return nil
-}
-
-// A makeshift solution to deliver authorized_keys to a non-root user
-// without modifying the existing API/bootstrap process
-// TODO: implement key delivery properly, i.e. sumbit keys to and write by the runner,
-// not the outer sh script that launches sshd and runner
-func copyAuthorizedKeys(srcPath string, uid int, gid int, dstPath string) error {
-	srcFile, err := os.Open(srcPath)
-	if err != nil {
-		return fmt.Errorf("open source authorized_keys: %w", err)
-	}
-	defer srcFile.Close()
-
-	dstExists := false
-	info, err := os.Stat(dstPath)
-	if err == nil {
-		dstExists = true
-		if info.IsDir() {
-			return fmt.Errorf("is a directory: %s", dstPath)
-		}
-		if err = os.Chmod(dstPath, 0o600); err != nil {
-			return fmt.Errorf("chmod destination authorized_keys: %w", err)
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("stat destination authorized_keys: %w", err)
-	}
-
-	dstFile, err := os.OpenFile(dstPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
-	if err != nil {
-		return fmt.Errorf("open destination authorized_keys: %w", err)
-	}
-	defer dstFile.Close()
-
-	if dstExists {
-		// visually separate our keys from existing ones
-		if _, err := dstFile.WriteString("\n\n"); err != nil {
-			return fmt.Errorf("write separator to authorized_keys: %w", err)
-		}
-	}
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return fmt.Errorf("copy authorized_keys: %w", err)
-	}
-	if err = os.Chown(dstPath, uid, gid); err != nil {
-		return fmt.Errorf("chown destination authorized_keys: %w", err)
-	}
-
-	return nil
-}
-
-// backupFile renames `/path/to/file` to `/path/to/file.dstack.bak`,
-// creates a new file with the same content, and returns restore function that
-// renames the backup back to the original name.
-// If the original file does not exist, restore function removes the file if it is created.
-// NB: A newly created file has default uid:gid and permissions, probably not
-// the same as the original file.
-func backupFile(ctx context.Context, path string) func(context.Context) {
-	var existed bool
-	backupPath := path + ".dstack.bak"
-
-	restoreFunc := func(ctx context.Context) {
-		if !existed {
-			err := os.Remove(path)
-			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				log.Error(ctx, "failed to remove", "path", path, "err", err)
-			}
-			return
-		}
-		err := os.Rename(backupPath, path)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Error(ctx, "failed to restore", "path", path, "err", err)
-		}
-	}
-
-	err := os.Rename(path, backupPath)
-	if errors.Is(err, os.ErrNotExist) {
-		existed = false
-		return restoreFunc
-	}
-	existed = true
-	if err != nil {
-		log.Error(ctx, "failed to back up", "path", path, "err", err)
-		return restoreFunc
-	}
-
-	src, err := os.Open(backupPath)
-	if err != nil {
-		log.Error(ctx, "failed to open backup src", "path", backupPath, "err", err)
-		return restoreFunc
-	}
-	defer src.Close()
-	dst, err := os.Create(path)
-	if err != nil {
-		log.Error(ctx, "failed to open backup dest", "path", path, "err", err)
-		return restoreFunc
-	}
-	defer dst.Close()
-	_, err = io.Copy(dst, src)
-	if err != nil {
-		log.Error(ctx, "failed to copy backup", "path", backupPath, "err", err)
-	}
-	return restoreFunc
 }
