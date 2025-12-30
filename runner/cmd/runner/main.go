@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"syscall"
 
@@ -121,27 +122,32 @@ func start(ctx context.Context, tempDir string, homeDir string, httpPort int, ss
 	log.DefaultEntry.Logger.SetOutput(io.MultiWriter(os.Stdout, defaultLogFile))
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(logLevel))
 
+	// NB: The Mkdir/Chown/Chmod code below relies on the fact that RunnerDstackDir path is _not_ nested (/dstack).
+	// Adjust it if the path is changed to, e.g., /opt/dstack
+	const dstackDir = consts.RunnerDstackDir
+	dstackSshDir := path.Join(dstackDir, "ssh")
+
 	// To ensure that all components of the authorized_keys path are owned by root and no directories
 	// are group or world writable, as required by sshd with "StrictModes yes" (the default value),
 	// we fix `/dstack` ownership and permissions and remove `/dstack/ssh` (it will be (re)created
 	// in Sshd.Prepare())
 	// See: https://github.com/openssh/openssh-portable/blob/d01efaa1c9ed84fd9011201dbc3c7cb0a82bcee3/misc.c#L2257-L2272
-	if err := os.Mkdir("/dstack", 0o755); errors.Is(err, os.ErrExist) {
-		if err := os.Chown("/dstack", 0, 0); err != nil {
+	if err := os.Mkdir(dstackDir, 0o755); errors.Is(err, os.ErrExist) {
+		if err := os.Chown(dstackDir, 0, 0); err != nil {
 			return fmt.Errorf("chown dstack dir: %w", err)
 		}
-		if err := os.Chmod("/dstack", 0o755); err != nil {
+		if err := os.Chmod(dstackDir, 0o755); err != nil {
 			return fmt.Errorf("chmod dstack dir: %w", err)
 		}
 	} else if err != nil {
 		return fmt.Errorf("create dstack dir: %w", err)
 	}
-	if err := os.RemoveAll("/dstack/ssh"); err != nil {
+	if err := os.RemoveAll(dstackSshDir); err != nil {
 		return fmt.Errorf("remove dstack ssh dir: %w", err)
 	}
 
 	sshd := ssh.NewSshd("/usr/sbin/sshd")
-	if err := sshd.Prepare(ctx, "/dstack/ssh", sshPort, "INFO"); err != nil {
+	if err := sshd.Prepare(ctx, dstackSshDir, sshPort, "INFO"); err != nil {
 		return fmt.Errorf("prepare sshd: %w", err)
 	}
 	if err := sshd.AddAuthorizedKeys(ctx, sshAuthorizedKeys...); err != nil {
@@ -156,7 +162,7 @@ func start(ctx context.Context, tempDir string, homeDir string, httpPort int, ss
 		}
 	}()
 
-	server, err := api.NewServer(ctx, tempDir, homeDir, fmt.Sprintf(":%d", httpPort), sshd, version)
+	server, err := api.NewServer(ctx, tempDir, homeDir, dstackDir, sshd, fmt.Sprintf(":%d", httpPort), version)
 	if err != nil {
 		return fmt.Errorf("create server: %w", err)
 	}

@@ -56,7 +56,7 @@ func mainInner() int {
 				Usage:       "Set shim's home directory",
 				Destination: &args.Shim.HomeDir,
 				TakesFile:   true,
-				DefaultText: path.Join("~", consts.DstackDirPath),
+				DefaultText: path.Join("~", consts.DstackUserDir),
 				Sources:     cli.EnvVars("DSTACK_SHIM_HOME"),
 			},
 			&cli.StringFlag{
@@ -187,7 +187,7 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 		if err != nil {
 			return err
 		}
-		shimHomeDir = filepath.Join(home, consts.DstackDirPath)
+		shimHomeDir = filepath.Join(home, consts.DstackUserDir)
 		args.Shim.HomeDir = shimHomeDir
 	}
 
