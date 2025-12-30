@@ -142,6 +142,7 @@ export const RunList: React.FC = () => {
                         className={styles.noFleetAlert}
                         projectName={projectDontHasFleet ?? ''}
                         show={!!projectDontHasFleet}
+                        dismissible={true}
                     />
 
                     <Header

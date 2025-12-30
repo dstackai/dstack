@@ -90,6 +90,7 @@ export const FleetList: React.FC = () => {
                         className={styles.noFleetAlert}
                         projectName={projectDontHasFleet ?? ''}
                         show={!!projectDontHasFleet}
+                        dismissible={true}
                     />
 
                     <Header
