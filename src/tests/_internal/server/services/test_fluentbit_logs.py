@@ -61,11 +61,12 @@ class TestHTTPFluentBitWriter:
             yield mock.return_value
 
     def test_init_creates_client(self, mock_httpx_client):
-        writer = HTTPFluentBitWriter(host="localhost", port=8080)
+        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
         assert writer._endpoint == "http://localhost:8080"
+        assert writer._tag_prefix == "dstack"
 
     def test_write_posts_records(self, mock_httpx_client):
-        writer = HTTPFluentBitWriter(host="localhost", port=8080)
+        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
         records = [
             {"message": "Hello", "@timestamp": "2023-10-06T10:00:00+00:00"},
             {"message": "World", "@timestamp": "2023-10-06T10:00:01+00:00"},
@@ -74,12 +75,12 @@ class TestHTTPFluentBitWriter:
 
         assert mock_httpx_client.post.call_count == 2
         mock_httpx_client.post.assert_any_call(
-            "http://localhost:8080/test-tag",
+            "http://localhost:8080/dstack.test-tag",
             json=records[0],
             headers={"Content-Type": "application/json"},
         )
         mock_httpx_client.post.assert_any_call(
-            "http://localhost:8080/test-tag",
+            "http://localhost:8080/dstack.test-tag",
             json=records[1],
             headers={"Content-Type": "application/json"},
         )
@@ -88,7 +89,7 @@ class TestHTTPFluentBitWriter:
         """Test that response.raise_for_status() is called to detect non-2xx responses."""
         mock_response = Mock()
         mock_httpx_client.post.return_value = mock_response
-        writer = HTTPFluentBitWriter(host="localhost", port=8080)
+        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
 
         writer.write(tag="test-tag", records=[{"message": "test"}])
 
@@ -105,7 +106,7 @@ class TestHTTPFluentBitWriter:
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "Server Error", request=Mock(), response=mock_response
         )
-        writer = HTTPFluentBitWriter(host="localhost", port=8080)
+        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
 
         with pytest.raises(LogStorageError, match="Fluent-bit HTTP error: status 500"):
             writer.write(tag="test-tag", records=[{"message": "test"}])
@@ -114,15 +115,39 @@ class TestHTTPFluentBitWriter:
         import httpx
 
         mock_httpx_client.post.side_effect = httpx.HTTPError("Connection failed")
-        writer = HTTPFluentBitWriter(host="localhost", port=8080)
+        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
 
         with pytest.raises(LogStorageError, match="Fluent-bit HTTP error"):
             writer.write(tag="test-tag", records=[{"message": "test"}])
 
     def test_close_closes_client(self, mock_httpx_client):
-        writer = HTTPFluentBitWriter(host="localhost", port=8080)
+        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
         writer.close()
         mock_httpx_client.close.assert_called_once()
+
+    def test_write_applies_tag_prefix(self, mock_httpx_client):
+        """Test that tag prefix is applied to tags in HTTP requests."""
+        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="dstack")
+        records = [{"message": "test"}]
+        writer.write(tag="project/run/job", records=records)
+
+        mock_httpx_client.post.assert_called_once_with(
+            "http://localhost:8080/dstack.project/run/job",
+            json=records[0],
+            headers={"Content-Type": "application/json"},
+        )
+
+    def test_write_with_empty_tag_prefix(self, mock_httpx_client):
+        """Test that empty tag prefix doesn't break the tag."""
+        writer = HTTPFluentBitWriter(host="localhost", port=8080, tag_prefix="")
+        records = [{"message": "test"}]
+        writer.write(tag="test-tag", records=records)
+
+        mock_httpx_client.post.assert_called_once_with(
+            "http://localhost:8080/test-tag",
+            json=records[0],
+            headers={"Content-Type": "application/json"},
+        )
 
 
 class TestForwardFluentBitWriter:
@@ -240,7 +265,7 @@ class TestFluentBitLogStorage:
                 protocol="http",
                 tag_prefix="dstack",
             )
-            mock.assert_called_once_with(host="localhost", port=8080)
+            mock.assert_called_once_with(host="localhost", port=8080, tag_prefix="dstack")
 
     def test_init_with_unsupported_protocol_raises(self):
         with pytest.raises(LogStorageError, match="Unsupported Fluent-bit protocol"):

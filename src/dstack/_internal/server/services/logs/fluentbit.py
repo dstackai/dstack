@@ -164,15 +164,17 @@ else:
     class HTTPFluentBitWriter:
         """Writes logs to Fluent-bit via HTTP POST."""
 
-        def __init__(self, host: str, port: int) -> None:
+        def __init__(self, host: str, port: int, tag_prefix: str) -> None:
             self._endpoint = f"http://{host}:{port}"
             self._client = httpx.Client(timeout=30.0)
+            self._tag_prefix = tag_prefix
 
         def write(self, tag: str, records: List[dict]) -> None:
+            prefixed_tag = f"{self._tag_prefix}.{tag}" if self._tag_prefix else tag
             for record in records:
                 try:
                     response = self._client.post(
-                        f"{self._endpoint}/{tag}",
+                        f"{self._endpoint}/{prefixed_tag}",
                         json=record,
                         headers={"Content-Type": "application/json"},
                     )
@@ -249,7 +251,9 @@ else:
             self._tag_prefix = tag_prefix
 
             if protocol == "http":
-                self._writer: FluentBitWriter = HTTPFluentBitWriter(host=host, port=port)
+                self._writer: FluentBitWriter = HTTPFluentBitWriter(
+                    host=host, port=port, tag_prefix=tag_prefix
+                )
             elif protocol == "forward":
                 self._writer = ForwardFluentBitWriter(host=host, port=port, tag_prefix=tag_prefix)
             else:
