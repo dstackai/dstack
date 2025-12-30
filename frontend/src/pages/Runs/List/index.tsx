@@ -7,8 +7,11 @@ import { Button, ButtonDropdown, Header, Loader, PropertyFilter, SpaceBetween, T
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
+import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { ROUTES } from 'routes';
 import { useLazyGetRunsQuery } from 'services/run';
+
+import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
 import { useRunListPreferences } from './Preferences/useRunListPreferences';
 import {
@@ -48,6 +51,8 @@ export const RunList: React.FC = () => {
     } = useFilters({
         localStorePrefix: 'administration-run-list-page',
     });
+
+    const projectHavingFleetMap = useCheckingForFleetsInProjects({});
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IRun, TRunsRequestParams>({
         useLazyQuery: useLazyGetRunsQuery,
@@ -117,6 +122,8 @@ export const RunList: React.FC = () => {
         }
     };
 
+    const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
+
     return (
         <Table
             {...collectionProps}
@@ -130,50 +137,58 @@ export const RunList: React.FC = () => {
             columnDisplay={preferences.contentDisplay}
             preferences={<Preferences />}
             header={
-                <Header
-                    variant="awsui-h1-sticky"
-                    actions={
-                        <SpaceBetween size="xs" direction="horizontal">
-                            <ButtonDropdown
-                                items={[
-                                    {
-                                        text: 'Dev environment',
-                                        id: 'dev_env',
-                                        href: `${ROUTES.RUNS.CREATE_DEV_ENV}${
-                                            filteringRequestParams.project_name
-                                                ? `?project_name=${filteringRequestParams.project_name}`
-                                                : ''
-                                        }`,
-                                    },
-                                ]}
-                                onItemFollow={onFollowButtonDropdownLink}
-                            >
-                                {t('common.new')}
-                            </ButtonDropdown>
+                <>
+                    <NoFleetProjectAlert
+                        className={styles.noFleetAlert}
+                        projectName={projectDontHasFleet ?? ''}
+                        show={!!projectDontHasFleet}
+                    />
 
-                            <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
-                                {t('common.abort')}
-                            </Button>
+                    <Header
+                        variant="awsui-h1-sticky"
+                        actions={
+                            <SpaceBetween size="xs" direction="horizontal">
+                                <ButtonDropdown
+                                    items={[
+                                        {
+                                            text: 'Dev environment',
+                                            id: 'dev_env',
+                                            href: `${ROUTES.RUNS.CREATE_DEV_ENV}${
+                                                filteringRequestParams.project_name
+                                                    ? `?project_name=${filteringRequestParams.project_name}`
+                                                    : ''
+                                            }`,
+                                        },
+                                    ]}
+                                    onItemFollow={onFollowButtonDropdownLink}
+                                >
+                                    {t('common.new')}
+                                </ButtonDropdown>
 
-                            <Button formAction="none" onClick={stopClickHandle} disabled={isDisabledStopButton}>
-                                {t('common.stop')}
-                            </Button>
+                                <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
+                                    {t('common.abort')}
+                                </Button>
 
-                            {/*<Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>*/}
-                            {/*    {t('common.delete')}*/}
-                            {/*</Button>*/}
+                                <Button formAction="none" onClick={stopClickHandle} disabled={isDisabledStopButton}>
+                                    {t('common.stop')}
+                                </Button>
 
-                            <Button
-                                iconName="refresh"
-                                disabled={isLoading}
-                                ariaLabel={t('common.refresh')}
-                                onClick={refreshList}
-                            />
-                        </SpaceBetween>
-                    }
-                >
-                    {t('projects.runs')}
-                </Header>
+                                {/*<Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>*/}
+                                {/*    {t('common.delete')}*/}
+                                {/*</Button>*/}
+
+                                <Button
+                                    iconName="refresh"
+                                    disabled={isLoading}
+                                    ariaLabel={t('common.refresh')}
+                                    onClick={refreshList}
+                                />
+                            </SpaceBetween>
+                        }
+                    >
+                        {t('projects.runs')}
+                    </Header>
+                </>
             }
             filter={
                 <div className={styles.selectFilters}>

@@ -36,6 +36,14 @@ class TestListProjects:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_list_only_no_fleets_returns_40x_if_not_authenticated(
+        self, test_db, client: AsyncClient
+    ):
+        response = await client.post("/api/projects/list_only_no_fleets")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_empty_list(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         response = await client.post("/api/projects/list", headers=get_auth_headers(user.token))
@@ -207,6 +215,495 @@ class TestListProjects:
         project_names = [p["project_name"] for p in projects]
         assert "public_project" in project_names
         assert "private_project" in project_names
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_only_no_fleets_returns_projects_without_active_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+
+        # Create project with no fleets
+        project_no_fleets = await create_project(
+            session=session,
+            owner=user,
+            name="project_no_fleets",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project_no_fleets, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        # Create project with active fleet
+        project_with_active_fleet = await create_project(
+            session=session,
+            owner=user,
+            name="project_with_active_fleet",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session,
+            project=project_with_active_fleet,
+            user=user,
+            project_role=ProjectRole.ADMIN,
+        )
+        await create_fleet(
+            session=session,
+            project=project_with_active_fleet,
+            deleted=False,
+        )
+
+        # Create project with deleted fleet (should be included)
+        project_with_deleted_fleet = await create_project(
+            session=session,
+            owner=user,
+            name="project_with_deleted_fleet",
+            created_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session,
+            project=project_with_deleted_fleet,
+            user=user,
+            project_role=ProjectRole.ADMIN,
+        )
+        deleted_fleet = await create_fleet(
+            session=session,
+            project=project_with_deleted_fleet,
+            deleted=True,
+        )
+        deleted_fleet.status = FleetStatus.TERMINATED
+        await session.commit()
+
+        # Test with list_only_no_fleets endpoint
+        response = await client.post(
+            "/api/projects/list_only_no_fleets",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+
+        # Should only return projects without active fleets
+        assert len(projects) == 2
+        project_names = {p["project_name"] for p in projects}
+        assert "project_no_fleets" in project_names
+        assert "project_with_deleted_fleet" in project_names
+        assert "project_with_active_fleet" not in project_names
+
+        # Test with regular list endpoint (default)
+        response = await client.post(
+            "/api/projects/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+
+        # Should return all projects
+        assert len(projects) == 3
+        project_names = {p["project_name"] for p in projects}
+        assert "project_no_fleets" in project_names
+        assert "project_with_active_fleet" in project_names
+        assert "project_with_deleted_fleet" in project_names
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_only_no_fleets_with_multiple_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        """Test project with multiple fleets - some active, some deleted"""
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+
+        # Create project with both active and deleted fleets
+        project_mixed = await create_project(
+            session=session,
+            owner=user,
+            name="project_mixed",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project_mixed, user=user, project_role=ProjectRole.ADMIN
+        )
+        # Add active fleet - should exclude project
+        await create_fleet(
+            session=session,
+            project=project_mixed,
+            deleted=False,
+        )
+        # Add deleted fleet - should not affect exclusion
+        deleted_fleet = await create_fleet(
+            session=session,
+            project=project_mixed,
+            deleted=True,
+        )
+        deleted_fleet.status = FleetStatus.TERMINATED
+        await session.commit()
+
+        # Project should NOT be included because it has an active fleet
+        response = await client.post(
+            "/api/projects/list_only_no_fleets",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+        project_names = {p["project_name"] for p in projects}
+        assert "project_mixed" not in project_names
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_only_no_fleets_empty_result(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        """Test when all projects have active fleets"""
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+
+        # Create projects, all with active fleets
+        for i in range(3):
+            project = await create_project(
+                session=session,
+                owner=user,
+                name=f"project_{i}",
+                created_at=datetime(2023, 1, 2, 3, 4 + i, tzinfo=timezone.utc),
+            )
+            await add_project_member(
+                session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+            )
+            await create_fleet(
+                session=session,
+                project=project,
+                deleted=False,
+            )
+
+        # Should return empty list
+        response = await client.post(
+            "/api/projects/list_only_no_fleets",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+        assert len(projects) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_only_no_fleets_respects_user_permissions(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        # Create regular user (not admin)
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+
+        # Create another user
+        owner = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
+
+        # Create project where user is a member (no fleets)
+        project_member = await create_project(
+            session=session,
+            owner=owner,
+            name="project_member",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project_member, user=user, project_role=ProjectRole.USER
+        )
+        await add_project_member(
+            session=session, project=project_member, user=owner, project_role=ProjectRole.ADMIN
+        )
+
+        # Create public project where user is NOT a member (no fleets)
+        public_project = await create_project(
+            session=session,
+            owner=owner,
+            name="public_project",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            is_public=True,
+        )
+        await add_project_member(
+            session=session, project=public_project, user=owner, project_role=ProjectRole.ADMIN
+        )
+
+        # Create private project where user is NOT a member (should not see this)
+        private_project = await create_project(
+            session=session,
+            owner=owner,
+            name="private_project",
+            created_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
+            is_public=False,
+        )
+        await add_project_member(
+            session=session, project=private_project, user=owner, project_role=ProjectRole.ADMIN
+        )
+
+        # Test with list_only_no_fleets endpoint
+        response = await client.post(
+            "/api/projects/list_only_no_fleets",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+
+        # Should only return member projects without active fleets
+        # (public projects where user is not a member are no longer included)
+        assert len(projects) == 1
+        project_names = {p["project_name"] for p in projects}
+        assert "project_member" in project_names
+        assert "public_project" not in project_names
+        assert "private_project" not in project_names
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_only_no_fleets_regular_user_filters_active_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        """Test that regular users correctly filter out projects with active fleets"""
+        # Create regular user (not admin)
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+
+        # Create another user
+        owner = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
+
+        # Create member project with no fleets (should be included)
+        project_member_no_fleet = await create_project(
+            session=session,
+            owner=owner,
+            name="project_member_no_fleet",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session,
+            project=project_member_no_fleet,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+
+        # Create member project with active fleet (should be excluded)
+        project_member_with_fleet = await create_project(
+            session=session,
+            owner=owner,
+            name="project_member_with_fleet",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session,
+            project=project_member_with_fleet,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        await create_fleet(
+            session=session,
+            project=project_member_with_fleet,
+            deleted=False,
+        )
+
+        # Create public project where user is a member with no fleets (should be included)
+        public_project_no_fleet = await create_project(
+            session=session,
+            owner=owner,
+            name="public_project_no_fleet",
+            created_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
+            is_public=True,
+        )
+        await add_project_member(
+            session=session,
+            project=public_project_no_fleet,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+
+        # Create public project where user is a member with active fleet (should be excluded)
+        public_project_with_fleet = await create_project(
+            session=session,
+            owner=owner,
+            name="public_project_with_fleet",
+            created_at=datetime(2023, 1, 2, 3, 7, tzinfo=timezone.utc),
+            is_public=True,
+        )
+        await add_project_member(
+            session=session,
+            project=public_project_with_fleet,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        await create_fleet(
+            session=session,
+            project=public_project_with_fleet,
+            deleted=False,
+        )
+
+        # Test with list_only_no_fleets endpoint
+        response = await client.post(
+            "/api/projects/list_only_no_fleets",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+
+        # Should only return member projects without active fleets
+        assert len(projects) == 2
+        project_names = {p["project_name"] for p in projects}
+        assert "project_member_no_fleet" in project_names
+        assert "public_project_no_fleet" in project_names
+        assert "project_member_with_fleet" not in project_names
+        assert "public_project_with_fleet" not in project_names
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_only_no_fleets_filters_active_fleets_correctly(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        """Test that projects with active fleets are correctly filtered out"""
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+
+        # Create project with active fleet
+        project_with_active = await create_project(
+            session=session,
+            owner=user,
+            name="project_with_active",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project_with_active, user=user, project_role=ProjectRole.ADMIN
+        )
+        active_fleet = await create_fleet(
+            session=session,
+            project=project_with_active,
+            deleted=False,
+        )
+        active_fleet.status = FleetStatus.ACTIVE
+        await session.commit()
+
+        # Create project with terminated but not deleted fleet (still active)
+        project_with_terminated = await create_project(
+            session=session,
+            owner=user,
+            name="project_with_terminated",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session,
+            project=project_with_terminated,
+            user=user,
+            project_role=ProjectRole.ADMIN,
+        )
+        terminated_fleet = await create_fleet(
+            session=session,
+            project=project_with_terminated,
+            deleted=False,
+        )
+        terminated_fleet.status = FleetStatus.TERMINATED
+        await session.commit()
+
+        # Both should be excluded
+        response = await client.post(
+            "/api/projects/list_only_no_fleets",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+        project_names = {p["project_name"] for p in projects}
+        assert "project_with_active" not in project_names
+        assert "project_with_terminated" not in project_names
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_only_no_fleets_sorted_by_created_at(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        """Test that results are sorted by created_at"""
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+
+        # Create projects in reverse order
+        project_3 = await create_project(
+            session=session,
+            owner=user,
+            name="project_3",
+            created_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project_3, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        project_1 = await create_project(
+            session=session,
+            owner=user,
+            name="project_1",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project_1, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        project_2 = await create_project(
+            session=session,
+            owner=user,
+            name="project_2",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session, project=project_2, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        # Results should be sorted by created_at ascending
+        response = await client.post(
+            "/api/projects/list_only_no_fleets",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+        assert len(projects) == 3
+        assert projects[0]["project_name"] == "project_1"
+        assert projects[1]["project_name"] == "project_2"
+        assert projects[2]["project_name"] == "project_3"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_only_no_fleets_admin_requires_membership(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        """Test that admins also require membership (unified behavior)"""
+        # Create admin user
+        admin = await create_user(session=session, global_role=GlobalRole.ADMIN)
+
+        # Create another user
+        owner = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
+
+        # Create project where admin is a member (no fleets) - should be included
+        project_with_membership = await create_project(
+            session=session,
+            owner=owner,
+            name="project_with_membership",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session,
+            project=project_with_membership,
+            user=admin,
+            project_role=ProjectRole.ADMIN,
+        )
+
+        # Create project where admin is NOT a member (no fleets) - should NOT be included
+        project_without_membership = await create_project(
+            session=session,
+            owner=owner,
+            name="project_without_membership",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        await add_project_member(
+            session=session,
+            project=project_without_membership,
+            user=owner,
+            project_role=ProjectRole.ADMIN,
+        )
+
+        # Test with list_only_no_fleets endpoint
+        response = await client.post(
+            "/api/projects/list_only_no_fleets",
+            headers=get_auth_headers(admin.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+
+        # Should only return project where admin is a member
+        assert len(projects) == 1
+        project_names = {p["project_name"] for p in projects}
+        assert "project_with_membership" in project_names
+        assert "project_without_membership" not in project_names
 
 
 class TestCreateProject:

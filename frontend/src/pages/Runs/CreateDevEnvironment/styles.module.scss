@@ -1,5 +1,9 @@
 @use '@cloudscape-design/design-tokens/index' as awsui;
 
+.noFleetAlert {
+  margin: 12px 0 0;
+}
+
 .wizardForm {
   & [class^="awsui_wizard"] {
     & [class^="awsui_footer"] {

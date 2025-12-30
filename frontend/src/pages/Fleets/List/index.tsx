@@ -5,8 +5,11 @@ import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } f
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
+import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { ROUTES } from 'routes';
 import { useLazyGetFleetsQuery } from 'services/fleet';
+
+import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
 import { useColumnsDefinitions, useEmptyMessages, useFilters } from './hooks';
 import { useDeleteFleet } from './useDeleteFleet';
@@ -34,6 +37,8 @@ export const FleetList: React.FC = () => {
         onChangeOnlyActive,
         isDisabledClearFilter,
     } = useFilters();
+
+    const projectHavingFleetMap = useCheckingForFleetsInProjects({});
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IFleet, TFleetListRequestParams>({
         useLazyQuery: useLazyGetFleetsQuery,
@@ -67,6 +72,8 @@ export const FleetList: React.FC = () => {
         deleteFleets([...selectedItems]).catch(console.log);
     };
 
+    const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
+
     return (
         <Table
             {...collectionProps}
@@ -78,25 +85,33 @@ export const FleetList: React.FC = () => {
             stickyHeader={true}
             selectionType="multi"
             header={
-                <Header
-                    variant="awsui-h1-sticky"
-                    actions={
-                        <SpaceBetween size="xs" direction="horizontal">
-                            <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
-                                {t('common.delete')}
-                            </Button>
+                <>
+                    <NoFleetProjectAlert
+                        className={styles.noFleetAlert}
+                        projectName={projectDontHasFleet ?? ''}
+                        show={!!projectDontHasFleet}
+                    />
 
-                            <Button
-                                iconName="refresh"
-                                disabled={isLoading}
-                                ariaLabel={t('common.refresh')}
-                                onClick={refreshList}
-                            />
-                        </SpaceBetween>
-                    }
-                >
-                    {t('navigation.fleets')}
-                </Header>
+                    <Header
+                        variant="awsui-h1-sticky"
+                        actions={
+                            <SpaceBetween size="xs" direction="horizontal">
+                                <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
+                                    {t('common.delete')}
+                                </Button>
+
+                                <Button
+                                    iconName="refresh"
+                                    disabled={isLoading}
+                                    ariaLabel={t('common.refresh')}
+                                    onClick={refreshList}
+                                />
+                            </SpaceBetween>
+                        }
+                    >
+                        {t('navigation.fleets')}
+                    </Header>
+                </>
             }
             filter={
                 <div className={styles.filters}>
