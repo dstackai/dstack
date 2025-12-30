@@ -240,7 +240,7 @@ Fluent-bit supports two modes depending on how you want to access logs.
 
 === "Ship-only mode"
 
-    Logs are forwarded to Fluent-bit but cannot be read through dstack. 
+    Logs are forwarded to Fluent-bit but cannot be read through `dstack`. 
     The dstack UI/CLI will show empty logs. Use this mode when:
 
     - You have an existing logging infrastructure (Kibana, Grafana, Datadog, etc.)

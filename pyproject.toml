@@ -219,7 +219,6 @@ nebius = [
 fluentbit = [
     "fluent-logger>=0.10.0",
     "elasticsearch>=8.0.0",
-    "httpx",
     "dstack[server]",
 ]
 all = [

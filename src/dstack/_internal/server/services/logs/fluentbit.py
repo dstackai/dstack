@@ -1,6 +1,8 @@
 from typing import List, Optional, Protocol
 from uuid import UUID
 
+import httpx
+
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.logs import (
     JobSubmissionLogs,
@@ -146,7 +148,6 @@ else:
 
 FLUENTBIT_AVAILABLE = True
 try:
-    import httpx
     from fluent import sender as fluent_sender
 except ImportError:
     FLUENTBIT_AVAILABLE = False
