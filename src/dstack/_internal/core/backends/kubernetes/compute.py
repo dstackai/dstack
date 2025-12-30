@@ -574,6 +574,7 @@ def _get_nvidia_gpu_from_node_labels(labels: dict[str, str]) -> Optional[Gpu]:
     gpu_product = labels.get(NVIDIA_GPU_PRODUCT_LABEL)
     if gpu_product is None:
         return None
+    gpu_product = gpu_product.replace("RTX-", "RTX")
     for gpu_name in NVIDIA_GPU_NAMES:
         if gpu_name.lower() in gpu_product.lower().split("-"):
             break
