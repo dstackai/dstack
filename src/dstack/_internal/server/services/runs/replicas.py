@@ -13,7 +13,6 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import (
-    create_group_run_spec,
     create_job_model_for_new_submission,
     logger,
 )
@@ -30,32 +29,15 @@ async def retry_run_replica_jobs(
     )
 
     # Determine replica group from existing job
-    base_run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
     job_spec = JobSpec.parse_raw(latest_jobs[0].job_spec_data)
     replica_group_name = job_spec.replica_group
-    replica_group = None
-
-    # Find matching replica group
-    if (
-        replica_group_name
-        and base_run_spec.configuration.type == "service"
-        and base_run_spec.configuration.replica_groups
-    ):
-        for group in base_run_spec.configuration.replica_groups:
-            if group.name == replica_group_name:
-                replica_group = group
-                break
-
-    run_spec = (
-        base_run_spec
-        if replica_group is None
-        else create_group_run_spec(base_run_spec, replica_group)
-    )
 
     new_jobs = await get_jobs_from_run_spec(
         run_spec=run_spec,
         secrets=secrets,
         replica_num=latest_jobs[0].replica_num,
+        replica_group_name=replica_group_name,
     )
     assert len(new_jobs) == len(latest_jobs), (
         "Changing the number of jobs within a replica is not yet supported"
@@ -69,10 +51,6 @@ async def retry_run_replica_jobs(
             job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
             job_model.termination_reason_message = "Replica is to be retried"
             switch_job_status(session, job_model, JobStatus.TERMINATING)
-
-        # Set replica_group on retried jobs to maintain group identity
-        if replica_group_name:
-            new_job.job_spec.replica_group = replica_group_name
 
         new_job_model = create_job_model_for_new_submission(
             run_model=run_model,
@@ -224,11 +202,9 @@ async def _scale_up_replicas(
                 run_spec=run_spec,
                 secrets=secrets,
                 replica_num=new_replica_num,
+                replica_group_name=group_name,
             )
             for job in jobs:
-                # Set replica_group if specified
-                if group_name is not None:
-                    job.job_spec.replica_group = group_name
                 job_model = create_job_model_for_new_submission(
                     run_model=run_model,
                     job=job,
@@ -288,7 +264,7 @@ async def scale_run_replicas_per_group(
                 run_model=run_model,
                 group=group,
                 replicas_diff=group_diff,
-                base_run_spec=RunSpec.__response__.parse_raw(run_model.run_spec),
+                run_spec=RunSpec.__response__.parse_raw(run_model.run_spec),
                 active_replicas=active_replicas,
                 inactive_replicas=inactive_replicas,
             )
@@ -299,7 +275,7 @@ async def scale_run_replicas_for_group(
     run_model: RunModel,
     group: ReplicaGroup,
     replicas_diff: int,
-    base_run_spec: RunSpec,
+    run_spec: RunSpec,
     active_replicas: List[Tuple[int, bool, int, List[JobModel]]],
     inactive_replicas: List[Tuple[int, bool, int, List[JobModel]]],
 ) -> None:
@@ -315,9 +291,6 @@ async def scale_run_replicas_for_group(
         group.name,
     )
 
-    # Get group-specific run_spec
-    group_run_spec = create_group_run_spec(base_run_spec, group)
-
     if replicas_diff < 0:
         _scale_down_replicas(active_replicas, abs(replicas_diff))
     else:
@@ -327,6 +300,6 @@ async def scale_run_replicas_for_group(
             active_replicas=active_replicas,
             inactive_replicas=inactive_replicas,
             replicas_diff=replicas_diff,
-            run_spec=group_run_spec,
+            run_spec=run_spec,
             group_name=group.name,
         )

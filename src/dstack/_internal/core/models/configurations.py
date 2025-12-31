@@ -611,7 +611,7 @@ class ConfigurationWithPortsParams(CoreModel):
 class ConfigurationWithCommandsParams(CoreModel):
     commands: Annotated[CommandsList, Field(description="The shell commands to run")] = []
 
-    @root_validator(pre=True)
+    @root_validator
     def check_image_or_commands_present(cls, values):
         # If replicas is list, skip validation - commands come from replica groups
         replicas = values.get("replicas")
@@ -957,7 +957,6 @@ class ServiceConfigurationParams(CoreModel):
             )
 
         resources = values.get("resources")
-        from dstack._internal.core.models.resources import ResourcesSpec
 
         default_resources = ResourcesSpec()
         if resources and resources.dict() != default_resources.dict():

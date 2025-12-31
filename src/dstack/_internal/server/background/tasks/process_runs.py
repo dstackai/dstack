@@ -40,7 +40,6 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import (
-    create_group_run_spec,
     fmt,
     process_terminating_run,
     run_model_to_run,
@@ -482,7 +481,7 @@ async def _handle_run_replicas(
                     session=session,
                     run_model=run_model,
                     group=group,
-                    base_run_spec=run_spec,
+                    run_spec=run_spec,
                     desired_replica_counts=counts,
                 )
         return
@@ -563,7 +562,6 @@ async def _update_jobs_to_new_deployment_in_place(
         session=session,
         project=run_model.project,
     )
-    base_run_spec = run_spec
 
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         if all(j.status.is_finished() for j in job_models):
@@ -573,22 +571,17 @@ async def _update_jobs_to_new_deployment_in_place(
 
         # Determine which group this replica belongs to
         replica_group_name = None
-        group_run_spec = base_run_spec
 
         if replicas:
             job_spec = JobSpec.__response__.parse_raw(job_models[0].job_spec_data)
             replica_group_name = job_spec.replica_group
 
-            for group in replicas:
-                if group.name == replica_group_name:
-                    group_run_spec = create_group_run_spec(base_run_spec, group)
-                    break
-
         # FIXME: Handle getting image configuration errors or skip it.
         new_job_specs = await get_job_specs_from_run_spec(
-            run_spec=group_run_spec,
+            run_spec=run_spec,
             secrets=secrets,
             replica_num=replica_num,
+            replica_group_name=replica_group_name,
         )
         assert len(new_job_specs) == len(job_models), (
             "Changing the number of jobs within a replica is not yet supported"
@@ -681,7 +674,7 @@ async def _handle_rolling_deployment_for_group(
     session: AsyncSession,
     run_model: RunModel,
     group: ReplicaGroup,
-    base_run_spec: RunSpec,
+    run_spec: RunSpec,
     desired_replica_counts: dict,
 ) -> None:
     """
@@ -726,7 +719,7 @@ async def _handle_rolling_deployment_for_group(
             run_model=run_model,
             group=group,
             replicas_diff=group_max_replica_count - non_terminated_replica_count,
-            base_run_spec=base_run_spec,
+            run_spec=run_spec,
             active_replicas=active_replicas,
             inactive_replicas=inactive_replicas,
         )
@@ -774,7 +767,7 @@ async def _handle_rolling_deployment_for_group(
             run_model=run_model,
             group=group,
             replicas_diff=-replicas_to_stop_count,
-            base_run_spec=base_run_spec,
+            run_spec=run_spec,
             active_replicas=active_replicas,
             inactive_replicas=inactive_replicas,
         )

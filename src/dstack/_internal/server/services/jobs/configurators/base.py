@@ -90,9 +90,11 @@ class JobConfigurator(ABC):
         self,
         run_spec: RunSpec,
         secrets: Optional[Dict[str, str]] = None,
+        replica_group_name: Optional[str] = None,
     ):
         self.run_spec = run_spec
         self.secrets = secrets or {}
+        self.replica_group_name = replica_group_name
 
     async def get_job_specs(self, replica_num: int) -> List[JobSpec]:
         job_spec = await self._get_job_spec(replica_num=replica_num, job_num=0, jobs_per_replica=1)
@@ -150,6 +152,7 @@ class JobConfigurator(ABC):
             job_num=job_num,
             job_name=f"{self.run_spec.run_name}-{job_num}-{replica_num}",
             jobs_per_replica=jobs_per_replica,
+            replica_group=self.replica_group_name or "default",
             app_specs=self._app_specs(),
             commands=await self._commands(),
             env=self._env(),
@@ -298,9 +301,15 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.registry_auth
 
     def _requirements(self, jobs_per_replica: int) -> Requirements:
+        resources = self.run_spec.configuration.resources
+        if self.run_spec.configuration.type == "service":
+            for group in self.run_spec.configuration.replica_groups:
+                if group.name == self.replica_group_name:
+                    resources = group.resources
+                    break
         spot_policy = self._spot_policy()
         return Requirements(
-            resources=self.run_spec.configuration.resources,
+            resources=resources,
             max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
             reservation=self.run_spec.merged_profile.reservation,
