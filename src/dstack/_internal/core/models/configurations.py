@@ -1006,10 +1006,6 @@ class ServiceConfiguration(
 
     @property
     def replica_groups(self) -> List[ReplicaGroup]:
-        """
-        Get normalized replica groups. After validation, replicas is always List[ReplicaGroup] or None.
-        Use this property for type-safe access in code.
-        """
         if self.replicas is None:
             return [
                 ReplicaGroup(
