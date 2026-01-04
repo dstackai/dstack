@@ -21,7 +21,7 @@ import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAler
 
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
-import { FORM_FIELD_NAMES } from './constants';
+import { FORM_FIELD_NAMES, IDE_OPTIONS } from './constants';
 
 import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
 
@@ -31,17 +31,6 @@ const requiredFieldError = 'This is a required field';
 const namesFieldError = 'Only latin characters, dashes, and digits';
 const urlFormatError = 'Only URLs';
 const workingDirFormatError = 'Must be an absolute path';
-
-const ideOptions = [
-    {
-        label: 'Cursor',
-        value: 'cursor',
-    },
-    {
-        label: 'VS Code',
-        value: 'vscode',
-    },
-];
 
 enum DockerPythonTabs {
     DOCKER = 'docker',
@@ -348,7 +337,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                         description={t('runs.dev_env.wizard.ide_description')}
                                         control={control}
                                         name="ide"
-                                        options={ideOptions}
+                                        options={IDE_OPTIONS}
                                         disabled={loading}
                                     />
 

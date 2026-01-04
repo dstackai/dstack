@@ -1,5 +1,8 @@
 import argparse
+import json
+import os
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -677,6 +680,14 @@ class DevEnvironmentConfigurator(RunWithPortsConfiguratorMixin, BaseRunConfigura
                     "Fix by opening [code]Command Palette[/code], executing [code]Shell Command: "
                     "Install 'cursor' command in PATH[/code], and restarting terminal.[/]\n"
                 )
+        if conf.ide == "windsurf" and conf.version is None:
+            conf.version = _detect_windsurf_version()
+            if conf.version is None:
+                console.print(
+                    "[secondary]Unable to detect the Windsurf version and pre-install extensions. "
+                    "Fix by opening [code]Command Palette[/code], executing [code]Shell Command: "
+                    "Install 'surf' command in PATH[/code], and restarting terminal.[/]\n"
+                )
 
 
 class ServiceConfigurator(RunWithCommandsConfiguratorMixin, BaseRunConfigurator):
@@ -727,6 +738,53 @@ def _detect_cursor_version(exe: str = "cursor") -> Optional[str]:
         return None
     if run.returncode == 0:
         return run.stdout.decode().split("\n")[1].strip()
+    return None
+
+
+def _detect_windsurf_version(exe: str = "surf") -> Optional[str]:
+    """
+    Detects the installed Windsurf product version and commit hash.
+    Returns string in format 'version@commit' (e.g., '1.13.5@97d7a...') or None.
+    """
+    # 1. Locate executable in PATH
+    cmd_path = shutil.which(exe)
+    if not cmd_path:
+        return None
+
+    try:
+        # 2. Resolve symlinks to find the actual installation directory
+        current_dir = os.path.dirname(os.path.realpath(cmd_path))
+
+        # 3. Walk up directory tree to find 'resources/app/product.json'
+        # Covers Linux (/opt/...), macOS (Contents/Resources/...), and Windows
+        for _ in range(6):
+            # Check standard lowercase and macOS TitleCase
+            for resource_folder in ["resources", "Resources"]:
+                json_path = os.path.join(current_dir, resource_folder, "app", "product.json")
+
+                if os.path.exists(json_path):
+                    try:
+                        with open(json_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            # Key 'windsurfVersion' is the product version (1.13.5)
+                            # Key 'version' is the base VS Code version (1.9x)
+                            ver = data.get("windsurfVersion")
+                            commit = data.get("commit")
+
+                            if ver and commit:
+                                return f"{ver}@{commit}"
+                    except (OSError, json.JSONDecodeError):
+                        continue
+
+            # Move up one directory level
+            parent = os.path.dirname(current_dir)
+            if parent == current_dir:  # Reached filesystem root
+                break
+            current_dir = parent
+
+    except Exception:
+        return None
+
     return None
 
 
