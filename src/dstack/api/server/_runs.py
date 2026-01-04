@@ -57,8 +57,14 @@ class RunsAPIClient(APIClientGroup):
         )
         return parse_obj_as(List[Run.__response__], resp.json())
 
-    def get(self, project_name: str, run_name: str) -> Run:
-        body = GetRunRequest(run_name=run_name)
+    def get(
+        self, project_name: str, run_name: Optional[str] = None, run_id: Optional[UUID] = None
+    ) -> Run:
+        if run_name is None and run_id is None:
+            raise ValueError("Either run_name or run_id must be provided")
+        if run_name is not None and run_id is not None:
+            raise ValueError("Cannot specify both run_name and run_id")
+        body = GetRunRequest(run_name=run_name, id=run_id)
         json_body = body.json()
         resp = self._request(f"/api/project/{project_name}/runs/get", body=json_body)
         return parse_obj_as(Run.__response__, resp.json())
