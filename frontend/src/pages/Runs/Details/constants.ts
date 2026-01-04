@@ -3,4 +3,5 @@ export enum CodeTab {
     Metrics = 'metrics',
     Logs = 'logs',
     Events = 'events',
+    Inspect = 'inspect',
 }
