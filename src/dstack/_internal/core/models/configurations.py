@@ -31,7 +31,7 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
-from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.core.services import is_valid_dstack_resource_name
 from dstack._internal.utils.common import has_duplicates, list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import (
@@ -55,6 +55,7 @@ DEFAULT_PROBE_INTERVAL = 15
 DEFAULT_PROBE_READY_AFTER = 1
 DEFAULT_PROBE_METHOD = "get"
 MAX_PROBE_URL_LEN = 2048
+DEFAULT_REPLICA_GROUP_NAME = "default"
 
 
 class RunConfigurationType(str, Enum):
@@ -720,6 +721,17 @@ class ServiceConfigurationParamsConfig(CoreConfig):
         )
 
 
+def _validate_replica_range(v: Range[int]) -> Range[int]:
+    """Validate a Range[int] used for replica counts."""
+    if v.max is None:
+        raise ValueError("The maximum number of replicas is required")
+    if v.min is None:
+        v.min = 0
+    if v.min < 0:
+        raise ValueError("The minimum number of replicas must be greater than or equal to 0")
+    return v
+
+
 class ReplicaGroup(CoreModel):
     name: Annotated[
         Optional[str],
@@ -747,29 +759,18 @@ class ReplicaGroup(CoreModel):
     commands: Annotated[
         CommandsList,
         Field(description="The shell commands to run for replicas in this group"),
-    ]
+    ] = []
 
     @validator("name")
     def validate_name(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
-            validate_dstack_resource_name(v)
+            if not is_valid_dstack_resource_name(v):
+                raise ValueError("Resource name should match regex '^[a-z][a-z0-9-]{1,40}$'")
         return v
 
     @validator("count")
     def convert_count(cls, v: Range[int]) -> Range[int]:
-        if v.max is None:
-            raise ValueError("The maximum number of replicas is required")
-        if v.min is None:
-            v.min = 0
-        if v.min < 0:
-            raise ValueError("The minimum number of replicas must be greater than or equal to 0")
-        return v
-
-    @validator("commands")
-    def validate_commands(cls, v: CommandsList) -> CommandsList:
-        if not v:
-            raise ValueError("`commands` must be set for replica groups")
-        return v
+        return _validate_replica_range(v)
 
     @root_validator()
     def validate_scaling(cls, values):
@@ -838,11 +839,13 @@ class ServiceConfigurationParams(CoreModel):
         Optional[Union[List[ReplicaGroup], Range[int]]],
         Field(
             description=(
-                "List of replica groups. Each group defines replicas with shared configuration "
-                "(commands, port, resources, scaling, probes, rate_limits). "
-                "When specified, the top-level `replicas`, `commands`, `port`, `resources`, "
-                "`scaling`, `probes`, and `rate_limits` are ignored. "
-                "Each replica group must have a unique name."
+                "The number of replicas or a list of replica groups. "
+                "Can be an integer (e.g., `2`), a range (e.g., `0..4`), or a list of replica groups. "
+                "Each replica group defines replicas with shared configuration "
+                "(commands, resources, scaling). "
+                "When `replicas` is a list of replica groups, top-level `scaling`, `commands`, "
+                "and `resources` are not allowed and must be specified in each replica group instead. "
+                "Replica group names are optional; if not provided, they default to `replica0`, `replica1`, etc."
             )
         ),
     ] = None
@@ -889,15 +892,7 @@ class ServiceConfigurationParams(CoreModel):
         if v is None:
             return v
         if isinstance(v, Range):
-            if v.max is None:
-                raise ValueError("The maximum number of replicas is required")
-            if v.min is None:
-                v.min = 0
-            if v.min < 0:
-                raise ValueError(
-                    "The minimum number of replicas must be greater than or equal to 0"
-                )
-            return v
+            return _validate_replica_range(v)
 
         if isinstance(v, list):
             if not v:
@@ -967,6 +962,26 @@ class ServiceConfigurationParams(CoreModel):
 
         return values
 
+    @root_validator()
+    def validate_replica_groups_have_commands_or_image(cls, values):
+        """
+        When replicas is a list, ensure each ReplicaGroup has commands OR service has image.
+        """
+        replicas = values.get("replicas")
+        image = values.get("image")
+
+        if not isinstance(replicas, list):
+            return values
+
+        for group in replicas:
+            if not group.commands and not image:
+                raise ValueError(
+                    f"Replica group '{group.name}' has no commands. "
+                    "Either set `commands` in the replica group or set `image` at the service level."
+                )
+
+        return values
+
 
 class ServiceConfigurationConfig(
     ProfileParamsConfig,
@@ -998,9 +1013,9 @@ class ServiceConfiguration(
         if self.replicas is None:
             return [
                 ReplicaGroup(
-                    name="default",
+                    name=DEFAULT_REPLICA_GROUP_NAME,
                     count=Range[int](min=1, max=1),
-                    commands=self.commands or [],
+                    commands=self.commands,
                     resources=self.resources,
                     scaling=self.scaling,
                 )
@@ -1010,9 +1025,9 @@ class ServiceConfiguration(
         if isinstance(self.replicas, Range):
             return [
                 ReplicaGroup(
-                    name="default",
+                    name=DEFAULT_REPLICA_GROUP_NAME,
                     count=self.replicas,
-                    commands=self.commands or [],
+                    commands=self.commands,
                     resources=self.resources,
                     scaling=self.scaling,
                 )

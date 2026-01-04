@@ -408,7 +408,7 @@ def get_runs_table(
         # Sort jobs by group index first, then by replica_num within each group
         def get_job_sort_key(job: Job) -> tuple:
             group_index = None
-            if group_name_to_index and job.job_spec.replica_group:
+            if group_name_to_index:
                 group_index = group_name_to_index.get(job.job_spec.replica_group)
             # Use a large number for jobs without groups to put them at the end
             return (group_index if group_index is not None else 999999, job.job_spec.replica_num)
@@ -422,7 +422,7 @@ def get_runs_table(
 
             # Get group index for this job
             group_index: Optional[int] = None
-            if group_name_to_index and job.job_spec.replica_group:
+            if group_name_to_index:
                 group_index = group_name_to_index.get(job.job_spec.replica_group)
 
             job_row: Dict[Union[str, int], Any] = {

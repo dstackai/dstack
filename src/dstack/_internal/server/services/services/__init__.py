@@ -148,8 +148,7 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
         )
     # Check if any group has autoscaling (min != max)
     has_autoscaling = any(
-        group.count.min != group.count.max
-        for group in (run_spec.configuration.replica_groups or [])
+        group.count.min != group.count.max for group in run_spec.configuration.replica_groups
     )
     if has_autoscaling:
         raise ServerClientError(

@@ -197,7 +197,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
 
     if run.run_spec.configuration.type == "service":
         run_model.desired_replica_count = sum(
-            group.count.min or 0 for group in (run.run_spec.configuration.replica_groups or [])
+            group.count.min or 0 for group in run.run_spec.configuration.replica_groups
         )
         await update_service_desired_replica_count(
             session,
@@ -211,8 +211,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
             # stay zero scaled
             return
 
-        # Per group scaling because single replica is also normalized to replica groups.
-        replicas: List[ReplicaGroup] = run.run_spec.configuration.replica_groups or []
+        replicas: List[ReplicaGroup] = run.run_spec.configuration.replica_groups
         counts = (
             json.loads(run_model.desired_replica_counts)
             if run_model.desired_replica_counts
@@ -459,7 +458,7 @@ async def _handle_run_replicas(
             # FIXME: should only include scaling events, not retries and deployments
             last_scaled_at=max((r.timestamp for r in replicas_info), default=None),
         )
-        replicas: List[ReplicaGroup] = run_spec.configuration.replica_groups or []
+        replicas: List[ReplicaGroup] = run_spec.configuration.replica_groups
         if replicas:
             counts = (
                 json.loads(run_model.desired_replica_counts)
@@ -602,9 +601,7 @@ def _has_out_of_date_replicas(run: RunModel, group_filter: Optional[str] = None)
         # Filter jobs by group if specified
         if group_filter is not None:
             job_spec = JobSpec.__response__.parse_raw(job.job_spec_data)
-            # Handle None case: treat None as "default" for backward compatibility
-            job_replica_group = job_spec.replica_group or "default"
-            if job_replica_group != group_filter:
+            if job_spec.replica_group != group_filter:
                 continue
         if job.deployment_num < run.deployment_num and not (
             job.status.is_finished() or job.termination_reason == JobTerminationReason.SCALED_DOWN

@@ -89,8 +89,8 @@ def validate_run_spec_and_set_defaults(
         )
     if isinstance(run_spec.configuration, ServiceConfiguration):
         # Check if any group has min=0
-        if run_spec.merged_profile.schedule and any(
-            group.count.min == 0 for group in (run_spec.configuration.replica_groups or [])
+        if run_spec.merged_profile.schedule and all(
+            group.count.min == 0 for group in run_spec.configuration.replica_groups
         ):
             raise ServerClientError(
                 "Scheduled services with autoscaling to zero are not supported"
@@ -154,7 +154,7 @@ def get_nodes_required_num(run_spec: RunSpec) -> int:
         nodes_required_num = run_spec.configuration.nodes
     elif run_spec.configuration.type == "service":
         nodes_required_num = sum(
-            group.count.min or 0 for group in (run_spec.configuration.replica_groups or [])
+            group.count.min or 0 for group in run_spec.configuration.replica_groups
         )
     return nodes_required_num
 

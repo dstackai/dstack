@@ -17,7 +17,9 @@ INSTALL_IPYKERNEL = (
 class DevEnvironmentJobConfigurator(JobConfigurator):
     TYPE: RunConfigurationType = RunConfigurationType.DEV_ENVIRONMENT
 
-    def __init__(self, run_spec: RunSpec, secrets: Dict[str, str]):
+    def __init__(
+        self, run_spec: RunSpec, secrets: Dict[str, str], replica_group_name: Optional[str] = None
+    ):
         assert run_spec.configuration.type == "dev-environment"
 
         if run_spec.configuration.ide == "vscode":
@@ -31,7 +33,7 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
             version=run_spec.configuration.version,
             extensions=["ms-python.python", "ms-toolsai.jupyter"],
         )
-        super().__init__(run_spec=run_spec, secrets=secrets)
+        super().__init__(run_spec=run_spec, secrets=secrets, replica_group_name=replica_group_name)
 
     def _shell_commands(self) -> List[str]:
         assert self.run_spec.configuration.type == "dev-environment"
