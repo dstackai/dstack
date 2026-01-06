@@ -34,9 +34,12 @@ type Server struct {
 	version string
 }
 
-func NewServer(ctx context.Context, tempDir string, homeDir string, address string, sshd ssh.SshdManager, version string) (*Server, error) {
+func NewServer(
+	ctx context.Context, tempDir string, homeDir string, dstackDir string, sshd ssh.SshdManager,
+	address string, version string,
+) (*Server, error) {
 	r := api.NewRouter()
-	ex, err := executor.NewRunExecutor(tempDir, homeDir, sshd)
+	ex, err := executor.NewRunExecutor(tempDir, homeDir, dstackDir, sshd)
 	if err != nil {
 		return nil, err
 	}

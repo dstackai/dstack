@@ -54,6 +54,7 @@ type ConnectionTracker interface {
 type RunExecutor struct {
 	tempDir    string
 	homeDir    string
+	dstackDir  string
 	archiveDir string
 	sshd       ssh.SshdManager
 
@@ -91,7 +92,7 @@ func (s *stubConnectionTracker) GetNoConnectionsSecs() int64   { return 0 }
 func (s *stubConnectionTracker) Track(ticker <-chan time.Time) {}
 func (s *stubConnectionTracker) Stop()                         {}
 
-func NewRunExecutor(tempDir string, homeDir string, sshd ssh.SshdManager) (*RunExecutor, error) {
+func NewRunExecutor(tempDir string, homeDir string, dstackDir string, sshd ssh.SshdManager) (*RunExecutor, error) {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
 	user, err := osuser.Current()
@@ -124,6 +125,7 @@ func NewRunExecutor(tempDir string, homeDir string, sshd ssh.SshdManager) (*RunE
 	return &RunExecutor{
 		tempDir:    tempDir,
 		homeDir:    homeDir,
+		dstackDir:  dstackDir,
 		archiveDir: filepath.Join(tempDir, "file_archives"),
 		sshd:       sshd,
 		currentUid: uid,
@@ -384,12 +386,12 @@ func (ex *RunExecutor) getRepoData() schemas.RepoData {
 }
 
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
-	node_rank := ex.jobSpec.JobNum
-	nodes_num := ex.jobSpec.JobsPerReplica
-	gpus_per_node_num := ex.clusterInfo.GPUSPerJob
-	gpus_num := nodes_num * gpus_per_node_num
+	nodeRank := ex.jobSpec.JobNum
+	nodesNum := ex.jobSpec.JobsPerReplica
+	gpusPerNodeNum := ex.clusterInfo.GPUSPerJob
+	gpusNum := nodesNum * gpusPerNodeNum
 
-	mpiHostfilePath := filepath.Join(ex.homeDir, ".dstack/mpi/hostfile")
+	mpiHostfilePath := filepath.Join(ex.dstackDir, "mpi/hostfile")
 
 	jobEnvs := map[string]string{
 		"DSTACK_RUN_ID":         ex.run.Id,
@@ -400,10 +402,10 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"DSTACK_WORKING_DIR":    ex.jobWorkingDir,
 		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
-		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
-		"DSTACK_NODES_NUM":      strconv.Itoa(nodes_num),
-		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(gpus_per_node_num),
-		"DSTACK_GPUS_NUM":       strconv.Itoa(gpus_num),
+		"DSTACK_NODE_RANK":      strconv.Itoa(nodeRank),
+		"DSTACK_NODES_NUM":      strconv.Itoa(nodesNum),
+		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(gpusPerNodeNum),
+		"DSTACK_GPUS_NUM":       strconv.Itoa(gpusNum),
 		"DSTACK_MPI_HOSTFILE":   mpiHostfilePath,
 	}
 
@@ -460,7 +462,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	envMap.Update(ex.jobSpec.Env, false)
 
 	const profilePath = "/etc/profile"
-	const dstackProfilePath = "/dstack/profile"
+	dstackProfilePath := path.Join(ex.dstackDir, "profile")
 	if err := writeDstackProfile(envMap, dstackProfilePath); err != nil {
 		log.Warning(ctx, "failed to write dstack_profile", "path", dstackProfilePath, "err", err)
 	} else if err := includeDstackProfile(profilePath, dstackProfilePath); err != nil {
@@ -508,7 +510,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		}
 	}
 
-	err = writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, gpus_per_node_num, mpiHostfilePath)
+	err = writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, gpusPerNodeNum, mpiHostfilePath)
 	if err != nil {
 		return fmt.Errorf("write MPI hostfile: %w", err)
 	}
@@ -839,7 +841,7 @@ func prepareSSHDir(uid int, gid int, homeDir string) (string, error) {
 	return sshDir, nil
 }
 
-func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path string) error {
+func writeMpiHostfile(ctx context.Context, ips []string, gpusPerNode int, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create MPI hostfile directory: %w", err)
 	}
@@ -855,9 +857,16 @@ func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path
 		}
 	}
 	if len(nonEmptyIps) == len(ips) {
+		var template string
+		if gpusPerNode == 0 {
+			// CPU node: the number of slots defaults to the number of processor cores on that host
+			// See: https://docs.open-mpi.org/en/main/launching-apps/scheduling.html#calculating-the-number-of-slots
+			template = "%s\n"
+		} else {
+			template = fmt.Sprintf("%%s slots=%d\n", gpusPerNode)
+		}
 		for _, ip := range nonEmptyIps {
-			line := fmt.Sprintf("%s slots=%d\n", ip, gpus_per_node)
-			if _, err = file.WriteString(line); err != nil {
+			if _, err = fmt.Fprintf(file, template, ip); err != nil {
 				return fmt.Errorf("write MPI hostfile line: %w", err)
 			}
 		}

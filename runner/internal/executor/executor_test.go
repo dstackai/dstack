@@ -28,13 +28,13 @@ func TestExecutor_WorkingDir_Set(t *testing.T) {
 
 	ex.jobSpec.WorkingDir = &workingDir
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
-	err = ex.setJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, workingDir, ex.jobWorkingDir)
 	err = os.MkdirAll(workingDir, 0o755)
 	require.NoError(t, err)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	// Normalize line endings for cross-platform compatibility.
 	assert.Equal(t, workingDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
@@ -47,11 +47,11 @@ func TestExecutor_WorkingDir_NotSet(t *testing.T) {
 	require.NoError(t, err)
 	ex.jobSpec.WorkingDir = nil
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
-	err = ex.setJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, cwd, ex.jobWorkingDir)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	assert.Equal(t, cwd+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
@@ -61,7 +61,7 @@ func TestExecutor_HomeDir(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo ~")
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err := ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	assert.Equal(t, ex.homeDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
@@ -71,7 +71,7 @@ func TestExecutor_NonZeroExit(t *testing.T) {
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "exit 100")
 	makeCodeTar(t, ex.codePath)
 
-	err := ex.Run(context.TODO())
+	err := ex.Run(t.Context())
 	assert.Error(t, err)
 	assert.NotEmpty(t, ex.jobStateHistory)
 	exitStatus := ex.jobStateHistory[len(ex.jobStateHistory)-1].ExitStatus
@@ -90,11 +90,11 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 		PrivateKey: &key,
 	}
 
-	clean, err := ex.setupCredentials(context.TODO())
+	clean, err := ex.setupCredentials(t.Context())
 	defer clean()
 	require.NoError(t, err)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	assert.Equal(t, key, b.String())
 }
@@ -106,10 +106,10 @@ func TestExecutor_LocalRepo(t *testing.T) {
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, cmd)
 	makeCodeTar(t, ex.codePath)
 
-	err := ex.setupRepo(context.TODO())
+	err := ex.setupRepo(t.Context())
 	require.NoError(t, err)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	assert.Equal(t, "bar\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
@@ -119,7 +119,7 @@ func TestExecutor_Recover(t *testing.T) {
 	ex.jobSpec.Commands = nil // cause a panic
 	makeCodeTar(t, ex.codePath)
 
-	err := ex.Run(context.TODO())
+	err := ex.Run(t.Context())
 	assert.ErrorContains(t, err, "recovered: ")
 }
 
@@ -136,7 +136,7 @@ func TestExecutor_MaxDuration(t *testing.T) {
 	ex.jobSpec.MaxDuration = 1 // seconds
 	makeCodeTar(t, ex.codePath)
 
-	err := ex.Run(context.TODO())
+	err := ex.Run(t.Context())
 	assert.ErrorContains(t, err, "killed")
 }
 
@@ -158,12 +158,12 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 	err := os.WriteFile(ex.codePath, []byte{}, 0o600) // empty diff
 	require.NoError(t, err)
 
-	err = ex.setJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(t.Context())
 	require.NoError(t, err)
-	err = ex.setupRepo(context.TODO())
+	err = ex.setupRepo(t.Context())
 	require.NoError(t, err)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	expected := fmt.Sprintf("%s\n%s\n%s\n", ex.getRepoData().RepoHash, ex.getRepoData().RepoConfigName, ex.getRepoData().RepoConfigEmail)
 	assert.Equal(t, expected, strings.ReplaceAll(b.String(), "\r\n", "\n"))
@@ -204,11 +204,13 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 		},
 	}
 
-	temp := filepath.Join(baseDir, "temp")
-	_ = os.Mkdir(temp, 0o700)
-	home := filepath.Join(baseDir, "home")
-	_ = os.Mkdir(home, 0o700)
-	ex, _ := NewRunExecutor(temp, home, new(sshdMock))
+	tempDir := filepath.Join(baseDir, "temp")
+	require.NoError(t, os.Mkdir(tempDir, 0o700))
+	homeDir := filepath.Join(baseDir, "home")
+	require.NoError(t, os.Mkdir(homeDir, 0o700))
+	dstackDir := filepath.Join(baseDir, "dstack")
+	require.NoError(t, os.Mkdir(dstackDir, 0o755))
+	ex, _ := NewRunExecutor(tempDir, homeDir, dstackDir, new(sshdMock))
 	ex.SetJob(body)
 	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
 	ex.setJobWorkingDir(context.Background())
@@ -261,7 +263,7 @@ func TestExecutor_Logs(t *testing.T) {
 	// \033[31m = red text, \033[1;32m = bold green text, \033[0m = reset
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "printf '\\033[31mRed Hello World\\033[0m\\n' && printf '\\033[1;32mBold Green Line 2\\033[0m\\n' && printf 'Line 3\\n'")
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err := ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 
 	logHistory := ex.GetHistory(0).JobLogs
@@ -285,7 +287,7 @@ func TestExecutor_LogsWithErrors(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo 'Success message' && echo 'Error message' >&2 && exit 1")
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err := ex.execJob(t.Context(), io.Writer(&b))
 	assert.Error(t, err)
 
 	logHistory := ex.GetHistory(0).JobLogs
@@ -309,7 +311,7 @@ func TestExecutor_LogsAnsiCodeHandling(t *testing.T) {
 
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, cmd)
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err := ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 
 	// 1. Check WebSocket logs, which should preserve ANSI codes.
