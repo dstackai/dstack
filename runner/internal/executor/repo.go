@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 
 	"github.com/codeclysm/extract/v4"
@@ -16,6 +18,23 @@ import (
 	"github.com/dstackai/dstack/runner/internal/repo"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 )
+
+// WriteRepoBlob must be called after SetJob
+func (ex *RunExecutor) WriteRepoBlob(src io.Reader) error {
+	if err := os.MkdirAll(ex.repoBlobDir, 0o755); err != nil {
+		return fmt.Errorf("create blob directory: %w", err)
+	}
+	ex.repoBlobPath = path.Join(ex.repoBlobDir, ex.run.RunSpec.RepoId)
+	blob, err := os.Create(ex.repoBlobPath)
+	if err != nil {
+		return fmt.Errorf("create blob file: %w", err)
+	}
+	defer func() { _ = blob.Close() }()
+	if _, err = io.Copy(blob, src); err != nil {
+		return fmt.Errorf("copy blob data: %w", err)
+	}
+	return nil
+}
 
 // setupRepo must be called from Run
 // Must be called after setJobWorkingDir and setJobCredentials
@@ -100,6 +119,10 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 		return fmt.Errorf("chown repo dir: %w", err)
 	}
 
+	if err := os.RemoveAll(ex.repoBlobDir); err != nil {
+		log.Warning(ctx, "Failed to remove repo blobs dir", "path", ex.repoBlobDir, "err", err)
+	}
+
 	return err
 }
 
@@ -143,7 +166,7 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 	}
 
 	log.Trace(ctx, "Applying diff")
-	repoDiff, err := os.ReadFile(ex.codePath)
+	repoDiff, err := os.ReadFile(ex.repoBlobPath)
 	if err != nil {
 		return fmt.Errorf("read repo diff: %w", err)
 	}
@@ -156,12 +179,12 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 }
 
 func (ex *RunExecutor) prepareArchive(ctx context.Context) error {
-	file, err := os.Open(ex.codePath)
+	file, err := os.Open(ex.repoBlobPath)
 	if err != nil {
 		return fmt.Errorf("open code archive: %w", err)
 	}
 	defer func() { _ = file.Close() }()
-	log.Trace(ctx, "Extracting code archive", "src", ex.codePath, "dst", ex.repoDir)
+	log.Trace(ctx, "Extracting code archive", "src", ex.repoBlobPath, "dst", ex.repoDir)
 	if err := extract.Tar(ctx, file, ex.repoDir, nil); err != nil {
 		return fmt.Errorf("extract tar archive: %w", err)
 	}

@@ -11,12 +11,10 @@ import (
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/metrics"
-	"github.com/dstackai/dstack/runner/internal/ssh"
 )
 
 type Server struct {
-	srv     *http.Server
-	tempDir string
+	srv *http.Server
 
 	shutdownCh   chan interface{} // server closes this chan on shutdown
 	jobBarrierCh chan interface{} // only server listens on this chan
@@ -34,15 +32,8 @@ type Server struct {
 	version string
 }
 
-func NewServer(
-	ctx context.Context, tempDir string, homeDir string, dstackDir string, sshd ssh.SshdManager,
-	address string, version string,
-) (*Server, error) {
+func NewServer(ctx context.Context, address string, version string, ex executor.Executor) (*Server, error) {
 	r := api.NewRouter()
-	ex, err := executor.NewRunExecutor(tempDir, homeDir, dstackDir, sshd)
-	if err != nil {
-		return nil, err
-	}
 
 	metricsCollector, err := metrics.NewMetricsCollector(ctx)
 	if err != nil {
@@ -54,7 +45,6 @@ func NewServer(
 			Addr:    address,
 			Handler: r,
 		},
-		tempDir: tempDir,
 
 		shutdownCh:   make(chan interface{}),
 		jobBarrierCh: make(chan interface{}),

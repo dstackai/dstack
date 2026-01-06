@@ -15,6 +15,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/runner/api"
 	"github.com/dstackai/dstack/runner/internal/ssh"
@@ -162,7 +163,12 @@ func start(ctx context.Context, tempDir string, homeDir string, httpPort int, ss
 		}
 	}()
 
-	server, err := api.NewServer(ctx, tempDir, homeDir, dstackDir, sshd, fmt.Sprintf(":%d", httpPort), version)
+	ex, err := executor.NewRunExecutor(tempDir, homeDir, dstackDir, sshd)
+	if err != nil {
+		return fmt.Errorf("create executor: %w", err)
+	}
+
+	server, err := api.NewServer(ctx, fmt.Sprintf(":%d", httpPort), version, ex)
 	if err != nil {
 		return fmt.Errorf("create server: %w", err)
 	}
