@@ -741,7 +741,7 @@ def _detect_cursor_version(exe: str = "cursor") -> Optional[str]:
     return None
 
 
-def _detect_windsurf_version(exe: str = "surf") -> Optional[str]:
+def _detect_windsurf_version(exe: str = "windsurf") -> Optional[str]:
     """
     Detects the installed Windsurf product version and commit hash.
     Returns string in format 'version@commit' (e.g., '1.13.5@97d7a...') or None.
