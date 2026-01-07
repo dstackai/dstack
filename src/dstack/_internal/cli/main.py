@@ -12,13 +12,13 @@ from dstack._internal.cli.commands.event import EventCommand
 from dstack._internal.cli.commands.fleet import FleetCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
-from dstack._internal.cli.commands.inspect import InspectCommand
 from dstack._internal.cli.commands.login import LoginCommand
 from dstack._internal.cli.commands.logs import LogsCommand
 from dstack._internal.cli.commands.metrics import MetricsCommand
 from dstack._internal.cli.commands.offer import OfferCommand
 from dstack._internal.cli.commands.project import ProjectCommand
 from dstack._internal.cli.commands.ps import PsCommand
+from dstack._internal.cli.commands.run import RunCommand
 from dstack._internal.cli.commands.secrets import SecretCommand
 from dstack._internal.cli.commands.server import ServerCommand
 from dstack._internal.cli.commands.stop import StopCommand
@@ -69,13 +69,13 @@ def main():
     FleetCommand.register(subparsers)
     GatewayCommand.register(subparsers)
     InitCommand.register(subparsers)
-    InspectCommand.register(subparsers)
     OfferCommand.register(subparsers)
     LoginCommand.register(subparsers)
     LogsCommand.register(subparsers)
     MetricsCommand.register(subparsers)
     ProjectCommand.register(subparsers)
     PsCommand.register(subparsers)
+    RunCommand.register(subparsers)
     SecretCommand.register(subparsers)
     ServerCommand.register(subparsers)
     StopCommand.register(subparsers)

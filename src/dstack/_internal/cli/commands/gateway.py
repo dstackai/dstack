@@ -16,7 +16,8 @@ from dstack._internal.cli.utils.gateway import (
     print_gateways_json,
     print_gateways_table,
 )
-from dstack._internal.core.errors import CLIError
+from dstack._internal.core.errors import CLIError, ResourceNotExistsError
+from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -83,6 +84,20 @@ class GatewayCommand(APIBaseCommand):
         )
         update_parser.add_argument("--domain", help="Set the domain for the gateway")
 
+        get_parser = subparsers.add_parser(
+            "get", help="Get a gateway", formatter_class=self._parser.formatter_class
+        )
+        get_parser.add_argument(
+            "name", metavar="NAME", help="The name of the gateway"
+        ).completer = GatewayNameCompleter()  # type: ignore[attr-defined]
+        get_parser.add_argument(
+            "--json",
+            action="store_true",
+            required=True,
+            help="Output in JSON format",
+        )
+        get_parser.set_defaults(subfunc=self._get)
+
     def _command(self, args: argparse.Namespace):
         super()._command(args)
         # TODO handle errors
@@ -130,3 +145,15 @@ class GatewayCommand(APIBaseCommand):
                 )
         gateway = self.api.client.gateways.get(self.api.project, args.name)
         print_gateways_table([gateway])
+
+    def _get(self, args: argparse.Namespace):
+        # TODO: Implement non-json output format
+        try:
+            gateway = self.api.client.gateways.get(
+                project_name=self.api.project, gateway_name=args.name
+            )
+        except ResourceNotExistsError:
+            console.print("Gateway not found")
+            exit(1)
+
+        print(pydantic_orjson_dumps_with_indent(gateway.dict(), default=None))
