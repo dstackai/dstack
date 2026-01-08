@@ -1,5 +1,6 @@
 import argparse
 import time
+from uuid import UUID
 
 from rich.live import Live
 
@@ -12,7 +13,8 @@ from dstack._internal.cli.utils.common import (
     console,
 )
 from dstack._internal.cli.utils.fleet import get_fleets_table, print_fleets_table
-from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.errors import CLIError, ResourceNotExistsError
+from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 
 
 class FleetCommand(APIBaseCommand):
@@ -63,6 +65,29 @@ class FleetCommand(APIBaseCommand):
         )
         delete_parser.set_defaults(subfunc=self._delete)
 
+        get_parser = subparsers.add_parser(
+            "get", help="Get a fleet", formatter_class=self._parser.formatter_class
+        )
+        name_group = get_parser.add_mutually_exclusive_group(required=True)
+        name_group.add_argument(
+            "name",
+            nargs="?",
+            metavar="NAME",
+            help="The name of the fleet",
+        ).completer = FleetNameCompleter()  # type: ignore[attr-defined]
+        name_group.add_argument(
+            "--id",
+            type=str,
+            help="The ID of the fleet (UUID)",
+        )
+        get_parser.add_argument(
+            "--json",
+            action="store_true",
+            required=True,
+            help="Output in JSON format",
+        )
+        get_parser.set_defaults(subfunc=self._get)
+
     def _command(self, args: argparse.Namespace):
         super()._command(args)
         args.subfunc(args)
@@ -112,3 +137,25 @@ class FleetCommand(APIBaseCommand):
             )
 
         console.print(f"Fleet [code]{args.name}[/] instances deleted")
+
+    def _get(self, args: argparse.Namespace):
+        # TODO: Implement non-json output format
+        fleet_id = None
+        if args.id is not None:
+            try:
+                fleet_id = UUID(args.id)
+            except ValueError:
+                raise CLIError(f"Invalid UUID format: {args.id}")
+
+        try:
+            if args.id is not None:
+                fleet = self.api.client.fleets.get(
+                    project_name=self.api.project, fleet_id=fleet_id
+                )
+            else:
+                fleet = self.api.client.fleets.get(project_name=self.api.project, name=args.name)
+        except ResourceNotExistsError:
+            console.print(f"Fleet [code]{args.name or args.id}[/] not found")
+            exit(1)
+
+        print(pydantic_orjson_dumps_with_indent(fleet.dict(), default=None))

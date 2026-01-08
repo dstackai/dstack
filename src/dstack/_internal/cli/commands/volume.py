@@ -13,6 +13,7 @@ from dstack._internal.cli.utils.common import (
 )
 from dstack._internal.cli.utils.volume import get_volumes_table, print_volumes_table
 from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 
 
 class VolumeCommand(APIBaseCommand):
@@ -54,6 +55,22 @@ class VolumeCommand(APIBaseCommand):
         )
         delete_parser.set_defaults(subfunc=self._delete)
 
+        get_parser = subparsers.add_parser(
+            "get", help="Get a volume", formatter_class=self._parser.formatter_class
+        )
+        get_parser.add_argument(
+            "name",
+            metavar="NAME",
+            help="The name of the volume",
+        ).completer = VolumeNameCompleter()  # type: ignore[attr-defined]
+        get_parser.add_argument(
+            "--json",
+            action="store_true",
+            required=True,
+            help="Output in JSON format",
+        )
+        get_parser.set_defaults(subfunc=self._get)
+
     def _command(self, args: argparse.Namespace):
         super()._command(args)
         args.subfunc(args)
@@ -88,3 +105,13 @@ class VolumeCommand(APIBaseCommand):
             self.api.client.volumes.delete(project_name=self.api.project, names=[args.name])
 
         console.print(f"Volume [code]{args.name}[/] deleted")
+
+    def _get(self, args: argparse.Namespace):
+        # TODO: Implement non-json output format
+        try:
+            volume = self.api.client.volumes.get(project_name=self.api.project, name=args.name)
+        except ResourceNotExistsError:
+            console.print("Volume not found")
+            exit(1)
+
+        print(pydantic_orjson_dumps_with_indent(volume.dict(), default=None))
