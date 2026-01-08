@@ -140,9 +140,15 @@ class FleetCommand(APIBaseCommand):
 
     def _get(self, args: argparse.Namespace):
         # TODO: Implement non-json output format
+        fleet_id = None
+        if args.id:
+            try:
+                fleet_id = UUID(args.id)
+            except ValueError:
+                raise CLIError(f"Invalid UUID format: {args.id}")
+
         try:
             if args.id:
-                fleet_id = UUID(args.id)
                 fleet = self.api.client.fleets.get(
                     project_name=self.api.project, fleet_id=fleet_id
                 )
@@ -151,7 +157,5 @@ class FleetCommand(APIBaseCommand):
         except ResourceNotExistsError:
             console.print(f"Fleet [code]{args.name or args.id}[/] not found")
             exit(1)
-        except ValueError:
-            raise CLIError(f"Invalid UUID format: {args.id}")
 
         print(pydantic_orjson_dumps_with_indent(fleet.dict(), default=None))

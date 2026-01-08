@@ -50,16 +50,20 @@ class RunCommand(APIBaseCommand):
 
     def _get(self, args: argparse.Namespace):
         # TODO: Implement non-json output format
+        run_id = None
+        if args.id:
+            try:
+                run_id = UUID(args.id)
+            except ValueError:
+                raise CLIError(f"Invalid UUID format: {args.id}")
+
         try:
             if args.id:
-                run_id = UUID(args.id)
                 run = self.api.client.runs.get(project_name=self.api.project, run_id=run_id)
             else:
                 run = self.api.client.runs.get(project_name=self.api.project, run_name=args.name)
         except ResourceNotExistsError:
             console.print(f"Run [code]{args.name or args.id}[/] not found")
             exit(1)
-        except ValueError:
-            raise CLIError(f"Invalid UUID format: {args.id}")
 
         print(pydantic_orjson_dumps_with_indent(run.dict(), default=None))
