@@ -6,7 +6,8 @@ from typing import Optional
 from pydantic import BaseModel
 
 import dstack._internal.utils.common as common_utils
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import ScalingSpec
+from dstack._internal.core.models.resources import Range
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 
 
@@ -119,21 +120,21 @@ class RPSAutoscaler(BaseServiceScaler):
         return new_desired_count
 
 
-def get_service_scaler(conf: ServiceConfiguration) -> BaseServiceScaler:
-    assert conf.replicas.min is not None
-    assert conf.replicas.max is not None
-    if conf.scaling is None:
+def get_service_scaler(count: Range[int], scaling: Optional[ScalingSpec]) -> BaseServiceScaler:
+    assert count.min is not None
+    assert count.max is not None
+    if scaling is None:
         return ManualScaler(
-            min_replicas=conf.replicas.min,
-            max_replicas=conf.replicas.max,
+            min_replicas=count.min,
+            max_replicas=count.max,
         )
-    if conf.scaling.metric == "rps":
+    if scaling.metric == "rps":
         return RPSAutoscaler(
             # replicas count validated by configuration model
-            min_replicas=conf.replicas.min,
-            max_replicas=conf.replicas.max,
-            target=conf.scaling.target,
-            scale_up_delay=conf.scaling.scale_up_delay,
-            scale_down_delay=conf.scaling.scale_down_delay,
+            min_replicas=count.min,
+            max_replicas=count.max,
+            target=scaling.target,
+            scale_up_delay=scaling.scale_up_delay,
+            scale_down_delay=scaling.scale_down_delay,
         )
-    raise ValueError(f"No scaler found for scaling parameters {conf.scaling}")
+    raise ValueError(f"No scaler found for scaling parameters {scaling}")

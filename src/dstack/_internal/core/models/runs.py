@@ -17,6 +17,7 @@ from dstack._internal.core.models.common import (
 )
 from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_METHOD,
+    DEFAULT_REPLICA_GROUP_NAME,
     LEGACY_REPO_DIR,
     AnyRunConfiguration,
     HTTPHeaderSpec,
@@ -253,6 +254,7 @@ class JobSpec(CoreModel):
     job_num: int
     job_name: str
     jobs_per_replica: int = 1  # default value for backward compatibility
+    replica_group: str = DEFAULT_REPLICA_GROUP_NAME
     app_specs: Optional[List[AppSpec]]
     user: Optional[UnixUser] = None  # default value for backward compatibility
     commands: List[str]

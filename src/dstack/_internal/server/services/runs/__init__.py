@@ -486,12 +486,8 @@ async def submit_run(
 
         submitted_at = common_utils.get_current_datetime()
         initial_status = RunStatus.SUBMITTED
-        initial_replicas = 1
         if run_spec.merged_profile.schedule is not None:
             initial_status = RunStatus.PENDING
-            initial_replicas = 0
-        elif run_spec.configuration.type == "service":
-            initial_replicas = run_spec.configuration.replicas.min or 0
 
         run_model = RunModel(
             id=uuid.uuid4(),
@@ -519,12 +515,46 @@ async def submit_run(
 
         if run_spec.configuration.type == "service":
             await services.register_service(session, run_model, run_spec)
+            service_config = run_spec.configuration
 
-        for replica_num in range(initial_replicas):
+            global_replica_num = 0  # Global counter across all groups for unique replica_num
+
+            for replica_group in service_config.replica_groups:
+                if run_spec.merged_profile.schedule is not None:
+                    group_initial_replicas = 0
+                else:
+                    group_initial_replicas = replica_group.count.min or 0
+
+                # Each replica in this group gets the same group-specific configuration
+                for group_replica_num in range(group_initial_replicas):
+                    jobs = await get_jobs_from_run_spec(
+                        run_spec=run_spec,
+                        secrets=secrets,
+                        replica_num=global_replica_num,
+                        replica_group_name=replica_group.name,
+                    )
+
+                    for job in jobs:
+                        job_model = create_job_model_for_new_submission(
+                            run_model=run_model,
+                            job=job,
+                            status=JobStatus.SUBMITTED,
+                        )
+                        session.add(job_model)
+                        events.emit(
+                            session,
+                            f"Job created on run submission. Status: {job_model.status.upper()}",
+                            actor=events.SystemActor(),
+                            targets=[
+                                events.Target.from_model(job_model),
+                            ],
+                        )
+                    global_replica_num += 1
+        else:
             jobs = await get_jobs_from_run_spec(
                 run_spec=run_spec,
                 secrets=secrets,
-                replica_num=replica_num,
+                replica_num=0,
             )
             for job in jobs:
                 job_model = create_job_model_for_new_submission(

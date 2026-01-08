@@ -405,7 +405,7 @@ class RunModel(BaseModel):
     priority: Mapped[int] = mapped_column(Integer, default=0)
     deployment_num: Mapped[int] = mapped_column(Integer)
     desired_replica_count: Mapped[int] = mapped_column(Integer)
-
+    desired_replica_counts: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     jobs: Mapped[List["JobModel"]] = relationship(
         back_populates="run", lazy="selectin", order_by="[JobModel.replica_num, JobModel.job_num]"
     )

@@ -2,6 +2,7 @@
 Application logic related to `type: service` runs.
 """
 
+import json
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -145,7 +146,11 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
             "The `https` configuration property is not applicable when running services without a gateway."
             " Please configure a gateway or remove the `https` property from the service configuration"
         )
-    if run_spec.configuration.replicas.min != run_spec.configuration.replicas.max:
+    # Check if any group has autoscaling (min != max)
+    has_autoscaling = any(
+        group.count.min != group.count.max for group in run_spec.configuration.replica_groups
+    )
+    if has_autoscaling:
         raise ServerClientError(
             "Auto-scaling is not supported when running services without a gateway."
             " Please configure a gateway or set `replicas` to a fixed value in the service configuration"
@@ -303,13 +308,24 @@ async def update_service_desired_replica_count(
     configuration: ServiceConfiguration,
     last_scaled_at: Optional[datetime],
 ) -> None:
-    scaler = get_service_scaler(configuration)
     stats = None
     if run_model.gateway_id is not None:
         conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
         stats = await conn.get_stats(run_model.project.name, run_model.run_name)
-    run_model.desired_replica_count = scaler.get_desired_count(
-        current_desired_count=run_model.desired_replica_count,
-        stats=stats,
-        last_scaled_at=last_scaled_at,
+    replica_groups = configuration.replica_groups
+    desired_replica_counts = {}
+    total = 0
+    prev_counts = (
+        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
     )
+    for group in replica_groups:
+        scaler = get_service_scaler(group.count, group.scaling)
+        group_desired = scaler.get_desired_count(
+            current_desired_count=prev_counts.get(group.name, group.count.min or 0),
+            stats=stats,
+            last_scaled_at=last_scaled_at,
+        )
+        desired_replica_counts[group.name] = group_desired
+        total += group_desired
+    run_model.desired_replica_counts = json.dumps(desired_replica_counts)
+    run_model.desired_replica_count = total
