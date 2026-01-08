@@ -52,11 +52,12 @@ type ConnectionTracker interface {
 }
 
 type RunExecutor struct {
-	tempDir    string
-	homeDir    string
-	dstackDir  string
-	archiveDir string
-	sshd       ssh.SshdManager
+	tempDir        string
+	homeDir        string
+	dstackDir      string
+	fileArchiveDir string
+	repoBlobDir    string
+	sshd           ssh.SshdManager
 
 	currentUid uint32
 
@@ -67,7 +68,7 @@ type RunExecutor struct {
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
 	repoDir         string
-	codePath        string
+	repoBlobPath    string
 	jobUid          int
 	jobGid          int
 	jobHomeDir      string
@@ -123,14 +124,15 @@ func NewRunExecutor(tempDir string, homeDir string, dstackDir string, sshd ssh.S
 	}
 
 	return &RunExecutor{
-		tempDir:    tempDir,
-		homeDir:    homeDir,
-		dstackDir:  dstackDir,
-		archiveDir: filepath.Join(tempDir, "file_archives"),
-		sshd:       sshd,
-		currentUid: uid,
-		jobUid:     -1,
-		jobGid:     -1,
+		tempDir:        tempDir,
+		homeDir:        homeDir,
+		dstackDir:      dstackDir,
+		fileArchiveDir: filepath.Join(tempDir, "file_archives"),
+		repoBlobDir:    filepath.Join(tempDir, "repo_blobs"),
+		sshd:           sshd,
+		currentUid:     uid,
+		jobUid:         -1,
+		jobGid:         -1,
 
 		mu:              mu,
 		state:           WaitSubmit,
@@ -145,7 +147,7 @@ func NewRunExecutor(tempDir string, homeDir string, dstackDir string, sshd ssh.S
 	}, nil
 }
 
-// Run must be called after SetJob and SetCodePath
+// Run must be called after SetJob and WriteRepoBlob
 func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
 	if err != nil {
@@ -294,11 +296,6 @@ func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
 	ex.secrets = body.Secrets
 	ex.repoCredentials = body.RepoCredentials
 	ex.state = WaitCode
-}
-
-func (ex *RunExecutor) SetCodePath(codePath string) {
-	ex.codePath = codePath
-	ex.state = WaitRun
 }
 
 func (ex *RunExecutor) SetJobState(ctx context.Context, state types.JobState) {

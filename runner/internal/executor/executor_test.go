@@ -69,7 +69,7 @@ func TestExecutor_HomeDir(t *testing.T) {
 func TestExecutor_NonZeroExit(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "exit 100")
-	makeCodeTar(t, ex.codePath)
+	makeCodeTar(t, ex)
 
 	err := ex.Run(t.Context())
 	assert.Error(t, err)
@@ -104,7 +104,7 @@ func TestExecutor_LocalRepo(t *testing.T) {
 	ex := makeTestExecutor(t)
 	cmd := fmt.Sprintf("cat %s/foo", *ex.jobSpec.RepoDir)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, cmd)
-	makeCodeTar(t, ex.codePath)
+	makeCodeTar(t, ex)
 
 	err := ex.setupRepo(t.Context())
 	require.NoError(t, err)
@@ -117,7 +117,7 @@ func TestExecutor_LocalRepo(t *testing.T) {
 func TestExecutor_Recover(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = nil // cause a panic
-	makeCodeTar(t, ex.codePath)
+	makeCodeTar(t, ex)
 
 	err := ex.Run(t.Context())
 	assert.ErrorContains(t, err, "recovered: ")
@@ -134,7 +134,7 @@ func TestExecutor_MaxDuration(t *testing.T) {
 	ex.killDelay = 500 * time.Millisecond
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo 1 && sleep 2 && echo 2")
 	ex.jobSpec.MaxDuration = 1 // seconds
-	makeCodeTar(t, ex.codePath)
+	makeCodeTar(t, ex)
 
 	err := ex.Run(t.Context())
 	assert.ErrorContains(t, err, "killed")
@@ -155,7 +155,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 		RepoConfigEmail: "developer@dstack.ai",
 	}
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "git rev-parse HEAD && git config user.name && git config user.email")
-	err := os.WriteFile(ex.codePath, []byte{}, 0o600) // empty diff
+	err := ex.WriteRepoBlob(bytes.NewReader([]byte{})) // empty diff
 	require.NoError(t, err)
 
 	err = ex.setJobWorkingDir(t.Context())
@@ -210,19 +210,17 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 	require.NoError(t, os.Mkdir(homeDir, 0o700))
 	dstackDir := filepath.Join(baseDir, "dstack")
 	require.NoError(t, os.Mkdir(dstackDir, 0o755))
-	ex, _ := NewRunExecutor(tempDir, homeDir, dstackDir, new(sshdMock))
+	ex, err := NewRunExecutor(tempDir, homeDir, dstackDir, new(sshdMock))
+	require.NoError(t, err)
 	ex.SetJob(body)
-	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
-	ex.setJobWorkingDir(context.Background())
+	require.NoError(t, ex.setJobWorkingDir(t.Context()))
 	return ex
 }
 
-func makeCodeTar(t *testing.T, path string) {
+func makeCodeTar(t *testing.T, ex *RunExecutor) {
 	t.Helper()
-	file, err := os.Create(path)
-	require.NoError(t, err)
-	defer func() { _ = file.Close() }()
-	tw := tar.NewWriter(file)
+	var b bytes.Buffer
+	tw := tar.NewWriter(&b)
 
 	files := []struct{ name, body string }{
 		{"foo", "bar\n"},
@@ -235,6 +233,8 @@ func makeCodeTar(t *testing.T, path string) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, tw.Close())
+
+	require.NoError(t, ex.WriteRepoBlob(&b))
 }
 
 func TestWriteDstackProfile(t *testing.T) {

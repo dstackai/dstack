@@ -18,11 +18,11 @@ import (
 
 var renameRegex = regexp.MustCompile(`^([^/]*)(/|$)`)
 
-func (ex *RunExecutor) AddFileArchive(id string, src io.Reader) error {
-	if err := os.MkdirAll(ex.archiveDir, 0o755); err != nil {
+func (ex *RunExecutor) WriteFileArchive(id string, src io.Reader) error {
+	if err := os.MkdirAll(ex.fileArchiveDir, 0o755); err != nil {
 		return fmt.Errorf("create archive directory: %w", err)
 	}
-	archivePath := path.Join(ex.archiveDir, id)
+	archivePath := path.Join(ex.fileArchiveDir, id)
 	archive, err := os.Create(archivePath)
 	if err != nil {
 		return fmt.Errorf("create archive file: %w", err)
@@ -45,13 +45,13 @@ func (ex *RunExecutor) setupFiles(ctx context.Context) error {
 		return fmt.Errorf("setup files: working dir must be absolute: %s", ex.jobWorkingDir)
 	}
 	for _, fa := range ex.jobSpec.FileArchives {
-		archivePath := path.Join(ex.archiveDir, fa.Id)
+		archivePath := path.Join(ex.fileArchiveDir, fa.Id)
 		if err := extractFileArchive(ctx, archivePath, fa.Path, ex.jobWorkingDir, ex.jobUid, ex.jobGid, ex.jobHomeDir); err != nil {
 			return fmt.Errorf("extract file archive %s: %w", fa.Id, err)
 		}
 	}
-	if err := os.RemoveAll(ex.archiveDir); err != nil {
-		log.Warning(ctx, "Failed to remove file archives dir", "path", ex.archiveDir, "err", err)
+	if err := os.RemoveAll(ex.fileArchiveDir); err != nil {
+		log.Warning(ctx, "Failed to remove file archives dir", "path", ex.fileArchiveDir, "err", err)
 	}
 	return nil
 }
@@ -90,7 +90,6 @@ func extractFileArchive(ctx context.Context, archivePath string, destPath string
 
 	if uid != -1 || gid != -1 {
 		for _, p := range paths {
-			log.Warning(ctx, "path", "path", p)
 			if err := os.Chown(path.Join(destBase, p), uid, gid); err != nil {
 				log.Warning(ctx, "Failed to chown", "path", p, "err", err)
 			}
