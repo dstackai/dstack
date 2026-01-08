@@ -206,6 +206,7 @@ async def _process_next_instance():
 
 
 async def _process_instance(session: AsyncSession, instance: InstanceModel):
+    logger.debug("%s: processing instance, status: %s", fmt(instance), instance.status.upper())
     # Refetch to load related attributes.
     # Load related attributes only for statuses that always need them.
     if instance.status in (
