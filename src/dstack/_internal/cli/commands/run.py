@@ -51,14 +51,14 @@ class RunCommand(APIBaseCommand):
     def _get(self, args: argparse.Namespace):
         # TODO: Implement non-json output format
         run_id = None
-        if args.id:
+        if args.id is not None:
             try:
                 run_id = UUID(args.id)
             except ValueError:
                 raise CLIError(f"Invalid UUID format: {args.id}")
 
         try:
-            if args.id:
+            if args.id is not None:
                 run = self.api.client.runs.get(project_name=self.api.project, run_id=run_id)
             else:
                 run = self.api.client.runs.get(project_name=self.api.project, run_name=args.name)

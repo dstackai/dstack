@@ -141,14 +141,14 @@ class FleetCommand(APIBaseCommand):
     def _get(self, args: argparse.Namespace):
         # TODO: Implement non-json output format
         fleet_id = None
-        if args.id:
+        if args.id is not None:
             try:
                 fleet_id = UUID(args.id)
             except ValueError:
                 raise CLIError(f"Invalid UUID format: {args.id}")
 
         try:
-            if args.id:
+            if args.id is not None:
                 fleet = self.api.client.fleets.get(
                     project_name=self.api.project, fleet_id=fleet_id
                 )
