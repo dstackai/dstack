@@ -113,6 +113,13 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP`{ #DSTACK_SERVER_CLOUDWATCH_LOG_GROUP } – The CloudWatch Logs group for storing workloads logs. If not set, the default file-based log storage is used.
 - `DSTACK_SERVER_CLOUDWATCH_LOG_REGION`{ #DSTACK_SERVER_CLOUDWATCH_LOG_REGION } – The CloudWatch Logs region. Defaults to `None`.
 - `DSTACK_SERVER_GCP_LOGGING_PROJECT`{ #DSTACK_SERVER_GCP_LOGGING_PROJECT } – The GCP Logging project for storing workloads logs. If not set, the default file-based log storage is used.
+- `DSTACK_SERVER_FLUENTBIT_HOST`{ #DSTACK_SERVER_FLUENTBIT_HOST } – The Fluent-bit host for log forwarding. If set, enables Fluent-bit log storage.
+- `DSTACK_SERVER_FLUENTBIT_PORT`{ #DSTACK_SERVER_FLUENTBIT_PORT } – The Fluent-bit port. Defaults to `24224`.
+- `DSTACK_SERVER_FLUENTBIT_PROTOCOL`{ #DSTACK_SERVER_FLUENTBIT_PROTOCOL } – The protocol to use: `forward` or `http`. Defaults to `forward`.
+- `DSTACK_SERVER_FLUENTBIT_TAG_PREFIX`{ #DSTACK_SERVER_FLUENTBIT_TAG_PREFIX } – The tag prefix for logs. Defaults to `dstack`.
+- `DSTACK_SERVER_ELASTICSEARCH_HOST`{ #DSTACK_SERVER_ELASTICSEARCH_HOST } – The Elasticsearch/OpenSearch host for reading logs back through dstack. Optional; if not set, Fluent-bit runs in ship-only mode (logs are forwarded but not readable through dstack UI/CLI).
+- `DSTACK_SERVER_ELASTICSEARCH_INDEX`{ #DSTACK_SERVER_ELASTICSEARCH_INDEX } – The Elasticsearch/OpenSearch index pattern. Defaults to `dstack-logs`.
+- `DSTACK_SERVER_ELASTICSEARCH_API_KEY`{ #DSTACK_SERVER_ELASTICSEARCH_API_KEY } – The Elasticsearch/OpenSearch API key for authentication.
 - `DSTACK_ENABLE_PROMETHEUS_METRICS`{ #DSTACK_ENABLE_PROMETHEUS_METRICS } — Enables Prometheus metrics collection and export.
 - `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE`{ #DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE } – Request body size limit for services running with a gateway, in bytes. Defaults to 64 MiB.
 - `DSTACK_SERVICE_CLIENT_TIMEOUT`{ #DSTACK_SERVICE_CLIENT_TIMEOUT } – Timeout in seconds for HTTP requests sent from the in-server proxy and gateways to service replicas. Defaults to 60.
