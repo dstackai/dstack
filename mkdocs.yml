@@ -170,6 +170,7 @@ plugins:
         "examples/clusters/a3mega/index.md": "examples/clusters/gcp/index.md"
         "examples/clusters/a4/index.md": "examples/clusters/gcp/index.md"
         "examples/clusters/efa/index.md": "examples/clusters/aws/index.md"
+        "docs/guides/migration.md": "docs/guides/upgrade.md"
   - typeset
   - gen-files:
       scripts: # always relative to mkdocs.yml
@@ -277,7 +278,9 @@ nav:
           - Troubleshooting: docs/guides/troubleshooting.md
           - Metrics: docs/guides/metrics.md
           - Protips: docs/guides/protips.md
-          - Migration: docs/guides/migration.md
+          - Upgrade: docs/guides/upgrade.md
+          - Migration:
+              - Slurm: docs/guides/migration/slurm.md
       - Reference:
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
