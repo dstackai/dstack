@@ -1801,4 +1801,3 @@ Health status:
 | `idle (failure)` | Fatal issues (uncorrectable ECC, PCIe failures); instance excluded from scheduling |
 
 GPU health metrics are also exported to Prometheus (see [Prometheus integration](#prometheus-integration)).
-
