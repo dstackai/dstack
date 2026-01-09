@@ -1341,7 +1341,7 @@ $ sbatch --job-name=ModelTraining --dependency=singleton train.sh
 
 Both Slurm and `dstack` handle sensitive data (API keys, tokens, passwords) for ML workloads. Slurm uses environment variables or files, while `dstack` provides encrypted secrets management in addition to environment variables.
 
-### Slurm environment variables
+### Slurm
 
 Slurm uses OS-level authentication. Jobs run with the user's UID/GID and inherit the environment from the login node. No built-in secrets management; users manage credentials in their environment or shared files.
 
@@ -1357,7 +1357,7 @@ $ sbatch --export=ALL train.sh
 
 </div>
 
-### dstack secrets management
+### dstack
 
 In addition to environment variables (`env`), `dstack` provides a secrets management system with encryption. Secrets are referenced in configuration using `${{ secrets.name }}` syntax.
 
