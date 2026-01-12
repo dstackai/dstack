@@ -16,6 +16,7 @@ import (
 
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/executor"
+	linuxuser "github.com/dstackai/dstack/runner/internal/linux/user"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/runner/api"
 	"github.com/dstackai/dstack/runner/internal/ssh"
@@ -30,7 +31,6 @@ func main() {
 
 func mainInner() int {
 	var tempDir string
-	var homeDir string
 	var httpPort int
 	var sshPort int
 	var sshAuthorizedKeys []string
@@ -61,13 +61,6 @@ func mainInner() int {
 						Destination: &tempDir,
 						TakesFile:   true,
 					},
-					&cli.StringFlag{
-						Name:        "home-dir",
-						Usage:       "HomeDir directory for credentials and $HOME",
-						Value:       consts.RunnerHomeDir,
-						Destination: &homeDir,
-						TakesFile:   true,
-					},
 					&cli.IntFlag{
 						Name:        "http-port",
 						Usage:       "Set a http port",
@@ -87,7 +80,7 @@ func mainInner() int {
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return start(ctx, tempDir, homeDir, httpPort, sshPort, sshAuthorizedKeys, logLevel, Version)
+					return start(ctx, tempDir, httpPort, sshPort, sshAuthorizedKeys, logLevel, Version)
 				},
 			},
 		},
@@ -104,7 +97,7 @@ func mainInner() int {
 	return 0
 }
 
-func start(ctx context.Context, tempDir string, homeDir string, httpPort int, sshPort int, sshAuthorizedKeys []string, logLevel int, version string) error {
+func start(ctx context.Context, tempDir string, httpPort int, sshPort int, sshAuthorizedKeys []string, logLevel int, version string) error {
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return fmt.Errorf("create temp directory: %w", err)
 	}
@@ -114,14 +107,38 @@ func start(ctx context.Context, tempDir string, homeDir string, httpPort int, ss
 		return fmt.Errorf("create default log file: %w", err)
 	}
 	defer func() {
-		closeErr := defaultLogFile.Close()
-		if closeErr != nil {
-			log.Error(ctx, "Failed to close default log file", "err", closeErr)
+		if err := defaultLogFile.Close(); err != nil {
+			log.Error(ctx, "Failed to close default log file", "err", err)
 		}
 	}()
-
 	log.DefaultEntry.Logger.SetOutput(io.MultiWriter(os.Stdout, defaultLogFile))
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(logLevel))
+
+	currentUser, err := linuxuser.FromCurrentProcess()
+	if err != nil {
+		return fmt.Errorf("get current process user: %w", err)
+	}
+	if !currentUser.IsRoot() {
+		return fmt.Errorf("must be root: %s", currentUser)
+	}
+	if currentUser.HomeDir == "" {
+		log.Warning(ctx, "Current user does not have home dir, using /root as a fallback", "user", currentUser)
+		currentUser.HomeDir = "/root"
+	}
+	// Fix the current process HOME, just in case some internals require it (e.g., they use os.UserHomeDir() or
+	// spawn a child process which uses that variable)
+	envHome, envHomeIsSet := os.LookupEnv("HOME")
+	if envHome != currentUser.HomeDir {
+		if !envHomeIsSet {
+			log.Warning(ctx, "HOME is not set, setting the value", "home", currentUser.HomeDir)
+		} else {
+			log.Warning(ctx, "HOME is incorrect, fixing the value", "current", envHome, "home", currentUser.HomeDir)
+		}
+		if err := os.Setenv("HOME", currentUser.HomeDir); err != nil {
+			return fmt.Errorf("set HOME: %w", err)
+		}
+	}
+	log.Trace(ctx, "Running as", "user", currentUser)
 
 	// NB: The Mkdir/Chown/Chmod code below relies on the fact that RunnerDstackDir path is _not_ nested (/dstack).
 	// Adjust it if the path is changed to, e.g., /opt/dstack
@@ -163,7 +180,7 @@ func start(ctx context.Context, tempDir string, homeDir string, httpPort int, ss
 		}
 	}()
 
-	ex, err := executor.NewRunExecutor(tempDir, homeDir, dstackDir, sshd)
+	ex, err := executor.NewRunExecutor(tempDir, dstackDir, *currentUser, sshd)
 	if err != nil {
 		return fmt.Errorf("create executor: %w", err)
 	}
