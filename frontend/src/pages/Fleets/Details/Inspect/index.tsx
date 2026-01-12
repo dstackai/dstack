@@ -1,24 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
-import ace from 'ace-builds';
-import CodeEditor, { CodeEditorProps } from '@cloudscape-design/components/code-editor';
-import { Mode } from '@cloudscape-design/global-styles';
 
-import { Container, Header, Loader } from 'components';
-import { CODE_EDITOR_I18N_STRINGS } from 'components/form/CodeEditor/constants';
+import { CodeEditor, Container, Header, Loader } from 'components';
 
-import { useAppSelector } from 'hooks';
 import { useGetFleetDetailsQuery } from 'services/fleet';
-
-import { selectSystemMode } from 'App/slice';
-
-import 'ace-builds/src-noconflict/theme-cloud_editor';
-import 'ace-builds/src-noconflict/theme-cloud_editor_dark';
-import 'ace-builds/src-noconflict/mode-json';
-import 'ace-builds/src-noconflict/ext-language_tools';
-
-ace.config.set('useWorker', false);
 
 interface AceEditorElement extends HTMLElement {
     env?: {
@@ -34,8 +20,6 @@ export const FleetInspect = () => {
     const paramProjectName = params.projectName ?? '';
     const paramFleetId = params.fleetId ?? '';
 
-    const systemMode = useAppSelector(selectSystemMode) ?? '';
-
     const { data: fleetData, isLoading } = useGetFleetDetailsQuery(
         {
             projectName: paramProjectName,
@@ -45,25 +29,6 @@ export const FleetInspect = () => {
             refetchOnMountOrArgChange: true,
         },
     );
-
-    const [codeEditorPreferences, setCodeEditorPreferences] = useState<CodeEditorProps['preferences']>(() => ({
-        theme: systemMode === Mode.Dark ? 'cloud_editor_dark' : 'cloud_editor',
-    }));
-
-    useEffect(() => {
-        if (systemMode === Mode.Dark)
-            setCodeEditorPreferences({
-                theme: 'cloud_editor_dark',
-            });
-        else
-            setCodeEditorPreferences({
-                theme: 'cloud_editor',
-            });
-    }, [systemMode]);
-
-    const onCodeEditorPreferencesChange: CodeEditorProps['onPreferencesChange'] = (e) => {
-        setCodeEditorPreferences(e.detail);
-    };
 
     const jsonContent = useMemo(() => {
         if (!fleetData) return '';
@@ -98,11 +63,6 @@ export const FleetInspect = () => {
             <CodeEditor
                 value={jsonContent}
                 language="json"
-                i18nStrings={CODE_EDITOR_I18N_STRINGS}
-                ace={ace}
-                themes={{ light: [], dark: [] }}
-                preferences={codeEditorPreferences}
-                onPreferencesChange={onCodeEditorPreferencesChange}
                 editorContentHeight={600}
                 onChange={() => {
                     // Prevent editing - onChange is required but we ignore changes
