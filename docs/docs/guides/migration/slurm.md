@@ -1,8 +1,11 @@
-# Slurm
+# Migrate from Slurm
 
 Both Slurm and `dstack` are open-source workload orchestration systems designed to manage compute resources and schedule jobs.
 
-This guide maps Slurm features to their `dstack` equivalents, explains key differences, and shows how to migrate GPU-accelerated workloads to `dstack`.
+While `dstack` is use-case agnostic and natively supports development and production-grade inference, this guide focuses only on training workloads.
+
+!!! tip "Slurm vs dstack"
+    Slurm is a battle-tested system with decades of production use in HPC environments. `dstack` is designed for modern ML/AI workloads with cloud-native provisioning and container-first architecture. Slurm is better suited for traditional HPC centers with static clusters; `dstack` is better suited for cloud-native ML teams working with cloud GPUs. Both systems can handle distributed training and batch workloads—the choice depends on your preferences. 
 
 | | Slurm | dstack |
 |---|-------|--------|
@@ -20,7 +23,7 @@ Both Slurm and `dstack` follow a client-server architecture with a control plane
 | **Control plane** | `slurmctld` (controller) | `dstack-server` |
 | **State persistence** | `slurmdbd` (database) | `dstack-server` (SQLite/PostgreSQL) |
 | **REST API** | `slurmrestd` (REST API) | `dstack-server` (HTTP API) |
-| **Compute plane** | `slurmd` (compute agent) | `dstack-shim` (VM-based) or `dstack-runner` (container-based) |
+| **Compute plane** | `slurmd` (compute agent) | `dstack-shim` (on VMs/hosts) and/or `dstack-runner` (inside containers) |
 | **Client** | CLI from login nodes | CLI from anywhere |
 | **High availability** | Active-passive failover (typically 2 controller nodes) | Horizontal scaling with multiple server replicas (requires PostgreSQL) |
 
@@ -129,7 +132,9 @@ Launching `train-model`...
 | **Duration** | `--time=2:00:00` | `max_duration: 2h` (both enforce walltime) |
 | **Cluster** | `--partition=gpu` | `fleets: [gpu]` (see Partitions and fleets below) |
 | **Output** | `--output=train-%j.out` (writes files) | `dstack logs` or UI (streams via API) |
+| **Working directory** | `--chdir=/path/to/dir` or defaults to submission directory | `working_dir: /path/to/dir` (defaults to image's working directory, typically `/dstack/run`) |
 | **Environment variables** | `export VAR` or `--export=ALL,VAR=value` | `env: - VAR` or `--env VAR=value` |
+| **Node exclusivity** | `--exclusive` (entire node) | Automatic if `blocks` is not used or job uses all blocks; required for distributed tasks (`nodes` > 1) |
 
 > For multi-node examples, see [Distributed training](#distributed-training) below.
 
@@ -141,7 +146,7 @@ By default, Slurm runs jobs on compute nodes using the host OS with cgroups for 
 
 === "Singularity/Apptainer"
 
-    Container image must exist on shared filesystem. Mount host directories with `--bind`:
+    Container image must exist on shared filesystem. Mount host directories with `--container-mounts`:
 
     ```bash
     #!/bin/bash
@@ -149,10 +154,10 @@ By default, Slurm runs jobs on compute nodes using the host OS with cgroups for 
     #SBATCH --gres=gpu:1
     #SBATCH --mem=32G
     #SBATCH --time=2:00:00
-    #SBATCH --container=/shared/images/pytorch-2.0-cuda11.8.sif
-    #SBATCH --bind=/shared/datasets:/datasets,/shared/checkpoints:/checkpoints
 
-    srun python train.py --batch-size=64
+    srun --container-image=/shared/images/pytorch-2.0-cuda11.8.sif \
+      --container-mounts=/shared/datasets:/datasets,/shared/checkpoints:/checkpoints \
+      python train.py --batch-size=64
     ```
 
 === "Pyxis with Enroot"
@@ -181,10 +186,10 @@ By default, Slurm runs jobs on compute nodes using the host OS with cgroups for 
     #SBATCH --gres=gpu:1
     #SBATCH --mem=32G
     #SBATCH --time=2:00:00
-    #SBATCH --container=docker://pytorch/pytorch:2.0.0-cuda11.8-cudnn8-runtime
-    #SBATCH --container-mounts=/shared/datasets:/datasets,/shared/checkpoints:/checkpoints
 
-    srun python train.py --batch-size=64
+    srun --container-image=docker://pytorch/pytorch:2.0.0-cuda11.8-cudnn8-runtime \
+      --container-mounts=/shared/datasets:/datasets,/shared/checkpoints:/checkpoints \
+      python train.py --batch-size=64
     ```
 
 ### dstack
@@ -381,7 +386,7 @@ Slurm explicitly controls both `nodes` and processes/tasks.
 
     If `startup_order` and `stop_criteria` are not configured (as in the PyTorch DDP example above), the master worker starts first and waits until all workers terminate. For MPI workloads, we need to change this.
 
-**Nodes and processes comparison:**
+#### Nodes and processes comparison
 
 | | Slurm | dstack |
 |---|-------|--------|
@@ -396,6 +401,7 @@ Slurm explicitly controls both `nodes` and processes/tasks.
 | `SLURM_NODEID` | `DSTACK_NODE_RANK` | Node rank (0-based) |
 | `SLURM_PROCID` | N/A | Process rank (0-based, across all processes) |
 | `SLURM_NTASKS` | `DSTACK_GPUS_NUM` | Total number of processes/GPUs |
+| `SLURM_NTASKS_PER_NODE` | `DSTACK_GPUS_PER_NODE` | Number of processes/GPUs per node |
 | `SLURM_JOB_NUM_NODES` | `DSTACK_NODES_NUM` | Number of nodes |
 | Manual master address | `DSTACK_MASTER_NODE_IP` | Master node IP (automatically set) |
 | N/A | `DSTACK_MPI_HOSTFILE` | Pre-populated MPI hostfile |
@@ -551,7 +557,7 @@ priority: 50
 
 retry:
   on_events: [no-capacity]  # Retry until idle instances are available (enables queueing similar to Slurm)
-  duration: 48h  # Maximum retry time
+  duration: 48h  # Maximum retry time (run age for no-capacity, time since last event for error/interruption)
 
 max_duration: 2h
 ```
@@ -760,7 +766,7 @@ Both Slurm and `dstack` allow workloads to access filesystems (including shared 
 | **Host filesystem access** | Full access by default (native processes); mounting required only for containers | Always uses containers; requires explicit mounting via `volumes` (instance or network) |
 | **Shared filesystems** | Assumes global namespace (NFS, Lustre, GPFS); same path exists on all nodes | Supported via SSH fleets with instance volumes (pre-mounted network storage); network volumes for backend fleets (limited support for shared filesystems) |
 | **Instance disk size** | Fixed by cluster administrator | Configurable via `disk` property in `resources` (tasks) or fleet configuration; supports ranges (e.g., `disk: 500GB` or `disk: 200GB..1TB`) |
-| **Local/temporary storage** | `$SLURM_TMPDIR` (auto-cleaned on job completion) | Instance volumes (persist for instance lifetime) or network volumes |
+| **Local/temporary storage** | `$SLURM_TMPDIR` (auto-cleaned on job completion) | Container filesystem (auto-cleaned on job completion; except instance volumes or network volumes) |
 | **File transfer** | `sbcast` for broadcasting files to allocated nodes | `repos` and `files` properties; `rsync`/`scp` via SSH (when attached) |
 
 ### Slurm
@@ -808,22 +814,24 @@ Slurm assumes a shared filesystem (NFS, Lustre, GPFS) with a global namespace. T
     #SBATCH --nodes=4
     #SBATCH --gres=gpu:8
     #SBATCH --time=24:00:00
-    #SBATCH --container=/shared/images/pytorch-2.0-cuda11.8.sif
-    #SBATCH --bind=/shared/datasets:/datasets,/shared/checkpoints:/checkpoints
 
     # Shared filesystem mounted at /datasets and /checkpoints
     DATASET_PATH=/datasets/imagenet
 
     # Local scratch accessible via $SLURM_TMPDIR (host storage mounted into container)
-    cp -r $DATASET_PATH $SLURM_TMPDIR/dataset
+    # Copy dataset to local scratch, then train
+    srun --container-image=/shared/images/pytorch-2.0-cuda11.8.sif \
+      --container-mounts=/shared/datasets:/datasets,/shared/checkpoints:/checkpoints \
+      cp -r $DATASET_PATH $SLURM_TMPDIR/dataset
 
-    # Training with local dataset
-    python train.py \
-      --data=$SLURM_TMPDIR/dataset \
-      --checkpoint-dir=/checkpoints \
-      --epochs=100
+    srun --container-image=/shared/images/pytorch-2.0-cuda11.8.sif \
+      --container-mounts=/shared/datasets:/datasets,/shared/checkpoints:/checkpoints \
+      python train.py \
+        --data=$SLURM_TMPDIR/dataset \
+        --checkpoint-dir=/checkpoints \
+        --epochs=100
 
-    # $SLURM_TMPDIR automatically cleaned when job ends
+    # \$SLURM_TMPDIR automatically cleaned when job ends
     # Checkpoints saved to mounted shared filesystem persist
     ```
 
@@ -1229,113 +1237,6 @@ $ for i in {1..100}; do
 
 </div>
 
-## Job dependencies
-
-Job dependencies enable chaining tasks together, ensuring that downstream jobs only run after upstream jobs complete.
-
-### Slurm dependencies
-
-Slurm provides native dependency support via `--dependency` flags. Dependencies are managed by Slurm:
-
-| Dependency type | Description |
-|----------------|-------------|
-| **`afterok`** | Runs only if the dependency job finishes with Exit Code 0 (success) |
-| **`afterany`** | Runs regardless of success or failure (useful for cleanup jobs) |
-| **`aftercorr`** | For array jobs, allows corresponding tasks to start as soon as the matching task in the dependency array completes (e.g., Task 1 of Array B starts when Task 1 of Array A finishes, without waiting for the entire Array A) |
-| **`singleton`** | Based on job name and user (not job IDs), ensures only one job with the same name runs at a time for that user (useful for serializing access to shared resources) |
-
-Submit a job that depends on another job completing successfully:
-
-<div class="termy">
-
-```shell
-$ JOB_TRAIN=$(sbatch train.sh | awk '{print $4}')
-  Submitted batch job 1001
-
-$ sbatch --dependency=afterok:$JOB_TRAIN evaluate.sh
-  Submitted batch job 1002
-```
-
-</div>
-
-Submit a job with singleton dependency (only one job with this name runs at a time):
-
-<div class="termy">
-
-```shell
-$ sbatch --job-name=ModelTraining --dependency=singleton train.sh
-  Submitted batch job 1004
-```
-
-</div>
-
-### dstack
-
-`dstack` does not support native job dependencies. Use external workflow orchestration tools (Airflow, Prefect, etc.) to implement dependencies.
-
-=== "Prefect"
-
-    ```python
-    from prefect import flow, task
-    import subprocess
-
-    @task
-    def train_model():
-        """Submit training job and wait for completion"""
-        subprocess.run(
-            ["dstack", "apply", "-f", "train.dstack.yml", "--name", "train-run"],
-            check=True  # Raises exception if training fails
-        )
-        return "train-run"
-
-    @task
-    def evaluate_model(run_name):
-        """Submit evaluation job after training succeeds"""
-        subprocess.run(
-            ["dstack", "apply", "-f", "evaluate.dstack.yml", "--name", f"eval-{run_name}"],
-            check=True
-        )
-
-    @flow
-    def ml_pipeline():
-        train_run = train_model()
-        evaluate_model(train_run)
-    ```
-
-=== "Airflow"
-
-    ```python
-    from airflow.decorators import dag, task
-    from datetime import datetime
-    import subprocess
-
-    @dag(schedule=None, start_date=datetime(2024, 1, 1), catchup=False)
-    def ml_training_pipeline():
-        @task
-        def train(context):
-            """Submit training job and wait for completion"""
-            run_name = f"train-{context['ds']}"
-            subprocess.run(
-                ["dstack", "apply", "-f", "train.dstack.yml", "--name", run_name],
-                check=True  # Raises exception if training fails
-            )
-            return run_name
-        
-        @task
-        def evaluate(run_name, context):
-            """Submit evaluation job after training succeeds"""
-            eval_name = f"eval-{run_name}"
-            subprocess.run(
-                ["dstack", "apply", "-f", "evaluate.dstack.yml", "--name", eval_name],
-                check=True
-            )
-        
-        # Define task dependencies - train() completes before evaluate() starts
-        train_run = train()
-        evaluate(train_run)
-
-    ml_training_pipeline()
-    ```
 
 ## Environment variables and secrets
 
@@ -1801,3 +1702,138 @@ Health status:
 | `idle (failure)` | Fatal issues (uncorrectable ECC, PCIe failures); instance excluded from scheduling |
 
 GPU health metrics are also exported to Prometheus (see [Prometheus integration](#prometheus-integration)).
+
+## Job dependencies
+
+Job dependencies enable chaining tasks together, ensuring that downstream jobs only run after upstream jobs complete.
+
+### Slurm dependencies
+
+Slurm provides native dependency support via `--dependency` flags. Dependencies are managed by Slurm:
+
+| Dependency type | Description |
+|----------------|-------------|
+| **`afterok`** | Runs only if the dependency job finishes with Exit Code 0 (success) |
+| **`afterany`** | Runs regardless of success or failure (useful for cleanup jobs) |
+| **`aftercorr`** | For array jobs, allows corresponding tasks to start as soon as the matching task in the dependency array completes (e.g., Task 1 of Array B starts when Task 1 of Array A finishes, without waiting for the entire Array A) |
+| **`singleton`** | Based on job name and user (not job IDs), ensures only one job with the same name runs at a time for that user (useful for serializing access to shared resources) |
+
+Submit a job that depends on another job completing successfully:
+
+<div class="termy">
+
+```shell
+$ JOB_TRAIN=$(sbatch train.sh | awk '{print $4}')
+  Submitted batch job 1001
+
+$ sbatch --dependency=afterok:$JOB_TRAIN evaluate.sh
+  Submitted batch job 1002
+```
+
+</div>
+
+Submit a job with singleton dependency (only one job with this name runs at a time):
+
+<div class="termy">
+
+```shell
+$ sbatch --job-name=ModelTraining --dependency=singleton train.sh
+  Submitted batch job 1004
+```
+
+</div>
+
+### dstack { #dstack-workflow-orchestration }
+
+`dstack` does not support native job dependencies. Use external workflow orchestration tools (Airflow, Prefect, etc.) to implement dependencies.
+
+=== "Prefect"
+
+    ```python
+    from prefect import flow, task
+    import subprocess
+
+    @task
+    def train_model():
+        """Submit training job and wait for completion"""
+        subprocess.run(
+            ["dstack", "apply", "-f", "train.dstack.yml", "--name", "train-run"],
+            check=True  # Raises exception if training fails
+        )
+        return "train-run"
+
+    @task
+    def evaluate_model(run_name):
+        """Submit evaluation job after training succeeds"""
+        subprocess.run(
+            ["dstack", "apply", "-f", "evaluate.dstack.yml", "--name", f"eval-{run_name}"],
+            check=True
+        )
+
+    @flow
+    def ml_pipeline():
+        train_run = train_model()
+        evaluate_model(train_run)
+    ```
+
+=== "Airflow"
+
+    ```python
+    from airflow.decorators import dag, task
+    from datetime import datetime
+    import subprocess
+
+    @dag(schedule=None, start_date=datetime(2024, 1, 1), catchup=False)
+    def ml_training_pipeline():
+        @task
+        def train(context):
+            """Submit training job and wait for completion"""
+            run_name = f"train-{context['ds']}"
+            subprocess.run(
+                ["dstack", "apply", "-f", "train.dstack.yml", "--name", run_name],
+                check=True  # Raises exception if training fails
+            )
+            return run_name
+        
+        @task
+        def evaluate(run_name, context):
+            """Submit evaluation job after training succeeds"""
+            eval_name = f"eval-{run_name}"
+            subprocess.run(
+                ["dstack", "apply", "-f", "evaluate.dstack.yml", "--name", eval_name],
+                check=True
+            )
+        
+        # Define task dependencies - train() completes before evaluate() starts
+        train_run = train()
+        evaluate(train_run)
+
+    ml_training_pipeline()
+    ```
+
+## Heterogeneous jobs
+
+Heterogeneous jobs (het jobs) allow a single job to request different resource configurations for different components (e.g., GPU nodes for training, high-memory CPU nodes for preprocessing). This is an edge case used for coordinated multi-component workflows.
+
+### Slurm
+
+Slurm supports heterogeneous jobs via `#SBATCH hetjob` and `--het-group` flags. Each component can specify different resources:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=ml-pipeline
+#SBATCH hetjob
+#SBATCH --het-group=0 --nodes=2 --gres=gpu:8 --mem=200G
+#SBATCH --het-group=1 --nodes=1 --mem=500G --partition=highmem
+
+# Use SLURM_JOB_COMPONENT_ID to identify the component
+if [ "$SLURM_JOB_COMPONENT_ID" -eq 0 ]; then
+    srun python train.py
+elif [ "$SLURM_JOB_COMPONENT_ID" -eq 1 ]; then
+    srun python preprocess.py
+fi
+```
+
+### dstack
+
+`dstack` does not support heterogeneous jobs natively. Use separate runs with [workflow orchestration tools (Prefect, Airflow)](#dstack-workflow-orchestration) or submit multiple runs programmatically to coordinate components with different resource requirements.
