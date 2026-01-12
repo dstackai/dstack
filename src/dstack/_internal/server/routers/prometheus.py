@@ -25,6 +25,9 @@ router = APIRouter(
 async def get_prometheus_metrics(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> str:
+    # Note: Prometheus warns against storing high cardinality values in labels,
+    # yet both client and custom metrics have labels like project, run, fleet, etc.
+    # This may require a very big Prometheus server with lots of storage.
     if not settings.ENABLE_PROMETHEUS_METRICS:
         raise error_not_found()
     custom_metrics_ = await custom_metrics.get_metrics(session=session)

@@ -306,19 +306,31 @@ def register_routes(app: FastAPI, ui: bool = True):
 
             return project_name
 
+        def _extract_endpoint_label(request: Request, response: Response) -> str:
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", None)
+            if route_path:
+                return route_path
+            if not request.url.path.startswith("/api/"):
+                return "__non_api__"
+            if response.status_code == status.HTTP_404_NOT_FOUND:
+                return "__not_found__"
+            return "__unmatched__"
+
         project_name = _extract_project_name(request)
         response: Response = await call_next(request)
+        endpoint_label = _extract_endpoint_label(request, response)
 
         REQUEST_DURATION.labels(
             method=request.method,
-            endpoint=request.url.path,
+            endpoint=endpoint_label,
             http_status=response.status_code,
             project_name=project_name,
         ).observe(request.state.process_time)
 
         REQUESTS_TOTAL.labels(
             method=request.method,
-            endpoint=request.url.path,
+            endpoint=endpoint_label,
             http_status=response.status_code,
             project_name=project_name,
         ).inc()
