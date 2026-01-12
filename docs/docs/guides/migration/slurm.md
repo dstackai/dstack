@@ -1,8 +1,6 @@
 # Migrate from Slurm
 
-Both Slurm and `dstack` are open-source workload orchestration systems designed to manage compute resources and schedule jobs.
-
-While `dstack` is use-case agnostic and natively supports development and production-grade inference, this guide focuses only on training workloads.
+Both Slurm and `dstack` are open-source workload orchestration systems designed to manage compute resources and schedule jobs. This guide compares Slurm and `dstack`, maps features between the two systems, and shows their `dstack` equivalents.
 
 !!! tip "Slurm vs dstack"
     Slurm is a battle-tested system with decades of production use in HPC environments. `dstack` is designed for modern ML/AI workloads with cloud-native provisioning and container-first architecture. Slurm is better suited for traditional HPC centers with static clusters; `dstack` is better suited for cloud-native ML teams working with cloud GPUs. Both systems can handle distributed training and batch workloads—the choice depends on your preferences. 
@@ -13,6 +11,8 @@ While `dstack` is use-case agnostic and natively supports development and produc
 | **Containers** | Optional via plugins | Built around containers from the ground up |
 | **Use cases** | Batch job scheduling and distributed training | Interactive development, distributed training, and production inference services |
 | **Personas** | HPC centers, academic institutions, research labs | ML engineering teams, AI startups, cloud-native organizations |
+
+While `dstack` is use-case agnostic and natively supports development and production-grade inference, this guide focuses only on training workloads.
 
 ## Architecture
 
