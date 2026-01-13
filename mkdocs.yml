@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source control plane for running development, training, and inference jobs on GPUs - across hyperscalers, neoclouds, or on-prem.
+  dstack is an open-source control plane for GPU provisioning and orchestration across GPU clouds, Kubernetes, and on-prem clusters.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -170,6 +170,7 @@ plugins:
         "examples/clusters/a3mega/index.md": "examples/clusters/gcp/index.md"
         "examples/clusters/a4/index.md": "examples/clusters/gcp/index.md"
         "examples/clusters/efa/index.md": "examples/clusters/aws/index.md"
+        "docs/guides/migration.md": "docs/guides/upgrade.md"
   - typeset
   - gen-files:
       scripts: # always relative to mkdocs.yml
@@ -277,7 +278,9 @@ nav:
           - Troubleshooting: docs/guides/troubleshooting.md
           - Metrics: docs/guides/metrics.md
           - Protips: docs/guides/protips.md
-          - Migration: docs/guides/migration.md
+          - Upgrade: docs/guides/upgrade.md
+      - Migration:
+        - Slurm: docs/guides/migration/slurm.md
       - Reference:
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
