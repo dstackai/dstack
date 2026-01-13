@@ -24,6 +24,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+@sentry_utils.instrument_background_task
 async def process_gateways_connections():
     await _remove_inactive_connections()
     await _process_active_connections()

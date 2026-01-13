@@ -33,6 +33,10 @@ from dstack._internal.server.background.tasks.process_terminating_jobs import (
     process_terminating_jobs,
 )
 from dstack._internal.server.background.tasks.process_volumes import process_submitted_volumes
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 _scheduler = AsyncIOScheduler()
 
@@ -76,8 +80,13 @@ def start_background_tasks() -> AsyncIOScheduler:
             collect_prometheus_metrics, IntervalTrigger(seconds=10), max_instances=1
         )
         _scheduler.add_job(delete_prometheus_metrics, IntervalTrigger(minutes=5), max_instances=1)
-    _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
-    _scheduler.add_job(process_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5)
+    if settings.GATEWAY_PROCESSING_DISABLED:
+        logger.info("Gateway processing disabled")
+    else:
+        _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
+        _scheduler.add_job(
+            process_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5
+        )
     _scheduler.add_job(
         process_submitted_volumes, IntervalTrigger(seconds=10, jitter=2), max_instances=5
     )
