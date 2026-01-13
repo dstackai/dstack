@@ -1,3 +1,4 @@
+import os
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -113,6 +114,10 @@ async def list_projects_with_no_active_fleets(
 
     Applies to all users (both regular users and admins require membership).
     """
+    # Testing https://github.com/sqlalchemy/sqlalchemy/discussions/12536
+    if os.getenv("DSTACK_LIST_NO_ACTIVE_FLEETS_DISABLED") is not None:
+        return []
+
     active_fleet_alias = aliased(FleetModel)
     member_alias = aliased(MemberModel)
 
