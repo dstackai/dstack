@@ -11,11 +11,11 @@ from dstack._internal.cli.utils.common import (
     NO_OFFERS_WARNING,
     add_row_from_dict,
     console,
+    format_instance_availability,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import (
-    InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
 )
@@ -168,14 +168,6 @@ def print_run_plan(
     for i, offer in enumerate(job_plan.offers, start=1):
         r = offer.instance.resources
 
-        availability = ""
-        if offer.availability in {
-            InstanceAvailability.NOT_AVAILABLE,
-            InstanceAvailability.NO_QUOTA,
-            InstanceAvailability.IDLE,
-            InstanceAvailability.BUSY,
-        }:
-            availability = offer.availability.value.replace("_", " ").lower()
         instance = offer.instance.name
         if offer.total_blocks > 1:
             instance += f" ({offer.blocks}/{offer.total_blocks})"
@@ -185,7 +177,7 @@ def print_run_plan(
             r.pretty_format(include_spot=True),
             instance,
             f"${offer.price:.4f}".rstrip("0").rstrip("."),
-            availability,
+            format_instance_availability(offer.availability),
             style=None if i == 1 or not include_run_properties else "secondary",
         )
     if job_plan.total_offers > len(job_plan.offers):

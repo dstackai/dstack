@@ -14,6 +14,7 @@ from dstack._internal.cli.utils.common import (
     NO_OFFERS_WARNING,
     confirm_ask,
     console,
+    format_instance_availability,
 )
 from dstack._internal.cli.utils.fleet import get_fleets_table
 from dstack._internal.cli.utils.rich import MultiItemStatus
@@ -32,7 +33,7 @@ from dstack._internal.core.models.fleets import (
     FleetSpec,
     InstanceGroupPlacement,
 )
-from dstack._internal.core.models.instances import InstanceAvailability, InstanceStatus, SSHKey
+from dstack._internal.core.models.instances import InstanceStatus, SSHKey
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.logging import get_logger
@@ -420,12 +421,6 @@ def _print_plan_header(plan: FleetPlan):
     for index, offer in enumerate(print_offers, start=1):
         resources = offer.instance.resources
 
-        availability = ""
-        if offer.availability in {
-            InstanceAvailability.NOT_AVAILABLE,
-            InstanceAvailability.NO_QUOTA,
-        }:
-            availability = offer.availability.value.replace("_", " ").title()
         offers_table.add_row(
             f"{index}",
             offer.backend.replace("remote", "ssh"),
@@ -434,7 +429,7 @@ def _print_plan_header(plan: FleetPlan):
             resources.pretty_format(),
             "yes" if resources.spot else "no",
             f"${offer.price:3f}".rstrip("0").rstrip("."),
-            availability,
+            format_instance_availability(offer.availability),
             style=None if index == 1 else "secondary",
         )
     if len(plan.offers) > offers_limit:
