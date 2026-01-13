@@ -1,9 +1,14 @@
+---
+title: Migrate from Slurm
+description: This guide compares Slurm and dstack, and shows how to orchestrate equivalent GPU-based workloads using dstack.
+---
+
 # Migrate from Slurm
 
 Both Slurm and `dstack` are open-source workload orchestration systems designed to manage compute resources and schedule jobs. This guide compares Slurm and `dstack`, maps features between the two systems, and shows their `dstack` equivalents.
 
 !!! tip "Slurm vs dstack"
-    Slurm is a battle-tested system with decades of production use in HPC environments. `dstack` is designed for modern ML/AI workloads with cloud-native provisioning and container-first architecture. Slurm is better suited for traditional HPC centers with static clusters; `dstack` is better suited for cloud-native ML teams working with cloud GPUs. Both systems can handle distributed training and batch workloads—the choice depends on your preferences. 
+    Slurm is a battle-tested system with decades of production use in HPC environments. `dstack` is designed for modern ML/AI workloads with cloud-native provisioning and container-first architecture. Slurm is better suited for traditional HPC centers with static clusters; `dstack` is better suited for cloud-native ML teams working with cloud GPUs. Both systems can handle distributed training and batch workloads. 
 
 | | Slurm | dstack |
 |---|-------|--------|
@@ -12,7 +17,7 @@ Both Slurm and `dstack` are open-source workload orchestration systems designed 
 | **Use cases** | Batch job scheduling and distributed training | Interactive development, distributed training, and production inference services |
 | **Personas** | HPC centers, academic institutions, research labs | ML engineering teams, AI startups, cloud-native organizations |
 
-While `dstack` is use-case agnostic and natively supports development and production-grade inference, this guide focuses only on training workloads.
+While `dstack` is designed to be use-case agnostic and supports both development and production-grade inference, this guide focuses specifically on training workloads.
 
 ## Architecture
 
@@ -424,7 +429,7 @@ Both systems support core scheduling features and efficient resource utilization
 
 ### Slurm
 
-Slurm may use a multi-factor priority system, and limit usage across accounts, QOS, users, and single runs.
+Slurm may use a multi-factor priority system, and limit usage across accounts, users, and runs.
 
 #### QOS
 
@@ -1837,3 +1842,9 @@ fi
 ### dstack
 
 `dstack` does not support heterogeneous jobs natively. Use separate runs with [workflow orchestration tools (Prefect, Airflow)](#dstack-workflow-orchestration) or submit multiple runs programmatically to coordinate components with different resource requirements.
+
+## What's next?
+
+1. Check out [Quickstart](../../quickstart.md)
+2. Read about [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), and [services](../../concepts/services.md)
+3. Browse the [examples](../../../examples.md)
