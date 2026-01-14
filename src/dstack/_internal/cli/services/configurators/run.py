@@ -339,6 +339,8 @@ class BaseRunConfigurator(
     def apply_args(self, conf: RunConfigurationT, args: argparse.Namespace):
         apply_resources_args(args, conf)
         apply_profile_args(args, conf)
+        if args.run_name:
+            conf.name = args.run_name
         self.apply_env_vars(conf.env, args)
         self.interpolate_env(conf)
 
