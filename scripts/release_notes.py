@@ -32,6 +32,9 @@ def get_draft_release_by_tag(tag: str) -> dict:
         headers={"Authorization": f"token {GITHUB_TOKEN}"},
         timeout=10,
     )
+    if not r.ok:
+        msg = f"Error getting GitHub releases; status: {r.status_code}, body: {r.text}"
+        raise Exception(msg)
     for release in r.json():
         if release["tag_name"] == tag and release["draft"]:
             return release
