@@ -12,8 +12,7 @@ from typing import Dict, List, Optional, Set, TypeVar
 import gpuhunt
 from pydantic import parse_obj_as
 
-import dstack._internal.core.models.resources as resources
-from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec, port_mapping
+from dstack._internal.cli.services.args import port_mapping
 from dstack._internal.cli.services.configurators.base import (
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator,
@@ -26,6 +25,7 @@ from dstack._internal.cli.services.repos import (
     is_git_repo_url,
     register_init_repo_args,
 )
+from dstack._internal.cli.services.resources import apply_resources_args, register_resources_args
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.rich import MultiItemStatus
 from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
@@ -309,29 +309,7 @@ class BaseRunConfigurator(
             default=3,
         )
         cls.register_env_args(configuration_group)
-        configuration_group.add_argument(
-            "--cpu",
-            type=cpu_spec,
-            help="Request CPU for the run. "
-            "The format is [code]ARCH[/]:[code]COUNT[/] (all parts are optional)",
-            dest="cpu_spec",
-            metavar="SPEC",
-        )
-        configuration_group.add_argument(
-            "--gpu",
-            type=gpu_spec,
-            help="Request GPU for the run. "
-            "The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
-            dest="gpu_spec",
-            metavar="SPEC",
-        )
-        configuration_group.add_argument(
-            "--disk",
-            type=disk_spec,
-            help="Request the size range of disk for the run. Example [code]--disk 100GB..[/].",
-            metavar="RANGE",
-            dest="disk_spec",
-        )
+        register_resources_args(configuration_group)
         register_profile_args(parser)
         repo_group = parser.add_argument_group("Repo Options")
         repo_group.add_argument(
@@ -359,16 +337,8 @@ class BaseRunConfigurator(
         register_init_repo_args(repo_group)
 
     def apply_args(self, conf: RunConfigurationT, args: argparse.Namespace):
+        apply_resources_args(args, conf)
         apply_profile_args(args, conf)
-        if args.run_name:
-            conf.name = args.run_name
-        if args.cpu_spec:
-            conf.resources.cpu = resources.CPUSpec.parse_obj(args.cpu_spec)
-        if args.gpu_spec:
-            conf.resources.gpu = resources.GPUSpec.parse_obj(args.gpu_spec)
-        if args.disk_spec:
-            conf.resources.disk = args.disk_spec
-
         self.apply_env_vars(conf.env, args)
         self.interpolate_env(conf)
 
