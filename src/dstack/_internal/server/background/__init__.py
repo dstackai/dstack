@@ -1,3 +1,5 @@
+import os
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -71,74 +73,93 @@ def start_background_tasks() -> AsyncIOScheduler:
     # that the first waiting for the lock will acquire it.
     # The jitter is needed to give all tasks a chance to acquire locks.
 
-    _scheduler.add_job(process_probes, IntervalTrigger(seconds=3, jitter=1))
-    _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
-    _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
-    _scheduler.add_job(delete_events, IntervalTrigger(minutes=7), max_instances=1)
+    if os.getenv("DSTACK_PROBES_PROCESSING_DISABLED") is None:
+        _scheduler.add_job(process_probes, IntervalTrigger(seconds=3, jitter=1))
+    if os.getenv("DSTACK_COLLECT_METRICS_PROCESSING_DISABLED") is None:
+        _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
+    if os.getenv("DSTACK_DELETE_METRICS_PROCESSING_DISABLED") is None:
+        _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
+    if os.getenv("DSTACK_DELETE_EVENTS_PROCESSING_DISABLED") is None:
+        _scheduler.add_job(delete_events, IntervalTrigger(minutes=7), max_instances=1)
     if settings.ENABLE_PROMETHEUS_METRICS:
-        _scheduler.add_job(
-            collect_prometheus_metrics, IntervalTrigger(seconds=10), max_instances=1
-        )
-        _scheduler.add_job(delete_prometheus_metrics, IntervalTrigger(minutes=5), max_instances=1)
-    if settings.GATEWAY_PROCESSING_DISABLED:
-        logger.info("Gateway processing disabled")
-    else:
+        if os.getenv("DSTACK_COLLECT_PROMETHEUS_METRICS_PROCESSING_DISABLED") is None:
+            _scheduler.add_job(
+                collect_prometheus_metrics, IntervalTrigger(seconds=10), max_instances=1
+            )
+        if os.getenv("DSTACK_DELETE_PROMETHEUS_METRICS_PROCESSING_DISABLED") is None:
+            _scheduler.add_job(
+                delete_prometheus_metrics, IntervalTrigger(minutes=5), max_instances=1
+            )
+    if os.getenv("DSTACK_GATEWAY_PROCESSING_DISABLED") is None:
         _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
         _scheduler.add_job(
             process_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5
         )
-    _scheduler.add_job(
-        process_submitted_volumes, IntervalTrigger(seconds=10, jitter=2), max_instances=5
-    )
-    _scheduler.add_job(
-        process_idle_volumes, IntervalTrigger(seconds=60, jitter=10), max_instances=1
-    )
-    _scheduler.add_job(process_placement_groups, IntervalTrigger(seconds=30, jitter=5))
-    _scheduler.add_job(
-        process_fleets,
-        IntervalTrigger(seconds=10, jitter=2),
-        max_instances=1,
-    )
-    _scheduler.add_job(delete_instance_health_checks, IntervalTrigger(minutes=5), max_instances=1)
+    if os.getenv("DSTACK_SUBMITTED_VOLUMES_PROCESSING_DISABLED") is None:
+        _scheduler.add_job(
+            process_submitted_volumes, IntervalTrigger(seconds=10, jitter=2), max_instances=5
+        )
+    if os.getenv("DSTACK_IDLE_VOLUMES_PROCESSING_DISABLED") is None:
+        _scheduler.add_job(
+            process_idle_volumes, IntervalTrigger(seconds=60, jitter=10), max_instances=1
+        )
+    if os.getenv("DSTACK_PLACEMENT_GROUPS_PROCESSING_DISABLED") is None:
+        _scheduler.add_job(process_placement_groups, IntervalTrigger(seconds=30, jitter=5))
+    if os.getenv("DSTACK_FLEETS_PROCESSING_DISABLED") is None:
+        _scheduler.add_job(
+            process_fleets,
+            IntervalTrigger(seconds=10, jitter=2),
+            max_instances=1,
+        )
+    if os.getenv("DSTACK_DELETE_INSTANCE_HEALTH_CHECKS_PROCESSING_DISABLED") is None:
+        _scheduler.add_job(
+            delete_instance_health_checks, IntervalTrigger(minutes=5), max_instances=1
+        )
     for replica in range(settings.SERVER_BACKGROUND_PROCESSING_FACTOR):
         # Add multiple copies of tasks if requested.
         # max_instances=1 for additional copies to avoid running too many tasks.
         # Move other tasks here when they need per-replica scaling.
-        _scheduler.add_job(
-            process_submitted_jobs,
-            IntervalTrigger(seconds=4, jitter=2),
-            kwargs={"batch_size": 5},
-            max_instances=4 if replica == 0 else 1,
-        )
-        _scheduler.add_job(
-            process_running_jobs,
-            IntervalTrigger(seconds=4, jitter=2),
-            kwargs={"batch_size": 5},
-            max_instances=2 if replica == 0 else 1,
-        )
-        _scheduler.add_job(
-            process_terminating_jobs,
-            IntervalTrigger(seconds=4, jitter=2),
-            kwargs={"batch_size": 5},
-            max_instances=2 if replica == 0 else 1,
-        )
-        _scheduler.add_job(
-            process_runs,
-            IntervalTrigger(seconds=2, jitter=1),
-            kwargs={"batch_size": 5},
-            max_instances=2 if replica == 0 else 1,
-        )
-        _scheduler.add_job(
-            process_instances,
-            IntervalTrigger(seconds=4, jitter=2),
-            kwargs={"batch_size": 5},
-            max_instances=2 if replica == 0 else 1,
-        )
-        _scheduler.add_job(
-            process_compute_groups,
-            IntervalTrigger(seconds=15, jitter=2),
-            kwargs={"batch_size": 1},
-            max_instances=2 if replica == 0 else 1,
-        )
+        if os.getenv("DSTACK_SUBMITTED_JOBS_PROCESSING_DISABLED") is None:
+            _scheduler.add_job(
+                process_submitted_jobs,
+                IntervalTrigger(seconds=4, jitter=2),
+                kwargs={"batch_size": 5},
+                max_instances=4 if replica == 0 else 1,
+            )
+        if os.getenv("DSTACK_RUNNING_JOBS_PROCESSING_DISABLED") is None:
+            _scheduler.add_job(
+                process_running_jobs,
+                IntervalTrigger(seconds=4, jitter=2),
+                kwargs={"batch_size": 5},
+                max_instances=2 if replica == 0 else 1,
+            )
+        if os.getenv("DSTACK_TERMINATING_JOBS_PROCESSING_DISABLED") is None:
+            _scheduler.add_job(
+                process_terminating_jobs,
+                IntervalTrigger(seconds=4, jitter=2),
+                kwargs={"batch_size": 5},
+                max_instances=2 if replica == 0 else 1,
+            )
+        if os.getenv("DSTACK_RUNS_PROCESSING_DISABLED") is None:
+            _scheduler.add_job(
+                process_runs,
+                IntervalTrigger(seconds=2, jitter=1),
+                kwargs={"batch_size": 5},
+                max_instances=2 if replica == 0 else 1,
+            )
+        if os.getenv("DSTACK_INSTANCES_PROCESSING_DISABLED") is None:
+            _scheduler.add_job(
+                process_instances,
+                IntervalTrigger(seconds=4, jitter=2),
+                kwargs={"batch_size": 5},
+                max_instances=2 if replica == 0 else 1,
+            )
+        if os.getenv("DSTACK_COMPUTE_GROUPS_PROCESSING_DISABLED") is None:
+            _scheduler.add_job(
+                process_compute_groups,
+                IntervalTrigger(seconds=15, jitter=2),
+                kwargs={"batch_size": 1},
+                max_instances=2 if replica == 0 else 1,
+            )
     _scheduler.start()
     return _scheduler
