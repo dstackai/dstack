@@ -95,7 +95,13 @@ export const UserDetails: React.FC = () => {
                 </SpaceBetween>
             </ContentLayout>
 
-            <ConfirmationDialog visible={showDeleteConfirm} onDiscard={toggleDeleteConfirm} onConfirm={deleteUserHandler} />
+            <ConfirmationDialog
+                visible={showDeleteConfirm}
+                content={<Box variant="span">{t('confirm_dialog.message')}</Box>}
+                onDiscard={toggleDeleteConfirm}
+                onConfirm={deleteUserHandler}
+                confirmButtonLabel={t('common.delete')}
+            />
         </>
     );
 };

@@ -10,6 +10,7 @@ import {
     AppLayout as GenericAppLayout,
     AppLayoutProps as GenericAppLayoutProps,
     BreadcrumbGroup,
+    ConfirmationDialog,
     HelpPanel,
     Notifications,
     SideNavigation,
@@ -35,6 +36,7 @@ import {
     setToolsTab,
 } from 'App/slice';
 
+import { selectConfirmationDialogs } from '../../components/ConfirmationDialog/slice';
 import { AnnotationContext } from './AnnotationContext';
 import { useSideNavigation } from './hooks';
 import { TallyComponent } from './Tally';
@@ -71,6 +73,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const helpPanelContent = useAppSelector(selectHelpPanelContent);
     const dispatch = useAppDispatch();
     const { navLinks, activeHref } = useSideNavigation();
+    const confirmationDialogs = useAppSelector(selectConfirmationDialogs);
 
     const onFollowHandler: SideNavigationProps['onFollow'] = (event) => {
         event.preventDefault();
@@ -254,6 +257,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             />
 
             <TallyComponent />
+
+            {confirmationDialogs.map(({ uuid, ...props }) => (
+                <ConfirmationDialog key={uuid} {...props} visible />
+            ))}
         </AnnotationContext>
     );
 };

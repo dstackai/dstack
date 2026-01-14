@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 
+import confirmationReducer from 'components/ConfirmationDialog/slice';
 import notificationsReducer from 'components/Notifications/slice';
 
 import { artifactApi } from 'services/artifact';
@@ -25,6 +26,7 @@ export const store = configureStore({
     reducer: {
         app: appReducer,
         notifications: notificationsReducer,
+        confirmation: confirmationReducer,
         [projectApi.reducerPath]: projectApi.reducer,
         [runApi.reducerPath]: runApi.reducer,
         [artifactApi.reducerPath]: artifactApi.reducer,

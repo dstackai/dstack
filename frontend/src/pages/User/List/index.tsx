@@ -208,8 +208,10 @@ export const UserList: React.FC = () => {
 
             <ConfirmationDialog
                 visible={showDeleteConfirm}
+                content={<Box variant="span">{t('confirm_dialog.message')}</Box>}
                 onDiscard={toggleDeleteConfirm}
                 onConfirm={deleteSelectedUserHandler}
+                confirmButtonLabel={t('common.delete')}
             />
         </>
     );

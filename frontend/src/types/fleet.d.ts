@@ -45,9 +45,12 @@ declare interface IFleetConfigurationRequest {
         max?: number;
     };
     placement?: 'any' | 'cluster';
+    reservation?: string;
     resources?: IFleetConfigurationResource[];
+    blocks?: string | number;
     backends?: TBackendType[];
     regions?: string[];
+    availability_zones?: string[];
     instance_types?: string[];
     spot_policy?: TSpotPolicy;
     retry?:
@@ -76,13 +79,14 @@ declare interface IProfileRequest {
     instance_name?: string;
     creation_policy?: 'reuse' | 'reuse-or-create';
     idle_duration?: number | string;
-    name: string;
+    name?: string;
     default?: boolean;
 }
 
 declare interface IFleetSpec {
-    autocreated: boolean;
+    autocreated?: boolean;
     configuration: IFleetConfigurationRequest;
+    configuration_path?: string;
     profile: IProfileRequest;
 }
 
@@ -95,4 +99,12 @@ declare interface IFleet {
     spec: IFleetSpec;
     status: 'submitted' | 'active' | 'terminating' | 'terminated' | 'failed';
     status_message: string;
+}
+
+declare interface IApplyFleetPlanRequestRequest {
+    plan: {
+        spec: IFleetSpec;
+    };
+
+    force: boolean;
 }
