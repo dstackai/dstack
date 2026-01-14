@@ -5,9 +5,9 @@ from collections.abc import Iterable
 from datetime import timedelta
 from typing import Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
 from dstack._internal import settings
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
@@ -148,14 +148,37 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         .execution_options(populate_existing=True)
     )
     job_model = res.unique().scalar_one()
+    # Select only latest submissions for every job.
+    latest_submissions_sq = (
+        select(
+            JobModel.run_id.label("run_id"),
+            JobModel.replica_num.label("replica_num"),
+            JobModel.job_num.label("job_num"),
+            func.max(JobModel.submission_num).label("max_submission_num"),
+        )
+        .where(JobModel.run_id == job_model.run_id)
+        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
+        .subquery()
+    )
+    job_alias = aliased(JobModel)
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
+        .join(job_alias, job_alias.run_id == RunModel.id)
+        .join(
+            latest_submissions_sq,
+            onclause=and_(
+                job_alias.run_id == latest_submissions_sq.c.run_id,
+                job_alias.replica_num == latest_submissions_sq.c.replica_num,
+                job_alias.job_num == latest_submissions_sq.c.job_num,
+                job_alias.submission_num == latest_submissions_sq.c.max_submission_num,
+            ),
+        )
         .options(joinedload(RunModel.project))
         .options(joinedload(RunModel.user))
         .options(joinedload(RunModel.repo))
         .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
-        .options(joinedload(RunModel.jobs))
+        .options(contains_eager(RunModel.jobs, alias=job_alias))
     )
     run_model = res.unique().scalar_one()
     repo_model = run_model.repo
