@@ -249,7 +249,6 @@ class KubernetesCompute(
                             )
                         ],
                         security_context=client.V1SecurityContext(
-                            # TODO(#1535): support non-root images properly
                             run_as_user=0,
                             run_as_group=0,
                             privileged=job.job_spec.privileged,

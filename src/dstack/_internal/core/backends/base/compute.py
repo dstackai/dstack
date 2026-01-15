@@ -944,8 +944,6 @@ def get_docker_commands(
         "unset LD_LIBRARY_PATH && unset LD_PRELOAD",
         # common functions
         'exists() { command -v "$1" > /dev/null 2>&1; }',
-        # TODO(#1535): support non-root images properly
-        "mkdir -p /root && chown root:root /root && export HOME=/root",
         # package manager detection/abstraction
         "install_pkg() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }",
         'if exists apt-get; then install_pkg() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi',
@@ -963,8 +961,6 @@ def get_docker_commands(
         "--log-level",
         "6",
         "start",
-        "--home-dir",
-        "/root",
         "--temp-dir",
         "/tmp/runner",
         "--http-port",

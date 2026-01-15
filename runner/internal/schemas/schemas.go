@@ -124,22 +124,6 @@ type User struct {
 	Username  *string `json:"username"`
 	Gid       *uint32 `json:"gid"`
 	Groupname *string `json:"groupname"`
-	GroupIds  []uint32
-	HomeDir   string
-}
-
-func (u *User) GetUsername() string {
-	if u.Username == nil {
-		return ""
-	}
-	return *u.Username
-}
-
-func (u *User) GetGroupname() string {
-	if u.Groupname == nil {
-		return ""
-	}
-	return *u.Groupname
 }
 
 type HealthcheckResponse struct {
