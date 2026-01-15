@@ -124,19 +124,28 @@ def get_request_size(request: Request) -> int:
 
 
 def get_client_version(request: Request) -> Optional[packaging.version.Version]:
+    """
+    FastAPI dependency that returns the dstack client version or None if the version is latest/dev.
+    """
+
     version = request.headers.get("x-api-version")
     if version is None:
         return None
-    return parse_version(version)
+    try:
+        return parse_version(version)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=[error_detail(str(e))],
+        )
 
 
 def check_client_server_compatibility(
     client_version: Optional[packaging.version.Version],
     server_version: Optional[str],
-) -> Optional[CustomORJSONResponse]:
+) -> None:
     """
-    Returns `JSONResponse` with error if client/server versions are incompatible.
-    Returns `None` otherwise.
+    Raise HTTP exception if the client is incompatible with the server.
     """
     if client_version is None or server_version is None:
         return None
@@ -149,21 +158,9 @@ def check_client_server_compatibility(
         client_version.major > parsed_server_version.major
         or client_version.minor > parsed_server_version.minor
     ):
-        return error_incompatible_versions(
-            str(client_version), server_version, ask_cli_update=False
+        msg = f"The client/CLI version ({client_version}) is incompatible with the server version ({server_version})."
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=get_server_client_error_details(ServerClientError(msg=msg)),
         )
     return None
-
-
-def error_incompatible_versions(
-    client_version: Optional[str],
-    server_version: str,
-    ask_cli_update: bool,
-) -> CustomORJSONResponse:
-    msg = f"The client/CLI version ({client_version}) is incompatible with the server version ({server_version})."
-    if ask_cli_update:
-        msg += f" Update the dstack CLI: `pip install dstack=={server_version}`."
-    return CustomORJSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={"detail": get_server_client_error_details(ServerClientError(msg=msg))},
-    )

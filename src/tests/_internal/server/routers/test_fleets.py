@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timezone
+from typing import Optional
 from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
@@ -1166,6 +1167,68 @@ class TestGetPlan:
             "max_offer_price": None,
             "action": "create",
         }
+
+    @pytest.mark.parametrize(
+        ("client_version", "expected_availability"),
+        [
+            ("0.20.3", InstanceAvailability.NOT_AVAILABLE),
+            ("0.20.4", InstanceAvailability.NO_BALANCE),
+            (None, InstanceAvailability.NO_BALANCE),
+        ],
+    )
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_replaces_no_balance_with_not_available_for_old_clients(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        expected_availability: InstanceAvailability,
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        offers = [
+            InstanceOfferWithAvailability(
+                backend=BackendType.AWS,
+                instance=InstanceType(
+                    name="instance-1",
+                    resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                ),
+                region="us",
+                price=1.0,
+                availability=InstanceAvailability.AVAILABLE,
+            ),
+            InstanceOfferWithAvailability(
+                backend=BackendType.AWS,
+                instance=InstanceType(
+                    name="instance-2",
+                    resources=Resources(cpus=2, memory_mib=1024, spot=False, gpus=[]),
+                ),
+                region="us",
+                price=2.0,
+                availability=InstanceAvailability.NO_BALANCE,
+            ),
+        ]
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = offers
+            response = await client.post(
+                f"/api/project/{project.name}/fleets/get_plan",
+                headers=headers,
+                json={"spec": get_fleet_spec().dict()},
+            )
+
+        assert response.status_code == 200
+        offers = response.json()["offers"]
+        assert len(offers) == 2
+        assert offers[0]["availability"] == InstanceAvailability.AVAILABLE.value
+        assert offers[1]["availability"] == expected_availability.value
 
 
 def _fleet_model_to_json_dict(fleet: FleetModel) -> dict:

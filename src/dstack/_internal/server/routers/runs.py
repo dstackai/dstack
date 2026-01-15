@@ -1,10 +1,12 @@
-from typing import Annotated, List, Optional, Tuple, cast
+from typing import Annotated, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
+from packaging.version import Version
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.runs import Run, RunPlan
+from dstack._internal.server.compatibility.common import patch_offers_list
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
@@ -21,6 +23,7 @@ from dstack._internal.server.services import runs, users
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
+    get_client_version,
 )
 
 root_router = APIRouter(
@@ -35,9 +38,10 @@ project_router = APIRouter(
 )
 
 
-def use_legacy_repo_dir(request: Request) -> bool:
-    client_release = cast(Optional[tuple[int, ...]], request.state.client_release)
-    return client_release is not None and client_release < (0, 19, 27)
+def use_legacy_repo_dir(
+    client_version: Annotated[Optional[Version], Depends(get_client_version)],
+) -> bool:
+    return client_version is not None and client_version < Version("0.19.27")
 
 
 @root_router.post(
@@ -110,6 +114,7 @@ async def get_plan(
     body: GetRunPlanRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
     user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
+    client_version: Annotated[Optional[Version], Depends(get_client_version)],
     legacy_repo_dir: Annotated[bool, Depends(use_legacy_repo_dir)],
 ):
     """
@@ -127,6 +132,8 @@ async def get_plan(
         max_offers=body.max_offers,
         legacy_repo_dir=legacy_repo_dir,
     )
+    for job_plan in run_plan.job_plans:
+        patch_offers_list(job_plan.offers, client_version)
     return CustomORJSONResponse(run_plan)
 
 

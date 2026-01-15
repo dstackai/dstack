@@ -2,69 +2,51 @@ from typing import Optional
 
 import packaging.version
 import pytest
+from fastapi import HTTPException
 
 from dstack._internal.server.utils.routers import check_client_server_compatibility
 
 
 class TestCheckClientServerCompatibility:
-    @pytest.mark.parametrize("client_version", [packaging.version.parse("12.12.12"), None])
-    def test_returns_none_if_server_version_is_none(
-        self, client_version: Optional[packaging.version.Version]
-    ):
-        assert (
-            check_client_server_compatibility(
-                client_version=client_version,
-                server_version=None,
-            )
-            is None
-        )
-
     @pytest.mark.parametrize(
-        "client_version,server_version",
+        ("client_version", "server_version"),
         [
+            ("0.12.5", "0.12.4"),
+            ("0.12.5rc1", "0.12.4"),
+            ("0.12.4rc1", "0.12.4"),
             ("0.12.4", "0.12.4"),
             ("0.12.4", "0.12.5"),
             ("0.12.4", "0.13.0"),
             ("0.12.4", "1.12.0"),
             ("0.12.4", "0.12.5rc1"),
             ("1.0.5", "1.0.6"),
+            ("12.12.12", None),
+            (None, "0.1.12"),
+            (None, None),
         ],
     )
-    def test_returns_none_if_compatible(self, client_version: str, server_version: str):
-        assert (
-            check_client_server_compatibility(
-                client_version=packaging.version.parse(client_version),
-                server_version=server_version,
-            )
-            is None
+    def test_compatible(
+        self, client_version: Optional[str], server_version: Optional[str]
+    ) -> None:
+        parsed_client_version = None
+        if client_version is not None:
+            parsed_client_version = packaging.version.parse(client_version)
+
+        check_client_server_compatibility(
+            client_version=parsed_client_version,
+            server_version=server_version,
         )
 
     @pytest.mark.parametrize(
-        "client_version,server_version",
+        ("client_version", "server_version"),
         [
             ("0.13.0", "0.12.4"),
             ("1.12.0", "0.12.0"),
         ],
     )
-    def test_returns_error_if_client_version_larger(
-        self, client_version: str, server_version: str
-    ):
-        res = check_client_server_compatibility(
-            client_version=packaging.version.parse(client_version),
-            server_version=server_version,
-        )
-        assert res is not None
-
-    @pytest.mark.parametrize(
-        "server_version",
-        [
-            None,
-            "0.1.12",
-        ],
-    )
-    def test_returns_none_if_client_version_is_latest(self, server_version: Optional[str]):
-        res = check_client_server_compatibility(
-            client_version=None,
-            server_version=server_version,
-        )
-        assert res is None
+    def test_incompatible(self, client_version: str, server_version: str) -> None:
+        with pytest.raises(HTTPException):
+            check_client_server_compatibility(
+                client_version=packaging.version.parse(client_version),
+                server_version=server_version,
+            )
