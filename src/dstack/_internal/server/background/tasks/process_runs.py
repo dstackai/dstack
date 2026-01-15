@@ -2,9 +2,9 @@ import asyncio
 import datetime
 from typing import List, Optional, Set, Tuple
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, selectinload
+from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
 import dstack._internal.server.services.services.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
@@ -144,22 +144,7 @@ async def _process_next_run():
 
 
 async def _process_run(session: AsyncSession, run_model: RunModel):
-    # Refetch to load related attributes.
-    res = await session.execute(
-        select(RunModel)
-        .where(RunModel.id == run_model.id)
-        .execution_options(populate_existing=True)
-        .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
-        .options(joinedload(RunModel.user).load_only(UserModel.name))
-        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
-        .options(
-            selectinload(RunModel.jobs)
-            .joinedload(JobModel.instance)
-            .load_only(InstanceModel.fleet_id)
-        )
-        .execution_options(populate_existing=True)
-    )
-    run_model = res.unique().scalar_one()
+    run_model = await _refetch_run_model(session, run_model)
     logger.debug("%s: processing run", fmt(run_model))
     try:
         if run_model.status == RunStatus.PENDING:
@@ -179,6 +164,46 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
 
     run_model.last_processed_at = common.get_current_datetime()
     await session.commit()
+
+
+async def _refetch_run_model(session: AsyncSession, run_model: RunModel) -> RunModel:
+    # Select only latest submissions for every job.
+    latest_submissions_sq = (
+        select(
+            JobModel.run_id.label("run_id"),
+            JobModel.replica_num.label("replica_num"),
+            JobModel.job_num.label("job_num"),
+            func.max(JobModel.submission_num).label("max_submission_num"),
+        )
+        .where(JobModel.run_id == run_model.id)
+        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
+        .subquery()
+    )
+    job_alias = aliased(JobModel)
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == run_model.id)
+        .outerjoin(latest_submissions_sq, latest_submissions_sq.c.run_id == RunModel.id)
+        .outerjoin(
+            job_alias,
+            onclause=and_(
+                job_alias.run_id == latest_submissions_sq.c.run_id,
+                job_alias.replica_num == latest_submissions_sq.c.replica_num,
+                job_alias.job_num == latest_submissions_sq.c.job_num,
+                job_alias.submission_num == latest_submissions_sq.c.max_submission_num,
+            ),
+        )
+        .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
+        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
+        .options(
+            contains_eager(RunModel.jobs, alias=job_alias)
+            .joinedload(JobModel.instance)
+            .load_only(InstanceModel.fleet_id)
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
 
 
 async def _process_pending_run(session: AsyncSession, run_model: RunModel):
