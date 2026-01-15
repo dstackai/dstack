@@ -1,6 +1,6 @@
 import datetime
 from collections.abc import Iterable
-from typing import Union, cast
+from typing import Optional, Union, cast
 from unittest.mock import patch
 
 import pytest
@@ -15,7 +15,7 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.profiles import Profile, ProfileRetry, Schedule
+from dstack._internal.core.models.profiles import Profile, ProfileRetry, RetryEvent, Schedule
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     JobSpec,
@@ -48,6 +48,7 @@ async def make_run(
     deployment_num: int = 0,
     image: str = "ubuntu:latest",
     probes: Iterable[ProbeConfig] = (),
+    retry: Optional[ProfileRetry] = None,
 ) -> RunModel:
     project = await create_project(session=session)
     user = await create_user(session=session)
@@ -58,7 +59,7 @@ async def make_run(
     run_name = "test-run"
     profile = Profile(
         name="test-profile",
-        retry=True,
+        retry=retry or True,
     )
     run_spec = get_run_spec(
         repo_id=repo.name,
@@ -229,6 +230,44 @@ class TestProcessRuns:
         await session.refresh(run)
         assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.JOB_FAILED
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_calculates_retry_duration_since_last_successful_submission(
+        self, test_db, session: AsyncSession
+    ):
+        run = await make_run(
+            session,
+            status=RunStatus.RUNNING,
+            replicas=1,
+            retry=ProfileRetry(duration=300, on_events=[RetryEvent.NO_CAPACITY]),
+        )
+        now = run.submitted_at + datetime.timedelta(minutes=10)
+        # Retry logic should look at this job and calculate retry duration since its last_processed_at.
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.EXECUTOR_ERROR,
+            last_processed_at=now - datetime.timedelta(minutes=4),
+            replica_num=0,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            replica_num=0,
+            submission_num=1,
+            last_processed_at=now - datetime.timedelta(minutes=2),
+            job_provisioning_data=None,
+        )
+        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
+            datetime_mock.return_value = now
+            await process_runs.process_runs()
+        await session.refresh(run)
+        assert run.status == RunStatus.PENDING
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

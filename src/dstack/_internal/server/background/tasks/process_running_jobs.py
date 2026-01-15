@@ -5,9 +5,9 @@ from collections.abc import Iterable
 from datetime import timedelta
 from typing import Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
 from dstack._internal import settings
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
@@ -139,25 +139,8 @@ async def _process_next_running_job():
 
 
 async def _process_running_job(session: AsyncSession, job_model: JobModel):
-    # Refetch to load related attributes.
-    res = await session.execute(
-        select(JobModel)
-        .where(JobModel.id == job_model.id)
-        .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
-        .options(joinedload(JobModel.probes).load_only(ProbeModel.success_streak))
-        .execution_options(populate_existing=True)
-    )
-    job_model = res.unique().scalar_one()
-    res = await session.execute(
-        select(RunModel)
-        .where(RunModel.id == job_model.run_id)
-        .options(joinedload(RunModel.project))
-        .options(joinedload(RunModel.user))
-        .options(joinedload(RunModel.repo))
-        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
-        .options(joinedload(RunModel.jobs))
-    )
-    run_model = res.unique().scalar_one()
+    job_model = await _refetch_job_model(session, job_model)
+    run_model = await _fetch_run_model(session, job_model.run_id)
     repo_model = run_model.repo
     project = run_model.project
     run = run_model_to_run(run_model, include_sensitive=True)
@@ -419,6 +402,53 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
 
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
+
+
+async def _refetch_job_model(session: AsyncSession, job_model: JobModel) -> JobModel:
+    res = await session.execute(
+        select(JobModel)
+        .where(JobModel.id == job_model.id)
+        .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
+        .options(joinedload(JobModel.probes).load_only(ProbeModel.success_streak))
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
+
+
+async def _fetch_run_model(session: AsyncSession, run_id: uuid.UUID) -> RunModel:
+    # Select only latest submissions for every job.
+    latest_submissions_sq = (
+        select(
+            JobModel.run_id.label("run_id"),
+            JobModel.replica_num.label("replica_num"),
+            JobModel.job_num.label("job_num"),
+            func.max(JobModel.submission_num).label("max_submission_num"),
+        )
+        .where(JobModel.run_id == run_id)
+        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
+        .subquery()
+    )
+    job_alias = aliased(JobModel)
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == run_id)
+        .join(job_alias, job_alias.run_id == RunModel.id)
+        .join(
+            latest_submissions_sq,
+            onclause=and_(
+                job_alias.run_id == latest_submissions_sq.c.run_id,
+                job_alias.replica_num == latest_submissions_sq.c.replica_num,
+                job_alias.job_num == latest_submissions_sq.c.job_num,
+                job_alias.submission_num == latest_submissions_sq.c.max_submission_num,
+            ),
+        )
+        .options(joinedload(RunModel.project))
+        .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.repo))
+        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
+        .options(contains_eager(RunModel.jobs, alias=job_alias))
+    )
+    return res.unique().scalar_one()
 
 
 async def _wait_for_instance_provisioning_data(session: AsyncSession, job_model: JobModel):

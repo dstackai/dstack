@@ -88,6 +88,8 @@ export type { FormCardsProps } from './form/Cards/types';
 export { FormCards } from './form/Cards';
 export { Notifications } from './Notifications';
 export { ConfirmationDialog } from './ConfirmationDialog';
+export { CodeEditor } from './CodeEditor';
+export type { CodeEditorProps } from './CodeEditor';
 export { FileUploader } from './FileUploader';
 export { InfoLink } from './InfoLink';
 export { ButtonWithConfirmation } from './ButtonWithConfirmation';
