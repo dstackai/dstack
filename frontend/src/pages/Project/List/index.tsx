@@ -54,7 +54,7 @@ export const ProjectList: React.FC = () => {
     const renderEmptyMessage = (): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('projects.empty_message_title')} message={t('projects.empty_message_text')}>
-                {isAvailableProjectManaging && <Button onClick={addProjectHandler}>{t('common.create_')}</Button>}
+                {isAvailableProjectManaging && <Button onClick={addProjectHandler}>{t('common.create')}</Button>}
             </ListEmptyMessage>
         );
     };
@@ -137,7 +137,7 @@ export const ProjectList: React.FC = () => {
                                         {t('common.delete')}
                                     </ButtonWithConfirmation>
 
-                                    <Button onClick={addProjectHandler}>{t('common.create_')}</Button>
+                                    <Button onClick={addProjectHandler}>{t('common.create')}</Button>
 
                                     <Button
                                         iconName="refresh"

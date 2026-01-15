@@ -23,7 +23,7 @@ export const ProjectAdd: React.FC = () => {
             href: ROUTES.PROJECT.LIST,
         },
         {
-            text: t('common.create', { text: t('navigation.project') }),
+            text: t('common.create_wit_text', { text: t('navigation.project') }),
             href: ROUTES.PROJECT.ADD,
         },
     ]);
