@@ -11,7 +11,7 @@ from paramiko.ssh_exception import PasswordRequiredException
 from pydantic import ValidationError
 from sqlalchemy import and_, delete, func, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, with_loader_criteria
 
 from dstack._internal import settings
 from dstack._internal.core.backends.base.compute import (
@@ -218,7 +218,12 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
             .where(InstanceModel.id == instance.id)
             .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
             .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
-            .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
+            .options(
+                joinedload(InstanceModel.fleet).joinedload(FleetModel.instances),
+                with_loader_criteria(
+                    InstanceModel, InstanceModel.deleted == False, include_aliases=True
+                ),
+            )
             .execution_options(populate_existing=True)
         )
         instance = res.unique().scalar_one()
@@ -228,7 +233,12 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
             .where(InstanceModel.id == instance.id)
             .options(joinedload(InstanceModel.project))
             .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
-            .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
+            .options(
+                joinedload(InstanceModel.fleet).joinedload(FleetModel.instances),
+                with_loader_criteria(
+                    InstanceModel, InstanceModel.deleted == False, include_aliases=True
+                ),
+            )
             .execution_options(populate_existing=True)
         )
         instance = res.unique().scalar_one()

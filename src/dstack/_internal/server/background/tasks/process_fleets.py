@@ -60,7 +60,9 @@ async def process_fleets():
                 .options(
                     load_only(FleetModel.id, FleetModel.name),
                     selectinload(FleetModel.instances).load_only(InstanceModel.id),
-                    with_loader_criteria(InstanceModel, InstanceModel.deleted == False),
+                    with_loader_criteria(
+                        InstanceModel, InstanceModel.deleted == False, include_aliases=True
+                    ),
                 )
                 .order_by(FleetModel.last_processed_at.asc())
                 .limit(BATCH_SIZE)
@@ -115,7 +117,9 @@ async def _process_fleets(session: AsyncSession, fleet_models: List[FleetModel])
         .where(FleetModel.id.in_(fleet_ids))
         .options(
             joinedload(FleetModel.instances).joinedload(InstanceModel.jobs).load_only(JobModel.id),
-            with_loader_criteria(InstanceModel, InstanceModel.deleted == False),
+            with_loader_criteria(
+                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            ),
         )
         .options(joinedload(FleetModel.project))
         .options(joinedload(FleetModel.runs).load_only(RunModel.status))
