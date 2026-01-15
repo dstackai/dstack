@@ -7,5 +7,5 @@ export type FormToggleProps<T extends FieldValues> = Omit<ToggleProps, 'value' |
     Omit<FormFieldProps, 'errorText'> &
     Pick<ControllerProps<T>, 'control' | 'name' | 'rules'> & {
         leftContent?: ReactNode;
-        toggleLabel?: string;
+        toggleLabel?: ReactNode | string;
     };

@@ -28,7 +28,6 @@ export const FormToggle = <T extends FieldValues>({
             render={({ field: { onChange, value, ...fieldRest }, fieldState: { error } }) => {
                 return (
                     <FormField
-                        description={description}
                         label={label}
                         info={info}
                         stretch={stretch}
@@ -46,6 +45,7 @@ export const FormToggle = <T extends FieldValues>({
                                 onChange(event.detail.checked);
                                 onChangeProp?.(event);
                             }}
+                            description={description}
                         >
                             {toggleLabel}
                         </ToggleCSD>

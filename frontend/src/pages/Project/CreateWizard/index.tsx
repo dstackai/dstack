@@ -465,33 +465,19 @@ export const CreateProjectWizard: React.FC = () => {
                         ),
                     },
                     {
-                        title: 'Default fleet',
+                        title: 'Fleets',
                         content: (
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
                                     <FormToggle
-                                        toggleLabel={t('projects.edit.default_fleet')}
+                                        toggleLabel={<strong>{t('projects.edit.default_fleet')}</strong>}
+                                        constraintText={t('projects.edit.default_fleet_description')}
                                         control={control}
                                         name="enable_default_fleet"
                                     />
 
                                     {formValues['enable_default_fleet'] && (
                                         <>
-                                            <SpaceBetween direction="vertical" size="s">
-                                                <div>
-                                                    To create dev environments, submit tasks, or run services, you need at least
-                                                    one fleet.
-                                                </div>
-
-                                                <div>
-                                                    It's recommended to create it now, or you can set it up manually later.
-                                                </div>
-
-                                                <div>
-                                                    Don't worry, creating a fleet doesn’t necessarily create cloud instances.
-                                                </div>
-                                            </SpaceBetween>
-
                                             <FormInput
                                                 label={t('projects.edit.fleet_name')}
                                                 description={t('projects.edit.fleet_name_description')}
