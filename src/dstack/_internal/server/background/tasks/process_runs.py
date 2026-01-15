@@ -33,6 +33,7 @@ from dstack._internal.server.services.jobs import (
     get_job_specs_from_run_spec,
     group_jobs_by_replica_latest,
     is_master_job,
+    job_model_to_job_submission,
     switch_job_status,
 )
 from dstack._internal.server.services.locking import get_locker
@@ -319,7 +320,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                 and job_model.termination_reason
                 not in {JobTerminationReason.DONE_BY_RUNNER, JobTerminationReason.SCALED_DOWN}
             ):
-                current_duration = _should_retry_job(run, job, job_model)
+                current_duration = await _should_retry_job(session, run, job, job_model)
                 if current_duration is None:
                     replica_statuses.add(RunStatus.FAILED)
                     run_termination_reasons.add(RunTerminationReason.JOB_FAILED)
@@ -577,19 +578,44 @@ def _has_out_of_date_replicas(run: RunModel) -> bool:
     return False
 
 
-def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datetime.timedelta]:
+async def _should_retry_job(
+    session: AsyncSession,
+    run: Run,
+    job: Job,
+    job_model: JobModel,
+) -> Optional[datetime.timedelta]:
     """
     Checks if the job should be retried.
     Returns the current duration of retrying if retry is enabled.
+    Retrying duration is calculated as the time since `last_processed_at`
+    of the latest provisioned submission.
     """
     if job.job_spec.retry is None:
         return None
 
     last_provisioned_submission = None
-    for job_submission in reversed(job.job_submissions):
-        if job_submission.job_provisioning_data is not None:
-            last_provisioned_submission = job_submission
-            break
+    if len(job.job_submissions) > 0:
+        last_submission = job.job_submissions[-1]
+        if last_submission.job_provisioning_data is not None:
+            last_provisioned_submission = last_submission
+        else:
+            # The caller passes at most one latest submission in job.job_submissions, so check the db.
+            res = await session.execute(
+                select(JobModel)
+                .where(
+                    JobModel.run_id == job_model.run_id,
+                    JobModel.replica_num == job_model.replica_num,
+                    JobModel.job_num == job_model.job_num,
+                    JobModel.job_provisioning_data.is_not(None),
+                )
+                .order_by(JobModel.last_processed_at.desc())
+                .limit(1)
+            )
+            last_provisioned_submission_model = res.scalar()
+            if last_provisioned_submission_model is not None:
+                last_provisioned_submission = job_model_to_job_submission(
+                    last_provisioned_submission_model
+                )
 
     if (
         job_model.termination_reason is not None
@@ -599,13 +625,10 @@ def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datet
     ):
         return common.get_current_datetime() - run.submitted_at
 
-    if last_provisioned_submission is None:
-        return None
-
     if (
-        last_provisioned_submission.termination_reason is not None
-        and JobTerminationReason(last_provisioned_submission.termination_reason).to_retry_event()
-        in job.job_spec.retry.on_events
+        job_model.termination_reason is not None
+        and job_model.termination_reason.to_retry_event() in job.job_spec.retry.on_events
+        and last_provisioned_submission is not None
     ):
         return common.get_current_datetime() - last_provisioned_submission.last_processed_at
 

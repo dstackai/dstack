@@ -251,6 +251,7 @@ class TestProcessRuns:
             termination_reason=JobTerminationReason.EXECUTOR_ERROR,
             last_processed_at=now - datetime.timedelta(minutes=4),
             replica_num=0,
+            job_provisioning_data=get_job_provisioning_data(),
         )
         await create_job(
             session=session,
