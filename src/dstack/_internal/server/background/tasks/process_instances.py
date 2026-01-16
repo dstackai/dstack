@@ -554,7 +554,9 @@ def _deploy_instance(
 async def _create_instance(session: AsyncSession, instance: InstanceModel) -> None:
     master_instance = await _get_fleet_master_instance(session, instance)
     if _need_to_wait_fleet_provisioning(instance, master_instance):
-        logger.debug("Waiting for the first instance in the fleet to be provisioned")
+        logger.debug(
+            "%s: waiting for the first instance in the fleet to be provisioned", fmt(instance)
+        )
         return
 
     try:
