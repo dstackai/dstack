@@ -79,7 +79,6 @@ from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_create_instance_offers,
     is_cloud_cluster,
-    is_fleet_master_instance,
 )
 from dstack._internal.server.services.instances import (
     get_instance_configuration,
@@ -553,7 +552,8 @@ def _deploy_instance(
 
 
 async def _create_instance(session: AsyncSession, instance: InstanceModel) -> None:
-    if _need_to_wait_fleet_provisioning(instance):
+    master_instance = await _get_fleet_master_instance(session, instance)
+    if _need_to_wait_fleet_provisioning(instance, master_instance):
         logger.debug("Waiting for the first instance in the fleet to be provisioned")
         return
 
@@ -586,6 +586,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
     placement_group_model = get_placement_group_model_for_instance(
         placement_group_models=placement_group_models,
         instance_model=instance,
+        master_instance_model=master_instance,
     )
     offers = await get_create_instance_offers(
         project=instance.project,
@@ -604,11 +605,15 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             continue
         compute = backend.compute()
         assert isinstance(compute, ComputeWithCreateInstanceSupport)
-        instance_offer = _get_instance_offer_for_instance(instance_offer, instance)
+        instance_offer = _get_instance_offer_for_instance(
+            instance_offer=instance_offer,
+            instance=instance,
+            master_instance=master_instance,
+        )
         if (
             instance.fleet
             and is_cloud_cluster(instance.fleet)
-            and is_fleet_master_instance(instance)
+            and instance.id == master_instance.id
             and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
             and (
@@ -677,7 +682,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
                 "instance_status": InstanceStatus.PROVISIONING.value,
             },
         )
-        if instance.fleet_id and is_fleet_master_instance(instance):
+        if instance.fleet_id and instance.id == master_instance.id:
             # Clean up placement groups that did not end up being used.
             # Flush to update still uncommitted placement groups.
             await session.flush()
@@ -695,13 +700,27 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
         InstanceTerminationReason.NO_OFFERS,
         "All offers failed" if offers else "No offers found",
     )
-    if instance.fleet and is_fleet_master_instance(instance) and is_cloud_cluster(instance.fleet):
+    if instance.fleet and instance.id == master_instance.id and is_cloud_cluster(instance.fleet):
         # Do not attempt to deploy other instances, as they won't determine the correct cluster
         # backend, region, and placement group without a successfully deployed master instance
         for sibling_instance in instance.fleet.instances:
             if sibling_instance.id == instance.id:
                 continue
             _mark_terminated(sibling_instance, InstanceTerminationReason.MASTER_FAILED)
+
+
+async def _get_fleet_master_instance(
+    session: AsyncSession, instance: InstanceModel
+) -> InstanceModel:
+    # The "master" fleet instance is relevant for cloud clusters only:
+    # it can be any fixed instance that is chosen to be provisioned first.
+    res = await session.execute(
+        select(InstanceModel)
+        .where(InstanceModel.fleet_id == instance.fleet_id)
+        .order_by(InstanceModel.instance_num, InstanceModel.created_at)
+        .limit(1)
+    )
+    return res.scalar_one()
 
 
 def _mark_terminated(
@@ -1192,15 +1211,17 @@ def _get_termination_deadline(instance: InstanceModel) -> datetime.datetime:
     return instance.first_termination_retry_at + TERMINATION_RETRY_MAX_DURATION
 
 
-def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
+def _need_to_wait_fleet_provisioning(
+    instance: InstanceModel, master_instance: InstanceModel
+) -> bool:
     # Cluster cloud instances should wait for the first fleet instance to be provisioned
     # so that they are provisioned in the same backend/region
     if instance.fleet is None:
         return False
     if (
-        is_fleet_master_instance(instance)
-        or instance.fleet.instances[0].job_provisioning_data is not None
-        or instance.fleet.instances[0].status == InstanceStatus.TERMINATED
+        instance.id == master_instance.id
+        or master_instance.job_provisioning_data is not None
+        or master_instance.status == InstanceStatus.TERMINATED
     ):
         return False
     return is_cloud_cluster(instance.fleet)
@@ -1209,13 +1230,13 @@ def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
 def _get_instance_offer_for_instance(
     instance_offer: InstanceOfferWithAvailability,
     instance: InstanceModel,
+    master_instance: InstanceModel,
 ) -> InstanceOfferWithAvailability:
     if instance.fleet is None:
         return instance_offer
     fleet = fleet_model_to_fleet(instance.fleet)
-    master_instance = instance.fleet.instances[0]
-    master_job_provisioning_data = get_instance_provisioning_data(master_instance)
     if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
+        master_job_provisioning_data = get_instance_provisioning_data(master_instance)
         return get_instance_offer_with_restricted_az(
             instance_offer=instance_offer,
             master_job_provisioning_data=master_job_provisioning_data,
