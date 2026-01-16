@@ -232,7 +232,3 @@ async def create_placement_group(
     )
     placement_group_model.provisioning_data = pgpd.json()
     return placement_group_model
-
-
-def _is_fleet_master_instance(instance: InstanceModel) -> bool:
-    return instance.fleet is not None and instance.id == instance.fleet.instances[0].id
