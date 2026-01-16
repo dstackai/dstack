@@ -126,6 +126,7 @@ async def _process_next_run():
                     JobModel.run_id == run_model.id,
                     JobModel.id.not_in(job_lockset),
                 )
+                .options(load_only(JobModel.id))
                 .order_by(JobModel.id)  # take locks in order
                 .with_for_update(skip_locked=True, key_share=True)
             )
