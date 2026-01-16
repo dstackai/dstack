@@ -98,9 +98,10 @@ async def schedule_fleet_placement_groups_deletion(
 def get_placement_group_model_for_instance(
     placement_group_models: list[PlacementGroupModel],
     instance_model: InstanceModel,
+    master_instance_model: InstanceModel,
 ) -> Optional[PlacementGroupModel]:
     placement_group_model = None
-    if not _is_fleet_master_instance(instance_model):
+    if instance_model.id != master_instance_model.id:
         if placement_group_models:
             placement_group_model = placement_group_models[0]
         if len(placement_group_models) > 1:
@@ -231,7 +232,3 @@ async def create_placement_group(
     )
     placement_group_model.provisioning_data = pgpd.json()
     return placement_group_model
-
-
-def _is_fleet_master_instance(instance: InstanceModel) -> bool:
-    return instance.fleet is not None and instance.id == instance.fleet.instances[0].id

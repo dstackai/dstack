@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, selectinload
+from sqlalchemy.orm import joinedload, load_only, selectinload, with_loader_criteria
 
 from dstack._internal.core.models.fleets import FleetSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
@@ -60,6 +60,9 @@ async def process_fleets():
                 .options(
                     load_only(FleetModel.id, FleetModel.name),
                     selectinload(FleetModel.instances).load_only(InstanceModel.id),
+                    with_loader_criteria(
+                        InstanceModel, InstanceModel.deleted == False, include_aliases=True
+                    ),
                 )
                 .order_by(FleetModel.last_processed_at.asc())
                 .limit(BATCH_SIZE)
@@ -72,6 +75,7 @@ async def process_fleets():
                 .where(
                     InstanceModel.id.not_in(instance_lockset),
                     InstanceModel.fleet_id.in_(fleet_ids),
+                    InstanceModel.deleted == False,
                 )
                 .options(load_only(InstanceModel.id, InstanceModel.fleet_id))
                 .order_by(InstanceModel.id)
@@ -113,8 +117,11 @@ async def _process_fleets(session: AsyncSession, fleet_models: List[FleetModel])
         .where(FleetModel.id.in_(fleet_ids))
         .options(
             joinedload(FleetModel.instances).joinedload(InstanceModel.jobs).load_only(JobModel.id),
-            joinedload(FleetModel.project),
+            with_loader_criteria(
+                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            ),
         )
+        .options(joinedload(FleetModel.project))
         .options(joinedload(FleetModel.runs).load_only(RunModel.status))
         .execution_options(populate_existing=True)
     )

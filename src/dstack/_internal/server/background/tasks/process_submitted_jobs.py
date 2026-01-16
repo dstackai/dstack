@@ -7,7 +7,14 @@ from typing import List, Optional, Union
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
+from sqlalchemy.orm import (
+    contains_eager,
+    joinedload,
+    load_only,
+    noload,
+    selectinload,
+    with_loader_criteria,
+)
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import (
@@ -213,7 +220,12 @@ async def _process_submitted_job(
         select(JobModel)
         .where(JobModel.id == job_model.id)
         .options(joinedload(JobModel.instance))
-        .options(joinedload(JobModel.fleet).joinedload(FleetModel.instances))
+        .options(
+            joinedload(JobModel.fleet).joinedload(FleetModel.instances),
+            with_loader_criteria(
+                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            ),
+        )
     )
     job_model = res.unique().scalar_one()
     res = await session.execute(
@@ -221,7 +233,12 @@ async def _process_submitted_job(
         .where(RunModel.id == job_model.run_id)
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(RunModel.user).load_only(UserModel.name))
-        .options(joinedload(RunModel.fleet).joinedload(FleetModel.instances))
+        .options(
+            joinedload(RunModel.fleet).joinedload(FleetModel.instances),
+            with_loader_criteria(
+                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            ),
+        )
     )
     run_model = res.unique().scalar_one()
     logger.debug("%s: provisioning has started", fmt(job_model))
