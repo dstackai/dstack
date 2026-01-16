@@ -196,9 +196,9 @@ class KubernetesCompute(
                     self.api, gpu_spec
                 )
                 logger.debug("Requesting GPU resource: %s=%d", gpu_resource, gpu_request)
+                resources_requests[gpu_resource] = str(gpu_request)
                 # Limit must be set (GPU resources cannot be overcommitted)
                 # and must be equal to request.
-                resources_requests[gpu_resource] = str(gpu_request)
                 resources_limits[gpu_resource] = str(gpu_request)
                 # It should be NoSchedule, but we also add NoExecute toleration just in case.
                 for effect in [TaintEffect.NO_SCHEDULE, TaintEffect.NO_EXECUTE]:
