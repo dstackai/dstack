@@ -266,7 +266,10 @@ async def find_optimal_fleet_with_offers(
             continue
 
         if not _run_can_fit_into_fleet(run_spec, candidate_fleet):
-            logger.debug("Skipping fleet %s from consideration: run cannot fit into fleet")
+            logger.debug(
+                "Skipping fleet %s from consideration: run cannot fit into fleet",
+                candidate_fleet.name,
+            )
             continue
 
         instance_offers = _get_instance_offers_in_fleet(
