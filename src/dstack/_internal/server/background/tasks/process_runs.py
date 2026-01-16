@@ -4,7 +4,7 @@ from typing import List, Optional, Set, Tuple
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
+from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only, with_loader_criteria
 
 import dstack._internal.server.services.services.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
@@ -111,7 +111,15 @@ async def _process_next_run():
                         ),
                     ),
                 )
-                .options(joinedload(RunModel.jobs).load_only(JobModel.id))
+                .options(
+                    joinedload(RunModel.jobs).load_only(JobModel.id),
+                    # No need to lock finished jobs
+                    with_loader_criteria(
+                        JobModel,
+                        JobModel.status.not_in(JobStatus.finished_statuses()),
+                        include_aliases=True,
+                    ),
+                )
                 .options(load_only(RunModel.id))
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
@@ -126,7 +134,14 @@ async def _process_next_run():
                     JobModel.run_id == run_model.id,
                     JobModel.id.not_in(job_lockset),
                 )
-                .options(load_only(JobModel.id))
+                .options(
+                    load_only(JobModel.id),
+                    with_loader_criteria(
+                        JobModel,
+                        JobModel.status.not_in(JobStatus.finished_statuses()),
+                        include_aliases=True,
+                    ),
+                )
                 .order_by(JobModel.id)  # take locks in order
                 .with_for_update(skip_locked=True, key_share=True)
             )
