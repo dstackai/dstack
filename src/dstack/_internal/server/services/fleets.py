@@ -733,10 +733,6 @@ def is_cloud_cluster(fleet_model: FleetModel) -> bool:
     )
 
 
-def is_fleet_master_instance(instance: InstanceModel) -> bool:
-    return instance.fleet is not None and instance.id == instance.fleet.instances[0].id
-
-
 def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
     profile = fleet_spec.merged_profile
     requirements = Requirements(

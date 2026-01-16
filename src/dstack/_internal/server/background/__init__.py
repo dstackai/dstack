@@ -48,7 +48,14 @@ def get_scheduler() -> AsyncIOScheduler:
 
 
 def start_background_tasks() -> AsyncIOScheduler:
-    # We try to process as many resources as possible without exhausting DB connections.
+    # Background processing is implemented via in-memory locks on SQLite
+    # and SELECT FOR UPDATE on Postgres. Locks may be held for a long time.
+    # This is currently the main bottleneck for scaling dstack processing
+    # as processing more resources requires more DB connections.
+    # TODO: Make background processing efficient by committing locks to DB
+    # and processing outside of DB transactions.
+    #
+    # Now we just try to process as many resources as possible without exhausting DB connections.
     #
     # Quick tasks can process multiple resources per transaction.
     # Potentially long tasks process one resource per transaction

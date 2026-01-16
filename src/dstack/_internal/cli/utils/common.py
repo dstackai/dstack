@@ -12,6 +12,7 @@ from rich.theme import Theme
 from dstack._internal import settings
 from dstack._internal.cli.utils.rich import DstackRichHandler
 from dstack._internal.core.errors import CLIError, DstackError
+from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.utils.common import get_dstack_dir, parse_since
 
 _colors = {
@@ -146,3 +147,9 @@ def resolve_url(url: str, timeout: float = 5.0) -> str:
     except requests.exceptions.ConnectionError as e:
         raise ValueError(f"Failed to resolve url {url}") from e
     return response.url
+
+
+def format_instance_availability(v: InstanceAvailability) -> str:
+    if v in (InstanceAvailability.UNKNOWN, InstanceAvailability.AVAILABLE):
+        return ""
+    return v.value.replace("_", " ").lower()

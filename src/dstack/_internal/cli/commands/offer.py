@@ -3,11 +3,11 @@ from pathlib import Path
 from typing import List, Literal, cast
 
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec
 from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
 )
 from dstack._internal.cli.services.profile import register_profile_args
+from dstack._internal.cli.services.resources import register_resources_args
 from dstack._internal.cli.utils.common import console
 from dstack._internal.cli.utils.gpu import print_gpu_json, print_gpu_table
 from dstack._internal.cli.utils.run import print_offers_json, print_run_plan
@@ -47,29 +47,7 @@ class OfferConfigurator(BaseRunConfigurator):
             default=50,
         )
         cls.register_env_args(configuration_group)
-        configuration_group.add_argument(
-            "--cpu",
-            type=cpu_spec,
-            help="Request CPU for the run. "
-            "The format is [code]ARCH[/]:[code]COUNT[/] (all parts are optional)",
-            dest="cpu_spec",
-            metavar="SPEC",
-        )
-        configuration_group.add_argument(
-            "--gpu",
-            type=gpu_spec,
-            help="Request GPU for the run. "
-            "The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
-            dest="gpu_spec",
-            metavar="SPEC",
-        )
-        configuration_group.add_argument(
-            "--disk",
-            type=disk_spec,
-            help="Request the size range of disk for the run. Example [code]--disk 100GB..[/].",
-            metavar="RANGE",
-            dest="disk_spec",
-        )
+        register_resources_args(configuration_group)
         register_profile_args(parser)
 
 

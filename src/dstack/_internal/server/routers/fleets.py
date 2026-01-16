@@ -1,11 +1,13 @@
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends
+from packaging.version import Version
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.fleets as fleets_services
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.fleets import Fleet, FleetPlan
+from dstack._internal.server.compatibility.common import patch_offers_list
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.fleets import (
@@ -21,6 +23,7 @@ from dstack._internal.server.security.permissions import Authenticated, ProjectM
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
+    get_client_version,
 )
 
 root_router = APIRouter(
@@ -101,6 +104,7 @@ async def get_plan(
     body: GetFleetPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    client_version: Optional[Version] = Depends(get_client_version),
 ):
     """
     Returns a fleet plan for the given fleet configuration.
@@ -112,6 +116,7 @@ async def get_plan(
         user=user,
         spec=body.spec,
     )
+    patch_offers_list(plan.offers, client_version)
     return CustomORJSONResponse(plan)
 
 
