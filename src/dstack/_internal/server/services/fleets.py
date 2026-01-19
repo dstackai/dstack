@@ -42,7 +42,12 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.projects import Project
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import JobProvisioningData, Requirements, get_policy_map
+from dstack._internal.core.models.runs import (
+    JobProvisioningData,
+    Requirements,
+    RunStatus,
+    get_policy_map,
+)
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import ModelDiff, copy_model, diff_models
@@ -53,6 +58,7 @@ from dstack._internal.server.models import (
     JobModel,
     MemberModel,
     ProjectModel,
+    RunModel,
     UserModel,
 )
 from dstack._internal.server.services import events
@@ -613,48 +619,61 @@ async def delete_fleets(
     instance_nums: Optional[List[int]] = None,
 ):
     res = await session.execute(
-        select(FleetModel)
+        select(FleetModel.id)
         .where(
             FleetModel.project_id == project.id,
             FleetModel.name.in_(names),
             FleetModel.deleted == False,
         )
-        .options(joinedload(FleetModel.instances))
+        .order_by(FleetModel.id)  # take locks in order
+        .with_for_update(key_share=True)
     )
-    fleet_models = res.scalars().unique().all()
-    fleets_ids = sorted([f.id for f in fleet_models])
-    instances_ids = sorted([i.id for f in fleet_models for i in f.instances])
-    await session.commit()
-    logger.info("Deleting fleets: %s", [v.name for v in fleet_models])
+    fleets_ids = list(res.scalars().unique().all())
+    res = await session.execute(
+        select(InstanceModel.id)
+        .where(
+            InstanceModel.fleet_id.in_(fleets_ids),
+            InstanceModel.deleted == False,
+        )
+        .order_by(InstanceModel.id)  # take locks in order
+        .with_for_update(key_share=True)
+    )
+    instances_ids = list(res.scalars().unique().all())
+    if is_db_sqlite():
+        # Start new transaction to see committed changes after lock
+        await session.commit()
     async with (
         get_locker(get_db().dialect_name).lock_ctx(FleetModel.__tablename__, fleets_ids),
         get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids),
     ):
-        # Refetch after lock
-        # TODO: Lock instances with FOR UPDATE?
-        # TODO: Do not lock fleet when deleting only instances
+        # Refetch after lock.
+        # TODO: Do not lock fleet when deleting only instances.
         res = await session.execute(
             select(FleetModel)
-            .where(
-                FleetModel.project_id == project.id,
-                FleetModel.name.in_(names),
-                FleetModel.deleted == False,
-            )
+            .where(FleetModel.id.in_(fleets_ids))
             .options(
-                selectinload(FleetModel.instances)
+                joinedload(FleetModel.instances.and_(InstanceModel.id.in_(instances_ids)))
                 .joinedload(InstanceModel.jobs)
                 .load_only(JobModel.id)
             )
-            .options(selectinload(FleetModel.runs))
+            .options(
+                joinedload(
+                    FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
+                )
+            )
             .execution_options(populate_existing=True)
-            .order_by(FleetModel.id)  # take locks in order
-            .with_for_update(key_share=True)
         )
         fleet_models = res.scalars().unique().all()
         fleets = [fleet_model_to_fleet(m) for m in fleet_models]
         for fleet in fleets:
             if fleet.spec.configuration.ssh_config is not None:
                 _check_can_manage_ssh_fleets(user=user, project=project)
+        if instance_nums is None:
+            logger.info("Deleting fleets: %s", [f.name for f in fleet_models])
+        else:
+            logger.info(
+                "Deleting fleets %s instances %s", [f.name for f in fleet_models], instance_nums
+            )
         for fleet_model in fleet_models:
             _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
             # TERMINATING fleets are deleted by process_fleets after instances are terminated
