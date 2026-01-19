@@ -47,6 +47,7 @@ async def list_fleets(
     """
     Returns all fleets and instances within them visible to user sorted by descending `created_at`.
     `project_name` and `only_active` can be specified as filters.
+    Includes only active fleet instances. To list all fleet instances, use `/api/instances/list`.
 
     The results are paginated. To get the next page, pass `created_at` and `id` of
     the last fleet from the previous page as `prev_created_at` and `prev_id`.
@@ -72,6 +73,7 @@ async def list_project_fleets(
 ):
     """
     Returns all fleets in the project.
+    Includes only active fleet instances. To list all fleet instances, use `/api/instances/list`.
     """
     _, project = user_project
     return CustomORJSONResponse(
