@@ -73,7 +73,7 @@ class CloudRiftCompute(
         instance_config: InstanceConfiguration,
         placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
-        commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
+        commands = get_shim_commands()
         startup_script = " ".join([" && ".join(commands)])
         logger.debug(
             f"Creating instance for offer {instance_offer.instance.name} in region {instance_offer.region} with commands: {startup_script}"

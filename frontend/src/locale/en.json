@@ -396,6 +396,7 @@
       "log": "Logs",
       "log_empty_message_title": "No logs",
       "log_empty_message_text": "No logs to display.",
+      "inspect": "Inspect",
       "run_name": "Name",
       "workflow_name": "Workflow",
       "configuration": "Configuration",
@@ -564,10 +565,16 @@
   },
 
   "fleets": {
+    "no_alert": {
+      "title": "No fleets",
+      "description": "The project has no fleets. Create one before submitting a run.",
+      "button_title": "Create a fleet"
+    },
     "fleet": "Fleet",
     "fleet_placeholder": "Filtering by fleet",
     "fleet_name": "Fleet name",
     "total_instances": "Number of instances",
+    "inspect": "Inspect",
     "empty_message_title": "No fleets",
     "empty_message_text": "No fleets to display.",
     "nomatch_message_title": "No matches",

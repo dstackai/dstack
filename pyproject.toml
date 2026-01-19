@@ -32,7 +32,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.15",
+    "gpuhunt==0.1.16",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "orjson",
@@ -98,7 +98,6 @@ ignore = [
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pre-commit>=4.2.0",
     "pytest~=7.2",
     "pytest-asyncio>=0.23.8",
@@ -136,7 +135,7 @@ gateway = [
     "uvicorn",
     "aiorwlock",
     "aiocache",
-    "httpx",
+    "httpx>=0.28.0",
     "jinja2",
 ]
 server = [
@@ -145,7 +144,7 @@ server = [
     "uvicorn[standard]",
     "aiorwlock",
     "aiocache",
-    "httpx",
+    "httpx>=0.28.0",
     "jinja2",
     "watchfiles",
     "sqlalchemy[asyncio]>=2.0.0",

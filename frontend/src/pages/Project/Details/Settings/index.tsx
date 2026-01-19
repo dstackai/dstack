@@ -22,6 +22,7 @@ import {
 import { HotspotIds } from 'layouts/AppLayout/TutorialPanel/constants';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
+import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { riseRouterException } from 'libs';
 import { copyToClipboard } from 'libs';
 import { ROUTES } from 'routes';
@@ -37,6 +38,7 @@ import { getProjectRoleByUserName } from 'pages/Project/utils';
 
 import { useBackendsTable } from '../../Backends/hooks';
 import { BackendsTable } from '../../Backends/Table';
+import { NoFleetProjectAlert } from '../../components/NoFleetProjectAlert';
 import { GatewaysTable } from '../../Gateways';
 import { useGatewaysTable } from '../../Gateways/hooks';
 import { ProjectSecrets } from '../../Secrets';
@@ -59,6 +61,10 @@ export const ProjectSettings: React.FC = () => {
     const [updateProject] = useUpdateProjectMutation();
     const { deleteProject, isDeleting } = useDeleteProject();
     const { data: currentUser } = useGetUserDataQuery({});
+
+    const projectNames = useMemo(() => [paramProjectName], [paramProjectName]);
+
+    const projectHavingFleetMap = useCheckingForFleetsInProjects({ projectNames });
 
     const { data, isLoading, error } = useGetProjectQuery({ name: paramProjectName });
 
@@ -180,6 +186,8 @@ export const ProjectSettings: React.FC = () => {
 
     const [activeStepIndex, setActiveStepIndex] = React.useState(0);
 
+    const projectDontHasFleet = !projectHavingFleetMap?.[paramProjectName];
+
     if (isLoadingPage)
         return (
             <Container>
@@ -191,6 +199,8 @@ export const ProjectSettings: React.FC = () => {
         <>
             {data && backendsData && gatewaysData && (
                 <SpaceBetween size="l">
+                    <NoFleetProjectAlert projectName={paramProjectName} show={projectDontHasFleet} dismissible />
+
                     {isProjectMember && (
                         <ExpandableSection
                             variant="container"

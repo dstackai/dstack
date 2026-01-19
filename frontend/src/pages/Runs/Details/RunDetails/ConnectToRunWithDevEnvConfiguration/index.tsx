@@ -19,6 +19,7 @@ import {
 import { copyToClipboard } from 'libs';
 
 import { useConfigProjectCliCommand } from 'pages/Project/hooks/useConfigProjectCliComand';
+import { getIDEDisplayName } from 'pages/Runs/CreateDevEnvironment/constants';
 
 import styles from './styles.module.scss';
 
@@ -52,7 +53,9 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
     const [attachCommand, copyAttachCommand] = getAttachCommand(run);
     const [sshCommand, copySSHCommand] = getSSHCommand(run);
 
-    const openInIDEUrl = `${run.run_spec.configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}/${run.run_spec.working_dir || 'workflow'}`;
+    const configuration = run.run_spec.configuration as TDevEnvironmentConfiguration;
+    const openInIDEUrl = `${configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}/${run.run_spec.working_dir || 'workflow'}`;
+    const ideDisplayName = getIDEDisplayName(configuration.ide);
 
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
 
@@ -74,7 +77,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                     onNavigate={({ detail }) => setActiveStepIndex(detail.requestedStepIndex)}
                     activeStepIndex={activeStepIndex}
                     onSubmit={() => window.open(openInIDEUrl, '_blank')}
-                    submitButtonText="Open in VS Code"
+                    submitButtonText={`Open in ${ideDisplayName}`}
                     allowSkipTo
                     steps={[
                         {
@@ -216,7 +219,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                         },
                         {
                             title: 'Open',
-                            description: 'After the CLI is attached, you can open the dev environment in VS Code.',
+                            description: `After the CLI is attached, you can open the dev environment in ${ideDisplayName}.`,
                             content: (
                                 <SpaceBetween size="s">
                                     <Button
@@ -224,7 +227,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                                         external={true}
                                         onClick={() => window.open(openInIDEUrl, '_blank')}
                                     >
-                                        Open in VS Code
+                                        Open in {ideDisplayName}
                                     </Button>
 
                                     <ExpandableSection headerText="Need plain SSH?">

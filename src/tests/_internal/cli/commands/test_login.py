@@ -13,8 +13,12 @@ class TestLogin:
             patch("dstack._internal.cli.commands.login.webbrowser") as webbrowser_mock,
             patch("dstack._internal.cli.commands.login.APIClient") as APIClientMock,
             patch("dstack._internal.cli.commands.login._LoginServer") as LoginServerMock,
+            patch(
+                "dstack._internal.cli.commands.login._normalize_url_or_error"
+            ) as _normalize_url_or_error_mock,
         ):
             webbrowser_mock.open.return_value = True
+            _normalize_url_or_error_mock.return_value = "http://127.0.0.1:31313"
             APIClientMock.return_value.auth.list_providers.return_value = [
                 SimpleNamespace(name="github", enabled=True)
             ]
@@ -49,7 +53,11 @@ class TestLogin:
             patch("dstack._internal.cli.commands.login.APIClient") as APIClientMock,
             patch("dstack._internal.cli.commands.login.ConfigManager") as ConfigManagerMock,
             patch("dstack._internal.cli.commands.login._LoginServer") as LoginServerMock,
+            patch(
+                "dstack._internal.cli.commands.login._normalize_url_or_error"
+            ) as _normalize_url_or_error_mock,
         ):
+            _normalize_url_or_error_mock.return_value = "http://127.0.0.1:31313"
             webbrowser_mock.open.return_value = True
             APIClientMock.return_value.auth.list_providers.return_value = [
                 SimpleNamespace(name="github", enabled=True)

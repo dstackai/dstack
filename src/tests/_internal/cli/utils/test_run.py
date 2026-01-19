@@ -96,6 +96,7 @@ async def create_run_with_job(
     job_provisioning_data: Optional[JobProvisioningData] = None,
     termination_reason: Optional[JobTerminationReason] = None,
     exit_status: Optional[int] = None,
+    termination_reason_message: Optional[str] = None,
     submitted_at: Optional[datetime] = None,
 ) -> Run:
     if submitted_at is None:
@@ -178,6 +179,9 @@ async def create_run_with_job(
 
     if exit_status is not None:
         job_model.exit_status = exit_status
+    if termination_reason_message is not None:
+        job_model.termination_reason_message = termination_reason_message
+    if exit_status is not None or termination_reason_message is not None:
         await session.commit()
 
     await session.refresh(run_model_db)
@@ -226,13 +230,14 @@ class TestGetRunsTable:
         assert status_style == "bold sea_green3"
 
     @pytest.mark.parametrize(
-        "job_status,termination_reason,exit_status,expected_status,expected_style",
+        "job_status,termination_reason,exit_status,termination_reason_message,expected_status,expected_style",
         [
-            (JobStatus.DONE, None, None, "exited (0)", "grey"),
+            (JobStatus.DONE, None, None, None, "exited (0)", "grey"),
             (
                 JobStatus.FAILED,
                 JobTerminationReason.CONTAINER_EXITED_WITH_ERROR,
                 1,
+                None,
                 "exited (1)",
                 "indian_red1",
             ),
@@ -240,6 +245,7 @@ class TestGetRunsTable:
                 JobStatus.FAILED,
                 JobTerminationReason.CONTAINER_EXITED_WITH_ERROR,
                 42,
+                None,
                 "exited (42)",
                 "indian_red1",
             ),
@@ -247,12 +253,22 @@ class TestGetRunsTable:
                 JobStatus.FAILED,
                 JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
                 None,
+                None,
                 "no offers",
                 "gold1",
             ),
             (
                 JobStatus.FAILED,
+                JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                None,
+                "No matching fleet found. Possible reasons: https://dstack.ai/docs/guides/troubleshooting/#no-fleets",
+                "no fleets",
+                "indian_red1",
+            ),
+            (
+                JobStatus.FAILED,
                 JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+                None,
                 None,
                 "interrupted",
                 "gold1",
@@ -261,6 +277,7 @@ class TestGetRunsTable:
                 JobStatus.FAILED,
                 JobTerminationReason.INSTANCE_UNREACHABLE,
                 None,
+                None,
                 "error",
                 "indian_red1",
             ),
@@ -268,14 +285,22 @@ class TestGetRunsTable:
                 JobStatus.TERMINATED,
                 JobTerminationReason.TERMINATED_BY_USER,
                 None,
+                None,
                 "stopped",
                 "grey",
             ),
-            (JobStatus.TERMINATED, JobTerminationReason.ABORTED_BY_USER, None, "aborted", "grey"),
-            (JobStatus.RUNNING, None, None, "running", "bold sea_green3"),
-            (JobStatus.PROVISIONING, None, None, "provisioning", "bold deep_sky_blue1"),
-            (JobStatus.PULLING, None, None, "pulling", "bold sea_green3"),
-            (JobStatus.TERMINATING, None, None, "terminating", "bold deep_sky_blue1"),
+            (
+                JobStatus.TERMINATED,
+                JobTerminationReason.ABORTED_BY_USER,
+                None,
+                None,
+                "aborted",
+                "grey",
+            ),
+            (JobStatus.RUNNING, None, None, None, "running", "bold sea_green3"),
+            (JobStatus.PROVISIONING, None, None, None, "provisioning", "bold deep_sky_blue1"),
+            (JobStatus.PULLING, None, None, None, "pulling", "bold sea_green3"),
+            (JobStatus.TERMINATING, None, None, None, "terminating", "bold deep_sky_blue1"),
         ],
     )
     async def test_status_messages(
@@ -284,6 +309,7 @@ class TestGetRunsTable:
         job_status: JobStatus,
         termination_reason: Optional[JobTerminationReason],
         exit_status: Optional[int],
+        termination_reason_message: Optional[str],
         expected_status: str,
         expected_style: str,
     ):
@@ -292,6 +318,7 @@ class TestGetRunsTable:
             job_status=job_status,
             termination_reason=termination_reason,
             exit_status=exit_status,
+            termination_reason_message=termination_reason_message,
         )
 
         table = get_runs_table([api_run], verbose=False)

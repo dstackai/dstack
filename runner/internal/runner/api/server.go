@@ -5,9 +5,6 @@ import (
 	"errors"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/dstackai/dstack/runner/internal/api"
@@ -17,8 +14,7 @@ import (
 )
 
 type Server struct {
-	srv     *http.Server
-	tempDir string
+	srv *http.Server
 
 	shutdownCh   chan interface{} // server closes this chan on shutdown
 	jobBarrierCh chan interface{} // only server listens on this chan
@@ -36,12 +32,8 @@ type Server struct {
 	version string
 }
 
-func NewServer(ctx context.Context, tempDir string, homeDir string, address string, sshPort int, version string) (*Server, error) {
+func NewServer(ctx context.Context, address string, version string, ex executor.Executor) (*Server, error) {
 	r := api.NewRouter()
-	ex, err := executor.NewRunExecutor(tempDir, homeDir, sshPort)
-	if err != nil {
-		return nil, err
-	}
 
 	metricsCollector, err := metrics.NewMetricsCollector(ctx)
 	if err != nil {
@@ -53,7 +45,6 @@ func NewServer(ctx context.Context, tempDir string, homeDir string, address stri
 			Addr:    address,
 			Handler: r,
 		},
-		tempDir: tempDir,
 
 		shutdownCh:   make(chan interface{}),
 		jobBarrierCh: make(chan interface{}),
@@ -82,9 +73,6 @@ func NewServer(ctx context.Context, tempDir string, homeDir string, address stri
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	signals := []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT}
-	signalCh := make(chan os.Signal, 1)
-
 	go func() {
 		if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Error(ctx, "Server failed", "err", err)
@@ -97,20 +85,21 @@ func (s *Server) Run(ctx context.Context) error {
 	case <-time.After(s.submitWaitDuration):
 		log.Error(ctx, "Job didn't start in time, shutting down")
 		return errors.New("no job submitted")
+	case <-ctx.Done():
+		log.Error(ctx, "Received interrupt signal, shutting down")
+		return ctx.Err()
 	}
 
 	// todo timeout on code and run
 
-	signal.Notify(signalCh, signals...)
 	select {
-	case <-signalCh:
-		log.Error(ctx, "Received interrupt signal, shutting down")
-		s.stop()
 	case <-s.jobBarrierCh:
 		log.Info(ctx, "Job finished, shutting down")
+	case <-ctx.Done():
+		log.Error(ctx, "Received interrupt signal, shutting down")
+		s.stop()
 	}
 	close(s.shutdownCh)
-	signal.Reset(signals...)
 
 	logsToWait := []struct {
 		ch   <-chan interface{}

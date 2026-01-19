@@ -9,8 +9,6 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/dstackai/dstack/runner/internal/api"
@@ -18,6 +16,9 @@ import (
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 )
+
+// TODO: set some reasonable value; (optional) make configurable
+const maxBodySize = math.MaxInt64
 
 func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	return &schemas.HealthcheckResponse{
@@ -84,13 +85,16 @@ func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "missing boundary"}
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, math.MaxInt64)
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	formReader := multipart.NewReader(r.Body, boundary)
 	part, err := formReader.NextPart()
-	if errors.Is(err, io.EOF) {
-		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty form"}
-	}
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, &api.Error{Status: http.StatusBadRequest, Msg: "empty form"}
+		}
+		if isMaxBytesError(err) {
+			return nil, &api.Error{Status: http.StatusRequestEntityTooLarge}
+		}
 		return nil, fmt.Errorf("read multipart form: %w", err)
 	}
 	defer func() { _ = part.Close() }()
@@ -106,8 +110,11 @@ func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request
 	if archiveId == "" {
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "missing file name"}
 	}
-	if err := s.executor.AddFileArchive(archiveId, part); err != nil {
-		return nil, fmt.Errorf("add file archive: %w", err)
+	if err := s.executor.WriteFileArchive(archiveId, part); err != nil {
+		if isMaxBytesError(err) {
+			return nil, &api.Error{Status: http.StatusRequestEntityTooLarge}
+		}
+		return nil, fmt.Errorf("write file archive: %w", err)
 	}
 	if _, err := formReader.NextPart(); !errors.Is(err, io.EOF) {
 		return nil, &api.Error{Status: http.StatusBadRequest, Msg: "extra form field(s)"}
@@ -123,21 +130,17 @@ func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, math.MaxInt64)
-	codePath := filepath.Join(s.tempDir, "code") // todo random name?
-	file, err := os.Create(codePath)
-	if err != nil {
-		return nil, fmt.Errorf("create code file: %w", err)
-	}
-	defer func() { _ = file.Close() }()
-	if _, err = io.Copy(file, r.Body); err != nil {
-		if err.Error() == "http: request body too large" {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+
+	if err := s.executor.WriteRepoBlob(r.Body); err != nil {
+		if isMaxBytesError(err) {
 			return nil, &api.Error{Status: http.StatusRequestEntityTooLarge}
 		}
 		return nil, fmt.Errorf("copy request body: %w", err)
 	}
 
-	s.executor.SetCodePath(codePath)
+	s.executor.SetRunnerState(executor.WaitRun)
+
 	return nil, nil
 }
 
@@ -180,4 +183,9 @@ func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (interfa
 func (s *Server) stopPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.stop()
 	return nil, nil
+}
+
+func isMaxBytesError(err error) bool {
+	var maxBytesError *http.MaxBytesError
+	return errors.As(err, &maxBytesError)
 }

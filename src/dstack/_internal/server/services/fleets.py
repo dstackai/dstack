@@ -6,7 +6,7 @@ from typing import List, Literal, Optional, Tuple, TypeVar, Union, cast
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import aliased, joinedload, selectinload
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.features import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
@@ -40,6 +40,7 @@ from dstack._internal.core.models.profiles import (
     Profile,
     SpotPolicy,
 )
+from dstack._internal.core.models.projects import Project
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
@@ -50,6 +51,7 @@ from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
     JobModel,
+    MemberModel,
     ProjectModel,
     UserModel,
 )
@@ -70,6 +72,7 @@ from dstack._internal.server.services.projects import (
     get_member,
     get_member_permissions,
     list_user_project_models,
+    project_model_to_project,
 )
 from dstack._internal.server.services.resources import set_resources_defaults
 from dstack._internal.utils import random_names
@@ -96,6 +99,53 @@ def switch_fleet_status(
 
     msg = f"Fleet status changed {old_status.upper()} -> {new_status.upper()}"
     events.emit(session, msg, actor=actor, targets=[events.Target.from_model(fleet_model)])
+
+
+async def list_projects_with_no_active_fleets(
+    session: AsyncSession,
+    user: UserModel,
+) -> List[Project]:
+    """
+    Returns all projects where the user is a member that have no active fleets.
+
+    Active fleets are those with `deleted == False`. Projects with only deleted fleets
+    (or no fleets) are included. Deleted projects are excluded.
+
+    Applies to all users (both regular users and admins require membership).
+    """
+    active_fleet_alias = aliased(FleetModel)
+    member_alias = aliased(MemberModel)
+
+    query = (
+        select(ProjectModel)
+        .join(
+            member_alias,
+            and_(
+                member_alias.project_id == ProjectModel.id,
+                member_alias.user_id == user.id,
+            ),
+        )
+        .outerjoin(
+            active_fleet_alias,
+            and_(
+                active_fleet_alias.project_id == ProjectModel.id,
+                active_fleet_alias.deleted == False,
+            ),
+        )
+        .where(
+            ProjectModel.deleted == False,
+            active_fleet_alias.id.is_(None),
+        )
+        .order_by(ProjectModel.created_at)
+    )
+
+    res = await session.execute(query)
+    project_models = list(res.scalars().unique().all())
+
+    return [
+        project_model_to_project(p, include_backends=False, include_members=False)
+        for p in project_models
+    ]
 
 
 async def list_fleets(
@@ -676,10 +726,6 @@ def is_cloud_cluster(fleet_model: FleetModel) -> bool:
         fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
         and fleet.spec.configuration.ssh_config is None
     )
-
-
-def is_fleet_master_instance(instance: InstanceModel) -> bool:
-    return instance.fleet is not None and instance.id == instance.fleet.instances[0].id
 
 
 def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:

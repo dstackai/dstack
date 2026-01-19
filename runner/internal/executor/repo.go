@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 
 	"github.com/codeclysm/extract/v4"
@@ -17,22 +19,38 @@ import (
 	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
-// setupRepo must be called from Run
-// Must be called after setJobWorkingDir and setJobCredentials
+// WriteRepoBlob must be called after SetJob
+func (ex *RunExecutor) WriteRepoBlob(src io.Reader) error {
+	if err := os.MkdirAll(ex.repoBlobDir, 0o755); err != nil {
+		return fmt.Errorf("create blob directory: %w", err)
+	}
+	ex.repoBlobPath = path.Join(ex.repoBlobDir, ex.run.RunSpec.RepoId)
+	blob, err := os.Create(ex.repoBlobPath)
+	if err != nil {
+		return fmt.Errorf("create blob file: %w", err)
+	}
+	defer func() { _ = blob.Close() }()
+	if _, err = io.Copy(blob, src); err != nil {
+		return fmt.Errorf("copy blob data: %w", err)
+	}
+	return nil
+}
+
+// setupRepo must be called from Run after setJobUser and setJobWorkingDir
 func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 	log.Trace(ctx, "Setting up repo")
 	if ex.jobWorkingDir == "" {
-		return errors.New("setup repo: working dir is not set")
+		return errors.New("working dir is not set")
 	}
 	if !filepath.IsAbs(ex.jobWorkingDir) {
-		return fmt.Errorf("setup repo: working dir must be absolute: %s", ex.jobWorkingDir)
+		return fmt.Errorf("working dir must be absolute: %s", ex.jobWorkingDir)
 	}
 	if ex.jobSpec.RepoDir == nil {
-		return errors.New("repo_dir is not set")
+		return errors.New("repo dir is not set")
 	}
 
 	var err error
-	ex.repoDir, err = common.ExpandPath(*ex.jobSpec.RepoDir, ex.jobWorkingDir, ex.jobHomeDir)
+	ex.repoDir, err = common.ExpandPath(*ex.jobSpec.RepoDir, ex.jobWorkingDir, ex.jobUser.HomeDir)
 	if err != nil {
 		return fmt.Errorf("expand repo dir path: %w", err)
 	}
@@ -52,12 +70,12 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 		}
 		switch repoExistsAction {
 		case schemas.RepoExistsActionError:
-			return fmt.Errorf("setup repo: repo dir is not empty: %s", ex.repoDir)
+			return fmt.Errorf("repo dir is not empty: %s", ex.repoDir)
 		case schemas.RepoExistsActionSkip:
 			log.Info(ctx, "Skipping repo checkout: repo dir is not empty", "path", ex.repoDir)
 			return nil
 		default:
-			return fmt.Errorf("setup repo: unsupported action: %s", repoExistsAction)
+			return fmt.Errorf("unsupported action: %s", repoExistsAction)
 		}
 	}
 
@@ -98,6 +116,10 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 
 	if err := ex.chownRepoDir(ctx); err != nil {
 		return fmt.Errorf("chown repo dir: %w", err)
+	}
+
+	if err := os.RemoveAll(ex.repoBlobDir); err != nil {
+		log.Warning(ctx, "Failed to remove repo blobs dir", "path", ex.repoBlobDir, "err", err)
 	}
 
 	return err
@@ -143,7 +165,7 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 	}
 
 	log.Trace(ctx, "Applying diff")
-	repoDiff, err := os.ReadFile(ex.codePath)
+	repoDiff, err := os.ReadFile(ex.repoBlobPath)
 	if err != nil {
 		return fmt.Errorf("read repo diff: %w", err)
 	}
@@ -156,12 +178,12 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 }
 
 func (ex *RunExecutor) prepareArchive(ctx context.Context) error {
-	file, err := os.Open(ex.codePath)
+	file, err := os.Open(ex.repoBlobPath)
 	if err != nil {
 		return fmt.Errorf("open code archive: %w", err)
 	}
 	defer func() { _ = file.Close() }()
-	log.Trace(ctx, "Extracting code archive", "src", ex.codePath, "dst", ex.repoDir)
+	log.Trace(ctx, "Extracting code archive", "src", ex.repoBlobPath, "dst", ex.repoDir)
 	if err := extract.Tar(ctx, file, ex.repoDir, nil); err != nil {
 		return fmt.Errorf("extract tar archive: %w", err)
 	}
@@ -214,9 +236,6 @@ func (ex *RunExecutor) restoreRepoDir(ctx context.Context, tmpDir string) error 
 
 func (ex *RunExecutor) chownRepoDir(ctx context.Context) error {
 	log.Trace(ctx, "Chowning repo dir")
-	if ex.jobUid == -1 && ex.jobGid == -1 {
-		return nil
-	}
 	return filepath.WalkDir(
 		ex.repoDir,
 		func(p string, d fs.DirEntry, err error) error {
@@ -225,7 +244,7 @@ func (ex *RunExecutor) chownRepoDir(ctx context.Context) error {
 				log.Debug(ctx, "Error while walking repo dir", "path", p, "err", err)
 				return nil
 			}
-			if err := os.Chown(p, ex.jobUid, ex.jobGid); err != nil {
+			if err := os.Chown(p, ex.jobUser.Uid, ex.jobUser.Gid); err != nil {
 				log.Debug(ctx, "Error while chowning repo dir", "path", p, "err", err)
 			}
 			return nil

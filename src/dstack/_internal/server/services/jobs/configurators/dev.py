@@ -7,6 +7,7 @@ from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.services.jobs.configurators.extensions.cursor import CursorDesktop
 from dstack._internal.server.services.jobs.configurators.extensions.vscode import VSCodeDesktop
+from dstack._internal.server.services.jobs.configurators.extensions.windsurf import WindsurfDesktop
 
 INSTALL_IPYKERNEL = (
     "(echo 'pip install ipykernel...' && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
@@ -26,6 +27,8 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
             __class = VSCodeDesktop
         elif run_spec.configuration.ide == "cursor":
             __class = CursorDesktop
+        elif run_spec.configuration.ide == "windsurf":
+            __class = WindsurfDesktop
         else:
             raise ServerClientError(f"Unsupported IDE: {run_spec.configuration.ide}")
         self.ide = __class(

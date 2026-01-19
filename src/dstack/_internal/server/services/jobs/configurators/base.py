@@ -224,6 +224,17 @@ class JobConfigurator(ABC):
         ):
             return []
         return [
+            f"eval $(echo 'export DSTACK_VENV_DIR={DSTACK_DIR}/venv' | sudo tee -a {DSTACK_PROFILE_PATH})",
+            # Make sure /dstack/venv is owned by the current user.
+            # XXX: Generally, /dstack and all its descendants should be owned by root, as it is
+            # intended to be a place for files shared by all users, but since a non-root user
+            # should be able to install packages via pip and we want to avoid cluttering the user's
+            # home dir if possible, we make the venv dir owned by the current user rather than
+            # creating it inside the user's home or (even worse) making /dstack/venv
+            # world-writable.
+            "sudo rm -rf $DSTACK_VENV_DIR",
+            "sudo mkdir $DSTACK_VENV_DIR",
+            "sudo chown $(id -u):$(id -g) $DSTACK_VENV_DIR",
             # `uv` may emit:
             # > warning: `VIRTUAL_ENV=/dstack/venv` does not match the project environment path
             # > `.venv` and will be ignored; use `--active` to target the active environment
@@ -232,9 +243,8 @@ class JobConfigurator(ABC):
             # used for legacy `pip`-based configurations). `--no-active` suppresses the warning.
             # Alternatively, the user can call `deactivate` once before using `uv`.
             # If the user really wants to reuse dstack's venv, they must spefify `--active`.
-            f"uv venv -q --prompt dstack -p {self._python()} --seed {DSTACK_DIR}/venv",
-            f"echo '. {DSTACK_DIR}/venv/bin/activate' >> {DSTACK_PROFILE_PATH}",
-            f". {DSTACK_DIR}/venv/bin/activate",
+            f"uv venv -q --prompt dstack -p {self._python()} --seed $DSTACK_VENV_DIR",
+            f"eval $(echo '. $DSTACK_VENV_DIR/bin/activate' | sudo tee -a {DSTACK_PROFILE_PATH})",
         ]
 
     def _app_specs(self) -> List[AppSpec]:

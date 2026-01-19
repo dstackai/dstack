@@ -6,11 +6,16 @@ from rich.table import Table
 
 from dstack._internal.cli.models.offers import OfferCommandOutput, OfferRequirements
 from dstack._internal.cli.models.runs import PsCommandOutput
-from dstack._internal.cli.utils.common import NO_OFFERS_WARNING, add_row_from_dict, console
+from dstack._internal.cli.utils.common import (
+    NO_FLEETS_WARNING,
+    NO_OFFERS_WARNING,
+    add_row_from_dict,
+    console,
+    format_instance_availability,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import (
-    InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
 )
@@ -75,7 +80,10 @@ def print_runs_json(project: str, runs: List[Run]) -> None:
 
 
 def print_run_plan(
-    run_plan: RunPlan, max_offers: Optional[int] = None, include_run_properties: bool = True
+    run_plan: RunPlan,
+    max_offers: Optional[int] = None,
+    include_run_properties: bool = True,
+    no_fleets: bool = False,
 ):
     run_spec = run_plan.get_effective_run_spec()
     job_plan = run_plan.job_plans[0]
@@ -160,14 +168,6 @@ def print_run_plan(
     for i, offer in enumerate(job_plan.offers, start=1):
         r = offer.instance.resources
 
-        availability = ""
-        if offer.availability in {
-            InstanceAvailability.NOT_AVAILABLE,
-            InstanceAvailability.NO_QUOTA,
-            InstanceAvailability.IDLE,
-            InstanceAvailability.BUSY,
-        }:
-            availability = offer.availability.value.replace("_", " ").lower()
         instance = offer.instance.name
         if offer.total_blocks > 1:
             instance += f" ({offer.blocks}/{offer.total_blocks})"
@@ -177,7 +177,7 @@ def print_run_plan(
             r.pretty_format(include_spot=True),
             instance,
             f"${offer.price:.4f}".rstrip("0").rstrip("."),
-            availability,
+            format_instance_availability(offer.availability),
             style=None if i == 1 or not include_run_properties else "secondary",
         )
     if job_plan.total_offers > len(job_plan.offers):
@@ -195,7 +195,7 @@ def print_run_plan(
             )
         console.print()
     else:
-        console.print(NO_OFFERS_WARNING)
+        console.print(NO_FLEETS_WARNING if no_fleets else NO_OFFERS_WARNING)
 
 
 def _format_run_status(run) -> str:
@@ -215,8 +215,10 @@ def _format_run_status(run) -> str:
         RunStatus.FAILED: "indian_red1",
         RunStatus.DONE: "grey",
     }
-    if status_text == "no offers" or status_text == "interrupted":
+    if status_text in ("no offers", "interrupted"):
         color = "gold1"
+    elif status_text == "no fleets":
+        color = "indian_red1"
     elif status_text == "pulling":
         color = "sea_green3"
     else:
@@ -230,6 +232,8 @@ def _format_job_submission_status(job_submission: JobSubmission, verbose: bool) 
     job_status = job_submission.status
     if status_message in ("no offers", "interrupted"):
         color = "gold1"
+    elif status_message == "no fleets":
+        color = "indian_red1"
     elif status_message == "stopped":
         color = "grey"
     else:

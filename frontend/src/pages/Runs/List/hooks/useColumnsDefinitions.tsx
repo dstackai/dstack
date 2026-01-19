@@ -84,13 +84,14 @@ export const useColumnsDefinitions = () => {
                 const terminationReason = finishedRunStatuses.includes(item.status)
                     ? item.latest_job_submission?.termination_reason
                     : null;
+                const statusMessage = getRunStatusMessage(item);
 
                 return (
                     <StatusIndicator
                         type={getStatusIconType(status, terminationReason)}
-                        colorOverride={getStatusIconColor(status, terminationReason)}
+                        colorOverride={getStatusIconColor(status, terminationReason, statusMessage)}
                     >
-                        {getRunStatusMessage(item)}
+                        {statusMessage}
                     </StatusIndicator>
                 );
             },

@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	osuser "os/user"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -27,8 +26,10 @@ import (
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/connections"
+	linuxuser "github.com/dstackai/dstack/runner/internal/linux/user"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
+	"github.com/dstackai/dstack/runner/internal/ssh"
 	"github.com/dstackai/dstack/runner/internal/types"
 )
 
@@ -51,11 +52,13 @@ type ConnectionTracker interface {
 }
 
 type RunExecutor struct {
-	tempDir    string
-	homeDir    string
-	archiveDir string
-	sshPort    int
-	currentUid uint32
+	tempDir     string
+	dstackDir   string
+	currentUser linuxuser.User
+	sshd        ssh.SshdManager
+
+	fileArchiveDir string
+	repoBlobDir    string
 
 	run             schemas.Run
 	jobSpec         schemas.JobSpec
@@ -64,11 +67,10 @@ type RunExecutor struct {
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
 	repoDir         string
-	codePath        string
-	jobUid          int
-	jobGid          int
-	jobHomeDir      string
-	jobWorkingDir   string
+	repoBlobPath    string
+	// If the user is not specified in the JobSpec, jobUser should point to currentUser
+	jobUser       *linuxuser.User
+	jobWorkingDir string
 
 	mu              *sync.RWMutex
 	state           string
@@ -89,17 +91,9 @@ func (s *stubConnectionTracker) GetNoConnectionsSecs() int64   { return 0 }
 func (s *stubConnectionTracker) Track(ticker <-chan time.Time) {}
 func (s *stubConnectionTracker) Stop()                         {}
 
-func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, error) {
+func NewRunExecutor(tempDir string, dstackDir string, currentUser linuxuser.User, sshd ssh.SshdManager) (*RunExecutor, error) {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
-	user, err := osuser.Current()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current user: %w", err)
-	}
-	uid, err := parseStringId(user.Uid)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse current user uid: %w", err)
-	}
 
 	// Try to initialize procfs, but don't fail if it's not available (e.g., on macOS)
 	var connectionTracker ConnectionTracker
@@ -110,7 +104,7 @@ func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, 
 			return nil, fmt.Errorf("initialize procfs: %w", err)
 		}
 		connectionTracker = connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
-			Port:            uint64(sshPort),
+			Port:            uint64(sshd.Port()),
 			MinConnDuration: 10 * time.Second, // shorter connections are likely from dstack-server
 			Procfs:          proc,
 		})
@@ -120,13 +114,13 @@ func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, 
 	}
 
 	return &RunExecutor{
-		tempDir:    tempDir,
-		homeDir:    homeDir,
-		archiveDir: filepath.Join(tempDir, "file_archives"),
-		sshPort:    sshPort,
-		currentUid: uid,
-		jobUid:     -1,
-		jobGid:     -1,
+		tempDir:     tempDir,
+		dstackDir:   dstackDir,
+		currentUser: currentUser,
+		sshd:        sshd,
+
+		fileArchiveDir: filepath.Join(tempDir, "file_archives"),
+		repoBlobDir:    filepath.Join(tempDir, "repo_blobs"),
 
 		mu:              mu,
 		state:           WaitSubmit,
@@ -141,7 +135,7 @@ func NewRunExecutor(tempDir string, homeDir string, sshPort int) (*RunExecutor, 
 	}, nil
 }
 
-// Run must be called after SetJob and SetCodePath
+// Run must be called after SetJob and WriteRepoBlob
 func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
 	if err != nil {
@@ -182,29 +176,41 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
 
-	if ex.jobSpec.User == nil {
-		ex.jobSpec.User = &schemas.User{Uid: &ex.currentUid}
-	}
-	if err := fillUser(ex.jobSpec.User); err != nil {
+	if err := ex.setJobUser(ctx); err != nil {
 		ex.SetJobStateWithTerminationReason(
 			ctx,
 			types.JobStateFailed,
 			types.TerminationReasonExecutorError,
-			fmt.Sprintf("Failed to fill in the job user fields (%s)", err),
+			fmt.Sprintf("Failed to set job user (%s)", err),
 		)
-		return fmt.Errorf("fill user: %w", err)
+		return fmt.Errorf("set job user: %w", err)
 	}
 
-	ex.setJobCredentials(ctx)
+	// setJobUser sets User.HomeDir to "/" if the original home dir is not set or not accessible,
+	// in that case we skip home dir provisioning
+	if ex.jobUser.HomeDir == "/" {
+		log.Info(ctx, "Skipping home dir provisioning")
+	} else {
+		// All home dir-related errors are considered non-fatal
+		cleanupGitCredentials, err := ex.setupGitCredentials(ctx)
+		if err != nil {
+			log.Error(ctx, "Failed to set up Git credentials", "err", err)
+		} else {
+			defer cleanupGitCredentials()
+		}
+		if err := ex.setupClusterSsh(ctx); err != nil {
+			log.Error(ctx, "Failed to set up cluster SSH", "err", err)
+		}
+	}
 
 	if err := ex.setJobWorkingDir(ctx); err != nil {
 		ex.SetJobStateWithTerminationReason(
 			ctx,
 			types.JobStateFailed,
 			types.TerminationReasonExecutorError,
-			fmt.Sprintf("Failed to set up the working dir (%s)", err),
+			fmt.Sprintf("Failed to set job working dir (%s)", err),
 		)
-		return fmt.Errorf("prepare job working dir: %w", err)
+		return fmt.Errorf("set job working dir: %w", err)
 	}
 
 	if err := ex.setupRepo(ctx); err != nil {
@@ -226,13 +232,6 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		)
 		return fmt.Errorf("setup files: %w", err)
 	}
-
-	cleanupCredentials, err := ex.setupCredentials(ctx)
-	if err != nil {
-		ex.SetJobState(ctx, types.JobStateFailed)
-		return fmt.Errorf("setup credentials: %w", err)
-	}
-	defer cleanupCredentials()
 
 	connectionTrackerTicker := time.NewTicker(2500 * time.Millisecond)
 	go ex.connectionTracker.Track(connectionTrackerTicker.C)
@@ -292,11 +291,6 @@ func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
 	ex.state = WaitCode
 }
 
-func (ex *RunExecutor) SetCodePath(codePath string) {
-	ex.codePath = codePath
-	ex.state = WaitRun
-}
-
 func (ex *RunExecutor) SetJobState(ctx context.Context, state types.JobState) {
 	ex.SetJobStateWithTerminationReason(ctx, state, "", "")
 }
@@ -338,21 +332,7 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 	ex.state = state
 }
 
-func (ex *RunExecutor) setJobCredentials(ctx context.Context) {
-	if ex.jobSpec.User.Uid != nil {
-		ex.jobUid = int(*ex.jobSpec.User.Uid)
-	}
-	if ex.jobSpec.User.Gid != nil {
-		ex.jobGid = int(*ex.jobSpec.User.Gid)
-	}
-	if ex.jobSpec.User.HomeDir != "" {
-		ex.jobHomeDir = ex.jobSpec.User.HomeDir
-	} else {
-		ex.jobHomeDir = "/"
-	}
-	log.Trace(ctx, "Job credentials", "uid", ex.jobUid, "gid", ex.jobGid, "home", ex.jobHomeDir)
-}
-
+// setJobWorkingDir must be called from Run after setJobUser
 func (ex *RunExecutor) setJobWorkingDir(ctx context.Context) error {
 	var err error
 	if ex.jobSpec.WorkingDir == nil {
@@ -361,15 +341,70 @@ func (ex *RunExecutor) setJobWorkingDir(ctx context.Context) error {
 			return fmt.Errorf("get working directory: %w", err)
 		}
 	} else {
-		ex.jobWorkingDir, err = common.ExpandPath(*ex.jobSpec.WorkingDir, "", ex.jobHomeDir)
+		ex.jobWorkingDir, err = common.ExpandPath(*ex.jobSpec.WorkingDir, "", ex.jobUser.HomeDir)
 		if err != nil {
 			return fmt.Errorf("expand working dir path: %w", err)
 		}
 		if !path.IsAbs(ex.jobWorkingDir) {
-			return fmt.Errorf("working_dir must be absolute: %s", ex.jobWorkingDir)
+			return fmt.Errorf("working dir must be absolute: %s", ex.jobWorkingDir)
 		}
 	}
 	log.Trace(ctx, "Job working dir", "path", ex.jobWorkingDir)
+	return nil
+}
+
+// setupClusterSsh must be called from Run after setJobUser
+func (ex *RunExecutor) setupClusterSsh(ctx context.Context) error {
+	if ex.jobSpec.SSHKey == nil || len(ex.clusterInfo.JobIPs) < 2 {
+		return nil
+	}
+
+	sshDir, err := prepareUserSshDir(ex.jobUser)
+	if err != nil {
+		return fmt.Errorf("prepare user ssh dir: %w", err)
+	}
+
+	privatePath := filepath.Join(sshDir, "dstack_job")
+	privateFile, err := os.OpenFile(privatePath, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0o600)
+	if err != nil {
+		return fmt.Errorf("open private key file: %w", err)
+	}
+	defer privateFile.Close()
+	if err := os.Chown(privatePath, ex.jobUser.Uid, ex.jobUser.Uid); err != nil {
+		return fmt.Errorf("chown private key: %w", err)
+	}
+	if _, err := privateFile.WriteString(ex.jobSpec.SSHKey.Private); err != nil {
+		return fmt.Errorf("write private key: %w", err)
+	}
+
+	// TODO: move job hosts config to ~/.dstack/ssh/config.d/current_job.conf
+	// and add "Include ~/.dstack/ssh/config.d/*.conf" directive to ~/.ssh/config if not present
+	// instead of appending job hosts config directly (don't bloat user's ssh_config)
+	configPath := filepath.Join(sshDir, "config")
+	configFile, err := os.OpenFile(configPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
+	if err != nil {
+		return fmt.Errorf("open SSH config: %w", err)
+	}
+	defer configFile.Close()
+	if err := os.Chown(configPath, ex.jobUser.Uid, ex.jobUser.Gid); err != nil {
+		return fmt.Errorf("chown SSH config: %w", err)
+	}
+	configBuffer := new(bytes.Buffer)
+	for _, ip := range ex.clusterInfo.JobIPs {
+		fmt.Fprintf(configBuffer, "\nHost %s\n", ip)
+		fmt.Fprintf(configBuffer, "    Port %d\n", ex.sshd.Port())
+		configBuffer.WriteString("    StrictHostKeyChecking no\n")
+		configBuffer.WriteString("    UserKnownHostsFile /dev/null\n")
+		fmt.Fprintf(configBuffer, "    IdentityFile %s\n", privatePath)
+	}
+	if _, err := configFile.Write(configBuffer.Bytes()); err != nil {
+		return fmt.Errorf("write SSH config: %w", err)
+	}
+
+	if err := ex.sshd.AddAuthorizedKeys(ctx, ex.jobSpec.SSHKey.Public); err != nil {
+		return fmt.Errorf("add authorized key: %w", err)
+	}
+
 	return nil
 }
 
@@ -382,12 +417,12 @@ func (ex *RunExecutor) getRepoData() schemas.RepoData {
 }
 
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
-	node_rank := ex.jobSpec.JobNum
-	nodes_num := ex.jobSpec.JobsPerReplica
-	gpus_per_node_num := ex.clusterInfo.GPUSPerJob
-	gpus_num := nodes_num * gpus_per_node_num
+	nodeRank := ex.jobSpec.JobNum
+	nodesNum := ex.jobSpec.JobsPerReplica
+	gpusPerNodeNum := ex.clusterInfo.GPUSPerJob
+	gpusNum := nodesNum * gpusPerNodeNum
 
-	mpiHostfilePath := filepath.Join(ex.homeDir, ".dstack/mpi/hostfile")
+	mpiHostfilePath := filepath.Join(ex.dstackDir, "mpi/hostfile")
 
 	jobEnvs := map[string]string{
 		"DSTACK_RUN_ID":         ex.run.Id,
@@ -398,10 +433,10 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"DSTACK_WORKING_DIR":    ex.jobWorkingDir,
 		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
-		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
-		"DSTACK_NODES_NUM":      strconv.Itoa(nodes_num),
-		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(gpus_per_node_num),
-		"DSTACK_GPUS_NUM":       strconv.Itoa(gpus_num),
+		"DSTACK_NODE_RANK":      strconv.Itoa(nodeRank),
+		"DSTACK_NODES_NUM":      strconv.Itoa(nodesNum),
+		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(gpusPerNodeNum),
+		"DSTACK_GPUS_NUM":       strconv.Itoa(gpusNum),
 		"DSTACK_MPI_HOSTFILE":   mpiHostfilePath,
 	}
 
@@ -424,33 +459,26 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
-	if err := common.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUid, ex.jobGid); err != nil {
+	if err := common.MkdirAll(ctx, ex.jobWorkingDir, ex.jobUser.Uid, ex.jobUser.Gid, 0o755); err != nil {
 		return fmt.Errorf("create working directory: %w", err)
 	}
 	cmd.Dir = ex.jobWorkingDir
 
-	// User must be already set
-	user := ex.jobSpec.User
 	// Strictly speaking, we need CAP_SETUID and CAP_GUID (for Cmd.Start()->
 	// Cmd.SysProcAttr.Credential) and CAP_CHOWN (for startCommand()->os.Chown()),
 	// but for the sake of simplicity we instead check if we are root or not
-	if ex.currentUid == 0 {
-		log.Trace(
-			ctx, "Using credentials",
-			"uid", *user.Uid, "gid", *user.Gid, "groups", user.GroupIds,
-			"username", user.GetUsername(), "groupname", user.GetGroupname(),
-			"home", user.HomeDir,
-		)
+	if ex.currentUser.IsRoot() {
+		log.Trace(ctx, "Using credentials", "user", ex.jobUser)
 		if cmd.SysProcAttr == nil {
 			cmd.SysProcAttr = &syscall.SysProcAttr{}
 		}
-		cmd.SysProcAttr.Credential = &syscall.Credential{
-			Uid:    *user.Uid,
-			Gid:    *user.Gid,
-			Groups: user.GroupIds,
+		creds, err := ex.jobUser.ProcessCredentials()
+		if err != nil {
+			return fmt.Errorf("prepare process credentials: %w", err)
 		}
+		cmd.SysProcAttr.Credential = creds
 	} else {
-		log.Info(ctx, "Current user is not root, cannot set process credentials", "uid", ex.currentUid)
+		log.Info(ctx, "Current user is not root, cannot set process credentials", "user", ex.currentUser)
 	}
 
 	envMap := NewEnvMap(ParseEnvList(os.Environ()), jobEnvs, ex.secrets)
@@ -458,66 +486,17 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	envMap.Update(ex.jobSpec.Env, false)
 
 	const profilePath = "/etc/profile"
-	const dstackProfilePath = "/dstack/profile"
+	dstackProfilePath := path.Join(ex.dstackDir, "profile")
 	if err := writeDstackProfile(envMap, dstackProfilePath); err != nil {
 		log.Warning(ctx, "failed to write dstack_profile", "path", dstackProfilePath, "err", err)
 	} else if err := includeDstackProfile(profilePath, dstackProfilePath); err != nil {
 		log.Warning(ctx, "failed to include dstack_profile", "path", profilePath, "err", err)
 	}
 
-	// As of 2024-11-29, ex.homeDir is always set to /root
-	rootSSHDir, err := prepareSSHDir(-1, -1, ex.homeDir)
-	if err != nil {
-		log.Warning(ctx, "failed to prepare ssh dir", "home", ex.homeDir, "err", err)
-	}
-	userSSHDir := ""
-	uid := -1
-	gid := -1
-	if user != nil && *user.Uid != 0 {
-		// non-root user
-		uid = int(*user.Uid)
-		gid = int(*user.Gid)
-		homeDir, isHomeDirAccessible := prepareHomeDir(ctx, uid, gid, user.HomeDir)
-		envMap["HOME"] = homeDir
-		if isHomeDirAccessible {
-			log.Trace(ctx, "provisioning homeDir", "path", homeDir)
-			userSSHDir, err = prepareSSHDir(uid, gid, homeDir)
-			if err != nil {
-				log.Warning(ctx, "failed to prepare ssh dir", "home", homeDir, "err", err)
-			} else {
-				rootSSHKeysPath := filepath.Join(rootSSHDir, "authorized_keys")
-				userSSHKeysPath := filepath.Join(userSSHDir, "authorized_keys")
-				restoreUserSSHKeys := backupFile(ctx, userSSHKeysPath)
-				defer restoreUserSSHKeys(ctx)
-				if err := copyAuthorizedKeys(rootSSHKeysPath, uid, gid, userSSHKeysPath); err != nil {
-					log.Warning(ctx, "failed to copy authorized keys", "path", homeDir, "err", err)
-				}
-			}
-		} else {
-			log.Trace(ctx, "homeDir is not accessible, skipping provisioning", "path", homeDir)
-		}
-	} else {
-		// root user
-		envMap["HOME"] = ex.homeDir
-		userSSHDir = filepath.Join(ex.homeDir, ".ssh")
-	}
-
-	if ex.jobSpec.SSHKey != nil && userSSHDir != "" {
-		err := configureSSH(
-			ex.jobSpec.SSHKey.Private, ex.jobSpec.SSHKey.Public, ex.clusterInfo.JobIPs, ex.sshPort,
-			uid, gid, userSSHDir,
-		)
-		if err != nil {
-			log.Warning(ctx, "failed to configure SSH", "err", err)
-		}
-	}
-
-	err = writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, gpus_per_node_num, mpiHostfilePath)
+	err = writeMpiHostfile(ctx, ex.clusterInfo.JobIPs, gpusPerNodeNum, mpiHostfilePath)
 	if err != nil {
 		return fmt.Errorf("write MPI hostfile: %w", err)
 	}
-
-	cmd.Env = envMap.Render()
 
 	// Configure process resource limits
 	// TODO: Make rlimits customizable in the run configuration. Currently, we only set max locked memory
@@ -533,6 +512,10 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	if err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, &rlimitMemlock); err != nil {
 		log.Error(ctx, "Failed to set resource limits", "err", err)
 	}
+
+	// HOME must be added after writeDstackProfile to avoid overriding the correct per-user value set by sshd
+	envMap["HOME"] = ex.jobUser.HomeDir
+	cmd.Env = envMap.Render()
 
 	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
 
@@ -556,25 +539,31 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	return nil
 }
 
-func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
+// setupGitCredentials must be called from Run after setJobUser
+func (ex *RunExecutor) setupGitCredentials(ctx context.Context) (func(), error) {
 	if ex.repoCredentials == nil {
 		return func() {}, nil
 	}
+
 	switch ex.repoCredentials.GetProtocol() {
 	case "ssh":
 		if ex.repoCredentials.PrivateKey == nil {
 			return nil, fmt.Errorf("private key is missing")
 		}
-		keyPath := filepath.Join(ex.homeDir, ".ssh/id_rsa")
+		sshDir, err := prepareUserSshDir(ex.jobUser)
+		if err != nil {
+			return nil, fmt.Errorf("prepare user ssh dir: %w", err)
+		}
+		keyPath := filepath.Join(sshDir, "id_rsa")
 		if _, err := os.Stat(keyPath); err == nil {
 			return nil, fmt.Errorf("private key already exists")
-		}
-		if err := os.MkdirAll(filepath.Dir(keyPath), 0o700); err != nil {
-			return nil, fmt.Errorf("create ssh directory: %w", err)
 		}
 		log.Info(ctx, "Writing private key", "path", keyPath)
 		if err := os.WriteFile(keyPath, []byte(*ex.repoCredentials.PrivateKey), 0o600); err != nil {
 			return nil, fmt.Errorf("write private key: %w", err)
+		}
+		if err := os.Chown(keyPath, ex.jobUser.Uid, ex.jobUser.Gid); err != nil {
+			return nil, fmt.Errorf("chown private key: %w", err)
 		}
 		return func() {
 			log.Info(ctx, "Removing private key", "path", keyPath)
@@ -584,11 +573,11 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 		if ex.repoCredentials.OAuthToken == nil {
 			return func() {}, nil
 		}
-		hostsPath := filepath.Join(ex.homeDir, ".config/gh/hosts.yml")
+		hostsPath := filepath.Join(ex.jobUser.HomeDir, ".config/gh/hosts.yml")
 		if _, err := os.Stat(hostsPath); err == nil {
 			return nil, fmt.Errorf("hosts.yml file already exists")
 		}
-		if err := os.MkdirAll(filepath.Dir(hostsPath), 0o700); err != nil {
+		if err := common.MkdirAll(ctx, filepath.Dir(hostsPath), ex.jobUser.Uid, ex.jobUser.Gid, 0o700); err != nil {
 			return nil, fmt.Errorf("create gh config directory: %w", err)
 		}
 		log.Info(ctx, "Writing OAuth token", "path", hostsPath)
@@ -599,6 +588,9 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 		ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", cloneURL.Hostname(), *ex.repoCredentials.OAuthToken)
 		if err := os.WriteFile(hostsPath, []byte(ghHost), 0o600); err != nil {
 			return nil, fmt.Errorf("write OAuth token: %w", err)
+		}
+		if err := os.Chown(hostsPath, ex.jobUser.Uid, ex.jobUser.Gid); err != nil {
+			return nil, fmt.Errorf("chown OAuth token: %w", err)
 		}
 		return func() {
 			log.Info(ctx, "Removing OAuth token", "path", hostsPath)
@@ -648,104 +640,6 @@ func buildLDLibraryPathEnv(ctx context.Context) (string, error) {
 	return currentLDPath, nil
 }
 
-// fillUser fills missing User fields
-// Since normally only one kind of identifier is set (either id or name), we don't check
-// (id, name) pair consistency -- id has higher priority and overwites name with a real
-// name, ignoring the already set name value (if any)
-// HomeDir and SupplementaryGroupIds are always set unconditionally, as they are not
-// provided by the dstack server
-func fillUser(user *schemas.User) error {
-	if user.Uid == nil && user.Username == nil {
-		return errors.New("neither Uid nor Username is set")
-	}
-
-	if user.Gid == nil && user.Groupname != nil {
-		osGroup, err := osuser.LookupGroup(*user.Groupname)
-		if err != nil {
-			return fmt.Errorf("failed to look up group by Groupname: %w", err)
-		}
-		gid, err := parseStringId(osGroup.Gid)
-		if err != nil {
-			return fmt.Errorf("failed to parse group Gid: %w", err)
-		}
-		user.Gid = &gid
-	}
-
-	var osUser *osuser.User
-
-	if user.Uid == nil {
-		var err error
-		osUser, err = osuser.Lookup(*user.Username)
-		if err != nil {
-			return fmt.Errorf("failed to look up user by Username: %w", err)
-		}
-		uid, err := parseStringId(osUser.Uid)
-		if err != nil {
-			return fmt.Errorf("failed to parse Uid: %w", err)
-		}
-		user.Uid = &uid
-	} else {
-		var err error
-		osUser, err = osuser.LookupId(strconv.Itoa(int(*user.Uid)))
-		if err != nil {
-			var notFoundErr osuser.UnknownUserIdError
-			if !errors.As(err, &notFoundErr) {
-				return fmt.Errorf("failed to look up user by Uid: %w", err)
-			}
-		}
-	}
-
-	if osUser != nil {
-		user.Username = &osUser.Username
-		user.HomeDir = osUser.HomeDir
-	} else {
-		user.Username = nil
-		user.HomeDir = ""
-	}
-
-	// If Gid is not set, either directly or via Groupname, use user's primary group
-	// and supplementary groups, see https://docs.docker.com/reference/dockerfile/#user
-	// If user doesn't exist, set Gid to 0 and supplementary groups to an empty list
-	if user.Gid == nil {
-		if osUser != nil {
-			gid, err := parseStringId(osUser.Gid)
-			if err != nil {
-				return fmt.Errorf("failed to parse primary Gid: %w", err)
-			}
-			user.Gid = &gid
-			groupStringIds, err := osUser.GroupIds()
-			if err != nil {
-				return fmt.Errorf("failed to get supplementary groups: %w", err)
-			}
-			var groupIds []uint32
-			for _, groupStringId := range groupStringIds {
-				groupId, err := parseStringId(groupStringId)
-				if err != nil {
-					return fmt.Errorf("failed to parse supplementary group id: %w", err)
-				}
-				groupIds = append(groupIds, groupId)
-			}
-			user.GroupIds = groupIds
-		} else {
-			var fallbackGid uint32 = 0
-			user.Gid = &fallbackGid
-			user.GroupIds = []uint32{}
-		}
-	}
-	return nil
-}
-
-func parseStringId(stringId string) (uint32, error) {
-	id, err := strconv.ParseInt(stringId, 10, 32)
-	if err != nil {
-		return 0, err
-	}
-	if id < 0 {
-		return 0, fmt.Errorf("negative id value: %d", id)
-	}
-	return uint32(id), nil
-}
-
 // A simplified copypasta of creack/pty Start->StartWithSize->StartWithAttrs
 // with two additions:
 // * controlling terminal is properly set (cmd.Extrafiles, Cmd.SysProcAttr.Ctty)
@@ -789,61 +683,30 @@ func startCommand(cmd *exec.Cmd) (*os.File, error) {
 	return ptm, nil
 }
 
-func prepareHomeDir(ctx context.Context, uid int, gid int, homeDir string) (string, bool) {
-	if homeDir == "" {
-		// user does not exist
-		return "/", false
-	}
-	if info, err := os.Stat(homeDir); errors.Is(err, os.ErrNotExist) {
-		if strings.Contains(homeDir, "nonexistent") {
-			// let `/nonexistent` stay non-existent
-			return homeDir, false
-		}
-		if err = os.MkdirAll(homeDir, 0o755); err != nil {
-			log.Warning(ctx, "failed to create homeDir", "err", err)
-			return homeDir, false
-		}
-		if err = os.Chmod(homeDir, 0o750); err != nil {
-			log.Warning(ctx, "failed to chmod homeDir", "err", err)
-		}
-		if err = os.Chown(homeDir, uid, gid); err != nil {
-			log.Warning(ctx, "failed to chown homeDir", "err", err)
-		}
-		return homeDir, true
-	} else if err != nil {
-		log.Warning(ctx, "homeDir is not accessible", "err", err)
-		return homeDir, false
-	} else if !info.IsDir() {
-		log.Warning(ctx, "HomeDir is not a dir", "path", homeDir)
-		return homeDir, false
-	}
-	return homeDir, true
-}
-
-func prepareSSHDir(uid int, gid int, homeDir string) (string, error) {
-	sshDir := filepath.Join(homeDir, ".ssh")
+func prepareUserSshDir(user *linuxuser.User) (string, error) {
+	sshDir := filepath.Join(user.HomeDir, ".ssh")
 	info, err := os.Stat(sshDir)
 	if err == nil {
 		if !info.IsDir() {
 			return "", fmt.Errorf("not a directory: %s", sshDir)
 		}
-		if err = os.Chmod(sshDir, 0o700); err != nil {
+		if err := os.Chmod(sshDir, 0o700); err != nil {
 			return "", fmt.Errorf("chmod ssh dir: %w", err)
 		}
 	} else if errors.Is(err, os.ErrNotExist) {
-		if err = os.MkdirAll(sshDir, 0o700); err != nil {
+		if err := os.MkdirAll(sshDir, 0o700); err != nil {
 			return "", fmt.Errorf("create ssh dir: %w", err)
 		}
 	} else {
 		return "", err
 	}
-	if err = os.Chown(sshDir, uid, gid); err != nil {
+	if err := os.Chown(sshDir, user.Uid, user.Gid); err != nil {
 		return "", fmt.Errorf("chown ssh dir: %w", err)
 	}
 	return sshDir, nil
 }
 
-func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path string) error {
+func writeMpiHostfile(ctx context.Context, ips []string, gpusPerNode int, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create MPI hostfile directory: %w", err)
 	}
@@ -859,9 +722,16 @@ func writeMpiHostfile(ctx context.Context, ips []string, gpus_per_node int, path
 		}
 	}
 	if len(nonEmptyIps) == len(ips) {
+		var template string
+		if gpusPerNode == 0 {
+			// CPU node: the number of slots defaults to the number of processor cores on that host
+			// See: https://docs.open-mpi.org/en/main/launching-apps/scheduling.html#calculating-the-number-of-slots
+			template = "%s\n"
+		} else {
+			template = fmt.Sprintf("%%s slots=%d\n", gpusPerNode)
+		}
 		for _, ip := range nonEmptyIps {
-			line := fmt.Sprintf("%s slots=%d\n", ip, gpus_per_node)
-			if _, err = file.WriteString(line); err != nil {
+			if _, err = fmt.Fprintf(file, template, ip); err != nil {
 				return fmt.Errorf("write MPI hostfile line: %w", err)
 			}
 		}
@@ -912,155 +782,4 @@ func includeDstackProfile(profilePath string, dstackProfilePath string) error {
 		return fmt.Errorf("chmod profile file: %w", err)
 	}
 	return nil
-}
-
-func configureSSH(private string, public string, ips []string, port int, uid int, gid int, sshDir string) error {
-	privatePath := filepath.Join(sshDir, "dstack_job")
-	privateFile, err := os.OpenFile(privatePath, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0o600)
-	if err != nil {
-		return fmt.Errorf("open private key file: %w", err)
-	}
-	defer privateFile.Close()
-	if err := os.Chown(privatePath, uid, gid); err != nil {
-		return fmt.Errorf("chown private key: %w", err)
-	}
-	if _, err := privateFile.WriteString(private); err != nil {
-		return fmt.Errorf("write private key: %w", err)
-	}
-
-	akPath := filepath.Join(sshDir, "authorized_keys")
-	akFile, err := os.OpenFile(akPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
-	if err != nil {
-		return fmt.Errorf("open authorized_keys: %w", err)
-	}
-	defer akFile.Close()
-	if err := os.Chown(akPath, uid, gid); err != nil {
-		return fmt.Errorf("chown authorized_keys: %w", err)
-	}
-	if _, err := akFile.WriteString(public); err != nil {
-		return fmt.Errorf("write public key: %w", err)
-	}
-
-	configPath := filepath.Join(sshDir, "config")
-	configFile, err := os.OpenFile(configPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
-	if err != nil {
-		return fmt.Errorf("open SSH config: %w", err)
-	}
-	defer configFile.Close()
-	if err := os.Chown(configPath, uid, gid); err != nil {
-		return fmt.Errorf("chown SSH config: %w", err)
-	}
-	var configBuffer bytes.Buffer
-	for _, ip := range ips {
-		configBuffer.WriteString(fmt.Sprintf("\nHost %s\n", ip))
-		configBuffer.WriteString(fmt.Sprintf("    Port %d\n", port))
-		configBuffer.WriteString("    StrictHostKeyChecking no\n")
-		configBuffer.WriteString("    UserKnownHostsFile /dev/null\n")
-		configBuffer.WriteString(fmt.Sprintf("    IdentityFile %s\n", privatePath))
-	}
-	if _, err := configFile.Write(configBuffer.Bytes()); err != nil {
-		return fmt.Errorf("write SSH config: %w", err)
-	}
-	return nil
-}
-
-// A makeshift solution to deliver authorized_keys to a non-root user
-// without modifying the existing API/bootstrap process
-// TODO: implement key delivery properly, i.e. sumbit keys to and write by the runner,
-// not the outer sh script that launches sshd and runner
-func copyAuthorizedKeys(srcPath string, uid int, gid int, dstPath string) error {
-	srcFile, err := os.Open(srcPath)
-	if err != nil {
-		return fmt.Errorf("open source authorized_keys: %w", err)
-	}
-	defer srcFile.Close()
-
-	dstExists := false
-	info, err := os.Stat(dstPath)
-	if err == nil {
-		dstExists = true
-		if info.IsDir() {
-			return fmt.Errorf("is a directory: %s", dstPath)
-		}
-		if err = os.Chmod(dstPath, 0o600); err != nil {
-			return fmt.Errorf("chmod destination authorized_keys: %w", err)
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("stat destination authorized_keys: %w", err)
-	}
-
-	dstFile, err := os.OpenFile(dstPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
-	if err != nil {
-		return fmt.Errorf("open destination authorized_keys: %w", err)
-	}
-	defer dstFile.Close()
-
-	if dstExists {
-		// visually separate our keys from existing ones
-		if _, err := dstFile.WriteString("\n\n"); err != nil {
-			return fmt.Errorf("write separator to authorized_keys: %w", err)
-		}
-	}
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return fmt.Errorf("copy authorized_keys: %w", err)
-	}
-	if err = os.Chown(dstPath, uid, gid); err != nil {
-		return fmt.Errorf("chown destination authorized_keys: %w", err)
-	}
-
-	return nil
-}
-
-// backupFile renames `/path/to/file` to `/path/to/file.dstack.bak`,
-// creates a new file with the same content, and returns restore function that
-// renames the backup back to the original name.
-// If the original file does not exist, restore function removes the file if it is created.
-// NB: A newly created file has default uid:gid and permissions, probably not
-// the same as the original file.
-func backupFile(ctx context.Context, path string) func(context.Context) {
-	var existed bool
-	backupPath := path + ".dstack.bak"
-
-	restoreFunc := func(ctx context.Context) {
-		if !existed {
-			err := os.Remove(path)
-			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				log.Error(ctx, "failed to remove", "path", path, "err", err)
-			}
-			return
-		}
-		err := os.Rename(backupPath, path)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Error(ctx, "failed to restore", "path", path, "err", err)
-		}
-	}
-
-	err := os.Rename(path, backupPath)
-	if errors.Is(err, os.ErrNotExist) {
-		existed = false
-		return restoreFunc
-	}
-	existed = true
-	if err != nil {
-		log.Error(ctx, "failed to back up", "path", path, "err", err)
-		return restoreFunc
-	}
-
-	src, err := os.Open(backupPath)
-	if err != nil {
-		log.Error(ctx, "failed to open backup src", "path", backupPath, "err", err)
-		return restoreFunc
-	}
-	defer src.Close()
-	dst, err := os.Create(path)
-	if err != nil {
-		log.Error(ctx, "failed to open backup dest", "path", path, "err", err)
-		return restoreFunc
-	}
-	defer dst.Close()
-	_, err = io.Copy(dst, src)
-	if err != nil {
-		log.Error(ctx, "failed to copy backup", "path", backupPath, "err", err)
-	}
-	return restoreFunc
 }

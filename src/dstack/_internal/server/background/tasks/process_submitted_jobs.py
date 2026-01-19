@@ -7,7 +7,14 @@ from typing import List, Optional, Union
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
+from sqlalchemy.orm import (
+    contains_eager,
+    joinedload,
+    load_only,
+    noload,
+    selectinload,
+    with_loader_criteria,
+)
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import (
@@ -213,7 +220,12 @@ async def _process_submitted_job(
         select(JobModel)
         .where(JobModel.id == job_model.id)
         .options(joinedload(JobModel.instance))
-        .options(joinedload(JobModel.fleet).joinedload(FleetModel.instances))
+        .options(
+            joinedload(JobModel.fleet).joinedload(FleetModel.instances),
+            with_loader_criteria(
+                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            ),
+        )
     )
     job_model = res.unique().scalar_one()
     res = await session.execute(
@@ -221,7 +233,12 @@ async def _process_submitted_job(
         .where(RunModel.id == job_model.run_id)
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(RunModel.user).load_only(UserModel.name))
-        .options(joinedload(RunModel.fleet).joinedload(FleetModel.instances))
+        .options(
+            joinedload(RunModel.fleet).joinedload(FleetModel.instances),
+            with_loader_criteria(
+                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            ),
+        )
     )
     run_model = res.unique().scalar_one()
     logger.debug("%s: provisioning has started", fmt(job_model))
@@ -349,9 +366,10 @@ async def _process_submitted_job(
                 job_model.termination_reason = (
                     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
                 )
+                # Note: `_get_job_status_message` relies on the "No fleet found" substring to return "no fleets"
                 job_model.termination_reason_message = (
-                    "No fleet found. Create it before submitting a run: "
-                    "https://dstack.ai/docs/concepts/fleets"
+                    "No matching fleet found. Possible reasons: "
+                    "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
                 )
                 switch_job_status(session, job_model, JobStatus.TERMINATING)
                 job_model.last_processed_at = common_utils.get_current_datetime()

@@ -109,8 +109,8 @@ def _build_replica_lists(
     List[Tuple[int, bool, int, List[JobModel]]], List[Tuple[int, bool, int, List[JobModel]]]
 ]:
     # lists of (importance, is_out_of_date, replica_num, jobs)
-    active_replicas = []
-    inactive_replicas = []
+    active_replicas: list[tuple[int, bool, int, list[JobModel]]] = []
+    inactive_replicas: list[tuple[int, bool, int, list[JobModel]]] = []
 
     for replica_num, replica_jobs in group_jobs_by_replica_latest(jobs):
         # Filter by group if specified

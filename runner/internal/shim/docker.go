@@ -920,51 +920,21 @@ func encodeRegistryAuth(username string, password string) (string, error) {
 	return base64.URLEncoding.EncodeToString(encodedConfig), nil
 }
 
-func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
+func getSSHShellCommands() []string {
 	return []string{
-		// save and unset ld.so variables
-		`_LD_LIBRARY_PATH=${LD_LIBRARY_PATH-} && unset LD_LIBRARY_PATH`,
-		`_LD_PRELOAD=${LD_PRELOAD-} && unset LD_PRELOAD`,
+		`( :`,
+		// See https://github.com/dstackai/dstack/issues/1769
+		`unset LD_LIBRARY_PATH && unset LD_PRELOAD`,
 		// common functions
-		`_exists() { command -v "$1" > /dev/null 2>&1; }`,
-		// TODO(#1535): support non-root images properly
-		"mkdir -p /root && chown root:root /root && export HOME=/root",
+		`exists() { command -v "$1" > /dev/null 2>&1; }`,
 		// package manager detection/abstraction
-		`_install() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }`,
-		`if _exists apt-get; then _install() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi`,
-		`if _exists yum; then _install() { yum install -y "$1"; }; fi`,
-		`if _exists apk; then _install() { apk add -U "$1"; }; fi`,
+		`install_pkg() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }`,
+		`if exists apt-get; then install_pkg() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi`,
+		`if exists yum; then install_pkg() { yum install -y "$1"; }; fi`,
+		`if exists apk; then install_pkg() { apk add -U "$1"; }; fi`,
 		// check in sshd is here, install if not
-		`if ! _exists sshd; then _install openssh-server; fi`,
-		// create ssh dirs and add public key
-		"mkdir -p ~/.ssh",
-		"chmod 700 ~/.ssh",
-		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", publicSSHKey),
-		"chmod 600 ~/.ssh/authorized_keys",
-		// regenerate host keys
-		"rm -rf /etc/ssh/ssh_host_*",
-		"ssh-keygen -A > /dev/null",
-		// Ensure that PRIVSEP_PATH 1) exists 2) empty 3) owned by root,
-		// see https://github.com/dstackai/dstack/issues/1999
-		// /run/sshd is used in Debian-based distros, including Ubuntu:
-		// https://salsa.debian.org/ssh-team/openssh/-/blob/debian/1%259.7p1-7/debian/rules#L60
-		// /var/empty is the default path if not configured via ./configure --with-privsep-path=...
-		"rm -rf /run/sshd && mkdir -p /run/sshd && chown root:root /run/sshd",
-		"rm -rf /var/empty && mkdir -p /var/empty && chown root:root /var/empty",
-		// start sshd
-		fmt.Sprintf(
-			"/usr/sbin/sshd"+
-				" -p %d"+
-				" -o PidFile=none"+
-				" -o PasswordAuthentication=no"+
-				" -o AllowTcpForwarding=yes"+
-				" -o ClientAliveInterval=30"+
-				" -o ClientAliveCountMax=4",
-			openSSHPort,
-		),
-		// restore ld.so variables
-		`if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi`,
-		`if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi`,
+		`if ! exists sshd; then install_pkg openssh-server; fi`,
+		`: )`,
 	}
 }
 
@@ -1213,21 +1183,19 @@ func (c *CLIArgs) DockerPJRTDevice() string {
 }
 
 func (c *CLIArgs) DockerShellCommands(publicKeys []string) []string {
-	concatinatedPublicKeys := c.Docker.ConcatinatedPublicSSHKeys
-	if len(publicKeys) > 0 {
-		concatinatedPublicKeys = strings.Join(publicKeys, "\n")
-	}
-	commands := getSSHShellCommands(c.Runner.SSHPort, concatinatedPublicKeys)
-	runnerArgs := []string{
+	commands := getSSHShellCommands()
+	runnerCommand := []string{
+		consts.RunnerBinaryPath,
 		"--log-level", strconv.Itoa(c.Runner.LogLevel),
 		"start",
+		"--temp-dir", consts.RunnerTempDir,
 		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
 		"--ssh-port", strconv.Itoa(c.Runner.SSHPort),
-		"--temp-dir", consts.RunnerTempDir,
-		"--home-dir", consts.RunnerHomeDir,
 	}
-	commands = append(commands, fmt.Sprintf("%s %s", consts.RunnerBinaryPath, strings.Join(runnerArgs, " ")))
-	return commands
+	for _, key := range publicKeys {
+		runnerCommand = append(runnerCommand, "--ssh-authorized-key", fmt.Sprintf("'%s'", key))
+	}
+	return append(commands, strings.Join(runnerCommand, " "))
 }
 
 func (c *CLIArgs) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {

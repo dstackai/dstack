@@ -364,10 +364,12 @@ async def list_events(
             (
                 joinedload(EventModel.targets)
                 .joinedload(EventTargetModel.entity_project)
-                .load_only(ProjectModel.name)
+                .load_only(ProjectModel.name, ProjectModel.original_name, ProjectModel.deleted)
                 .noload(ProjectModel.owner)
             ),
-            joinedload(EventModel.actor_user).load_only(UserModel.name),
+            joinedload(EventModel.actor_user).load_only(
+                UserModel.name, UserModel.original_name, UserModel.deleted
+            ),
         )
     )
     if event_filters:
@@ -386,23 +388,39 @@ async def list_events(
     return list(map(event_model_to_event, event_models))
 
 
-def event_model_to_event(event_model: EventModel) -> Event:
-    targets = [
-        EventTarget(
-            type=target.entity_type.value,
-            project_id=target.entity_project_id,
-            project_name=target.entity_project.name if target.entity_project else None,
-            id=target.entity_id,
-            name=target.entity_name,
-        )
-        for target in event_model.targets
-    ]
+def event_target_model_to_event_target(model: EventTargetModel) -> EventTarget:
+    project_name = None
+    is_project_deleted = None
+    if model.entity_project is not None:
+        project_name = model.entity_project.name
+        is_project_deleted = model.entity_project.deleted
+        if is_project_deleted and model.entity_project.original_name is not None:
+            project_name = model.entity_project.original_name
+    return EventTarget(
+        type=model.entity_type.value,
+        project_id=model.entity_project_id,
+        project_name=project_name,
+        is_project_deleted=is_project_deleted,
+        id=model.entity_id,
+        name=model.entity_name,
+    )
 
+
+def event_model_to_event(event_model: EventModel) -> Event:
+    actor_user_name = None
+    is_actor_user_deleted = None
+    if event_model.actor_user is not None:
+        actor_user_name = event_model.actor_user.name
+        is_actor_user_deleted = event_model.actor_user.deleted
+        if is_actor_user_deleted and event_model.actor_user.original_name is not None:
+            actor_user_name = event_model.actor_user.original_name
+    targets = list(map(event_target_model_to_event_target, event_model.targets))
     return Event(
         id=event_model.id,
         message=event_model.message,
         recorded_at=event_model.recorded_at,
         actor_user_id=event_model.actor_user_id,
-        actor_user=event_model.actor_user.name if event_model.actor_user else None,
+        actor_user=actor_user_name,
+        is_actor_user_deleted=is_actor_user_deleted,
         targets=targets,
     )

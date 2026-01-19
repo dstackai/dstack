@@ -39,7 +39,11 @@ export const getStatusIconType = (
 export const getStatusIconColor = (
     status: IRun['status'] | TJobStatus,
     terminationReason: string | null | undefined,
+    statusMessage: string,
 ): StatusIndicatorProps.Color | undefined => {
+    if (statusMessage === 'No fleets') {
+        return 'red';
+    }
     if (terminationReason === 'failed_to_start_due_to_no_capacity' || terminationReason === 'interrupted_by_no_capacity') {
         return 'yellow';
     }

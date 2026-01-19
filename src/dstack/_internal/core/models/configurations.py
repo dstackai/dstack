@@ -626,10 +626,17 @@ class ConfigurationWithCommandsParams(CoreModel):
 
 class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[
-        Union[Literal["vscode"], Literal["cursor"]],
-        Field(description="The IDE to run. Supported values include `vscode` and `cursor`"),
+        Union[Literal["vscode"], Literal["cursor"], Literal["windsurf"]],
+        Field(
+            description="The IDE to run. Supported values include `vscode`, `cursor`, and `windsurf`"
+        ),
     ]
-    version: Annotated[Optional[str], Field(description="The version of the IDE")] = None
+    version: Annotated[
+        Optional[str],
+        Field(
+            description="The version of the IDE. For `windsurf`, the version is in the format `version@commit`"
+        ),
+    ] = None
     init: Annotated[CommandsList, Field(description="The shell commands to run on startup")] = []
     inactivity_duration: Annotated[
         Optional[Union[Literal["off"], int, bool, str]],
@@ -655,6 +662,19 @@ class DevEnvironmentConfigurationParams(CoreModel):
         if isinstance(v, int):
             return v
         return None
+
+    @root_validator
+    def validate_windsurf_version_format(cls, values):
+        ide = values.get("ide")
+        version = values.get("version")
+        if ide == "windsurf" and version:
+            # Validate format: version@commit
+            if not re.match(r"^.+@[a-f0-9]+$", version):
+                raise ValueError(
+                    f"Invalid Windsurf version format: `{version}`. "
+                    "Expected format: `version@commit` (e.g., `1.106.0@8951cd3ad688e789573d7f51750d67ae4a0bea7d`)"
+                )
+        return values
 
 
 class DevEnvironmentConfigurationConfig(

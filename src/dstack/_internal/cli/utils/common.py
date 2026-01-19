@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+import requests
 from rich.console import Console
 from rich.prompt import Confirm
 from rich.table import Table
@@ -11,6 +12,7 @@ from rich.theme import Theme
 from dstack._internal import settings
 from dstack._internal.cli.utils.rich import DstackRichHandler
 from dstack._internal.core.errors import CLIError, DstackError
+from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.utils.common import get_dstack_dir, parse_since
 
 _colors = {
@@ -32,7 +34,13 @@ LIVE_TABLE_PROVISION_INTERVAL_SECS = 2
 NO_OFFERS_WARNING = (
     "[warning]"
     "No matching instance offers available. Possible reasons:"
-    " https://dstack.ai/docs/guides/troubleshooting/#no-offers"
+    " [link]https://dstack.ai/docs/guides/troubleshooting/#no-offers[/link]"
+    "[/]\n"
+)
+NO_FLEETS_WARNING = (
+    "[error]"
+    "The project has no fleets. Create one before submitting a run.\n"
+    "See [link]https://dstack.ai/docs/guides/troubleshooting/#no-fleets[/link]"
     "[/]\n"
 )
 
@@ -122,3 +130,26 @@ def get_start_time(since: Optional[str]) -> Optional[datetime]:
         return parse_since(since)
     except ValueError as e:
         raise CLIError(e.args[0])
+
+
+def resolve_url(url: str, timeout: float = 5.0) -> str:
+    """
+    Starts with http:// and follows redirects. Returns the final URL (including scheme).
+    """
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = "http://" + url
+    try:
+        response = requests.get(
+            url,
+            allow_redirects=True,
+            timeout=timeout,
+        )
+    except requests.exceptions.ConnectionError as e:
+        raise ValueError(f"Failed to resolve url {url}") from e
+    return response.url
+
+
+def format_instance_availability(v: InstanceAvailability) -> str:
+    if v in (InstanceAvailability.UNKNOWN, InstanceAvailability.AVAILABLE):
+        return ""
+    return v.value.replace("_", " ").lower()
