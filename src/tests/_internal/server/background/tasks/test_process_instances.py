@@ -599,6 +599,34 @@ class TestTerminate:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_terminates_terminating_deleted_instance(self, test_db, session: AsyncSession):
+        # There was a race condition when instance could stay in Terminating while marked as deleted.
+        # TODO:
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.TERMINATING
+        )
+        instance.deleted = True
+        instance.termination_reason = InstanceTerminationReason.IDLE_TIMEOUT
+        instance.last_job_processed_at = instance.deleted_at = (
+            get_current_datetime() + dt.timedelta(minutes=-19)
+        )
+        await session.commit()
+
+        with self.mock_terminate_in_backend() as mock:
+            await process_instances()
+            mock.assert_called_once()
+
+        await session.refresh(instance)
+
+        assert instance is not None
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.deleted == True
+        assert instance.deleted_at is not None
+        assert instance.finished_at is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "error", [BackendError("err"), RuntimeError("err"), NotYetTerminated("")]
     )
