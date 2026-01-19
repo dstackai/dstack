@@ -668,7 +668,12 @@ async def delete_fleets(
         for fleet in fleets:
             if fleet.spec.configuration.ssh_config is not None:
                 _check_can_manage_ssh_fleets(user=user, project=project)
-        logger.info("Deleting fleets: %s", [f.name for f in fleet_models])
+        if instance_nums is None:
+            logger.info("Deleting fleets: %s", [f.name for f in fleet_models])
+        else:
+            logger.info(
+                "Deleting fleets %s instances %s", [f.name for f in fleet_models], instance_nums
+            )
         for fleet_model in fleet_models:
             _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
             # TERMINATING fleets are deleted by process_fleets after instances are terminated
