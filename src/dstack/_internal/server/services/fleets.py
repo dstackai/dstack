@@ -180,9 +180,7 @@ async def list_fleets(
         limit=limit,
         ascending=ascending,
     )
-    return [
-        fleet_model_to_fleet(v, include_deleted_instances=not only_active) for v in fleet_models
-    ]
+    return [fleet_model_to_fleet(v) for v in fleet_models]
 
 
 async def list_projects_fleet_models(
@@ -227,7 +225,7 @@ async def list_projects_fleet_models(
         .where(*filters)
         .order_by(*order_by)
         .limit(limit)
-        .options(joinedload(FleetModel.instances))
+        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
     )
     fleet_models = list(res.unique().scalars().all())
     return fleet_models
@@ -256,7 +254,9 @@ async def list_project_fleet_models(
     if not include_deleted:
         filters.append(FleetModel.deleted == False)
     res = await session.execute(
-        select(FleetModel).where(*filters).options(joinedload(FleetModel.instances))
+        select(FleetModel)
+        .where(*filters)
+        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
     )
     return list(res.unique().scalars().all())
 
@@ -293,7 +293,9 @@ async def get_project_fleet_model_by_id(
         FleetModel.project_id == project.id,
     ]
     res = await session.execute(
-        select(FleetModel).where(*filters).options(joinedload(FleetModel.instances))
+        select(FleetModel)
+        .where(*filters)
+        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
     )
     return res.unique().scalar_one_or_none()
 
@@ -311,7 +313,9 @@ async def get_project_fleet_model_by_name(
     if not include_deleted:
         filters.append(FleetModel.deleted == False)
     res = await session.execute(
-        select(FleetModel).where(*filters).options(joinedload(FleetModel.instances))
+        select(FleetModel)
+        .where(*filters)
+        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
     )
     return res.unique().scalar_one_or_none()
 
@@ -717,8 +721,13 @@ def get_fleet_spec(fleet_model: FleetModel) -> FleetSpec:
 
 
 async def generate_fleet_name(session: AsyncSession, project: ProjectModel) -> str:
-    fleet_models = await list_project_fleet_models(session=session, project=project)
-    names = {v.name for v in fleet_models}
+    res = await session.execute(
+        select(FleetModel.name).where(
+            FleetModel.project_id == project.id,
+            FleetModel.deleted == False,
+        )
+    )
+    names = set(res.scalars().all())
     while True:
         name = random_names.generate_name()
         if name not in names:
