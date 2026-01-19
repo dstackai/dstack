@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { isNil } from 'lodash';
 import * as yup from 'yup';
 import { WizardProps } from '@cloudscape-design/components';
 import { TilesProps } from '@cloudscape-design/components/tiles';
@@ -14,29 +15,32 @@ import {
     FormInput,
     FormTiles,
     FormToggle,
-    InfoLink,
     KeyValuePairs,
     SpaceBetween,
     Wizard,
 } from 'components';
 
-import { useBreadcrumbs, useConfirmationDialog, useHelpPanel, useNotifications } from 'hooks';
+import { useBreadcrumbs, useConfirmationDialog, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { useGetBackendBaseTypesQuery, useGetBackendTypesQuery } from 'services/backend';
 import { useApplyFleetMutation } from 'services/fleet';
 import { useCreateWizardProjectMutation } from 'services/project';
 
-import { FLEET_IDLE_DURATION_INFO, FLEET_MAX_INSTANCES_INFO, FLEET_MIN_INSTANCES_INFO, projectTypeOptions } from './constants';
+import { FleetFormFields } from '../../Fleets/Details/components/FleetFormFields';
+import {
+    getMaxInstancesValidator,
+    getMinInstancesValidator,
+    idleDurationValidator,
+} from '../../Fleets/Details/components/FleetFormFields/constants';
+import { useYupValidationResolver } from '../hooks/useYupValidationResolver';
+import { projectTypeOptions } from './constants';
 
 import { IProjectWizardForm } from './types';
-
-// import styles from './styles.module.scss';
 
 const requiredFieldError = 'This is required field';
 const minOneLengthError = 'Need to choose one or more';
 const namesFieldError = 'Only latin characters, dashes, underscores, and digits';
-const numberFieldError = 'This is number field';
 
 const fleetStepIndex = 2;
 
@@ -50,70 +54,21 @@ const projectValidationSchema = yup.object({
         is: 'gpu_marketplace',
         then: yup.array().min(1, minOneLengthError).required(requiredFieldError),
     }),
-    fleet_min_instances: yup.number().when('enable_default_fleet', {
-        is: true,
-        then: yup
-            .number()
-            .required(requiredFieldError)
-            .typeError(numberFieldError)
-            .min(0)
-            .test('is-smaller-than-man', 'The minimum value must be less than the maximum value.', (value, context) => {
-                const { fleet_max_instances } = context.parent;
-                if (typeof fleet_max_instances !== 'number' || typeof value !== 'number') return true;
-                return value <= fleet_max_instances;
-            }),
+    fleet: yup.object().shape({
+        min_instances: yup.number().when('enable_default', {
+            is: true,
+            then: getMinInstancesValidator('max_instances'),
+        }),
+        max_instances: yup.number().when('enable_default', {
+            is: true,
+            then: getMaxInstancesValidator('min_instances'),
+        }),
+        idle_duration: yup.string().when('enable_default', {
+            is: true,
+            then: idleDurationValidator,
+        }),
     }),
-    fleet_max_instances: yup.number().when('enable_default_fleet', {
-        is: true,
-        then: yup
-            .number()
-            .typeError(numberFieldError)
-            .min(1)
-            .test('is-greater-than-min', 'The maximum value must be greater than the minimum value', (value, context) => {
-                const { fleet_min_instances } = context.parent;
-                if (typeof fleet_min_instances !== 'number' || typeof value !== 'number') return true;
-                return value >= fleet_min_instances;
-            }),
-    }),
-    fleet_idle_duration: yup.string().matches(/^[1-9]\d*[smhdw]$/, 'Invalid duration'),
 });
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
-const useYupValidationResolver = (validationSchema) =>
-    useCallback(
-        async (data: IProjectWizardForm) => {
-            try {
-                const values = await validationSchema.validate(data, {
-                    abortEarly: false,
-                });
-
-                return {
-                    values,
-                    errors: {},
-                };
-            } catch (errors) {
-                return {
-                    values: {},
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-expect-error
-                    errors: errors.inner.reduce(
-                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                        // @ts-expect-error
-                        (allErrors, currentError) => ({
-                            ...allErrors,
-                            [currentError.path]: {
-                                type: currentError.type ?? 'validation',
-                                message: currentError.message,
-                            },
-                        }),
-                        {},
-                    ),
-                };
-            }
-        },
-        [validationSchema],
-    );
 
 export const CreateProjectWizard: React.FC = () => {
     const { t } = useTranslation();
@@ -125,7 +80,6 @@ export const CreateProjectWizard: React.FC = () => {
     const { data: backendBaseTypesData, isLoading: isBackendBaseTypesLoading } = useGetBackendBaseTypesQuery();
     const { data: backendTypesData, isLoading: isBackendTypesLoading } = useGetBackendTypesQuery();
 
-    const [openHelpPanel] = useHelpPanel();
     const [openConfirmationDialog] = useConfirmationDialog();
 
     const loading = isLoading || isApplyingFleet;
@@ -169,9 +123,11 @@ export const CreateProjectWizard: React.FC = () => {
         resolver,
         defaultValues: {
             project_type: 'gpu_marketplace',
-            enable_default_fleet: true,
-            fleet_min_instances: 0,
-            fleet_idle_duration: '5m',
+            fleet: {
+                enable_default: true,
+                min_instances: 0,
+                idle_duration: '5m',
+            },
         },
     });
 
@@ -194,18 +150,20 @@ export const CreateProjectWizard: React.FC = () => {
     };
 
     const getFormValuesForFleetApplying = (): IApplyFleetPlanRequestRequest => {
-        const { fleet_min_instances, fleet_max_instances, fleet_idle_duration, fleet_name } = getValues();
+        const {
+            fleet: { min_instances, max_instances, idle_duration, name },
+        } = getValues();
 
         return {
             plan: {
                 spec: {
                     configuration: {
-                        ...(fleet_name ? { name: fleet_name } : {}),
+                        ...(name ? { name } : {}),
                         nodes: {
-                            min: fleet_min_instances,
-                            ...(fleet_max_instances ? { max: fleet_max_instances } : {}),
+                            min: min_instances,
+                            ...(max_instances ? { max: max_instances } : {}),
                         },
-                        ...(fleet_idle_duration ? { idle_duration: fleet_idle_duration } : {}),
+                        ...(idle_duration ? { idle_duration } : {}),
                     },
                     profile: {},
                 },
@@ -251,7 +209,7 @@ export const CreateProjectWizard: React.FC = () => {
     };
 
     const validateFleet = async () => {
-        return await trigger(['enable_default_fleet', 'fleet_min_instances', 'fleet_max_instances', 'fleet_idle_duration']);
+        return await trigger(['fleet.enable_default', 'fleet.min_instances', 'fleet.max_instances', 'fleet.idle_duration']);
     };
 
     const emptyValidator = async () => Promise.resolve(true);
@@ -268,7 +226,7 @@ export const CreateProjectWizard: React.FC = () => {
         if (reason === 'next') {
             stepValidators[activeStepIndex]?.().then((isValid) => {
                 if (isValid) {
-                    if (activeStepIndex === fleetStepIndex && formValues?.['fleet_min_instances'] > 0) {
+                    if (activeStepIndex === fleetStepIndex && formValues?.['fleet']['min_instances'] > 0) {
                         openConfirmationDialog({
                             title: 'Are sure want to set min instances above than 0?',
                             content: null,
@@ -312,7 +270,7 @@ export const CreateProjectWizard: React.FC = () => {
     const onSubmitWizard = async () => {
         const isValid = await trigger();
 
-        const { enable_default_fleet } = getValues();
+        const { fleet } = getValues();
 
         if (!isValid) {
             return;
@@ -322,7 +280,7 @@ export const CreateProjectWizard: React.FC = () => {
 
         request
             .then(async (data) => {
-                if (enable_default_fleet) {
+                if (fleet.enable_default) {
                     await applyFleet({
                         projectName: data.project_name,
                         ...getFormValuesForFleetApplying(),
@@ -345,7 +303,7 @@ export const CreateProjectWizard: React.FC = () => {
     };
 
     const onSubmit = () => {
-        if (activeStepIndex < 2) {
+        if (activeStepIndex < 3) {
             onNavigate({ requestedStepIndex: activeStepIndex + 1, reason: 'next' });
         } else {
             onSubmitWizard().catch(console.log);
@@ -353,18 +311,18 @@ export const CreateProjectWizard: React.FC = () => {
     };
 
     const getDefaultFleetSummary = () => {
-        const summaryFields: Array<keyof IProjectWizardForm> = [
-            'fleet_name',
-            'fleet_min_instances',
-            'fleet_max_instances',
-            'fleet_idle_duration',
+        const summaryFields: Array<keyof IProjectWizardForm['fleet']> = [
+            'name',
+            'min_instances',
+            'max_instances',
+            'idle_duration',
         ];
 
         const result: string[] = [];
 
         summaryFields.forEach((fieldName) => {
-            if (formValues[fieldName]) {
-                result.push(`${t(`projects.edit.${fieldName}`)}: ${formValues[fieldName]}`);
+            if (!isNil(formValues?.fleet?.[fieldName])) {
+                result.push(`${t(`fleets.edit.${fieldName}`)}: ${formValues['fleet'][fieldName]}`);
             }
         });
 
@@ -473,51 +431,15 @@ export const CreateProjectWizard: React.FC = () => {
                                         toggleLabel={<strong>{t('projects.edit.default_fleet')}</strong>}
                                         constraintText={t('projects.edit.default_fleet_description')}
                                         control={control}
-                                        name="enable_default_fleet"
+                                        name="fleet.enable_default"
                                     />
 
-                                    {formValues['enable_default_fleet'] && (
-                                        <>
-                                            <FormInput
-                                                label={t('projects.edit.fleet_name')}
-                                                description={t('projects.edit.fleet_name_description')}
-                                                placeholder={t('projects.edit.fleet_name_placeholder')}
-                                                constraintText={t('projects.edit.fleet_name_constraint')}
-                                                control={control}
-                                                name="fleet_name"
-                                                disabled={loading}
-                                            />
-
-                                            <FormInput
-                                                info={<InfoLink onFollow={() => openHelpPanel(FLEET_MIN_INSTANCES_INFO)} />}
-                                                label={t('projects.edit.fleet_min_instances')}
-                                                description={t('projects.edit.fleet_min_instances_description')}
-                                                control={control}
-                                                name="fleet_min_instances"
-                                                disabled={loading}
-                                                type="number"
-                                            />
-
-                                            <FormInput
-                                                info={<InfoLink onFollow={() => openHelpPanel(FLEET_MAX_INSTANCES_INFO)} />}
-                                                label={t('projects.edit.fleet_max_instances')}
-                                                description={t('projects.edit.fleet_max_instances_description')}
-                                                placeholder={t('projects.edit.fleet_max_instances_placeholder')}
-                                                control={control}
-                                                name="fleet_max_instances"
-                                                disabled={loading}
-                                                type="number"
-                                            />
-
-                                            <FormInput
-                                                info={<InfoLink onFollow={() => openHelpPanel(FLEET_IDLE_DURATION_INFO)} />}
-                                                label={t('projects.edit.fleet_idle_duration')}
-                                                description={t('projects.edit.fleet_idle_duration_description')}
-                                                control={control}
-                                                name="fleet_idle_duration"
-                                                disabled={loading}
-                                            />
-                                        </>
+                                    {formValues['fleet']['enable_default'] && (
+                                        <FleetFormFields<IProjectWizardForm>
+                                            control={control}
+                                            disabledAllFields={loading}
+                                            fieldNamePrefix="fleet."
+                                        />
                                     )}
                                 </SpaceBetween>
                             </Container>
@@ -545,7 +467,7 @@ export const CreateProjectWizard: React.FC = () => {
                                                     ? (formValues['backends'] ?? []).join(', ')
                                                     : 'The backends can be configured with your own cloud credentials in the project settings after the project is created.',
                                         },
-                                        ...(formValues['enable_default_fleet']
+                                        ...(formValues['fleet']['enable_default']
                                             ? [
                                                   {
                                                       label: 'Default fleet',
