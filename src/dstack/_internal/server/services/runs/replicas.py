@@ -88,7 +88,7 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
     if replicas_diff < 0:
-        _scale_down_replicas(active_replicas, abs(replicas_diff))
+        _scale_down_replicas(session, active_replicas, abs(replicas_diff))
     else:
         await _scale_up_replicas(
             session,
@@ -149,6 +149,7 @@ def _build_replica_lists(
 
 
 def _scale_down_replicas(
+    session: AsyncSession,
     active_replicas: List[Tuple[int, bool, int, List[JobModel]]],
     count: int,
 ) -> None:
@@ -160,8 +161,9 @@ def _scale_down_replicas(
         for job in replica_jobs:
             if job.status.is_finished() or job.status == JobStatus.TERMINATING:
                 continue
-            job.status = JobStatus.TERMINATING
             job.termination_reason = JobTerminationReason.SCALED_DOWN
+            switch_job_status(session, job, JobStatus.TERMINATING, events.SystemActor())
+            # background task will process the job later
 
 
 async def _scale_up_replicas(
@@ -292,7 +294,7 @@ async def scale_run_replicas_for_group(
     )
 
     if replicas_diff < 0:
-        _scale_down_replicas(active_replicas, abs(replicas_diff))
+        _scale_down_replicas(session, active_replicas, abs(replicas_diff))
     else:
         await _scale_up_replicas(
             session=session,
