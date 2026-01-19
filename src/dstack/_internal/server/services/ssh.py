@@ -30,7 +30,7 @@ def container_ssh_tunnel(
         ssh_port = jpd.ssh_port
         ssh_proxy = jpd.ssh_proxy
     else:
-        ssh_destination = "root@localhost"  # TODO(#1535): support non-root images properly
+        ssh_destination = "root@localhost"
         ssh_port = DSTACK_RUNNER_SSH_PORT
         job_submission = jobs_services.job_model_to_job_submission(job)
         jrd = job_submission.job_runtime_data

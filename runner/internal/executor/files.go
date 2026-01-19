@@ -34,19 +34,22 @@ func (ex *RunExecutor) WriteFileArchive(id string, src io.Reader) error {
 	return nil
 }
 
-// setupFiles must be called from Run
-// Must be called after setJobWorkingDir and setJobCredentials
+// setupFiles must be called from Run after setJobUser and setJobWorkingDir
 func (ex *RunExecutor) setupFiles(ctx context.Context) error {
 	log.Trace(ctx, "Setting up files")
 	if ex.jobWorkingDir == "" {
-		return errors.New("setup files: working dir is not set")
+		return errors.New("working dir is not set")
 	}
 	if !filepath.IsAbs(ex.jobWorkingDir) {
-		return fmt.Errorf("setup files: working dir must be absolute: %s", ex.jobWorkingDir)
+		return fmt.Errorf("working dir must be absolute: %s", ex.jobWorkingDir)
 	}
 	for _, fa := range ex.jobSpec.FileArchives {
 		archivePath := path.Join(ex.fileArchiveDir, fa.Id)
-		if err := extractFileArchive(ctx, archivePath, fa.Path, ex.jobWorkingDir, ex.jobUid, ex.jobGid, ex.jobHomeDir); err != nil {
+		err := extractFileArchive(
+			ctx, archivePath, fa.Path, ex.jobWorkingDir, ex.jobUser.HomeDir,
+			ex.jobUser.Uid, ex.jobUser.Gid,
+		)
+		if err != nil {
 			return fmt.Errorf("extract file archive %s: %w", fa.Id, err)
 		}
 	}
@@ -56,7 +59,7 @@ func (ex *RunExecutor) setupFiles(ctx context.Context) error {
 	return nil
 }
 
-func extractFileArchive(ctx context.Context, archivePath string, destPath string, baseDir string, uid int, gid int, homeDir string) error {
+func extractFileArchive(ctx context.Context, archivePath string, destPath string, baseDir string, homeDir string, uid int, gid int) error {
 	log.Trace(ctx, "Extracting file archive", "archive", archivePath, "dest", destPath, "base", baseDir, "home", homeDir)
 
 	destPath, err := common.ExpandPath(destPath, baseDir, homeDir)
@@ -64,7 +67,7 @@ func extractFileArchive(ctx context.Context, archivePath string, destPath string
 		return fmt.Errorf("expand destination path: %w", err)
 	}
 	destBase, destName := path.Split(destPath)
-	if err := common.MkdirAll(ctx, destBase, uid, gid); err != nil {
+	if err := common.MkdirAll(ctx, destBase, uid, gid, 0o755); err != nil {
 		return fmt.Errorf("create destination directory: %w", err)
 	}
 	if err := os.RemoveAll(destPath); err != nil {
@@ -88,11 +91,9 @@ func extractFileArchive(ctx context.Context, archivePath string, destPath string
 		return fmt.Errorf("extract tar archive: %w", err)
 	}
 
-	if uid != -1 || gid != -1 {
-		for _, p := range paths {
-			if err := os.Chown(path.Join(destBase, p), uid, gid); err != nil {
-				log.Warning(ctx, "Failed to chown", "path", p, "err", err)
-			}
+	for _, p := range paths {
+		if err := os.Chown(path.Join(destBase, p), uid, gid); err != nil {
+			log.Warning(ctx, "Failed to chown", "path", p, "err", err)
 		}
 	}
 

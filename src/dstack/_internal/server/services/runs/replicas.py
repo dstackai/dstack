@@ -75,8 +75,8 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
     )
 
     # lists of (importance, is_out_of_date, replica_num, jobs)
-    active_replicas = []
-    inactive_replicas = []
+    active_replicas: list[tuple[int, bool, int, list[JobModel]]] = []
+    inactive_replicas: list[tuple[int, bool, int, list[JobModel]]] = []
 
     for replica_num, replica_jobs in group_jobs_by_replica_latest(run_model.jobs):
         statuses = set(job.status for job in replica_jobs)
@@ -108,8 +108,8 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
             for job in replica_jobs:
                 if job.status.is_finished() or job.status == JobStatus.TERMINATING:
                     continue
-                job.status = JobStatus.TERMINATING
                 job.termination_reason = JobTerminationReason.SCALED_DOWN
+                switch_job_status(session, job, JobStatus.TERMINATING, events.SystemActor())
                 # background task will process the job later
     else:
         scheduled_replicas = 0

@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	linuxuser "github.com/dstackai/dstack/runner/internal/linux/user"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,7 +64,7 @@ func TestExecutor_HomeDir(t *testing.T) {
 
 	err := ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, ex.homeDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
+	assert.Equal(t, ex.currentUser.HomeDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
 func TestExecutor_NonZeroExit(t *testing.T) {
@@ -90,7 +91,7 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 		PrivateKey: &key,
 	}
 
-	clean, err := ex.setupCredentials(t.Context())
+	clean, err := ex.setupGitCredentials(t.Context())
 	defer clean()
 	require.NoError(t, err)
 
@@ -206,14 +207,23 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 
 	tempDir := filepath.Join(baseDir, "temp")
 	require.NoError(t, os.Mkdir(tempDir, 0o700))
-	homeDir := filepath.Join(baseDir, "home")
-	require.NoError(t, os.Mkdir(homeDir, 0o700))
+
 	dstackDir := filepath.Join(baseDir, "dstack")
 	require.NoError(t, os.Mkdir(dstackDir, 0o755))
-	ex, err := NewRunExecutor(tempDir, homeDir, dstackDir, new(sshdMock))
+
+	currentUser, err := linuxuser.FromCurrentProcess()
 	require.NoError(t, err)
+	homeDir := filepath.Join(baseDir, "home")
+	require.NoError(t, os.Mkdir(homeDir, 0o700))
+	currentUser.HomeDir = homeDir
+
+	ex, err := NewRunExecutor(tempDir, dstackDir, *currentUser, new(sshdMock))
+	require.NoError(t, err)
+
 	ex.SetJob(body)
+	require.NoError(t, ex.setJobUser(t.Context()))
 	require.NoError(t, ex.setJobWorkingDir(t.Context()))
+
 	return ex
 }
 

@@ -49,7 +49,7 @@ func ExpandPath(pth string, base string, home string) (string, error) {
 	return pth, nil
 }
 
-func MkdirAll(ctx context.Context, pth string, uid int, gid int) error {
+func MkdirAll(ctx context.Context, pth string, uid int, gid int, perm os.FileMode) error {
 	paths := []string{pth}
 	for {
 		pth = path.Dir(pth)
@@ -60,7 +60,7 @@ func MkdirAll(ctx context.Context, pth string, uid int, gid int) error {
 	}
 	for _, p := range slices.Backward(paths) {
 		if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {
-			if err := os.Mkdir(p, 0o755); err != nil {
+			if err := os.Mkdir(p, perm); err != nil {
 				return err
 			}
 			if uid != -1 || gid != -1 {
