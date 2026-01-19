@@ -601,7 +601,7 @@ class TestTerminate:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminates_terminating_deleted_instance(self, test_db, session: AsyncSession):
         # There was a race condition when instance could stay in Terminating while marked as deleted.
-        # TODO:
+        # TODO: Drop this after all such "bad" instances are processed.
         project = await create_project(session=session)
         instance = await create_instance(
             session=session, project=project, status=InstanceStatus.TERMINATING
