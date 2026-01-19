@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional
 from unittest.mock import Mock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from freezegun import freeze_time
@@ -603,19 +603,17 @@ class TestApplyFleetPlan:
             remote_connection_info=get_remote_connection_info(host="10.0.0.100"),
         )
 
-        with patch("uuid.uuid4") as m:
-            m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
-            response = await client.post(
-                f"/api/project/{project.name}/fleets/apply",
-                headers=get_auth_headers(user.token),
-                json={
-                    "plan": {
-                        "spec": spec.dict(),
-                        "current_resource": _fleet_model_to_json_dict(fleet),
-                    },
-                    "force": False,
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/apply",
+            headers=get_auth_headers(user.token),
+            json={
+                "plan": {
+                    "spec": spec.dict(),
+                    "current_resource": _fleet_model_to_json_dict(fleet),
                 },
-            )
+                "force": False,
+            },
+        )
 
         assert response.status_code == 200, response.json()
         assert response.json() == {
@@ -711,7 +709,7 @@ class TestApplyFleetPlan:
                     "status": "terminating",
                     "unreachable": False,
                     "health_status": "healthy",
-                    "termination_reason": None,
+                    "termination_reason": "terminated_by_user",
                     "termination_reason_message": None,
                     "created": "2023-01-02T03:04:00+00:00",
                     "region": "remote",
@@ -721,7 +719,7 @@ class TestApplyFleetPlan:
                     "busy_blocks": 0,
                 },
                 {
-                    "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "id": SomeUUID4Str(),
                     "project_name": project.name,
                     "backend": "remote",
                     "instance_type": {
@@ -761,7 +759,7 @@ class TestApplyFleetPlan:
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATING
         res = await session.execute(
-            select(InstanceModel).where(InstanceModel.id == "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+            select(InstanceModel).where(InstanceModel.id == response.json()["instances"][1]["id"])
         )
         instance = res.unique().scalar_one()
         assert instance.status == InstanceStatus.PENDING

@@ -21,7 +21,7 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RunConfigurationType
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import (
     Job,
     JobProvisioningData,
@@ -44,8 +44,9 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events, services
 from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.instances import (
-    format_instance_status_for_event,
+    format_instance_blocks_for_event,
     get_instance_ssh_private_keys,
+    switch_instance_status,
 )
 from dstack._internal.server.services.jobs.configurators.base import (
     JobConfigurator,
@@ -352,18 +353,16 @@ async def process_terminating_job(
         blocks = 1
     instance_model.busy_blocks -= blocks
 
-    if instance_model.status == InstanceStatus.BUSY:
+    if instance_model.status != InstanceStatus.BUSY or jpd is None or not jpd.dockerized:
+        # Terminate instances that:
+        # - have not finished provisioning yet
+        # - belong to container-based backends, and hence cannot be reused
+        if instance_model.status not in InstanceStatus.finished_statuses():
+            instance_model.termination_reason = InstanceTerminationReason.JOB_FINISHED
+            switch_instance_status(session, instance_model, InstanceStatus.TERMINATING)
+    elif not [j for j in instance_model.jobs if j.id != job_model.id]:
         # no other jobs besides this one
-        if not [j for j in instance_model.jobs if j.id != job_model.id]:
-            instance_model.status = InstanceStatus.IDLE
-    elif instance_model.status != InstanceStatus.TERMINATED:
-        # instance was PROVISIONING (specially for the job)
-        # schedule for termination
-        instance_model.status = InstanceStatus.TERMINATING
-
-    if jpd is None or not jpd.dockerized:
-        # do not reuse vastai/k8s instances
-        instance_model.status = InstanceStatus.TERMINATING
+        switch_instance_status(session, instance_model, InstanceStatus.IDLE)
 
     # The instance should be released even if detach fails
     # so that stuck volumes don't prevent the instance from terminating.
@@ -374,7 +373,7 @@ async def process_terminating_job(
         session,
         (
             "Job unassigned from instance."
-            f" Instance status: {format_instance_status_for_event(instance_model)}"
+            f" Instance blocks: {format_instance_blocks_for_event(instance_model)}"
         ),
         actor=events.SystemActor(),
         targets=[

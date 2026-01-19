@@ -26,7 +26,7 @@ from dstack._internal.server.services.fleets import (
     is_fleet_in_use,
     switch_fleet_status,
 )
-from dstack._internal.server.services.instances import format_instance_status_for_event
+from dstack._internal.server.services.instances import switch_instance_status
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime
@@ -219,15 +219,10 @@ def _maintain_fleet_nodes_in_min_max_range(
             if nodes_redundant == 0:
                 break
             if instance.status in [InstanceStatus.IDLE]:
-                instance.status = InstanceStatus.TERMINATING
                 instance.termination_reason = InstanceTerminationReason.MAX_INSTANCES_LIMIT
                 instance.termination_reason_message = "Fleet has too many instances"
+                switch_instance_status(session, instance, InstanceStatus.TERMINATING)
                 nodes_redundant -= 1
-                logger.info(
-                    "Terminating instance %s: %s",
-                    instance.name,
-                    instance.termination_reason,
-                )
         return True
     nodes_missing = fleet_spec.configuration.nodes.min - active_instances_num
     for i in range(nodes_missing):
@@ -243,7 +238,7 @@ def _maintain_fleet_nodes_in_min_max_range(
             session,
             (
                 "Instance created to meet target fleet node count."
-                f" Status: {format_instance_status_for_event(instance_model)}"
+                f" Status: {instance_model.status.upper()}"
             ),
             actor=events.SystemActor(),
             targets=[events.Target.from_model(instance_model)],
