@@ -1,6 +1,7 @@
 import threading
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import boto3
@@ -94,6 +95,19 @@ def _ec2client_cache_methodkey(self, ec2_client, *args, **kwargs):
     return hashkey(*args, **kwargs)
 
 
+@dataclass
+class AWSQuotasSharedCache:
+    """
+    `AWSQuotasSharedCache` can be used to share quotas cache across multiple instances of `AWSCompute`
+    when they are using the same creds, e.g. for `DstackBackend` in dstack Sky.
+    This makes cold cache less likely and prevents AWS rate limits.
+    """
+
+    cache: TTLCache
+    cache_lock: threading.Lock
+    execution_lock: threading.Lock
+
+
 class AWSCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
@@ -106,7 +120,9 @@ class AWSCompute(
     ComputeWithVolumeSupport,
     Compute,
 ):
-    def __init__(self, config: AWSConfig):
+    def __init__(
+        self, config: AWSConfig, quotas_shared_cache: Optional[AWSQuotasSharedCache] = None
+    ):
         super().__init__()
         self.config = config
         if isinstance(config.creds, AWSAccessKeyCreds):
@@ -121,9 +137,14 @@ class AWSCompute(
         # with more aggressive/longer caches.
         self._offers_post_filter_cache_lock = threading.Lock()
         self._offers_post_filter_cache = TTLCache(maxsize=10, ttl=180)
-        self._get_regions_to_quotas_cache_lock = threading.Lock()
-        self._get_regions_to_quotas_execution_lock = threading.Lock()
-        self._get_regions_to_quotas_cache = TTLCache(maxsize=10, ttl=300)
+        if quotas_shared_cache is not None:
+            self._get_regions_to_quotas_cache_lock = quotas_shared_cache.cache_lock
+            self._get_regions_to_quotas_execution_lock = quotas_shared_cache.execution_lock
+            self._get_regions_to_quotas_cache = quotas_shared_cache.cache
+        else:
+            self._get_regions_to_quotas_cache_lock = threading.Lock()
+            self._get_regions_to_quotas_execution_lock = threading.Lock()
+            self._get_regions_to_quotas_cache = TTLCache(maxsize=10, ttl=600)
         self._get_regions_to_zones_cache_lock = threading.Lock()
         self._get_regions_to_zones_cache = Cache(maxsize=10)
         self._get_vpc_id_subnet_id_or_error_cache_lock = threading.Lock()
