@@ -6,7 +6,7 @@ import { isNil } from 'lodash';
 import * as yup from 'yup';
 import { WizardProps } from '@cloudscape-design/components';
 
-import { Container, FormInput, InfoLink, KeyValuePairs, SpaceBetween, Wizard } from 'components';
+import { Container, InfoLink, KeyValuePairs, SpaceBetween, Wizard } from 'components';
 
 import { useBreadcrumbs, useConfirmationDialog, useHelpPanel, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
@@ -23,7 +23,7 @@ import { IFleetWizardForm } from './types';
 const requiredFieldError = 'This is required field';
 const namesFieldError = 'Only latin characters, dashes, underscores, and digits';
 
-const fleetStepIndex = 1;
+const fleetStepIndex = 0;
 
 const fleetValidationSchema = yup.object({
     project_name: yup
@@ -101,10 +101,6 @@ export const FleetAdd: React.FC = () => {
         },
     ]);
 
-    const validateName = async () => {
-        return await trigger(['project_name']);
-    };
-
     const validateFleet = async () => {
         return await trigger(['min_instances', 'max_instances', 'idle_duration']);
     };
@@ -118,7 +114,7 @@ export const FleetAdd: React.FC = () => {
         requestedStepIndex: number;
         reason: WizardProps.NavigationReason;
     }) => {
-        const stepValidators = [validateName, validateFleet, emptyValidator];
+        const stepValidators = [validateFleet, emptyValidator];
 
         if (reason === 'next') {
             stepValidators[activeStepIndex]?.().then((isValid) => {
@@ -219,22 +215,6 @@ export const FleetAdd: React.FC = () => {
                 onCancel={onCancelHandler}
                 submitButtonText={t('projects.wizard.submit')}
                 steps={[
-                    {
-                        title: 'Project',
-                        content: (
-                            <Container>
-                                <SpaceBetween direction="vertical" size="l">
-                                    <FormInput
-                                        label={t('projects.edit.project_name')}
-                                        control={control}
-                                        name="project_name"
-                                        readOnly
-                                        disabled={loading}
-                                    />
-                                </SpaceBetween>
-                            </Container>
-                        ),
-                    },
                     {
                         title: 'Settings',
                         info: <InfoLink onFollow={() => openHelpPanel(DEFAULT_FLEET_INFO)} />,
