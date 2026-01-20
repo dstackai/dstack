@@ -51,9 +51,9 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.schemas.runner import GPUDevice, TaskStatus
+from dstack._internal.server.services import events, services
 from dstack._internal.server.services import files as files_services
 from dstack._internal.server.services import logs as logs_services
-from dstack._internal.server.services import services
 from dstack._internal.server.services.instances import get_instance_ssh_private_keys
 from dstack._internal.server.services.jobs import (
     find_job,
@@ -355,7 +355,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             )
 
         if success:
-            job_model.disconnected_at = None
+            _reset_disconnected_at(session, job_model)
         else:
             if job_model.termination_reason:
                 logger.warning(
@@ -368,8 +368,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 # job will be terminated and instance will be emptied by process_terminating_jobs
             else:
                 # No job_model.termination_reason set means ssh connection failed
-                if job_model.disconnected_at is None:
-                    job_model.disconnected_at = common_utils.get_current_datetime()
+                _set_disconnected_at_now(session, job_model)
                 if _should_terminate_job_due_to_disconnect(job_model):
                     # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE for on-demand.
                     job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
@@ -931,6 +930,28 @@ def _should_terminate_due_to_low_gpu_util(min_util: int, gpus_util: Iterable[Ite
         if all(util < min_util for util in gpu_util):
             return True
     return False
+
+
+def _set_disconnected_at_now(session: AsyncSession, job_model: JobModel) -> None:
+    if job_model.disconnected_at is None:
+        job_model.disconnected_at = common_utils.get_current_datetime()
+        events.emit(
+            session,
+            "Job became unreachable",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(job_model)],
+        )
+
+
+def _reset_disconnected_at(session: AsyncSession, job_model: JobModel) -> None:
+    if job_model.disconnected_at is not None:
+        job_model.disconnected_at = None
+        events.emit(
+            session,
+            "Job became reachable",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(job_model)],
+        )
 
 
 def _get_cluster_info(
