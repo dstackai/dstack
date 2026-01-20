@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional, Protocol
 from uuid import UUID
 
@@ -112,8 +113,6 @@ else:
                 message = source.get("message", "")
 
                 if timestamp_str:
-                    from datetime import datetime
-
                     try:
                         timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
                     except ValueError:
