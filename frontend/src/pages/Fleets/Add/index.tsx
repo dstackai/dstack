@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { isNil } from 'lodash';
 import * as yup from 'yup';
-import { WizardProps } from '@cloudscape-design/components';
+import { Box, WizardProps } from '@cloudscape-design/components';
 
 import { Container, InfoLink, KeyValuePairs, SpaceBetween, Wizard } from 'components';
 
@@ -217,7 +217,13 @@ export const FleetAdd: React.FC = () => {
                 steps={[
                     {
                         title: 'Settings',
-                        info: <InfoLink onFollow={() => openHelpPanel(DEFAULT_FLEET_INFO)} />,
+                        description: (
+                            <Box>
+                                At least one fleet is required to run dev environments, tasks, or services. Create it here, or
+                                create it using the <code>dstack apply</code> command via the CLI.{' '}
+                                <InfoLink onFollow={() => openHelpPanel(DEFAULT_FLEET_INFO)} />
+                            </Box>
+                        ),
                         content: (
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
