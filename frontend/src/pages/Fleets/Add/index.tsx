@@ -154,7 +154,7 @@ export const FleetAdd: React.FC = () => {
         }).unwrap();
 
         request
-            .then(async (data) => {
+            .then((data) => {
                 pushNotification({
                     type: 'success',
                     content: t('fleets.create.success_notification'),
