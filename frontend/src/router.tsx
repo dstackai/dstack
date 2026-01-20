@@ -203,7 +203,7 @@ export const router = createBrowserRouter([
                 element: <FleetList />,
             },
             {
-                path: ROUTES.FLEETS.ADD,
+                path: ROUTES.FLEETS.ADD.TEMPLATE,
                 element: <FleetAdd />,
             },
             {

@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { isNil } from 'lodash';
 import * as yup from 'yup';
 import { WizardProps } from '@cloudscape-design/components';
 
-import { Container, FormSelect, KeyValuePairs, SpaceBetween, Wizard } from 'components';
+import { Container, FormInput, InfoLink, KeyValuePairs, SpaceBetween, Wizard } from 'components';
 
-import { useBreadcrumbs, useConfirmationDialog, useNotifications } from 'hooks';
-import { useProjectFilter } from 'hooks/useProjectFilter';
+import { useBreadcrumbs, useConfirmationDialog, useHelpPanel, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 import { useApplyFleetMutation } from 'services/fleet';
 
+import { DEFAULT_FLEET_INFO } from 'pages/Project/constants';
 import { useYupValidationResolver } from 'pages/Project/hooks/useYupValidationResolver';
 
 import { getMaxInstancesValidator, getMinInstancesValidator, idleDurationValidator } from './FleetFormFields/constants';
@@ -38,18 +38,21 @@ const fleetValidationSchema = yup.object({
 export const FleetAdd: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const params = useParams();
+    const paramProjectName = params.projectName ?? '';
+    const [openHelpPanel] = useHelpPanel();
     const [pushNotification] = useNotifications();
     const [openConfirmationDialog] = useConfirmationDialog();
     const [applyFleet, { isLoading: isApplyingFleet }] = useApplyFleetMutation();
     const [activeStepIndex, setActiveStepIndex] = useState(0);
     const resolver = useYupValidationResolver(fleetValidationSchema);
-    const { projectOptions } = useProjectFilter({ localStorePrefix: 'add-fleet-page' });
 
     const loading = isApplyingFleet;
 
     const formMethods = useForm<IFleetWizardForm>({
         resolver,
         defaultValues: {
+            project_name: paramProjectName,
             min_instances: 0,
             idle_duration: '5m',
         },
@@ -81,13 +84,20 @@ export const FleetAdd: React.FC = () => {
 
     useBreadcrumbs([
         {
+            text: t('navigation.project_other'),
+            href: ROUTES.PROJECT.LIST,
+        },
+        {
+            text: paramProjectName,
+            href: ROUTES.PROJECT.DETAILS.FORMAT(paramProjectName),
+        },
+        {
             text: t('navigation.fleets'),
             href: ROUTES.FLEETS.LIST,
         },
-
         {
             text: t('common.create_wit_text', { text: t('navigation.fleet') }),
-            href: ROUTES.FLEETS.ADD,
+            href: ROUTES.FLEETS.ADD.FORMAT(paramProjectName),
         },
     ]);
 
@@ -214,11 +224,11 @@ export const FleetAdd: React.FC = () => {
                         content: (
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
-                                    <FormSelect
+                                    <FormInput
                                         label={t('projects.edit.project_name')}
                                         control={control}
                                         name="project_name"
-                                        options={projectOptions}
+                                        readOnly
                                         disabled={loading}
                                     />
                                 </SpaceBetween>
@@ -226,7 +236,8 @@ export const FleetAdd: React.FC = () => {
                         ),
                     },
                     {
-                        title: 'Fleets',
+                        title: 'Settings',
+                        info: <InfoLink onFollow={() => openHelpPanel(DEFAULT_FLEET_INFO)} />,
                         content: (
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
