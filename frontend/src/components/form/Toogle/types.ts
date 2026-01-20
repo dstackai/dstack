@@ -9,4 +9,5 @@ export type FormToggleProps<T extends FieldValues> = Omit<ToggleProps, 'value' |
         toggleDescription?: ReactNode;
         leftContent?: ReactNode;
         toggleLabel?: ReactNode | string;
+        toggleInfo?: ReactNode;
     };

@@ -5,6 +5,8 @@ import ToggleCSD from '@cloudscape-design/components/toggle';
 
 import { FormToggleProps } from './types';
 
+import styles from './index.module.scss';
+
 export const FormToggle = <T extends FieldValues>({
     name,
     control,
@@ -19,6 +21,7 @@ export const FormToggle = <T extends FieldValues>({
     toggleLabel,
     onChange: onChangeProp,
     toggleDescription,
+    toggleInfo,
     ...props
 }: FormToggleProps<T>) => {
     return (
@@ -49,7 +52,23 @@ export const FormToggle = <T extends FieldValues>({
                             }}
                             description={toggleDescription}
                         >
-                            {toggleLabel}
+                            {(toggleLabel || toggleInfo) && (
+                                <span className={styles.labelWithInfo}>
+                                    {toggleLabel}
+                                    {toggleLabel && toggleInfo && <span aria-hidden="true" className={styles.divider} />}
+                                    {toggleInfo && (
+                                        <span
+                                            className={styles.info}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onPointerDown={(e) => e.stopPropagation()}
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                        >
+                                            {toggleInfo}
+                                        </span>
+                                    )}
+                                </span>
+                            )}
                         </ToggleCSD>
                     </FormField>
                 );

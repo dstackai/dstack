@@ -15,12 +15,13 @@ import {
     FormInput,
     FormTiles,
     FormToggle,
+    InfoLink,
     KeyValuePairs,
     SpaceBetween,
     Wizard,
 } from 'components';
 
-import { useBreadcrumbs, useConfirmationDialog, useNotifications } from 'hooks';
+import { useBreadcrumbs, useConfirmationDialog, useHelpPanel, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { useGetBackendBaseTypesQuery, useGetBackendTypesQuery } from 'services/backend';
@@ -33,6 +34,7 @@ import {
     getMinInstancesValidator,
     idleDurationValidator,
 } from '../../Fleets/Details/components/FleetFormFields/constants';
+import { DEFAULT_FLEET_INFO } from '../constants';
 import { useYupValidationResolver } from '../hooks/useYupValidationResolver';
 import { projectTypeOptions } from './constants';
 
@@ -75,6 +77,7 @@ export const CreateProjectWizard: React.FC = () => {
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
     const [activeStepIndex, setActiveStepIndex] = useState(0);
+    const [openHelpPanel] = useHelpPanel();
     const [createProject, { isLoading }] = useCreateWizardProjectMutation();
     const [applyFleet, { isLoading: isApplyingFleet }] = useApplyFleetMutation();
     const { data: backendBaseTypesData, isLoading: isBackendBaseTypesLoading } = useGetBackendBaseTypesQuery();
@@ -347,7 +350,7 @@ export const CreateProjectWizard: React.FC = () => {
                 submitButtonText={t('projects.wizard.submit')}
                 steps={[
                     {
-                        title: 'Name and type',
+                        title: 'Settings',
                         content: (
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
@@ -414,7 +417,7 @@ export const CreateProjectWizard: React.FC = () => {
                                         loading={isBackendTypesLoading}
                                         items={backendOptions}
                                         cardDefinition={{
-                                            header: (item) => item.label,
+                                            header: (item: { label: string }) => item.label,
                                         }}
                                         cardsPerRow={[{ cards: 1 }, { minWidth: 400, cards: 2 }, { minWidth: 800, cards: 3 }]}
                                     />
@@ -430,6 +433,7 @@ export const CreateProjectWizard: React.FC = () => {
                                     <FormToggle
                                         toggleLabel={<strong>{t('projects.edit.default_fleet')}</strong>}
                                         constraintText={t('projects.edit.default_fleet_description')}
+                                        toggleInfo={<InfoLink onFollow={() => openHelpPanel(DEFAULT_FLEET_INFO)} />}
                                         control={control}
                                         name="fleet.enable_default"
                                     />

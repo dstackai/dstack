@@ -22,7 +22,6 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
         <SpaceBetween direction="vertical" size="l">
             <FormInput
                 label={t('fleets.edit.name')}
-                description={t('fleets.edit.name_description')}
                 placeholder={t('fleets.edit.name_placeholder')}
                 constraintText={t('fleets.edit.name_constraint')}
                 control={control}
@@ -35,7 +34,7 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
             <FormInput
                 info={<InfoLink onFollow={() => openHelpPanel(FLEET_MIN_INSTANCES_INFO)} />}
                 label={t('fleets.edit.min_instances')}
-                description={t('fleets.edit.min_instances_description')}
+                constraintText={t('fleets.edit.min_instances_description')}
                 control={control}
                 //eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
@@ -47,7 +46,7 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
             <FormInput
                 info={<InfoLink onFollow={() => openHelpPanel(FLEET_MAX_INSTANCES_INFO)} />}
                 label={t('fleets.edit.max_instances')}
-                description={t('fleets.edit.max_instances_description')}
+                constraintText={t('fleets.edit.max_instances_description')}
                 placeholder={t('fleets.edit.max_instances_placeholder')}
                 control={control}
                 //eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -60,7 +59,7 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
             <FormInput
                 info={<InfoLink onFollow={() => openHelpPanel(FLEET_IDLE_DURATION_INFO)} />}
                 label={t('fleets.edit.idle_duration')}
-                description={t('fleets.edit.idle_duration_description')}
+                constraintText={t('fleets.edit.idle_duration_description')}
                 control={control}
                 //eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error

@@ -6,9 +6,9 @@ import { isNil } from 'lodash';
 import * as yup from 'yup';
 import { WizardProps } from '@cloudscape-design/components';
 
-import { Container, FormCheckbox, FormInput, FormToggle, KeyValuePairs, SpaceBetween, Wizard } from 'components';
+import { Container, FormInput, FormToggle, InfoLink, KeyValuePairs, SpaceBetween, Wizard } from 'components';
 
-import { useBreadcrumbs, useConfirmationDialog, useNotifications } from 'hooks';
+import { useBreadcrumbs, useConfirmationDialog, useHelpPanel, useNotifications } from 'hooks';
 import { isResponseServerError, isResponseServerFormFieldError } from 'libs';
 import { ROUTES } from 'routes';
 import { useApplyFleetMutation } from 'services/fleet';
@@ -21,6 +21,7 @@ import {
     idleDurationValidator,
 } from 'pages/Fleets/Details/components/FleetFormFields/constants';
 
+import { DEFAULT_FLEET_INFO } from '../constants';
 import { useYupValidationResolver } from '../hooks/useYupValidationResolver';
 
 import { IProjectForm } from '../Form/types';
@@ -58,6 +59,7 @@ export const ProjectAdd: React.FC = () => {
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
     const [openConfirmationDialog] = useConfirmationDialog();
+    const [openHelpPanel] = useHelpPanel();
     const [createProject, { isLoading }] = useCreateProjectMutation();
     const [applyFleet, { isLoading: isApplyingFleet }] = useApplyFleetMutation();
     const [activeStepIndex, setActiveStepIndex] = useState(0);
@@ -203,7 +205,7 @@ export const ProjectAdd: React.FC = () => {
                 if (isResponseServerError(errorRequestData)) {
                     errorRequestData.detail.forEach((error) => {
                         if (isResponseServerFormFieldError(error)) {
-                            setError(error.loc.join('.') as FieldPath<IProject>, { type: 'custom', message: error.msg });
+                            setError(error.loc.join('.') as FieldPath<IProjectForm>, { type: 'custom', message: error.msg });
                         } else {
                             pushNotification({
                                 type: 'error',
@@ -272,9 +274,9 @@ export const ProjectAdd: React.FC = () => {
                                         disabled={loading}
                                     />
 
-                                    <FormCheckbox
+                                    <FormToggle
                                         label={t('projects.edit.is_public')}
-                                        description={t('projects.edit.is_public_description')}
+                                        toggleDescription={t('projects.edit.is_public_description')}
                                         control={control}
                                         name="is_public"
                                         disabled={loading}
@@ -291,6 +293,7 @@ export const ProjectAdd: React.FC = () => {
                                     <FormToggle
                                         toggleLabel={<strong>{t('projects.edit.default_fleet')}</strong>}
                                         constraintText={t('projects.edit.default_fleet_description')}
+                                        toggleInfo={<InfoLink onFollow={() => openHelpPanel(DEFAULT_FLEET_INFO)} />}
                                         control={control}
                                         name="fleet.enable_default"
                                     />

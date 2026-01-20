@@ -1,0 +1,17 @@
+@use '@cloudscape-design/design-tokens/index' as awsui;
+
+.labelWithInfo {
+    display: inline-flex;
+    align-items: center;
+}
+
+.divider {
+    display: inline-block;
+    height: 16px;
+    border-left: 1px solid awsui.$color-border-divider-default;
+    margin: 0 8px;
+}
+
+.info {
+    display: inline-flex;
+}
