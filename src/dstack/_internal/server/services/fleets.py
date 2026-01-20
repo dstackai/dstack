@@ -31,6 +31,7 @@ from dstack._internal.core.models.fleets import (
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceStatus,
+    InstanceTerminationReason,
     RemoteConnectionInfo,
     SSHConnectionParams,
     SSHKey,
@@ -65,9 +66,9 @@ from dstack._internal.server.services import events
 from dstack._internal.server.services import instances as instances_services
 from dstack._internal.server.services import offers as offers_services
 from dstack._internal.server.services.instances import (
-    format_instance_status_for_event,
     get_instance_remote_connection_info,
     list_active_remote_instances,
+    switch_instance_status,
 )
 from dstack._internal.server.services.locking import (
     get_locker,
@@ -679,7 +680,9 @@ async def delete_fleets(
                 "Deleting fleets %s instances %s", [f.name for f in fleet_models], instance_nums
             )
         for fleet_model in fleet_models:
-            _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
+            _terminate_fleet_instances(
+                session=session, fleet_model=fleet_model, instance_nums=instance_nums, actor=user
+            )
             # TERMINATING fleets are deleted by process_fleets after instances are terminated
             if instance_nums is None:
                 switch_fleet_status(
@@ -873,7 +876,7 @@ async def _create_fleet(
                     session,
                     (
                         "Instance created on fleet submission."
-                        f" Status: {format_instance_status_for_event(instance_model)}"
+                        f" Status: {instance_model.status.upper()}"
                     ),
                     actor=events.UserActor.from_user(user),
                     targets=[events.Target.from_model(instance_model)],
@@ -892,7 +895,7 @@ async def _create_fleet(
                     session,
                     (
                         "Instance created on fleet submission."
-                        f" Status: {format_instance_status_for_event(instance_model)}"
+                        f" Status: {instance_model.status.upper()}"
                     ),
                     # Set `SystemActor` for consistency with other places where cloud instances can be
                     # created (fleet spec consolidation, job provisioning, etc). Think of the fleet as being
@@ -978,17 +981,14 @@ async def _update_fleet(
                 )
                 events.emit(
                     session,
-                    (
-                        "Instance created on fleet update."
-                        f" Status: {format_instance_status_for_event(instance_model)}"
-                    ),
+                    f"Instance created on fleet update. Status: {instance_model.status.upper()}",
                     actor=events.UserActor.from_user(user),
                     targets=[events.Target.from_model(instance_model)],
                 )
                 fleet_model.instances.append(instance_model)
                 active_instance_nums.add(instance_num)
         if removed_instance_nums:
-            _terminate_fleet_instances(fleet_model, removed_instance_nums)
+            _terminate_fleet_instances(session, fleet_model, removed_instance_nums, actor=user)
 
     await session.commit()
     return fleet_model_to_fleet(fleet_model)
@@ -1197,7 +1197,12 @@ def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:
     return spec.configuration.nodes.target
 
 
-def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):
+def _terminate_fleet_instances(
+    session: AsyncSession,
+    fleet_model: FleetModel,
+    instance_nums: Optional[List[int]],
+    actor: UserModel,
+):
     if is_fleet_in_use(fleet_model, instance_nums=instance_nums):
         if instance_nums is not None:
             raise ServerClientError(
@@ -1210,4 +1215,10 @@ def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[
         if instance.status == InstanceStatus.TERMINATED:
             instance.deleted = True
         else:
-            instance.status = InstanceStatus.TERMINATING
+            instance.termination_reason = InstanceTerminationReason.TERMINATED_BY_USER
+            switch_instance_status(
+                session,
+                instance,
+                InstanceStatus.TERMINATING,
+                actor=events.UserActor.from_user(actor),
+            )

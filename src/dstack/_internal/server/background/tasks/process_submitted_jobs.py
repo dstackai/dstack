@@ -87,8 +87,9 @@ from dstack._internal.server.services.fleets import (
     is_cloud_cluster,
 )
 from dstack._internal.server.services.instances import (
-    format_instance_status_for_event,
+    format_instance_blocks_for_event,
     get_instance_provisioning_data,
+    switch_instance_status,
 )
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
@@ -507,7 +508,7 @@ async def _process_submitted_job(
             session.add(instance)
             events.emit(
                 session,
-                f"Instance created for job. Instance status: {format_instance_status_for_event(instance)}",
+                f"Instance created for job. Instance status: {instance.status.upper()}",
                 actor=events.SystemActor(),
                 targets=[
                     events.Target.from_model(instance),
@@ -646,7 +647,7 @@ async def _assign_job_to_fleet_instance(
         .options(joinedload(InstanceModel.volume_attachments))
     )
     instance = res.unique().scalar_one()
-    instance.status = InstanceStatus.BUSY
+    switch_instance_status(session, instance, InstanceStatus.BUSY)
     instance.busy_blocks += offer.blocks
 
     job_model.instance = instance
@@ -657,7 +658,7 @@ async def _assign_job_to_fleet_instance(
         session,
         (
             "Job assigned to instance."
-            f" Instance status: {format_instance_status_for_event(instance)}"
+            f" Instance blocks: {format_instance_blocks_for_event(instance)}"
         ),
         actor=events.SystemActor(),
         targets=[

@@ -256,6 +256,7 @@ class InstanceStatus(str, Enum):
 
 
 class InstanceTerminationReason(str, Enum):
+    TERMINATED_BY_USER = "terminated_by_user"
     IDLE_TIMEOUT = "idle_timeout"
     PROVISIONING_TIMEOUT = "provisioning_timeout"
     ERROR = "error"

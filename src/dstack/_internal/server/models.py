@@ -632,6 +632,7 @@ class InstanceModel(BaseModel):
     compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
     compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")
 
+    # NOTE: `status` must be changed only via `switch_instance_status()`
     status: Mapped[InstanceStatus] = mapped_column(EnumAsString(InstanceStatus, 100), index=True)
     unreachable: Mapped[bool] = mapped_column(Boolean)
 

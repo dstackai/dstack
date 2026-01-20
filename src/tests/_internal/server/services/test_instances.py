@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.instances as instances_services
@@ -9,11 +10,12 @@ from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Instance,
     InstanceStatus,
+    InstanceTerminationReason,
     InstanceType,
     Resources,
 )
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.server.models import InstanceModel
+from dstack._internal.server.models import EventModel, InstanceModel
 from dstack._internal.server.testing.common import (
     create_instance,
     create_project,
@@ -22,6 +24,51 @@ from dstack._internal.server.testing.common import (
     get_volume_configuration,
 )
 from dstack._internal.utils.common import get_current_datetime
+
+
+class TestSwitchInstanceStatus:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_includes_termination_reason_in_event_messages_only_once(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.PENDING
+        )
+        instance.termination_reason = InstanceTerminationReason.ERROR
+        instance.termination_reason_message = "Some err"
+        instances_services.switch_instance_status(session, instance, InstanceStatus.TERMINATING)
+        instances_services.switch_instance_status(session, instance, InstanceStatus.TERMINATED)
+
+        res = await session.execute(select(EventModel))
+        events = res.scalars().all()
+        assert len(events) == 2
+        assert {e.message for e in events} == {
+            "Instance status changed PENDING -> TERMINATING. Termination reason: ERROR (Some err)",
+            # Do not duplicate the termination reason in the second event
+            "Instance status changed TERMINATING -> TERMINATED",
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_includes_termination_reason_in_event_message_when_switching_directly_to_terminated(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.PENDING
+        )
+        instance.termination_reason = InstanceTerminationReason.ERROR
+        instance.termination_reason_message = "Some err"
+        instances_services.switch_instance_status(session, instance, InstanceStatus.TERMINATED)
+
+        res = await session.execute(select(EventModel))
+        events = res.scalars().all()
+        assert len(events) == 1
+        assert events[0].message == (
+            "Instance status changed PENDING -> TERMINATED. Termination reason: ERROR (Some err)"
+        )
 
 
 class TestFilterPoolInstances:
