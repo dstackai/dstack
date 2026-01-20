@@ -28,12 +28,12 @@ import { useGetBackendBaseTypesQuery, useGetBackendTypesQuery } from 'services/b
 import { useApplyFleetMutation } from 'services/fleet';
 import { useCreateWizardProjectMutation } from 'services/project';
 
-import { FleetFormFields } from '../../Fleets/Details/components/FleetFormFields';
+import { FleetFormFields } from '../../Fleets/Add/FleetFormFields';
 import {
     getMaxInstancesValidator,
     getMinInstancesValidator,
     idleDurationValidator,
-} from '../../Fleets/Details/components/FleetFormFields/constants';
+} from '../../Fleets/Add/FleetFormFields/constants';
 import { DEFAULT_FLEET_INFO } from '../constants';
 import { useYupValidationResolver } from '../hooks/useYupValidationResolver';
 import { projectTypeOptions } from './constants';

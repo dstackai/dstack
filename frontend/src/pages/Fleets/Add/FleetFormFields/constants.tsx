@@ -112,4 +112,4 @@ export const getMaxInstancesValidator = (minInstancesFieldPath: string) =>
             return value >= minInstances;
         });
 
-export const idleDurationValidator = yup.string().matches(/^[1-9]\d*[smhdw]$/, 'Invalid duration');
+export const idleDurationValidator = yup.string().matches(/^\d+[smhdw]$/, 'Invalid duration');

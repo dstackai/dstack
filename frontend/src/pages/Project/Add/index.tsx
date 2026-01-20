@@ -14,12 +14,12 @@ import { ROUTES } from 'routes';
 import { useApplyFleetMutation } from 'services/fleet';
 import { useCreateProjectMutation } from 'services/project';
 
-import { FleetFormFields } from 'pages/Fleets/Details/components/FleetFormFields';
+import { FleetFormFields } from 'pages/Fleets/Add/FleetFormFields';
 import {
     getMaxInstancesValidator,
     getMinInstancesValidator,
     idleDurationValidator,
-} from 'pages/Fleets/Details/components/FleetFormFields/constants';
+} from 'pages/Fleets/Add/FleetFormFields/constants';
 
 import { DEFAULT_FLEET_INFO } from '../constants';
 import { useYupValidationResolver } from '../hooks/useYupValidationResolver';

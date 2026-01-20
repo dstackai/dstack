@@ -1,4 +1,4 @@
-import { FleetFormFields } from 'pages/Fleets/Details/components/FleetFormFields/type';
+import { FleetFormFields } from 'pages/Fleets/Add/FleetFormFields/type';
 
 export interface IProps {
     initialValues?: Partial<IProjectForm>;

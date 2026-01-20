@@ -18,6 +18,14 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
     const { t } = useTranslation();
     const [openHelpPanel] = useHelpPanel();
 
+    const getFieldNameWitPrefix = (name: string) => {
+        if (!fieldNamePrefix) {
+            return name;
+        }
+
+        [fieldNamePrefix, name].join('.');
+    };
+
     return (
         <SpaceBetween direction="vertical" size="l">
             <FormInput
@@ -27,7 +35,7 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
                 control={control}
                 //eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
-                name={`${fieldNamePrefix}.name`}
+                name={getFieldNameWitPrefix(`name`)}
                 disabled={disabledAllFields}
             />
 
@@ -38,7 +46,7 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
                 control={control}
                 //eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
-                name={`${fieldNamePrefix}.min_instances`}
+                name={getFieldNameWitPrefix(`min_instances`)}
                 disabled={disabledAllFields}
                 type="number"
             />
@@ -51,7 +59,7 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
                 control={control}
                 //eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
-                name={`${fieldNamePrefix}.max_instances`}
+                name={getFieldNameWitPrefix(`max_instances`)}
                 disabled={disabledAllFields}
                 type="number"
             />
@@ -63,7 +71,7 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
                 control={control}
                 //eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
-                name={`${fieldNamePrefix}.idle_duration`}
+                name={getFieldNameWitPrefix(`idle_duration`)}
                 disabled={disabledAllFields}
             />
         </SpaceBetween>

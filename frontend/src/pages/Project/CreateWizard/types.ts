@@ -1,4 +1,4 @@
-import { FleetFormFields } from 'pages/Fleets/Details/components/FleetFormFields/type';
+import { FleetFormFields } from 'pages/Fleets/Add/FleetFormFields/type';
 
 export interface IProjectWizardForm extends Pick<IProject, 'project_name'> {
     project_type: 'gpu_marketplace' | 'own_cloud';

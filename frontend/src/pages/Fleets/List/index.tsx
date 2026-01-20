@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
@@ -18,6 +19,7 @@ import styles from './styles.module.scss';
 
 export const FleetList: React.FC = () => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
 
     useBreadcrumbs([
         {
@@ -66,6 +68,10 @@ export const FleetList: React.FC = () => {
 
     const isDisabledDeleteButton = !selectedItems?.length || isDeleting;
 
+    const addFleetHandler = () => {
+        navigate(ROUTES.FLEETS.ADD);
+    };
+
     const deleteClickHandle = () => {
         if (!selectedItems?.length) return;
 
@@ -100,6 +106,8 @@ export const FleetList: React.FC = () => {
                                 <Button formAction="none" onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
                                     {t('common.delete')}
                                 </Button>
+
+                                <Button onClick={addFleetHandler}>{t('common.create')}</Button>
 
                                 <Button
                                     iconName="refresh"

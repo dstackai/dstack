@@ -137,6 +137,7 @@ export const ROUTES = {
 
     FLEETS: {
         LIST: '/fleets',
+        ADD: '/fleets/add',
         DETAILS: {
             TEMPLATE: `/projects/:projectName/fleets/:fleetId`,
             FORMAT: (projectName: string, fleetId: string) =>
