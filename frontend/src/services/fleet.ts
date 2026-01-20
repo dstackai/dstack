@@ -66,7 +66,25 @@ export const fleetApi = createApi({
 
             invalidatesTags: ['Fleets'],
         }),
+
+        applyFleet: builder.mutation<IFleet, IApplyFleetPlanRequestRequest & { projectName: IProject['project_name'] }>({
+            query: ({ projectName, ...body }) => {
+                return {
+                    url: API.PROJECTS.FLEETS_APPLY(projectName),
+                    method: 'POST',
+                    body,
+                };
+            },
+
+            invalidatesTags: ['Fleets'],
+        }),
     }),
 });
 
-export const { useGetFleetsQuery, useLazyGetFleetsQuery, useDeleteFleetMutation, useGetFleetDetailsQuery } = fleetApi;
+export const {
+    useGetFleetsQuery,
+    useLazyGetFleetsQuery,
+    useDeleteFleetMutation,
+    useGetFleetDetailsQuery,
+    useApplyFleetMutation,
+} = fleetApi;

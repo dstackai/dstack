@@ -1,12 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import cn from 'classnames';
 
 import type { ButtonProps } from 'components';
 import { Alert, AlertProps, Button } from 'components';
 
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
-import { goToUrl } from 'libs';
+import { ROUTES } from 'routes';
 
 import styles from './styles.module.scss';
 
@@ -19,11 +20,12 @@ type NoFleetProjectAlertProps = {
 
 export const NoFleetProjectAlert: React.FC<NoFleetProjectAlertProps> = ({ projectName, show, className, dismissible }) => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [dontShowAgain, setDontShowAgain] = useLocalStorageState(`noFleetProjectAlert-${projectName}`, false);
 
     const onCreateAFleet: ButtonProps['onClick'] = (event) => {
         event.preventDefault();
-        goToUrl('https://dstack.ai/docs/quickstart/#create-a-fleet', true);
+        navigate(ROUTES.FLEETS.ADD.FORMAT(projectName));
     };
 
     const onDismiss: AlertProps['onDismiss'] = () => setDontShowAgain(true);
@@ -40,7 +42,7 @@ export const NoFleetProjectAlert: React.FC<NoFleetProjectAlertProps> = ({ projec
                 dismissible={dismissible}
                 onDismiss={onDismiss}
                 action={
-                    <Button iconName="external" formAction="none" onClick={onCreateAFleet}>
+                    <Button formAction="none" onClick={onCreateAFleet}>
                         {t('fleets.no_alert.button_title')}
                     </Button>
                 }

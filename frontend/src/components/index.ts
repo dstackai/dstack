@@ -73,6 +73,7 @@ export { ListEmptyMessage } from './ListEmptyMessage';
 export { DetailsHeader } from './DetailsHeader';
 export { Loader } from './Loader';
 export { FormCheckbox } from './form/Checkbox';
+export { FormToggle } from './form/Toogle';
 export { FormInput } from './form/Input';
 export { FormMultiselect } from './form/Multiselect';
 export { FormSelect } from './form/Select';
