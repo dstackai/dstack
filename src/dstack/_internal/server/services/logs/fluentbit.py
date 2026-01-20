@@ -100,7 +100,6 @@ else:
             try:
                 response = self._client.search(**search_params)
             except ElasticsearchError as e:
-                logger.error("Elasticsearch/OpenSearch search error: %s", e)
                 raise LogStorageError(f"Elasticsearch/OpenSearch error: {e}") from e
 
             hits = response.get("hits", {}).get("hits", [])
@@ -179,16 +178,10 @@ else:
                     )
                     response.raise_for_status()
                 except httpx.HTTPStatusError as e:
-                    logger.error(
-                        "Fluent-bit HTTP request failed with status %d: %s",
-                        e.response.status_code,
-                        e.response.text,
-                    )
                     raise LogStorageError(
                         f"Fluent-bit HTTP error: status {e.response.status_code}"
                     ) from e
                 except httpx.HTTPError as e:
-                    logger.error("Failed to write log to Fluent-bit via HTTP: %s", e)
                     raise LogStorageError(f"Fluent-bit HTTP error: {e}") from e
 
         def close(self) -> None:
@@ -205,7 +198,6 @@ else:
             for record in records:
                 if not self._sender.emit(tag, record):
                     error = self._sender.last_error
-                    logger.error("Failed to write log to Fluent-bit via Forward: %s", error)
                     self._sender.clear_last_error()
                     raise LogStorageError(f"Fluent-bit Forward error: {error}")
 
@@ -270,7 +262,7 @@ else:
                     index=es_index,
                     api_key=es_api_key,
                 )
-                logger.debug(
+                logger.info(
                     "Fluent-bit log storage initialized with Elasticsearch/OpenSearch reader"
                 )
             else:
