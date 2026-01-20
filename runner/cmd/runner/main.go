@@ -78,6 +78,12 @@ func mainInner() int {
 						Usage:       "dstack server or user authorized key. May be specified multiple times",
 						Destination: &sshAuthorizedKeys,
 					},
+					// --home-dir is not used since 0.20.4, but the flag was retained as no-op
+					// for compatibility with pre-0.20.4 shims; remove the flag eventually
+					&cli.StringFlag{
+						Name:   "home-dir",
+						Hidden: true,
+					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
 					return start(ctx, tempDir, httpPort, sshPort, sshAuthorizedKeys, logLevel, Version)
