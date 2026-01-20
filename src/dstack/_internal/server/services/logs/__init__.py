@@ -2,6 +2,7 @@ import atexit
 from typing import List, Optional
 from uuid import UUID
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.logs import JobSubmissionLogs
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel
@@ -105,9 +106,13 @@ def write_logs(
 
 
 async def poll_logs_async(project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
-    job_submission_logs = await run_async(
-        get_log_storage().poll_logs, project=project, request=request
-    )
+    try:
+        job_submission_logs = await run_async(
+            get_log_storage().poll_logs, project=project, request=request
+        )
+    except LogStorageError as e:
+        logger.error("Failed to poll logs from log storage: %s", repr(e))
+        raise ServerClientError("Failed to poll logs from log storage")
     # Logs are stored in plaintext but transmitted in base64 for API/CLI backward compatibility.
     # Old logs stored in base64 are encoded twice for transmission and shown as base64 in CLI/UI.
     # We live with that.

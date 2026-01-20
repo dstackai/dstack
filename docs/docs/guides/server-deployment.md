@@ -229,8 +229,8 @@ Fluent-bit supports two modes depending on how you want to access logs.
 
 === "Full mode"
 
-    Logs are shipped to Fluent-bit and can be read back through the dstack UI and CLI via Elasticsearch or OpenSearch.
-    Use this mode when you want a complete integration with log viewing in dstack:
+    Logs are shipped to Fluent-bit and can be read back through the `dstack` UI and CLI via Elasticsearch or OpenSearch.
+    Use this mode when you want a complete integration with log viewing in `dstack`:
 
     ```shell
     $ DSTACK_SERVER_FLUENTBIT_HOST=fluentbit.example.com \
@@ -244,7 +244,7 @@ Fluent-bit supports two modes depending on how you want to access logs.
     The dstack UI/CLI will show empty logs. Use this mode when:
 
     - You have an existing logging infrastructure (Kibana, Grafana, Datadog, etc.)
-    - You only need to forward logs without reading them back through dstack
+    - You only need to forward logs without reading them back through `dstack`
     - You want to reduce operational complexity by not running Elasticsearch/OpenSearch
 
     ```shell
