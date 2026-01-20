@@ -239,11 +239,7 @@ export const FleetAdd: React.FC = () => {
                                 <KeyValuePairs
                                     items={[
                                         {
-                                            label: t('projects.edit.project_name'),
-                                            value: formValues['project_name'],
-                                        },
-                                        {
-                                            label: 'Default fleet',
+                                            label: 'Fleet settings',
                                             value: getDefaultFleetSummary(),
                                         },
                                     ]}
