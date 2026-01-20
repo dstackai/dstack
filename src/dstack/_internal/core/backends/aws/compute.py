@@ -1,6 +1,6 @@
 import threading
 from collections.abc import Iterable
-from concurrent.futures import ThreadPoolExecutor, as_completed, wait
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import boto3
@@ -147,15 +147,7 @@ class AWSCompute(
         with self._get_regions_to_quotas_execution_lock:
             # Cache lock does not prevent concurrent execution.
             # We use a separate lock to avoid requesting quotas in parallel and hitting rate limits.
-            with ThreadPoolExecutor() as executor:
-                fs = [
-                    executor.submit(self._get_regions_to_quotas, self.session, regions),
-                    executor.submit(self._get_regions_to_zones, self.session, regions),
-                ]
-                wait(fs)
-
-        # Read from cache
-        regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
+            regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
         regions_to_zones = self._get_regions_to_zones(self.session, regions)
 
         availability_offers = []
