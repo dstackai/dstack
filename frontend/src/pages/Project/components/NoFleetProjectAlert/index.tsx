@@ -42,7 +42,7 @@ export const NoFleetProjectAlert: React.FC<NoFleetProjectAlertProps> = ({ projec
                 dismissible={dismissible}
                 onDismiss={onDismiss}
                 action={
-                    <Button iconName="external" formAction="none" onClick={onCreateAFleet}>
+                    <Button formAction="none" onClick={onCreateAFleet}>
                         {t('fleets.no_alert.button_title')}
                     </Button>
                 }
