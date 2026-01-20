@@ -1,5 +1,6 @@
 import asyncio
 import heapq
+import time
 from collections.abc import Iterable, Iterator
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 from uuid import UUID
@@ -361,7 +362,7 @@ async def get_backend_offers(
                 yield (backend, offer)
 
     logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
-    tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
+    tasks = [run_async(_get_offers, backend, requirements) for backend in backends]
     offers_by_backend = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
         if isinstance(result, BackendError):
@@ -391,3 +392,13 @@ def check_backend_type_available(backend_type: BackendType):
             " Ensure that backend dependencies are installed."
             f" Available backends: {[b.value for b in list_available_backend_types()]}."
         )
+
+
+def _get_offers(
+    backend: Backend, requirements: Requirements
+) -> Iterator[InstanceOfferWithAvailability]:
+    start = time.time()
+    res = backend.compute().get_offers(requirements)
+    duration = time.time() - start
+    logger.debug("Got offers from %s in %.6fs", backend.TYPE.value, duration)
+    return res
