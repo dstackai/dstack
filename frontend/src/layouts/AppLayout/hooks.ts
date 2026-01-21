@@ -25,11 +25,11 @@ export const useSideNavigation = () => {
     const generalLinks = [
         { type: 'link', text: t('navigation.runs'), href: ROUTES.RUNS.LIST },
         { type: 'link', text: t('navigation.offers'), href: ROUTES.OFFERS.LIST },
-        { type: 'link', text: t('navigation.models'), href: ROUTES.MODELS.LIST },
         { type: 'link', text: t('navigation.fleets'), href: ROUTES.FLEETS.LIST },
         { type: 'link', text: t('navigation.instances'), href: ROUTES.INSTANCES.LIST },
         { type: 'link', text: t('navigation.volumes'), href: ROUTES.VOLUMES.LIST },
         { type: 'link', text: t('navigation.events'), href: ROUTES.EVENTS.LIST },
+        { type: 'link', text: t('navigation.models'), href: ROUTES.MODELS.LIST },
         { type: 'link', text: t('navigation.project_other'), href: ROUTES.PROJECT.LIST },
 
         isGlobalAdmin && {
