@@ -586,6 +586,9 @@
       "terminating": "Terminating",
       "terminated": "Terminated"
     },
+    "create": {
+      "success_notification": "The fleet is created!"
+    },
     "instances": {
       "active_only": "Active instances",
       "filter_property_placeholder": "Filter by properties",
