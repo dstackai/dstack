@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 
-import { ConfirmationDialog, ContentLayout, SpaceBetween, Tabs } from 'components';
+import { Box, ConfirmationDialog, ContentLayout, SpaceBetween, Tabs } from 'components';
 import { DetailsHeader } from 'components';
 
 import { useNotifications /* usePermissionGuard*/ } from 'hooks';
