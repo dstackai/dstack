@@ -18,12 +18,12 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
     const { t } = useTranslation();
     const [openHelpPanel] = useHelpPanel();
 
-    const getFieldNameWitPrefix = (name: string) => {
+    const getFieldNameWitPrefix = (name: string): string => {
         if (!fieldNamePrefix) {
             return name;
         }
 
-        [fieldNamePrefix, name].join('.');
+        return [fieldNamePrefix, name].join('.');
     };
 
     return (

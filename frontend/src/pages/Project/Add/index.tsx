@@ -302,7 +302,7 @@ export const ProjectAdd: React.FC = () => {
                                         <FleetFormFields<IProjectForm>
                                             control={control}
                                             disabledAllFields={loading}
-                                            fieldNamePrefix="fleet."
+                                            fieldNamePrefix="fleet"
                                         />
                                     )}
                                 </SpaceBetween>

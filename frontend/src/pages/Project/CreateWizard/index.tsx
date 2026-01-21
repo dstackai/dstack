@@ -442,7 +442,7 @@ export const CreateProjectWizard: React.FC = () => {
                                         <FleetFormFields<IProjectWizardForm>
                                             control={control}
                                             disabledAllFields={loading}
-                                            fieldNamePrefix="fleet."
+                                            fieldNamePrefix="fleet"
                                         />
                                     )}
                                 </SpaceBetween>
