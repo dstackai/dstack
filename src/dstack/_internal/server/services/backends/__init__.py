@@ -362,7 +362,7 @@ async def get_backend_offers(
                 yield (backend, offer)
 
     logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
-    tasks = [run_async(_get_offers, backend, requirements) for backend in backends]
+    tasks = [run_async(get_offers_tracked, backend, requirements) for backend in backends]
     offers_by_backend = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
         if isinstance(result, BackendError):
@@ -394,7 +394,7 @@ def check_backend_type_available(backend_type: BackendType):
         )
 
 
-def _get_offers(
+def get_offers_tracked(
     backend: Backend, requirements: Requirements
 ) -> Iterator[InstanceOfferWithAvailability]:
     start = time.time()

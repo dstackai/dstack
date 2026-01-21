@@ -6,6 +6,7 @@ import string
 import threading
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
@@ -14,7 +15,7 @@ from typing import Callable, Dict, List, Optional
 import git
 import requests
 import yaml
-from cachetools import TTLCache, cachedmethod
+from cachetools import Cache, TTLCache, cachedmethod
 from gpuhunt import CPUArchitecture
 
 from dstack._internal import settings
@@ -87,6 +88,18 @@ class GoArchType(str, Enum):
         if self == self.ARM64:
             return CPUArchitecture.ARM
         assert False, self
+
+
+@dataclass
+class ComputeCache:
+    cache: Cache
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+@dataclass
+class ComputeTTLCache:
+    cache: TTLCache
+    lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 class Compute(ABC):
