@@ -1,7 +1,6 @@
 import concurrent.futures
 import json
 import re
-import threading
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -19,6 +18,7 @@ import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack import version
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeTTLCache,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
@@ -127,11 +127,9 @@ class GCPCompute(
             credentials=self.credentials
         )
         self.reservations_client = compute_v1.ReservationsClient(credentials=self.credentials)
-        self._usable_subnets_cache_lock = threading.Lock()
-        self._usable_subnets_cache = TTLCache(maxsize=1, ttl=120)
-        self._find_reservation_cache_lock = threading.Lock()
-        # smaller TTL, since we check the reservation's in_use_count, which can change often
-        self._find_reservation_cache = TTLCache(maxsize=8, ttl=20)
+        self._usable_subnets_cache = ComputeTTLCache(cache=TTLCache(maxsize=1, ttl=120))
+        # Smaller TTL since we check the reservation's in_use_count, which can change often
+        self._reservation_cache = ComputeTTLCache(cache=TTLCache(maxsize=8, ttl=20))
 
     def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         regions = get_or_error(self.config.regions)
@@ -948,8 +946,8 @@ class GCPCompute(
         return nic_subnets
 
     @cachedmethod(
-        cache=lambda self: self._usable_subnets_cache,
-        lock=lambda self: self._usable_subnets_cache_lock,
+        cache=lambda self: self._usable_subnets_cache.cache,
+        lock=lambda self: self._usable_subnets_cache.lock,
     )
     def _list_usable_subnets(self) -> list[compute_v1.UsableSubnetwork]:
         # To avoid hitting the `ListUsable requests per minute` system limit, we fetch all subnets
@@ -969,8 +967,8 @@ class GCPCompute(
         )
 
     @cachedmethod(
-        cache=lambda self: self._find_reservation_cache,
-        lock=lambda self: self._find_reservation_cache_lock,
+        cache=lambda self: self._reservation_cache.cache,
+        lock=lambda self: self._reservation_cache.lock,
     )
     def _find_reservation(self, configured_name: str) -> dict[str, compute_v1.Reservation]:
         if match := RESERVATION_PATTERN.fullmatch(configured_name):
