@@ -1,6 +1,7 @@
 const { defineConfig, globalIgnores } = require('eslint/config');
 const i18N = require('eslint-plugin-i18n');
 const simpleImportSort = require('eslint-plugin-simple-import-sort');
+const react = require('eslint-plugin-react');
 const { FlatCompat } = require('@eslint/eslintrc');
 const js = require('@eslint/js');
 const typescriptEslint = require('@typescript-eslint/eslint-plugin');
@@ -18,20 +19,25 @@ const BASE_CONFIG = {
         'plugin:@typescript-eslint/eslint-recommended',
         'plugin:@typescript-eslint/recommended',
         'prettier',
-        'plugin:prettier/recommended'
+        'plugin:prettier/recommended',
+        'plugin:react/recommended',
     ),
 
     plugins: {
         '@typescript-eslint': typescriptEslint,
         i18n: i18N,
         'simple-import-sort': simpleImportSort,
+        react: react,
     },
 
     languageOptions: {
         parser: tsParser,
     },
+    settings: {},
 
     rules: {
+        'react/jsx-no-target-blank': 'off',
+        'react/no-unescaped-entities': 'off',
         'i18n/no-russian-character': 1,
 
         'simple-import-sort/imports': [
