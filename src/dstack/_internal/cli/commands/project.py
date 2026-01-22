@@ -4,7 +4,13 @@ from typing import Any, Union
 
 from requests import HTTPError
 from rich.table import Table
-from simple_term_menu import TerminalMenu
+
+try:
+    from simple_term_menu import TerminalMenu  # type: ignore[assignment]
+
+    _is_menu_available = sys.stdin.isatty()
+except (ImportError, NotImplementedError):
+    _is_menu_available = False
 
 import dstack.api.server
 from dstack._internal.cli.commands import BaseCommand
@@ -16,7 +22,10 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def select_default_project():
+def show_default_project_menu():
+    if not _is_menu_available:
+        raise CLIError("Interactive menu is not supported on this platform")
+
     config_manager = ConfigManager()
 
     project_configs = config_manager.list_project_configs()
@@ -48,7 +57,7 @@ def select_default_project():
             default_index = i
         menu_entries.append(entry)
 
-    terminal_menu = TerminalMenu(
+    terminal_menu = TerminalMenu(  # pyright: ignore[reportPossiblyUnboundVariable]
         menu_entries=menu_entries,
         title=f"Select the default project (↑↓ Enter):\n{header}",
         cycle_cursor=True,
@@ -124,7 +133,7 @@ class ProjectCommand(BaseCommand):
         set_default_parser.add_argument(
             "name",
             type=str,
-            nargs="?" if sys.stdin.isatty() else None,
+            nargs="?" if _is_menu_available else None,
             help="The name of the project to set as default",
         )
         set_default_parser.set_defaults(subfunc=self._set_default)
@@ -215,15 +224,13 @@ class ProjectCommand(BaseCommand):
         console.print(table)
 
     def _project(self, args: argparse.Namespace):
-        if not sys.stdin.isatty() or getattr(args, "verbose", False):
-            self._list(args)
+        if _is_menu_available and not getattr(args, "verbose", False):
+            show_default_project_menu()
         else:
-            select_default_project()
+            self._list(args)
 
     def _set_default(self, args: argparse.Namespace):
-        if sys.stdin.isatty() and not getattr(args, "name", False):
-            select_default_project()
-        else:
+        if args.name:
             config_manager = ConfigManager()
             project_config = config_manager.get_project_config(args.name)
             if project_config is None:
@@ -234,3 +241,5 @@ class ProjectCommand(BaseCommand):
             )
             config_manager.save()
             console.print("[grey58]OK[/]")
+        else:
+            show_default_project_menu()
