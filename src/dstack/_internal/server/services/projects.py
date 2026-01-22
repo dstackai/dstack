@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from sqlalchemy import and_, delete, or_, select, update
+from sqlalchemy import and_, delete, func, literal_column, or_, select, update
 from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import QueryableAttribute, joinedload, load_only
@@ -20,6 +20,8 @@ from dstack._internal.core.models.projects import (
     MemberPermissions,
     Project,
     ProjectHookConfig,
+    ProjectsInfoList,
+    ProjectsInfoListOrProjectsList,
 )
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -67,11 +69,12 @@ async def list_user_accessible_projects(
     session: AsyncSession,
     user: UserModel,
     include_not_joined: bool,
+    return_total_count: bool,
     prev_created_at: Optional[datetime],
     prev_id: Optional[uuid.UUID],
     limit: int,
     ascending: bool,
-) -> List[Project]:
+) -> ProjectsInfoListOrProjectsList:
     """
     Returns all projects accessible to the user:
     - All projects for global admins
@@ -125,12 +128,19 @@ async def list_user_accessible_projects(
     order_by = (ProjectModel.created_at.desc(), ProjectModel.id)
     if ascending:
         order_by = (ProjectModel.created_at.asc(), ProjectModel.id.desc())
+    total_count = None
+    if return_total_count:
+        res = await session.execute(stmt.with_only_columns(func.count(literal_column("1"))))
+        total_count = res.scalar_one()
     res = await session.execute(stmt.where(*pagination_filters).order_by(*order_by).limit(limit))
     project_models = res.unique().scalars().all()
-    return [
+    projects = [
         project_model_to_project(p, include_backends=False, include_members=False)
         for p in project_models
     ]
+    if total_count is None:
+        return projects
+    return ProjectsInfoList(total_count=total_count, projects=projects)
 
 
 async def get_project_by_name(

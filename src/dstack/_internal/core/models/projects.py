@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import UUID4
 
@@ -26,6 +26,16 @@ class Project(CoreModel):
     backends: List[BackendInfo]
     members: List[Member]
     is_public: bool = False
+
+
+class ProjectsInfoList(CoreModel):
+    total_count: Optional[int] = None
+    projects: List[Project]
+
+
+# For backward compatibility with 0.20 clients, endpoints return `List[Project]` if `total_count` is None.
+# TODO: Replace with ProjectsInfoList in 0.21.
+ProjectsInfoListOrProjectsList = Union[List[Project], ProjectsInfoList]
 
 
 class ProjectHookConfig(CoreModel):

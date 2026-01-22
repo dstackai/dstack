@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.projects import Project
+from dstack._internal.core.models.projects import Project, ProjectsInfoListOrProjectsList
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import (
@@ -36,7 +36,7 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=List[Project])
+@router.post("/list", response_model=ProjectsInfoListOrProjectsList)
 async def list_projects(
     body: Optional[ListProjectsRequest] = None,
     session: AsyncSession = Depends(get_session),
@@ -58,6 +58,7 @@ async def list_projects(
             session=session,
             user=user,
             include_not_joined=body.include_not_joined,
+            return_total_count=body.return_total_count,
             prev_created_at=body.prev_created_at,
             prev_id=body.prev_id,
             limit=body.limit,
