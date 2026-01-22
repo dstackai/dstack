@@ -39,17 +39,18 @@ class ProjectsAPIClient(APIClientGroup):
         if return_total_count is not None:
             body["return_total_count"] = return_total_count
         if prev_created_at is not None:
-            body["prev_created_at"] = prev_created_at
+            body["prev_created_at"] = prev_created_at.isoformat()
         if prev_id is not None:
-            body["prev_id"] = prev_id
+            body["prev_id"] = str(prev_id)
         if limit is not None:
             body["limit"] = limit
         if ascending is not None:
             body["ascending"] = ascending
         resp = self._request("/api/projects/list", body=json.dumps(body))
-        if return_total_count is None:
-            return parse_obj_as(List[Project.__response__], resp.json())
-        return parse_obj_as(ProjectsInfoList, resp.json())
+        resp_json = resp.json()
+        if isinstance(resp_json, list):
+            return parse_obj_as(List[Project.__response__], resp_json)
+        return parse_obj_as(ProjectsInfoList, resp_json)
 
     def create(self, project_name: str, is_public: bool = False) -> Project:
         body = CreateProjectRequest(project_name=project_name, is_public=is_public)
