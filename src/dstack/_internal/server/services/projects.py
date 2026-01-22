@@ -1,8 +1,9 @@
 import secrets
 import uuid
+from datetime import datetime
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import QueryableAttribute, joinedload, load_only
@@ -62,56 +63,73 @@ async def get_or_create_default_project(
     return default_project, True
 
 
-async def list_user_projects(
-    session: AsyncSession,
-    user: UserModel,
-) -> List[Project]:
-    """
-    Returns projects where the user is a member or all projects for global admins.
-    """
-    projects = await list_user_project_models(
-        session=session,
-        user=user,
-    )
-    projects = sorted(projects, key=lambda p: p.created_at)
-    return [
-        project_model_to_project(p, include_backends=False, include_members=False)
-        for p in projects
-    ]
-
-
 async def list_user_accessible_projects(
     session: AsyncSession,
     user: UserModel,
     include_not_joined: bool,
+    prev_created_at: Optional[datetime],
+    prev_id: Optional[uuid.UUID],
+    limit: int,
+    ascending: bool,
 ) -> List[Project]:
     """
     Returns all projects accessible to the user:
+    - All projects for global admins
     - Projects where user is a member (public or private)
     - if `include_not_joined`: Public projects where user is NOT a member
     """
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_member_project_models(session=session, user=user)
+    stmt = select(ProjectModel).where(ProjectModel.deleted == False)
+    if user.global_role != GlobalRole.ADMIN:
+        stmt = stmt.outerjoin(
+            MemberModel,
+            onclause=and_(
+                MemberModel.project_id == ProjectModel.id,
+                MemberModel.user_id == user.id,
+            ),
+        )
         if include_not_joined:
-            public_projects = await list_public_non_member_project_models(
-                session=session, user=user
+            stmt = stmt.where(
+                or_(
+                    ProjectModel.is_public == True,
+                    MemberModel.user_id.is_not(None),
+                )
             )
-            projects += public_projects
-
-    projects = sorted(projects, key=lambda p: p.created_at)
+        else:
+            stmt = stmt.where(MemberModel.user_id.is_not(None))
+    pagination_filters = []
+    if prev_created_at is not None:
+        if ascending:
+            if prev_id is None:
+                pagination_filters.append(ProjectModel.created_at > prev_created_at)
+            else:
+                pagination_filters.append(
+                    or_(
+                        ProjectModel.created_at > prev_created_at,
+                        and_(
+                            ProjectModel.created_at == prev_created_at, ProjectModel.id < prev_id
+                        ),
+                    )
+                )
+        else:
+            if prev_id is None:
+                pagination_filters.append(ProjectModel.created_at < prev_created_at)
+            else:
+                pagination_filters.append(
+                    or_(
+                        ProjectModel.created_at < prev_created_at,
+                        and_(
+                            ProjectModel.created_at == prev_created_at, ProjectModel.id > prev_id
+                        ),
+                    )
+                )
+    order_by = (ProjectModel.created_at.desc(), ProjectModel.id)
+    if ascending:
+        order_by = (ProjectModel.created_at.asc(), ProjectModel.id.desc())
+    res = await session.execute(stmt.where(*pagination_filters).order_by(*order_by).limit(limit))
+    project_models = res.scalars().all()
     return [
         project_model_to_project(p, include_backends=False, include_members=False)
-        for p in projects
-    ]
-
-
-async def list_projects(session: AsyncSession) -> List[Project]:
-    projects = await list_project_models(session=session)
-    return [
-        project_model_to_project(p, include_backends=False, include_members=False)
-        for p in projects
+        for p in project_models
     ]
 
 

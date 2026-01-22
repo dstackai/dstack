@@ -1,4 +1,6 @@
-from typing import Annotated, List
+from datetime import datetime
+from typing import Annotated, List, Optional
+from uuid import UUID
 
 from pydantic import Field
 
@@ -10,6 +12,10 @@ class ListProjectsRequest(CoreModel):
     include_not_joined: Annotated[
         bool, Field(description="Include public projects where user is not a member")
     ] = True
+    prev_created_at: Optional[datetime] = None
+    prev_id: Optional[UUID] = None
+    limit: int = Field(2000, ge=0, le=2000)
+    ascending: bool = False
 
 
 class CreateProjectRequest(CoreModel):
