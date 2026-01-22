@@ -15,7 +15,6 @@ from dstack._internal.server.models import MemberModel, ProjectModel
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
-    create_backend,
     create_fleet,
     create_project,
     create_repo,
@@ -64,10 +63,6 @@ class TestListProjects:
         )
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
-        )
-        await create_backend(
-            session=session,
-            project_id=project.id,
         )
         response = await client.post("/api/projects/list", headers=get_auth_headers(user.token))
         assert response.status_code in [200]
@@ -216,6 +211,129 @@ class TestListProjects:
         assert "public_project" in project_names
         assert "private_project" in project_names
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_paginated_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(
+            session=session,
+            created_at=datetime(2023, 1, 2, 3, 0, tzinfo=timezone.utc),
+            global_role=GlobalRole.ADMIN,
+        )
+        project1 = await create_project(
+            session=session,
+            name="project1",
+            owner=user,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        project2 = await create_project(
+            session=session,
+            name="project2",
+            owner=user,
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        project3 = await create_project(
+            session=session,
+            name="project3",
+            owner=user,
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+        )
+        response = await client.post(
+            "/api/projects/list",
+            headers=get_auth_headers(user.token),
+            json={"limit": 1},
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "project_id": str(project3.id),
+                "project_name": project3.name,
+                "owner": {
+                    "id": str(user.id),
+                    "username": user.name,
+                    "created_at": "2023-01-02T03:00:00+00:00",
+                    "global_role": user.global_role,
+                    "email": None,
+                    "active": True,
+                    "permissions": {
+                        "can_create_projects": True,
+                    },
+                    "ssh_public_key": None,
+                },
+                "created_at": "2023-01-02T03:05:00+00:00",
+                "backends": [],
+                "members": [],
+                "is_public": False,
+            }
+        ]
+        response = await client.post(
+            "/api/projects/list",
+            headers=get_auth_headers(user.token),
+            json={
+                "prev_created_at": "2023-01-02T03:05:00+00:00",
+                "prev_id": str(project3.id),
+                "limit": 1,
+            },
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "project_id": str(project2.id),
+                "project_name": project2.name,
+                "owner": {
+                    "id": str(user.id),
+                    "username": user.name,
+                    "created_at": "2023-01-02T03:00:00+00:00",
+                    "global_role": user.global_role,
+                    "email": None,
+                    "active": True,
+                    "permissions": {
+                        "can_create_projects": True,
+                    },
+                    "ssh_public_key": None,
+                },
+                "created_at": "2023-01-02T03:05:00+00:00",
+                "backends": [],
+                "members": [],
+                "is_public": False,
+            }
+        ]
+        response = await client.post(
+            "/api/projects/list",
+            headers=get_auth_headers(user.token),
+            json={
+                "prev_created_at": "2023-01-02T03:05:00+00:00",
+                "prev_id": str(project2.id),
+                "limit": 1,
+            },
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "project_id": str(project1.id),
+                "project_name": project1.name,
+                "owner": {
+                    "id": str(user.id),
+                    "username": user.name,
+                    "created_at": "2023-01-02T03:00:00+00:00",
+                    "global_role": user.global_role,
+                    "email": None,
+                    "active": True,
+                    "permissions": {
+                        "can_create_projects": True,
+                    },
+                    "ssh_public_key": None,
+                },
+                "created_at": "2023-01-02T03:04:00+00:00",
+                "backends": [],
+                "members": [],
+                "is_public": False,
+            }
+        ]
+
+
+class TestListOnlyNoFleets:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_only_no_fleets_returns_projects_without_active_fleets(

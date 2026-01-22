@@ -126,7 +126,7 @@ async def list_user_accessible_projects(
     if ascending:
         order_by = (ProjectModel.created_at.asc(), ProjectModel.id.desc())
     res = await session.execute(stmt.where(*pagination_filters).order_by(*order_by).limit(limit))
-    project_models = res.scalars().all()
+    project_models = res.unique().scalars().all()
     return [
         project_model_to_project(p, include_backends=False, include_members=False)
         for p in project_models

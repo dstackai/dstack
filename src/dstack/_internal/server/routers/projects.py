@@ -43,7 +43,7 @@ async def list_projects(
     user: UserModel = Depends(Authenticated()),
 ):
     """
-    Returns projects visible to the user, sorted by ascending `created_at`.
+    Returns projects visible to the user.
 
     Returns all accessible projects (member projects for regular users, all non-deleted
     projects for global admins, plus public projects if `include_not_joined` is `True`).
