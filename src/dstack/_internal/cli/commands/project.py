@@ -1,8 +1,10 @@
 import argparse
+import sys
 from typing import Any, Union
 
 from requests import HTTPError
 from rich.table import Table
+from simple_term_menu import TerminalMenu
 
 import dstack.api.server
 from dstack._internal.cli.commands import BaseCommand
@@ -12,6 +14,59 @@ from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def select_default_project():
+    config_manager = ConfigManager()
+
+    project_configs = config_manager.list_project_configs()
+    default_project = config_manager.get_project_config()
+
+    if len(project_configs) == 0:
+        raise CLIError("No projects configured. Use [code]dstack project add[/] to add a project.")
+
+    max_project_len = max(len(pc.name) for pc in project_configs) if project_configs else 0
+    max_url_len = max(len(pc.url) for pc in project_configs) if project_configs else 0
+    project_col_width = max(max_project_len, len("PROJECT"))
+    url_col_width = max(max_url_len, len("URL"))
+    default_col_width = len("DEFAULT")
+
+    cursor_width = 2
+    header = f"{'':<{cursor_width}}{'PROJECT':<{project_col_width}}  {'URL':<{url_col_width}}  {'DEFAULT':^{default_col_width}}"
+
+    menu_entries = []
+    default_index = None
+    for i, project_config in enumerate(project_configs):
+        is_default = project_config.name == default_project.name if default_project else False
+        project_name = project_config.name.ljust(project_col_width)
+        url = project_config.url.ljust(url_col_width)
+        default_marker = (
+            "✓".center(default_col_width) if is_default else "".center(default_col_width)
+        )
+        entry = f"{project_name}  {url}  {default_marker}"
+        if is_default:
+            default_index = i
+        menu_entries.append(entry)
+
+    terminal_menu = TerminalMenu(
+        menu_entries=menu_entries,
+        title=f"Select the default project (↑↓ Enter):\n{header}",
+        cycle_cursor=True,
+        cursor_index=default_index if default_index is not None else 0,
+        show_search_hint=False,
+    )
+    selected_index = terminal_menu.show()
+
+    if selected_index is not None and isinstance(selected_index, int):
+        selected_project = project_configs[selected_index]
+        config_manager.configure_project(
+            name=selected_project.name,
+            url=selected_project.url,
+            token=selected_project.token,
+            default=True,
+        )
+        config_manager.save()
+        console.print("[grey58]OK[/]")
 
 
 class ProjectCommand(BaseCommand):
@@ -67,14 +122,17 @@ class ProjectCommand(BaseCommand):
         # Set default subcommand
         set_default_parser = subparsers.add_parser("set-default", help="Set default project")
         set_default_parser.add_argument(
-            "name", type=str, help="The name of the project to set as default"
+            "name",
+            type=str,
+            nargs="?" if sys.stdin.isatty() else None,
+            help="The name of the project to set as default",
         )
         set_default_parser.set_defaults(subfunc=self._set_default)
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
         if not hasattr(args, "subfunc"):
-            args.subfunc = self._list
+            args.subfunc = self._project
         args.subfunc(args)
 
     def _add(self, args: argparse.Namespace):
@@ -156,14 +214,23 @@ class ProjectCommand(BaseCommand):
 
         console.print(table)
 
-    def _set_default(self, args: argparse.Namespace):
-        config_manager = ConfigManager()
-        project_config = config_manager.get_project_config(args.name)
-        if project_config is None:
-            raise CLIError(f"Project '{args.name}' not found")
+    def _project(self, args: argparse.Namespace):
+        if not sys.stdin.isatty() or getattr(args, "verbose", False):
+            self._list(args)
+        else:
+            select_default_project()
 
-        config_manager.configure_project(
-            name=args.name, url=project_config.url, token=project_config.token, default=True
-        )
-        config_manager.save()
-        console.print("[grey58]OK[/]")
+    def _set_default(self, args: argparse.Namespace):
+        if sys.stdin.isatty() and not getattr(args, "name", False):
+            select_default_project()
+        else:
+            config_manager = ConfigManager()
+            project_config = config_manager.get_project_config(args.name)
+            if project_config is None:
+                raise CLIError(f"Project '{args.name}' not found")
+
+            config_manager.configure_project(
+                name=args.name, url=project_config.url, token=project_config.token, default=True
+            )
+            config_manager.save()
+            console.print("[grey58]OK[/]")
