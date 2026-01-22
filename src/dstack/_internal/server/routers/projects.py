@@ -52,7 +52,7 @@ async def list_projects(
     """
     if body is None:
         # For backward compatibility
-        body = ListProjectsRequest(limit=2000)
+        body = ListProjectsRequest()
     return CustomORJSONResponse(
         await projects.list_user_accessible_projects(
             session=session,

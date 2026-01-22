@@ -14,7 +14,7 @@ class ListProjectsRequest(CoreModel):
     ] = True
     prev_created_at: Optional[datetime] = None
     prev_id: Optional[UUID] = None
-    limit: int = Field(2000, ge=0, le=2000)
+    limit: int = Field(default=2000, ge=0, le=2000)
     ascending: bool = False
 
 

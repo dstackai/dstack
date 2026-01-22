@@ -1,4 +1,7 @@
-from typing import List
+import json
+from datetime import datetime
+from typing import Any, List, Optional
+from uuid import UUID
 
 from pydantic import parse_obj_as
 
@@ -8,7 +11,6 @@ from dstack._internal.server.schemas.projects import (
     AddProjectMemberRequest,
     CreateProjectRequest,
     DeleteProjectsRequest,
-    ListProjectsRequest,
     MemberSetting,
     RemoveProjectMemberRequest,
     SetProjectMembersRequest,
@@ -17,9 +19,27 @@ from dstack.api.server._group import APIClientGroup
 
 
 class ProjectsAPIClient(APIClientGroup):
-    def list(self, include_not_joined: bool = True) -> List[Project]:
-        body = ListProjectsRequest(include_not_joined=include_not_joined)
-        resp = self._request("/api/projects/list", body=body.json())
+    def list(
+        self,
+        include_not_joined: bool = True,
+        prev_created_at: Optional[datetime] = None,
+        prev_id: Optional[UUID] = None,
+        limit: Optional[int] = None,
+        ascending: Optional[bool] = None,
+    ) -> List[Project]:
+        # Excluding None fields for backward compatibility with 0.20 servers.
+        body: dict[str, Any] = {
+            "include_not_joined": include_not_joined,
+        }
+        if prev_created_at is not None:
+            body["prev_created_at"] = prev_created_at
+        if prev_id is not None:
+            body["prev_id"] = prev_id
+        if limit is not None:
+            body["limit"] = limit
+        if ascending is not None:
+            body["ascending"] = ascending
+        resp = self._request("/api/projects/list", body=json.dumps(body))
         return parse_obj_as(List[Project.__response__], resp.json())
 
     def create(self, project_name: str, is_public: bool = False) -> Project:
