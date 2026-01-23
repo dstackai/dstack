@@ -6,10 +6,10 @@ from requests import HTTPError
 from rich.table import Table
 
 try:
-    from simple_term_menu import TerminalMenu  # type: ignore[assignment]
+    import questionary
 
     _is_menu_available = sys.stdin.isatty()
-except (ImportError, NotImplementedError):
+except (ImportError, NotImplementedError, AttributeError):
     _is_menu_available = False
 
 import dstack.api.server
@@ -34,37 +34,24 @@ def show_default_project_menu():
     if len(project_configs) == 0:
         raise CLIError("No projects configured. Use [code]dstack project add[/] to add a project.")
 
-    max_project_len = max(len(pc.name) for pc in project_configs) if project_configs else 0
-    max_url_len = max(len(pc.url) for pc in project_configs) if project_configs else 0
-    project_col_width = max(max_project_len, len("PROJECT"))
-    url_col_width = max(max_url_len, len("URL"))
-    default_col_width = len("DEFAULT")
-
-    cursor_width = 2
-    header = f"{'':<{cursor_width}}{'PROJECT':<{project_col_width}}  {'URL':<{url_col_width}}  {'DEFAULT':^{default_col_width}}"
-
     menu_entries = []
     default_index = None
     for i, project_config in enumerate(project_configs):
         is_default = project_config.name == default_project.name if default_project else False
-        project_name = project_config.name.ljust(project_col_width)
-        url = project_config.url.ljust(url_col_width)
-        default_marker = (
-            "✓".center(default_col_width) if is_default else "".center(default_col_width)
-        )
-        entry = f"{project_name}  {url}  {default_marker}"
+        entry = f"{project_config.name} ({project_config.url})"
         if is_default:
             default_index = i
-        menu_entries.append(entry)
+        menu_entries.append((entry, i))
 
-    terminal_menu = TerminalMenu(  # pyright: ignore[reportPossiblyUnboundVariable]
-        menu_entries=menu_entries,
-        title=f"Select the default project (↑↓ Enter):\n{header}",
-        cycle_cursor=True,
-        cursor_index=default_index if default_index is not None else 0,
-        show_search_hint=False,
-    )
-    selected_index = terminal_menu.show()
+    choices = [questionary.Choice(title=entry, value=index) for entry, index in menu_entries]  # pyright: ignore[reportPossiblyUnboundVariable]
+    default_value = default_index
+    selected_index = questionary.select(  # pyright: ignore[reportPossiblyUnboundVariable]
+        message="Select the default project (↑↓ Enter):",
+        choices=choices,
+        default=default_value,  # pyright: ignore[reportArgumentType]
+        qmark="",
+        instruction="",
+    ).ask()
 
     if selected_index is not None and isinstance(selected_index, int):
         selected_project = project_configs[selected_index]
