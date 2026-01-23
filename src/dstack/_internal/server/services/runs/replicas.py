@@ -94,7 +94,6 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         await _scale_up_replicas(
             session,
             run_model,
-            active_replicas,
             inactive_replicas,
             replicas_diff,
             run_spec,
@@ -293,7 +292,6 @@ async def scale_run_replicas_for_group(
         await _scale_up_replicas(
             session=session,
             run_model=run_model,
-            active_replicas=active_replicas,
             inactive_replicas=inactive_replicas,
             replicas_diff=replicas_diff,
             run_spec=run_spec,
