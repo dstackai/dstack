@@ -1,16 +1,17 @@
-from typing import List
+from typing import Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceNotExistsError
-from dstack._internal.core.models.users import User, UserWithCreds
+from dstack._internal.core.models.users import User, UsersInfoListOrUsersList, UserWithCreds
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.schemas.users import (
     CreateUserRequest,
     DeleteUsersRequest,
     GetUserRequest,
+    ListUsersRequest,
     RefreshTokenRequest,
     UpdateUserRequest,
 )
@@ -28,12 +29,34 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=List[User])
+@router.post("/list", response_model=UsersInfoListOrUsersList)
 async def list_users(
+    body: Optional[ListUsersRequest] = None,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
-    return CustomORJSONResponse(await users.list_users_for_user(session=session, user=user))
+    """
+    Returns users visible to the user, sorted by descending `created_at`.
+
+    Admins see all non-deleted users. Non-admins only see themselves.
+
+    The results are paginated. To get the next page, pass `created_at` and `id` of
+    the last user from the previous page as `prev_created_at` and `prev_id`.
+    """
+    if body is None:
+        # For backward compatibility
+        body = ListUsersRequest()
+    return CustomORJSONResponse(
+        await users.list_users_for_user(
+            session=session,
+            user=user,
+            return_total_count=body.return_total_count,
+            prev_created_at=body.prev_created_at,
+            prev_id=body.prev_id,
+            limit=body.limit,
+            ascending=body.ascending,
+        )
+    )
 
 
 @router.post("/get_my_user", response_model=UserWithCreds)

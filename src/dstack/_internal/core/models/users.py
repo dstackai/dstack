@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional, Union
 
 from pydantic import UUID4
 
@@ -40,6 +40,16 @@ class UserTokenCreds(CoreModel):
 class UserWithCreds(User):
     creds: UserTokenCreds
     ssh_private_key: Optional[str] = None
+
+
+class UsersInfoList(CoreModel):
+    total_count: Optional[int] = None
+    users: List[User]
+
+
+# For backward compatibility with 0.20 clients, endpoints return `List[User]` if `total_count` is None.
+# TODO: Replace with UsersInfoList in 0.21.
+UsersInfoListOrUsersList = Union[List[User], UsersInfoList]
 
 
 class UserHookConfig(CoreModel):

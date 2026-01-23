@@ -1,7 +1,46 @@
-from typing import List, Optional
+from datetime import datetime
+from typing import Annotated, List, Optional
+from uuid import UUID
+
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.users import GlobalRole
+
+
+class ListUsersRequest(CoreModel):
+    return_total_count: Annotated[
+        bool, Field(description="Return `total_count` with the total number of users.")
+    ] = False
+    prev_created_at: Annotated[
+        Optional[datetime],
+        Field(
+            description=(
+                "Paginate users by specifying `created_at` of the last (first) user in previous "
+                "batch for descending (ascending)."
+            )
+        ),
+    ] = None
+    prev_id: Annotated[
+        Optional[UUID],
+        Field(
+            description=(
+                "Paginate users by specifying `id` of the last (first) user in previous batch "
+                "for descending (ascending). Must be used together with `prev_created_at`."
+            )
+        ),
+    ] = None
+    limit: Annotated[int, Field(ge=0, le=2000, description="Limit number of users returned.")] = (
+        2000
+    )
+    ascending: Annotated[
+        bool,
+        Field(
+            description=(
+                "Return users sorted by `created_at` in ascending order. Defaults to descending."
+            )
+        ),
+    ] = False
 
 
 class GetUserRequest(CoreModel):

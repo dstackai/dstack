@@ -39,7 +39,7 @@ class TestListUsers:
         admin = await create_user(
             session=session,
             name="admin",
-            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
             global_role=GlobalRole.ADMIN,
         )
         other_user = await create_user(
@@ -61,7 +61,7 @@ class TestListUsers:
             {
                 "id": str(admin.id),
                 "username": admin.name,
-                "created_at": "2023-01-02T03:04:00+00:00",
+                "created_at": "2023-01-02T03:05:00+00:00",
                 "global_role": admin.global_role,
                 "email": None,
                 "active": True,
@@ -82,6 +82,118 @@ class TestListUsers:
                 },
                 "ssh_public_key": None,
             },
+        ]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_total_count(self, test_db, session: AsyncSession, client: AsyncClient):
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
+            global_role=GlobalRole.ADMIN,
+        )
+        await create_user(
+            session=session,
+            name="user_one",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        await create_user(
+            session=session,
+            name="deleted_user",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+            deleted=True,
+        )
+        response = await client.post(
+            "/api/users/list",
+            headers=get_auth_headers(admin.token),
+            json={"limit": 1, "return_total_count": True},
+        )
+        assert response.status_code == 200
+        assert response.json() == {
+            "total_count": 2,
+            "users": [
+                {
+                    "id": str(admin.id),
+                    "username": admin.name,
+                    "created_at": "2023-01-02T03:06:00+00:00",
+                    "global_role": admin.global_role,
+                    "email": None,
+                    "active": True,
+                    "permissions": {
+                        "can_create_projects": True,
+                    },
+                    "ssh_public_key": None,
+                }
+            ],
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_paginates_results(self, test_db, session: AsyncSession, client: AsyncClient):
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
+            global_role=GlobalRole.ADMIN,
+        )
+        user_one = await create_user(
+            session=session,
+            name="user_one",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        await create_user(
+            session=session,
+            name="user_two",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        response = await client.post(
+            "/api/users/list",
+            headers=get_auth_headers(admin.token),
+            json={"limit": 1},
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "id": str(admin.id),
+                "username": admin.name,
+                "created_at": "2023-01-02T03:06:00+00:00",
+                "global_role": admin.global_role,
+                "email": None,
+                "active": True,
+                "permissions": {
+                    "can_create_projects": True,
+                },
+                "ssh_public_key": None,
+            }
+        ]
+        response = await client.post(
+            "/api/users/list",
+            headers=get_auth_headers(admin.token),
+            json={
+                "prev_created_at": "2023-01-02T03:06:00+00:00",
+                "prev_id": str(admin.id),
+                "limit": 1,
+            },
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "id": str(user_one.id),
+                "username": user_one.name,
+                "created_at": "2023-01-02T03:05:00+00:00",
+                "global_role": user_one.global_role,
+                "email": None,
+                "active": True,
+                "permissions": {
+                    "can_create_projects": True,
+                },
+                "ssh_public_key": None,
+            }
         ]
 
     @pytest.mark.asyncio
