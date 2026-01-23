@@ -19,7 +19,7 @@ class ListProjectsRequest(CoreModel):
         Optional[str],
         Field(
             description="Include only projects with the name containing `name_pattern`.",
-            regex="^[a-zA-Z0-9-]*$",
+            regex="^[a-zA-Z0-9-_]*$",
         ),
     ] = None
     prev_created_at: Annotated[
