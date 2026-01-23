@@ -122,6 +122,7 @@ dev = [
     "pre-commit>=4.2.0",
     "pytest~=8.0",
     "pytest-asyncio>=0.23.8",
+    "pytest-mock>=3.14.0",
     "pytest-httpbin>=2.1.0",
     "pytest-socket>=0.7.0",
     "pytest-env>=1.1.0",
