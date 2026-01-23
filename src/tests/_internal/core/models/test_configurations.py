@@ -4,7 +4,11 @@ import pytest
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import RegistryAuth
-from dstack._internal.core.models.configurations import RepoSpec, parse_run_configuration
+from dstack._internal.core.models.configurations import (
+    DevEnvironmentConfigurationParams,
+    RepoSpec,
+    parse_run_configuration,
+)
 from dstack._internal.core.models.resources import Range
 
 
@@ -139,3 +143,49 @@ def test_registry_auth_hashable():
     """
     registry_auth = RegistryAuth(username="username", password="password")
     hash(registry_auth)
+
+
+class TestDevEnvironmentConfigurationParams:
+    def test_windsurf_version_valid_format(self):
+        params = DevEnvironmentConfigurationParams(
+            ide="windsurf", version="1.106.0@8951cd3ad688e789573d7f51750d67ae4a0bea7d"
+        )
+        assert params.ide == "windsurf"
+        assert params.version == "1.106.0@8951cd3ad688e789573d7f51750d67ae4a0bea7d"
+
+    def test_windsurf_version_valid_short_commit(self):
+        params = DevEnvironmentConfigurationParams(ide="windsurf", version="1.0.0@abc123")
+        assert params.version == "1.0.0@abc123"
+
+    def test_windsurf_version_empty_allowed(self):
+        params = DevEnvironmentConfigurationParams(ide="windsurf", version=None)
+        assert params.ide == "windsurf"
+        assert params.version is None
+
+    def test_windsurf_version_invalid_missing_at(self):
+        with pytest.raises(ValueError, match="Invalid Windsurf version format"):
+            DevEnvironmentConfigurationParams(ide="windsurf", version="1.106.0")
+
+    def test_windsurf_version_invalid_missing_commit(self):
+        with pytest.raises(ValueError, match="Invalid Windsurf version format"):
+            DevEnvironmentConfigurationParams(ide="windsurf", version="1.106.0@")
+
+    def test_windsurf_version_invalid_missing_version(self):
+        with pytest.raises(ValueError, match="Invalid Windsurf version format"):
+            DevEnvironmentConfigurationParams(
+                ide="windsurf", version="@8951cd3ad688e789573d7f51750d67ae4a0bea7d"
+            )
+
+    def test_windsurf_version_invalid_non_hex_commit(self):
+        with pytest.raises(ValueError, match="Invalid Windsurf version format"):
+            DevEnvironmentConfigurationParams(ide="windsurf", version="1.106.0@ghijklmnop")
+
+    def test_vscode_version_not_validated(self):
+        params = DevEnvironmentConfigurationParams(ide="vscode", version="1.80.0")
+        assert params.ide == "vscode"
+        assert params.version == "1.80.0"
+
+    def test_cursor_version_not_validated(self):
+        params = DevEnvironmentConfigurationParams(ide="cursor", version="0.40.0")
+        assert params.ide == "cursor"
+        assert params.version == "0.40.0"

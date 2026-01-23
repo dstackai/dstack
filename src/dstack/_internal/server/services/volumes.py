@@ -380,8 +380,13 @@ def instance_model_to_volume_instance(instance_model: InstanceModel) -> VolumeIn
 
 
 async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> str:
-    volume_models = await list_project_volume_models(session=session, project=project)
-    names = {v.name for v in volume_models}
+    res = await session.execute(
+        select(VolumeModel.name).where(
+            VolumeModel.project_id == project.id,
+            VolumeModel.deleted == False,
+        )
+    )
+    names = set(res.scalars().all())
     while True:
         name = random_names.generate_name()
         if name not in names:

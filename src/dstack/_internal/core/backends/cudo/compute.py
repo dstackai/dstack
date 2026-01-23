@@ -75,7 +75,7 @@ class CudoCompute(
             commands = install_jq_commands()
         else:
             commands = install_docker_commands()
-        commands += get_shim_commands(authorized_keys=public_keys)
+        commands += get_shim_commands()
 
         try:
             resp_data = self.api_client.create_virtual_machine(

@@ -12,6 +12,7 @@ const NOTIFICATION_LIFE_TIME = 6000;
 type TUseNotificationsArgs = { temporary?: boolean; liveTime?: number } | undefined;
 
 const defaultArgs: NonNullable<Required<TUseNotificationsArgs>> = { temporary: true, liveTime: NOTIFICATION_LIFE_TIME };
+
 export const useNotifications = (args: TUseNotificationsArgs = defaultArgs) => {
     const dispatch = useAppDispatch();
     const notificationIdsSet = useRef(new Set<ReturnType<typeof getUid>>());

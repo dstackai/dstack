@@ -1,11 +1,13 @@
 {
   "dstack": "Dstack",
   "common": {
+    "ok": "OK",
     "loading": "Loading",
     "add": "Add",
     "yes": "Yes",
     "no": "No",
-    "create": "Create {{text}}",
+    "create": "Create",
+    "create_wit_text": "Create {{text}}",
     "edit": "Edit",
     "delete": "Delete",
     "remove": "Remove",
@@ -73,6 +75,7 @@
     "runs": "Runs",
     "models": "Models",
     "fleets": "Fleets",
+    "fleet": "Fleet",
     "project": "project",
     "project_other": "Projects",
     "general": "General",
@@ -197,7 +200,7 @@
     },
     "edit": {
       "general": "General",
-      "project_name": "Project name",
+      "project_name": "Name",
       "owner": "Owner",
       "project_name_description": "Only latin characters, dashes, underscores, and digits",
       "project_type": "Project type",
@@ -205,16 +208,11 @@
       "backends": "Backends",
       "base_backends_description": "dstack will automatically collect offers from the following providers. Deselect providers you don’t want to use.",
       "backends_description": "The following backends can be configured with your own cloud credentials in the project settings after the project is created.",
-      "default_fleet": "Create default fleet",
-      "default_fleet_description": "You can create default fleet for project",
-      "fleet_name": "Fleet name",
-      "fleet_name_description": "Only latin characters, dashes, underscores, and digits",
-      "fleet_min_instances": "Min number of instances",
-      "fleet_min_instances_description": "Only digits",
-      "fleet_max_instances": "Max number of instances",
-      "fleet_max_instances_description": "Only digits",
-      "is_public": "Make project public",
-      "is_public_description": "Public projects can be accessed by any user without being a member",
+      "create_default_fleet": "Create a default fleet",
+      "default_fleet": "Default fleet",
+      "default_fleet_description": "At least one fleet is required to run dev environments, tasks, or services.",
+      "is_public": "Public",
+      "is_public_description": "Allow any user join the project as a member",
       "backend": "Backend",
       "backend_config": "Backend config",
       "backend_config_description": "Specify the backend config in the YAML format. Click Info for examples.",
@@ -226,7 +224,7 @@
       "update_visibility_success": "Project visibility updated successfully",
       "update_visibility_confirm_title": "Change project visibility",
       "update_visibility_confirm_message": "Are you sure you want to change the project visibility? This will affect who can access this project.",
-      "change_visibility": "Change visibility",
+      "change_visibility": "Change",
       "project_visibility": "Visibility",
       "project_visibility_description": "Control who can access this project",
       "make_project_public": "Make project public",
@@ -396,6 +394,7 @@
       "log": "Logs",
       "log_empty_message_title": "No logs",
       "log_empty_message_text": "No logs to display.",
+      "inspect": "Inspect",
       "run_name": "Name",
       "workflow_name": "Workflow",
       "configuration": "Configuration",
@@ -478,8 +477,7 @@
         "offer": "Offer",
         "offer_description": "Select an offer for the dev environment.",
         "name": "Name",
-        "name_description": "The name of the run, e.g. 'my-dev-env'",
-        "name_constraint": "If not specified, generated automatically",
+        "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",
         "name_placeholder": "Optional",
         "ide": "IDE",
         "ide_description": "Select which IDE would you like to use with the dev environment.",
@@ -564,10 +562,16 @@
   },
 
   "fleets": {
+    "no_alert": {
+      "title": "No fleets",
+      "description": "The project has no fleets. Create one before submitting a run.",
+      "button_title": "Create a fleet"
+    },
     "fleet": "Fleet",
     "fleet_placeholder": "Filtering by fleet",
     "fleet_name": "Fleet name",
     "total_instances": "Number of instances",
+    "inspect": "Inspect",
     "empty_message_title": "No fleets",
     "empty_message_text": "No fleets to display.",
     "nomatch_message_title": "No matches",
@@ -581,6 +585,9 @@
       "failed": "Failed",
       "terminating": "Terminating",
       "terminated": "Terminated"
+    },
+    "create": {
+      "success_notification": "The fleet is created!"
     },
     "instances": {
       "active_only": "Active instances",
@@ -611,6 +618,19 @@
       "spot": "Spot",
       "started": "Started",
       "price": "Price"
+    },
+    "edit": {
+      "name": "Name",
+      "name_description": "The name of the fleet, e.g. 'my-fleet'",
+      "name_placeholder": "Optional",
+      "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",
+      "min_instances": "Min number of instances",
+      "min_instances_description": "Set it `0` to provision instances only when required",
+      "max_instances": "Max number of instances",
+      "max_instances_description": "Required only if you want to set an upper limit",
+      "max_instances_placeholder": "Optional",
+      "idle_duration": "Idle duration",
+      "idle_duration_description": "Example: '0s', '1m', '1h'"
     }
   },
   "volume": {

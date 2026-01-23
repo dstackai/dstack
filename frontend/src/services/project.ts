@@ -20,7 +20,7 @@ export const projectApi = createApi({
         prepareHeaders: fetchBaseQueryHeaders,
     }),
 
-    tagTypes: ['Projects', 'ProjectRepos', 'ProjectLogs', 'Backends'],
+    tagTypes: ['Projects', 'NoFleetsProject', 'ProjectRepos', 'ProjectLogs', 'Backends'],
 
     endpoints: (builder) => ({
         getProjects: builder.query<IProject[], void>({
@@ -40,6 +40,27 @@ export const projectApi = createApi({
                     : ['Projects'],
         }),
 
+        getOnlyNoFleetsProjects: builder.query<IProject[], void>({
+            query: (body) => {
+                return {
+                    url: API.PROJECTS.LIST_ONLY_NO_FLEETS(),
+                    method: 'POST',
+                    body,
+                };
+            },
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            transformResponse: (response: any[]): IProject[] => response.map(transformProjectResponse),
+
+            providesTags: (result) =>
+                result
+                    ? [
+                          ...result.map(({ project_name }) => ({ type: 'NoFleetsProject' as const, id: project_name })),
+                          'NoFleetsProject',
+                      ]
+                    : ['NoFleetsProject'],
+        }),
+
         getProject: builder.query<IProject, { name: IProject['project_name'] }>({
             query: ({ name }) => {
                 return {
@@ -53,7 +74,7 @@ export const projectApi = createApi({
             providesTags: (result) => (result ? [{ type: 'Projects' as const, id: result.project_name }] : []),
         }),
 
-        createProject: builder.mutation<IProject, IProject>({
+        createProject: builder.mutation<IProject, IProjectCreateRequestParams>({
             query: (project) => ({
                 url: API.PROJECTS.CREATE(),
                 method: 'POST',
@@ -180,6 +201,7 @@ export const projectApi = createApi({
 
 export const {
     useGetProjectsQuery,
+    useGetOnlyNoFleetsProjectsQuery,
     useLazyGetProjectsQuery,
     useGetProjectQuery,
     useCreateProjectMutation,

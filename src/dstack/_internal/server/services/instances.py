@@ -25,6 +25,7 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceStatus,
+    InstanceTerminationReason,
     InstanceType,
     RemoteConnectionInfo,
     Resources,
@@ -49,6 +50,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse
 from dstack._internal.server.schemas.runner import InstanceHealthResponse, TaskStatus
+from dstack._internal.server.services import events
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import generate_shared_offer
 from dstack._internal.server.services.projects import list_user_project_models
@@ -59,11 +61,55 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def format_instance_status_for_event(instance_model: InstanceModel) -> str:
-    msg = instance_model.status.upper()
-    if instance_model.total_blocks is not None:
-        msg += f" ({instance_model.busy_blocks}/{instance_model.total_blocks} blocks busy)"
-    return msg
+def switch_instance_status(
+    session: AsyncSession,
+    instance_model: InstanceModel,
+    new_status: InstanceStatus,
+    actor: events.AnyActor = events.SystemActor(),
+):
+    """
+    Switch instance status.
+
+    **Usage notes**:
+
+    - When switching to `TERMINATING` or `TERMINATED`,
+      `instance_model.termination_reason` must be set
+
+    - When `instance_model.termination_reason` is set to `ERROR`,
+      the error must be further explained in `instance_model.termination_reason_message`
+    """
+
+    old_status = instance_model.status
+    if old_status == new_status:
+        return
+
+    instance_model.status = new_status
+
+    msg = f"Instance status changed {old_status.upper()} -> {new_status.upper()}"
+    if (
+        new_status == InstanceStatus.TERMINATING
+        or new_status == InstanceStatus.TERMINATED
+        and old_status != InstanceStatus.TERMINATING
+    ):
+        if instance_model.termination_reason is None:
+            raise ValueError(
+                f"termination_reason must be set when switching to {new_status.upper()} status"
+            )
+        if (
+            instance_model.termination_reason == InstanceTerminationReason.ERROR
+            and not instance_model.termination_reason_message
+        ):
+            raise ValueError(
+                "termination_reason_message must be set when termination_reason is ERROR"
+            )
+        msg += f". Termination reason: {instance_model.termination_reason.upper()}"
+        if instance_model.termination_reason_message:
+            msg += f" ({instance_model.termination_reason_message})"
+    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(instance_model)])
+
+
+def format_instance_blocks_for_event(instance_model: InstanceModel) -> str:
+    return f"{instance_model.busy_blocks}/{instance_model.total_blocks} busy"
 
 
 async def get_instance_health_checks(

@@ -120,7 +120,7 @@ func TestExpandtPath_ErrorTildeUsernameNotSupported_TildeUsernameWithPath(t *tes
 func TestMkdirAll_AbsPath_NotExists(t *testing.T) {
 	absPath := path.Join(t.TempDir(), "a/b/c")
 	require.NoDirExists(t, absPath)
-	err := MkdirAll(context.Background(), absPath, -1, -1)
+	err := MkdirAll(context.Background(), absPath, -1, -1, 0o755)
 	require.NoError(t, err)
 	require.DirExists(t, absPath)
 }
@@ -128,7 +128,7 @@ func TestMkdirAll_AbsPath_NotExists(t *testing.T) {
 func TestMkdirAll_AbsPath_Exists(t *testing.T) {
 	absPath, err := os.Getwd()
 	require.NoError(t, err)
-	err = MkdirAll(context.Background(), absPath, -1, -1)
+	err = MkdirAll(context.Background(), absPath, -1, -1, 0o755)
 	require.NoError(t, err)
 	require.DirExists(t, absPath)
 }
@@ -139,7 +139,7 @@ func TestMkdirAll_RelPath_NotExists(t *testing.T) {
 	relPath := "a/b/c"
 	absPath := path.Join(cwd, relPath)
 	require.NoDirExists(t, absPath)
-	err := MkdirAll(context.Background(), relPath, -1, -1)
+	err := MkdirAll(context.Background(), relPath, -1, -1, 0o755)
 	require.NoError(t, err)
 	require.DirExists(t, absPath)
 }
@@ -151,7 +151,7 @@ func TestMkdirAll_RelPath_Exists(t *testing.T) {
 	absPath := path.Join(cwd, relPath)
 	err := os.MkdirAll(absPath, 0o755)
 	require.NoError(t, err)
-	err = MkdirAll(context.Background(), relPath, -1, -1)
+	err = MkdirAll(context.Background(), relPath, -1, -1, 0o755)
 	require.NoError(t, err)
 	require.DirExists(t, absPath)
 }

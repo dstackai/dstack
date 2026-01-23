@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, selectinload
+from sqlalchemy.orm import joinedload, load_only, selectinload, with_loader_criteria
 
 from dstack._internal.core.models.fleets import FleetSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
@@ -26,7 +26,7 @@ from dstack._internal.server.services.fleets import (
     is_fleet_in_use,
     switch_fleet_status,
 )
-from dstack._internal.server.services.instances import format_instance_status_for_event
+from dstack._internal.server.services.instances import switch_instance_status
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime
@@ -60,6 +60,9 @@ async def process_fleets():
                 .options(
                     load_only(FleetModel.id, FleetModel.name),
                     selectinload(FleetModel.instances).load_only(InstanceModel.id),
+                    with_loader_criteria(
+                        InstanceModel, InstanceModel.deleted == False, include_aliases=True
+                    ),
                 )
                 .order_by(FleetModel.last_processed_at.asc())
                 .limit(BATCH_SIZE)
@@ -72,6 +75,7 @@ async def process_fleets():
                 .where(
                     InstanceModel.id.not_in(instance_lockset),
                     InstanceModel.fleet_id.in_(fleet_ids),
+                    InstanceModel.deleted == False,
                 )
                 .options(load_only(InstanceModel.id, InstanceModel.fleet_id))
                 .order_by(InstanceModel.id)
@@ -113,8 +117,11 @@ async def _process_fleets(session: AsyncSession, fleet_models: List[FleetModel])
         .where(FleetModel.id.in_(fleet_ids))
         .options(
             joinedload(FleetModel.instances).joinedload(InstanceModel.jobs).load_only(JobModel.id),
-            joinedload(FleetModel.project),
+            with_loader_criteria(
+                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            ),
         )
+        .options(joinedload(FleetModel.project))
         .options(joinedload(FleetModel.runs).load_only(RunModel.status))
         .execution_options(populate_existing=True)
     )
@@ -212,15 +219,10 @@ def _maintain_fleet_nodes_in_min_max_range(
             if nodes_redundant == 0:
                 break
             if instance.status in [InstanceStatus.IDLE]:
-                instance.status = InstanceStatus.TERMINATING
                 instance.termination_reason = InstanceTerminationReason.MAX_INSTANCES_LIMIT
                 instance.termination_reason_message = "Fleet has too many instances"
+                switch_instance_status(session, instance, InstanceStatus.TERMINATING)
                 nodes_redundant -= 1
-                logger.info(
-                    "Terminating instance %s: %s",
-                    instance.name,
-                    instance.termination_reason,
-                )
         return True
     nodes_missing = fleet_spec.configuration.nodes.min - active_instances_num
     for i in range(nodes_missing):
@@ -236,7 +238,7 @@ def _maintain_fleet_nodes_in_min_max_range(
             session,
             (
                 "Instance created to meet target fleet node count."
-                f" Status: {format_instance_status_for_event(instance_model)}"
+                f" Status: {instance_model.status.upper()}"
             ),
             actor=events.SystemActor(),
             targets=[events.Target.from_model(instance_model)],

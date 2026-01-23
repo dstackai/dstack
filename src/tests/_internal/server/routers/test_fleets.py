@@ -1,7 +1,8 @@
 import json
 from datetime import datetime, timezone
+from typing import Optional
 from unittest.mock import Mock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from freezegun import freeze_time
@@ -602,19 +603,17 @@ class TestApplyFleetPlan:
             remote_connection_info=get_remote_connection_info(host="10.0.0.100"),
         )
 
-        with patch("uuid.uuid4") as m:
-            m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
-            response = await client.post(
-                f"/api/project/{project.name}/fleets/apply",
-                headers=get_auth_headers(user.token),
-                json={
-                    "plan": {
-                        "spec": spec.dict(),
-                        "current_resource": _fleet_model_to_json_dict(fleet),
-                    },
-                    "force": False,
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/apply",
+            headers=get_auth_headers(user.token),
+            json={
+                "plan": {
+                    "spec": spec.dict(),
+                    "current_resource": _fleet_model_to_json_dict(fleet),
                 },
-            )
+                "force": False,
+            },
+        )
 
         assert response.status_code == 200, response.json()
         assert response.json() == {
@@ -710,7 +709,7 @@ class TestApplyFleetPlan:
                     "status": "terminating",
                     "unreachable": False,
                     "health_status": "healthy",
-                    "termination_reason": None,
+                    "termination_reason": "terminated_by_user",
                     "termination_reason_message": None,
                     "created": "2023-01-02T03:04:00+00:00",
                     "region": "remote",
@@ -720,7 +719,7 @@ class TestApplyFleetPlan:
                     "busy_blocks": 0,
                 },
                 {
-                    "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "id": SomeUUID4Str(),
                     "project_name": project.name,
                     "backend": "remote",
                     "instance_type": {
@@ -760,7 +759,7 @@ class TestApplyFleetPlan:
         await session.refresh(instance)
         assert instance.status == InstanceStatus.TERMINATING
         res = await session.execute(
-            select(InstanceModel).where(InstanceModel.id == "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+            select(InstanceModel).where(InstanceModel.id == response.json()["instances"][1]["id"])
         )
         instance = res.unique().scalar_one()
         assert instance.status == InstanceStatus.PENDING
@@ -1166,6 +1165,68 @@ class TestGetPlan:
             "max_offer_price": None,
             "action": "create",
         }
+
+    @pytest.mark.parametrize(
+        ("client_version", "expected_availability"),
+        [
+            ("0.20.3", InstanceAvailability.NOT_AVAILABLE),
+            ("0.20.4", InstanceAvailability.NO_BALANCE),
+            (None, InstanceAvailability.NO_BALANCE),
+        ],
+    )
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_replaces_no_balance_with_not_available_for_old_clients(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        expected_availability: InstanceAvailability,
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        offers = [
+            InstanceOfferWithAvailability(
+                backend=BackendType.AWS,
+                instance=InstanceType(
+                    name="instance-1",
+                    resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                ),
+                region="us",
+                price=1.0,
+                availability=InstanceAvailability.AVAILABLE,
+            ),
+            InstanceOfferWithAvailability(
+                backend=BackendType.AWS,
+                instance=InstanceType(
+                    name="instance-2",
+                    resources=Resources(cpus=2, memory_mib=1024, spot=False, gpus=[]),
+                ),
+                region="us",
+                price=2.0,
+                availability=InstanceAvailability.NO_BALANCE,
+            ),
+        ]
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = offers
+            response = await client.post(
+                f"/api/project/{project.name}/fleets/get_plan",
+                headers=headers,
+                json={"spec": get_fleet_spec().dict()},
+            )
+
+        assert response.status_code == 200
+        offers = response.json()["offers"]
+        assert len(offers) == 2
+        assert offers[0]["availability"] == InstanceAvailability.AVAILABLE.value
+        assert offers[1]["availability"] == expected_availability.value
 
 
 def _fleet_model_to_json_dict(fleet: FleetModel) -> dict:

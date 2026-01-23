@@ -63,6 +63,7 @@ export const API = {
     PROJECTS: {
         BASE: () => `${API.BASE()}/projects`,
         LIST: () => `${API.PROJECTS.BASE()}/list`,
+        LIST_ONLY_NO_FLEETS: () => `${API.PROJECTS.BASE()}/list_only_no_fleets`,
         CREATE: () => `${API.PROJECTS.BASE()}/create`,
         CREATE_WIZARD: () => `${API.PROJECTS.BASE()}/create_wizard`,
         DELETE: () => `${API.PROJECTS.BASE()}/delete`,
@@ -98,6 +99,7 @@ export const API = {
         // Fleets
         FLEETS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/list`,
         FLEETS_DETAILS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/get`,
+        FLEETS_APPLY: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/apply`,
         FLEETS_DELETE: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/fleets/delete`,
         FLEET_INSTANCES_DELETE: (projectName: IProject['project_name']) =>
             `${API.BASE()}/project/${projectName}/fleets/delete_instances`,

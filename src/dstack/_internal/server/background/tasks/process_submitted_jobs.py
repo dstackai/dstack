@@ -7,7 +7,14 @@ from typing import List, Optional, Union
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, joinedload, load_only, noload, selectinload
+from sqlalchemy.orm import (
+    contains_eager,
+    joinedload,
+    load_only,
+    noload,
+    selectinload,
+    with_loader_criteria,
+)
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import (
@@ -80,8 +87,9 @@ from dstack._internal.server.services.fleets import (
     is_cloud_cluster,
 )
 from dstack._internal.server.services.instances import (
-    format_instance_status_for_event,
+    format_instance_blocks_for_event,
     get_instance_provisioning_data,
+    switch_instance_status,
 )
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
@@ -213,7 +221,12 @@ async def _process_submitted_job(
         select(JobModel)
         .where(JobModel.id == job_model.id)
         .options(joinedload(JobModel.instance))
-        .options(joinedload(JobModel.fleet).joinedload(FleetModel.instances))
+        .options(
+            joinedload(JobModel.fleet).joinedload(FleetModel.instances),
+            with_loader_criteria(
+                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            ),
+        )
     )
     job_model = res.unique().scalar_one()
     res = await session.execute(
@@ -221,7 +234,12 @@ async def _process_submitted_job(
         .where(RunModel.id == job_model.run_id)
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(RunModel.user).load_only(UserModel.name))
-        .options(joinedload(RunModel.fleet).joinedload(FleetModel.instances))
+        .options(
+            joinedload(RunModel.fleet).joinedload(FleetModel.instances),
+            with_loader_criteria(
+                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            ),
+        )
     )
     run_model = res.unique().scalar_one()
     logger.debug("%s: provisioning has started", fmt(job_model))
@@ -490,7 +508,7 @@ async def _process_submitted_job(
             session.add(instance)
             events.emit(
                 session,
-                f"Instance created for job. Instance status: {format_instance_status_for_event(instance)}",
+                f"Instance created for job. Instance status: {instance.status.upper()}",
                 actor=events.SystemActor(),
                 targets=[
                     events.Target.from_model(instance),
@@ -629,7 +647,7 @@ async def _assign_job_to_fleet_instance(
         .options(joinedload(InstanceModel.volume_attachments))
     )
     instance = res.unique().scalar_one()
-    instance.status = InstanceStatus.BUSY
+    switch_instance_status(session, instance, InstanceStatus.BUSY)
     instance.busy_blocks += offer.blocks
 
     job_model.instance = instance
@@ -640,7 +658,7 @@ async def _assign_job_to_fleet_instance(
         session,
         (
             "Job assigned to instance."
-            f" Instance status: {format_instance_status_for_event(instance)}"
+            f" Instance blocks: {format_instance_blocks_for_event(instance)}"
         ),
         actor=events.SystemActor(),
         targets=[

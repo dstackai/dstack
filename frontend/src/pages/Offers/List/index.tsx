@@ -181,6 +181,10 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
         {
             id: 'availability',
             content: (gpu: IGpu) => {
+                // FIXME: array to string comparison never passes.
+                // Additionally, there are more availability statuses that are worth displaying,
+                // and several of them may be present at once.
+
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
                 if (gpu.availability === 'not_available') {

@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	linuxuser "github.com/dstackai/dstack/runner/internal/linux/user"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,13 +29,13 @@ func TestExecutor_WorkingDir_Set(t *testing.T) {
 
 	ex.jobSpec.WorkingDir = &workingDir
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
-	err = ex.setJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, workingDir, ex.jobWorkingDir)
 	err = os.MkdirAll(workingDir, 0o755)
 	require.NoError(t, err)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	// Normalize line endings for cross-platform compatibility.
 	assert.Equal(t, workingDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
@@ -47,11 +48,11 @@ func TestExecutor_WorkingDir_NotSet(t *testing.T) {
 	require.NoError(t, err)
 	ex.jobSpec.WorkingDir = nil
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
-	err = ex.setJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, cwd, ex.jobWorkingDir)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	assert.Equal(t, cwd+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
@@ -61,17 +62,17 @@ func TestExecutor_HomeDir(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo ~")
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err := ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, ex.homeDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
+	assert.Equal(t, ex.currentUser.HomeDir+"\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
 
 func TestExecutor_NonZeroExit(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "exit 100")
-	makeCodeTar(t, ex.codePath)
+	makeCodeTar(t, ex)
 
-	err := ex.Run(context.TODO())
+	err := ex.Run(t.Context())
 	assert.Error(t, err)
 	assert.NotEmpty(t, ex.jobStateHistory)
 	exitStatus := ex.jobStateHistory[len(ex.jobStateHistory)-1].ExitStatus
@@ -90,11 +91,11 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 		PrivateKey: &key,
 	}
 
-	clean, err := ex.setupCredentials(context.TODO())
+	clean, err := ex.setupGitCredentials(t.Context())
 	defer clean()
 	require.NoError(t, err)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	assert.Equal(t, key, b.String())
 }
@@ -104,12 +105,12 @@ func TestExecutor_LocalRepo(t *testing.T) {
 	ex := makeTestExecutor(t)
 	cmd := fmt.Sprintf("cat %s/foo", *ex.jobSpec.RepoDir)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, cmd)
-	makeCodeTar(t, ex.codePath)
+	makeCodeTar(t, ex)
 
-	err := ex.setupRepo(context.TODO())
+	err := ex.setupRepo(t.Context())
 	require.NoError(t, err)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	assert.Equal(t, "bar\n", strings.ReplaceAll(b.String(), "\r\n", "\n"))
 }
@@ -117,9 +118,9 @@ func TestExecutor_LocalRepo(t *testing.T) {
 func TestExecutor_Recover(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = nil // cause a panic
-	makeCodeTar(t, ex.codePath)
+	makeCodeTar(t, ex)
 
-	err := ex.Run(context.TODO())
+	err := ex.Run(t.Context())
 	assert.ErrorContains(t, err, "recovered: ")
 }
 
@@ -134,9 +135,9 @@ func TestExecutor_MaxDuration(t *testing.T) {
 	ex.killDelay = 500 * time.Millisecond
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo 1 && sleep 2 && echo 2")
 	ex.jobSpec.MaxDuration = 1 // seconds
-	makeCodeTar(t, ex.codePath)
+	makeCodeTar(t, ex)
 
-	err := ex.Run(context.TODO())
+	err := ex.Run(t.Context())
 	assert.ErrorContains(t, err, "killed")
 }
 
@@ -155,15 +156,15 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 		RepoConfigEmail: "developer@dstack.ai",
 	}
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "git rev-parse HEAD && git config user.name && git config user.email")
-	err := os.WriteFile(ex.codePath, []byte{}, 0o600) // empty diff
+	err := ex.WriteRepoBlob(bytes.NewReader([]byte{})) // empty diff
 	require.NoError(t, err)
 
-	err = ex.setJobWorkingDir(context.TODO())
+	err = ex.setJobWorkingDir(t.Context())
 	require.NoError(t, err)
-	err = ex.setupRepo(context.TODO())
+	err = ex.setupRepo(t.Context())
 	require.NoError(t, err)
 
-	err = ex.execJob(context.TODO(), io.Writer(&b))
+	err = ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 	expected := fmt.Sprintf("%s\n%s\n%s\n", ex.getRepoData().RepoHash, ex.getRepoData().RepoConfigName, ex.getRepoData().RepoConfigEmail)
 	assert.Equal(t, expected, strings.ReplaceAll(b.String(), "\r\n", "\n"))
@@ -204,23 +205,32 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 		},
 	}
 
-	temp := filepath.Join(baseDir, "temp")
-	_ = os.Mkdir(temp, 0o700)
-	home := filepath.Join(baseDir, "home")
-	_ = os.Mkdir(home, 0o700)
-	ex, _ := NewRunExecutor(temp, home, 10022)
+	tempDir := filepath.Join(baseDir, "temp")
+	require.NoError(t, os.Mkdir(tempDir, 0o700))
+
+	dstackDir := filepath.Join(baseDir, "dstack")
+	require.NoError(t, os.Mkdir(dstackDir, 0o755))
+
+	currentUser, err := linuxuser.FromCurrentProcess()
+	require.NoError(t, err)
+	homeDir := filepath.Join(baseDir, "home")
+	require.NoError(t, os.Mkdir(homeDir, 0o700))
+	currentUser.HomeDir = homeDir
+
+	ex, err := NewRunExecutor(tempDir, dstackDir, *currentUser, new(sshdMock))
+	require.NoError(t, err)
+
 	ex.SetJob(body)
-	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
-	ex.setJobWorkingDir(context.Background())
+	require.NoError(t, ex.setJobUser(t.Context()))
+	require.NoError(t, ex.setJobWorkingDir(t.Context()))
+
 	return ex
 }
 
-func makeCodeTar(t *testing.T, path string) {
+func makeCodeTar(t *testing.T, ex *RunExecutor) {
 	t.Helper()
-	file, err := os.Create(path)
-	require.NoError(t, err)
-	defer func() { _ = file.Close() }()
-	tw := tar.NewWriter(file)
+	var b bytes.Buffer
+	tw := tar.NewWriter(&b)
 
 	files := []struct{ name, body string }{
 		{"foo", "bar\n"},
@@ -233,6 +243,8 @@ func makeCodeTar(t *testing.T, path string) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, tw.Close())
+
+	require.NoError(t, ex.WriteRepoBlob(&b))
 }
 
 func TestWriteDstackProfile(t *testing.T) {
@@ -261,7 +273,7 @@ func TestExecutor_Logs(t *testing.T) {
 	// \033[31m = red text, \033[1;32m = bold green text, \033[0m = reset
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "printf '\\033[31mRed Hello World\\033[0m\\n' && printf '\\033[1;32mBold Green Line 2\\033[0m\\n' && printf 'Line 3\\n'")
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err := ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 
 	logHistory := ex.GetHistory(0).JobLogs
@@ -285,7 +297,7 @@ func TestExecutor_LogsWithErrors(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo 'Success message' && echo 'Error message' >&2 && exit 1")
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err := ex.execJob(t.Context(), io.Writer(&b))
 	assert.Error(t, err)
 
 	logHistory := ex.GetHistory(0).JobLogs
@@ -309,7 +321,7 @@ func TestExecutor_LogsAnsiCodeHandling(t *testing.T) {
 
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, cmd)
 
-	err := ex.execJob(context.TODO(), io.Writer(&b))
+	err := ex.execJob(t.Context(), io.Writer(&b))
 	assert.NoError(t, err)
 
 	// 1. Check WebSocket logs, which should preserve ANSI codes.
@@ -339,6 +351,24 @@ func TestExecutor_LogsAnsiCodeHandling(t *testing.T) {
 	for i := 1; i < len(wsLogHistory); i++ {
 		assert.GreaterOrEqual(t, wsLogHistory[i].Timestamp, wsLogHistory[i-1].Timestamp)
 	}
+}
+
+type sshdMock struct{}
+
+func (d *sshdMock) Port() int {
+	return 0
+}
+
+func (d *sshdMock) Start(context.Context) error {
+	return nil
+}
+
+func (d *sshdMock) Stop(context.Context) error {
+	return nil
+}
+
+func (d *sshdMock) AddAuthorizedKeys(context.Context, ...string) error {
+	return nil
 }
 
 func combineLogMessages(logHistory []schemas.LogEvent) string {

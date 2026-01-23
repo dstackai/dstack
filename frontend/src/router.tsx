@@ -10,9 +10,10 @@ import { LoginByGoogleCallback } from 'App/Login/LoginByGoogleCallback';
 import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
 import { TokenLogin } from 'App/Login/TokenLogin';
 import { Logout } from 'App/Logout';
-import { FleetDetails, FleetList } from 'pages/Fleets';
+import { FleetAdd, FleetDetails, FleetList } from 'pages/Fleets';
 import { EventsList as FleetEventsList } from 'pages/Fleets/Details/Events';
 import { FleetDetails as FleetDetailsGeneral } from 'pages/Fleets/Details/FleetDetails';
+import { FleetInspect } from 'pages/Fleets/Details/Inspect';
 import { InstanceList } from 'pages/Instances';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
@@ -28,6 +29,7 @@ import {
     RunDetailsPage,
     RunList,
 } from 'pages/Runs';
+import { RunInspect } from 'pages/Runs/Details/Inspect';
 import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
 import { EventsList as JobEvents } from 'pages/Runs/Details/Jobs/Events';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
@@ -122,6 +124,10 @@ export const router = createBrowserRouter([
                         path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.EVENTS.TEMPLATE,
                         element: <RunEvents />,
                     },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.INSPECT.TEMPLATE,
+                        element: <RunInspect />,
+                    },
                 ],
             },
             {
@@ -197,6 +203,10 @@ export const router = createBrowserRouter([
                 element: <FleetList />,
             },
             {
+                path: ROUTES.FLEETS.ADD.TEMPLATE,
+                element: <FleetAdd />,
+            },
+            {
                 path: ROUTES.FLEETS.DETAILS.TEMPLATE,
                 element: <FleetDetails />,
                 children: [
@@ -207,6 +217,10 @@ export const router = createBrowserRouter([
                     {
                         path: ROUTES.FLEETS.DETAILS.EVENTS.TEMPLATE,
                         element: <FleetEventsList />,
+                    },
+                    {
+                        path: ROUTES.FLEETS.DETAILS.INSPECT.TEMPLATE,
+                        element: <FleetInspect />,
                     },
                 ],
             },

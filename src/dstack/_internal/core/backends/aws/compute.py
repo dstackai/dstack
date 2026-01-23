@@ -1,6 +1,7 @@
 import threading
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import boto3
@@ -19,6 +20,8 @@ from dstack._internal.core.backends.aws.models import (
 )
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    ComputeCache,
+    ComputeTTLCache,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithGatewaySupport,
@@ -94,6 +97,11 @@ def _ec2client_cache_methodkey(self, ec2_client, *args, **kwargs):
     return hashkey(*args, **kwargs)
 
 
+@dataclass
+class AWSQuotasCache(ComputeTTLCache):
+    execution_lock: threading.Lock = field(default_factory=threading.Lock)
+
+
 class AWSCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
@@ -106,7 +114,12 @@ class AWSCompute(
     ComputeWithVolumeSupport,
     Compute,
 ):
-    def __init__(self, config: AWSConfig):
+    def __init__(
+        self,
+        config: AWSConfig,
+        quotas_cache: Optional[AWSQuotasCache] = None,
+        zones_cache: Optional[ComputeCache] = None,
+    ):
         super().__init__()
         self.config = config
         if isinstance(config.creds, AWSAccessKeyCreds):
@@ -119,23 +132,18 @@ class AWSCompute(
         # Caches to avoid redundant API calls when provisioning many instances
         # get_offers is already cached but we still cache its sub-functions
         # with more aggressive/longer caches.
-        self._offers_post_filter_cache_lock = threading.Lock()
-        self._offers_post_filter_cache = TTLCache(maxsize=10, ttl=180)
-        self._get_regions_to_quotas_cache_lock = threading.Lock()
-        self._get_regions_to_quotas_execution_lock = threading.Lock()
-        self._get_regions_to_quotas_cache = TTLCache(maxsize=10, ttl=300)
-        self._get_regions_to_zones_cache_lock = threading.Lock()
-        self._get_regions_to_zones_cache = Cache(maxsize=10)
-        self._get_vpc_id_subnet_id_or_error_cache_lock = threading.Lock()
-        self._get_vpc_id_subnet_id_or_error_cache = TTLCache(maxsize=100, ttl=600)
-        self._get_maximum_efa_interfaces_cache_lock = threading.Lock()
-        self._get_maximum_efa_interfaces_cache = Cache(maxsize=100)
-        self._get_subnets_availability_zones_cache_lock = threading.Lock()
-        self._get_subnets_availability_zones_cache = Cache(maxsize=100)
-        self._create_security_group_cache_lock = threading.Lock()
-        self._create_security_group_cache = TTLCache(maxsize=100, ttl=600)
-        self._get_image_id_and_username_cache_lock = threading.Lock()
-        self._get_image_id_and_username_cache = TTLCache(maxsize=100, ttl=600)
+        self._offers_post_filter_cache = ComputeTTLCache(cache=TTLCache(maxsize=10, ttl=180))
+        if quotas_cache is None:
+            quotas_cache = AWSQuotasCache(cache=TTLCache(maxsize=10, ttl=600))
+        self._regions_to_quotas_cache = quotas_cache
+        if zones_cache is None:
+            zones_cache = ComputeCache(cache=Cache(maxsize=10))
+        self._regions_to_zones_cache = zones_cache
+        self._vpc_id_subnet_id_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
+        self._maximum_efa_interfaces_cache = ComputeCache(cache=Cache(maxsize=100))
+        self._subnets_availability_zones_cache = ComputeCache(cache=Cache(maxsize=100))
+        self._security_group_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
+        self._image_id_and_username_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
 
     def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
@@ -144,7 +152,7 @@ class AWSCompute(
             extra_filter=_supported_instances,
         )
         regions = list(set(i.region for i in offers))
-        with self._get_regions_to_quotas_execution_lock:
+        with self._regions_to_quotas_cache.execution_lock:
             # Cache lock does not prevent concurrent execution.
             # We use a separate lock to avoid requesting quotas in parallel and hitting rate limits.
             regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
@@ -173,9 +181,9 @@ class AWSCompute(
         return hash(requirements.json())
 
     @cachedmethod(
-        cache=lambda self: self._offers_post_filter_cache,
+        cache=lambda self: self._offers_post_filter_cache.cache,
         key=_get_offers_cached_key,
-        lock=lambda self: self._offers_post_filter_cache_lock,
+        lock=lambda self: self._offers_post_filter_cache.lock,
     )
     def get_offers_post_filter(
         self, requirements: Requirements
@@ -789,9 +797,9 @@ class AWSCompute(
         return hashkey(tuple(regions))
 
     @cachedmethod(
-        cache=lambda self: self._get_regions_to_quotas_cache,
+        cache=lambda self: self._regions_to_quotas_cache.cache,
         key=_get_regions_to_quotas_key,
-        lock=lambda self: self._get_regions_to_quotas_cache_lock,
+        lock=lambda self: self._regions_to_quotas_cache.lock,
     )
     def _get_regions_to_quotas(
         self,
@@ -808,9 +816,9 @@ class AWSCompute(
         return hashkey(tuple(regions))
 
     @cachedmethod(
-        cache=lambda self: self._get_regions_to_zones_cache,
+        cache=lambda self: self._regions_to_zones_cache.cache,
         key=_get_regions_to_zones_key,
-        lock=lambda self: self._get_regions_to_zones_cache_lock,
+        lock=lambda self: self._regions_to_zones_cache.lock,
     )
     def _get_regions_to_zones(
         self,
@@ -832,9 +840,9 @@ class AWSCompute(
         )
 
     @cachedmethod(
-        cache=lambda self: self._get_vpc_id_subnet_id_or_error_cache,
+        cache=lambda self: self._vpc_id_subnet_id_cache.cache,
         key=_get_vpc_id_subnet_id_or_error_cache_key,
-        lock=lambda self: self._get_vpc_id_subnet_id_or_error_cache_lock,
+        lock=lambda self: self._vpc_id_subnet_id_cache.lock,
     )
     def _get_vpc_id_subnet_id_or_error(
         self,
@@ -853,9 +861,9 @@ class AWSCompute(
         )
 
     @cachedmethod(
-        cache=lambda self: self._get_maximum_efa_interfaces_cache,
+        cache=lambda self: self._maximum_efa_interfaces_cache.cache,
         key=_ec2client_cache_methodkey,
-        lock=lambda self: self._get_maximum_efa_interfaces_cache_lock,
+        lock=lambda self: self._maximum_efa_interfaces_cache.lock,
     )
     def _get_maximum_efa_interfaces(
         self,
@@ -877,9 +885,9 @@ class AWSCompute(
         return hashkey(region, tuple(subnet_ids))
 
     @cachedmethod(
-        cache=lambda self: self._get_subnets_availability_zones_cache,
+        cache=lambda self: self._subnets_availability_zones_cache.cache,
         key=_get_subnets_availability_zones_key,
-        lock=lambda self: self._get_subnets_availability_zones_cache_lock,
+        lock=lambda self: self._subnets_availability_zones_cache.lock,
     )
     def _get_subnets_availability_zones(
         self,
@@ -893,9 +901,9 @@ class AWSCompute(
         )
 
     @cachedmethod(
-        cache=lambda self: self._create_security_group_cache,
+        cache=lambda self: self._security_group_cache.cache,
         key=_ec2client_cache_methodkey,
-        lock=lambda self: self._create_security_group_cache_lock,
+        lock=lambda self: self._security_group_cache.lock,
     )
     def _create_security_group(
         self,
@@ -923,9 +931,9 @@ class AWSCompute(
         )
 
     @cachedmethod(
-        cache=lambda self: self._get_image_id_and_username_cache,
+        cache=lambda self: self._image_id_and_username_cache.cache,
         key=_get_image_id_and_username_cache_key,
-        lock=lambda self: self._get_image_id_and_username_cache_lock,
+        lock=lambda self: self._image_id_and_username_cache.lock,
     )
     def _get_image_id_and_username(
         self,

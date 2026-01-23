@@ -159,7 +159,7 @@ $ DSTACK_DATABASE_URL=postgresql+asyncpg://user:password@db-host:5432/dstack dst
 
 By default, `dstack` stores workload logs locally in `~/.dstack/server/projects/<project_name>/logs`.
 For multi-replica server deployments, it's required to store logs externally.
-`dstack` supports storing logs using AWS CloudWatch or GCP Logging.
+`dstack` supports storing logs using AWS CloudWatch, GCP Logging, or Fluent-bit with Elasticsearch / Opensearch.
 
 ### AWS CloudWatch
 
@@ -221,6 +221,78 @@ To store logs using GCP Logging, set the `DSTACK_SERVER_GCP_LOGGING_PROJECT` env
     ```
 
     </div>
+
+### Fluent-bit
+
+To store logs using Fluent-bit, set the `DSTACK_SERVER_FLUENTBIT_HOST` environment variable.
+Fluent-bit supports two modes depending on how you want to access logs.
+
+=== "Full mode"
+
+    Logs are shipped to Fluent-bit and can be read back through the `dstack` UI and CLI via Elasticsearch or OpenSearch.
+    Use this mode when you want a complete integration with log viewing in `dstack`:
+
+    ```shell
+    $ DSTACK_SERVER_FLUENTBIT_HOST=fluentbit.example.com \
+      DSTACK_SERVER_ELASTICSEARCH_HOST=https://elasticsearch.example.com:9200 \
+      dstack server
+    ```
+
+=== "Ship-only mode"
+
+    Logs are forwarded to Fluent-bit but cannot be read through `dstack`. 
+    The dstack UI/CLI will show empty logs. Use this mode when:
+
+    - You have an existing logging infrastructure (Kibana, Grafana, Datadog, etc.)
+    - You only need to forward logs without reading them back through `dstack`
+    - You want to reduce operational complexity by not running Elasticsearch/OpenSearch
+
+    ```shell
+    $ DSTACK_SERVER_FLUENTBIT_HOST=fluentbit.example.com \
+      dstack server
+    ```
+
+??? info "Additional configuration"
+    The following optional environment variables can be used to customize the Fluent-bit integration:
+
+    **Fluent-bit settings:**
+
+    - `DSTACK_SERVER_FLUENTBIT_PORT` – The Fluent-bit port. Defaults to `24224`.
+    - `DSTACK_SERVER_FLUENTBIT_PROTOCOL` – The protocol to use: `forward` or `http`. Defaults to `forward`.
+    - `DSTACK_SERVER_FLUENTBIT_TAG_PREFIX` – The tag prefix for logs. Defaults to `dstack`.
+
+    **Elasticsearch/OpenSearch settings (for full mode only):**
+
+    - `DSTACK_SERVER_ELASTICSEARCH_HOST` – The Elasticsearch/OpenSearch host for reading logs. If not set, runs in ship-only mode.
+    - `DSTACK_SERVER_ELASTICSEARCH_INDEX` – The Elasticsearch/OpenSearch index pattern. Defaults to `dstack-logs`.
+    - `DSTACK_SERVER_ELASTICSEARCH_API_KEY` – The Elasticsearch/OpenSearch API key for authentication.
+
+??? info "Fluent-bit configuration"
+    Configure Fluent-bit to receive logs and forward them to Elasticsearch or OpenSearch. Example configuration:
+
+    ```ini
+    [INPUT]
+        Name        forward
+        Listen      0.0.0.0
+        Port        24224
+
+    [OUTPUT]
+        Name            es
+        Match           dstack.*
+        Host            elasticsearch.example.com
+        Port            9200
+        Index           dstack-logs
+        Suppress_Type_Name On
+    ```
+
+??? info "Required dependencies"
+    To use Fluent-bit log storage, install the `fluentbit` extras:
+
+    ```shell
+    $ pip install "dstack[all]" -U
+    # or
+    $ pip install "dstack[fluentbit]" -U
+    ```
 
 ## File storage
 
@@ -426,8 +498,10 @@ If a deployment is stuck due to a deadlock when applying DB migrations, try scal
 
 ??? info "Can I run multiple replicas of dstack server?"
 
-    Yes, you can if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).
+    Yes, you can if you configure `dstack` to use [PostgreSQL](#postgresql) and an external log storage
+    such as [AWS CloudWatch](#aws-cloudwatch), [GCP Logging](#gcp-logging), or [Fluent-bit](#fluent-bit).
 
 ??? info "Does dstack server support blue-green or rolling deployments?"
 
-    Yes, it does if you configure `dstack` to use [PostgreSQL](#postgresql) and [AWS CloudWatch](#aws-cloudwatch).
+    Yes, it does if you configure `dstack` to use [PostgreSQL](#postgresql) and an external log storage
+    such as [AWS CloudWatch](#aws-cloudwatch), [GCP Logging](#gcp-logging), or [Fluent-bit](#fluent-bit).

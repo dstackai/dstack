@@ -1,4 +1,5 @@
-from typing import List, Union
+from typing import List, Optional, Union
+from uuid import UUID
 
 from pydantic import parse_obj_as
 
@@ -24,8 +25,14 @@ class FleetsAPIClient(APIClientGroup):
         resp = self._request(f"/api/project/{project_name}/fleets/list")
         return parse_obj_as(List[Fleet.__response__], resp.json())
 
-    def get(self, project_name: str, name: str) -> Fleet:
-        body = GetFleetRequest(name=name)
+    def get(
+        self, project_name: str, name: Optional[str] = None, fleet_id: Optional[UUID] = None
+    ) -> Fleet:
+        if name is None and fleet_id is None:
+            raise ValueError("Either name or fleet_id must be provided")
+        if name is not None and fleet_id is not None:
+            raise ValueError("Cannot specify both name and fleet_id")
+        body = GetFleetRequest(name=name, id=fleet_id)
         resp = self._request(
             f"/api/project/{project_name}/fleets/get",
             body=body.json(),

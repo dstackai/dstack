@@ -1,6 +1,7 @@
 package consts
 
-const DstackDirPath string = ".dstack"
+// A directory inside user's home used for dstack-related files
+const DstackUserDir string = ".dstack"
 
 // Runner's log filenames
 const (
@@ -25,10 +26,13 @@ const (
 	// NOTE: RunnerRuntimeDir would be a more appropriate name, but it's called tempDir
 	// throughout runner's codebase
 	RunnerTempDir = "/tmp/runner"
-	// Currently, it's a directory where authorized_keys, git credentials, etc. are placed
-	// The current user's homedir (as of 2024-12-28, it's always root) should be used
-	// instead of the hardcoded value
-	RunnerHomeDir = "/root"
+	// A directory for:
+	// 1. Files used by the runner and related components (e.g., sshd stores its config and log inside /dstack/ssh)
+	// 2. Files shared between users (e.g., sshd authorized_keys, MPI hostfile)
+	// The inner structure should be considered private and subject to change, the users should not make assumptions
+	// about its structure.
+	// The only way to access its content/paths should be via public environment variables such as DSTACK_MPI_HOSTFILE.
+	RunnerDstackDir = "/dstack"
 )
 
 const (

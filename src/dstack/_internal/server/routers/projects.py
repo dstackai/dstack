@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.projects import Project
+from dstack._internal.core.models.projects import Project, ProjectsInfoListOrProjectsList
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import (
@@ -23,7 +23,7 @@ from dstack._internal.server.security.permissions import (
     ProjectManagerOrSelfLeave,
     ProjectMemberOrPublicAccess,
 )
-from dstack._internal.server.services import projects
+from dstack._internal.server.services import fleets, projects
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -36,14 +36,17 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=List[Project])
+@router.post("/list", response_model=ProjectsInfoListOrProjectsList)
 async def list_projects(
     body: Optional[ListProjectsRequest] = None,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ):
     """
-    Returns all projects visible to user sorted by descending `created_at`.
+    Returns projects visible to the user.
+
+    Returns all accessible projects (member projects for regular users, all non-deleted
+    projects for global admins, plus public projects if `include_not_joined` is `True`).
 
     `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
     """
@@ -52,8 +55,35 @@ async def list_projects(
         body = ListProjectsRequest()
     return CustomORJSONResponse(
         await projects.list_user_accessible_projects(
-            session=session, user=user, include_not_joined=body.include_not_joined
+            session=session,
+            user=user,
+            include_not_joined=body.include_not_joined,
+            return_total_count=body.return_total_count,
+            name_pattern=body.name_pattern,
+            prev_created_at=body.prev_created_at,
+            prev_id=body.prev_id,
+            limit=body.limit,
+            ascending=body.ascending,
         )
+    )
+
+
+@router.post("/list_only_no_fleets", response_model=List[Project])
+async def list_only_no_fleets(
+    session: AsyncSession = Depends(get_session),
+    user: UserModel = Depends(Authenticated()),
+):
+    """
+    Returns only projects where the user is a member and that have no active fleets,
+    sorted by ascending `created_at`.
+
+    Active fleets are those with `deleted == False`. Projects with deleted fleets
+    (but no active fleets) are included.
+
+    `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
+    """
+    return CustomORJSONResponse(
+        await fleets.list_projects_with_no_active_fleets(session=session, user=user)
     )
 
 

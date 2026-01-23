@@ -7,6 +7,7 @@ import { Button, ContentLayout, DetailsHeader, Tabs } from 'components';
 enum CodeTab {
     Details = 'details',
     Events = 'events',
+    Inspect = 'inspect',
 }
 
 import { useBreadcrumbs } from 'hooks';
@@ -95,6 +96,11 @@ export const FleetDetails: React.FC = () => {
                             label: 'Events',
                             id: CodeTab.Events,
                             href: ROUTES.FLEETS.DETAILS.EVENTS.FORMAT(paramProjectName, paramFleetId),
+                        },
+                        {
+                            label: 'Inspect',
+                            id: CodeTab.Inspect,
+                            href: ROUTES.FLEETS.DETAILS.INSPECT.FORMAT(paramProjectName, paramFleetId),
                         },
                     ]}
                 />

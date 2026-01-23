@@ -13,7 +13,6 @@ type Executor interface {
 	GetJobWsLogsHistory() []schemas.LogEvent
 	GetRunnerState() string
 	Run(ctx context.Context) error
-	SetCodePath(codePath string)
 	SetJob(job schemas.SubmitBody)
 	SetJobState(ctx context.Context, state types.JobState)
 	SetJobStateWithTerminationReason(
@@ -23,7 +22,8 @@ type Executor interface {
 		termination_message string,
 	)
 	SetRunnerState(state string)
-	AddFileArchive(id string, src io.Reader) error
+	WriteFileArchive(id string, src io.Reader) error
+	WriteRepoBlob(src io.Reader) error
 	Lock()
 	RLock()
 	RUnlock()

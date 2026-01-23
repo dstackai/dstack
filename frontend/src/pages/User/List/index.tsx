@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 
 import {
+    Box,
     Button,
     ConfirmationDialog,
     Header,
@@ -208,8 +209,10 @@ export const UserList: React.FC = () => {
 
             <ConfirmationDialog
                 visible={showDeleteConfirm}
+                content={<Box variant="span">{t('confirm_dialog.message')}</Box>}
                 onDiscard={toggleDeleteConfirm}
                 onConfirm={deleteSelectedUserHandler}
+                confirmButtonLabel={t('common.delete')}
             />
         </>
     );

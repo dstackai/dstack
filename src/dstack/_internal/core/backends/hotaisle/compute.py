@@ -103,10 +103,7 @@ class HotAisleCompute(
             if provisioning_data.hostname is None and provisioning_data.backend_data:
                 backend_data = HotAisleInstanceBackendData.load(provisioning_data.backend_data)
                 provisioning_data.hostname = backend_data.ip_address
-            commands = get_shim_commands(
-                authorized_keys=[project_ssh_public_key],
-                arch=provisioning_data.instance_type.resources.cpu_arch,
-            )
+            commands = get_shim_commands(arch=provisioning_data.instance_type.resources.cpu_arch)
             launch_command = "sudo sh -c " + shlex.quote(" && ".join(commands))
             thread = Thread(
                 target=_start_runner,

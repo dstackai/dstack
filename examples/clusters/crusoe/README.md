@@ -6,12 +6,12 @@ title: Distributed workload orchestration on Crusoe with dstack
 
 Crusoe offers two ways to use clusters with fast interconnect:
 
-* [Kubernetes](#kubernetes) – Lets you interact with clusters through the Kubernetes API and includes support for NVIDIA GPU operators and related tools.
-* [Virtual Machines (VMs)](#vms) – Gives you direct access to clusters in the form of virtual machines.
+* [Crusoe Managed Kubernetes](#kubernetes) – Lets you interact with clusters through the Kubernetes API and includes support for NVIDIA and AMD GPU operators and related tools.
+* [Virtual Machines (VMs)](#vms) – Gives you direct access to clusters in the form of virtual machines with NVIDIA and AMD GPUs.
 
 Both options use the same underlying networking infrastructure. This example walks you through how to set up Crusoe clusters to use with `dstack`.
 
-## Kubernetes
+## Crusoe Managed Kubernetes { #kubernetes }
 
 !!! info "Prerequsisites"
     1. Go `Networking` → `Firewall Rules`, click `Create Firewall Rule`, and allow ingress traffic on port `30022`. This port will be used by the `dstack` server to access the jump host.
@@ -21,7 +21,7 @@ Both options use the same underlying networking infrastructure. This example wal
 
 ### Configure the backend
 
-Follow the standard instructions for setting up a [Kubernetes](https://dstack.ai/docs/concepts/backends/#kubernetes) backend:
+Follow the standard instructions for setting up a [`kubernetes`](https://dstack.ai/docs/concepts/backends/#kubernetes) backend:
 
 <div editor-title="~/.dstack/server/config.yml">
 
@@ -40,7 +40,7 @@ projects:
 
 ### Create a fleet
 
-Once the Kubernetes cluster and the `dstack` server are running, you can create a fleet:
+Once the Crusoe Managed Kubernetes cluster and the `dstack` server are running, you can create a fleet:
 
 <div editor-title="crusoe-fleet.dstack.yml">
     
@@ -118,9 +118,9 @@ Once the fleet is created, you can run [dev environments](https://dstack.ai/docs
 
 Use a [distributed task](https://dstack.ai/docs/concepts/tasks#distributed-task) that runs NCCL tests to validate cluster network bandwidth.
 
-=== "Kubernetes"
+=== "Crusoe Managed Kubernetes"
 
-    If you’re running on Crusoe’s Kubernetes, make sure to install HPC-X and provide an up-to-date topology file. 
+    If you’re running on Crusoe Managed Kubernetes, make sure to install HPC-X and provide an up-to-date topology file. 
 
     <div editor-title="crusoe-nccl-tests.dstack.yml">
 
@@ -185,9 +185,9 @@ Use a [distributed task](https://dstack.ai/docs/concepts/tasks#distributed-task)
     > The task above downloads an A100 topology file from a Gist. The most reliable way to obtain the latest topology is to copy it from a Crusoe-provisioned VM (see [VMs](#vms)).
     
     ??? info "Privileged"
-        When running on Kubernetes, set `privileged` to `true` to ensure access to InfiniBand.
+        When running on Crusoe Managed Kubernetes, set `privileged` to `true` to ensure access to InfiniBand.
 
-=== "SSH fleets"
+=== "VMs"
 
 With Crusoe VMs, HPC-X and up-to-date topology files are already available on the hosts. When using SSH fleets, simply mount them via [instance volumes](https://dstack.ai/docs/concepts/volumes#instance-volumes).
 
@@ -294,4 +294,4 @@ nccl-tests provisioning completed (running)
 
 1. Learn about [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), [services](https://dstack.ai/docs/concepts/services)
 2. Read the [Kuberentes](https://dstack.ai/docs/guides/kubernetes), and [Clusters](https://dstack.ai/docs/guides/clusters) guides
-3. Check Crusoe's docs on [networking](https://docs.crusoecloud.com/networking/infiniband/) and [Kubernetes](https://docs.crusoecloud.com/orchestration/cmk/index.html)
+3. Check the docs on [Crusoe's networking](https://docs.crusoecloud.com/networking/infiniband/) and ["Crusoe Managed" Kubernetes](https://docs.crusoecloud.com/orchestration/cmk/index.html)

@@ -14,8 +14,7 @@ import (
 )
 
 type Server struct {
-	srv     *http.Server
-	tempDir string
+	srv *http.Server
 
 	shutdownCh   chan interface{} // server closes this chan on shutdown
 	jobBarrierCh chan interface{} // only server listens on this chan
@@ -33,12 +32,8 @@ type Server struct {
 	version string
 }
 
-func NewServer(ctx context.Context, tempDir string, homeDir string, address string, sshPort int, version string) (*Server, error) {
+func NewServer(ctx context.Context, address string, version string, ex executor.Executor) (*Server, error) {
 	r := api.NewRouter()
-	ex, err := executor.NewRunExecutor(tempDir, homeDir, sshPort)
-	if err != nil {
-		return nil, err
-	}
 
 	metricsCollector, err := metrics.NewMetricsCollector(ctx)
 	if err != nil {
@@ -50,7 +45,6 @@ func NewServer(ctx context.Context, tempDir string, homeDir string, address stri
 			Addr:    address,
 			Handler: r,
 		},
-		tempDir: tempDir,
 
 		shutdownCh:   make(chan interface{}),
 		jobBarrierCh: make(chan interface{}),

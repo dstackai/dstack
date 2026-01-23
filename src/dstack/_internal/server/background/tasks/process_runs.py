@@ -2,9 +2,9 @@ import asyncio
 import datetime
 from typing import List, Optional, Set, Tuple
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, selectinload
+from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only, with_loader_criteria
 
 import dstack._internal.server.services.services.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
@@ -33,6 +33,7 @@ from dstack._internal.server.services.jobs import (
     get_job_specs_from_run_spec,
     group_jobs_by_replica_latest,
     is_master_job,
+    job_model_to_job_submission,
     switch_job_status,
 )
 from dstack._internal.server.services.locking import get_locker
@@ -110,7 +111,15 @@ async def _process_next_run():
                         ),
                     ),
                 )
-                .options(joinedload(RunModel.jobs).load_only(JobModel.id))
+                .options(
+                    joinedload(RunModel.jobs).load_only(JobModel.id),
+                    # No need to lock finished jobs
+                    with_loader_criteria(
+                        JobModel,
+                        JobModel.status.not_in(JobStatus.finished_statuses()),
+                        include_aliases=True,
+                    ),
+                )
                 .options(load_only(RunModel.id))
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
@@ -125,12 +134,20 @@ async def _process_next_run():
                     JobModel.run_id == run_model.id,
                     JobModel.id.not_in(job_lockset),
                 )
+                .options(
+                    load_only(JobModel.id),
+                    with_loader_criteria(
+                        JobModel,
+                        JobModel.status.not_in(JobStatus.finished_statuses()),
+                        include_aliases=True,
+                    ),
+                )
                 .order_by(JobModel.id)  # take locks in order
                 .with_for_update(skip_locked=True, key_share=True)
             )
             job_models = res.scalars().all()
             if len(run_model.jobs) != len(job_models):
-                # Some jobs are locked
+                # Some jobs are locked or there was a non-repeatable read
                 return
             job_ids = [j.id for j in run_model.jobs]
             run_lockset.add(run_model.id)
@@ -144,22 +161,7 @@ async def _process_next_run():
 
 
 async def _process_run(session: AsyncSession, run_model: RunModel):
-    # Refetch to load related attributes.
-    res = await session.execute(
-        select(RunModel)
-        .where(RunModel.id == run_model.id)
-        .execution_options(populate_existing=True)
-        .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
-        .options(joinedload(RunModel.user).load_only(UserModel.name))
-        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
-        .options(
-            selectinload(RunModel.jobs)
-            .joinedload(JobModel.instance)
-            .load_only(InstanceModel.fleet_id)
-        )
-        .execution_options(populate_existing=True)
-    )
-    run_model = res.unique().scalar_one()
+    run_model = await _refetch_run_model(session, run_model)
     logger.debug("%s: processing run", fmt(run_model))
     try:
         if run_model.status == RunStatus.PENDING:
@@ -179,6 +181,46 @@ async def _process_run(session: AsyncSession, run_model: RunModel):
 
     run_model.last_processed_at = common.get_current_datetime()
     await session.commit()
+
+
+async def _refetch_run_model(session: AsyncSession, run_model: RunModel) -> RunModel:
+    # Select only latest submissions for every job.
+    latest_submissions_sq = (
+        select(
+            JobModel.run_id.label("run_id"),
+            JobModel.replica_num.label("replica_num"),
+            JobModel.job_num.label("job_num"),
+            func.max(JobModel.submission_num).label("max_submission_num"),
+        )
+        .where(JobModel.run_id == run_model.id)
+        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
+        .subquery()
+    )
+    job_alias = aliased(JobModel)
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == run_model.id)
+        .outerjoin(latest_submissions_sq, latest_submissions_sq.c.run_id == RunModel.id)
+        .outerjoin(
+            job_alias,
+            onclause=and_(
+                job_alias.run_id == latest_submissions_sq.c.run_id,
+                job_alias.replica_num == latest_submissions_sq.c.replica_num,
+                job_alias.job_num == latest_submissions_sq.c.job_num,
+                job_alias.submission_num == latest_submissions_sq.c.max_submission_num,
+            ),
+        )
+        .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
+        .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
+        .options(
+            contains_eager(RunModel.jobs, alias=job_alias)
+            .joinedload(JobModel.instance)
+            .load_only(InstanceModel.fleet_id)
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
 
 
 async def _process_pending_run(session: AsyncSession, run_model: RunModel):
@@ -294,7 +336,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
                 and job_model.termination_reason
                 not in {JobTerminationReason.DONE_BY_RUNNER, JobTerminationReason.SCALED_DOWN}
             ):
-                current_duration = _should_retry_job(run, job, job_model)
+                current_duration = await _should_retry_job(session, run, job, job_model)
                 if current_duration is None:
                     replica_statuses.add(RunStatus.FAILED)
                     run_termination_reasons.add(RunTerminationReason.JOB_FAILED)
@@ -552,19 +594,44 @@ def _has_out_of_date_replicas(run: RunModel) -> bool:
     return False
 
 
-def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datetime.timedelta]:
+async def _should_retry_job(
+    session: AsyncSession,
+    run: Run,
+    job: Job,
+    job_model: JobModel,
+) -> Optional[datetime.timedelta]:
     """
     Checks if the job should be retried.
     Returns the current duration of retrying if retry is enabled.
+    Retrying duration is calculated as the time since `last_processed_at`
+    of the latest provisioned submission.
     """
     if job.job_spec.retry is None:
         return None
 
     last_provisioned_submission = None
-    for job_submission in reversed(job.job_submissions):
-        if job_submission.job_provisioning_data is not None:
-            last_provisioned_submission = job_submission
-            break
+    if len(job.job_submissions) > 0:
+        last_submission = job.job_submissions[-1]
+        if last_submission.job_provisioning_data is not None:
+            last_provisioned_submission = last_submission
+        else:
+            # The caller passes at most one latest submission in job.job_submissions, so check the db.
+            res = await session.execute(
+                select(JobModel)
+                .where(
+                    JobModel.run_id == job_model.run_id,
+                    JobModel.replica_num == job_model.replica_num,
+                    JobModel.job_num == job_model.job_num,
+                    JobModel.job_provisioning_data.is_not(None),
+                )
+                .order_by(JobModel.last_processed_at.desc())
+                .limit(1)
+            )
+            last_provisioned_submission_model = res.scalar()
+            if last_provisioned_submission_model is not None:
+                last_provisioned_submission = job_model_to_job_submission(
+                    last_provisioned_submission_model
+                )
 
     if (
         job_model.termination_reason is not None
@@ -574,13 +641,10 @@ def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datet
     ):
         return common.get_current_datetime() - run.submitted_at
 
-    if last_provisioned_submission is None:
-        return None
-
     if (
-        last_provisioned_submission.termination_reason is not None
-        and JobTerminationReason(last_provisioned_submission.termination_reason).to_retry_event()
-        in job.job_spec.retry.on_events
+        job_model.termination_reason is not None
+        and job_model.termination_reason.to_retry_event() in job.job_spec.retry.on_events
+        and last_provisioned_submission is not None
     ):
         return common.get_current_datetime() - last_provisioned_submission.last_processed_at
 

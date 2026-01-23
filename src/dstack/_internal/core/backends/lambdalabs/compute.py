@@ -95,10 +95,7 @@ class LambdaCompute(
         instance_info = _get_instance_info(self.api_client, provisioning_data.instance_id)
         if instance_info is not None and instance_info["status"] != "booting":
             provisioning_data.hostname = instance_info["ip"]
-            commands = get_shim_commands(
-                authorized_keys=[project_ssh_public_key],
-                arch=provisioning_data.instance_type.resources.cpu_arch,
-            )
+            commands = get_shim_commands(arch=provisioning_data.instance_type.resources.cpu_arch)
             # shim is assumed to be run under root
             launch_command = "sudo sh -c " + shlex.quote(" && ".join(commands))
             thread = Thread(

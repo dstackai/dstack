@@ -189,6 +189,11 @@ export const RunDetailsPage: React.FC = () => {
                                     id: CodeTab.Events,
                                     href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.EVENTS.FORMAT(paramProjectName, paramRunId),
                                 },
+                                {
+                                    label: 'Inspect',
+                                    id: CodeTab.Inspect,
+                                    href: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.INSPECT.FORMAT(paramProjectName, paramRunId),
+                                },
                             ]}
                         />
                     )}

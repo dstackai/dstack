@@ -43,6 +43,11 @@ export const ROUTES = {
                         FORMAT: (projectName: string, runId: string) =>
                             buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.LOGS.TEMPLATE, { projectName, runId }),
                     },
+                    INSPECT: {
+                        TEMPLATE: `/projects/:projectName/runs/:runId/inspect`,
+                        FORMAT: (projectName: string, runId: string) =>
+                            buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.INSPECT.TEMPLATE, { projectName, runId }),
+                    },
                     JOBS: {
                         DETAILS: {
                             TEMPLATE: `/projects/:projectName/runs/:runId/jobs/:jobName`,
@@ -132,6 +137,10 @@ export const ROUTES = {
 
     FLEETS: {
         LIST: '/fleets',
+        ADD: {
+            TEMPLATE: `/projects/:projectName/fleets/add`,
+            FORMAT: (projectName: string) => buildRoute(ROUTES.FLEETS.ADD.TEMPLATE, { projectName }),
+        },
         DETAILS: {
             TEMPLATE: `/projects/:projectName/fleets/:fleetId`,
             FORMAT: (projectName: string, fleetId: string) =>
@@ -140,6 +149,11 @@ export const ROUTES = {
                 TEMPLATE: `/projects/:projectName/fleets/:fleetId/events`,
                 FORMAT: (projectName: string, fleetId: string) =>
                     buildRoute(ROUTES.FLEETS.DETAILS.EVENTS.TEMPLATE, { projectName, fleetId }),
+            },
+            INSPECT: {
+                TEMPLATE: `/projects/:projectName/fleets/:fleetId/inspect`,
+                FORMAT: (projectName: string, fleetId: string) =>
+                    buildRoute(ROUTES.FLEETS.DETAILS.INSPECT.TEMPLATE, { projectName, fleetId }),
             },
         },
     },

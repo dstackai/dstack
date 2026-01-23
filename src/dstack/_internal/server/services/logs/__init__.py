@@ -2,12 +2,14 @@ import atexit
 from typing import List, Optional
 from uuid import UUID
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.logs import JobSubmissionLogs
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
 from dstack._internal.server.services.logs import aws as aws_logs
+from dstack._internal.server.services.logs import fluentbit as fluentbit_logs
 from dstack._internal.server.services.logs import gcp as gcp_logs
 from dstack._internal.server.services.logs.base import (
     LogStorage,
@@ -57,6 +59,29 @@ def get_log_storage() -> LogStorage:
                 logger.debug("Using GCP Logs storage")
         else:
             logger.error("Cannot use GCP Logs storage: GCP deps are not installed")
+    elif settings.SERVER_FLUENTBIT_HOST:
+        if fluentbit_logs.FLUENTBIT_AVAILABLE:
+            try:
+                _log_storage = fluentbit_logs.FluentBitLogStorage(
+                    host=settings.SERVER_FLUENTBIT_HOST,
+                    port=settings.SERVER_FLUENTBIT_PORT,
+                    protocol=settings.SERVER_FLUENTBIT_PROTOCOL,
+                    tag_prefix=settings.SERVER_FLUENTBIT_TAG_PREFIX,
+                    es_host=settings.SERVER_ELASTICSEARCH_HOST,
+                    es_index=settings.SERVER_ELASTICSEARCH_INDEX,
+                    es_api_key=settings.SERVER_ELASTICSEARCH_API_KEY,
+                )
+            except LogStorageError as e:
+                logger.error("Failed to initialize Fluent-bit Logs storage: %s", e)
+            except Exception:
+                logger.exception("Got exception when initializing Fluent-bit Logs storage")
+            else:
+                if settings.SERVER_ELASTICSEARCH_HOST:
+                    logger.debug("Using Fluent-bit Logs storage with Elasticsearch/OpenSearch")
+                else:
+                    logger.debug("Using Fluent-bit Logs storage in ship-only mode")
+        else:
+            logger.error("Cannot use Fluent-bit Logs storage: fluent-logger is not installed")
     if _log_storage is None:
         _log_storage = FileLogStorage()
         logger.debug("Using file-based storage")
@@ -81,9 +106,13 @@ def write_logs(
 
 
 async def poll_logs_async(project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
-    job_submission_logs = await run_async(
-        get_log_storage().poll_logs, project=project, request=request
-    )
+    try:
+        job_submission_logs = await run_async(
+            get_log_storage().poll_logs, project=project, request=request
+        )
+    except LogStorageError as e:
+        logger.error("Failed to poll logs from log storage: %s", repr(e))
+        raise ServerClientError("Failed to poll logs from log storage")
     # Logs are stored in plaintext but transmitted in base64 for API/CLI backward compatibility.
     # Old logs stored in base64 are encoded twice for transmission and shown as base64 in CLI/UI.
     # We live with that.

@@ -7,6 +7,11 @@ declare type TCreateWizardProjectParams = {
     };
 };
 
+declare type TGetProjectsParams = {
+    only_no_fleets?: boolean;
+    include_not_joined?: boolean;
+};
+
 declare type TProjectBackend = {
     name: string;
     config: IBackendAWS | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal | IBackendDstack;
@@ -41,3 +46,7 @@ declare interface IProjectSecret {
     name: string;
     value?: string;
 }
+
+declare type IProjectCreateRequestParams = Pick<IProject, 'project_name'> & {
+    is_public: boolean;
+};

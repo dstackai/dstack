@@ -7,19 +7,21 @@ import * as yup from 'yup';
 import { Box, Link, WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import type { TabsProps, ToggleProps } from 'components';
+import { TabsProps, ToggleProps } from 'components';
 import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Tabs, Toggle, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
+import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { useApplyRunMutation } from 'services/run';
 
 import { OfferList } from 'pages/Offers/List';
+import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
-import { FORM_FIELD_NAMES } from './constants';
+import { FORM_FIELD_NAMES, IDE_OPTIONS } from './constants';
 
 import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
 
@@ -29,17 +31,6 @@ const requiredFieldError = 'This is a required field';
 const namesFieldError = 'Only latin characters, dashes, and digits';
 const urlFormatError = 'Only URLs';
 const workingDirFormatError = 'Must be an absolute path';
-
-const ideOptions = [
-    {
-        label: 'Cursor',
-        value: 'cursor',
-    },
-    {
-        label: 'VS Code',
-        value: 'vscode',
-    },
-];
 
 enum DockerPythonTabs {
     DOCKER = 'docker',
@@ -117,6 +108,9 @@ export const CreateDevEnvironment: React.FC = () => {
 
     const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: selectedProject ?? '' });
 
+    const projectHavingFleetMap = useCheckingForFleetsInProjects({ projectNames: selectedProject ? [selectedProject] : [] });
+    const projectDontHasFleets = !!selectedProject && !projectHavingFleetMap[selectedProject];
+
     const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
 
     const loading = isApplying;
@@ -174,6 +168,10 @@ export const CreateDevEnvironment: React.FC = () => {
         const stepValidators = [validateOffer, validateSecondStep, validateConfig];
 
         if (reason === 'next') {
+            if (projectDontHasFleets) {
+                window.scrollTo(0, 0);
+            }
+
             stepValidators[activeStepIndex]?.().then((isValid) => {
                 if (isValid) {
                     setActiveStepIndex(requestedStepIndex);
@@ -277,6 +275,12 @@ export const CreateDevEnvironment: React.FC = () => {
 
     return (
         <form className={cn({ [styles.wizardForm]: activeStepIndex === 0 })} onSubmit={handleSubmit(onSubmit)}>
+            <NoFleetProjectAlert
+                className={styles.noFleetAlert}
+                projectName={selectedProject ?? ''}
+                show={projectDontHasFleets}
+            />
+
             <Wizard
                 activeStepIndex={activeStepIndex}
                 onNavigate={onNavigateHandler}
@@ -333,7 +337,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                         description={t('runs.dev_env.wizard.ide_description')}
                                         control={control}
                                         name="ide"
-                                        options={ideOptions}
+                                        options={IDE_OPTIONS}
                                         disabled={loading}
                                     />
 

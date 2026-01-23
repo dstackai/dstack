@@ -205,9 +205,7 @@ class InstanceAvailability(Enum):
     AVAILABLE = "available"
     NOT_AVAILABLE = "not_available"
     NO_QUOTA = "no_quota"
-    NO_BALANCE = (
-        "no_balance"  # Introduced in 0.19.24, may be used after a short compatibility period
-    )
+    NO_BALANCE = "no_balance"  # For dstack Sky
     IDLE = "idle"
     BUSY = "busy"
 
@@ -258,6 +256,7 @@ class InstanceStatus(str, Enum):
 
 
 class InstanceTerminationReason(str, Enum):
+    TERMINATED_BY_USER = "terminated_by_user"
     IDLE_TIMEOUT = "idle_timeout"
     PROVISIONING_TIMEOUT = "provisioning_timeout"
     ERROR = "error"

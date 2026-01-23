@@ -17,6 +17,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.compute_groups import compute_group_model_to_compute_group
+from dstack._internal.server.services.instances import switch_instance_status
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, run_async
@@ -83,12 +84,14 @@ async def _process_compute_group(session: AsyncSession, compute_group_model: Com
     )
     compute_group_model = res.unique().scalar_one()
     if all(i.status == InstanceStatus.TERMINATING for i in compute_group_model.instances):
-        await _terminate_compute_group(compute_group_model)
+        await _terminate_compute_group(session, compute_group_model)
     compute_group_model.last_processed_at = get_current_datetime()
     await session.commit()
 
 
-async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> None:
+async def _terminate_compute_group(
+    session: AsyncSession, compute_group_model: ComputeGroupModel
+) -> None:
     if (
         compute_group_model.last_termination_retry_at is not None
         and _next_termination_retry_at(compute_group_model) > get_current_datetime()
@@ -147,7 +150,7 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> No
         instance_model.deleted = True
         instance_model.deleted_at = get_current_datetime()
         instance_model.finished_at = get_current_datetime()
-        instance_model.status = InstanceStatus.TERMINATED
+        switch_instance_status(session, instance_model, InstanceStatus.TERMINATED)
     logger.info(
         "Terminated compute group %s",
         compute_group.name,

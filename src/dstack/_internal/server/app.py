@@ -5,16 +5,18 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Awaitable, Callable, List, Optional
+from typing import Annotated, Awaitable, Callable, List, Optional
 
 import sentry_sdk
-from fastapi import FastAPI, Request, Response, status
+from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.datastructures import URL
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from packaging.version import Version
 from prometheus_client import Counter, Histogram
 from sentry_sdk.types import SamplingContext
 
+from dstack._internal import settings as core_settings
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
@@ -68,7 +70,6 @@ from dstack._internal.server.utils.routers import (
     get_client_version,
     get_server_client_error_details,
 )
-from dstack._internal.settings import DSTACK_VERSION
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import check_required_ssh_version
 
@@ -91,6 +92,9 @@ def create_app() -> FastAPI:
     app = FastAPI(
         docs_url="/api/docs",
         lifespan=lifespan,
+        dependencies=[
+            Depends(_check_client_version),
+        ],
     )
     app.state.proxy_dependency_injector = ServerProxyDependencyInjector()
     return app
@@ -102,7 +106,7 @@ async def lifespan(app: FastAPI):
     if settings.SENTRY_DSN is not None:
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
-            release=DSTACK_VERSION,
+            release=core_settings.DSTACK_VERSION,
             environment=settings.SERVER_ENVIRONMENT,
             enable_tracing=True,
             traces_sampler=_sentry_traces_sampler,
@@ -164,7 +168,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Background processing is disabled")
     PROBES_SCHEDULER.start()
-    dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
+    dstack_version = (
+        core_settings.DSTACK_VERSION if core_settings.DSTACK_VERSION else "(no version)"
+    )
     job_network_mode_log = (
         logger.info
         if settings.JOB_NETWORK_MODE != settings.DEFAULT_JOB_NETWORK_MODE
@@ -306,49 +312,35 @@ def register_routes(app: FastAPI, ui: bool = True):
 
             return project_name
 
+        def _extract_endpoint_label(request: Request, response: Response) -> str:
+            route = request.scope.get("route")
+            route_path = getattr(route, "path", None)
+            if route_path:
+                return route_path
+            if not request.url.path.startswith("/api/"):
+                return "__non_api__"
+            if response.status_code == status.HTTP_404_NOT_FOUND:
+                return "__not_found__"
+            return "__unmatched__"
+
         project_name = _extract_project_name(request)
         response: Response = await call_next(request)
+        endpoint_label = _extract_endpoint_label(request, response)
 
         REQUEST_DURATION.labels(
             method=request.method,
-            endpoint=request.url.path,
+            endpoint=endpoint_label,
             http_status=response.status_code,
             project_name=project_name,
         ).observe(request.state.process_time)
 
         REQUESTS_TOTAL.labels(
             method=request.method,
-            endpoint=request.url.path,
+            endpoint=endpoint_label,
             http_status=response.status_code,
             project_name=project_name,
         ).inc()
         return response
-
-    @app.middleware("http")
-    async def check_client_version(request: Request, call_next):
-        if (
-            not request.url.path.startswith("/api/")
-            or request.url.path in _NO_API_VERSION_CHECK_ROUTES
-        ):
-            return await call_next(request)
-        try:
-            client_version = get_client_version(request)
-        except ValueError as e:
-            return CustomORJSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"detail": [error_detail(str(e))]},
-            )
-        client_release: Optional[tuple[int, ...]] = None
-        if client_version is not None:
-            client_release = client_version.release
-        request.state.client_release = client_release
-        response = check_client_server_compatibility(
-            client_version=client_version,
-            server_version=DSTACK_VERSION,
-        )
-        if response is not None:
-            return response
-        return await call_next(request)
 
     @app.get("/healthcheck")
     async def healthcheck():
@@ -382,6 +374,19 @@ def register_routes(app: FastAPI, ui: bool = True):
         @app.get("/")
         async def index():
             return RedirectResponse("/api/docs")
+
+
+def _check_client_version(
+    request: Request, client_version: Annotated[Optional[Version], Depends(get_client_version)]
+) -> None:
+    if (
+        request.url.path.startswith("/api/")
+        and request.url.path not in _NO_API_VERSION_CHECK_ROUTES
+    ):
+        check_client_server_compatibility(
+            client_version=client_version,
+            server_version=core_settings.DSTACK_VERSION,
+        )
 
 
 def _is_proxy_request(request: Request) -> bool:

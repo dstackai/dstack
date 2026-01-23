@@ -920,15 +920,13 @@ func encodeRegistryAuth(username string, password string) (string, error) {
 	return base64.URLEncoding.EncodeToString(encodedConfig), nil
 }
 
-func getSSHShellCommands(publicSSHKey string) []string {
+func getSSHShellCommands() []string {
 	return []string{
 		`( :`,
 		// See https://github.com/dstackai/dstack/issues/1769
 		`unset LD_LIBRARY_PATH && unset LD_PRELOAD`,
 		// common functions
 		`exists() { command -v "$1" > /dev/null 2>&1; }`,
-		// TODO(#1535): support non-root images properly
-		"mkdir -p /root && chown root:root /root && export HOME=/root",
 		// package manager detection/abstraction
 		`install_pkg() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }`,
 		`if exists apt-get; then install_pkg() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi`,
@@ -936,11 +934,6 @@ func getSSHShellCommands(publicSSHKey string) []string {
 		`if exists apk; then install_pkg() { apk add -U "$1"; }; fi`,
 		// check in sshd is here, install if not
 		`if ! exists sshd; then install_pkg openssh-server; fi`,
-		// create ssh dirs and add public key
-		"mkdir -p ~/.ssh",
-		"chmod 700 ~/.ssh",
-		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", publicSSHKey),
-		"chmod 600 ~/.ssh/authorized_keys",
 		`: )`,
 	}
 }
@@ -1190,21 +1183,19 @@ func (c *CLIArgs) DockerPJRTDevice() string {
 }
 
 func (c *CLIArgs) DockerShellCommands(publicKeys []string) []string {
-	concatinatedPublicKeys := c.Docker.ConcatinatedPublicSSHKeys
-	if len(publicKeys) > 0 {
-		concatinatedPublicKeys = strings.Join(publicKeys, "\n")
-	}
-	commands := getSSHShellCommands(concatinatedPublicKeys)
-	runnerArgs := []string{
+	commands := getSSHShellCommands()
+	runnerCommand := []string{
+		consts.RunnerBinaryPath,
 		"--log-level", strconv.Itoa(c.Runner.LogLevel),
 		"start",
+		"--temp-dir", consts.RunnerTempDir,
 		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
 		"--ssh-port", strconv.Itoa(c.Runner.SSHPort),
-		"--temp-dir", consts.RunnerTempDir,
-		"--home-dir", consts.RunnerHomeDir,
 	}
-	commands = append(commands, fmt.Sprintf("%s %s", consts.RunnerBinaryPath, strings.Join(runnerArgs, " ")))
-	return commands
+	for _, key := range publicKeys {
+		runnerCommand = append(runnerCommand, "--ssh-authorized-key", fmt.Sprintf("'%s'", key))
+	}
+	return append(commands, strings.Join(runnerCommand, " "))
 }
 
 func (c *CLIArgs) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {

@@ -1,6 +1,7 @@
 import { ControllerProps, FieldValues } from 'react-hook-form';
-import { CodeEditorProps } from '@cloudscape-design/components/code-editor';
 import { FormFieldProps } from '@cloudscape-design/components/form-field';
+
+import { CodeEditorProps } from '../../CodeEditor';
 
 export type FormCodeEditorProps<T extends FieldValues> = Omit<
     CodeEditorProps,

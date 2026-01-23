@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sync"
 	"syscall"
 	"time"
 
@@ -14,16 +15,29 @@ import (
 	"github.com/dstackai/dstack/runner/internal/log"
 )
 
+type SshdManager interface {
+	Port() int
+
+	Start(context.Context) error
+	Stop(context.Context) error
+	AddAuthorizedKeys(context.Context, ...string) error
+}
+
 var hostKeys = [...]string{
 	"ssh_host_rsa_key",
 	"ssh_host_ecdsa_key",
 	"ssh_host_ed25519_key",
 }
 
+// Implements SshdManager
 type Sshd struct {
 	binPath  string
 	confPath string
 	logPath  string
+	akPath   string
+	port     int
+
+	akMu sync.Mutex
 
 	cmd *exec.Cmd
 }
@@ -34,19 +48,34 @@ func NewSshd(binPath string) *Sshd {
 	}
 }
 
-func (d *Sshd) Prepare(ctx context.Context, confDir string, logDir string, port int) error {
+func (d *Sshd) Port() int {
+	return d.port
+}
+
+func (d *Sshd) Prepare(ctx context.Context, baseDir string, port int, logLevel string) error {
+	confDir := path.Join(baseDir, "conf")
 	if err := os.MkdirAll(confDir, 0o755); err != nil {
 		return fmt.Errorf("create conf dir: %w", err)
 	}
+
 	if err := generateHostKeys(ctx, confDir); err != nil {
 		return fmt.Errorf("generate host keys: %w", err)
 	}
-	confPath, err := createSshdConfig(ctx, confDir, port)
+
+	akPath, err := prepareAuthorizedKeysFile(confDir)
+	if err != nil {
+		return fmt.Errorf("prepare authorized_keys: %w", err)
+	}
+	d.akPath = akPath
+
+	confPath, err := createSshdConfig(ctx, confDir, port, logLevel, akPath)
 	if err != nil {
 		return fmt.Errorf("create sshd config: %w", err)
 	}
 	d.confPath = confPath
+	d.port = port
 
+	logDir := path.Join(baseDir, "log")
 	logPath, err := prepareLogPath(logDir)
 	if err != nil {
 		return fmt.Errorf("prepare log path: %w", err)
@@ -62,6 +91,29 @@ func (d *Sshd) Prepare(ctx context.Context, confDir string, logDir string, port 
 	}
 	if err := preparePrivsepPath("/run/sshd"); err != nil {
 		return fmt.Errorf("prepare PRIVSEP_PATH: %w", err)
+	}
+
+	return nil
+}
+
+func (d *Sshd) AddAuthorizedKeys(ctx context.Context, authorizedKeys ...string) error {
+	d.akMu.Lock()
+	defer d.akMu.Unlock()
+
+	file, err := os.OpenFile(d.akPath, os.O_WRONLY|os.O_APPEND, 0o700)
+	if err != nil {
+		return fmt.Errorf("open authorized_keys: %w", err)
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Error(ctx, "Close authorized_keys", "err", err)
+		}
+	}()
+
+	for _, key := range authorizedKeys {
+		if _, err := fmt.Fprintln(file, key); err != nil {
+			return fmt.Errorf("write authorized_keys: %w", err)
+		}
 	}
 
 	return nil
@@ -148,7 +200,23 @@ func copyHostKey(srcDir string, destDir string, key string) error {
 	return nil
 }
 
-func createSshdConfig(ctx context.Context, confDir string, port int) (string, error) {
+func prepareAuthorizedKeysFile(confDir string) (string, error) {
+	// Ensures that the file exists, has correct ownership and permissions, and is empty
+	akPath := path.Join(confDir, "authorized_keys")
+	if _, err := common.RemoveIfExists(akPath); err != nil {
+		return "", err
+	}
+	file, err := os.OpenFile(akPath, os.O_CREATE|os.O_EXCL|os.O_RDONLY, 0o644)
+	if err != nil {
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		return "", err
+	}
+	return akPath, nil
+}
+
+func createSshdConfig(ctx context.Context, confDir string, port int, logLevel string, akPath string) (string, error) {
 	confPath := path.Join(confDir, "sshd_config")
 	file, err := os.OpenFile(confPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
@@ -161,6 +229,7 @@ func createSshdConfig(ctx context.Context, confDir string, port int) (string, er
 	}()
 
 	lines := []string{
+		fmt.Sprintf("LogLevel %s", logLevel),
 		fmt.Sprintf("Port %d", port),
 		"PidFile none",
 		"Subsystem sftp internal-sftp",
@@ -176,7 +245,8 @@ func createSshdConfig(ctx context.Context, confDir string, port int) (string, er
 		// See: useradd(8)
 		// TODO: Change to `no` if a custom OpenSSH build without LOCKED_PASSWD_PREFIX is used
 		"UsePAM yes",
-		"AuthorizedKeysFile .ssh/authorized_keys",
+		// Keep ~/.ssh/authorized_keys as a fallback in case our sshd server is also used by the user for their purposes
+		fmt.Sprintf("AuthorizedKeysFile %s .ssh/authorized_keys", akPath),
 		"AcceptEnv LANG LC_* COLORTERM NO_COLOR",
 		"ClientAliveInterval 30",
 		"ClientAliveCountMax 4",
