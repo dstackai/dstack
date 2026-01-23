@@ -26,6 +26,7 @@ class UsersAPIClient(APIClientGroup):
     def list(
         self,
         return_total_count: Optional[bool] = None,
+        name_pattern: Optional[str] = None,
         prev_created_at: Optional[datetime] = None,
         prev_id: Optional[UUID] = None,
         limit: Optional[int] = None,
@@ -35,6 +36,8 @@ class UsersAPIClient(APIClientGroup):
         body: dict[str, Any] = {}
         if return_total_count is not None:
             body["return_total_count"] = return_total_count
+        if name_pattern is not None:
+            body["name_pattern"] = name_pattern
         if prev_created_at is not None:
             body["prev_created_at"] = prev_created_at
         if prev_id is not None:

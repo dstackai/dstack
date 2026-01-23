@@ -27,6 +27,7 @@ class TestUsersAPIClientList:
 
         result = client.list(
             return_total_count=True,
+            name_pattern="user",
             prev_created_at=dt,
             prev_id=uid,
             limit=1,
@@ -36,6 +37,7 @@ class TestUsersAPIClientList:
         payload = json.loads(recorder.last_body)
         assert recorder.last_path == "/api/users/list"
         assert payload["return_total_count"] is True
+        assert payload["name_pattern"] == "user"
         assert payload["prev_created_at"] == dt.isoformat()
         assert payload["prev_id"] == str(uid)
         assert payload["limit"] == 1

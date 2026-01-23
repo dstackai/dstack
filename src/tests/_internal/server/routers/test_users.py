@@ -198,6 +198,50 @@ class TestListUsers:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_by_name_pattern(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(
+            session=session,
+            name="admin",
+            created_at=datetime(2023, 1, 2, 3, 6, tzinfo=timezone.utc),
+            global_role=GlobalRole.ADMIN,
+        )
+        matching_user = await create_user(
+            session=session,
+            name="alpha_user",
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        await create_user(
+            session=session,
+            name="bravo",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            global_role=GlobalRole.USER,
+        )
+        response = await client.post(
+            "/api/users/list",
+            headers=get_auth_headers(admin.token),
+            json={"name_pattern": "alpha"},
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "id": str(matching_user.id),
+                "username": matching_user.name,
+                "created_at": "2023-01-02T03:05:00+00:00",
+                "global_role": matching_user.global_role,
+                "email": None,
+                "active": True,
+                "permissions": {
+                    "can_create_projects": True,
+                },
+                "ssh_public_key": None,
+            }
+        ]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_non_admins_see_only_themselves(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

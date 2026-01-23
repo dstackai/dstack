@@ -59,6 +59,7 @@ async def list_users_for_user(
     session: AsyncSession,
     user: UserModel,
     return_total_count: bool,
+    name_pattern: Optional[str],
     prev_created_at: Optional[datetime],
     prev_id: Optional[uuid.UUID],
     limit: int,
@@ -69,12 +70,15 @@ async def list_users_for_user(
             session=session,
             include_deleted=False,
             return_total_count=return_total_count,
+            name_pattern=name_pattern,
             prev_created_at=prev_created_at,
             prev_id=prev_id,
             limit=limit,
             ascending=ascending,
         )
-    users = [user_model_to_user(user)]
+    users = []
+    if not user.deleted and (name_pattern is None or name_pattern.lower() in user.name.lower()):
+        users.append(user_model_to_user(user))
     if return_total_count:
         return UsersInfoList(total_count=len(users), users=users)
     return users
@@ -84,6 +88,7 @@ async def list_all_users(
     session: AsyncSession,
     include_deleted: bool = False,
     return_total_count: bool = False,
+    name_pattern: Optional[str] = None,
     prev_created_at: Optional[datetime] = None,
     prev_id: Optional[uuid.UUID] = None,
     limit: int = 2000,
@@ -92,6 +97,9 @@ async def list_all_users(
     filters = []
     if not include_deleted:
         filters.append(UserModel.deleted == False)
+    if name_pattern:
+        name_pattern = name_pattern.replace("_", "/_")
+        filters.append(UserModel.name.ilike(f"%{name_pattern}%", escape="/"))
     stmt = select(UserModel).where(*filters)
     pagination_filters = []
     if prev_created_at is not None:

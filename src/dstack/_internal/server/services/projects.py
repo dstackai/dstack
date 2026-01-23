@@ -85,7 +85,8 @@ async def list_user_accessible_projects(
     """
     filters = [ProjectModel.deleted == False]
     if name_pattern:
-        filters.append(ProjectModel.name.ilike(f"%{name_pattern}%"))
+        name_pattern = name_pattern.replace("_", "/_")
+        filters.append(ProjectModel.name.ilike(f"%{name_pattern}%", escape="/"))
     stmt = select(ProjectModel).where(*filters)
     if user.global_role != GlobalRole.ADMIN:
         stmt = stmt.outerjoin(
@@ -168,7 +169,6 @@ async def create_project(
     user_permissions = users.get_user_permissions(user)
     if not user_permissions.can_create_projects:
         raise ForbiddenError("User cannot create projects")
-    validate_project_name(project_name)
     project = await get_project_model_by_name(
         session=session, project_name=project_name, ignore_case=True
     )
@@ -577,6 +577,7 @@ async def get_project_model_by_id_or_error(
 async def create_project_model(
     session: AsyncSession, owner: UserModel, project_name: str, is_public: bool = False
 ) -> ProjectModel:
+    validate_project_name(project_name)
     private_bytes, public_bytes = await run_async(
         generate_rsa_key_pair_bytes, f"{project_name}@dstack"
     )
