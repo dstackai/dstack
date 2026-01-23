@@ -27,6 +27,9 @@ class EventsAPIClient(APIClientGroup):
         prev_id: Optional[UUID] = None,
         limit: int = LIST_EVENTS_DEFAULT_LIMIT,
         ascending: bool = False,
+        *,
+        # NOTE: New parameters go here. Avoid positional parameters, they can break compatibility.
+        target_volumes: Optional[list[UUID]] = None,
     ) -> list[Event]:
         if prev_recorded_at is not None:
             # Time zones other than UTC are misinterpreted by the server:
@@ -39,6 +42,7 @@ class EventsAPIClient(APIClientGroup):
             target_instances=target_instances,
             target_runs=target_runs,
             target_jobs=target_jobs,
+            target_volumes=target_volumes,
             within_projects=within_projects,
             within_fleets=within_fleets,
             within_runs=within_runs,

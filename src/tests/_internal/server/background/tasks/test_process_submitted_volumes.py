@@ -11,6 +11,7 @@ from dstack._internal.server.testing.common import (
     create_project,
     create_user,
     create_volume,
+    list_events,
 )
 
 
@@ -51,3 +52,6 @@ class TestProcessSubmittedVolumes:
             aws_mock.compute.return_value.create_volume.assert_called_once()
         await session.refresh(volume)
         assert volume.status == VolumeStatus.ACTIVE
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Volume status changed SUBMITTED -> ACTIVE"

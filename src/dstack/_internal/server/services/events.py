@@ -20,6 +20,7 @@ from dstack._internal.server.models import (
     ProjectModel,
     RunModel,
     UserModel,
+    VolumeModel,
 )
 from dstack._internal.server.services.logging import fmt_entity
 from dstack._internal.utils.common import get_current_datetime
@@ -91,6 +92,7 @@ class Target:
             ProjectModel,
             RunModel,
             UserModel,
+            VolumeModel,
         ],
     ) -> "Target":
         if isinstance(model, FleetModel):
@@ -132,6 +134,13 @@ class Target:
             return Target(
                 type=EventTargetType.USER,
                 project_id=None,
+                id=model.id,
+                name=model.name,
+            )
+        if isinstance(model, VolumeModel):
+            return Target(
+                type=EventTargetType.VOLUME,
+                project_id=model.project_id or model.project.id,
                 id=model.id,
                 name=model.name,
             )
@@ -212,6 +221,7 @@ async def list_events(
     target_instances: Optional[list[uuid.UUID]],
     target_runs: Optional[list[uuid.UUID]],
     target_jobs: Optional[list[uuid.UUID]],
+    target_volumes: Optional[list[uuid.UUID]],
     within_projects: Optional[list[uuid.UUID]],
     within_fleets: Optional[list[uuid.UUID]],
     within_runs: Optional[list[uuid.UUID]],
@@ -279,6 +289,13 @@ async def list_events(
             and_(
                 EventTargetModel.entity_type == EventTargetType.JOB,
                 EventTargetModel.entity_id.in_(target_jobs),
+            )
+        )
+    if target_volumes is not None:
+        target_filters.append(
+            and_(
+                EventTargetModel.entity_type == EventTargetType.VOLUME,
+                EventTargetModel.entity_id.in_(target_volumes),
             )
         )
     if within_projects is not None:

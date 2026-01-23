@@ -20,6 +20,7 @@ from dstack._internal.server.testing.common import (
     create_volume,
     get_volume_configuration,
     get_volume_provisioning_data,
+    list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -73,10 +74,13 @@ class TestProcessIdleVolumes:
 
         await session.refresh(volume1)
         await session.refresh(volume2)
+        events = await list_events(session)
         assert volume1.deleted
         assert volume1.deleted_at is not None
         assert not volume2.deleted
         assert volume2.deleted_at is None
+        assert len(events) == 1
+        assert events[0].message == "Volume deleted due to exceeding auto_cleanup_duration"
 
 
 @pytest.mark.asyncio

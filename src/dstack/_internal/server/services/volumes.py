@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -33,6 +33,7 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import events
 from dstack._internal.server.services.instances import get_instance_provisioning_data
 from dstack._internal.server.services.locking import (
     get_locker,
@@ -44,6 +45,24 @@ from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def switch_volume_status(
+    session: AsyncSession,
+    volume_model: VolumeModel,
+    new_status: VolumeStatus,
+    actor: events.AnyActor = events.SystemActor(),
+):
+    old_status = volume_model.status
+    if old_status == new_status:
+        return
+
+    volume_model.status = new_status
+
+    msg = f"Volume status changed {old_status.upper()} -> {new_status.upper()}"
+    if volume_model.status_message is not None:
+        msg += f" ({volume_model.status_message})"
+    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(volume_model)])
 
 
 async def list_volumes(
@@ -245,11 +264,19 @@ async def create_volume(
             attachments=[],
         )
         session.add(volume_model)
+        events.emit(
+            session,
+            message=f"Volume created. Status: {volume_model.status.upper()}",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(volume_model)],
+        )
         await session.commit()
         return volume_model_to_volume(volume_model)
 
 
-async def delete_volumes(session: AsyncSession, project: ProjectModel, names: List[str]):
+async def delete_volumes(
+    session: AsyncSession, project: ProjectModel, names: List[str], user: UserModel
+):
     res = await session.execute(
         select(VolumeModel).where(
             VolumeModel.project_id == project.id,
@@ -287,17 +314,14 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
                 await _delete_volume(session=session, project=project, volume_model=volume_model)
             except Exception:
                 logger.exception("Error when deleting volume %s", volume_model.name)
-        await session.execute(
-            update(VolumeModel)
-            .where(
-                VolumeModel.project_id == project.id,
-                VolumeModel.id.in_(volumes_ids),
+            volume_model.deleted = True
+            volume_model.deleted_at = common.get_current_datetime()
+            events.emit(
+                session,
+                message="Volume deleted",
+                actor=events.UserActor.from_user(user),
+                targets=[events.Target.from_model(volume_model)],
             )
-            .values(
-                deleted=True,
-                deleted_at=common.get_current_datetime(),
-            )
-        )
         await session.commit()
 
 

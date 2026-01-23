@@ -22,6 +22,7 @@ from dstack._internal.server.testing.common import (
     get_auth_headers,
     get_volume_configuration,
     get_volume_provisioning_data,
+    list_events,
 )
 
 
@@ -357,6 +358,9 @@ class TestCreateVolume:
         }
         res = await session.execute(select(VolumeModel))
         assert res.scalar_one()
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Volume created. Status: SUBMITTED"
 
 
 class TestDeleteVolumes:
@@ -397,6 +401,9 @@ class TestDeleteVolumes:
         assert response.status_code == 200
         await session.refresh(volume)
         assert volume.deleted
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Volume deleted"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -428,3 +435,5 @@ class TestDeleteVolumes:
         assert response.status_code == 400
         await session.refresh(volume)
         assert not volume.deleted
+        events = await list_events(session)
+        assert len(events) == 0

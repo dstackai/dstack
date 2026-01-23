@@ -12,6 +12,7 @@ from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import ProjectModel, UserModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import events
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.volumes import (
     get_volume_configuration,
@@ -100,8 +101,12 @@ async def _delete_idle_volumes(session: AsyncSession, volumes: List[VolumeModel]
 
         volume_model.deleted = True
         volume_model.deleted_at = get_current_datetime()
-
-        logger.info("Deleted idle volume %s", volume_model.name)
+        events.emit(
+            session=session,
+            message="Volume deleted due to exceeding auto_cleanup_duration",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(volume_model)],
+        )
 
     await session.commit()
 
