@@ -1,8 +1,10 @@
+import re
 import secrets
 import uuid
+from datetime import datetime
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import and_, delete, literal_column, or_, select, update
 from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import QueryableAttribute, joinedload, load_only
@@ -19,6 +21,8 @@ from dstack._internal.core.models.projects import (
     MemberPermissions,
     Project,
     ProjectHookConfig,
+    ProjectsInfoList,
+    ProjectsInfoListOrProjectsList,
 )
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -62,57 +66,87 @@ async def get_or_create_default_project(
     return default_project, True
 
 
-async def list_user_projects(
-    session: AsyncSession,
-    user: UserModel,
-) -> List[Project]:
-    """
-    Returns projects where the user is a member or all projects for global admins.
-    """
-    projects = await list_user_project_models(
-        session=session,
-        user=user,
-    )
-    projects = sorted(projects, key=lambda p: p.created_at)
-    return [
-        project_model_to_project(p, include_backends=False, include_members=False)
-        for p in projects
-    ]
-
-
 async def list_user_accessible_projects(
     session: AsyncSession,
     user: UserModel,
     include_not_joined: bool,
-) -> List[Project]:
+    return_total_count: bool,
+    name_pattern: Optional[str],
+    prev_created_at: Optional[datetime],
+    prev_id: Optional[uuid.UUID],
+    limit: int,
+    ascending: bool,
+) -> ProjectsInfoListOrProjectsList:
     """
     Returns all projects accessible to the user:
+    - All projects for global admins
     - Projects where user is a member (public or private)
     - if `include_not_joined`: Public projects where user is NOT a member
     """
-    if user.global_role == GlobalRole.ADMIN:
-        projects = await list_project_models(session=session)
-    else:
-        projects = await list_member_project_models(session=session, user=user)
+    filters = [ProjectModel.deleted == False]
+    if name_pattern:
+        name_pattern = name_pattern.replace("_", "/_")
+        filters.append(ProjectModel.name.ilike(f"%{name_pattern}%", escape="/"))
+    stmt = select(ProjectModel).where(*filters)
+    if user.global_role != GlobalRole.ADMIN:
+        stmt = stmt.outerjoin(
+            MemberModel,
+            onclause=and_(
+                MemberModel.project_id == ProjectModel.id,
+                MemberModel.user_id == user.id,
+            ),
+        )
         if include_not_joined:
-            public_projects = await list_public_non_member_project_models(
-                session=session, user=user
+            stmt = stmt.where(
+                or_(
+                    ProjectModel.is_public == True,
+                    MemberModel.user_id.is_not(None),
+                )
             )
-            projects += public_projects
-
-    projects = sorted(projects, key=lambda p: p.created_at)
-    return [
+        else:
+            stmt = stmt.where(MemberModel.user_id.is_not(None))
+    pagination_filters = []
+    if prev_created_at is not None:
+        if ascending:
+            if prev_id is None:
+                pagination_filters.append(ProjectModel.created_at > prev_created_at)
+            else:
+                pagination_filters.append(
+                    or_(
+                        ProjectModel.created_at > prev_created_at,
+                        and_(
+                            ProjectModel.created_at == prev_created_at, ProjectModel.id < prev_id
+                        ),
+                    )
+                )
+        else:
+            if prev_id is None:
+                pagination_filters.append(ProjectModel.created_at < prev_created_at)
+            else:
+                pagination_filters.append(
+                    or_(
+                        ProjectModel.created_at < prev_created_at,
+                        and_(
+                            ProjectModel.created_at == prev_created_at, ProjectModel.id > prev_id
+                        ),
+                    )
+                )
+    order_by = (ProjectModel.created_at.desc(), ProjectModel.id)
+    if ascending:
+        order_by = (ProjectModel.created_at.asc(), ProjectModel.id.desc())
+    total_count = None
+    if return_total_count:
+        res = await session.execute(stmt.with_only_columns(safunc.count(literal_column("1"))))
+        total_count = res.scalar_one()
+    res = await session.execute(stmt.where(*pagination_filters).order_by(*order_by).limit(limit))
+    project_models = res.unique().scalars().all()
+    projects = [
         project_model_to_project(p, include_backends=False, include_members=False)
-        for p in projects
+        for p in project_models
     ]
-
-
-async def list_projects(session: AsyncSession) -> List[Project]:
-    projects = await list_project_models(session=session)
-    return [
-        project_model_to_project(p, include_backends=False, include_members=False)
-        for p in projects
-    ]
+    if total_count is None:
+        return projects
+    return ProjectsInfoList(total_count=total_count, projects=projects)
 
 
 async def get_project_by_name(
@@ -543,6 +577,7 @@ async def get_project_model_by_id_or_error(
 async def create_project_model(
     session: AsyncSession, owner: UserModel, project_name: str, is_public: bool = False
 ) -> ProjectModel:
+    validate_project_name(project_name)
     private_bytes, public_bytes = await run_async(
         generate_rsa_key_pair_bytes, f"{project_name}@dstack"
     )
@@ -647,6 +682,15 @@ def get_member_permissions(member_model: MemberModel) -> MemberPermissions:
     return MemberPermissions(
         can_manage_ssh_fleets=can_manage_ssh_fleets,
     )
+
+
+def validate_project_name(project_name: str):
+    if not is_valid_project_name(project_name):
+        raise ServerClientError("Project name should match regex '^[a-zA-Z0-9-_]{1,50}$'")
+
+
+def is_valid_project_name(project_name: str) -> bool:
+    return re.match("^[a-zA-Z0-9-_]{1,50}$", project_name) is not None
 
 
 _CREATE_PROJECT_HOOKS = []

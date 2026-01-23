@@ -5,9 +5,10 @@ import secrets
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, literal_column, or_, select
 from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
@@ -21,6 +22,8 @@ from dstack._internal.core.models.users import (
     User,
     UserHookConfig,
     UserPermissions,
+    UsersInfoList,
+    UsersInfoListOrUsersList,
     UserTokenCreds,
     UserWithCreds,
 )
@@ -55,23 +58,90 @@ async def get_or_create_admin_user(session: AsyncSession) -> Tuple[UserModel, bo
 async def list_users_for_user(
     session: AsyncSession,
     user: UserModel,
-) -> List[User]:
+    return_total_count: bool,
+    name_pattern: Optional[str],
+    prev_created_at: Optional[datetime],
+    prev_id: Optional[uuid.UUID],
+    limit: int,
+    ascending: bool,
+) -> UsersInfoListOrUsersList:
     if user.global_role == GlobalRole.ADMIN:
-        return await list_all_users(session=session)
-    return [user_model_to_user(user)]
+        return await list_all_users(
+            session=session,
+            include_deleted=False,
+            return_total_count=return_total_count,
+            name_pattern=name_pattern,
+            prev_created_at=prev_created_at,
+            prev_id=prev_id,
+            limit=limit,
+            ascending=ascending,
+        )
+    users = []
+    if not user.deleted and (name_pattern is None or name_pattern.lower() in user.name.lower()):
+        users.append(user_model_to_user(user))
+    if return_total_count:
+        return UsersInfoList(total_count=len(users), users=users)
+    return users
 
 
 async def list_all_users(
     session: AsyncSession,
     include_deleted: bool = False,
-) -> List[User]:
+    return_total_count: bool = False,
+    name_pattern: Optional[str] = None,
+    prev_created_at: Optional[datetime] = None,
+    prev_id: Optional[uuid.UUID] = None,
+    limit: int = 2000,
+    ascending: bool = False,
+) -> UsersInfoListOrUsersList:
     filters = []
     if not include_deleted:
         filters.append(UserModel.deleted == False)
-    res = await session.execute(select(UserModel).where(*filters))
+    if name_pattern:
+        name_pattern = name_pattern.replace("_", "/_")
+        filters.append(UserModel.name.ilike(f"%{name_pattern}%", escape="/"))
+    stmt = select(UserModel).where(*filters)
+    pagination_filters = []
+    if prev_created_at is not None:
+        if ascending:
+            if prev_id is None:
+                pagination_filters.append(UserModel.created_at > prev_created_at)
+            else:
+                pagination_filters.append(
+                    or_(
+                        UserModel.created_at > prev_created_at,
+                        and_(
+                            UserModel.created_at == prev_created_at,
+                            UserModel.id < prev_id,
+                        ),
+                    )
+                )
+        else:
+            if prev_id is None:
+                pagination_filters.append(UserModel.created_at < prev_created_at)
+            else:
+                pagination_filters.append(
+                    or_(
+                        UserModel.created_at < prev_created_at,
+                        and_(
+                            UserModel.created_at == prev_created_at,
+                            UserModel.id > prev_id,
+                        ),
+                    )
+                )
+    order_by = (UserModel.created_at.desc(), UserModel.id)
+    if ascending:
+        order_by = (UserModel.created_at.asc(), UserModel.id.desc())
+    total_count = None
+    if return_total_count:
+        res = await session.execute(stmt.with_only_columns(safunc.count(literal_column("1"))))
+        total_count = res.scalar_one()
+    res = await session.execute(stmt.where(*pagination_filters).order_by(*order_by).limit(limit))
     user_models = res.scalars().all()
-    user_models = sorted(user_models, key=lambda u: u.created_at)
-    return [user_model_to_user(u) for u in user_models]
+    users = [user_model_to_user(u) for u in user_models]
+    if total_count is None:
+        return users
+    return UsersInfoList(total_count=total_count, users=users)
 
 
 async def get_user_with_creds_by_name(
