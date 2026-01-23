@@ -756,7 +756,7 @@ class ReplicaGroup(CoreModel):
     name: Annotated[
         Optional[str],
         Field(
-            description="The name of the replica group. If not provided, defaults to 'replica0', 'replica1', etc. based on position."
+            description="The name of the replica group. If not provided, defaults to 'replica-group-0', 'replica-group-1', etc. based on position."
         ),
     ]
     count: Annotated[
@@ -865,7 +865,6 @@ class ServiceConfigurationParams(CoreModel):
                 "(commands, resources, scaling). "
                 "When `replicas` is a list of replica groups, top-level `scaling`, `commands`, "
                 "and `resources` are not allowed and must be specified in each replica group instead. "
-                "Replica group names are optional; if not provided, they default to `replica0`, `replica1`, etc."
             )
         ),
     ] = None
@@ -921,7 +920,7 @@ class ServiceConfigurationParams(CoreModel):
             # Assign default names to groups without names
             for index, group in enumerate(v):
                 if group.name is None:
-                    group.name = f"replica{index}"
+                    group.name = f"replica-group-{index}"
 
             # Check for duplicate names
             names = [group.name for group in v]

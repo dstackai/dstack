@@ -82,24 +82,24 @@ async def get_job_plans(
     job_plans = []
 
     if run_spec.configuration.type == "service":
+        volumes = await get_job_configured_volumes(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job_num=0,
+        )
+        candidate_fleet_models = await _select_candidate_fleet_models(
+            session=session,
+            project=project,
+            run_model=None,
+            run_spec=run_spec,
+        )
         for replica_group in run_spec.configuration.replica_groups:
             jobs = await get_jobs_from_run_spec(
                 run_spec=run_spec,
                 secrets=secrets,
                 replica_num=0,
                 replica_group_name=replica_group.name,
-            )
-            volumes = await get_job_configured_volumes(
-                session=session,
-                project=project,
-                run_spec=run_spec,
-                job_num=0,
-            )
-            candidate_fleet_models = await _select_candidate_fleet_models(
-                session=session,
-                project=project,
-                run_model=None,
-                run_spec=run_spec,
             )
             fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
                 project=project,

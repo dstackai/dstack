@@ -88,7 +88,6 @@ def validate_run_spec_and_set_defaults(
             f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
         )
     if isinstance(run_spec.configuration, ServiceConfiguration):
-        # Check if any group has min=0
         if run_spec.merged_profile.schedule and all(
             group.count.min == 0 for group in run_spec.configuration.replica_groups
         ):

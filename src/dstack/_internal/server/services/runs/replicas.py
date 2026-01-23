@@ -1,4 +1,5 @@
-from typing import Dict, List, Optional, Tuple
+import json
+from typing import List, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -84,11 +85,11 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         abs(replicas_diff),
     )
 
-    active_replicas, inactive_replicas = _build_replica_lists(run_model, run_model.jobs)
+    active_replicas, inactive_replicas = build_replica_lists(run_model, run_model.jobs)
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
     if replicas_diff < 0:
-        _scale_down_replicas(session, active_replicas, abs(replicas_diff))
+        scale_down_replicas(session, active_replicas, abs(replicas_diff))
     else:
         await _scale_up_replicas(
             session,
@@ -101,7 +102,7 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         )
 
 
-def _build_replica_lists(
+def build_replica_lists(
     run_model: RunModel,
     jobs: List[JobModel],
     group_filter: Optional[str] = None,
@@ -148,7 +149,7 @@ def _build_replica_lists(
     return active_replicas, inactive_replicas
 
 
-def _scale_down_replicas(
+def scale_down_replicas(
     session: AsyncSession,
     active_replicas: List[Tuple[int, bool, int, List[JobModel]]],
     count: int,
@@ -228,11 +229,14 @@ async def scale_run_replicas_per_group(
     session: AsyncSession,
     run_model: RunModel,
     replicas: List[ReplicaGroup],
-    desired_replica_counts: Dict[str, int],
 ) -> None:
     """Scale each replica group independently"""
     if not replicas:
         return
+
+    desired_replica_counts = (
+        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
+    )
 
     for group in replicas:
         if group.name is None:
@@ -240,7 +244,7 @@ async def scale_run_replicas_per_group(
         group_desired = desired_replica_counts.get(group.name, group.count.min or 0)
 
         # Build replica lists filtered by this group
-        active_replicas, inactive_replicas = _build_replica_lists(
+        active_replicas, inactive_replicas = build_replica_lists(
             run_model=run_model, jobs=run_model.jobs, group_filter=group.name
         )
 
@@ -250,11 +254,8 @@ async def scale_run_replicas_per_group(
 
         if group_diff != 0:
             # Check if rolling deployment is in progress for THIS GROUP
-            from dstack._internal.server.background.tasks.process_runs import (
-                _has_out_of_date_replicas,
-            )
 
-            group_has_out_of_date = _has_out_of_date_replicas(run_model, group_filter=group.name)
+            group_has_out_of_date = has_out_of_date_replicas(run_model, group_filter=group.name)
 
             # During rolling deployment, don't scale down old replicas
             # Let rolling deployment handle stopping old replicas
@@ -294,7 +295,7 @@ async def scale_run_replicas_for_group(
     )
 
     if replicas_diff < 0:
-        _scale_down_replicas(session, active_replicas, abs(replicas_diff))
+        scale_down_replicas(session, active_replicas, abs(replicas_diff))
     else:
         await _scale_up_replicas(
             session=session,
@@ -305,3 +306,17 @@ async def scale_run_replicas_for_group(
             run_spec=run_spec,
             group_name=group.name,
         )
+
+
+def has_out_of_date_replicas(run: RunModel, group_filter: Optional[str] = None) -> bool:
+    for job in run.jobs:
+        # Filter jobs by group if specified
+        if group_filter is not None:
+            job_spec = JobSpec.__response__.parse_raw(job.job_spec_data)
+            if job_spec.replica_group != group_filter:
+                continue
+        if job.deployment_num < run.deployment_num and not (
+            job.status.is_finished() or job.termination_reason == JobTerminationReason.SCALED_DOWN
+        ):
+            return True
+    return False

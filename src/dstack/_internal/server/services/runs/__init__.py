@@ -486,8 +486,10 @@ async def submit_run(
 
         submitted_at = common_utils.get_current_datetime()
         initial_status = RunStatus.SUBMITTED
+        initial_replicas = 1
         if run_spec.merged_profile.schedule is not None:
             initial_status = RunStatus.PENDING
+            initial_replicas = 0
 
         run_model = RunModel(
             id=uuid.uuid4(),
@@ -551,30 +553,31 @@ async def submit_run(
                         )
                     global_replica_num += 1
         else:
-            jobs = await get_jobs_from_run_spec(
-                run_spec=run_spec,
-                secrets=secrets,
-                replica_num=0,
-            )
-            for job in jobs:
-                job_model = create_job_model_for_new_submission(
-                    run_model=run_model,
-                    job=job,
-                    status=JobStatus.SUBMITTED,
+            for replica_num in range(initial_replicas):
+                jobs = await get_jobs_from_run_spec(
+                    run_spec=run_spec,
+                    secrets=secrets,
+                    replica_num=replica_num,
                 )
-                session.add(job_model)
-                events.emit(
-                    session,
-                    f"Job created on run submission. Status: {job_model.status.upper()}",
-                    # Set `SystemActor` for consistency with all other places where jobs can be
-                    # created (retry, scaling, rolling deployments, etc). Think of the run as being
-                    # created by the user, while the job is created by the system to satisfy the
-                    # run spec.
-                    actor=events.SystemActor(),
-                    targets=[
-                        events.Target.from_model(job_model),
-                    ],
-                )
+                for job in jobs:
+                    job_model = create_job_model_for_new_submission(
+                        run_model=run_model,
+                        job=job,
+                        status=JobStatus.SUBMITTED,
+                    )
+                    session.add(job_model)
+                    events.emit(
+                        session,
+                        f"Job created on run submission. Status: {job_model.status.upper()}",
+                        # Set `SystemActor` for consistency with all other places where jobs can be
+                        # created (retry, scaling, rolling deployments, etc). Think of the run as being
+                        # created by the user, while the job is created by the system to satisfy the
+                        # run spec.
+                        actor=events.SystemActor(),
+                        targets=[
+                            events.Target.from_model(job_model),
+                        ],
+                    )
         await session.commit()
         await session.refresh(run_model)
 
