@@ -1,7 +1,6 @@
 import uuid
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.instances as instances_services
@@ -15,13 +14,14 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.server.models import EventModel, InstanceModel
+from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.testing.common import (
     create_instance,
     create_project,
     create_user,
     get_volume,
     get_volume_configuration,
+    list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -41,8 +41,7 @@ class TestSwitchInstanceStatus:
         instances_services.switch_instance_status(session, instance, InstanceStatus.TERMINATING)
         instances_services.switch_instance_status(session, instance, InstanceStatus.TERMINATED)
 
-        res = await session.execute(select(EventModel))
-        events = res.scalars().all()
+        events = await list_events(session)
         assert len(events) == 2
         assert {e.message for e in events} == {
             "Instance status changed PENDING -> TERMINATING. Termination reason: ERROR (Some err)",
@@ -63,8 +62,7 @@ class TestSwitchInstanceStatus:
         instance.termination_reason_message = "Some err"
         instances_services.switch_instance_status(session, instance, InstanceStatus.TERMINATED)
 
-        res = await session.execute(select(EventModel))
-        events = res.scalars().all()
+        events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == (
             "Instance status changed PENDING -> TERMINATED. Termination reason: ERROR (Some err)"
