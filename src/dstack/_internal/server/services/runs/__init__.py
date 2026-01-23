@@ -490,8 +490,6 @@ async def submit_run(
         if run_spec.merged_profile.schedule is not None:
             initial_status = RunStatus.PENDING
             initial_replicas = 0
-        elif run_spec.configuration.type == "service":
-            initial_replicas = run_spec.configuration.replicas.min or 0
 
         run_model = RunModel(
             id=uuid.uuid4(),
@@ -519,32 +517,67 @@ async def submit_run(
 
         if run_spec.configuration.type == "service":
             await services.register_service(session, run_model, run_spec)
+            service_config = run_spec.configuration
 
-        for replica_num in range(initial_replicas):
-            jobs = await get_jobs_from_run_spec(
-                run_spec=run_spec,
-                secrets=secrets,
-                replica_num=replica_num,
-            )
-            for job in jobs:
-                job_model = create_job_model_for_new_submission(
-                    run_model=run_model,
-                    job=job,
-                    status=JobStatus.SUBMITTED,
+            global_replica_num = 0  # Global counter across all groups for unique replica_num
+
+            for replica_group in service_config.replica_groups:
+                if run_spec.merged_profile.schedule is not None:
+                    group_initial_replicas = 0
+                else:
+                    group_initial_replicas = replica_group.count.min or 0
+
+                # Each replica in this group gets the same group-specific configuration
+                for group_replica_num in range(group_initial_replicas):
+                    jobs = await get_jobs_from_run_spec(
+                        run_spec=run_spec,
+                        secrets=secrets,
+                        replica_num=global_replica_num,
+                        replica_group_name=replica_group.name,
+                    )
+
+                    for job in jobs:
+                        job_model = create_job_model_for_new_submission(
+                            run_model=run_model,
+                            job=job,
+                            status=JobStatus.SUBMITTED,
+                        )
+                        session.add(job_model)
+                        events.emit(
+                            session,
+                            f"Job created on run submission. Status: {job_model.status.upper()}",
+                            actor=events.SystemActor(),
+                            targets=[
+                                events.Target.from_model(job_model),
+                            ],
+                        )
+                    global_replica_num += 1
+        else:
+            for replica_num in range(initial_replicas):
+                jobs = await get_jobs_from_run_spec(
+                    run_spec=run_spec,
+                    secrets=secrets,
+                    replica_num=replica_num,
                 )
-                session.add(job_model)
-                events.emit(
-                    session,
-                    f"Job created on run submission. Status: {job_model.status.upper()}",
-                    # Set `SystemActor` for consistency with all other places where jobs can be
-                    # created (retry, scaling, rolling deployments, etc). Think of the run as being
-                    # created by the user, while the job is created by the system to satisfy the
-                    # run spec.
-                    actor=events.SystemActor(),
-                    targets=[
-                        events.Target.from_model(job_model),
-                    ],
-                )
+                for job in jobs:
+                    job_model = create_job_model_for_new_submission(
+                        run_model=run_model,
+                        job=job,
+                        status=JobStatus.SUBMITTED,
+                    )
+                    session.add(job_model)
+                    events.emit(
+                        session,
+                        f"Job created on run submission. Status: {job_model.status.upper()}",
+                        # Set `SystemActor` for consistency with all other places where jobs can be
+                        # created (retry, scaling, rolling deployments, etc). Think of the run as being
+                        # created by the user, while the job is created by the system to satisfy the
+                        # run spec.
+                        actor=events.SystemActor(),
+                        targets=[
+                            events.Target.from_model(job_model),
+                        ],
+                    )
         await session.commit()
         await session.refresh(run_model)
 
