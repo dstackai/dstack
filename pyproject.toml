@@ -96,11 +96,33 @@ ignore = [
     "src/dstack/_internal/server/migrations/versions",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["src/tests"]
+addopts = [
+    "--disable-socket",
+    "--allow-hosts=127.0.0.1,localhost",
+    # unix socket for Docker/testcontainers
+    "--allow-unix-socket",
+]
+markers = [
+    "shim_version",
+    "dockerized",
+]
+env = [
+    "DSTACK_CLI_RICH_FORCE_TERMINAL=0",
+]
+filterwarnings = [
+    # testcontainers modules use deprecated decorators – nothing we can do:
+    # https://github.com/testcontainers/testcontainers-python/issues/874
+    "ignore:^The @wait_container_is_ready decorator:DeprecationWarning"
+]
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.2.0",
-    "pytest~=7.2",
+    "pytest~=8.0",
     "pytest-asyncio>=0.23.8",
+    "pytest-mock>=3.14.0",
     "pytest-httpbin>=2.1.0",
     "pytest-socket>=0.7.0",
     "pytest-env>=1.1.0",
