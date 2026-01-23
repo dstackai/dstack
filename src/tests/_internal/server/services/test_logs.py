@@ -798,8 +798,8 @@ class TestPollLogsRequestValidation:
 class TestCloudWatchLogStorage:
     FAKE_NOW = datetime(2023, 10, 6, 10, 1, 54, tzinfo=timezone.utc)
 
-    @freeze_time(FAKE_NOW)
     @pytest_asyncio.fixture
+    @freeze_time(FAKE_NOW)
     async def project(self, test_db, session: AsyncSession) -> ProjectModel:
         project = await create_project(session=session, name="test-proj")
         return project
