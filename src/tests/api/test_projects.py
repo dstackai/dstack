@@ -26,8 +26,8 @@ PROJECT_PAYLOAD = {
 }
 
 
-class TestProjectsList:
-    def test_projects_list_serializes_pagination_and_parses_total_count(self):
+class TestProjectsAPIClientList:
+    def test_projects_list_serializes_pagination_and_parses_info_list(self):
         request = RequestRecorder(payload={"total_count": 1, "projects": [PROJECT_PAYLOAD]})
         client = ProjectsAPIClient(_request=request, _logger=logging.getLogger("test"))
         dt = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
