@@ -101,11 +101,11 @@ class TestRESTPlugin:
             CustomApplyPolicy()
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
+    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     async def test_on_apply_plugin_service_returns_mutated_spec(
         self, test_db, user, project, spec
     ):
@@ -125,11 +125,11 @@ class TestRESTPlugin:
             assert result == type(spec)(**response_dict["spec"])
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
+    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     async def test_on_apply_plugin_service_call_fails(self, test_db, user, project, spec):
         policy = CustomApplyPolicy()
         with mock.patch("requests.post", side_effect=requests.RequestException("fail")):
@@ -137,11 +137,11 @@ class TestRESTPlugin:
                 policy.on_apply(user=user.name, project=project.name, spec=spec)
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
+    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     async def test_on_apply_plugin_service_connection_fails(self, test_db, user, project, spec):
         policy = CustomApplyPolicy()
         with mock.patch(
@@ -151,11 +151,11 @@ class TestRESTPlugin:
                 policy.on_apply(user=user.name, project=project.name, spec=spec)
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
+    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     async def test_on_apply_plugin_service_returns_invalid_spec(
         self, test_db, user, project, spec
     ):
@@ -168,7 +168,6 @@ class TestRESTPlugin:
                 policy.on_apply(user.name, project=project.name, spec=spec)
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
@@ -193,6 +192,7 @@ class TestRESTPlugin:
             ),
         ],
     )
+    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     async def test_on_apply_plugin_service_error_handling(
         self, test_db, user, project, spec, error, expectation
     ):
