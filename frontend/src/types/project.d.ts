@@ -46,3 +46,7 @@ declare interface IProjectSecret {
     name: string;
     value?: string;
 }
+
+declare type IProjectCreateRequestParams = Pick<IProject, 'project_name'> & {
+    is_public: boolean;
+};

@@ -1,8 +1,18 @@
-from typing import List
+import json
+from datetime import datetime
+from typing import Any, List, Optional
+from uuid import UUID
 
 from pydantic import parse_obj_as
+from pydantic.json import pydantic_encoder
 
-from dstack._internal.core.models.users import GlobalRole, User, UserWithCreds
+from dstack._internal.core.models.users import (
+    GlobalRole,
+    User,
+    UsersInfoList,
+    UsersInfoListOrUsersList,
+    UserWithCreds,
+)
 from dstack._internal.server.schemas.users import (
     CreateUserRequest,
     GetUserRequest,
@@ -13,9 +23,39 @@ from dstack.api.server._group import APIClientGroup
 
 
 class UsersAPIClient(APIClientGroup):
-    def list(self) -> List[User]:
-        resp = self._request("/api/users/list")
-        return parse_obj_as(List[User.__response__], resp.json())
+    def list(
+        self,
+        return_total_count: Optional[bool] = None,
+        name_pattern: Optional[str] = None,
+        prev_created_at: Optional[datetime] = None,
+        prev_id: Optional[UUID] = None,
+        limit: Optional[int] = None,
+        ascending: Optional[bool] = None,
+    ) -> UsersInfoListOrUsersList:
+        # Passing only non-None fields for backward compatibility with 0.20 servers.
+        body: dict[str, Any] = {}
+        if return_total_count is not None:
+            body["return_total_count"] = return_total_count
+        if name_pattern is not None:
+            body["name_pattern"] = name_pattern
+        if prev_created_at is not None:
+            body["prev_created_at"] = prev_created_at
+        if prev_id is not None:
+            body["prev_id"] = prev_id
+        if limit is not None:
+            body["limit"] = limit
+        if ascending is not None:
+            body["ascending"] = ascending
+        if body:
+            resp = self._request(
+                "/api/users/list", body=json.dumps(body, default=pydantic_encoder)
+            )
+        else:
+            resp = self._request("/api/users/list")
+        resp_json = resp.json()
+        if isinstance(resp_json, list):
+            return parse_obj_as(List[User.__response__], resp_json)
+        return parse_obj_as(UsersInfoList, resp_json)
 
     def get_my_user(self) -> UserWithCreds:
         resp = self._request("/api/users/get_my_user")

@@ -1,3 +1,5 @@
+from typing import Optional
+
 import botocore.exceptions
 
 from dstack._internal.core.backends.aws.compute import AWSCompute
@@ -11,9 +13,12 @@ class AWSBackend(Backend):
     TYPE = BackendType.AWS
     COMPUTE_CLASS = AWSCompute
 
-    def __init__(self, config: AWSConfig):
+    def __init__(self, config: AWSConfig, compute: Optional[AWSCompute] = None):
         self.config = config
-        self._compute = AWSCompute(self.config)
+        if compute is not None:
+            self._compute = compute
+        else:
+            self._compute = AWSCompute(self.config)
         self._check_credentials()
 
     def compute(self) -> AWSCompute:

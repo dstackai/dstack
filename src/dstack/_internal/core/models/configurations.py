@@ -31,6 +31,7 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
+from dstack._internal.core.services import is_valid_dstack_resource_name
 from dstack._internal.utils.common import has_duplicates, list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import (
@@ -54,6 +55,7 @@ DEFAULT_PROBE_INTERVAL = 15
 DEFAULT_PROBE_READY_AFTER = 1
 DEFAULT_PROBE_METHOD = "get"
 MAX_PROBE_URL_LEN = 2048
+DEFAULT_REPLICA_GROUP_NAME = "default"
 
 
 class RunConfigurationType(str, Enum):
@@ -612,6 +614,11 @@ class ConfigurationWithCommandsParams(CoreModel):
 
     @root_validator
     def check_image_or_commands_present(cls, values):
+        # If replicas is list, skip validation - commands come from replica groups
+        replicas = values.get("replicas")
+        if isinstance(replicas, list):
+            return values
+
         if not values.get("commands") and not values.get("image"):
             raise ValueError("Either `commands` or `image` must be set")
         return values
@@ -734,6 +741,68 @@ class ServiceConfigurationParamsConfig(CoreConfig):
         )
 
 
+def _validate_replica_range(v: Range[int]) -> Range[int]:
+    """Validate a Range[int] used for replica counts."""
+    if v.max is None:
+        raise ValueError("The maximum number of replicas is required")
+    if v.min is None:
+        v.min = 0
+    if v.min < 0:
+        raise ValueError("The minimum number of replicas must be greater than or equal to 0")
+    return v
+
+
+class ReplicaGroup(CoreModel):
+    name: Annotated[
+        Optional[str],
+        Field(
+            description="The name of the replica group. If not provided, defaults to 'replica-group-0', 'replica-group-1', etc. based on position."
+        ),
+    ]
+    count: Annotated[
+        Range[int],
+        Field(
+            description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
+            "If it's a range, the `scaling` property is required"
+        ),
+    ]
+    scaling: Annotated[
+        Optional[ScalingSpec],
+        Field(description="The auto-scaling rules. Required if `count` is set to a range"),
+    ] = None
+
+    resources: Annotated[
+        ResourcesSpec,
+        Field(description="The resources requirements for replicas in this group"),
+    ] = ResourcesSpec()
+
+    commands: Annotated[
+        CommandsList,
+        Field(description="The shell commands to run for replicas in this group"),
+    ] = []
+
+    @validator("name")
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not is_valid_dstack_resource_name(v):
+                raise ValueError("Resource name should match regex '^[a-z][a-z0-9-]{1,40}$'")
+        return v
+
+    @validator("count")
+    def convert_count(cls, v: Range[int]) -> Range[int]:
+        return _validate_replica_range(v)
+
+    @root_validator()
+    def validate_scaling(cls, values):
+        scaling = values.get("scaling")
+        count = values.get("count")
+        if count and count.min != count.max and not scaling:
+            raise ValueError("When you set `count` to a range, ensure to specify `scaling`.")
+        if count and count.min == count.max and scaling:
+            raise ValueError("To use `scaling`, `count` must be set to a range.")
+        return values
+
+
 class ServiceConfigurationParams(CoreModel):
     port: Annotated[
         # NOTE: it's a PortMapping for historical reasons. Only `port.container_port` is used.
@@ -775,13 +844,7 @@ class ServiceConfigurationParams(CoreModel):
         SERVICE_HTTPS_DEFAULT
     )
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
-    replicas: Annotated[
-        Range[int],
-        Field(
-            description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
-            "If it's a range, the `scaling` property is required"
-        ),
-    ] = Range[int](min=1, max=1)
+
     scaling: Annotated[
         Optional[ScalingSpec],
         Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
@@ -791,6 +854,20 @@ class ServiceConfigurationParams(CoreModel):
         list[ProbeConfig],
         Field(description="List of probes used to determine job health"),
     ] = []
+
+    replicas: Annotated[
+        Optional[Union[List[ReplicaGroup], Range[int]]],
+        Field(
+            description=(
+                "The number of replicas or a list of replica groups. "
+                "Can be an integer (e.g., `2`), a range (e.g., `0..4`), or a list of replica groups. "
+                "Each replica group defines replicas with shared configuration "
+                "(commands, resources, scaling). "
+                "When `replicas` is a list of replica groups, top-level `scaling`, `commands`, "
+                "and `resources` are not allowed and must be specified in each replica group instead. "
+            )
+        ),
+    ] = None
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
@@ -805,26 +882,6 @@ class ServiceConfigurationParams(CoreModel):
         if isinstance(v, str):
             return OpenAIChatModel(type="chat", name=v, format="openai")
         return v
-
-    @validator("replicas")
-    def convert_replicas(cls, v: Range[int]) -> Range[int]:
-        if v.max is None:
-            raise ValueError("The maximum number of replicas is required")
-        if v.min is None:
-            v.min = 0
-        if v.min < 0:
-            raise ValueError("The minimum number of replicas must be greater than or equal to 0")
-        return v
-
-    @root_validator()
-    def validate_scaling(cls, values):
-        scaling = values.get("scaling")
-        replicas = values.get("replicas")
-        if replicas and replicas.min != replicas.max and not scaling:
-            raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
-        if replicas and replicas.min == replicas.max and scaling:
-            raise ValueError("To use `scaling`, `replicas` must be set to a range.")
-        return values
 
     @validator("rate_limits")
     def validate_rate_limits(cls, v: list[RateLimit]) -> list[RateLimit]:
@@ -847,6 +904,103 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError("Probes must be unique")
         return v
 
+    @validator("replicas")
+    def validate_replicas(
+        cls, v: Optional[Union[Range[int], List[ReplicaGroup]]]
+    ) -> Optional[Union[Range[int], List[ReplicaGroup]]]:
+        if v is None:
+            return v
+        if isinstance(v, Range):
+            return _validate_replica_range(v)
+
+        if isinstance(v, list):
+            if not v:
+                raise ValueError("`replicas` cannot be an empty list")
+
+            # Assign default names to groups without names
+            for index, group in enumerate(v):
+                if group.name is None:
+                    group.name = f"replica-group-{index}"
+
+            # Check for duplicate names
+            names = [group.name for group in v]
+            if len(names) != len(set(names)):
+                duplicates = [name for name in set(names) if names.count(name) > 1]
+                raise ValueError(
+                    f"Duplicate replica group names found: {duplicates}. "
+                    "Each replica group must have a unique name."
+                )
+        return v
+
+    @root_validator()
+    def validate_scaling(cls, values):
+        scaling = values.get("scaling")
+        replicas = values.get("replicas")
+
+        if isinstance(replicas, Range):
+            if replicas and replicas.min != replicas.max and not scaling:
+                raise ValueError(
+                    "When you set `replicas` to a range, ensure to specify `scaling`."
+                )
+            if replicas and replicas.min == replicas.max and scaling:
+                raise ValueError("To use `scaling`, `replicas` must be set to a range.")
+        return values
+
+    @root_validator()
+    def validate_top_level_properties_with_replica_groups(cls, values):
+        """
+        When replicas is a list of ReplicaGroup, forbid top-level scaling, commands, and resources
+        """
+        replicas = values.get("replicas")
+
+        if not isinstance(replicas, list):
+            return values
+
+        scaling = values.get("scaling")
+        if scaling is not None:
+            raise ValueError(
+                "Top-level `scaling` is not allowed when `replicas` is a list. "
+                "Specify `scaling` in each replica group instead."
+            )
+
+        commands = values.get("commands", [])
+        if commands:
+            raise ValueError(
+                "Top-level `commands` is not allowed when `replicas` is a list. "
+                "Specify `commands` in each replica group instead."
+            )
+
+        resources = values.get("resources")
+
+        default_resources = ResourcesSpec()
+        if resources and resources.dict() != default_resources.dict():
+            raise ValueError(
+                "Top-level `resources` is not allowed when `replicas` is a list. "
+                "Specify `resources` in each replica group instead."
+            )
+
+        return values
+
+    @root_validator()
+    def validate_replica_groups_have_commands_or_image(cls, values):
+        """
+        When replicas is a list, ensure each ReplicaGroup has commands OR service has image.
+        """
+        replicas = values.get("replicas")
+        image = values.get("image")
+
+        if not isinstance(replicas, list):
+            return values
+
+        for group in replicas:
+            if not group.commands and not image:
+                raise ValueError(
+                    f"Replica group '{group.name}' has no commands. "
+                    "Either set `commands` in the replica group or set `image` at the service level."
+                )
+
+        return values
+
 
 class ServiceConfigurationConfig(
     ProfileParamsConfig,
@@ -868,6 +1022,34 @@ class ServiceConfiguration(
     generate_dual_core_model(ServiceConfigurationConfig),
 ):
     type: Literal["service"] = "service"
+
+    @property
+    def replica_groups(self) -> List[ReplicaGroup]:
+        if self.replicas is None:
+            return [
+                ReplicaGroup(
+                    name=DEFAULT_REPLICA_GROUP_NAME,
+                    count=Range[int](min=1, max=1),
+                    commands=self.commands,
+                    resources=self.resources,
+                    scaling=self.scaling,
+                )
+            ]
+        if isinstance(self.replicas, list):
+            return self.replicas
+        if isinstance(self.replicas, Range):
+            return [
+                ReplicaGroup(
+                    name=DEFAULT_REPLICA_GROUP_NAME,
+                    count=self.replicas,
+                    commands=self.commands,
+                    resources=self.resources,
+                    scaling=self.scaling,
+                )
+            ]
+        raise ValueError(
+            f"Invalid replicas type: {type(self.replicas)}. Expected None, Range[int], or List[ReplicaGroup]"
+        )
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]

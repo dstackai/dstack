@@ -17,3 +17,5 @@ export const Code = forwardRef<HTMLDivElement, Props>(({ children, className }, 
         </div>
     );
 });
+
+Code.displayName = 'Code';

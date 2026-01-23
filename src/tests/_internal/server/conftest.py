@@ -13,7 +13,7 @@ from dstack._internal.server.testing.conf import postgres_container, session, te
 
 
 @pytest.fixture
-def client(event_loop):
+def client():
     transport = httpx.ASGITransport(app=app)
     return httpx.AsyncClient(transport=transport, base_url="http://test")
 

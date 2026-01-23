@@ -88,7 +88,9 @@ def validate_run_spec_and_set_defaults(
             f"Maximum utilization_policy.time_window is {settings.SERVER_METRICS_RUNNING_TTL_SECONDS}s"
         )
     if isinstance(run_spec.configuration, ServiceConfiguration):
-        if run_spec.merged_profile.schedule and run_spec.configuration.replicas.min == 0:
+        if run_spec.merged_profile.schedule and all(
+            group.count.min == 0 for group in run_spec.configuration.replica_groups
+        ):
             raise ServerClientError(
                 "Scheduled services with autoscaling to zero are not supported"
             )
@@ -149,11 +151,10 @@ def get_nodes_required_num(run_spec: RunSpec) -> int:
     nodes_required_num = 1
     if run_spec.configuration.type == "task":
         nodes_required_num = run_spec.configuration.nodes
-    elif (
-        run_spec.configuration.type == "service"
-        and run_spec.configuration.replicas.min is not None
-    ):
-        nodes_required_num = run_spec.configuration.replicas.min
+    elif run_spec.configuration.type == "service":
+        nodes_required_num = sum(
+            group.count.min or 0 for group in run_spec.configuration.replica_groups
+        )
     return nodes_required_num
 
 

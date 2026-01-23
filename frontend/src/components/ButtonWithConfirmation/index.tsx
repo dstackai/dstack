@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Box from '@cloudscape-design/components/box';
 
 import { Button } from '../Button';
@@ -13,18 +14,29 @@ export const ButtonWithConfirmation: React.FC<IProps> = ({
     confirmButtonLabel,
     ...props
 }) => {
+    const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
 
     const toggleDeleteConfirm = () => {
         setShowConfirmDelete((val) => !val);
     };
 
-    const content = typeof confirmContent === 'string' ? <Box variant="span">{confirmContent}</Box> : confirmContent;
-
     const onConfirm = () => {
         if (onClick) onClick();
 
         setShowConfirmDelete(false);
+    };
+
+    const getContent = () => {
+        if (!confirmContent) {
+            return <Box variant="span">{t('confirm_dialog.message')}</Box>;
+        }
+
+        if (typeof confirmContent === 'string') {
+            return <Box variant="span">{confirmContent}</Box>;
+        }
+
+        return confirmContent;
     };
 
     return (
@@ -36,8 +48,8 @@ export const ButtonWithConfirmation: React.FC<IProps> = ({
                 onDiscard={toggleDeleteConfirm}
                 onConfirm={onConfirm}
                 title={confirmTitle}
-                content={content}
-                confirmButtonLabel={confirmButtonLabel}
+                content={getContent()}
+                confirmButtonLabel={confirmButtonLabel ?? t('common.delete')}
             />
         </>
     );

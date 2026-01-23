@@ -9,7 +9,7 @@ import { IProps } from './types';
 
 export const ConfirmationDialog: React.FC<IProps> = ({
     title: titleProp,
-    content: contentProp,
+    content,
     visible = false,
     onDiscard,
     onConfirm,
@@ -18,9 +18,8 @@ export const ConfirmationDialog: React.FC<IProps> = ({
 }) => {
     const { t } = useTranslation();
     const title = titleProp ?? t('confirm_dialog.title');
-    const content = contentProp ?? <Box variant="span">{t('confirm_dialog.message')}</Box>;
     const cancelButtonLabel = cancelButtonLabelProp ?? t('common.cancel');
-    const confirmButtonLabel = confirmButtonLabelProp ?? t('common.delete');
+    const confirmButtonLabel = confirmButtonLabelProp ?? t('common.ok');
 
     return (
         <Modal

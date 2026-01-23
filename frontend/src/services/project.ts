@@ -74,7 +74,7 @@ export const projectApi = createApi({
             providesTags: (result) => (result ? [{ type: 'Projects' as const, id: result.project_name }] : []),
         }),
 
-        createProject: builder.mutation<IProject, IProject>({
+        createProject: builder.mutation<IProject, IProjectCreateRequestParams>({
             query: (project) => ({
                 url: API.PROJECTS.CREATE(),
                 method: 'POST',

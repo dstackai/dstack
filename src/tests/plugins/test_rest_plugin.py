@@ -1,7 +1,6 @@
 import json
 import os
 from contextlib import nullcontext as does_not_raise
-from unittest import mock
 from unittest.mock import Mock
 
 import pytest
@@ -101,14 +100,14 @@ class TestRESTPlugin:
             CustomApplyPolicy()
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
     async def test_on_apply_plugin_service_returns_mutated_spec(
-        self, test_db, user, project, spec
+        self, mocker, test_db, user, project, spec
     ):
+        mocker.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
         policy = CustomApplyPolicy()
         mock_response = Mock()
         response_dict = {"spec": spec.dict(), "error": None}
@@ -120,55 +119,54 @@ class TestRESTPlugin:
 
         mock_response.text = json.dumps(response_dict)
         mock_response.raise_for_status = Mock()
-        with mock.patch("requests.post", return_value=mock_response):
-            result = policy.on_apply(user=user.name, project=project.name, spec=spec)
-            assert result == type(spec)(**response_dict["spec"])
+        mocker.patch("requests.post", return_value=mock_response)
+        result = policy.on_apply(user=user.name, project=project.name, spec=spec)
+        assert result == type(spec)(**response_dict["spec"])
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
-    async def test_on_apply_plugin_service_call_fails(self, test_db, user, project, spec):
+    async def test_on_apply_plugin_service_call_fails(self, mocker, test_db, user, project, spec):
+        mocker.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
         policy = CustomApplyPolicy()
-        with mock.patch("requests.post", side_effect=requests.RequestException("fail")):
-            with pytest.raises(ServerClientError):
-                policy.on_apply(user=user.name, project=project.name, spec=spec)
+        mocker.patch("requests.post", side_effect=requests.RequestException("fail"))
+        with pytest.raises(ServerClientError):
+            policy.on_apply(user=user.name, project=project.name, spec=spec)
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
-    async def test_on_apply_plugin_service_connection_fails(self, test_db, user, project, spec):
+    async def test_on_apply_plugin_service_connection_fails(
+        self, mocker, test_db, user, project, spec
+    ):
+        mocker.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
         policy = CustomApplyPolicy()
-        with mock.patch(
-            "requests.post", side_effect=requests.ConnectionError("Failed to connect")
-        ):
-            with pytest.raises(ServerClientError):
-                policy.on_apply(user=user.name, project=project.name, spec=spec)
+        mocker.patch("requests.post", side_effect=requests.ConnectionError("Failed to connect"))
+        with pytest.raises(ServerClientError):
+            policy.on_apply(user=user.name, project=project.name, spec=spec)
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
     )
     async def test_on_apply_plugin_service_returns_invalid_spec(
-        self, test_db, user, project, spec
+        self, mocker, test_db, user, project, spec
     ):
+        mocker.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
         policy = CustomApplyPolicy()
         mock_response = Mock()
         mock_response.text = json.dumps({"invalid-key": "abc"})
         mock_response.raise_for_status = Mock()
-        with mock.patch("requests.post", return_value=mock_response):
-            with pytest.raises(ServerClientError):
-                policy.on_apply(user.name, project=project.name, spec=spec)
+        mocker.patch("requests.post", return_value=mock_response)
+        with pytest.raises(ServerClientError):
+            policy.on_apply(user.name, project=project.name, spec=spec)
 
     @pytest.mark.asyncio
-    @mock.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "spec", ["run_spec", "fleet_spec", "volume_spec", "gateway_spec"], indirect=True
@@ -194,14 +192,15 @@ class TestRESTPlugin:
         ],
     )
     async def test_on_apply_plugin_service_error_handling(
-        self, test_db, user, project, spec, error, expectation
+        self, mocker, test_db, user, project, spec, error, expectation
     ):
+        mocker.patch.dict(os.environ, {PLUGIN_SERVICE_URI_ENV_VAR_NAME: "http://mock"})
         policy = CustomApplyPolicy()
         mock_response = Mock()
         response_dict = {"spec": spec.dict(), "error": error}
         mock_response.text = json.dumps(response_dict)
         mock_response.raise_for_status = Mock()
-        with mock.patch("requests.post", return_value=mock_response):
-            with expectation:
-                result = policy.on_apply(user=user.name, project=project.name, spec=spec)
-                assert result == type(spec)(**response_dict["spec"])
+        mocker.patch("requests.post", return_value=mock_response)
+        with expectation:
+            result = policy.on_apply(user=user.name, project=project.name, spec=spec)
+            assert result == type(spec)(**response_dict["spec"])

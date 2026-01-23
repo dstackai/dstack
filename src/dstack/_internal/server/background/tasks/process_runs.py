@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import json
 from typing import List, Optional, Set, Tuple
 
 from sqlalchemy import and_, func, or_, select
@@ -8,6 +9,7 @@ from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only, with_
 
 import dstack._internal.server.services.services.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
+from dstack._internal.core.models.configurations import ReplicaGroup
 from dstack._internal.core.models.profiles import RetryEvent, StopCriteria
 from dstack._internal.core.models.runs import (
     Job,
@@ -45,9 +47,14 @@ from dstack._internal.server.services.runs import (
     switch_run_status,
 )
 from dstack._internal.server.services.runs.replicas import (
+    build_replica_lists,
+    has_out_of_date_replicas,
     is_replica_registered,
+    job_belongs_to_group,
     retry_run_replica_jobs,
+    scale_down_replicas,
     scale_run_replicas,
+    scale_run_replicas_per_group,
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.services import update_service_desired_replica_count
@@ -234,9 +241,10 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
         logger.debug("%s: retrying run is not yet ready for resubmission", fmt(run_model))
         return
 
-    run_model.desired_replica_count = 1
     if run.run_spec.configuration.type == "service":
-        run_model.desired_replica_count = run.run_spec.configuration.replicas.min or 0
+        run_model.desired_replica_count = sum(
+            group.count.min or 0 for group in run.run_spec.configuration.replica_groups
+        )
         await update_service_desired_replica_count(
             session,
             run_model,
@@ -245,12 +253,18 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
             last_scaled_at=None,
         )
 
-    if run_model.desired_replica_count == 0:
-        # stay zero scaled
-        return
+        if run_model.desired_replica_count == 0:
+            # stay zero scaled
+            return
 
-    await scale_run_replicas(session, run_model, replicas_diff=run_model.desired_replica_count)
-    switch_run_status(session, run_model, RunStatus.SUBMITTED)
+        replicas: List[ReplicaGroup] = run.run_spec.configuration.replica_groups
+
+        await scale_run_replicas_per_group(session, run_model, replicas)
+    else:
+        run_model.desired_replica_count = 1
+        await scale_run_replicas(session, run_model, replicas_diff=run_model.desired_replica_count)
+
+    switch_run_status(session=session, run_model=run_model, new_status=RunStatus.SUBMITTED)
 
 
 def _retrying_run_ready_for_resubmission(run_model: RunModel, run: Run) -> bool:
@@ -486,9 +500,60 @@ async def _handle_run_replicas(
             # FIXME: should only include scaling events, not retries and deployments
             last_scaled_at=max((r.timestamp for r in replicas_info), default=None),
         )
+        replicas: List[ReplicaGroup] = run_spec.configuration.replica_groups
+        assert replicas, "replica groups should always return at least one group"
+
+        await scale_run_replicas_per_group(session, run_model, replicas)
+
+        # Handle per-group rolling deployment
+        await _update_jobs_to_new_deployment_in_place(
+            session=session,
+            run_model=run_model,
+            run_spec=run_spec,
+            replicas=replicas,
+        )
+        # Process per-group rolling deployment
+        for group in replicas:
+            await _handle_rolling_deployment_for_group(
+                session=session, run_model=run_model, group=group, run_spec=run_spec
+            )
+        # Terminate replicas from groups that were removed from the configuration
+        existing_group_names = set()
+        for job in run_model.jobs:
+            if job.status.is_finished():
+                continue
+            try:
+                job_spec = JobSpec.__response__.parse_raw(job.job_spec_data)
+                existing_group_names.add(job_spec.replica_group)
+            except Exception:
+                continue
+        new_group_names = {group.name for group in replicas}
+        removed_group_names = existing_group_names - new_group_names
+        for removed_group_name in removed_group_names:
+            # Build replica lists for this removed group
+            active_replicas, inactive_replicas = build_replica_lists(
+                run_model=run_model,
+                group_filter=removed_group_name,
+            )
+
+            total_replicas = len(active_replicas) + len(inactive_replicas)
+            if total_replicas > 0:
+                logger.info(
+                    "%s: terminating %d replica(s) from removed group '%s'",
+                    fmt(run_model),
+                    total_replicas,
+                    removed_group_name,
+                )
+                # Terminate all active replicas in the removed group
+                if active_replicas:
+                    scale_down_replicas(session, active_replicas, len(active_replicas))
+                # Terminate all inactive replicas in the removed group
+                if inactive_replicas:
+                    scale_down_replicas(session, inactive_replicas, len(inactive_replicas))
+        return
 
     max_replica_count = run_model.desired_replica_count
-    if _has_out_of_date_replicas(run_model):
+    if has_out_of_date_replicas(run_model):
         # allow extra replicas when deployment is in progress
         max_replica_count += ROLLING_DEPLOYMENT_MAX_SURGE
 
@@ -506,7 +571,7 @@ async def _handle_run_replicas(
         run_model=run_model,
         run_spec=run_spec,
     )
-    if _has_out_of_date_replicas(run_model):
+    if has_out_of_date_replicas(run_model):
         assert run_spec.configuration.type == "service", (
             "Rolling deployment is only supported for services"
         )
@@ -551,7 +616,10 @@ async def _handle_run_replicas(
 
 
 async def _update_jobs_to_new_deployment_in_place(
-    session: AsyncSession, run_model: RunModel, run_spec: RunSpec
+    session: AsyncSession,
+    run_model: RunModel,
+    run_spec: RunSpec,
+    replicas: Optional[List] = None,
 ) -> None:
     """
     Bump deployment_num for jobs that do not require redeployment.
@@ -560,16 +628,26 @@ async def _update_jobs_to_new_deployment_in_place(
         session=session,
         project=run_model.project,
     )
+
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         if all(j.status.is_finished() for j in job_models):
             continue
         if all(j.deployment_num == run_model.deployment_num for j in job_models):
             continue
+
+        # Determine which group this replica belongs to
+        replica_group_name = None
+
+        if replicas:
+            job_spec = JobSpec.__response__.parse_raw(job_models[0].job_spec_data)
+            replica_group_name = job_spec.replica_group
+
         # FIXME: Handle getting image configuration errors or skip it.
         new_job_specs = await get_job_specs_from_run_spec(
             run_spec=run_spec,
             secrets=secrets,
             replica_num=replica_num,
+            replica_group_name=replica_group_name,
         )
         assert len(new_job_specs) == len(job_models), (
             "Changing the number of jobs within a replica is not yet supported"
@@ -583,15 +661,6 @@ async def _update_jobs_to_new_deployment_in_place(
         if can_update_all_jobs:
             for job_model in job_models:
                 job_model.deployment_num = run_model.deployment_num
-
-
-def _has_out_of_date_replicas(run: RunModel) -> bool:
-    for job in run.jobs:
-        if job.deployment_num < run.deployment_num and not (
-            job.status.is_finished() or job.termination_reason == JobTerminationReason.SCALED_DOWN
-        ):
-            return True
-    return False
 
 
 async def _should_retry_job(
@@ -671,3 +740,103 @@ def _should_stop_on_master_done(run: Run) -> bool:
         if is_master_job(job) and job.job_submissions[-1].status == JobStatus.DONE:
             return True
     return False
+
+
+async def _handle_rolling_deployment_for_group(
+    session: AsyncSession, run_model: RunModel, group: ReplicaGroup, run_spec: RunSpec
+) -> None:
+    """
+    Handle rolling deployment for a single replica group.
+    """
+    from dstack._internal.server.services.runs.replicas import (
+        build_replica_lists,
+        scale_run_replicas_for_group,
+    )
+
+    desired_replica_counts = (
+        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
+    )
+
+    group_desired = desired_replica_counts.get(group.name, group.count.min or 0)
+
+    # Check if group has out-of-date replicas
+    if not has_out_of_date_replicas(run_model, group_filter=group.name):
+        return  # Group is up-to-date
+
+    # Calculate max replicas (allow surge during deployment)
+    group_max_replica_count = group_desired + ROLLING_DEPLOYMENT_MAX_SURGE
+
+    # Count non-terminated replicas for this group only
+
+    non_terminated_replica_count = len(
+        {
+            j.replica_num
+            for j in run_model.jobs
+            if not j.status.is_finished()
+            and group.name is not None
+            and job_belongs_to_group(job=j, group_name=group.name)
+        }
+    )
+
+    # Start new up-to-date replicas if needed
+    if non_terminated_replica_count < group_max_replica_count:
+        active_replicas, inactive_replicas = build_replica_lists(
+            run_model=run_model,
+            group_filter=group.name,
+        )
+
+        await scale_run_replicas_for_group(
+            session=session,
+            run_model=run_model,
+            group=group,
+            replicas_diff=group_max_replica_count - non_terminated_replica_count,
+            run_spec=run_spec,
+            active_replicas=active_replicas,
+            inactive_replicas=inactive_replicas,
+        )
+
+    # Stop out-of-date replicas that are not registered
+    replicas_to_stop_count = 0
+    for _, jobs in group_jobs_by_replica_latest(run_model.jobs):
+        assert group.name is not None, "Group name is always set"
+        if not job_belongs_to_group(jobs[0], group.name):
+            continue
+        # Check if replica is out-of-date and not registered
+        if (
+            any(j.deployment_num < run_model.deployment_num for j in jobs)
+            and any(
+                j.status not in [JobStatus.TERMINATING] + JobStatus.finished_statuses()
+                for j in jobs
+            )
+            and not is_replica_registered(jobs)
+        ):
+            replicas_to_stop_count += 1
+
+    # Stop excessive registered out-of-date replicas
+    non_terminating_registered_replicas_count = 0
+    for _, jobs in group_jobs_by_replica_latest(run_model.jobs):
+        assert group.name is not None, "Group name is always set"
+        if not job_belongs_to_group(jobs[0], group.name):
+            continue
+
+        if is_replica_registered(jobs) and all(j.status != JobStatus.TERMINATING for j in jobs):
+            non_terminating_registered_replicas_count += 1
+
+    replicas_to_stop_count += max(0, non_terminating_registered_replicas_count - group_desired)
+
+    if replicas_to_stop_count > 0:
+        # Build lists again to get current state
+        active_replicas, inactive_replicas = build_replica_lists(
+            run_model=run_model,
+            group_filter=group.name,
+        )
+
+        await scale_run_replicas_for_group(
+            session=session,
+            run_model=run_model,
+            group=group,
+            replicas_diff=-replicas_to_stop_count,
+            run_spec=run_spec,
+            active_replicas=active_replicas,
+            inactive_replicas=inactive_replicas,
+        )

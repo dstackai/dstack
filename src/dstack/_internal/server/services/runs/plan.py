@@ -78,57 +78,117 @@ async def get_job_plans(
         run_spec.run_name = "dry-run"
 
     secrets = await get_project_secrets_mapping(session=session, project=project)
-    jobs = await get_jobs_from_run_spec(
-        run_spec=run_spec,
-        secrets=secrets,
-        replica_num=0,
-    )
-    volumes = await get_job_configured_volumes(
-        session=session,
-        project=project,
-        run_spec=run_spec,
-        job_num=0,
-    )
-    candidate_fleet_models = await _select_candidate_fleet_models(
-        session=session,
-        project=project,
-        run_model=None,
-        run_spec=run_spec,
-    )
-    fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
-        project=project,
-        fleet_models=candidate_fleet_models,
-        run_model=None,
-        run_spec=run_spec,
-        job=jobs[0],
-        master_job_provisioning_data=None,
-        volumes=volumes,
-        exclude_not_available=False,
-    )
-    if _should_force_non_fleet_offers(run_spec) or (
-        FeatureFlags.AUTOCREATED_FLEETS_ENABLED and profile.fleets is None and fleet_model is None
-    ):
-        # Keep the old behavior returning all offers irrespective of fleets.
-        # Needed for supporting offers with autocreated fleets flow (and for `dstack offer`).
-        instance_offers, backend_offers = await _get_non_fleet_offers(
-            session=session,
-            project=project,
-            profile=profile,
-            run_spec=run_spec,
-            job=jobs[0],
-            volumes=volumes,
-        )
 
     job_plans = []
-    for job in jobs:
-        job_plan = _get_job_plan(
-            instance_offers=instance_offers,
-            backend_offers=backend_offers,
-            profile=profile,
-            job=job,
-            max_offers=max_offers,
+
+    if run_spec.configuration.type == "service":
+        volumes = await get_job_configured_volumes(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job_num=0,
         )
-        job_plans.append(job_plan)
+        candidate_fleet_models = await _select_candidate_fleet_models(
+            session=session,
+            project=project,
+            run_model=None,
+            run_spec=run_spec,
+        )
+        for replica_group in run_spec.configuration.replica_groups:
+            jobs = await get_jobs_from_run_spec(
+                run_spec=run_spec,
+                secrets=secrets,
+                replica_num=0,
+                replica_group_name=replica_group.name,
+            )
+            fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
+                project=project,
+                fleet_models=candidate_fleet_models,
+                run_model=None,
+                run_spec=run_spec,
+                job=jobs[0],
+                master_job_provisioning_data=None,
+                volumes=volumes,
+                exclude_not_available=False,
+            )
+            if _should_force_non_fleet_offers(run_spec) or (
+                FeatureFlags.AUTOCREATED_FLEETS_ENABLED
+                and profile.fleets is None
+                and fleet_model is None
+            ):
+                # Keep the old behavior returning all offers irrespective of fleets.
+                # Needed for supporting offers with autocreated fleets flow (and for `dstack offer`).
+                instance_offers, backend_offers = await _get_non_fleet_offers(
+                    session=session,
+                    project=project,
+                    profile=profile,
+                    run_spec=run_spec,
+                    job=jobs[0],
+                    volumes=volumes,
+                )
+
+            for job in jobs:
+                job_plan = _get_job_plan(
+                    instance_offers=instance_offers,
+                    backend_offers=backend_offers,
+                    profile=profile,
+                    job=job,
+                    max_offers=max_offers,
+                )
+                job_plans.append(job_plan)
+    else:
+        jobs = await get_jobs_from_run_spec(
+            run_spec=run_spec,
+            secrets=secrets,
+            replica_num=0,
+        )
+        volumes = await get_job_configured_volumes(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job_num=0,
+        )
+        candidate_fleet_models = await _select_candidate_fleet_models(
+            session=session,
+            project=project,
+            run_model=None,
+            run_spec=run_spec,
+        )
+        fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
+            project=project,
+            fleet_models=candidate_fleet_models,
+            run_model=None,
+            run_spec=run_spec,
+            job=jobs[0],
+            master_job_provisioning_data=None,
+            volumes=volumes,
+            exclude_not_available=False,
+        )
+        if _should_force_non_fleet_offers(run_spec) or (
+            FeatureFlags.AUTOCREATED_FLEETS_ENABLED
+            and profile.fleets is None
+            and fleet_model is None
+        ):
+            # Keep the old behavior returning all offers irrespective of fleets.
+            # Needed for supporting offers with autocreated fleets flow (and for `dstack offer`).
+            instance_offers, backend_offers = await _get_non_fleet_offers(
+                session=session,
+                project=project,
+                profile=profile,
+                run_spec=run_spec,
+                job=jobs[0],
+                volumes=volumes,
+            )
+
+        for job in jobs:
+            job_plan = _get_job_plan(
+                instance_offers=instance_offers,
+                backend_offers=backend_offers,
+                profile=profile,
+                job=job,
+                max_offers=max_offers,
+            )
+            job_plans.append(job_plan)
 
     run_spec.run_name = run_name
     return job_plans

@@ -10,6 +10,9 @@ class ServiceJobConfigurator(JobConfigurator):
 
     def _shell_commands(self) -> List[str]:
         assert self.run_spec.configuration.type == "service"
+        for group in self.run_spec.configuration.replica_groups:
+            if group.name == self.replica_group_name:
+                return group.commands
         return self.run_spec.configuration.commands
 
     def _default_single_branch(self) -> bool:

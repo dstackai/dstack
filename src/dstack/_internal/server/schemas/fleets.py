@@ -9,10 +9,10 @@ from dstack._internal.core.models.fleets import ApplyFleetPlanInput, FleetSpec
 
 
 class ListFleetsRequest(CoreModel):
-    project_name: Optional[str]
+    project_name: Optional[str] = None
     only_active: bool = False
-    prev_created_at: Optional[datetime]
-    prev_id: Optional[UUID]
+    prev_created_at: Optional[datetime] = None
+    prev_id: Optional[UUID] = None
     limit: int = Field(100, ge=0, le=100)
     ascending: bool = False
 

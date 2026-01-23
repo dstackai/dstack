@@ -99,7 +99,10 @@ def switch_job_status(
 
 
 async def get_jobs_from_run_spec(
-    run_spec: RunSpec, secrets: Dict[str, str], replica_num: int
+    run_spec: RunSpec,
+    secrets: Dict[str, str],
+    replica_num: int,
+    replica_group_name: Optional[str] = None,
 ) -> List[Job]:
     return [
         Job(job_spec=s, job_submissions=[])
@@ -107,14 +110,20 @@ async def get_jobs_from_run_spec(
             run_spec=run_spec,
             secrets=secrets,
             replica_num=replica_num,
+            replica_group_name=replica_group_name,
         )
     ]
 
 
 async def get_job_specs_from_run_spec(
-    run_spec: RunSpec, secrets: Dict[str, str], replica_num: int
+    run_spec: RunSpec,
+    secrets: Dict[str, str],
+    replica_num: int,
+    replica_group_name: Optional[str] = None,
 ) -> List[JobSpec]:
-    job_configurator = _get_job_configurator(run_spec=run_spec, secrets=secrets)
+    job_configurator = _get_job_configurator(
+        run_spec=run_spec, secrets=secrets, replica_group_name=replica_group_name
+    )
     job_specs = await job_configurator.get_job_specs(replica_num=replica_num)
     return job_specs
 
@@ -242,10 +251,14 @@ def is_master_job(job: Job) -> bool:
     return job.job_spec.job_num == 0
 
 
-def _get_job_configurator(run_spec: RunSpec, secrets: Dict[str, str]) -> JobConfigurator:
+def _get_job_configurator(
+    run_spec: RunSpec, secrets: Dict[str, str], replica_group_name: Optional[str] = None
+) -> JobConfigurator:
     configuration_type = RunConfigurationType(run_spec.configuration.type)
     configurator_class = _configuration_type_to_configurator_class_map[configuration_type]
-    return configurator_class(run_spec=run_spec, secrets=secrets)
+    return configurator_class(
+        run_spec=run_spec, secrets=secrets, replica_group_name=replica_group_name
+    )
 
 
 _job_configurator_classes = [
