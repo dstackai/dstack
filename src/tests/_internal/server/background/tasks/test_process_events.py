@@ -3,14 +3,12 @@ from unittest.mock import patch
 
 import pytest
 from freezegun import freeze_time
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_events import delete_events
-from dstack._internal.server.models import EventModel
 from dstack._internal.server.services import events
-from dstack._internal.server.testing.common import create_user
+from dstack._internal.server.testing.common import create_user, list_events
 
 
 @pytest.mark.asyncio
@@ -27,8 +25,7 @@ async def test_deletes_old_events(test_db, session: AsyncSession) -> None:
             )
     await session.commit()
 
-    res = await session.execute(select(EventModel))
-    all_events = res.scalars().all()
+    all_events = await list_events(session)
     assert len(all_events) == 10
 
     with (
@@ -37,8 +34,7 @@ async def test_deletes_old_events(test_db, session: AsyncSession) -> None:
     ):
         await delete_events()
 
-    res = await session.execute(select(EventModel).order_by(EventModel.recorded_at))
-    remaining_events = res.scalars().all()
+    remaining_events = await list_events(session)
     assert len(remaining_events) == 5
     assert [e.message for e in remaining_events] == [
         "Event 5",
