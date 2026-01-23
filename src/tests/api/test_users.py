@@ -19,7 +19,7 @@ USER_PAYLOAD = {
 
 
 class TestUsersAPIClientList:
-    def test_serializes_pagination_and_parses_total_count(self):
+    def test_serializes_pagination_and_parses_info_list(self):
         recorder = RequestRecorder({"total_count": 1, "users": [USER_PAYLOAD]})
         client = UsersAPIClient(_request=recorder, _logger=logging.getLogger("test"))
         dt = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)

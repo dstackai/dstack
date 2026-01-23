@@ -1,3 +1,4 @@
+import re
 import secrets
 import uuid
 from datetime import datetime
@@ -167,6 +168,7 @@ async def create_project(
     user_permissions = users.get_user_permissions(user)
     if not user_permissions.can_create_projects:
         raise ForbiddenError("User cannot create projects")
+    validate_project_name(project_name)
     project = await get_project_model_by_name(
         session=session, project_name=project_name, ignore_case=True
     )
@@ -679,6 +681,15 @@ def get_member_permissions(member_model: MemberModel) -> MemberPermissions:
     return MemberPermissions(
         can_manage_ssh_fleets=can_manage_ssh_fleets,
     )
+
+
+def validate_project_name(project_name: str):
+    if not is_valid_project_name(project_name):
+        raise ServerClientError("Project name should match regex '^[a-zA-Z0-9-_]{1,50}$'")
+
+
+def is_valid_project_name(project_name: str) -> bool:
+    return re.match("^[a-zA-Z0-9-_]{1,50}$", project_name) is not None
 
 
 _CREATE_PROJECT_HOOKS = []
