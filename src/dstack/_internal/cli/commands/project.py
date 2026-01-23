@@ -1,6 +1,6 @@
 import argparse
 import sys
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 from requests import HTTPError
 from rich.table import Table
@@ -8,31 +8,45 @@ from rich.table import Table
 try:
     import questionary
 
-    _is_menu_available = sys.stdin.isatty()
+    is_project_menu_supported = sys.stdin.isatty()
 except (ImportError, NotImplementedError, AttributeError):
-    _is_menu_available = False
+    is_project_menu_supported = False
 
 import dstack.api.server
 from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.utils.common import add_row_from_dict, confirm_ask, console
 from dstack._internal.core.errors import ClientError, CLIError
+from dstack._internal.core.models.config import ProjectConfig
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-def show_default_project_menu():
-    if not _is_menu_available:
+def select_default_project(
+    project_configs: list[ProjectConfig], default_project: Optional[ProjectConfig]
+) -> Optional[ProjectConfig]:
+    """Show an interactive menu to select a default project.
+
+    This method only prompts for selection and does not update the configuration.
+    Use `ConfigManager.configure_project()` and `ConfigManager.save()` to persist
+    the selected project as default.
+
+    Args:
+        project_configs: Non-empty list of available project configurations.
+        default_project: Currently default project, if any.
+
+    Returns:
+        Selected project configuration, or None if cancelled.
+
+    Raises:
+        CLIError: If `is_project_menu_supported` is False or `project_configs` is empty.
+    """
+    if not is_project_menu_supported:
         raise CLIError("Interactive menu is not supported on this platform")
 
-    config_manager = ConfigManager()
-
-    project_configs = config_manager.list_project_configs()
-    default_project = config_manager.get_project_config()
-
     if len(project_configs) == 0:
-        raise CLIError("No projects configured. Use [code]dstack project add[/] to add a project.")
+        raise CLIError("No projects configured")
 
     menu_entries = []
     default_index = None
@@ -46,23 +60,16 @@ def show_default_project_menu():
     choices = [questionary.Choice(title=entry, value=index) for entry, index in menu_entries]  # pyright: ignore[reportPossiblyUnboundVariable]
     default_value = default_index
     selected_index = questionary.select(  # pyright: ignore[reportPossiblyUnboundVariable]
-        message="Select the default project (↑↓ Enter):",
+        message="Select the default project:",
         choices=choices,
         default=default_value,  # pyright: ignore[reportArgumentType]
         qmark="",
-        instruction="",
+        instruction="(↑↓ Enter)",
     ).ask()
 
     if selected_index is not None and isinstance(selected_index, int):
-        selected_project = project_configs[selected_index]
-        config_manager.configure_project(
-            name=selected_project.name,
-            url=selected_project.url,
-            token=selected_project.token,
-            default=True,
-        )
-        config_manager.save()
-        console.print("[grey58]OK[/]")
+        return project_configs[selected_index]
+    return None
 
 
 class ProjectCommand(BaseCommand):
@@ -120,7 +127,7 @@ class ProjectCommand(BaseCommand):
         set_default_parser.add_argument(
             "name",
             type=str,
-            nargs="?" if _is_menu_available else None,
+            nargs="?" if is_project_menu_supported else None,
             help="The name of the project to set as default",
         )
         set_default_parser.set_defaults(subfunc=self._set_default)
@@ -211,8 +218,20 @@ class ProjectCommand(BaseCommand):
         console.print(table)
 
     def _project(self, args: argparse.Namespace):
-        if _is_menu_available and not getattr(args, "verbose", False):
-            show_default_project_menu()
+        if is_project_menu_supported and not getattr(args, "verbose", False):
+            config_manager = ConfigManager()
+            project_configs = config_manager.list_project_configs()
+            default_project = config_manager.get_project_config()
+            selected_project = select_default_project(project_configs, default_project)
+            if selected_project is not None:
+                config_manager.configure_project(
+                    name=selected_project.name,
+                    url=selected_project.url,
+                    token=selected_project.token,
+                    default=True,
+                )
+                config_manager.save()
+                console.print("[grey58]OK[/]")
         else:
             self._list(args)
 
@@ -229,4 +248,16 @@ class ProjectCommand(BaseCommand):
             config_manager.save()
             console.print("[grey58]OK[/]")
         else:
-            show_default_project_menu()
+            config_manager = ConfigManager()
+            project_configs = config_manager.list_project_configs()
+            default_project = config_manager.get_project_config()
+            selected_project = select_default_project(project_configs, default_project)
+            if selected_project is not None:
+                config_manager.configure_project(
+                    name=selected_project.name,
+                    url=selected_project.url,
+                    token=selected_project.token,
+                    default=True,
+                )
+                config_manager.save()
+                console.print("[grey58]OK[/]")
