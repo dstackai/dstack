@@ -15,6 +15,13 @@ class ListProjectsRequest(CoreModel):
     return_total_count: Annotated[
         bool, Field(description="Return `total_count` with the total number of projects.")
     ] = False
+    name_pattern: Annotated[
+        Optional[str],
+        Field(
+            description="Include only projects with the name containing `name_pattern`.",
+            regex="^[a-zA-Z0-9-]*$",
+        ),
+    ] = None
     prev_created_at: Annotated[
         Optional[datetime],
         Field(

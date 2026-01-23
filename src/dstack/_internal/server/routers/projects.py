@@ -59,6 +59,7 @@ async def list_projects(
             user=user,
             include_not_joined=body.include_not_joined,
             return_total_count=body.return_total_count,
+            name_pattern=body.name_pattern,
             prev_created_at=body.prev_created_at,
             prev_id=body.prev_id,
             limit=body.limit,

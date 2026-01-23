@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from sqlalchemy import and_, delete, func, literal_column, or_, select, update
+from sqlalchemy import and_, delete, literal_column, or_, select, update
 from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import QueryableAttribute, joinedload, load_only
@@ -70,6 +70,7 @@ async def list_user_accessible_projects(
     user: UserModel,
     include_not_joined: bool,
     return_total_count: bool,
+    name_pattern: Optional[str],
     prev_created_at: Optional[datetime],
     prev_id: Optional[uuid.UUID],
     limit: int,
@@ -81,7 +82,10 @@ async def list_user_accessible_projects(
     - Projects where user is a member (public or private)
     - if `include_not_joined`: Public projects where user is NOT a member
     """
-    stmt = select(ProjectModel).where(ProjectModel.deleted == False)
+    filters = [ProjectModel.deleted == False]
+    if name_pattern:
+        filters.append(ProjectModel.name.ilike(f"%{name_pattern}%"))
+    stmt = select(ProjectModel).where(*filters)
     if user.global_role != GlobalRole.ADMIN:
         stmt = stmt.outerjoin(
             MemberModel,
@@ -130,7 +134,7 @@ async def list_user_accessible_projects(
         order_by = (ProjectModel.created_at.asc(), ProjectModel.id.desc())
     total_count = None
     if return_total_count:
-        res = await session.execute(stmt.with_only_columns(func.count(literal_column("1"))))
+        res = await session.execute(stmt.with_only_columns(safunc.count(literal_column("1"))))
         total_count = res.scalar_one()
     res = await session.execute(stmt.where(*pagination_filters).order_by(*order_by).limit(limit))
     project_models = res.unique().scalars().all()

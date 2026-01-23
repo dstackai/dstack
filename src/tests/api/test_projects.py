@@ -36,6 +36,7 @@ class TestProjectsList:
         result = client.list(
             return_total_count=True,
             prev_created_at=dt,
+            name_pattern="p",
             prev_id=pid,
             limit=1,
             ascending=True,
@@ -45,6 +46,7 @@ class TestProjectsList:
         assert request.last_path == "/api/projects/list"
         assert payload["include_not_joined"] is True
         assert payload["return_total_count"] is True
+        assert payload["name_pattern"] == "p"
         assert payload["prev_created_at"] == dt.isoformat()
         assert payload["prev_id"] == str(pid)
         assert payload["limit"] == 1
