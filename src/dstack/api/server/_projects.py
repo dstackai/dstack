@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional, Union, overload
 from uuid import UUID
 
 from pydantic import parse_obj_as
@@ -23,9 +23,38 @@ from dstack.api.server._group import APIClientGroup
 
 
 class ProjectsAPIClient(APIClientGroup):
+    @overload
     def list(
         self,
         include_not_joined: bool = True,
+        *,
+        return_total_count: Literal[True],
+        name_pattern: Optional[str] = None,
+        prev_created_at: Optional[datetime] = None,
+        prev_id: Optional[UUID] = None,
+        limit: Optional[int] = None,
+        ascending: Optional[bool] = None,
+    ) -> ProjectsInfoList:
+        pass
+
+    @overload
+    def list(
+        self,
+        include_not_joined: bool = True,
+        *,
+        return_total_count: Union[Literal[False], None] = None,
+        name_pattern: Optional[str] = None,
+        prev_created_at: Optional[datetime] = None,
+        prev_id: Optional[UUID] = None,
+        limit: Optional[int] = None,
+        ascending: Optional[bool] = None,
+    ) -> List[Project]:
+        pass
+
+    def list(
+        self,
+        include_not_joined: bool = True,
+        *,
         return_total_count: Optional[bool] = None,
         name_pattern: Optional[str] = None,
         prev_created_at: Optional[datetime] = None,
