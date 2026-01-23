@@ -25,7 +25,7 @@ dependencies = [
     "rich",
     "rich-argparse",
     "tqdm",
-    "simple-term-menu",
+    "questionary>=2.0.1",
     "pydantic>=1.10.10,<2.0.0",
     "pydantic-duality>=1.2.4",
     "websocket-client",
