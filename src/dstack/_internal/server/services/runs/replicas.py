@@ -31,7 +31,7 @@ async def retry_run_replica_jobs(
 
     # Determine replica group from existing job
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-    job_spec = JobSpec.parse_raw(latest_jobs[0].job_spec_data)
+    job_spec = JobSpec.__response__.parse_raw(latest_jobs[0].job_spec_data)
     replica_group_name = job_spec.replica_group
 
     new_jobs = await get_jobs_from_run_spec(
@@ -85,7 +85,7 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         abs(replicas_diff),
     )
 
-    active_replicas, inactive_replicas = build_replica_lists(run_model, run_model.jobs)
+    active_replicas, inactive_replicas = build_replica_lists(run_model)
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
     if replicas_diff < 0:
@@ -104,7 +104,6 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
 
 def build_replica_lists(
     run_model: RunModel,
-    jobs: List[JobModel],
     group_filter: Optional[str] = None,
 ) -> Tuple[
     List[Tuple[int, bool, int, List[JobModel]]], List[Tuple[int, bool, int, List[JobModel]]]
@@ -113,14 +112,10 @@ def build_replica_lists(
     active_replicas: list[tuple[int, bool, int, list[JobModel]]] = []
     inactive_replicas: list[tuple[int, bool, int, list[JobModel]]] = []
 
-    for replica_num, replica_jobs in group_jobs_by_replica_latest(jobs):
+    for replica_num, replica_jobs in group_jobs_by_replica_latest(run_model.jobs):
         # Filter by group if specified
         if group_filter is not None:
-            try:
-                job_spec = JobSpec.parse_raw(replica_jobs[0].job_spec_data)
-                if job_spec.replica_group != group_filter:
-                    continue
-            except Exception:
+            if not job_belongs_to_group(replica_jobs[0], group_filter):
                 continue
 
         statuses = set(job.status for job in replica_jobs)
@@ -170,7 +165,6 @@ def scale_down_replicas(
 async def _scale_up_replicas(
     session: AsyncSession,
     run_model: RunModel,
-    active_replicas: List[Tuple[int, bool, int, List[JobModel]]],
     inactive_replicas: List[Tuple[int, bool, int, List[JobModel]]],
     replicas_diff: int,
     run_spec: RunSpec,
@@ -239,13 +233,12 @@ async def scale_run_replicas_per_group(
     )
 
     for group in replicas:
-        if group.name is None:
-            continue
+        assert group.name is not None, "Group name is always set"
         group_desired = desired_replica_counts.get(group.name, group.count.min or 0)
 
         # Build replica lists filtered by this group
         active_replicas, inactive_replicas = build_replica_lists(
-            run_model=run_model, jobs=run_model.jobs, group_filter=group.name
+            run_model=run_model, group_filter=group.name
         )
 
         # Count active replicas
@@ -308,12 +301,16 @@ async def scale_run_replicas_for_group(
         )
 
 
+def job_belongs_to_group(job: JobModel, group_name: str) -> bool:
+    job_spec = JobSpec.__response__.parse_raw(job.job_spec_data)
+    return job_spec.replica_group == group_name
+
+
 def has_out_of_date_replicas(run: RunModel, group_filter: Optional[str] = None) -> bool:
     for job in run.jobs:
         # Filter jobs by group if specified
         if group_filter is not None:
-            job_spec = JobSpec.__response__.parse_raw(job.job_spec_data)
-            if job_spec.replica_group != group_filter:
+            if not job_belongs_to_group(job, group_filter):
                 continue
         if job.deployment_num < run.deployment_num and not (
             job.status.is_finished() or job.termination_reason == JobTerminationReason.SCALED_DOWN

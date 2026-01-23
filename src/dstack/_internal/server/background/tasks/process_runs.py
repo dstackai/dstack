@@ -50,6 +50,7 @@ from dstack._internal.server.services.runs.replicas import (
     build_replica_lists,
     has_out_of_date_replicas,
     is_replica_registered,
+    job_belongs_to_group,
     retry_run_replica_jobs,
     scale_down_replicas,
     scale_run_replicas,
@@ -532,7 +533,6 @@ async def _handle_run_replicas(
             # Build replica lists for this removed group
             active_replicas, inactive_replicas = build_replica_lists(
                 run_model=run_model,
-                jobs=run_model.jobs,
                 group_filter=removed_group_name,
             )
 
@@ -774,7 +774,7 @@ async def _handle_rolling_deployment_for_group(
             for j in run_model.jobs
             if not j.status.is_finished()
             and group.name is not None
-            and _job_belongs_to_group(job=j, group_name=group.name)
+            and job_belongs_to_group(job=j, group_name=group.name)
         }
     )
 
@@ -782,7 +782,6 @@ async def _handle_rolling_deployment_for_group(
     if non_terminated_replica_count < group_max_replica_count:
         active_replicas, inactive_replicas = build_replica_lists(
             run_model=run_model,
-            jobs=run_model.jobs,
             group_filter=group.name,
         )
 
@@ -799,8 +798,8 @@ async def _handle_rolling_deployment_for_group(
     # Stop out-of-date replicas that are not registered
     replicas_to_stop_count = 0
     for _, jobs in group_jobs_by_replica_latest(run_model.jobs):
-        job_spec = JobSpec.__response__.parse_raw(jobs[0].job_spec_data)
-        if job_spec.replica_group != group.name:
+        assert group.name is not None, "Group name is always set"
+        if not job_belongs_to_group(jobs[0], group.name):
             continue
         # Check if replica is out-of-date and not registered
         if (
@@ -816,9 +815,8 @@ async def _handle_rolling_deployment_for_group(
     # Stop excessive registered out-of-date replicas
     non_terminating_registered_replicas_count = 0
     for _, jobs in group_jobs_by_replica_latest(run_model.jobs):
-        # Filter by group
-        job_spec = JobSpec.__response__.parse_raw(jobs[0].job_spec_data)
-        if job_spec.replica_group != group.name:
+        assert group.name is not None, "Group name is always set"
+        if not job_belongs_to_group(jobs[0], group.name):
             continue
 
         if is_replica_registered(jobs) and all(j.status != JobStatus.TERMINATING for j in jobs):
@@ -830,7 +828,6 @@ async def _handle_rolling_deployment_for_group(
         # Build lists again to get current state
         active_replicas, inactive_replicas = build_replica_lists(
             run_model=run_model,
-            jobs=run_model.jobs,
             group_filter=group.name,
         )
 
@@ -843,8 +840,3 @@ async def _handle_rolling_deployment_for_group(
             active_replicas=active_replicas,
             inactive_replicas=inactive_replicas,
         )
-
-
-def _job_belongs_to_group(job: JobModel, group_name: str) -> bool:
-    job_spec = JobSpec.__response__.parse_raw(job.job_spec_data)
-    return job_spec.replica_group == group_name

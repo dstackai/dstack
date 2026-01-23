@@ -392,8 +392,8 @@ def get_runs_table(
             replica_groups = run.run_spec.configuration.replica_groups
             if replica_groups:
                 for idx, group in enumerate(replica_groups):
-                    # Use group name or default to "replica-group-{idx}" if name is None
-                    group_name = group.name or f"replica-group-{idx}"
+                    assert group.name is not None, "Group name is always set"
+                    group_name = group.name
                     group_name_to_index[group_name] = idx
 
         run_row: Dict[Union[str, int], Any] = {
