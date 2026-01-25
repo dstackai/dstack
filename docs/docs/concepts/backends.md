@@ -1015,13 +1015,13 @@ To use the `kubernetes` backend with `dstack`, you need to configure it with the
 ```yaml
 projects:
 - name: main
-    backends:
-    - type: kubernetes
-      kubeconfig:
-        filename: ~/.kube/config
-      proxy_jump:
-        hostname: 204.12.171.137
-        port: 32000
+  backends:
+  - type: kubernetes
+    kubeconfig:
+      filename: ~/.kube/config
+    proxy_jump:
+      hostname: 204.12.171.137
+      port: 32000
 ```
 
 </div>
