@@ -370,8 +370,12 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                 # No job_model.termination_reason set means ssh connection failed
                 _set_disconnected_at_now(session, job_model)
                 if _should_terminate_job_due_to_disconnect(job_model):
-                    # TODO: Replace with JobTerminationReason.INSTANCE_UNREACHABLE for on-demand.
-                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+                    if job_provisioning_data.instance_type.resources.spot:
+                        job_model.termination_reason = (
+                            JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+                        )
+                    else:
+                        job_model.termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
                     job_model.termination_reason_message = "Instance is unreachable"
                     switch_job_status(session, job_model, JobStatus.TERMINATING)
                 else:

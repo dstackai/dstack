@@ -532,7 +532,7 @@ class TestProcessRunningJobs:
             assert SSHTunnelMock.call_count == 3
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATING
-        assert job.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+        assert job.termination_reason == JobTerminationReason.INSTANCE_UNREACHABLE
         assert job.remove_at is None
 
     @pytest.mark.asyncio
