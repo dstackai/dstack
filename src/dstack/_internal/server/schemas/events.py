@@ -91,6 +91,17 @@ class ListEventsRequest(CoreModel):
             max_items=MAX_FILTER_ITEMS,
         ),
     ] = None
+    target_gateways: Annotated[
+        Optional[list[uuid.UUID]],
+        Field(
+            description=(
+                "List of gateway IDs."
+                " The response will only include events that target the specified gateways"
+            ),
+            min_items=MIN_FILTER_ITEMS,
+            max_items=MAX_FILTER_ITEMS,
+        ),
+    ] = None
     within_projects: Annotated[
         Optional[list[uuid.UUID]],
         Field(

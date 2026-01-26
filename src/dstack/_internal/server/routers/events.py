@@ -45,6 +45,7 @@ async def list_events(
             target_runs=body.target_runs,
             target_jobs=body.target_jobs,
             target_volumes=body.target_volumes,
+            target_gateways=body.target_gateways,
             within_projects=body.within_projects,
             within_fleets=body.within_fleets,
             within_runs=body.within_runs,

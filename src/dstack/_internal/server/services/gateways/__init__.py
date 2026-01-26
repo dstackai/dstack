@@ -558,6 +558,7 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
     configuration = get_gateway_configuration(gateway_model)
     configuration.default = gateway_model.project.default_gateway_id == gateway_model.id
     return Gateway(
+        id=gateway_model.id,
         name=gateway_model.name,
         ip_address=ip_address,
         instance_id=instance_id,

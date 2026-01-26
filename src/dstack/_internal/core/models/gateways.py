@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from enum import Enum
 from typing import Dict, Optional, Union
 
@@ -93,6 +94,9 @@ class GatewaySpec(CoreModel):
 
 
 class Gateway(CoreModel):
+    # ID is only optional on the client side for compatibility with pre-0.20.7 servers.
+    # TODO(0.21): Make required.
+    id: Optional[uuid.UUID] = None
     name: str
     configuration: GatewayConfiguration
     created_at: datetime.datetime

@@ -14,6 +14,7 @@ from dstack._internal.server.models import (
     EventModel,
     EventTargetModel,
     FleetModel,
+    GatewayModel,
     InstanceModel,
     JobModel,
     MemberModel,
@@ -87,6 +88,7 @@ class Target:
     def from_model(
         model: Union[
             FleetModel,
+            GatewayModel,
             InstanceModel,
             JobModel,
             ProjectModel,
@@ -98,6 +100,13 @@ class Target:
         if isinstance(model, FleetModel):
             return Target(
                 type=EventTargetType.FLEET,
+                project_id=model.project_id or model.project.id,
+                id=model.id,
+                name=model.name,
+            )
+        if isinstance(model, GatewayModel):
+            return Target(
+                type=EventTargetType.GATEWAY,
                 project_id=model.project_id or model.project.id,
                 id=model.id,
                 name=model.name,
@@ -222,6 +231,7 @@ async def list_events(
     target_runs: Optional[list[uuid.UUID]],
     target_jobs: Optional[list[uuid.UUID]],
     target_volumes: Optional[list[uuid.UUID]],
+    target_gateways: Optional[list[uuid.UUID]],
     within_projects: Optional[list[uuid.UUID]],
     within_fleets: Optional[list[uuid.UUID]],
     within_runs: Optional[list[uuid.UUID]],
@@ -296,6 +306,13 @@ async def list_events(
             and_(
                 EventTargetModel.entity_type == EventTargetType.VOLUME,
                 EventTargetModel.entity_id.in_(target_volumes),
+            )
+        )
+    if target_gateways is not None:
+        target_filters.append(
+            and_(
+                EventTargetModel.entity_type == EventTargetType.GATEWAY,
+                EventTargetModel.entity_id.in_(target_gateways),
             )
         )
     if within_projects is not None:
