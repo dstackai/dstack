@@ -81,6 +81,20 @@ ignore-case = true
 [tool.uv.sources]
 dstack-plugin-server = { path = "examples/plugins/example_plugin_server", editable = true }
 
+[tool.ruff]
+target-version = "py39"
+line-length = 99
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "Q", "W", "PGH", "FLY", "S113"]
+ignore = [
+    "E501",
+    "E712",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dstack"]
+
 [tool.pyright]
 typeCheckingMode = "standard"
 include = [
