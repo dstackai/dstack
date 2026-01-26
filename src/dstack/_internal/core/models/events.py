@@ -16,6 +16,7 @@ class EventTargetType(str, Enum):
     INSTANCE = "instance"
     RUN = "run"
     JOB = "job"
+    VOLUME = "volume"
 
 
 class EventTarget(CoreModel):

@@ -112,6 +112,19 @@ export const useColumnsDefinitions = () => {
                                 </div>
                             );
 
+                        case 'volume':
+                            return (
+                                <div>
+                                    Volume{' '}
+                                    {target.project_name && (
+                                        <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(target.project_name)}>
+                                            {target.project_name}
+                                        </NavigateLink>
+                                    )}
+                                    /{target.name}
+                                </div>
+                            );
+
                         default:
                             return '---';
                     }

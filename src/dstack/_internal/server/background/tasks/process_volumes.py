@@ -16,6 +16,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.volumes import switch_volume_status
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
@@ -79,8 +80,8 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
             volume.name,
             volume.configuration.backend.value,
         )
-        volume_model.status = VolumeStatus.FAILED
         volume_model.status_message = "Backend not available"
+        switch_volume_status(session, volume_model, VolumeStatus.FAILED)
         volume_model.last_processed_at = get_current_datetime()
         await session.commit()
         return
@@ -102,18 +103,18 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
             )
     except BackendError as e:
         logger.info("Failed to create volume %s: %s", volume_model.name, repr(e))
-        volume_model.status = VolumeStatus.FAILED
         status_message = f"Backend error: {repr(e)}"
         if len(e.args) > 0:
             status_message = str(e.args[0])
         volume_model.status_message = status_message
+        switch_volume_status(session, volume_model, VolumeStatus.FAILED)
         volume_model.last_processed_at = get_current_datetime()
         await session.commit()
         return
     except Exception as e:
         logger.exception("Got exception when creating volume %s", volume_model.name)
-        volume_model.status = VolumeStatus.FAILED
         volume_model.status_message = f"Unexpected error: {repr(e)}"
+        switch_volume_status(session, volume_model, VolumeStatus.FAILED)
         volume_model.last_processed_at = get_current_datetime()
         await session.commit()
         return
@@ -123,6 +124,6 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
     # Provisioned volumes marked as active since they become available almost immediately in AWS
     # TODO: Consider checking volume state
     volume_model.volume_provisioning_data = vpd.json()
-    volume_model.status = VolumeStatus.ACTIVE
+    switch_volume_status(session, volume_model, VolumeStatus.ACTIVE)
     volume_model.last_processed_at = get_current_datetime()
     await session.commit()

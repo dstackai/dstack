@@ -745,6 +745,7 @@ class VolumeModel(BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
+    # NOTE: `status` must be changed only via `switch_volume_status()`
     status: Mapped[VolumeStatus] = mapped_column(EnumAsString(VolumeStatus, 100), index=True)
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 

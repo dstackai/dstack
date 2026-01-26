@@ -16,6 +16,7 @@ from dstack.api.server._events import EventsAPIClient
 class EventListFilters:
     target_fleets: Optional[list[uuid.UUID]] = None
     target_runs: Optional[list[uuid.UUID]] = None
+    target_volumes: Optional[list[uuid.UUID]] = None
     within_projects: Optional[list[uuid.UUID]] = None
     within_fleets: Optional[list[uuid.UUID]] = None
     within_runs: Optional[list[uuid.UUID]] = None

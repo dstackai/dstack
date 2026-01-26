@@ -116,5 +116,7 @@ async def delete_volumes(
     """
     Deletes one or more volumes.
     """
-    _, project = user_project
-    await volumes_services.delete_volumes(session=session, project=project, names=body.names)
+    user, project = user_project
+    await volumes_services.delete_volumes(
+        session=session, project=project, names=body.names, user=user
+    )

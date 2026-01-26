@@ -52,6 +52,13 @@ class EventCommand(APIBaseCommand):
                 dest="target_runs",
                 help="Only show events that target the specified runs",
             )
+            target_filters_group.add_argument(
+                "--target-volume",
+                action="append",
+                metavar="NAME",
+                dest="target_volumes",
+                help="Only show events that target the specified volumes",
+            )
             within_filters_group = parser.add_mutually_exclusive_group()
             within_filters_group.add_argument(
                 "--within-fleet",
@@ -107,6 +114,11 @@ def _build_filters(args: argparse.Namespace, api: Client) -> EventListFilters:
     elif args.target_runs:
         filters.target_runs = [
             api.client.runs.get(api.project, name).id for name in args.target_runs
+        ]
+    elif args.target_volumes:
+        filters.target_volumes = [
+            api.client.volumes.get(project_name=api.project, name=name).id
+            for name in args.target_volumes
         ]
 
     if args.within_fleets:
