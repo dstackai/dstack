@@ -73,7 +73,7 @@ To orchestrate compute across cloud providers or Kubernetes clusters, you need t
 
 Once the server is up, you can access it via the `dstack` CLI. 
 
-> The CLI can be set up via `pip` or `uv` on Linux, macOS, and Windows. It requires Git and OpenSSH.
+> The CLI can be used on Linux, macOS, and Windows. It requires Git and OpenSSH.
 
 === "uv"
 

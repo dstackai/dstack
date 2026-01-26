@@ -136,16 +136,17 @@ resources:
 </div>
 
 !!! info "Cluster placement"
-    To submit a distributed task, you must create at least one fleet with a [cluster placement](fleets.md#backend-placement).
+    To submit a distributed task, you must create at least one fleet with a [cluster placement](fleets.md#cluster-placement).
     <!-- TODO: Update the link once fleets.md is refactored. -->
 
 Jobs on each node communicate using their private IP addresses. Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other [system environment variables](#system-environment-variables) for inter-node communication.
 
-!!! info "Examples"
-    `dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
+<!-- TODO: explain `startup_order` and `stop_criteria` / MPI -->
+
+`dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
     
-    For detailed examples, see the [distributed training](../../examples.md#distributed-training) 
-    and [clusters](../../examples.md#clusters) examples.
+> For detailed examples, see the [distributed training](../../examples.md#distributed-training) 
+  and [clusters](../../examples.md#clusters) examples.
 
 ??? info "Network interface"
     Distributed frameworks usually detect the correct network interface automatically,

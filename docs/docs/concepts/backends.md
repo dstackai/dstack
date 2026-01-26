@@ -1037,9 +1037,13 @@ projects:
 
     No additional setup is required — `dstack` configures and manages the proxy automatically.
 
-??? info "NVIDIA GPU Operator"
-    For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
-    [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html) pre-installed.
+??? info "Required operators"
+    === "NVIDIA"
+        For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
+        [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html) pre-installed.
+    === "AMD"
+        For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
+        [AMD GPU Operator](https://github.com/ROCm/gpu-operator) pre-installed.
 
 <!-- ??? info "Managed Kubernetes"
     While `dstack` supports both managed and on-prem Kubernetes clusters, it can only run on pre-provisioned nodes.
@@ -1072,7 +1076,7 @@ projects:
     
     Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
 
-> To learn more, see the [Kubernetes](../guides/kubernetes.md) guide.
+> To learn more, see the [Lambda](../../examples/clusters/lambda/#kubernetes) and [Lambda](../../examples/clusters/crusoe/#kubernetes) examples.
 
 ### RunPod
 
