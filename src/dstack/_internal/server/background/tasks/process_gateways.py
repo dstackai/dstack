@@ -14,6 +14,7 @@ from dstack._internal.server.services.gateways import (
     GatewayConnection,
     create_gateway_compute,
     gateway_connections_pool,
+    switch_gateway_status,
 )
 from dstack._internal.server.services.locking import advisory_lock_ctx, get_locker
 from dstack._internal.server.services.logging import fmt
@@ -59,14 +60,6 @@ async def process_gateways():
             else:
                 logger.error(
                     "%s: unexpected gateway status %r", fmt(gateway_model), initial_status.upper()
-                )
-            if gateway_model.status != initial_status:
-                logger.info(
-                    "%s: gateway status has changed %s -> %s%s",
-                    fmt(gateway_model),
-                    initial_status.upper(),
-                    gateway_model.status.upper(),
-                    f": {gateway_model.status_message}" if gateway_model.status_message else "",
                 )
             gateway_model.last_processed_at = get_current_datetime()
             await session.commit()
@@ -128,8 +121,8 @@ async def _process_submitted_gateway(session: AsyncSession, gateway_model: Gatew
             project=gateway_model.project, backend_type=configuration.backend
         )
     except BackendNotAvailable:
-        gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = "Backend not available"
+        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
         return
 
     try:
@@ -140,18 +133,17 @@ async def _process_submitted_gateway(session: AsyncSession, gateway_model: Gatew
             backend_id=backend_model.id,
         )
         session.add(gateway_model)
-        gateway_model.status = GatewayStatus.PROVISIONING
+        switch_gateway_status(session, gateway_model, GatewayStatus.PROVISIONING)
     except BackendError as e:
-        logger.info("%s: failed to create gateway compute: %r", fmt(gateway_model), e)
-        gateway_model.status = GatewayStatus.FAILED
         status_message = f"Backend error: {repr(e)}"
         if len(e.args) > 0:
             status_message = str(e.args[0])
         gateway_model.status_message = status_message
+        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
     except Exception as e:
         logger.exception("%s: got exception when creating gateway compute", fmt(gateway_model))
-        gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = f"Unexpected error: {repr(e)}"
+        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
 
 
 async def _process_provisioning_gateway(
@@ -179,18 +171,18 @@ async def _process_provisioning_gateway(
         gateway_model.gateway_compute
     )
     if connection is None:
-        gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = "Failed to connect to gateway"
+        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
         gateway_model.gateway_compute.deleted = True
         return
     try:
         await gateways_services.configure_gateway(connection)
     except Exception:
         logger.exception("%s: failed to configure gateway", fmt(gateway_model))
-        gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = "Failed to configure gateway"
+        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
         await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
         gateway_model.gateway_compute.active = False
         return
 
-    gateway_model.status = GatewayStatus.RUNNING
+    switch_gateway_status(session, gateway_model, GatewayStatus.RUNNING)
