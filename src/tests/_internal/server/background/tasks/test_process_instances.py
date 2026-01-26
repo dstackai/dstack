@@ -77,6 +77,7 @@ from dstack._internal.server.testing.common import (
     get_job_provisioning_data,
     get_placement_group_provisioning_data,
     get_remote_connection_info,
+    list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -324,10 +325,13 @@ class TestCheckShim:
             healthcheck.assert_called()
 
         await session.refresh(instance)
+        events = await list_events(session)
 
         assert instance is not None
         assert instance.status == InstanceStatus.IDLE
         assert not instance.unreachable
+        assert len(events) == 1
+        assert events[0].message == "Instance became reachable"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("health_status", [HealthStatus.HEALTHY, HealthStatus.FAILURE])
@@ -351,12 +355,15 @@ class TestCheckShim:
             await process_instances()
 
         await session.refresh(instance)
+        events = await list_events(session)
 
         assert instance is not None
         assert instance.status == InstanceStatus.IDLE
         assert instance.unreachable
         # Should keep the previous status
         assert instance.health == health_status
+        assert len(events) == 1
+        assert events[0].message == "Instance became unreachable"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -384,11 +391,14 @@ class TestCheckShim:
             await process_instances()
 
         await session.refresh(instance)
+        events = await list_events(session)
 
         assert instance is not None
         assert instance.status == InstanceStatus.IDLE
         assert not instance.unreachable
         assert instance.health == HealthStatus.WARNING
+        assert len(events) == 1
+        assert events[0].message == "Instance health changed HEALTHY -> WARNING"
 
         res = await session.execute(select(InstanceHealthCheckModel))
         health_check = res.scalars().one()

@@ -43,6 +43,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
+    HealthStatus,
     InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceRuntime,
@@ -75,6 +76,7 @@ from dstack._internal.server.schemas.runner import (
     InstanceHealthResponse,
 )
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import events
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_create_instance_offers,
@@ -759,8 +761,8 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
         )
         session.add(health_check_model)
 
-    instance.health = health_status
-    instance.unreachable = not instance_check.reachable
+    _set_health(session, instance, health_status)
+    _set_unreachable(session, instance, unreachable=not instance_check.reachable)
 
     if instance_check.reachable:
         instance.termination_deadline = None
@@ -1091,6 +1093,31 @@ async def _terminate(session: AsyncSession, instance: InstanceModel) -> None:
     instance.deleted_at = get_current_datetime()
     instance.finished_at = get_current_datetime()
     switch_instance_status(session, instance, InstanceStatus.TERMINATED)
+
+
+def _set_health(session: AsyncSession, instance: InstanceModel, health: HealthStatus) -> None:
+    if instance.health != health:
+        events.emit(
+            session,
+            f"Instance health changed {instance.health.upper()} -> {health.upper()}",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(instance)],
+        )
+        instance.health = health
+
+
+def _set_unreachable(session: AsyncSession, instance: InstanceModel, unreachable: bool) -> None:
+    if (
+        instance.status.is_available()  # avoid misleading event during provisioning
+        and instance.unreachable != unreachable
+    ):
+        events.emit(
+            session,
+            "Instance became unreachable" if unreachable else "Instance became reachable",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(instance)],
+        )
+        instance.unreachable = unreachable
 
 
 def _next_termination_retry_at(instance: InstanceModel) -> datetime.datetime:
