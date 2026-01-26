@@ -419,6 +419,7 @@ async def get_project_gateway_model_by_name_for_update(
             res = await session.execute(
                 select(GatewayModel)
                 .where(GatewayModel.id.in_([gateway_id]), *filters)
+                .options(selectinload(GatewayModel.gateway_compute))
                 .with_for_update(key_share=True)
             )
             yield res.scalar_one_or_none()
