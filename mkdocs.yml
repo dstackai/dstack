@@ -74,15 +74,13 @@ plugins:
           - docs/concepts/tasks.md: How to run tasks - for training or fine-tuning, including distributed tasks
           - docs/concepts/services.md: How to deploy services - for model inference or web apps
           - docs/concepts/volumes.md: How to manage volumes - for persistent storage or caching
+          - docs/concepts/gateways.md: How to manage gateways - enabling auto-scaling, rate limits, and custom domains
           - docs/concepts/secrets.md: How to manage secrets - for API keys or other sensitive data
           - docs/concepts/projects.md: How to manage projects - for managing separate teams
-          - docs/concepts/gateways.md: How to manage gateways - enabling auto-scaling, rate limits, and custom domains
+          - docs/concepts/metrics.md: How to manage gateways - enabling auto-scaling, rate limits, and custom domains
         Guides:
-          - docs/guides/clusters.md: How to work with clusters - for distributed tasks
-          - docs/guides/kubernetes.md: How to work with Kubernetes
           - docs/guides/server-deployment.md: Detailed guide on how to deploy the dstack server
           - docs/guides/troubleshooting.md: Common issues and how to troubleshoot them
-          - docs/guides/metrics.md: How to monitor metrics
           - docs/guides/protips.md: Pro tips - tips and tricks to use dstack more efficiently
         Examples:
           - examples/single-node-training/trl/index.md: TRL
@@ -149,8 +147,8 @@ plugins:
         "blog/data-centers-and-private-clouds.md": "blog/posts/gpu-blocks-and-proxy-jump.md"
         "blog/distributed-training-with-aws-efa.md": "examples/clusters/aws/index.md"
         "blog/dstack-stats.md": "blog/posts/dstack-metrics.md"
-        "docs/concepts/metrics.md": "docs/guides/metrics.md"
-        "docs/guides/monitoring.md": "docs/guides/metrics.md"
+        "docs/guides/metrics.md": "docs/concepts/metrics.md"
+        "docs/guides/monitoring.md": "docs/concepts/metrics.md"
         "blog/nvidia-and-amd-on-vultr.md.md": "blog/posts/nvidia-and-amd-on-vultr.md"
         "examples/misc/nccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
         "examples/misc/a3high-clusters/index.md": "examples/clusters/gcp/index.md"
@@ -268,19 +266,18 @@ nav:
           - Tasks: docs/concepts/tasks.md
           - Services: docs/concepts/services.md
           - Volumes: docs/concepts/volumes.md
-          - Secrets: docs/concepts/secrets.md
-          - Projects: docs/concepts/projects.md
-          - Gateways: docs/concepts/gateways.md
+          - More:
+            - Gateways: docs/concepts/gateways.md
+            - Secrets: docs/concepts/secrets.md
+            - Projects: docs/concepts/projects.md
+            - Metrics: docs/concepts/metrics.md
       - Guides:
-          - Clusters: docs/guides/clusters.md
-          - Kubernetes: docs/guides/kubernetes.md
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
-          - Metrics: docs/guides/metrics.md
           - Protips: docs/guides/protips.md
           - Upgrade: docs/guides/upgrade.md
-      - Migration:
-        - Slurm: docs/guides/migration/slurm.md
+          - Migration: 
+            - Slurm: docs/guides/migration/slurm.md
       - Reference:
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md

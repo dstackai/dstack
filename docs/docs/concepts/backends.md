@@ -7,15 +7,16 @@ Backends allow `dstack` to provision fleets across cloud providers or Kubernetes
   * [VM-based](#vm-based) – use `dstack`'s native integration with cloud providers to provision VMs, manage clusters, and orchestrate container-based runs.  
   * [Container-based](#container-based) – use either `dstack`'s native integration with cloud providers or Kubernetes to orchestrate container-based runs; provisioning in this case is delegated to the cloud provider or Kubernetes.  
 
-??? info "SSH fleets"
+!!! info "SSH fleets"
     When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh-fleets) once the server is up.
 
 Backends can be configured via `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI. See the examples of backend configuration below.
 
+> If you update `~/.dstack/server/config.yml`, you have to restart the server.
+
 ## VM-based
 
-VM-based backends allow `dstack` users to manage clusters and orchestrate container-based runs across a wide range of cloud providers.  
-Under the hood, `dstack` uses native integrations with these providers to provision clusters on demand.  
+VM-based backends allow `dstack` users to manage clusters and orchestrate container-based runs across a wide range of cloud providers. Under the hood, `dstack` uses native integrations with these providers to provision clusters on demand.  
 
 Compared to [container-based](#container-based) backends, this approach offers finer-grained, simpler control over cluster provisioning and eliminates the dependency on a Kubernetes layer.
 

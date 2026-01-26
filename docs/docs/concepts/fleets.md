@@ -298,7 +298,7 @@ Define a fleet configuration as a YAML file in your project directory. The file 
     
 </div>
 
-??? info "Requirements" 
+??? info "Host requirements" 
     1.&nbsp;Hosts must be pre-installed with Docker.
 
     === "NVIDIA"

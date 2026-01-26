@@ -45,7 +45,7 @@ Overall, `dstack` collects three groups of metrics:
 | **Runs**   | Run metrics include run counters for each user in each project.                                                                                                   |
 | **Jobs**   | A run consists of one or more jobs, each mapped to a container. Job metrics offer insights into execution time, cost, GPU model, NVIDIA DCGM telemetry, and more. |
 
-For a full list of available metrics and labels, check out [Metrics](../../docs/guides/metrics.md).
+For a full list of available metrics and labels, check out [Metrics](../../docs/concepts/metrics.md).
 
 ??? info "NVIDIA"
     NVIDIA DCGM metrics are automatically collected for `aws`, `azure`, `gcp`, and `oci` backends,
@@ -59,7 +59,7 @@ For a full list of available metrics and labels, check out [Metrics](../../docs/
     only accessible through the UI and the [`dstack metrics`](dstack-metrics.md) CLI.
 
 !!! info "What's next?"
-    1. See [Metrics](../../docs/guides/metrics.md)
+    1. See [Metrics](../../docs/concepts/metrics.md)
     1. Check [dev environments](../../docs/concepts/dev-environments.md),
        [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md),
        and [fleets](../../docs/concepts/fleets.md)

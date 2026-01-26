@@ -12,7 +12,7 @@ categories:
 
 In large-scale training, a single bad GPU can derail progress. Sometimes the failure is obvious — jobs crash outright. Other times it’s subtle: correctable memory errors, intermittent instability, or thermal throttling that quietly drags down throughput. In big experiments, these issues can go unnoticed for hours or days, wasting compute and delaying results.
 
-`dstack` already supports GPU telemetry monitoring through NVIDIA DCGM [metrics](../../docs/guides/metrics.md), covering utilization, memory, and temperature. This release extends that capability with passive hardware health checks powered by DCGM [background health checks](https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/feature-overview.html#background-health-checks). With these, `dstack` continuously evaluates fleet GPUs for hardware reliability and displays their status before scheduling workloads.
+`dstack` already supports GPU telemetry monitoring through NVIDIA DCGM [metrics](../../docs/concepts/metrics.md), covering utilization, memory, and temperature. This release extends that capability with passive hardware health checks powered by DCGM [background health checks](https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/feature-overview.html#background-health-checks). With these, `dstack` continuously evaluates fleet GPUs for hardware reliability and displays their status before scheduling workloads.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/gpu-health-checks.png" width="630"/>
 
@@ -69,5 +69,5 @@ If you have experience with GPU reliability or ideas for automated recovery, joi
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)
     2. Explore the [clusters](../../docs/guides/clusters.md) guide
-    3. Learn more about [metrics](../../docs/guides/metrics.md)
+    3. Learn more about [metrics](../../docs/concepts/metrics.md)
     4. Join [Discord](https://discord.gg/u8SmfwPpMd)

@@ -1,11 +1,11 @@
 # Quickstart
 
-??? info "Prerequsites"
+!!! info "Prerequsites"
     Before using `dstack`, ensure you've [installed](installation/index.md) the server and the CLI.
 
 ## Create a fleet
 
-Before you can submit your first run, you have to create a [fleet](concepts/fleets.md). 
+> Before submitting runs, you must create a [fleet](concepts/fleets.md).
 
 === "Backend fleet"
     If you're using cloud providers or Kubernetes clusters and have configured the corresponding [backends](concepts/backends.md), create a fleet as follows:
