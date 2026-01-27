@@ -67,6 +67,13 @@ class EventCommand(APIBaseCommand):
                 dest="target_gateways",
                 help="Only show events that target the specified gateways",
             )
+            target_filters_group.add_argument(
+                "--target-secret",
+                action="append",
+                metavar="NAME",
+                dest="target_secrets",
+                help="Only show events that target the specified secrets",
+            )
             within_filters_group = parser.add_mutually_exclusive_group()
             within_filters_group.add_argument(
                 "--within-fleet",
@@ -139,6 +146,10 @@ def _build_filters(args: argparse.Namespace, api: Client) -> EventListFilters:
                     " Update the server to 0.20.7 or higher or remove --target-gateway."
                 )
             filters.target_gateways.append(id)
+    elif args.target_secrets:
+        filters.target_secrets = [
+            api.client.secrets.get(api.project, name=name).id for name in args.target_secrets
+        ]
 
     if args.within_fleets:
         filters.within_fleets = [

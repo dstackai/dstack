@@ -19,6 +19,7 @@ type RequestParamsKeys = keyof Pick<
     | 'target_jobs'
     | 'target_volumes'
     | 'target_gateways'
+    | 'target_secrets'
     | 'within_projects'
     | 'within_fleets'
     | 'within_runs'
@@ -35,6 +36,7 @@ const filterKeys: Record<string, RequestParamsKeys> = {
     TARGET_JOBS: 'target_jobs',
     TARGET_VOLUMES: 'target_volumes',
     TARGET_GATEWAYS: 'target_gateways',
+    TARGET_SECRETS: 'target_secrets',
     WITHIN_PROJECTS: 'within_projects',
     WITHIN_FLEETS: 'within_fleets',
     WITHIN_RUNS: 'within_runs',
@@ -53,6 +55,7 @@ const multipleChoiseKeys: RequestParamsKeys[] = [
     'target_jobs',
     'target_volumes',
     'target_gateways',
+    'target_secrets',
     'within_projects',
     'within_fleets',
     'within_runs',
@@ -69,6 +72,7 @@ const targetTypes = [
     { label: 'Job', value: 'job' },
     { label: 'Volume', value: 'volume' },
     { label: 'Gateway', value: 'gateway' },
+    { label: 'Secret', value: 'secret' },
 ];
 
 export const useFilters = () => {
@@ -170,6 +174,11 @@ export const useFilters = () => {
             key: filterKeys.TARGET_GATEWAYS,
             operators: ['='],
             propertyLabel: 'Target gateways',
+        },
+        {
+            key: filterKeys.TARGET_SECRETS,
+            operators: ['='],
+            propertyLabel: 'Target secrets',
         },
 
         {
