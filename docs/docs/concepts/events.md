@@ -11,7 +11,7 @@ Each event includes the following fields:
 | Targets   | The resources affected by the event                         |
 | Message   | A description of the change or additional event details     |
 
-Events can be queried by targeting a specific resource or within a group of related resources. For example, you can query events targeting a particular job or within a run, including the run itself and all of its associated resources.
+Events can be queried by targeting a specific resource or within a group of related resources. For example, you can query events targeting a particular job, or query events within a run, including the run itself and all of its jobs.
 
 Events are accessible through the UI, CLI, and API.
 
