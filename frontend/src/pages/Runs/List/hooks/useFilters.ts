@@ -23,7 +23,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [onlyActive, setOnlyActive] = useState(() => searchParams.get('only_active') === 'true');
     const { projectOptions } = useProjectFilter({ localStorePrefix });
-    const { data: usersData } = useGetUserListQuery();
+    const { data: usersData } = useGetUserListQuery({});
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
         requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),

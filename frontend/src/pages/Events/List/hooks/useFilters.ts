@@ -69,8 +69,8 @@ const targetTypes = [
 
 export const useFilters = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const { data: projectsData } = useGetProjectsQuery();
-    const { data: usersData } = useGetUserListQuery();
+    const { data: projectsData } = useGetProjectsQuery({});
+    const { data: usersData } = useGetUserListQuery({});
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
         requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),

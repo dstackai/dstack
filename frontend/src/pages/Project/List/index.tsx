@@ -1,44 +1,36 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { get as _get } from 'lodash';
 
-import {
-    Button,
-    ButtonWithConfirmation,
-    Header,
-    ListEmptyMessage,
-    Pagination,
-    SpaceBetween,
-    Table,
-    TextFilter,
-} from 'components';
+import { Button, ButtonWithConfirmation, Header, ListEmptyMessage, Loader, SpaceBetween, Table, TextFilter } from 'components';
 
-import { useBreadcrumbs, useCollection } from 'hooks';
+import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
 import { ROUTES } from 'routes';
-import { useGetProjectsQuery } from 'services/project';
+import { useLazyGetProjectsQuery } from 'services/project';
 
 import { useCheckAvailableProjectPermission } from '../hooks/useCheckAvailableProjectPermission';
 import { useDeleteProject } from '../hooks/useDeleteProject';
 import { useColumnsDefinitions } from './hooks';
 
-const SEARCHABLE_COLUMNS = ['project_name', 'owner.username'];
-
 export const ProjectList: React.FC = () => {
     const { t } = useTranslation();
 
-    const { isLoading, isFetching, data, refetch } = useGetProjectsQuery();
     const { isAvailableDeletingPermission, isAvailableProjectManaging } = useCheckAvailableProjectPermission();
     const { deleteProject, deleteProjects, isDeleting } = useDeleteProject();
+    const [filteringText, setFilteringText] = useState('');
+    const [namePattern, setNamePattern] = useState<string>('');
     const navigate = useNavigate();
 
-    const sortedData = useMemo<IProject[]>(() => {
-        if (!data) return [];
+    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IProject, TGetProjectListParams>({
+        useLazyQuery: useLazyGetProjectsQuery,
+        args: { name_pattern: namePattern, limit: DEFAULT_TABLE_PAGE_SIZE },
 
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        return [...data].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    }, [data]);
+        getPaginationParams: (lastProject) => ({
+            prev_created_at: lastProject.created_at,
+            prev_id: lastProject.project_id,
+        }),
+    });
 
     useBreadcrumbs([
         {
@@ -51,7 +43,24 @@ export const ProjectList: React.FC = () => {
         navigate(ROUTES.PROJECT.ADD);
     };
 
+    const onClearFilter = () => {
+        setNamePattern('');
+        setFilteringText('');
+    };
+
     const renderEmptyMessage = (): React.ReactNode => {
+        if (isLoading) {
+            return null;
+        }
+
+        if (filteringText) {
+            return (
+                <ListEmptyMessage title={t('projects.nomatch_message_title')} message={t('projects.nomatch_message_text')}>
+                    <Button onClick={onClearFilter}>{t('projects.nomatch_message_button_label')}</Button>
+                </ListEmptyMessage>
+            );
+        }
+
         return (
             <ListEmptyMessage title={t('projects.empty_message_title')} message={t('projects.empty_message_text')}>
                 {isAvailableProjectManaging && <Button onClick={addProjectHandler}>{t('common.create')}</Button>}
@@ -59,28 +68,10 @@ export const ProjectList: React.FC = () => {
         );
     };
 
-    const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
-        return (
-            <ListEmptyMessage title={t('projects.nomatch_message_title')} message={t('projects.nomatch_message_text')}>
-                <Button onClick={onClearFilter}>{t('projects.nomatch_message_button_label')}</Button>
-            </ListEmptyMessage>
-        );
-    };
-
-    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(sortedData, {
+    const { items, collectionProps } = useCollection(data, {
         filtering: {
             empty: renderEmptyMessage(),
-            noMatch: renderNoMatchMessage(() => actions.setFiltering('')),
-
-            filteringFunction: (projectItem: IProject, filteringText) => {
-                const filteringTextLowerCase = filteringText.toLowerCase();
-
-                return SEARCHABLE_COLUMNS.map((key) => _get(projectItem, key)).some(
-                    (value) => typeof value === 'string' && value.trim().toLowerCase().indexOf(filteringTextLowerCase) > -1,
-                );
-            },
         },
-        pagination: { pageSize: 20 },
         selection: {},
     });
 
@@ -103,12 +94,6 @@ export const ProjectList: React.FC = () => {
         onDeleteClick: isAvailableProjectManaging ? deleteProject : undefined,
     });
 
-    const renderCounter = () => {
-        if (!data?.length) return '';
-
-        return `(${data.length})`;
-    };
-
     return (
         <>
             <Table
@@ -116,14 +101,13 @@ export const ProjectList: React.FC = () => {
                 variant="full-page"
                 columnDefinitions={columns}
                 items={items}
-                loading={isLoading || isFetching}
+                loading={isLoading}
                 loadingText={t('common.loading')}
                 selectionType={isAvailableProjectManaging ? 'multi' : undefined}
                 stickyHeader={true}
                 header={
                     <Header
                         variant="awsui-h1-sticky"
-                        counter={renderCounter()}
                         actions={
                             isAvailableProjectManaging && (
                                 <SpaceBetween size="xs" direction="horizontal">
@@ -141,9 +125,9 @@ export const ProjectList: React.FC = () => {
 
                                     <Button
                                         iconName="refresh"
-                                        disabled={isLoading || isFetching}
+                                        disabled={isLoading}
                                         ariaLabel={t('common.refresh')}
-                                        onClick={refetch}
+                                        onClick={refreshList}
                                     />
                                 </SpaceBetween>
                             )
@@ -154,13 +138,14 @@ export const ProjectList: React.FC = () => {
                 }
                 filter={
                     <TextFilter
-                        {...filterProps}
-                        filteringPlaceholder={t('projects.search_placeholder') || ''}
-                        countText={t('common.match_count_with_value', { count: filteredItemsCount }) ?? ''}
+                        filteringText={filteringText}
+                        onChange={({ detail }) => setFilteringText(detail.filteringText)}
+                        onDelayedChange={() => setNamePattern(filteringText)}
                         disabled={isLoading}
+                        filteringPlaceholder={t('projects.search_placeholder') || ''}
                     />
                 }
-                pagination={<Pagination {...paginationProps} disabled={isLoading} />}
+                footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
             />
         </>
     );

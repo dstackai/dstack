@@ -1,47 +1,38 @@
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
 
-import {
-    Box,
-    Button,
-    ConfirmationDialog,
-    Header,
-    Link,
-    ListEmptyMessage,
-    NavigateLink,
-    Pagination,
-    SpaceBetween,
-    Table,
-    TextFilter,
-} from 'components';
+import { Box, Button, ConfirmationDialog, Header, ListEmptyMessage, Loader, SpaceBetween, Table, TextFilter } from 'components';
 
-import { DATE_TIME_FORMAT } from 'consts';
-import { useAppSelector, useBreadcrumbs, useCollection, useNotifications } from 'hooks';
-import { getServerError, includeSubString } from 'libs';
+import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { useAppSelector, useBreadcrumbs, useCollection, useInfiniteScroll, useNotifications } from 'hooks';
+import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
-import { useDeleteUsersMutation, useGetUserListQuery } from 'services/user';
+import { useDeleteUsersMutation, useLazyGetUserListQuery } from 'services/user';
 
 import { selectUserData } from 'App/slice';
+
+import { useColumnDefinitions } from './hooks';
 
 export const UserList: React.FC = () => {
     const { t } = useTranslation();
     const [showDeleteConfirm, setShowConfirmDelete] = useState(false);
+    const [filteringText, setFilteringText] = useState('');
+    const [namePattern, setNamePattern] = useState<string>('');
     const userData = useAppSelector(selectUserData);
     const userGlobalRole = userData?.global_role ?? '';
-    const { isLoading, isFetching, data, refetch } = useGetUserListQuery();
     const [deleteUsers, { isLoading: isDeleting }] = useDeleteUsersMutation();
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
 
-    const sortedData = useMemo<IUser[]>(() => {
-        if (!data) return [];
+    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IUser, TGetUserListParams>({
+        useLazyQuery: useLazyGetUserListQuery,
+        args: { name_pattern: namePattern, limit: DEFAULT_TABLE_PAGE_SIZE },
 
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        return [...data].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    }, [data]);
+        getPaginationParams: (lastUser) => ({
+            prev_created_at: lastUser.created_at,
+        }),
+    });
 
     useBreadcrumbs([
         {
@@ -50,30 +41,7 @@ export const UserList: React.FC = () => {
         },
     ]);
 
-    const COLUMN_DEFINITIONS = [
-        {
-            id: 'name',
-            header: t('users.user_name'),
-            cell: (item: IUser) => (
-                <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.username)}>{item.username}</NavigateLink>
-            ),
-        },
-        {
-            id: 'email',
-            header: t('users.email'),
-            cell: (item: IUser) => (item.email ? <Link href={`mailto:${item.email}`}>{item.email}</Link> : '-'),
-        },
-        {
-            id: 'global_role',
-            header: t('users.global_role'),
-            cell: (item: IUser) => t(`roles.${item.global_role}`),
-        },
-        process.env.UI_VERSION === 'sky' && {
-            id: 'created_at',
-            header: t('users.created_at'),
-            cell: (item: IUser) => format(new Date(item.created_at), DATE_TIME_FORMAT),
-        },
-    ].filter(Boolean);
+    const columns = useColumnDefinitions();
 
     const toggleDeleteConfirm = () => {
         setShowConfirmDelete((val) => !val);
@@ -83,7 +51,24 @@ export const UserList: React.FC = () => {
         navigate(ROUTES.USER.ADD);
     };
 
+    const onClearFilter = () => {
+        setNamePattern('');
+        setFilteringText('');
+    };
+
     const renderEmptyMessage = (): React.ReactNode => {
+        if (isLoading) {
+            return null;
+        }
+
+        if (filteringText) {
+            return (
+                <ListEmptyMessage title={t('users.nomatch_message_title')} message={t('users.nomatch_message_text')}>
+                    <Button onClick={onClearFilter}>{t('common.clearFilter')}</Button>
+                </ListEmptyMessage>
+            );
+        }
+
         return (
             <ListEmptyMessage title={t('users.empty_message_title')} message={t('projects.empty_message_text')}>
                 <Button onClick={addUserHandler}>{t('common.add')}</Button>
@@ -91,22 +76,10 @@ export const UserList: React.FC = () => {
         );
     };
 
-    const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
-        return (
-            <ListEmptyMessage title={t('users.nomatch_message_title')} message={t('users.nomatch_message_text')}>
-                <Button onClick={onClearFilter}>{t('common.clearFilter')}</Button>
-            </ListEmptyMessage>
-        );
-    };
-
-    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(sortedData, {
+    const { items, actions, collectionProps } = useCollection(data, {
         filtering: {
             empty: renderEmptyMessage(),
-            noMatch: renderNoMatchMessage(() => actions.setFiltering('')),
-            filteringFunction: (user, filteringText) =>
-                includeSubString(user.username, filteringText) || includeSubString(user.email ?? '', filteringText),
         },
-        pagination: { pageSize: 20 },
         selection: {},
     });
 
@@ -144,32 +117,23 @@ export const UserList: React.FC = () => {
         return isDeleting || collectionProps.selectedItems?.length !== 1 || userGlobalRole !== 'admin';
     }, [collectionProps.selectedItems]);
 
-    const renderCounter = () => {
-        const { selectedItems } = collectionProps;
-
-        if (!data?.length) return '';
-
-        if (selectedItems?.length) return `(${selectedItems?.length}/${data?.length ?? 0})`;
-
-        return `(${data.length})`;
-    };
-
     return (
         <>
             <Table
                 {...collectionProps}
                 variant="full-page"
                 isItemDisabled={getIsTableItemDisabled}
-                columnDefinitions={COLUMN_DEFINITIONS}
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                columnDefinitions={columns}
                 items={items}
-                loading={isLoading || isFetching}
+                loading={isLoading}
                 loadingText={t('common.loading')}
                 selectionType="multi"
                 stickyHeader={true}
                 header={
                     <Header
                         variant="awsui-h1-sticky"
-                        counter={renderCounter()}
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
                                 <Button formAction="none" onClick={editSelectedUserHandler} disabled={isDisabledEdit}>
@@ -186,9 +150,9 @@ export const UserList: React.FC = () => {
 
                                 <Button
                                     iconName="refresh"
-                                    disabled={isLoading || isFetching}
+                                    disabled={isLoading}
                                     ariaLabel={t('common.refresh')}
-                                    onClick={refetch}
+                                    onClick={refreshList}
                                 />
                             </SpaceBetween>
                         }
@@ -198,13 +162,14 @@ export const UserList: React.FC = () => {
                 }
                 filter={
                     <TextFilter
-                        {...filterProps}
+                        filteringText={filteringText}
+                        onChange={({ detail }) => setFilteringText(detail.filteringText)}
+                        onDelayedChange={() => setNamePattern(filteringText)}
                         filteringPlaceholder={t('users.search_placeholder')}
-                        countText={t('common.match_count_with_value', { count: filteredItemsCount })}
                         disabled={isLoading}
                     />
                 }
-                pagination={<Pagination {...paginationProps} disabled={isLoading} />}
+                footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
             />
 
             <ConfirmationDialog

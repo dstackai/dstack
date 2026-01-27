@@ -129,7 +129,7 @@ const filterKeys: Record<string, RequestParamsKeys> = {
 export const useFilters = (localStorePrefix = 'models-list-page') => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { projectOptions } = useProjectFilter({ localStorePrefix });
-    const { data: usersData } = useGetUserListQuery();
+    const { data: usersData } = useGetUserListQuery({});
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
         requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),

@@ -32,7 +32,7 @@ import styles from './styles.module.scss';
 export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, readonly, isAdmin, project }) => {
     const { t } = useTranslation();
     const [selectedItems, setSelectedItems] = useState<TProjectMemberWithIndex[]>([]);
-    const { data: usersData } = useGetUserListQuery();
+    const { data: usersData } = useGetUserListQuery({});
     const userData = useAppSelector(selectUserData);
     const { handleJoinProject, handleLeaveProject, isMemberActionLoading } = useProjectMemberActions();
     const [pushNotification] = useNotifications();

@@ -23,11 +23,12 @@ export const projectApi = createApi({
     tagTypes: ['Projects', 'NoFleetsProject', 'ProjectRepos', 'ProjectLogs', 'Backends'],
 
     endpoints: (builder) => ({
-        getProjects: builder.query<IProject[], void>({
-            query: () => {
+        getProjects: builder.query<IProject[], TGetProjectListParams>({
+            query: (body) => {
                 return {
                     url: API.PROJECTS.LIST(),
                     method: 'POST',
+                    body,
                 };
             },
 
@@ -201,8 +202,8 @@ export const projectApi = createApi({
 
 export const {
     useGetProjectsQuery,
-    useGetOnlyNoFleetsProjectsQuery,
     useLazyGetProjectsQuery,
+    useGetOnlyNoFleetsProjectsQuery,
     useGetProjectQuery,
     useCreateProjectMutation,
     useCreateWizardProjectMutation,

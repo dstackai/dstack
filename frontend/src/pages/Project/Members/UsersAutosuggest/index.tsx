@@ -14,7 +14,7 @@ type AutosuggestOption = { value: string; label?: string };
 export const UserAutosuggest: React.FC<Props> = ({ optionsFilter, onSelect: onSelectProp, ...props }) => {
     const { t } = useTranslation();
     const [value, setValue] = useState<string>('');
-    const { data: usersData, isLoading: isUsersLoading } = useGetUserListQuery();
+    const { data: usersData, isLoading: isUsersLoading } = useGetUserListQuery({});
 
     const options: AutosuggestOption[] = useMemo(() => {
         if (!usersData) return [];

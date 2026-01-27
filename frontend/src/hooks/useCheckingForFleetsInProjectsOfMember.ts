@@ -5,9 +5,12 @@ import { useGetOnlyNoFleetsProjectsQuery, useGetProjectsQuery } from 'services/p
 type Args = { projectNames?: IProject['project_name'][] };
 
 export const useCheckingForFleetsInProjects = ({ projectNames }: Args) => {
-    const { data: projectsData } = useGetProjectsQuery(undefined, {
-        skip: !!projectNames?.length,
-    });
+    const { data: projectsData } = useGetProjectsQuery(
+        {},
+        {
+            skip: !!projectNames?.length,
+        },
+    );
 
     const { data: noFleetsProjectsData } = useGetOnlyNoFleetsProjectsQuery();
 

@@ -16,7 +16,7 @@ export const useProjectFilter = ({ localStorePrefix }: Args) => {
         null,
     );
 
-    const { data: projectsData } = useGetProjectsQuery();
+    const { data: projectsData } = useGetProjectsQuery({});
 
     const projectOptions = useMemo<SelectCSDProps.Options>(() => {
         if (!projectsData?.length) return [];

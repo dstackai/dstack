@@ -37,11 +37,12 @@ export const userApi = createApi({
             },
         }),
 
-        getUserList: builder.query<IUser[], void>({
-            query: () => {
+        getUserList: builder.query<IUser[], TGetUserListParams>({
+            query: (body) => {
                 return {
                     url: API.USERS.LIST(),
                     method: 'POST',
+                    body,
                 };
             },
 
@@ -194,6 +195,7 @@ export const userApi = createApi({
 export const {
     useGetUserDataQuery,
     useGetUserListQuery,
+    useLazyGetUserListQuery,
     useGetUserQuery,
     useCheckAuthTokenMutation,
     useCreateUserMutation,

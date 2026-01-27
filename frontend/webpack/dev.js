@@ -4,7 +4,7 @@ const { srcDir } = require('./env');
 const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 const CircularDependencyPlugin = require('circular-dependency-plugin');
 
-const port = 3000;
+const port = 3002;
 
 module.exports = {
     mode: 'development',

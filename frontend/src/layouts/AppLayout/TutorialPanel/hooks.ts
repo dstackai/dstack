@@ -44,7 +44,7 @@ export const useTutorials = () => {
     } = useAppSelector(selectTutorialPanel);
 
     const { data: userBillingData } = useGetUserBillingInfoQuery({ username: useName ?? '' }, { skip: !useName });
-    const { data: projectData } = useGetProjectsQuery();
+    const { data: projectData } = useGetProjectsQuery({});
     const { data: runsData } = useGetRunsQuery({
         limit: 1,
     });

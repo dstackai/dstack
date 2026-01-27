@@ -56,6 +56,7 @@ export const useGetRunSpecFromYaml = ({ projectName = '' }) => {
 
             try {
                 await getRepo({ project_name: projectName, repo_id: repoId, include_creds: true }).unwrap();
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
             } catch (_) {
                 await initRepo({
                     project_name: projectName,

@@ -18,7 +18,7 @@ export const UserProjectList: React.FC = () => {
     const params = useParams();
     const paramUserName = params.userName ?? '';
 
-    const { isLoading, isFetching, data } = useGetProjectsQuery();
+    const { isLoading, isFetching, data } = useGetProjectsQuery({ limit: 200 });
 
     useBreadcrumbs([
         {
