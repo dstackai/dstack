@@ -4,9 +4,8 @@
 
 It streamlines development, training, and inference, and is compatible with any hardware, open-source tools, and frameworks.
 
-#### Hardware
-
-`dstack` supports `NVIDIA`, `AMD`, `TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
+!!! info "Accelerators"
+    `dstack` supports `NVIDIA`, `AMD`, `TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
 ## How does it work?
 
@@ -20,12 +19,11 @@ It streamlines development, training, and inference, and is compatible with any 
 
 `dstack` supports the following configurations:
    
+* [Fleets](concepts/fleets.md) &mdash; for managing cloud and on-prem clusters
 * [Dev environments](concepts/dev-environments.md) &mdash; for interactive development using a desktop IDE
 * [Tasks](concepts/tasks.md) &mdash; for scheduling jobs, incl. distributed ones (or running web apps)
 * [Services](concepts/services.md) &mdash; for deploying models (or web apps)
-* [Fleets](concepts/fleets.md) &mdash; for managing cloud and on-prem clusters
 * [Volumes](concepts/volumes.md) &mdash; for managing network volumes (to persist data)
-* [Gateways](concepts/gateways.md) &mdash; for publishing services with a custom domain and HTTPS
 
 Configuration can be defined as YAML files within your repo.
 

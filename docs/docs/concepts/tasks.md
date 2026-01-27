@@ -135,18 +135,18 @@ resources:
 
 </div>
 
-Nodes can communicate using their private IP addresses.
-Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
-[System environment variables](#system-environment-variables) for inter-node communication.
+!!! info "Cluster placement"
+    To submit a distributed task, you must create at least one fleet with a [cluster placement](fleets.md#cluster-placement).
+    <!-- TODO: Update the link once fleets.md is refactored. -->
+
+Jobs on each node communicate using their private IP addresses. Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other [system environment variables](#system-environment-variables) for inter-node communication.
+
+<!-- TODO: explain `startup_order` and `stop_criteria` / MPI -->
 
 `dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
-
-
-!!! info "MPI"
-    If want to use MPI, you can set `startup_order` to `workers-first` and `stop_criteria` to `master-done`, and use `DSTACK_MPI_HOSTFILE`.
-    See the [NCCL/RCCL tests](../../examples/clusters/nccl-rccl-tests/index.md) examples.
-
-> For detailed examples, see [distributed training](../../examples.md#distributed-training) examples.
+    
+> For detailed examples, see the [distributed training](../../examples.md#distributed-training) 
+  and [clusters](../../examples.md#clusters) examples.
 
 ??? info "Network interface"
     Distributed frameworks usually detect the correct network interface automatically,
@@ -171,11 +171,6 @@ Use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODES_IPS`, `DSTACK_NODE_RANK`, and other
     You can log in to any node from any node via SSH on port 10022 using the `~/.ssh/dstack_job` private key.
     For convenience, `~/.ssh/config` is preconfigured with these options, so a simple `ssh <node_ip>` is enough.
     For a list of nodes IPs check the `DSTACK_NODES_IPS` environment variable.
-
-!!! info "Cluster fleets"
-    To run distributed tasks, you need to create a fleet with [`placement: cluster`](fleets.md#cloud-placement).
-
-> See the [Clusters](../guides/clusters.md) guide for more details on how to use `dstack` on clusters.
 
 ### Resources
 

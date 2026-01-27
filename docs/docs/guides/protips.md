@@ -482,7 +482,7 @@ The `offer` command allows you to filter and group offers with various [advanced
 
 ## Metrics
 
-`dstack` tracks essential metrics accessible via the CLI and UI. To access advanced metrics like DCGM, configure the server to export metrics to Prometheus. See [Metrics](metrics.md) for details.
+`dstack` tracks essential metrics accessible via the CLI and UI. To access advanced metrics like DCGM, configure the server to export metrics to Prometheus. See [Metrics](../concepts/metrics.md) for details.
 
 ## Service quotas
 

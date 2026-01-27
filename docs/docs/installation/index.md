@@ -6,15 +6,6 @@
 
 ## Set up the server
 
-### Configure backends
-
-To orchestrate compute across cloud providers or Kubernetes clusters, you need to configure [backends](../concepts/backends.md).
-
-??? info "SSH fleets"
-    When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh-fleets) once the server is up.
-
-### Start the server
-
 The server can run on your laptop or any environment with access to the cloud and on-prem clusters you plan to use.
 
 === "uv"
@@ -72,16 +63,17 @@ The server can run on your laptop or any environment with access to the cloud an
         
     </div>
 
-To verify that backends are properly configured, use the [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list available GPU offers.
+For more details on server deployment options, see the [Server deployment](../guides/server-deployment.md) guide.
 
-!!! info "Server deployment"
-    For more details on server deployment options, see the [Server deployment](../guides/server-deployment.md) guide.
+### Configure backends
+
+> To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure [backends](../concepts/backends.md).
 
 ## Set up the CLI
 
 Once the server is up, you can access it via the `dstack` CLI. 
 
-> The CLI can be set up via `pip` or `uv` on Linux, macOS, and Windows. It requires Git and OpenSSH.
+> The CLI can be used on Linux, macOS, and Windows. It requires Git and OpenSSH.
 
 === "uv"
 
@@ -105,12 +97,14 @@ Once the server is up, you can access it via the `dstack` CLI.
 
 ??? info "Windows"
     To use the CLI on Windows, ensure you've installed Git and OpenSSH via 
-    [Git for Windows:material-arrow-top-right-thin:{ .external }](https://git-scm.com/download/win). 
+    [Git for Windows](https://git-scm.com/download/win). 
 
     When installing it, ensure you've checked 
     `Git from the command line and also from 3-rd party software` 
     (or `Use Git and optional Unix tools from the Command Prompt`), and 
     `Use bundled OpenSSH`.
+
+### Configure the default project
 
 To point the CLI to the `dstack` server, configure it
 with the server address, user token, and project name:
@@ -129,6 +123,10 @@ Configuration is updated at ~/.dstack/config.yml
 </div>
 
 This configuration is stored in `~/.dstack/config.yml`.
+
+### Check offers
+
+To verify that both the server and CLI are properly configured, use the [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list available GPU offers. If you don't see valid offers, ensure you've set up [backends](../concepts/backends.md).
 
 ??? info "Shell autocompletion"
 
@@ -195,11 +193,10 @@ This configuration is stored in `~/.dstack/config.yml`.
 
         > If you get an error similar to `2: command not found: compdef`, then add the following line to the beginning of your `~/.zshrc` file:
         > `autoload -Uz compinit && compinit`.
-    
 
 !!! info "What's next?"
-    1. Follow [Quickstart](../quickstart.md)
-    2. See [Backends](../concepts/backends.md)
+    1. See [Backends](../concepts/backends.md)
+    2. Follow [Quickstart](../quickstart.md)
     3. Check the [server deployment](../guides/server-deployment.md) guide
     4. Browse [examples](../../examples.md)
     5. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)

@@ -1,21 +1,22 @@
 # Backends
 
-Backends allow `dstack` to provision fleets across cloud providers or Kubernetes clusters.
+Backends allow `dstack` to provision fleets across GPU clouds or Kubernetes clusters.
 
 `dstack` supports two types of backends: 
 
   * [VM-based](#vm-based) – use `dstack`'s native integration with cloud providers to provision VMs, manage clusters, and orchestrate container-based runs.  
   * [Container-based](#container-based) – use either `dstack`'s native integration with cloud providers or Kubernetes to orchestrate container-based runs; provisioning in this case is delegated to the cloud provider or Kubernetes.  
 
-??? info "SSH fleets"
+!!! info "SSH fleets"
     When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](../concepts/fleets.md#ssh-fleets) once the server is up.
 
 Backends can be configured via `~/.dstack/server/config.yml` or through the [project settings page](../concepts/projects.md#backends) in the UI. See the examples of backend configuration below.
 
+> If you update `~/.dstack/server/config.yml`, you have to restart the server.
+
 ## VM-based
 
-VM-based backends allow `dstack` users to manage clusters and orchestrate container-based runs across a wide range of cloud providers.  
-Under the hood, `dstack` uses native integrations with these providers to provision clusters on demand.  
+VM-based backends allow `dstack` users to manage clusters and orchestrate container-based runs across a wide range of cloud providers. Under the hood, `dstack` uses native integrations with these providers to provision clusters on demand.  
 
 Compared to [container-based](#container-based) backends, this approach offers finer-grained, simpler control over cluster provisioning and eliminates the dependency on a Kubernetes layer.
 
@@ -1036,9 +1037,13 @@ projects:
 
     No additional setup is required — `dstack` configures and manages the proxy automatically.
 
-??? info "NVIDIA GPU Operator"
-    For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
-    [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html) pre-installed.
+??? info "Required operators"
+    === "NVIDIA"
+        For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
+        [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html) pre-installed.
+    === "AMD"
+        For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
+        [AMD GPU Operator](https://github.com/ROCm/gpu-operator) pre-installed.
 
 <!-- ??? info "Managed Kubernetes"
     While `dstack` supports both managed and on-prem Kubernetes clusters, it can only run on pre-provisioned nodes.
@@ -1071,7 +1076,7 @@ projects:
     
     Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
 
-> To learn more, see the [Kubernetes](../guides/kubernetes.md) guide.
+> To learn more, see the [Lambda](../../examples/clusters/lambda/#kubernetes) and [Lambda](../../examples/clusters/crusoe/#kubernetes) examples.
 
 ### RunPod
 

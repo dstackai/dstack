@@ -1,36 +1,22 @@
 # Fleets
 
-Fleets act both as pools of instances and as templates for how those instances are provisioned.
+Before submitting runs, you must create a fleet. Fleets act as both pools of instances and templates for how those instances are provisioned.
 
-`dstack` supports two kinds of fleets: 
+> `dstack` supports two fleet types: [backend fleets](#backend-fleet) (which are provisioned dynamically in the cloud or on Kubernetes), and [SSH fleets](#ssh-fleet) (which use existing on-prem servers).
 
-* [Backend fleets](#backend-fleets) – dynamically provisioned through configured backends; they are supported with any type of backends: [VM-based](backends.md#vm-based) and [container-based](backends.md#container-based) (incl. [Kubernetes](backends.md#kubernetes))
-* [SSH fleets](#ssh-fleets) – created using on-prem servers; do not require backends
+## Apply a configuration
 
-When you submit a dev environment, task, or service, `dstack` reuses idle instances or provisions new ones based on the fleet configuration. 
+To create a fleet, define its configuration in a YAML file. The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.yml`), regardless of fleet type.
 
-> You must create a fleet before submitting runs.
+=== "Backend fleets"
+    If you're using cloud providers or Kubernetes clusters and have configured the corresponding [backends](backends.md), create a backend fleet as follows:
 
-## Backend fleets
+    <div editor-title="fleet.dstack.yml"> 
 
-Backend fleets allow provisioning compute across cloud providers or Kubernetes clusters. 
-
-??? info "Prerequisites"
-    Before creating a backend fleet, make sure to configure the corresponding [backends](backends.md).
-
-### Apply the configuration
-
-To create a backend fleet, define a configuration as a YAML file. The file must have a
-`.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
-
-<div editor-title="fleet.dstack.yml">
-    
     ```yaml
     type: fleet
-    # The name is optional, if not specified, generated randomly
-    name: default
-    
-    # Can be a range or a fixed number
+    name: my-fleet
+
     # Allow to provision of up to 2 instances
     nodes: 0..2
 
@@ -39,255 +25,49 @@ To create a backend fleet, define a configuration as a YAML file. The file must 
 
     # Deprovision instances above the minimum if they remain idle
     idle_duration: 1h
-    
+
     resources:
       # Allow to provision up to 8 GPUs
       gpu: 0..8
     ```
-    
-</div>
 
-To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+    </div>
 
-<div class="termy">
+    Pass the fleet configuration to `dstack apply`:
 
-```shell
-$ dstack apply -f fleet.dstack.yml
+    <div class="termy">
 
-Provisioning...
----> 100%
+    ```shell
+    $ dstack apply -f fleet.dstack.yml
+        
+      #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
+      1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
+      2  azure    westeurope       2xCPU, 8GB, 100GB (disk)  yes   $0.0132
+      3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
 
- FLEET     INSTANCE  BACKEND  GPU  PRICE  STATUS  CREATED 
- my-fleet  -         -        -    -      -       -
-```
+    Create the fleet? [y/n]: y
 
-</div>
-
-If `nodes` is a range that starts above `0`, `dstack` pre-creates the initial number of instances up front, while any additional ones are created on demand. 
-
-> Setting the `nodes` range to start above `0` is supported only for [VM-based backends](backends.md#vm-based).
-
-??? info "Target number of nodes"
-
-    If `nodes` is defined as a range, you can start with more than the minimum number of instances by using the `target` parameter when creating the fleet.
-
-    <div editor-title="fleet.dstack.yml"> 
-
-    ```yaml
-    type: fleet
-
-    name: my-fleet
-
-    nodes:
-      min: 0
-      max: 2
-
-      # Provision 2 instances initially
-      target: 2
-
-    # Deprovision instances above the minimum if they remain idle
-    idle_duration: 1h
+      FLEET     INSTANCE  BACKEND              GPU             PRICE    STATUS  CREATED 
+      my-fleet  0         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago      
+                1         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago    
     ```
 
     </div>
 
-By default, when you submit a [dev environment](dev-environments.md), [task](tasks.md), or [service](services.md), `dstack` tries all available fleets. However, you can explicitly specify the [`fleets`](../reference/dstack.yml/dev-environment.md#fleets) in your run configuration
-or via [`--fleet`](../reference/cli/dstack/apply.md#fleet) with `dstack apply`.
+    If the `nodes` range starts with `0`, `dstack apply` creates only a template. Instances are provisioned only when you submit runs.
 
-### Configuration options
+=== "SSH fleets"
+    If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet as follows:
 
-#### Placement { #backend-placement }
-
-To ensure instances are interconnected (e.g., for
-[distributed tasks](tasks.md#distributed-tasks)), set `placement` to `cluster`. 
-This ensures all instances are provisioned with optimal inter-node connectivity.
-
-??? info "AWS"
-    When you create a fleet with AWS, [Elastic Fabric Adapter networking](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html) is automatically configured if it’s supported for the corresponding instance type.
-    Note, EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
-    Otherwise, instances are only connected by the default VPC subnet.
-
-    Refer to the [AWS](../../examples/clusters/aws/index.md) example for more details.
-
-??? info "GCP"
-    When you create a fleet with GCP, `dstack` automatically configures [GPUDirect-TCPXO and GPUDirect-TCPX](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot) networking for the A3 Mega and A3 High instance types, as well as RoCE networking for the A4 instance type.
-
-    !!! info "Backend configuration"    
-        You may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
-        Refer to the [GCP](../../examples/clusters/gcp/index.md) examples for more details.
-
-??? info "Nebius"
-    When you create a fleet with Nebius, [InfiniBand networking](https://docs.nebius.com/compute/clusters/gpu) is automatically configured if it’s supported for the corresponding instance type.
-    Otherwise, instances are only connected by the default VPC subnet.
-
-    An InfiniBand fabric for the cluster is selected automatically. If you prefer to use some specific fabrics, configure them in the
-    [backend settings](../reference/server/config.yml.md#nebius).
-
-The `cluster` placement is supported for `aws`, `azure`, `gcp`, `nebius`, `oci`, and `vultr`
-backends.
-
-> For more details on optimal inter-node connectivity, read the [Clusters](../guides/clusters.md) guide.
-
-<!-- TODO: Give a link to the Kubernetes guide -->
-
-#### Resources
-
-When you specify a resource value like `cpu` or `memory`,
-you can either use an exact value (e.g. `24GB`) or a 
-range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
-
-<div editor-title=".dstack.yml"> 
-
-```yaml
-type: fleet
-# The name is optional, if not specified, generated randomly
-name: my-fleet
-
-nodes: 2
-
-resources:
-  # 200GB or more RAM
-  memory: 200GB..
-  # 4 GPUs from 40GB to 80GB
-  gpu: 40GB..80GB:4
-  # Disk size
-  disk: 500GB
-```
-
-</div>
-
-The `gpu` property allows specifying not only memory size but also GPU vendor, names
-and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
-`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
-`A100:40GB:2` (two A100 GPUs of 40GB).
-
-??? info "Google Cloud TPU"
-    To use TPUs, specify its architecture via the `gpu` property.
-
-    ```yaml
-    type: fleet
-    # The name is optional, if not specified, generated randomly
-    name: my-fleet
-    
-    nodes: 2
-
-    resources:
-      gpu: v2-8
-    ```
-
-    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
-
-> If you’re unsure which offers (hardware configurations) are available from the configured backends, use the
-> [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list them.
-
-#### Blocks { #backend-blocks }
-
-For backend fleets, `blocks` function the same way as in SSH fleets. 
-See the [`Blocks`](#ssh-blocks) section under SSH fleets for details on the blocks concept.
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: fleet
-
-name: my-fleet
-
-resources:
-  gpu: NVIDIA:80GB:8
-
-# Split into 4 blocks, each with 2 GPUs
-blocks: 4
-```
-
-</div>
-
-#### Idle duration
-
-By default, fleet instances stay `idle` for 3 days and can be reused within that time.
-If an instance is not reused within this period, it is automatically terminated.
-
-To change the default idle duration, set
-[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the fleet configuration (e.g., `0s`, `1m`, or `off` for
-unlimited).
-
-<div editor-title="examples/misc/fleets/.dstack.yml">
+    <div editor-title="fleet.dstack.yml"> 
     
     ```yaml
     type: fleet
-    # The name is optional, if not specified, generated randomly
     name: my-fleet
     
-    nodes: 2
-
-    # Terminate instances idle for more than 1 hour
-    idle_duration: 1h
-    
-    resources:
-      gpu: 24GB
-    ```
-    
-</div>
-
-#### Spot policy
-
-By default, `dstack` uses on-demand instances. However, you can change that
-via the [`spot_policy`](../reference/dstack.yml/fleet.md#spot_policy) property. It accepts `spot`, `on-demand`, and `auto`.
-
-#### Retry policy
-
-By default, if `dstack` fails to provision an instance or an instance is interrupted, no retry is attempted.
-
-If you'd like `dstack` to do it, configure the 
-[retry](../reference/dstack.yml/fleet.md#retry) property accordingly:
-
-<div editor-title=".dstack.yml">
-
-```yaml
-type: fleet
-# The name is optional, if not specified, generated randomly
-name: my-fleet
-
-nodes: 1
-
-resources:
-  gpu: 24GB
-
-retry:
-  # Retry on specific events
-  on_events: [no-capacity, interruption]
-  # Retry for up to 1 hour
-  duration: 1h
-```
-
-</div>
-
-!!! info "Reference"
-    Backend fleets support many more configuration options,
-    incl. [`backends`](../reference/dstack.yml/fleet.md#backends), 
-    [`regions`](../reference/dstack.yml/fleet.md#regions), 
-    [`max_price`](../reference/dstack.yml/fleet.md#max_price), and
-    among [others](../reference/dstack.yml/fleet.md).
-
-## SSH fleets
-
-If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet.
-
-### Apply a configuration
-
-Define a fleet configuration as a YAML file in your project directory. The file must have a
-`.dstack.yml` extension (e.g. `.dstack.yml` or `fleet.dstack.yml`).
-
-<div editor-title="examples/misc/fleets/.dstack.yml"> 
-    
-    ```yaml
-    type: fleet
-    # The name is optional, if not specified, generated randomly
-    name: my-fleet
-
     # Uncomment if instances are interconnected
     #placement: cluster
 
-    # SSH credentials for the on-prem servers
     ssh_config:
       user: ubuntu
       identity_file: ~/.ssh/id_rsa
@@ -295,78 +75,268 @@ Define a fleet configuration as a YAML file in your project directory. The file 
         - 3.255.177.51
         - 3.255.177.52
     ```
+      
+    </div>
+
+    Pass the fleet configuration to `dstack apply`:
+
+    <div class="termy">
+
+    ```shell
+    $ dstack apply -f fleet.dstack.yml
+        
+    Provisioning...
+    ---> 100%
+
+      FLEET     INSTANCE  BACKEND       GPU      PRICE  STATUS  CREATED 
+      my-fleet  0         ssh (remote)  L4:24GB  $0     idle    3 mins ago      
+                1         ssh (remote)  L4:24GB  $0     idle    3 mins ago    
+    ```
+
+    </div>
+
+    `dstack apply` automatically connects to on-prem servers, installs the required dependencies, and adds them to the created fleet.
+
+    ??? info "Host requirements"
+        1.&nbsp;Hosts must be pre-installed with Docker.
+
+        === "NVIDIA"
+            2.&nbsp;Hosts with NVIDIA GPUs must also be pre-installed with CUDA 12.1 and
+            [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+
+        === "AMD"
+            2.&nbsp;Hosts with AMD GPUs must also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
+            [native package manager](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
+            or [AMDGPU installer](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
+
+        === "Intel Gaudi"
+            2.&nbsp;Hosts with Intel Gaudi accelerators must be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
+            This must include the drivers, `hl-smi`, and Habana Container Runtime.
+
+        === "Tenstorrent"
+            2.&nbsp;Hosts with Tenstorrent accelerators must be pre-installed with [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation).
+            This must include the drivers, `tt-smi`, and HugePages.
+
+        3.&nbsp;The user specified must have passwordless `sudo` access.
+
+        4.&nbsp;The SSH server must be running and configured with `AllowTcpForwarding yes` in `/etc/ssh/sshd_config`.
+
+        5.&nbsp;The firewall must allow SSH and should forbid any other connections from external networks. For `placement: cluster` fleets, it should also allow any communication between fleet nodes.
+
+> Once the fleet is created, you can run [dev environments](dev-environments.md), [tasks](tasks.md), and [services](services.md).
+
+## Configuration options
+
+Backend fleets support [many options](../reference/dstack.yml/fleet.md); see some major configuration examples below.
+
+### Cluster placement
+
+Both [backend fleets](#backend-fleet) and [SSH fleets](#ssh-fleet) allow the `placement` property to be set to `cluster`. 
+
+This property ensures that instances are interconnected. This is required for running [distributed tasks](tasks.md#distributed-tasks).
+
+=== "Backend fleets"
+    Backend fleets allow to provision interconnected clusters across supported backends.
+
+    <div editor-title="fleet.dstack.yml">
+        
+    ```yaml
+    type: fleet
+    name: my-fleet
     
-</div>
+    nodes: 2
+    placement: cluster
+    
+    resources:
+      gpu: H100:8
+    ```
+        
+    </div>
 
-??? info "Requirements" 
-    1.&nbsp;Hosts must be pre-installed with Docker.
+    #### Backends
 
-    === "NVIDIA"
-        2.&nbsp;Hosts with NVIDIA GPUs must also be pre-installed with CUDA 12.1 and
-        [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+    Fast interconnect is supported on the `aws`, `gcp`, `nebius`, `kubernetes`, and `runpod` backends. Some backends may require additional configuration.
 
-    === "AMD"
-        2.&nbsp;Hosts with AMD GPUs must also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
-        [native package manager](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
-        or [AMDGPU installer](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
+    === "AWS"
+        On AWS, `dstack` requires `public_ips` to be set to `false` in the backend configuration.
+        Refer to the [AWS](../../examples/clusters/aws/index.md) example for more details.
 
-    === "Intel Gaudi"
-        2.&nbsp;Hosts with Intel Gaudi accelerators must be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
-        This must include the drivers, `hl-smi`, and Habana Container Runtime.
+    === "GCP"
+        On GCP, you may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
+        Refer to the [GCP](../../examples/clusters/gcp/index.md) examples for more details.
 
-    === "Tenstorrent"
-        2.&nbsp;Hosts with Tenstorrent accelerators must be pre-installed with [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation).
-        This must include the drivers, `tt-smi`, and HugePages.
+    === "Nebius"
+        On [Nebius](https://docs.nebius.com/compute/clusters/gpu), `dstack` automatically configures InfiniBand networking if it is supported by the selected instance type.
 
-    3.&nbsp;The user specified must have passwordless `sudo` access.
+    === "Kubernetes"
+        If the Kubernetes cluster has interconnect configured, `dstack` can use it without additional setup.
+        See the [Lambda](../../examples/clusters/lambda/index.md#kubernetes) or [Crusoe](../../examples/clusters/crusoe/index.md#kubernetes) examples.
+    
+    === "Runpod"
+        On [Runpod](https://docs.runpod.io/instant-clusters), `dstack` automatically configures InfiniBand networking if it is supported by the selected instance type.
+    
+    > See the [Clusters](../../examples.md#clusters) examples.
 
-    4.&nbsp;The SSH server must be running and configured with `AllowTcpForwarding yes` in `/etc/ssh/sshd_config`.
+=== "SSH fleets"
+    If the hosts in the SSH fleet have interconnect configured, you only need to set `placement` to `cluster`.
 
-    5.&nbsp;The firewall must allow SSH and should forbid any other connections from external networks. For `placement: cluster` fleets, it should also allow any communication between fleet nodes.
+    <div editor-title="fleet.dstack.yml"> 
+        
+    ```yaml
+    type: fleet
+    name: my-fleet
 
-To create or update the fleet, pass the fleet configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
+    placement: cluster
 
-<div class="termy">
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/id_rsa
+      hosts:
+        - 3.255.177.51
+        - 3.255.177.52
+    ```
+      
+    </div>
 
-```shell
-$ dstack apply -f examples/misc/fleets/.dstack.yml
+    !!! info "Network"
+        By default, `dstack` automatically detects the network shared by the hosts. However, it's possible to configure it explicitly via the [`network`](../reference/dstack.yml/fleet.md#network) property.
 
-Provisioning...
----> 100%
+        <!-- TODO: Add network configuration example -->
 
- FLEET     INSTANCE  GPU             PRICE  STATUS  CREATED 
- my-fleet  0         L4:24GB (spot)  $0     idle    3 mins ago      
-           1         L4:24GB (spot)  $0     idle    3 mins ago    
+### Nodes
+
+The `nodes` property is supported only by backend fleets and specifies how many nodes `dstack` must or can provision.
+
+<div editor-title="fleet.dstack.yml"> 
+
+```yaml
+type: fleet
+name: my-fleet
+
+# Allow to provision of up to 2 instances
+nodes: 0..2
+
+# Uncomment to ensure instances are inter-connected
+#placement: cluster
+
+# Deprovision instances above the minimum if they remain idle
+idle_duration: 1h
+
+resources:
+  # Allow to provision up to 8 GPUs
+  gpu: 0..8
 ```
 
 </div>
 
-When you apply, `dstack` connects to the specified hosts using the provided SSH credentials, 
-installs the dependencies, and configures these hosts as a fleet.
+#### Pre-provisioning
 
-Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
+If the `nodes` range starts with `0`, `dstack apply` creates only a template, and instances are provisioned when you submit runs.
 
-### Configuration options
+To provision instances up front, set the `nodes` range to start above `0`. This pre-creates the initial number of instances; additional instances (if any) are provisioned on demand.
 
-#### Placement { #ssh-placement }
 
-If the hosts are interconnected (i.e. share the same network), set `placement` to `cluster`. 
-This is required if you'd like to use the fleet for [distributed tasks](tasks.md#distributed-tasks).
+<div editor-title="fleet.dstack.yml">
+        
+    ```yaml
+    type: fleet
+    name: my-fleet
+    
+    nodes: 2..10
 
-??? info "Network"  
-    By default, `dstack` automatically detects the network shared by the hosts. 
-    However, it's possible to configure it explicitly via 
-    the [`network`](../reference/dstack.yml/fleet.md#network) property.
+    # Uncomment to ensure instances are inter-connected
+    #placement: cluster
+    
+    resources:
+      gpu: H100:8
+    ```
+        
+    </div>
 
-    [//]: # (TODO: Provide an example and more detail)
+Pre-provisioning is supported only for [VM-based backends](backends.md#vm-based).
 
-> For more details on optimal inter-node connectivity, read the [Clusters](../guides/clusters.md) guide.
+??? info "Target number"
+    To pre-provision more than the minimum number of instances, set the `target` parameter.
 
-#### Blocks { #ssh-blocks }
+    <div editor-title="fleet.dstack.yml"> 
+
+    ```yaml
+    type: fleet
+    name: my-fleet
+
+    nodes:
+      min: 2
+      max: 10
+      target: 6
+
+    # Deprovision instances above the minimum if they remain idle
+    idle_duration: 1h
+    ```
+
+    </div>
+
+    `dstack apply` pre-provisions up to `target` and scales back to `min` after `idle_duration`.
+
+### Resources
+
+Backend fleets allow you to specify the resource requirements for the instances to be provisioned. The `resources` property syntax is the same as for [run configurations](dev-environments.md#resources).
+
+> Not directly related, but in addition to `resources`, you can specify [`spot_policy`](../reference/dstack.yml/fleet.md#instance_types), [`instance_types`](../reference/dstack.yml/fleet.md#instance_types), [`max_price`](../reference/dstack.yml/fleet.md#max_price), [`region`](../reference/dstack.yml/fleet.md#max_price), and other [options](../reference/dstack.yml/fleet.md#).
+
+<!-- TODO: add dedicated spot policy example -->
+
+### Backends
+
+### Idle duration
+
+By default, instances of a backend fleet stay `idle` for 3 days and can be reused within that time.
+If an instance is not reused within this period, it is automatically terminated.
+
+To change the default idle duration, set
+[`idle_duration`](../reference/dstack.yml/fleet.md#idle_duration) in the fleet configuration (e.g., `0s`, `1m`, or `off` for
+unlimited).
+
+<div editor-title="fleet.dstack.yml">
+    
+```yaml
+type: fleet
+name: my-fleet
+
+nodes: 2
+
+# Terminate instances idle for more than 1 hour
+idle_duration: 1h
+
+resources:
+  gpu: 24GB
+```
+
+</div>
+
+### Blocks
 
 By default, a job uses the entire instance—e.g., all 8 GPUs. To allow multiple jobs on the same instance, set the `blocks` property to divide the instance. Each job can then use one or more blocks, up to the full instance.
 
-<div editor-title=".dstack.yml">
+=== "Backend fleets"
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: fleet
+    name: my-fleet
+
+    nodes: 0..2
+
+    resources:
+      gpu: H100:8
+
+    # Split into 4 blocks, each with 2 GPUs
+    blocks: 4
+    ```
+
+    </div>
+
+=== "SSH fleets"
+    <div editor-title=".dstack.yml">
 
     ```yaml
     type: fleet
@@ -386,7 +356,7 @@ By default, a job uses the entire instance—e.g., all 8 GPUs. To allow multiple
           blocks: 1
     ```
 
-</div>
+    </div>
 
 All resources (GPU, CPU, memory) are split evenly across blocks, while disk is shared.
 
@@ -396,12 +366,51 @@ Set `blocks` to `auto` to match the number of blocks to the number of GPUs.
 
 !!! info "Distributed tasks"
     Distributed tasks require exclusive access to all host resources and therefore must use all blocks on each node.
-    
-#### Environment variables
 
-If needed, you can specify environment variables that will be used by `dstack-shim` and passed to containers.
+### SSH config
 
-[//]: # (TODO: Explain what dstack-shim is)
+<!-- TODO: add more detail -->
+
+#### Proxy jump
+
+If hosts are behind a head node (aka "login node"), configure [`proxy_jump`](../reference/dstack.yml/fleet.md#proxy_jump):
+
+<div editor-title="fleet.dstack.yml">
+
+    ```yaml
+    type: fleet
+    name: my-fleet
+
+    ssh_config:
+      user: ubuntu
+      identity_file: ~/.ssh/worker_node_key
+      hosts:
+        - 3.255.177.51
+        - 3.255.177.52
+      proxy_jump:
+        hostname: 3.255.177.50
+        user: ubuntu
+        identity_file: ~/.ssh/head_node_key
+    ```
+
+</div>
+
+To be able to attach to runs, both explicitly with `dstack attach` and implicitly with `dstack apply`, you must either add a front node key (`~/.ssh/head_node_key`) to an SSH agent or configure a key path in `~/.ssh/config`:
+
+<div editor-title="~/.ssh/config">
+
+    ```
+    Host 3.255.177.50
+        IdentityFile ~/.ssh/head_node_key
+    ```
+
+</div>
+
+where `Host` must match `ssh_config.proxy_jump.hostname` or `ssh_config.hosts[n].proxy_jump.hostname` if you configure head nodes on a per-worker basis.
+
+### Environment variables
+
+If needed, you can specify environment variables that will be automatically passed to any jobs running on this fleet.
 
 For example, these variables can be used to configure a proxy:
 
@@ -422,58 +431,8 @@ ssh_config:
     - 3.255.177.52
 ```
 
-#### Proxy jump
-
-If fleet hosts are behind a head node (aka "login node"), configure [`proxy_jump`](../reference/dstack.yml/fleet.md#proxy_jump):
-
-<div editor-title="examples/misc/fleets/.dstack.yml">
-
-    ```yaml
-    type: fleet
-    name: my-fleet
-
-    ssh_config:
-      user: ubuntu
-      identity_file: ~/.ssh/worker_node_key
-      hosts:
-        - 3.255.177.51
-        - 3.255.177.52
-      proxy_jump:
-        hostname: 3.255.177.50
-        user: ubuntu
-        identity_file: ~/.ssh/head_node_key
-    ```
-
-</div>
-
-To be able to attach to runs, both explicitly with `dstack attach` and implicitly with `dstack apply`, you must either
-add a front node key (`~/.ssh/head_node_key`) to an SSH agent or configure a key path in `~/.ssh/config`:
-
-<div editor-title="~/.ssh/config">
-
-    ```
-    Host 3.255.177.50
-        IdentityFile ~/.ssh/head_node_key
-    ```
-
-</div>
-
-where `Host` must match `ssh_config.proxy_jump.hostname` or `ssh_config.hosts[n].proxy_jump.hostname` if you configure head nodes
-on a per-worker basis.
-
 !!! info "Reference"
-    For all SSH fleet configuration options, refer to the [reference](../reference/dstack.yml/fleet.md).
-
-#### Troubleshooting
-
-!!! info "Resources"
-    Once the fleet is created, double-check that the GPU, memory, and disk are detected correctly.
-
-If the status does not change to `idle` after a few minutes or the resources are not displayed correctly, ensure that
-all host requirements are satisfied.
-
-If the requirements are met but the fleet still fails to be created correctly, check the logs at
-`/root/.dstack/shim.log` on the hosts for error details.
+    The fleet configuration file supports many more options. See the [reference](../reference/dstack.yml/fleet.md).
 
 ## Manage fleets
 
@@ -513,4 +472,6 @@ To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 !!! info "What's next?"
     1. Check [dev environments](dev-environments.md), [tasks](tasks.md), and
     [services](services.md)
-    2. Read the [Clusters](../guides/clusters.md) guide
+    2. Read about [Backends](backends.md) guide
+    3. Explore the [`.dstack.yml` reference](../reference/dstack.yml/fleet.md)
+    4. See the [Clusters](../../examples.md#clusters) example
