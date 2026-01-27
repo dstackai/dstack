@@ -17,7 +17,7 @@ Events are accessible through the UI, CLI, and API.
 
 ## UI
 
-The UI allows you to query events either globally on the dedicated `Events` page or within a specific group on the page of a run, job, fleet, instance, and other resources.
+The UI allows you to query events either globally on the dedicated `Events` page or within a specific group on the page of a run, job, fleet, and other resources.
 
 ### Global page
 
