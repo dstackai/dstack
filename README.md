@@ -18,7 +18,7 @@
 
 It streamlines development, training, and inference, and is compatible with any hardware, open-source tools, and frameworks.
 
-#### Hardware
+#### Accelerators
 
 `dstack` supports `NVIDIA`, `AMD`, `Google TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
 
@@ -46,7 +46,7 @@ It streamlines development, training, and inference, and is compatible with any 
 
 ##### Configure backends
 
-To orchestrate compute across cloud providers or existing Kubernetes clusters, you need to configure backends.
+To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure backends.
 
 Backends can be set up in `~/.dstack/server/config.yml` or through the [project settings page](https://dstack.ai/docs/concepts/projects#backends) in the UI.
 
@@ -123,12 +123,11 @@ Configuration is updated at ~/.dstack/config.yml
 
 `dstack` supports the following configurations:
    
-* [Dev environments](https://dstack.ai/docs/dev-environments) &mdash; for interactive development using a desktop IDE
-* [Tasks](https://dstack.ai/docs/tasks) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
-* [Services](https://dstack.ai/docs/services) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
-* [Fleets](https://dstack.ai/docs/fleets) &mdash; for managing cloud and on-prem clusters
+* [Fleets](https://dstack.ai/docs/concepts/fleets) &mdash; for managing cloud and on-prem clusters
+* [Dev environments](https://dstack.ai/docs/concepts/dev-environments) &mdash; for interactive development using a desktop IDE
+* [Tasks](https://dstack.ai/docs/concepts/tasks) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
+* [Services](https://dstack.ai/docs/concepts/services) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
 * [Volumes](https://dstack.ai/docs/concepts/volumes) &mdash; for managing persisted volumes
-* [Gateways](https://dstack.ai/docs/concepts/gateways) &mdash; for configuring the ingress traffic and public endpoints
 
 Configuration can be defined as YAML files within your repo.
 

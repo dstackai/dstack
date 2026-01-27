@@ -49,11 +49,9 @@
 
     </div>
 
-    If `nodes` is a range that starts above `0`, `dstack` pre-creates the initial number of instances up front, while any additional ones are created on demand. 
-    
-    > Setting the `nodes` range to start above `0` is supported only for [VM-based backends](concepts/backends.md#vm-based).
+    If the `nodes` range starts with `0`, `dstack apply` creates only a template. Instances are provisioned only when you submit runs.
 
-    If the fleet needs to be a cluster, the [placement](concepts/fleets.md#backend-placement) property must be set to `cluster`. 
+    If the fleet needs to be a cluster, the [placement](concepts/fleets.md#cluster-placement) property must be set to `cluster`.
     
 === "SSH fleet"
     If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet as follows:

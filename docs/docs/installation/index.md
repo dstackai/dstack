@@ -67,7 +67,7 @@ For more details on server deployment options, see the [Server deployment](../gu
 
 ### Configure backends
 
-To orchestrate compute across cloud providers or Kubernetes clusters, you need to configure [backends](../concepts/backends.md).
+> To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure [backends](../concepts/backends.md).
 
 ## Set up the CLI
 
@@ -97,7 +97,7 @@ Once the server is up, you can access it via the `dstack` CLI.
 
 ??? info "Windows"
     To use the CLI on Windows, ensure you've installed Git and OpenSSH via 
-    [Git for Windows:material-arrow-top-right-thin:{ .external }](https://git-scm.com/download/win). 
+    [Git for Windows](https://git-scm.com/download/win). 
 
     When installing it, ensure you've checked 
     `Git from the command line and also from 3-rd party software` 

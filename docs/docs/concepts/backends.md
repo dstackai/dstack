@@ -1,6 +1,6 @@
 # Backends
 
-Backends allow `dstack` to provision fleets across cloud providers or Kubernetes clusters.
+Backends allow `dstack` to provision fleets across GPU clouds or Kubernetes clusters.
 
 `dstack` supports two types of backends: 
 

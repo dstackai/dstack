@@ -8,8 +8,8 @@ Before submitting runs, you must create a fleet. Fleets act as both pools of ins
 
 To create a fleet, define its configuration in a YAML file. The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.yml`), regardless of fleet type.
 
-=== "Backend fleet"
-    If you're using cloud providers or Kubernetes clusters and have configured the corresponding [backends](backends.md), create a fleet as follows:
+=== "Backend fleets"
+    If you're using cloud providers or Kubernetes clusters and have configured the corresponding [backends](backends.md), create a backend fleet as follows:
 
     <div editor-title="fleet.dstack.yml"> 
 
@@ -54,9 +54,9 @@ To create a fleet, define its configuration in a YAML file. The filename must en
 
     </div>
 
-    If the `nodes` range starts with `0`, `dstack apply` creates only a template. Actual instances are provisioned when you submit runs.
+    If the `nodes` range starts with `0`, `dstack apply` creates only a template. Instances are provisioned only when you submit runs.
 
-=== "SSH fleet"
+=== "SSH fleets"
     If you have a group of on-prem servers accessible via SSH, you can create an SSH fleet as follows:
 
     <div editor-title="fleet.dstack.yml"> 
@@ -135,7 +135,7 @@ Both [backend fleets](#backend-fleet) and [SSH fleets](#ssh-fleet) allow the `pl
 
 This property ensures that instances are interconnected. This is required for running [distributed tasks](tasks.md#distributed-tasks).
 
-=== "Backend fleet"
+=== "Backend fleets"
     Backend fleets allow to provision interconnected clusters across supported backends.
 
     <div editor-title="fleet.dstack.yml">
@@ -153,21 +153,27 @@ This property ensures that instances are interconnected. This is required for ru
         
     </div>
 
-    For backend fleets, fast interconnect is currently supported only on the `aws`, `gcp`, `nebius`, and `runpod` backends.
+    #### Backends
+
+    Fast interconnect is supported on the `aws`, `gcp`, `nebius`, `kubernetes`, and `runpod` backends. Some backends may require additional configuration.
 
     === "AWS"
-        EFA requires the `public_ips` to be set to `false` in the `aws` backend configuration.
+        On AWS, `dstack` requires `public_ips` to be set to `false` in the backend configuration.
         Refer to the [AWS](../../examples/clusters/aws/index.md) example for more details.
 
     === "GCP"
-        You may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
+        On GCP, you may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
         Refer to the [GCP](../../examples/clusters/gcp/index.md) examples for more details.
 
     === "Nebius"
-        When you create a cloud fleet with Nebius, [InfiniBand](https://docs.nebius.com/compute/clusters/gpu) networking is automatically configured if it’s supported for the corresponding instance type.
+        On [Nebius](https://docs.nebius.com/compute/clusters/gpu), `dstack` automatically configures InfiniBand networking if it is supported by the selected instance type.
 
+    === "Kubernetes"
+        If the Kubernetes cluster has interconnect configured, `dstack` can use it without additional setup.
+        See the [Lambda](../../examples/clusters/lambda/index.md#kubernetes) or [Crusoe](../../examples/clusters/crusoe/index.md#kubernetes) examples.
+    
     === "Runpod"
-        When you run multinode tasks in a cluster cloud fleet with Runpod, `dstack` provisions [Runpod Instant Clusters](https://docs.runpod.io/instant-clusters) with InfiniBand networking configured.
+        On [Runpod](https://docs.runpod.io/instant-clusters), `dstack` automatically configures InfiniBand networking if it is supported by the selected instance type.
     
     > See the [Clusters](../../examples.md#clusters) examples.
 
@@ -199,7 +205,7 @@ This property ensures that instances are interconnected. This is required for ru
 
 ### Nodes
 
-The `nodes` property is supported only by backend fleets and specifies how many nodes `dstack` must provision or may provision.
+The `nodes` property is supported only by backend fleets and specifies how many nodes `dstack` must or can provision.
 
 <div editor-title="fleet.dstack.yml"> 
 
@@ -223,12 +229,34 @@ resources:
 
 </div>
 
-If `nodes` is a range that starts above `0`, `dstack` pre-creates the initial number of instances up front, while any additional ones are created on demand. 
+#### Pre-provisioning
 
-> Setting the `nodes` range to start above `0` is supported only for [VM-based backends](backends.md#vm-based).
+If the `nodes` range starts with `0`, `dstack apply` creates only a template, and instances are provisioned when you submit runs.
+
+To provision instances up front, set the `nodes` range to start above `0`. This pre-creates the initial number of instances; additional instances (if any) are provisioned on demand.
+
+
+<div editor-title="fleet.dstack.yml">
+        
+    ```yaml
+    type: fleet
+    name: my-fleet
+    
+    nodes: 2..10
+
+    # Uncomment to ensure instances are inter-connected
+    #placement: cluster
+    
+    resources:
+      gpu: H100:8
+    ```
+        
+    </div>
+
+Pre-provisioning is supported only for [VM-based backends](backends.md#vm-based).
 
 ??? info "Target number"
-    If `nodes` is defined as a range, you can start with more than the minimum number of instances by using the `target` parameter when creating the fleet.
+    To pre-provision more than the minimum number of instances, set the `target` parameter.
 
     <div editor-title="fleet.dstack.yml"> 
 
@@ -237,15 +265,17 @@ If `nodes` is a range that starts above `0`, `dstack` pre-creates the initial nu
     name: my-fleet
 
     nodes:
-      min: 0
-      max: 2
-      target: 2
+      min: 2
+      max: 10
+      target: 6
 
     # Deprovision instances above the minimum if they remain idle
     idle_duration: 1h
     ```
 
     </div>
+
+    `dstack apply` pre-provisions up to `target` and scales back to `min` after `idle_duration`.
 
 ### Resources
 
@@ -287,7 +317,7 @@ resources:
 
 By default, a job uses the entire instance—e.g., all 8 GPUs. To allow multiple jobs on the same instance, set the `blocks` property to divide the instance. Each job can then use one or more blocks, up to the full instance.
 
-=== "Backend fleet"
+=== "Backend fleets"
     <div editor-title=".dstack.yml">
 
     ```yaml
@@ -305,7 +335,7 @@ By default, a job uses the entire instance—e.g., all 8 GPUs. To allow multiple
 
     </div>
 
-=== "SSH fleet"
+=== "SSH fleets"
     <div editor-title=".dstack.yml">
 
     ```yaml
