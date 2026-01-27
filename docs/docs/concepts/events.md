@@ -1,6 +1,6 @@
 # Events
 
-Events provide a complete, chronological record of state changes across all resources. They are designed for auditing, debugging, and understanding the lifecycle of runs, jobs, fleets, and other resources.
+Events provide a chronological record of notable state changes and operations affecting `dstack` resources. They are designed for auditing, debugging, and understanding the lifecycle of runs, jobs, fleets, and other resources.
 
 Each event includes the following fields:
 
