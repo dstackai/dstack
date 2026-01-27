@@ -59,13 +59,14 @@ async def create_or_update_secret(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
-    _, project = user_project
+    user, project = user_project
     return CustomORJSONResponse(
         await secrets_services.create_or_update_secret(
             session=session,
             project=project,
             name=body.name,
             value=body.value,
+            user=user,
         )
     )
 
@@ -76,9 +77,10 @@ async def delete_secrets(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
-    _, project = user_project
+    user, project = user_project
     await secrets_services.delete_secrets(
         session=session,
         project=project,
         names=body.secrets_names,
+        user=user,
     )

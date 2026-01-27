@@ -11,6 +11,7 @@ from dstack._internal.server.testing.common import (
     create_secret,
     create_user,
     get_auth_headers,
+    list_events,
 )
 
 
@@ -145,6 +146,9 @@ class TestCreateOrUpdateSecret:
         res = await session.execute(select(SecretModel))
         secret_model = res.scalar()
         assert secret_model is not None
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Secret created"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -165,6 +169,29 @@ class TestCreateOrUpdateSecret:
         assert response.status_code == 200
         await session.refresh(secret)
         assert secret.value.get_plaintext_or_error() == "new_value"
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Secret updated"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_no_event_if_value_unchanged(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_secret(session=session, project=project, name="secret1", value="value")
+        response = await client.post(
+            f"/api/project/{project.name}/secrets/create_or_update",
+            headers=get_auth_headers(user.token),
+            json={"name": "secret1", "value": "value"},
+        )
+        assert response.status_code == 200
+        events = await list_events(session)
+        assert len(events) == 0
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -252,6 +279,11 @@ class TestDeleteSecrets:
         secrets = res.scalars().all()
         assert len(secrets) == 1
         assert secrets[0].name == "secret2"
+
+        # Verify event was emitted
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Secret deleted"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
