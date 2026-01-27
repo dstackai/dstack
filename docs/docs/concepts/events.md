@@ -67,4 +67,4 @@ If you invoke the command without arguments, it will include all events targetin
 
 ## TTL
 
-By default, `dstack` stores each event for 30 days and then deletes it. This can be overridden by changing the `DSTACK_SERVER_EVENTS_TTL_SECONDS` environment variable.
+By default, `dstack` stores each event for 30 days and then deletes it. This can be overridden by server administrators using the `DSTACK_SERVER_EVENTS_TTL_SECONDS` environment variable.
