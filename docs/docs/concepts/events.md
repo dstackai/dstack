@@ -29,7 +29,7 @@ This page allows you to query events targeting a specific resource or within a p
 
 ### Resource page
 
-The resource page shows events within that specific group. For example, if you open a run and switch to the `Events` tab, you will see all events within that run, including events targeting individual jobs, fleet instances, and other related resources.
+The resource page shows events within that specific group. For example, if you open a run and switch to the `Events` tab, you will see all events about that run and its jobs.
 
 ![](https://dstack.ai/static-assets/static-assets/images/dstack-ui-events-run.png){ width=800 }
 
