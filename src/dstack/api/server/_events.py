@@ -30,6 +30,7 @@ class EventsAPIClient(APIClientGroup):
         *,
         # NOTE: New parameters go here. Avoid positional parameters, they can break compatibility.
         target_volumes: Optional[list[UUID]] = None,
+        target_gateways: Optional[list[UUID]] = None,
     ) -> list[Event]:
         if prev_recorded_at is not None:
             # Time zones other than UTC are misinterpreted by the server:
@@ -43,6 +44,7 @@ class EventsAPIClient(APIClientGroup):
             target_runs=target_runs,
             target_jobs=target_jobs,
             target_volumes=target_volumes,
+            target_gateways=target_gateways,
             within_projects=within_projects,
             within_fleets=within_fleets,
             within_runs=within_runs,

@@ -17,6 +17,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
 )
+from dstack._internal.server.testing.matchers import SomeUUID4Str
 
 
 class TestListAndGetGateways:
@@ -54,6 +55,7 @@ class TestListAndGetGateways:
         assert response.status_code == 200
         assert response.json() == [
             {
+                "id": SomeUUID4Str(),
                 "backend": backend.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
@@ -107,6 +109,7 @@ class TestListAndGetGateways:
         )
         assert response.status_code == 200
         assert response.json() == {
+            "id": SomeUUID4Str(),
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": False,
@@ -189,6 +192,7 @@ class TestCreateGateway:
         )
         assert response.status_code == 200
         assert response.json() == {
+            "id": SomeUUID4Str(),
             "name": "test",
             "backend": "aws",
             "region": "us",
@@ -243,6 +247,7 @@ class TestCreateGateway:
             g.assert_called_once()
         assert response.status_code == 200
         assert response.json() == {
+            "id": SomeUUID4Str(),
             "name": "random-name",
             "backend": "aws",
             "region": "us",
@@ -347,6 +352,7 @@ class TestDefaultGateway:
         )
         assert response.status_code == 200
         assert response.json() == {
+            "id": SomeUUID4Str(),
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": True,
@@ -471,6 +477,7 @@ class TestDeleteGateway:
         assert response.status_code == 200
         assert response.json() == [
             {
+                "id": str(gateway_gcp.id),
                 "backend": backend_gcp.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
@@ -542,6 +549,7 @@ class TestUpdateGateway:
         )
         assert response.status_code == 200
         assert response.json() == {
+            "id": SomeUUID4Str(),
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "status": "submitted",
