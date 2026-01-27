@@ -31,7 +31,7 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
-from dstack._internal.core.services import is_valid_dstack_resource_name
+from dstack._internal.core.services import is_valid_replica_group_name
 from dstack._internal.utils.common import has_duplicates, list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import (
@@ -55,7 +55,7 @@ DEFAULT_PROBE_INTERVAL = 15
 DEFAULT_PROBE_READY_AFTER = 1
 DEFAULT_PROBE_METHOD = "get"
 MAX_PROBE_URL_LEN = 2048
-DEFAULT_REPLICA_GROUP_NAME = "default"
+DEFAULT_REPLICA_GROUP_NAME = "0"
 
 
 class RunConfigurationType(str, Enum):
@@ -756,7 +756,7 @@ class ReplicaGroup(CoreModel):
     name: Annotated[
         Optional[str],
         Field(
-            description="The name of the replica group. If not provided, defaults to 'replica-group-0', 'replica-group-1', etc. based on position."
+            description="The name of the replica group. If not provided, defaults to '0', '1', etc. based on position."
         ),
     ]
     count: Annotated[
@@ -784,8 +784,8 @@ class ReplicaGroup(CoreModel):
     @validator("name")
     def validate_name(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
-            if not is_valid_dstack_resource_name(v):
-                raise ValueError("Resource name should match regex '^[a-z][a-z0-9-]{1,40}$'")
+            if not is_valid_replica_group_name(v):
+                raise ValueError("Resource name should match regex '^[a-z0-9][a-z0-9-]{0,39}$'")
         return v
 
     @validator("count")
@@ -920,7 +920,7 @@ class ServiceConfigurationParams(CoreModel):
             # Assign default names to groups without names
             for index, group in enumerate(v):
                 if group.name is None:
-                    group.name = f"replica-group-{index}"
+                    group.name = str(index)
 
             # Check for duplicate names
             names = [group.name for group in v]
