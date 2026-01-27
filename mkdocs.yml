@@ -77,7 +77,8 @@ plugins:
           - docs/concepts/gateways.md: How to manage gateways - enabling auto-scaling, rate limits, and custom domains
           - docs/concepts/secrets.md: How to manage secrets - for API keys or other sensitive data
           - docs/concepts/projects.md: How to manage projects - for managing separate teams
-          - docs/concepts/metrics.md: How to manage gateways - enabling auto-scaling, rate limits, and custom domains
+          - docs/concepts/metrics.md: How to access metrics - for monitoring of runs/jobs/fleets, hardware usage (e.g. GPU util), etc
+          - docs/concepts/events.md: How to access events - aka audit log - for tracking state changes, resource creation/deletion, etc
         Guides:
           - docs/guides/server-deployment.md: Detailed guide on how to deploy the dstack server
           - docs/guides/troubleshooting.md: Common issues and how to troubleshoot them
@@ -271,6 +272,7 @@ nav:
             - Secrets: docs/concepts/secrets.md
             - Projects: docs/concepts/projects.md
             - Metrics: docs/concepts/metrics.md
+            - Events: docs/concepts/events.md
       - Guides:
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
