@@ -7,15 +7,9 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Optional
 
+import questionary
 from rich.prompt import Prompt as RichPrompt
 from rich.text import Text
-
-try:
-    import questionary
-
-    is_project_menu_supported = sys.stdin.isatty()
-except (ImportError, NotImplementedError, AttributeError):
-    is_project_menu_supported = False
 
 from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.commands.project import select_default_project
@@ -27,6 +21,8 @@ from dstack.api._public.runs import ConfigManager
 from dstack.api.server import APIClient
 
 logger = get_logger(__name__)
+
+is_project_menu_supported = sys.stdin.isatty()
 
 
 class UrlPrompt(RichPrompt):
@@ -117,28 +113,31 @@ class LoginCommand(BaseCommand):
         return provider
 
     def _prompt_url(self) -> str:
-        url = UrlPrompt.ask(
-            "Enter the server URL",
-            default="https://sky.dstack.ai",
-            console=console,
-        )
+        try:
+            url = UrlPrompt.ask(
+                "Enter the server URL",
+                default="https://sky.dstack.ai",
+                console=console,
+            )
+        except KeyboardInterrupt:
+            console.print("\nCancelled by user")
+            raise SystemExit(1)
         if url is None:
             raise CLIError("URL is required")
         return url
 
     def _prompt_provider(self, available_providers: list[str]) -> str:
         choices = [
-            questionary.Choice(title=provider, value=provider)  # pyright: ignore[reportPossiblyUnboundVariable]
-            for provider in available_providers
+            questionary.Choice(title=provider, value=provider) for provider in available_providers
         ]
-        selected_provider = questionary.select(  # pyright: ignore[reportPossiblyUnboundVariable]
+        selected_provider = questionary.select(
             message="Select SSO provider:",
             choices=choices,
             qmark="",
             instruction="(↑↓ Enter)",
         ).ask()
         if selected_provider is None:
-            raise CLIError("Provider selection is required")
+            raise SystemExit(1)
         return selected_provider
 
     def _configure_projects(

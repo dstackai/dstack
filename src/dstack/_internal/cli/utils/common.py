@@ -99,7 +99,11 @@ def configure_logging():
 
 def confirm_ask(prompt, **kwargs) -> bool:
     kwargs["console"] = console
-    return Confirm.ask(prompt=prompt, **kwargs)
+    try:
+        return Confirm.ask(prompt=prompt, **kwargs)
+    except KeyboardInterrupt:
+        console.print("\nCancelled by user")
+        raise SystemExit(1)
 
 
 def add_row_from_dict(table: Table, data: Dict[Union[str, int], Any], **kwargs):

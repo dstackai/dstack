@@ -2,15 +2,9 @@ import argparse
 import sys
 from typing import Any, Optional, Union
 
+import questionary
 from requests import HTTPError
 from rich.table import Table
-
-try:
-    import questionary
-
-    is_project_menu_supported = sys.stdin.isatty()
-except (ImportError, NotImplementedError, AttributeError):
-    is_project_menu_supported = False
 
 import dstack.api.server
 from dstack._internal.cli.commands import BaseCommand
@@ -21,6 +15,8 @@ from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+is_project_menu_supported = sys.stdin.isatty()
 
 
 def select_default_project(
@@ -57,9 +53,9 @@ def select_default_project(
             default_index = i
         menu_entries.append((entry, i))
 
-    choices = [questionary.Choice(title=entry, value=index) for entry, index in menu_entries]  # pyright: ignore[reportPossiblyUnboundVariable]
+    choices = [questionary.Choice(title=entry, value=index) for entry, index in menu_entries]
     default_value = default_index
-    selected_index = questionary.select(  # pyright: ignore[reportPossiblyUnboundVariable]
+    selected_index = questionary.select(
         message="Select the default project:",
         choices=choices,
         default=default_value,  # pyright: ignore[reportArgumentType]
