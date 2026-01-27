@@ -8,7 +8,7 @@ Each event includes the following fields:
 | --------- | ----------------------------------------------------------- |
 | Timestamp | When the event occurred                                     |
 | Actor     | The user or system that initiated the change, if applicable |
-| Target    | The resource affected by the event                          |
+| Targets   | The resources affected by the event                         |
 | Message   | A description of the change or additional event details     |
 
 Events can be queried by targeting a specific resource or within a group of related resources. For example, you can query events targeting a particular job or within a run, including the run itself and all of its associated resources.
