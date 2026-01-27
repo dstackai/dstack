@@ -25,7 +25,7 @@ export const UserList: React.FC = () => {
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
 
-    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IUser, TGetUserListParams>({
+    const { data, isLoading, refreshList, isLoadingMore, totalCount } = useInfiniteScroll<IUser, TGetUserListParams>({
         useLazyQuery: useLazyGetUserListQuery,
         args: { name_pattern: namePattern, limit: DEFAULT_TABLE_PAGE_SIZE },
 
@@ -117,6 +117,12 @@ export const UserList: React.FC = () => {
         return isDeleting || collectionProps.selectedItems?.length !== 1 || userGlobalRole !== 'admin';
     }, [collectionProps.selectedItems]);
 
+    const renderCounter = () => {
+        if (typeof totalCount !== 'number') return '';
+
+        return `(${totalCount})`;
+    };
+
     return (
         <>
             <Table
@@ -134,6 +140,7 @@ export const UserList: React.FC = () => {
                 header={
                     <Header
                         variant="awsui-h1-sticky"
+                        counter={renderCounter()}
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
                                 <Button formAction="none" onClick={editSelectedUserHandler} disabled={isDisabledEdit}>

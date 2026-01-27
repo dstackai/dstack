@@ -46,7 +46,7 @@ export const useFilters = ({ localStorePrefix }: Args) => {
                 });
         });
 
-        usersData?.forEach(({ username }) => {
+        usersData?.data?.forEach(({ username }) => {
             options.push({
                 propertyKey: filterKeys.USER_NAME,
                 value: username,

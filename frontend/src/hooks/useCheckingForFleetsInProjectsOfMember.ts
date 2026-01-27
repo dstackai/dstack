@@ -19,8 +19,8 @@ export const useCheckingForFleetsInProjects = ({ projectNames }: Args) => {
             return projectNames;
         }
 
-        if (projectsData) {
-            return projectsData.map((project) => project.project_name);
+        if (projectsData?.data) {
+            return projectsData.data.map((project) => project.project_name);
         }
 
         return [];

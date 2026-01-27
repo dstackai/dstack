@@ -22,7 +22,7 @@ export const ProjectList: React.FC = () => {
     const [namePattern, setNamePattern] = useState<string>('');
     const navigate = useNavigate();
 
-    const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IProject, TGetProjectListParams>({
+    const { data, isLoading, refreshList, isLoadingMore, totalCount } = useInfiniteScroll<IProject, TGetProjectListParams>({
         useLazyQuery: useLazyGetProjectsQuery,
         args: { name_pattern: namePattern, limit: DEFAULT_TABLE_PAGE_SIZE },
 
@@ -94,6 +94,12 @@ export const ProjectList: React.FC = () => {
         onDeleteClick: isAvailableProjectManaging ? deleteProject : undefined,
     });
 
+    const renderCounter = () => {
+        if (typeof totalCount !== 'number') return '';
+
+        return `(${totalCount})`;
+    };
+
     return (
         <>
             <Table
@@ -108,6 +114,7 @@ export const ProjectList: React.FC = () => {
                 header={
                     <Header
                         variant="awsui-h1-sticky"
+                        counter={renderCounter()}
                         actions={
                             isAvailableProjectManaging && (
                                 <SpaceBetween size="xs" direction="horizontal">

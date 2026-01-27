@@ -13,6 +13,11 @@ declare type TGetProjectListParams = TBaseRequestListParams & {
     name_pattern?: string;
 };
 
+declare type TGetProjectListResponse = {
+    total_count: number;
+    data: IProject[];
+};
+
 declare type TProjectBackend = {
     name: string;
     config: IBackendAWS | IBackendAzure | IBackendGCP | IBackendLambda | IBackendLocal | IBackendDstack;

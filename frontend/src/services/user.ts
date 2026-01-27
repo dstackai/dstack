@@ -37,17 +37,26 @@ export const userApi = createApi({
             },
         }),
 
-        getUserList: builder.query<IUser[], TGetUserListParams>({
+        getUserList: builder.query<TGetUserListResponse, TGetUserListParams>({
             query: (body) => {
                 return {
                     url: API.USERS.LIST(),
                     method: 'POST',
-                    body,
+                    body: {
+                        ...body,
+                        return_total_count: true,
+                    },
                 };
             },
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            transformResponse: (response: any): TGetUserListResponse => ({
+                ...response,
+                data: response.users,
+            }),
+
             providesTags: (result) =>
-                result ? [...result.map(({ username }) => ({ type: 'User' as const, id: username })), 'User'] : ['User'],
+                result ? [...result.data.map(({ username }) => ({ type: 'User' as const, id: username })), 'User'] : ['User'],
         }),
 
         getUser: builder.query<IUserWithCreds, { name: IUser['username'] }>({

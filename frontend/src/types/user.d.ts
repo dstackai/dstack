@@ -7,6 +7,11 @@ declare type TGetUserListParams = TBaseRequestListParams & {
     name_pattern?: string;
 };
 
+declare type TGetUserListResponse = {
+    total_count: number;
+    data: IUser[];
+};
+
 declare interface IUserResponseData {
     id: string;
     username: string;

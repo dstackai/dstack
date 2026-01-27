@@ -23,21 +23,27 @@ export const projectApi = createApi({
     tagTypes: ['Projects', 'NoFleetsProject', 'ProjectRepos', 'ProjectLogs', 'Backends'],
 
     endpoints: (builder) => ({
-        getProjects: builder.query<IProject[], TGetProjectListParams>({
+        getProjects: builder.query<TGetProjectListResponse, TGetProjectListParams>({
             query: (body) => {
                 return {
                     url: API.PROJECTS.LIST(),
                     method: 'POST',
-                    body,
+                    body: {
+                        ...body,
+                        return_total_count: true,
+                    },
                 };
             },
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            transformResponse: (response: any[]): IProject[] => response.map(transformProjectResponse),
+            transformResponse: (response: any): TGetProjectListResponse => ({
+                ...response,
+                data: response.projects.map(transformProjectResponse),
+            }),
 
             providesTags: (result) =>
                 result
-                    ? [...result.map(({ project_name }) => ({ type: 'Projects' as const, id: project_name })), 'Projects']
+                    ? [...result.data.map(({ project_name }) => ({ type: 'Projects' as const, id: project_name })), 'Projects']
                     : ['Projects'],
         }),
 

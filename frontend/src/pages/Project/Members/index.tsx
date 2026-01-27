@@ -96,7 +96,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
             return;
         }
 
-        const selectedUser = usersData?.find((u) => u.username === username);
+        const selectedUser = usersData?.data?.find((u) => u.username === username);
 
         if (selectedUser) {
             append({

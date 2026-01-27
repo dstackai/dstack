@@ -54,14 +54,14 @@ export const useTutorials = () => {
     useEffect(() => {
         if (
             userBillingData &&
-            projectData &&
+            projectData?.data &&
             runsData &&
             !completeIsChecked.current &&
             location.pathname !== ROUTES.PROJECT.ADD
         ) {
             const billingCompleted = userBillingData.balance > 0;
             const configureCLICompleted = runsData.length > 0;
-            const createProjectCompleted = projectData.length > 0;
+            const createProjectCompleted = projectData.data.length > 0;
 
             let tempHideStartUp = hideStartUp;
 
@@ -88,7 +88,7 @@ export const useTutorials = () => {
     }, [userBillingData, runsData, projectData, location.pathname]);
 
     useEffect(() => {
-        if (projectData && projectData.length > 0 && !createProjectCompleted) {
+        if (projectData?.data && projectData.data.length > 0 && !createProjectCompleted) {
             dispatch(
                 updateTutorialPanelState({
                     createProjectCompleted: true,
@@ -114,8 +114,8 @@ export const useTutorials = () => {
     }, []);
 
     const startConfigCliTutorial = useCallback(() => {
-        if (projectData?.length) {
-            navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(projectData[0].project_name));
+        if (projectData?.data?.length) {
+            navigate(ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(projectData.data[0].project_name));
         }
     }, [projectData]);
 

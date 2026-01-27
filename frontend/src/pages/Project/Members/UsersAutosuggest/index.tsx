@@ -19,7 +19,7 @@ export const UserAutosuggest: React.FC<Props> = ({ optionsFilter, onSelect: onSe
     const options: AutosuggestOption[] = useMemo(() => {
         if (!usersData) return [];
 
-        return usersData.map((user) => ({
+        return usersData?.data.map((user) => ({
             value: user.username,
         }));
     }, [usersData]);
