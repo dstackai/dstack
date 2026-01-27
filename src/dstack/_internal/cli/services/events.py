@@ -18,6 +18,7 @@ class EventListFilters:
     target_runs: Optional[list[uuid.UUID]] = None
     target_volumes: Optional[list[uuid.UUID]] = None
     target_gateways: Optional[list[uuid.UUID]] = None
+    target_secrets: Optional[list[uuid.UUID]] = None
     within_projects: Optional[list[uuid.UUID]] = None
     within_fleets: Optional[list[uuid.UUID]] = None
     within_runs: Optional[list[uuid.UUID]] = None

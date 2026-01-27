@@ -138,6 +138,19 @@ export const useColumnsDefinitions = () => {
                                 </div>
                             );
 
+                        case 'secret':
+                            return (
+                                <div>
+                                    Secret{' '}
+                                    {target.project_name && (
+                                        <NavigateLink href={ROUTES.PROJECT.DETAILS.FORMAT(target.project_name)}>
+                                            {target.project_name}
+                                        </NavigateLink>
+                                    )}
+                                    /{target.name}
+                                </div>
+                            );
+
                         default:
                             return '---';
                     }

@@ -18,6 +18,7 @@ class EventTargetType(str, Enum):
     JOB = "job"
     VOLUME = "volume"
     GATEWAY = "gateway"
+    SECRET = "secret"
 
 
 class EventTarget(CoreModel):
