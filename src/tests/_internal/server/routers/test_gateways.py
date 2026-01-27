@@ -10,12 +10,14 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
+    clear_events,
     create_backend,
     create_gateway,
     create_gateway_compute,
     create_project,
     create_user,
     get_auth_headers,
+    list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
 
@@ -218,6 +220,8 @@ class TestCreateGateway:
                 "tags": None,
             },
         }
+        events = await list_events(session)
+        assert events[0].message == "Gateway created. Status: SUBMITTED"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -273,6 +277,8 @@ class TestCreateGateway:
                 "tags": None,
             },
         }
+        events = await list_events(session)
+        assert events[0].message == "Gateway created. Status: SUBMITTED"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -337,6 +343,7 @@ class TestDefaultGateway:
             project_id=project.id,
             backend_id=backend.id,
             gateway_compute_id=gateway_compute.id,
+            name="first_gateway",
         )
         response = await client.post(
             f"/api/project/{project.name}/gateways/set_default",
@@ -378,6 +385,40 @@ class TestDefaultGateway:
                 "tags": None,
             },
         }
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway set as default"
+
+        second_gateway_compute = await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+        )
+        second_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=second_gateway_compute.id,
+            name="second_gateway",
+        )
+        await clear_events(session)
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/set_default",
+            json={"name": second_gateway.name},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        events = await list_events(session)
+        assert len(events) == 2
+        actual_events = [(e.targets[0].entity_name, e.message) for e in events]
+        expected_events = [
+            ("first_gateway", "Gateway unset as default"),
+            ("second_gateway", "Gateway set as default"),
+        ]
+        assert (
+            actual_events == expected_events
+            # in case events are emitted exactly at the same time
+            or actual_events == expected_events[::-1]
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -504,6 +545,10 @@ class TestDeleteGateway:
                 },
             }
         ]
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway deleted"
+        assert events[0].targets[0].entity_name == "gateway-aws"
 
 
 class TestUpdateGateway:
@@ -541,10 +586,11 @@ class TestUpdateGateway:
             project_id=project.id,
             backend_id=backend.id,
             gateway_compute_id=gateway_compute.id,
+            wildcard_domain="old.example",
         )
         response = await client.post(
             f"/api/project/{project.name}/gateways/set_wildcard_domain",
-            json={"name": gateway.name, "wildcard_domain": "test.com"},
+            json={"name": gateway.name, "wildcard_domain": "new.example"},
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
@@ -560,7 +606,7 @@ class TestUpdateGateway:
             "hostname": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
-            "wildcard_domain": "test.com",
+            "wildcard_domain": "new.example",
             "configuration": {
                 "type": "gateway",
                 "name": gateway.name,
@@ -568,13 +614,18 @@ class TestUpdateGateway:
                 "region": gateway.region,
                 "instance_type": None,
                 "router": None,
-                "domain": "test.com",
+                "domain": "new.example",
                 "default": False,
                 "public_ip": True,
                 "certificate": {"type": "lets-encrypt"},
                 "tags": None,
             },
         }
+        events = await list_events(session)
+        assert len(events) == 1
+        assert (
+            events[0].message == "Gateway wildcard domain changed 'old.example' -> 'new.example'"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

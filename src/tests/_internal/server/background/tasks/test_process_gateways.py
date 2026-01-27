@@ -13,6 +13,7 @@ from dstack._internal.server.testing.common import (
     create_gateway,
     create_gateway_compute,
     create_project,
+    list_events,
 )
 
 
@@ -46,6 +47,9 @@ class TestProcessSubmittedGateways:
         assert gateway.status == GatewayStatus.PROVISIONING
         assert gateway.gateway_compute is not None
         assert gateway.gateway_compute.ip_address == "2.2.2.2"
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway status changed SUBMITTED -> PROVISIONING"
 
     async def test_marks_gateway_as_failed_if_gateway_creation_errors(
         self, test_db, session: AsyncSession
@@ -71,6 +75,9 @@ class TestProcessSubmittedGateways:
         await session.refresh(gateway)
         assert gateway.status == GatewayStatus.FAILED
         assert gateway.status_message == "Some error"
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway status changed SUBMITTED -> FAILED (Some error)"
 
 
 @pytest.mark.asyncio
@@ -96,6 +103,9 @@ class TestProcessProvisioningGateways:
             pool_add.assert_called_once()
         await session.refresh(gateway)
         assert gateway.status == GatewayStatus.RUNNING
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway status changed PROVISIONING -> RUNNING"
 
     async def test_marks_gateway_as_failed_if_fails_to_connect(
         self, test_db, session: AsyncSession
@@ -119,3 +129,9 @@ class TestProcessProvisioningGateways:
         await session.refresh(gateway)
         assert gateway.status == GatewayStatus.FAILED
         assert gateway.status_message == "Failed to connect to gateway"
+        events = await list_events(session)
+        assert len(events) == 1
+        assert (
+            events[0].message
+            == "Gateway status changed PROVISIONING -> FAILED (Failed to connect to gateway)"
+        )

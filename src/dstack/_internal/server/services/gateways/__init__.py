@@ -1,6 +1,8 @@
 import asyncio
 import datetime
 import uuid
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from functools import partial
 from typing import List, Optional, Sequence
@@ -45,6 +47,7 @@ from dstack._internal.server.models import (
     ProjectModel,
     UserModel,
 )
+from dstack._internal.server.services import events
 from dstack._internal.server.services.backends import (
     check_backend_type_available,
     get_project_backend_by_type_or_error,
@@ -64,6 +67,24 @@ from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def switch_gateway_status(
+    session: AsyncSession,
+    gateway_model: GatewayModel,
+    new_status: GatewayStatus,
+    actor: events.AnyActor = events.SystemActor(),
+):
+    old_status = gateway_model.status
+    if old_status == new_status:
+        return
+
+    gateway_model.status = new_status
+
+    msg = f"Gateway status changed {old_status.upper()} -> {new_status.upper()}"
+    if gateway_model.status_message is not None:
+        msg += f" ({gateway_model.status_message})"
+    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(gateway_model)])
 
 
 GATEWAY_CONNECT_ATTEMPTS = 30
@@ -163,6 +184,7 @@ async def create_gateway(
             configuration.name = await generate_gateway_name(session=session, project=project)
 
         gateway = GatewayModel(
+            id=uuid.uuid4(),
             name=configuration.name,
             region=configuration.region,
             project_id=project.id,
@@ -173,11 +195,19 @@ async def create_gateway(
             last_processed_at=get_current_datetime(),
         )
         session.add(gateway)
+        events.emit(
+            session,
+            f"Gateway created. Status: {gateway.status.upper()}",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(gateway)],
+        )
         await session.commit()
 
         default_gateway = await get_project_default_gateway_model(session=session, project=project)
         if default_gateway is None or configuration.default:
-            await set_default_gateway(session=session, project=project, name=configuration.name)
+            await set_default_gateway(
+                session=session, project=project, name=configuration.name, user=user
+            )
         return gateway_model_to_gateway(gateway)
 
 
@@ -214,6 +244,7 @@ async def delete_gateways(
     session: AsyncSession,
     project: ProjectModel,
     gateways_names: List[str],
+    user: UserModel,
 ):
     res = await session.execute(
         select(GatewayModel).where(
@@ -273,46 +304,51 @@ async def delete_gateways(
                 gateway_model.gateway_compute.deleted = True
                 session.add(gateway_model.gateway_compute)
             await session.delete(gateway_model)
+            events.emit(
+                session,
+                "Gateway deleted",
+                actor=events.UserActor.from_user(user),
+                targets=[events.Target.from_model(gateway_model)],
+            )
         await session.commit()
 
 
 async def set_gateway_wildcard_domain(
-    session: AsyncSession, project: ProjectModel, name: str, wildcard_domain: Optional[str]
+    session: AsyncSession,
+    project: ProjectModel,
+    name: str,
+    wildcard_domain: Optional[str],
+    user: UserModel,
 ) -> Gateway:
-    gateway = await get_project_gateway_model_by_name(
-        session=session,
-        project=project,
-        name=name,
-    )
-    if gateway is None:
-        raise ResourceNotExistsError()
-    if gateway.backend.type == BackendType.DSTACK:
-        raise ServerClientError("Custom domains for dstack Sky gateway are not supported")
-    await session.execute(
-        update(GatewayModel)
-        .where(
-            GatewayModel.project_id == project.id,
-            GatewayModel.name == name,
-        )
-        .values(
-            wildcard_domain=wildcard_domain,
-        )
-    )
-    await session.commit()
-    gateway = await get_project_gateway_model_by_name(
-        session=session,
-        project=project,
-        name=name,
-    )
-    if gateway is None:
-        raise ResourceNotExistsError()
+    async with get_project_gateway_model_by_name_for_update(
+        session=session, project=project, name=name
+    ) as gateway:
+        if gateway is None:
+            raise ResourceNotExistsError()
+        if gateway.backend.type == BackendType.DSTACK:
+            raise ServerClientError("Custom domains for dstack Sky gateway are not supported")
+        old_domain = gateway.wildcard_domain
+        if old_domain != wildcard_domain:
+            gateway.wildcard_domain = wildcard_domain
+            events.emit(
+                session,
+                f"Gateway wildcard domain changed {old_domain!r} -> {gateway.wildcard_domain!r}",
+                actor=events.UserActor.from_user(user),
+                targets=[events.Target.from_model(gateway)],
+            )
+            await session.commit()
     return gateway_model_to_gateway(gateway)
 
 
-async def set_default_gateway(session: AsyncSession, project: ProjectModel, name: str):
+async def set_default_gateway(
+    session: AsyncSession, project: ProjectModel, name: str, user: Optional[UserModel]
+):
     gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
     if gateway is None:
         raise ResourceNotExistsError()
+    if project.default_gateway_id == gateway.id:
+        return
+    previous_gateway = await get_project_default_gateway_model(session, project)
     await session.execute(
         update(ProjectModel)
         .where(
@@ -321,6 +357,19 @@ async def set_default_gateway(session: AsyncSession, project: ProjectModel, name
         .values(
             default_gateway_id=gateway.id,
         )
+    )
+    if previous_gateway is not None:
+        events.emit(
+            session,
+            "Gateway unset as default",
+            actor=events.UserActor.from_user(user) if user is not None else events.SystemActor(),
+            targets=[events.Target.from_model(previous_gateway)],
+        )
+    events.emit(
+        session,
+        "Gateway set as default",
+        actor=events.UserActor.from_user(user) if user is not None else events.SystemActor(),
+        targets=[events.Target.from_model(gateway)],
     )
     await session.commit()
 
@@ -341,6 +390,38 @@ async def get_project_gateway_model_by_name(
         )
     )
     return res.scalar()
+
+
+@asynccontextmanager
+async def get_project_gateway_model_by_name_for_update(
+    session: AsyncSession, project: ProjectModel, name: str
+) -> AsyncGenerator[Optional[GatewayModel], None]:
+    """
+    Fetch the gateway from the database and lock it for update.
+
+    **NOTE**: commit changes to the database before exiting from this context manager,
+              so that in-memory locks are only released after commit.
+    """
+
+    filters = [
+        GatewayModel.project_id == project.id,
+        GatewayModel.name == name,
+    ]
+    res = await session.execute(select(GatewayModel.id).where(*filters))
+    gateway_id = res.scalar_one_or_none()
+    if gateway_id is None:
+        yield None
+    else:
+        async with get_locker(get_db().dialect_name).lock_ctx(
+            GatewayModel.__tablename__, [gateway_id]
+        ):
+            # Refetch after lock
+            res = await session.execute(
+                select(GatewayModel)
+                .where(GatewayModel.id.in_([gateway_id]), *filters)
+                .with_for_update(key_share=True, of=GatewayModel)
+            )
+            yield res.scalar_one_or_none()
 
 
 async def get_project_default_gateway_model(

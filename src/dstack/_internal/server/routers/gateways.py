@@ -72,11 +72,12 @@ async def delete_gateways(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
-    _, project = user_project
+    user, project = user_project
     await gateways.delete_gateways(
         session=session,
         project=project,
         gateways_names=body.names,
+        user=user,
     )
 
 
@@ -86,8 +87,8 @@ async def set_default_gateway(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
-    _, project = user_project
-    await gateways.set_default_gateway(session=session, project=project, name=body.name)
+    user, project = user_project
+    await gateways.set_default_gateway(session=session, project=project, name=body.name, user=user)
 
 
 @router.post("/set_wildcard_domain", response_model=models.Gateway)
@@ -96,9 +97,13 @@ async def set_gateway_wildcard_domain(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
-    _, project = user_project
+    user, project = user_project
     return CustomORJSONResponse(
         await gateways.set_gateway_wildcard_domain(
-            session=session, project=project, name=body.name, wildcard_domain=body.wildcard_domain
+            session=session,
+            project=project,
+            name=body.name,
+            wildcard_domain=body.wildcard_domain,
+            user=user,
         )
     )
