@@ -168,14 +168,6 @@ export const useTutorials = () => {
             },
 
             {
-                ...BILLING_TUTORIAL,
-                id: 4,
-                completed: billingCompleted,
-                startCallback: startBillingTutorial,
-                finishCallback: finishBillingTutorial,
-            },
-
-            {
                 ...QUICKSTART_TUTORIAL,
                 id: 5,
                 startWithoutActivation: true,
@@ -189,6 +181,14 @@ export const useTutorials = () => {
                 startWithoutActivation: true,
                 completed: discordCompleted,
                 startCallback: startDiscordTutorial,
+            },
+
+            {
+                ...BILLING_TUTORIAL,
+                id: 4,
+                completed: billingCompleted,
+                startCallback: startBillingTutorial,
+                finishCallback: finishBillingTutorial,
             },
         ];
     }, [

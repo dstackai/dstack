@@ -8,7 +8,7 @@ import { Box } from 'components';
 export const tutorialPanelI18nStrings: TutorialPanelProps.I18nStrings = {
     labelsTaskStatus: { pending: 'Pending', 'in-progress': 'In progress', success: 'Success' },
     loadingText: 'Loading',
-    tutorialListTitle: 'Take a tour',
+    tutorialListTitle: '',
     tutorialListDescription: 'Follow the tutorials below to get up to speed with dstack Sky.',
     tutorialListDownloadLinkText: 'Download PDF version',
     tutorialCompletedText: 'Completed',
@@ -50,7 +50,7 @@ export enum HotspotIds {
 
 export const BILLING_TUTORIAL: TutorialPanelProps.Tutorial = {
     completed: false,
-    title: 'Set up billing',
+    title: 'Billing',
     description: (
         <>
             <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
@@ -80,7 +80,7 @@ export const BILLING_TUTORIAL: TutorialPanelProps.Tutorial = {
 
 export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
     completed: false,
-    title: 'Set up the CLI',
+    title: 'CLI',
     prerequisitesAlert: 'Please, create a project before set up the CLI',
     description: (
         <>
@@ -111,7 +111,7 @@ export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
 
 export const CREATE_FIRST_PROJECT: TutorialPanelProps.Tutorial = {
     completed: false,
-    title: 'Create a project',
+    title: 'Project',
     description: (
         <>
             <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
@@ -136,7 +136,7 @@ export const CREATE_FIRST_PROJECT: TutorialPanelProps.Tutorial = {
 
 export const JOIN_DISCORD_TUTORIAL: TutorialPanelProps.Tutorial = {
     completed: false,
-    title: 'Community',
+    title: 'Discord',
     description: (
         <>
             <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
