@@ -148,22 +148,22 @@ export const useFilters = () => {
         {
             key: filterKeys.TARGET_FLEETS,
             operators: ['='],
-            propertyLabel: 'Target fleets',
+            propertyLabel: 'Target fleet IDs',
         },
         {
             key: filterKeys.TARGET_INSTANCES,
             operators: ['='],
-            propertyLabel: 'Target instances',
+            propertyLabel: 'Target instance IDs',
         },
         {
             key: filterKeys.TARGET_RUNS,
             operators: ['='],
-            propertyLabel: 'Target runs',
+            propertyLabel: 'Target run IDs',
         },
         {
             key: filterKeys.TARGET_JOBS,
             operators: ['='],
-            propertyLabel: 'Target jobs',
+            propertyLabel: 'Target job IDs',
         },
         {
             key: filterKeys.TARGET_VOLUMES,
@@ -191,13 +191,13 @@ export const useFilters = () => {
         {
             key: filterKeys.WITHIN_FLEETS,
             operators: ['='],
-            propertyLabel: 'Within fleets',
+            propertyLabel: 'Within fleet IDs',
         },
 
         {
             key: filterKeys.WITHIN_RUNS,
             operators: ['='],
-            propertyLabel: 'Within runs',
+            propertyLabel: 'Within run IDs',
         },
 
         {
