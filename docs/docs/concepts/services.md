@@ -164,58 +164,56 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 > The `scaling` property requires creating a [gateway](gateways.md).
 
-### Replica Groups
+??? info "Replica groups"
+    A service can include multiple replica groups. Each group can define its own `commands`, `resources` requirements, and `scaling` rules.
 
-Replica groups let you define multiple groups of replicas within a single service. Each group can define its own replica count, autoscaling rules, resource requirements, and commands.
+    <div editor-title="service.dstack.yml"> 
 
-<div editor-title="service.dstack.yml"> 
+    ```yaml
+    type: service
+    name: llama-8b-service
 
-```yaml
-type: service
-name: replica-groups
-image: lmsysorg/sglang:latest
+    image: lmsysorg/sglang:latest
+    env:
+      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
-env:
-  - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+    replicas:
+      - count: 1..2
+        scaling:
+          metric: rps
+          target: 10
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --port 8000 \
+              --trust-remote-code
+        resources:
+          gpu: 48GB
 
-replicas:
-  - count: 1..2
-    scaling:
-      metric: rps
-      target: 10
-    commands:
-      - |
-          python -m sglang.launch_server \
-            --model-path $MODEL_ID \
-            --port 8000 \
-            --trust-remote-code
+      - count: 1..4
+        scaling:
+          metric: rps
+          target: 5
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --port 8000 \
+              --trust-remote-code
+        resources:
+          gpu: 24GB
 
-    resources:
-      gpu: 48GB
+    port: 8000
+    model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+    ```
 
-  - count: 1..4
-    scaling:
-      metric: rps
-      target: 5
-    commands:
-      - |
-          python -m sglang.launch_server \
-            --model-path $MODEL_ID \
-            --port 8000 \
-            --trust-remote-code
-    resources:
-      gpu: 24GB
+    </div>
 
-port: 8000
-model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
-```
+    > Properties such as `regions`, `port`, `image`, `env` and some other cannot be configured per replica group. This support is coming soon.
 
-</div>
-
-> Support for configuring `port`, `image`, `env`, `docker`, and other properties is coming soon.
-
-!!! info
-    Replica groups enable `prefill–decode` disaggregation by running prefill and decode workers as separate replica groups within a single service. This capability is planned for an upcoming release. See the [issue](https://github.com/dstackai/dstack/issues/3363) for more details.
+??? info "Disaggregated serving"
+    Native support for disaggregated prefill and decode, allowing both worker types to run within a single service, is coming soon.
 
 ### Model
 
