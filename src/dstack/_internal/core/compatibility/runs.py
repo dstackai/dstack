@@ -1,7 +1,12 @@
 from typing import Optional
 
 from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeExcludeSetType
-from dstack._internal.core.models.runs import ApplyRunPlanInput, JobSpec, RunSpec
+from dstack._internal.core.models.runs import (
+    DEFAULT_REPLICA_GROUP_NAME,
+    ApplyRunPlanInput,
+    JobSpec,
+    RunSpec,
+)
 from dstack._internal.server.schemas.runs import GetRunPlanRequest, ListRunsRequest
 
 
@@ -23,7 +28,13 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
     current_resource = plan.current_resource
     if current_resource is not None:
         current_resource_excludes: IncludeExcludeDictType = {}
+        apply_plan_excludes["current_resource"] = current_resource_excludes
         current_resource_excludes["run_spec"] = get_run_spec_excludes(current_resource.run_spec)
+        current_resource_excludes["jobs"] = {
+            "__all__": {
+                "job_spec": get_job_spec_excludes([job.job_spec for job in current_resource.jobs]),
+            }
+        }
     return {"plan": apply_plan_excludes}
 
 
@@ -70,4 +81,6 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
     clients backward-compatibility with older servers.
     """
     spec_excludes: IncludeExcludeDictType = {}
+    if all(s.replica_group == DEFAULT_REPLICA_GROUP_NAME for s in job_specs):
+        spec_excludes["replica_group"] = True
     return spec_excludes
