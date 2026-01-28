@@ -19,7 +19,11 @@ from dstack._internal.core.errors import (
     ServerClientError,
     SSHError,
 )
-from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
+from dstack._internal.core.models.configurations import (
+    DEFAULT_REPLICA_GROUP_NAME,
+    SERVICE_HTTPS_DEFAULT,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
@@ -318,8 +322,18 @@ async def update_service_desired_replica_count(
     prev_counts = (
         json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
     )
+    if (
+        prev_counts == {}
+        and len(replica_groups) == 1
+        and replica_groups[0].name == DEFAULT_REPLICA_GROUP_NAME
+    ):
+        # Special case to avoid dropping the replica count to group.count.min
+        # when a 0.20.7+ server first processes a service created by a pre-0.20.7 server.
+        # TODO: remove once most users upgrade to 0.20.7+.
+        prev_counts = {DEFAULT_REPLICA_GROUP_NAME: run_model.desired_replica_count}
     for group in replica_groups:
         scaler = get_service_scaler(group.count, group.scaling)
+        assert group.name is not None, "Group name is always set"
         group_desired = scaler.get_desired_count(
             current_desired_count=prev_counts.get(group.name, group.count.min or 0),
             stats=stats,
