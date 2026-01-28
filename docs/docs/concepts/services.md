@@ -164,6 +164,57 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 > The `scaling` property requires creating a [gateway](gateways.md).
 
+??? info "Replica groups"
+    A service can include multiple replica groups. Each group can define its own `commands`, `resources` requirements, and `scaling` rules.
+
+    <div editor-title="service.dstack.yml"> 
+
+    ```yaml
+    type: service
+    name: llama-8b-service
+
+    image: lmsysorg/sglang:latest
+    env:
+      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+
+    replicas:
+      - count: 1..2
+        scaling:
+          metric: rps
+          target: 10
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --port 8000 \
+              --trust-remote-code
+        resources:
+          gpu: 48GB
+
+      - count: 1..4
+        scaling:
+          metric: rps
+          target: 5
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --port 8000 \
+              --trust-remote-code
+        resources:
+          gpu: 24GB
+
+    port: 8000
+    model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+    ```
+
+    </div>
+
+    > Properties such as `regions`, `port`, `image`, `env` and some other cannot be configured per replica group. This support is coming soon.
+
+??? info "Disaggregated serving"
+    Native support for disaggregated prefill and decode, allowing both worker types to run within a single service, is coming soon.
+
 ### Model
 
 If the service is running a chat model with an OpenAI-compatible interface,
