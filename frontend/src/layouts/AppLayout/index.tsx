@@ -183,7 +183,7 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                             },
                             process.env.UI_VERSION === 'sky' && {
                                 type: 'button',
-                                iconName: 'suggestions',
+                                iconName: 'support',
                                 title: t('common.tutorial_other'),
                                 onClick: toggleTutorialPanel,
                             },
