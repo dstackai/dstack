@@ -18,6 +18,8 @@ declare interface IUserResponseData {
     global_role: TUserRole;
     email: string | null;
     permissions: Record<TUserPermissionKeys, boolean>;
+    created_at: string;
+    active: boolean;
 }
 
 declare interface IUser {

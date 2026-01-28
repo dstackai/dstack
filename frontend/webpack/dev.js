@@ -26,12 +26,7 @@ module.exports = {
             {
                 context: ['/api'],
                 changeOrigin: true,
-                // target: 'http://127.0.0.1:8000',
-                target: 'http://127.0.0.1:3000',
-                // target: 'https://sky.dstack.ai/', //0ab1c6ee-3f7b-4839-a259-5e5c6074a97f
-                // target: 'https://sky-stage.dstack.ai/', //29001ee8-897c-47ea-bfec-819f56835ffe
-                // target: 'https://cloud.dstack.ai/', //0ab1c6ee-3f7b-4839-a259-5e5c6074a97f
-                // target: 'https://08fdfa6f0dd6.ngrok-free.app/',
+                target: 'http://127.0.0.1:8000',
                 logLevel: 'debug',
             },
         ],

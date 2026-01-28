@@ -33,20 +33,28 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     const [totalCount, setTotalCount] = useState<number | void>();
     const scrollElement = useRef<HTMLElement>(document.documentElement);
     const isLoadingRef = useRef<boolean>(false);
+    const isDisabledMoreRef = useRef<boolean>(false);
     const lastRequestParams = useRef<Args | undefined>(undefined);
-    const [disabledMore, setDisabledMore] = useState(false);
     const { limit, ...argsProp } = args;
     const lastArgsProps = useRef<Partial<Args>>(null);
 
     const [getItems, { isLoading, isFetching }] = useLazyQuery({ ...args } as Args);
 
     const getDataRequest = (params: Args) => {
-        lastRequestParams.current = params;
+        if (isEqual(params, lastRequestParams.current)) {
+            return Promise.reject();
+        }
 
-        return getItems({
+        const request = getItems({
             limit,
             ...params,
         } as Args).unwrap();
+
+        request.then(() => {
+            lastRequestParams.current = { ...params };
+        });
+
+        return request;
     };
 
     const getEmptyList = () => {
@@ -55,7 +63,8 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
         setData([]);
 
         getDataRequest(argsProp as Args).then((result: LazyQueryResponse<DataItem>) => {
-            setDisabledMore(false);
+            // setDisabledMore(false);
+            isDisabledMoreRef.current = false;
 
             if ('data' in result) {
                 setData(result.data as ListResponse<DataItem>);
@@ -77,7 +86,7 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     }, [argsProp, lastArgsProps, skip]);
 
     const getMore = async () => {
-        if (isLoadingRef.current || disabledMore || skip) {
+        if (isLoadingRef.current || isDisabledMoreRef.current || skip) {
             return;
         }
 
@@ -102,7 +111,7 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
             if (listResponse.length > 0) {
                 setData((prev) => [...prev, ...listResponse]);
             } else {
-                setDisabledMore(true);
+                isDisabledMoreRef.current = true;
             }
         } catch (e) {
             console.log(e);
@@ -110,7 +119,7 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
 
         setTimeout(() => {
             isLoadingRef.current = false;
-        }, 10);
+        }, 50);
     };
 
     useLayoutEffect(() => {
@@ -124,7 +133,7 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     }, [data]);
 
     const onScroll = useCallback(() => {
-        if (disabledMore || isLoadingRef.current) {
+        if (isDisabledMoreRef.current || isLoadingRef.current) {
             return;
         }
 
@@ -135,7 +144,7 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
         if (scrollPositionFromBottom < SCROLL_POSITION_GAP) {
             getMore().catch(console.log);
         }
-    }, [disabledMore, getMore]);
+    }, [getMore]);
 
     useEffect(() => {
         document.addEventListener('scroll', onScroll);
