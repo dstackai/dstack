@@ -2,6 +2,14 @@ import React from 'react';
 import { get } from 'lodash';
 import * as yup from 'yup';
 
+import { FleetFormFields } from './type';
+
+export const fleetFormDefaultValues: FleetFormFields = {
+    min_instances: 0,
+    idle_duration: '5m',
+    spot_policy: 'auto',
+};
+
 export const FLEET_MIN_INSTANCES_INFO = {
     header: <h2>Min number of instances</h2>,
     body: (
@@ -74,6 +82,15 @@ export const FLEET_IDLE_DURATION_INFO = {
                 </a>
                 .
             </p>
+        </>
+    ),
+};
+
+export const FLEET_SPOT_POLICY_INFO = {
+    header: <h2>Spot policy</h2>,
+    body: (
+        <>
+            <p>Spot policy</p>
         </>
     ),
 };

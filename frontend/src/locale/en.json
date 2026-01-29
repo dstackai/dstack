@@ -630,7 +630,9 @@
       "max_instances_description": "Required only if you want to set an upper limit",
       "max_instances_placeholder": "Optional",
       "idle_duration": "Idle duration",
-      "idle_duration_description": "Example: '0s', '1m', '1h'"
+      "idle_duration_description": "Example: '0s', '1m', '1h'",
+      "spot_policy": "Spot policy",
+      "spot_policy_description": "Select spot policy"
     }
   },
   "volume": {

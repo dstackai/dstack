@@ -30,6 +30,7 @@ import { useCreateWizardProjectMutation } from 'services/project';
 
 import { FleetFormFields } from '../../Fleets/Add/FleetFormFields';
 import {
+    fleetFormDefaultValues,
     getMaxInstancesValidator,
     getMinInstancesValidator,
     idleDurationValidator,
@@ -69,6 +70,7 @@ const projectValidationSchema = yup.object({
             is: true,
             then: idleDurationValidator,
         }),
+        spot_policy: yup.string().required(requiredFieldError),
     }),
 });
 
@@ -127,9 +129,8 @@ export const CreateProjectWizard: React.FC = () => {
         defaultValues: {
             project_type: 'gpu_marketplace',
             fleet: {
+                ...fleetFormDefaultValues,
                 enable_default: true,
-                min_instances: 0,
-                idle_duration: '5m',
             },
         },
     });
@@ -319,6 +320,7 @@ export const CreateProjectWizard: React.FC = () => {
             'min_instances',
             'max_instances',
             'idle_duration',
+            'spot_policy',
         ];
 
         const result: string[] = [];

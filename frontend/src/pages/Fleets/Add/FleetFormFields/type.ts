@@ -12,4 +12,5 @@ export type FleetFormFields = {
     min_instances: number;
     max_instances?: number;
     idle_duration?: string;
+    spot_policy: TSpotPolicy;
 };
