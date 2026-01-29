@@ -12,7 +12,7 @@ Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B
 
     ```yaml
     type: service
-    name: deepseek-r1-nvidia
+    name: deepseek-r1
 
     image: lmsysorg/sglang:latest
     env:
@@ -38,7 +38,7 @@ Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B
 
     ```yaml
     type: service
-    name: deepseek-r1-amd
+    name: deepseek-r1
 
     image: lmsysorg/sglang:v0.4.1.post4-rocm620
     env:
@@ -69,20 +69,19 @@ $ dstack apply -f examples/llms/deepseek/sglang/amd/.dstack.yml
  #  BACKEND  REGION     RESOURCES                         SPOT  PRICE
  1  runpod   EU-RO-1   24xCPU, 283GB, 1xMI300X (192GB)    no    $2.49
 
-Submit the run deepseek-r1-amd? [y/n]: y
+Submit the run deepseek-r1? [y/n]: y
 
 Provisioning...
 ---> 100%
 ```
 </div>
 
-Once the service is up, the model will be available via the OpenAI-compatible endpoint
-at `<dstack server URL>/proxy/models/<project name>/`.
+If no gateway is created, the service endpoint will be available at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
 
 <div class="termy">
 
 ```shell
-curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
+curl http://127.0.0.1:3000/proxy/services/main/deepseek-r1/v1/chat/completions \
     -X POST \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -H 'Content-Type: application/json' \
@@ -107,7 +106,7 @@ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 !!! info "SGLang Model Gateway"
     If you'd like to use a custom routing policy, e.g. by leveraging the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#), create a gateway with `router` set to `sglang`. Check out [gateways](https://dstack.ai/docs/concepts/gateways#router) for more details.
 
-> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling or HTTPs, rate-limits, etc), the OpenAI-compatible endpoint is available at `https://gateway.<gateway domain>/`.
+> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling or HTTPs, rate-limits, etc), the service endpoint will be available at `https://deepseek-r1.<gateway domain>/`.
 
 ## Source code
 

@@ -179,13 +179,12 @@ Provisioning...
 
 </div>
 
-Once the service is up, the model will be available via the OpenAI-compatible endpoint
-at `<dstack server URL>/proxy/models/<project name>/`.
+If no gateway is created, the service endpoint will be available at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
 
 <div class="termy">
 
 ```shell
-$ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
+$ curl http://127.0.0.1:3000/proxy/services/main/llama31/v1/chat/completions \
     -X POST \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -H 'Content-Type: application/json' \
@@ -207,8 +206,7 @@ $ curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
 
 </div>
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the OpenAI-compatible endpoint
-is available at `https://gateway.<gateway domain>/`.
+When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the service endpoint will be available at `https://llama31.<gateway domain>/`.
 
 [//]: # (TODO: How to prompting and tool calling)
 

@@ -121,15 +121,14 @@ model: mixtral
 ```
 </div>
 
-If it has a `model` mapping, the model will be accessible
-at `https://gateway.<project name>.sky.dstack.ai` via the OpenAI compatible interface.
+The service endpoint will be accessible at `https://<run name>.<project name>.sky.dstack.ai` via the OpenAI compatible interface.
 
 ```python
 from openai import OpenAI
 
 
 client = OpenAI(
-  base_url="https://gateway.<project name>.sky.dstack.ai",
+  base_url="https://<run name>.<project name>.sky.dstack.ai/v1",
   api_key="<dstack token>"
 )
 
