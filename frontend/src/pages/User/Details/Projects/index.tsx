@@ -18,7 +18,7 @@ export const UserProjectList: React.FC = () => {
     const params = useParams();
     const paramUserName = params.userName ?? '';
 
-    const { isLoading, isFetching, data } = useGetProjectsQuery();
+    const { isLoading, isFetching, data } = useGetProjectsQuery({ limit: 200 });
 
     useBreadcrumbs([
         {
@@ -41,11 +41,10 @@ export const UserProjectList: React.FC = () => {
     };
 
     const filteredData = useMemo<IProject[]>(() => {
-        if (!data) return [];
+        if (!data?.data) return [];
 
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        return [...data]
+        // eslint-disable-next-line no-unsafe-optional-chaining
+        return [...data?.data]
             .filter((p) => p.owner.username === paramUserName)
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }, [data]);

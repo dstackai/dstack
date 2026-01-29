@@ -129,7 +129,7 @@ const filterKeys: Record<string, RequestParamsKeys> = {
 export const useFilters = (localStorePrefix = 'models-list-page') => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { projectOptions } = useProjectFilter({ localStorePrefix });
-    const { data: usersData } = useGetUserListQuery();
+    const { data: usersData } = useGetUserListQuery({});
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
         requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
@@ -151,7 +151,7 @@ export const useFilters = (localStorePrefix = 'models-list-page') => {
                 });
         });
 
-        usersData?.forEach(({ username }) => {
+        usersData?.data?.forEach(({ username }) => {
             options.push({
                 propertyKey: filterKeys.USER_NAME,
                 value: username,
