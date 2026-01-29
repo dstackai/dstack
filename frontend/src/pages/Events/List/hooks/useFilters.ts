@@ -168,17 +168,17 @@ export const useFilters = () => {
         {
             key: filterKeys.TARGET_VOLUMES,
             operators: ['='],
-            propertyLabel: 'Target volumes',
+            propertyLabel: 'Target volume IDs',
         },
         {
             key: filterKeys.TARGET_GATEWAYS,
             operators: ['='],
-            propertyLabel: 'Target gateways',
+            propertyLabel: 'Target gateway IDs',
         },
         {
             key: filterKeys.TARGET_SECRETS,
             operators: ['='],
-            propertyLabel: 'Target secrets',
+            propertyLabel: 'Target secret IDs',
         },
 
         {
