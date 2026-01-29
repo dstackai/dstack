@@ -281,11 +281,37 @@ Pre-provisioning is supported only for [VM-based backends](backends.md#vm-based)
 
 Backend fleets allow you to specify the resource requirements for the instances to be provisioned. The `resources` property syntax is the same as for [run configurations](dev-environments.md#resources).
 
-> Not directly related, but in addition to `resources`, you can specify [`spot_policy`](../reference/dstack.yml/fleet.md#instance_types), [`instance_types`](../reference/dstack.yml/fleet.md#instance_types), [`max_price`](../reference/dstack.yml/fleet.md#max_price), [`region`](../reference/dstack.yml/fleet.md#max_price), and other [options](../reference/dstack.yml/fleet.md#).
+### Spot policy
 
-<!-- TODO: add dedicated spot policy example -->
+Backend fleets allow you to specify a `spot policy`. By default, it is set to `on-demand`. If you want to use spot instances, you must set it to `auto` if you plan to use both on-demand and spot instances, or to `spot` if only spot instances are allowed.
+
+<div editor-title="fleet.dstack.yml"> 
+
+```yaml
+type: fleet
+name: my-fleet
+
+nodes: 0..2
+
+# Uncomment to ensure instances are inter-connected
+#placement: cluster
+
+# Allows both on-demand and spot
+spot_policy: auto
+
+idle_duration: 1h
+
+resources:
+  gpu: 0..8
+```
+
+</div>
+
+Note that run configurations must specify their own `spot policy` which is also set to `on-demand` by default.
 
 ### Backends
+
+Backend fleets allow you to set `backends` to specify which backends are allowed to be used.
 
 ### Idle duration
 
@@ -432,7 +458,7 @@ ssh_config:
 ```
 
 !!! info "Reference"
-    The fleet configuration file supports many more options. See the [reference](../reference/dstack.yml/fleet.md).
+    The fleet configuration file supports additional options, including [`instance_types`](../reference/dstack.yml/fleet.md#instance_types), [`max_price`](../reference/dstack.yml/fleet.md#max_price), [`regions`](../reference/dstack.yml/fleet.md#max_price), among others. For the complete list, see the [reference](../reference/dstack.yml/fleet.md).
 
 ## Manage fleets
 
