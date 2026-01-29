@@ -402,6 +402,7 @@
       "priority": "Priority",
       "provider_name": "Provider",
       "status": "Status",
+      "probe": "Probes",
       "submitted_at": "Submitted",
       "finished_at": "Finished",
       "metrics": {

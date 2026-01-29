@@ -15,6 +15,7 @@ import {
     getJobListItemRegion,
     getJobListItemResources,
     getJobListItemSpot,
+    getJobProbesStatuses,
     getJobStatus,
     getJobStatusMessage,
     getJobSubmittedAt,
@@ -66,6 +67,11 @@ export const useColumnsDefinitions = ({
                     </StatusIndicator>
                 );
             },
+        },
+        {
+            id: 'probe',
+            header: t('projects.run.probe'),
+            cell: (item: IJob) => getJobProbesStatuses(item),
         },
         {
             id: 'priority',

@@ -171,6 +171,17 @@ declare interface IAppSpec {
     url_query_params?: { [key: string]: string };
 }
 
+declare interface IJobProbe {
+    type: 'http';
+    url: string;
+    method?: 'head' | 'post' | 'put' | 'patch' | 'delete' | 'get';
+    headers?: Array<{ name: string; value: string }>;
+    body?: string;
+    timeout: number;
+    interval: number;
+    ready_after: number;
+}
+
 declare interface IJobSpec {
     app_specs?: IAppSpec;
     commands: string[];
@@ -181,6 +192,7 @@ declare interface IJobSpec {
     job_num: number;
     max_duration?: number;
     working_dir: string;
+    probes?: IJobProbe[];
 }
 
 declare interface IGpu {
@@ -234,6 +246,7 @@ declare interface IJobSubmission {
     exit_status?: number | null;
     status_message?: string | null;
     error?: string | null;
+    probes?: Array<{ success_streak: number }>;
 }
 
 declare interface IJob {

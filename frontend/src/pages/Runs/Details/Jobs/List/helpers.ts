@@ -48,6 +48,31 @@ export const getJobStatus = (job: IJob) => {
     return job.job_submissions?.[job.job_submissions.length - 1].status;
 };
 
+export const getJobSubmissionProbes = (job: IJob) => {
+    return job.job_submissions?.[job.job_submissions.length - 1].probes;
+};
+
+export const getJobProbesStatuses = (job: IJob) => {
+    const status = getJobStatus(job);
+    const probes = getJobSubmissionProbes(job);
+
+    if (!probes?.length || status !== 'running') {
+        return null;
+    }
+
+    return probes
+        ?.map((probe, index) => {
+            if (job.job_spec?.probes?.[index] && probe.success_streak >= job.job_spec.probes[index].ready_after) {
+                return '✓';
+            } else if (probe.success_streak > 0) {
+                return '~';
+            } else {
+                return '×';
+            }
+        })
+        .join('');
+};
+
 export const getJobTerminationReason = (job: IJob) => {
     return job.job_submissions?.[job.job_submissions.length - 1].termination_reason ?? '-';
 };

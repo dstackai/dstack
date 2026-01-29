@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { getRunError, getRunPriority, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
+import { getRunError, getRunPriority, getRunProbe, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
@@ -121,6 +121,13 @@ export const RunDetails = () => {
                             </StatusIndicator>
                         </div>
                     </div>
+
+                    {runData.jobs.length <= 1 && (
+                        <div>
+                            <Box variant="awsui-key-label">{t('projects.run.probe')}</Box>
+                            <div>{getRunProbe(runData)}</div>
+                        </div>
+                    )}
 
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.error')}</Box>
