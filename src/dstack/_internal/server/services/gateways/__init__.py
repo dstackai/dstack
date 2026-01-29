@@ -444,7 +444,7 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 
 async def get_or_add_gateway_connection(
     session: AsyncSession, gateway_id: uuid.UUID
-) -> GatewayConnection:
+) -> tuple[GatewayModel, GatewayConnection]:
     gateway = await session.get(GatewayModel, gateway_id)
     if gateway is None:
         raise GatewayError("Gateway not found")
@@ -460,7 +460,7 @@ async def get_or_add_gateway_connection(
             "Failed to connect to gateway %s: %s", gateway.gateway_compute.ip_address, e
         )
         raise GatewayError("Failed to connect to gateway")
-    return conn
+    return gateway, conn
 
 
 async def init_gateways(session: AsyncSession):

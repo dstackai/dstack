@@ -1014,6 +1014,11 @@ class TestProcessRunningJobs:
         await session.refresh(job)
         assert job.status == JobStatus.RUNNING
         assert job.registered
+        events = await list_events(session)
+        assert {e.message for e in events} == {
+            "Job status changed PULLING -> RUNNING",
+            "Service replica registered to receive requests",
+        }
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -1104,7 +1109,14 @@ class TestProcessRunningJobs:
         await process_running_jobs()
 
         await session.refresh(job)
-        assert job.registered == expect_to_register
+        events = await list_events(session)
+        if expect_to_register:
+            assert job.registered
+            assert len(events) == 1
+            assert events[0].message == "Service replica registered to receive requests"
+        else:
+            assert not job.registered
+            assert not events
 
 
 class TestPatchBaseImageForAwsEfa:
