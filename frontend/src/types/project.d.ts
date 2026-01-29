@@ -7,9 +7,15 @@ declare type TCreateWizardProjectParams = {
     };
 };
 
-declare type TGetProjectsParams = {
-    only_no_fleets?: boolean;
+declare type TGetProjectListParams = TBaseRequestListParams & {
     include_not_joined?: boolean;
+    return_total_count?: boolean;
+    name_pattern?: string;
+};
+
+declare type TGetProjectListResponse = {
+    total_count: number;
+    data: IProject[];
 };
 
 declare type TProjectBackend = {

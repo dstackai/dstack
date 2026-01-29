@@ -41,7 +41,7 @@ export const LoginByGithubCallback: React.FC = () => {
                         .then(async ({ creds: { token } }) => {
                             dispatch(setAuthData({ token }));
                             if (process.env.UI_VERSION === 'sky') {
-                                const result = await getProjects().unwrap();
+                                const result = await getProjects({}).unwrap();
                                 if (result?.length === 0) {
                                     navigate(ROUTES.PROJECT.ADD);
                                     return;

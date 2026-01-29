@@ -2,12 +2,24 @@ declare type TUserRole = 'user' | 'admin';
 declare type TUserPermission = 'CAN_CREATE_PROJECTS';
 declare type TUserPermissionKeys = 'can_create_projects';
 
+declare type TGetUserListParams = TBaseRequestListParams & {
+    return_total_count?: boolean;
+    name_pattern?: string;
+};
+
+declare type TGetUserListResponse = {
+    total_count: number;
+    data: IUser[];
+};
+
 declare interface IUserResponseData {
     id: string;
     username: string;
     global_role: TUserRole;
     email: string | null;
     permissions: Record<TUserPermissionKeys, boolean>;
+    created_at: string;
+    active: boolean;
 }
 
 declare interface IUser {

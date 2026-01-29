@@ -16,20 +16,20 @@ export const useProjectFilter = ({ localStorePrefix }: Args) => {
         null,
     );
 
-    const { data: projectsData } = useGetProjectsQuery();
+    const { data: projectsData } = useGetProjectsQuery({});
 
     const projectOptions = useMemo<SelectCSDProps.Options>(() => {
-        if (!projectsData?.length) return [];
+        if (!projectsData?.data?.length) return [];
 
-        return projectsData.map((project) => ({ label: project.project_name, value: project.project_name }));
+        return projectsData.data.map((project) => ({ label: project.project_name, value: project.project_name }));
     }, [projectsData]);
 
     useEffect(() => {
-        if (!projectsData || !selectedProject) {
+        if (!projectsData?.data || !selectedProject) {
             return;
         }
 
-        const hasSelectedProject = projectsData.some(({ project_name }) => selectedProject?.value === project_name);
+        const hasSelectedProject = projectsData.data.some(({ project_name }) => selectedProject?.value === project_name);
 
         if (!hasSelectedProject) {
             setSelectedProject(null);

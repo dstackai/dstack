@@ -53,6 +53,7 @@ const envValidationSchema = yup.object({
         is: true,
         then: yup
             .string()
+            // eslint-disable-next-line no-useless-escape
             .matches(/^(https?):\/\/([^\s\/?#]+)((?:\/[^\s?#]*)*)(?::\/(.*))?$/i, urlFormatError)
             .required(requiredFieldError),
     }),
