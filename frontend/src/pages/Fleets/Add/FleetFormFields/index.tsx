@@ -69,17 +69,6 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
                 type="number"
             />
 
-            <FormInput
-                info={<InfoLink onFollow={() => openHelpPanel(FLEET_IDLE_DURATION_INFO)} />}
-                label={t('fleets.edit.idle_duration')}
-                constraintText={t('fleets.edit.idle_duration_description')}
-                control={control}
-                //eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                name={getFieldNameWitPrefix(`idle_duration`)}
-                disabled={disabledAllFields}
-            />
-
             <FormSelect
                 info={<InfoLink onFollow={() => openHelpPanel(FLEET_SPOT_POLICY_INFO)} />}
                 label={t('fleets.edit.spot_policy')}
@@ -94,6 +83,17 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
                     { label: 'on-demand', value: 'on-demand' },
                     { label: 'spot', value: 'spot' },
                 ]}
+            />
+
+            <FormInput
+                info={<InfoLink onFollow={() => openHelpPanel(FLEET_IDLE_DURATION_INFO)} />}
+                label={t('fleets.edit.idle_duration')}
+                constraintText={t('fleets.edit.idle_duration_description')}
+                control={control}
+                //eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                name={getFieldNameWitPrefix(`idle_duration`)}
+                disabled={disabledAllFields}
             />
         </SpaceBetween>
     );
