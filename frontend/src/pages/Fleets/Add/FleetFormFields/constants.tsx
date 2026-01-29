@@ -90,7 +90,18 @@ export const FLEET_SPOT_POLICY_INFO = {
     header: <h2>Spot policy</h2>,
     body: (
         <>
-            <p>Spot policy</p>
+            <p>
+                Some backends may support spot instances, also known as preemptive instances. Such instances come at a
+                significantly lower price but can be interrupted by the cloud provider at any time.
+            </p>
+            <p>
+                If you set <code>spot_policy</code> to <code>auto</code>, the fleet will allow the use of both types of
+                instances: <code>on-demand</code> and <code>spot</code>.
+            </p>
+            <p>
+                Note that run configurations must specify their own <code>spot_policy</code>, which by default is always{' '}
+                <code>on-demand</code>.
+            </p>
         </>
     ),
 };
