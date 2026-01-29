@@ -56,6 +56,8 @@ DEFAULT_PROBE_READY_AFTER = 1
 DEFAULT_PROBE_METHOD = "get"
 MAX_PROBE_URL_LEN = 2048
 DEFAULT_REPLICA_GROUP_NAME = "0"
+DEFAULT_MODEL_PROBE_TIMEOUT = 30
+DEFAULT_MODEL_PROBE_URL = "/v1/chat/completions"
 
 
 class RunConfigurationType(str, Enum):
@@ -851,9 +853,9 @@ class ServiceConfigurationParams(CoreModel):
     ] = None
     rate_limits: Annotated[list[RateLimit], Field(description="Rate limiting rules")] = []
     probes: Annotated[
-        list[ProbeConfig],
+        Optional[list[ProbeConfig]],
         Field(description="List of probes used to determine job health"),
-    ] = []
+    ] = None  # None = omitted (may get default when model is set); [] = explicit empty
 
     replicas: Annotated[
         Optional[Union[List[ReplicaGroup], Range[int]]],
@@ -895,7 +897,9 @@ class ServiceConfigurationParams(CoreModel):
         return v
 
     @validator("probes")
-    def validate_probes(cls, v: list[ProbeConfig]) -> list[ProbeConfig]:
+    def validate_probes(cls, v: Optional[list[ProbeConfig]]) -> Optional[list[ProbeConfig]]:
+        if v is None:
+            return v
         if has_duplicates(v):
             # Using a custom validator instead of Field(unique_items=True) to avoid Pydantic bug:
             # https://github.com/pydantic/pydantic/issues/3765
@@ -931,6 +935,35 @@ class ServiceConfigurationParams(CoreModel):
                     "Each replica group must have a unique name."
                 )
         return v
+
+    @root_validator()
+    def set_default_probes_for_model(cls, values):
+        model = values.get("model")
+        probes = values.get("probes")
+        if model is not None and probes is None:
+            body = orjson.dumps(
+                {
+                    "model": model.name,
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 1,
+                }
+            ).decode("utf-8")
+            values["probes"] = [
+                ProbeConfig(
+                    type="http",
+                    method="post",
+                    url=DEFAULT_MODEL_PROBE_URL,
+                    headers=[
+                        HTTPHeaderSpec(name="Content-Type", value="application/json"),
+                    ],
+                    body=body,
+                    timeout=DEFAULT_MODEL_PROBE_TIMEOUT,
+                )
+            ]
+        elif probes is None:
+            # Probes omitted and model not set: normalize to empty list for downstream.
+            values["probes"] = []
+        return values
 
     @root_validator()
     def validate_scaling(cls, values):
