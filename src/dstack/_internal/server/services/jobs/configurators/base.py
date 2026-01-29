@@ -394,7 +394,7 @@ class JobConfigurator(ABC):
 
     def _probes(self) -> list[ProbeSpec]:
         if isinstance(self.run_spec.configuration, ServiceConfiguration):
-            return list(map(_probe_config_to_spec, self.run_spec.configuration.probes))
+            return list(map(_probe_config_to_spec, self.run_spec.configuration.probes or []))
         return []
 
 
