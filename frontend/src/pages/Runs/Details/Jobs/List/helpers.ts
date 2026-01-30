@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import type { StatusIndicatorProps } from '@cloudscape-design/components/status-indicator';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { capitalize } from 'libs';
@@ -52,25 +53,22 @@ export const getJobSubmissionProbes = (job: IJob) => {
     return job.job_submissions?.[job.job_submissions.length - 1].probes;
 };
 
-export const getJobProbesStatuses = (job: IJob) => {
+export const getJobProbesStatuses = (job: IJob): StatusIndicatorProps.Type[] => {
     const status = getJobStatus(job);
     const probes = getJobSubmissionProbes(job);
 
     if (!probes?.length || status !== 'running') {
-        return null;
+        return [];
     }
 
-    return probes
-        ?.map((probe, index) => {
-            if (job.job_spec?.probes?.[index] && probe.success_streak >= job.job_spec.probes[index].ready_after) {
-                return '✓';
-            } else if (probe.success_streak > 0) {
-                return '~';
-            } else {
-                return '×';
-            }
-        })
-        .join('');
+    return probes.map((probe, index) => {
+        if (job.job_spec?.probes?.[index] && probe.success_streak >= job.job_spec.probes[index].ready_after) {
+            return 'success';
+        } else if (probe.success_streak > 0) {
+            return 'in-progress';
+        }
+        return 'not-started';
+    });
 };
 
 export const getJobTerminationReason = (job: IJob) => {

@@ -71,7 +71,10 @@ export const useColumnsDefinitions = ({
         {
             id: 'probe',
             header: t('projects.run.probe'),
-            cell: (item: IJob) => getJobProbesStatuses(item),
+            cell: (item: IJob) => {
+                const statuses = getJobProbesStatuses(item);
+                return statuses.map((statusType, index) => <StatusIndicator key={index} type={statusType} />);
+            },
         },
         {
             id: 'priority',
