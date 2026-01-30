@@ -90,7 +90,7 @@ $ curl http://localhost:3000/proxy/services/main/llama31/v1/chat/completions \
 
 </div>
 
-<!-- If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`. -->
+If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
 
 ## Configuration options
 
