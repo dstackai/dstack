@@ -26,6 +26,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.models.routers import merge_router_config_for_service
 from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel, RunModel
@@ -92,7 +93,10 @@ async def _register_service_in_gateway(
 
     gateway_configuration = get_gateway_configuration(gateway)
     service_https = _get_service_https(run_spec, gateway_configuration)
-    router = gateway_configuration.router
+    router = merge_router_config_for_service(
+        gateway_configuration.router,
+        run_spec.configuration.router_config,
+    )
     service_protocol = "https" if service_https else "http"
 
     if service_https and gateway_configuration.certificate is None:

@@ -330,6 +330,11 @@ class KubernetesCompute(
         if not pod_ip:
             return
         provisioning_data.internal_ip = pod_ip
+        logger.debug(
+            "Replica pod %s internal_ip=%s (cluster_ip will be set from Service)",
+            provisioning_data.instance_id,
+            pod_ip,
+        )
         service = self.api.read_namespaced_service(
             name=_get_pod_service_name(provisioning_data.instance_id),
             namespace=self.config.namespace,

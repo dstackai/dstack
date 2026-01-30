@@ -79,7 +79,7 @@ class Router(ABC):
         ...
 
     @abstractmethod
-    def update_replicas(self, replica_urls: List[str]) -> None:
+    async def update_replicas(self, replica_urls: List[str]) -> None:
         """Update replicas for service, replacing the current set.
 
         Args:
@@ -89,3 +89,25 @@ class Router(ABC):
             Exception: If updating replicas fails.
         """
         ...
+
+    def add_worker_to_router(
+        self,
+        url: str,
+        worker_type: str = "regular",
+        bootstrap_port: Optional[int] = None,
+    ) -> bool:
+        """Add a worker to the router.
+
+        Args:
+            url: Worker URL (e.g. http://10.0.5.134:8000).
+            worker_type: Type of worker ("regular", "prefill", or "decode").
+            bootstrap_port: Bootstrap port for prefill workers (optional).
+
+        Returns:
+            True if the worker was accepted, False otherwise.
+        """
+        raise NotImplementedError
+
+    async def register_worker(self, url: str) -> bool:
+        """Register worker with one attempt (no polling). Returns True if ready and added."""
+        raise NotImplementedError

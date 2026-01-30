@@ -28,6 +28,7 @@ from dstack._internal.core.models.profiles import (
     parse_off_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
@@ -883,6 +884,14 @@ class ServiceConfigurationParams(CoreModel):
                 "When `replicas` is a list of replica groups, top-level `scaling`, `commands`, "
                 "and `resources` are not allowed and must be specified in each replica group instead. "
             )
+        ),
+    ] = None
+    router_config: Annotated[
+        Optional[AnyRouterConfig],
+        Field(
+            description=(
+                "Router configuration for the service (e.g. routing policy and pd_disaggregation). "
+            ),
         ),
     ] = None
 

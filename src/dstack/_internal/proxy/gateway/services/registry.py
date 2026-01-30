@@ -136,6 +136,7 @@ async def register_replica(
     repo: GatewayProxyRepo,
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
+    internal_ip: Optional[str] = None,
 ) -> None:
     replica = models.Replica(
         id=replica_id,
@@ -145,6 +146,7 @@ async def register_replica(
         ssh_proxy=ssh_proxy,
         ssh_head_proxy=ssh_head_proxy,
         ssh_head_proxy_private_key=ssh_head_proxy_private_key,
+        internal_ip=internal_ip,
     )
 
     async with lock:
@@ -258,7 +260,12 @@ async def apply_service(
         service, repo, service_conn_pool
     )
     replica_configs = [
-        ReplicaConfig(id=replica.id, socket=conn.app_socket_path)
+        ReplicaConfig(
+            id=replica.id,
+            socket=conn.app_socket_path,
+            port=replica.app_port,
+            internal_ip=replica.internal_ip,
+        )
         for replica, conn in replica_conns.items()
     ]
     service_config = await get_nginx_service_config(service, replica_configs)

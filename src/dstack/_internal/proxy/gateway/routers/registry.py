@@ -80,6 +80,7 @@ async def register_replica(
         ssh_proxy=body.ssh_proxy,
         ssh_head_proxy=body.ssh_head_proxy,
         ssh_head_proxy_private_key=body.ssh_head_proxy_private_key,
+        internal_ip=body.internal_ip,
         repo=repo,
         nginx=nginx,
         service_conn_pool=service_conn_pool,

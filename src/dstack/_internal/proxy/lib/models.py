@@ -27,6 +27,7 @@ class Replica(ImmutableModel):
     # Optional outer proxy, a head node/bastion
     ssh_head_proxy: Optional[SSHConnectionParams] = None
     ssh_head_proxy_private_key: Optional[str] = None
+    internal_ip: Optional[str] = None
 
 
 class IPAddressPartitioningKey(ImmutableModel):

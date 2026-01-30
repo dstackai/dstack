@@ -1042,7 +1042,8 @@ def get_dstack_gateway_wheel(build: str, router: Optional[AnyRouterConfig] = Non
     if build == "latest":
         build = _fetch_version(f"{base_url}/latest-version") or "latest"
         logger.debug("Found the latest gateway build: %s", build)
-    wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
+    # wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
+    wheel = "https://bihan-test-bucket.s3.eu-west-1.amazonaws.com/dstack_gateway-0.0.1-py3-none-any.whl"
     # Build package spec with extras if router is specified
     if router:
         return f"dstack-gateway[{router.type}] @ {wheel}"
