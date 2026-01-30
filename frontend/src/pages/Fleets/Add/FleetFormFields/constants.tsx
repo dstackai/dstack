@@ -2,6 +2,14 @@ import React from 'react';
 import { get } from 'lodash';
 import * as yup from 'yup';
 
+import { FleetFormFields } from './type';
+
+export const fleetFormDefaultValues: FleetFormFields = {
+    min_instances: 0,
+    idle_duration: '5m',
+    spot_policy: 'auto',
+};
+
 export const FLEET_MIN_INSTANCES_INFO = {
     header: <h2>Min number of instances</h2>,
     body: (
@@ -73,6 +81,26 @@ export const FLEET_IDLE_DURATION_INFO = {
                     documentation
                 </a>
                 .
+            </p>
+        </>
+    ),
+};
+
+export const FLEET_SPOT_POLICY_INFO = {
+    header: <h2>Spot policy</h2>,
+    body: (
+        <>
+            <p>
+                Some backends may support spot instances, also known as preemptive instances. Such instances come at a
+                significantly lower price but can be interrupted by the cloud provider at any time.
+            </p>
+            <p>
+                If you set <code>spot_policy</code> to <code>auto</code>, the fleet will allow the use of both types of
+                instances: <code>on-demand</code> and <code>spot</code>.
+            </p>
+            <p>
+                Note that run configurations must specify their own <code>spot_policy</code>, which by default is always{' '}
+                <code>on-demand</code>.
             </p>
         </>
     ),

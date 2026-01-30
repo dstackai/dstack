@@ -16,6 +16,7 @@ import { useCreateProjectMutation } from 'services/project';
 
 import { FleetFormFields } from 'pages/Fleets/Add/FleetFormFields';
 import {
+    fleetFormDefaultValues,
     getMaxInstancesValidator,
     getMinInstancesValidator,
     idleDurationValidator,
@@ -51,6 +52,7 @@ const projectValidationSchema = yup.object({
             is: true,
             then: idleDurationValidator,
         }),
+        spot_policy: yup.string().required(requiredFieldError),
     }),
 });
 
@@ -72,9 +74,8 @@ export const ProjectAdd: React.FC = () => {
         defaultValues: {
             is_public: false,
             fleet: {
+                ...fleetFormDefaultValues,
                 enable_default: true,
-                min_instances: 0,
-                idle_duration: '5m',
             },
         },
     });
@@ -93,7 +94,7 @@ export const ProjectAdd: React.FC = () => {
 
     const getFormValuesForFleetApplying = (): IApplyFleetPlanRequestRequest => {
         const {
-            fleet: { min_instances, max_instances, idle_duration, name },
+            fleet: { min_instances, max_instances, idle_duration, name, spot_policy },
         } = getValues();
 
         return {
@@ -106,6 +107,7 @@ export const ProjectAdd: React.FC = () => {
                             ...(max_instances ? { max: max_instances } : {}),
                         },
                         ...(idle_duration ? { idle_duration } : {}),
+                        spot_policy,
                     },
                     profile: {},
                 },
@@ -231,7 +233,13 @@ export const ProjectAdd: React.FC = () => {
     };
 
     const getDefaultFleetSummary = () => {
-        const summaryFields: Array<keyof IProjectForm['fleet']> = ['name', 'min_instances', 'max_instances', 'idle_duration'];
+        const summaryFields: Array<keyof IProjectForm['fleet']> = [
+            'name',
+            'min_instances',
+            'max_instances',
+            'idle_duration',
+            'spot_policy',
+        ];
 
         const result: string[] = [];
 

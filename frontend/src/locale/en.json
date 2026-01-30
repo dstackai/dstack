@@ -625,12 +625,14 @@
       "name_placeholder": "Optional",
       "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",
       "min_instances": "Min number of instances",
-      "min_instances_description": "Set it `0` to provision instances only when required",
+      "min_instances_description": "Set it '0' to provision instances only when required",
       "max_instances": "Max number of instances",
       "max_instances_description": "Required only if you want to set an upper limit",
       "max_instances_placeholder": "Optional",
       "idle_duration": "Idle duration",
-      "idle_duration_description": "Example: '0s', '1m', '1h'"
+      "idle_duration_description": "Example: '0s', '1m', '1h'",
+      "spot_policy": "Spot policy",
+      "spot_policy_description": "Set it to 'auto' to allow the use of both on-demand and spot instances"
     }
   },
   "volume": {

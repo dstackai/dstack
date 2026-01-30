@@ -1,11 +1,16 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FormInput, InfoLink, SpaceBetween } from 'components';
+import { FormInput, FormSelect, InfoLink, SpaceBetween } from 'components';
 
 import { useHelpPanel } from 'hooks';
 
-import { FLEET_IDLE_DURATION_INFO, FLEET_MAX_INSTANCES_INFO, FLEET_MIN_INSTANCES_INFO } from './constants';
+import {
+    FLEET_IDLE_DURATION_INFO,
+    FLEET_MAX_INSTANCES_INFO,
+    FLEET_MIN_INSTANCES_INFO,
+    FLEET_SPOT_POLICY_INFO,
+} from './constants';
 import { FleetFormFieldsProps } from './type';
 
 import type { FieldValues } from 'react-hook-form/dist/types/fields';
@@ -62,6 +67,22 @@ export function FleetFormFields<T extends FieldValues = FieldValues>({
                 name={getFieldNameWitPrefix(`max_instances`)}
                 disabled={disabledAllFields}
                 type="number"
+            />
+
+            <FormSelect
+                info={<InfoLink onFollow={() => openHelpPanel(FLEET_SPOT_POLICY_INFO)} />}
+                label={t('fleets.edit.spot_policy')}
+                constraintText={t('fleets.edit.spot_policy_description')}
+                control={control}
+                //eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                name={getFieldNameWitPrefix(`spot_policy`)}
+                disabled={disabledAllFields}
+                options={[
+                    { label: 'auto', value: 'auto' },
+                    { label: 'on-demand', value: 'on-demand' },
+                    { label: 'spot', value: 'spot' },
+                ]}
             />
 
             <FormInput

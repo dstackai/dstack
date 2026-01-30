@@ -15,7 +15,12 @@ import { useApplyFleetMutation } from 'services/fleet';
 import { DEFAULT_FLEET_INFO } from 'pages/Project/constants';
 import { useYupValidationResolver } from 'pages/Project/hooks/useYupValidationResolver';
 
-import { getMaxInstancesValidator, getMinInstancesValidator, idleDurationValidator } from './FleetFormFields/constants';
+import {
+    fleetFormDefaultValues,
+    getMaxInstancesValidator,
+    getMinInstancesValidator,
+    idleDurationValidator,
+} from './FleetFormFields/constants';
 import { FleetFormFields } from './FleetFormFields';
 
 import { IFleetWizardForm } from './types';
@@ -33,6 +38,7 @@ const fleetValidationSchema = yup.object({
     min_instances: getMinInstancesValidator('max_instances'),
     max_instances: getMaxInstancesValidator('min_instances'),
     idle_duration: idleDurationValidator,
+    spot_policy: yup.string().required(requiredFieldError),
 });
 
 export const FleetAdd: React.FC = () => {
@@ -52,9 +58,8 @@ export const FleetAdd: React.FC = () => {
     const formMethods = useForm<IFleetWizardForm>({
         resolver,
         defaultValues: {
+            ...fleetFormDefaultValues,
             project_name: paramProjectName,
-            min_instances: 0,
-            idle_duration: '5m',
         },
     });
 
@@ -62,7 +67,7 @@ export const FleetAdd: React.FC = () => {
     const formValues = watch();
 
     const getFormValuesForFleetApplying = (): IApplyFleetPlanRequestRequest => {
-        const { min_instances, max_instances, idle_duration, name } = getValues();
+        const { min_instances, max_instances, idle_duration, name, spot_policy } = getValues();
 
         return {
             plan: {
@@ -74,6 +79,7 @@ export const FleetAdd: React.FC = () => {
                             ...(max_instances ? { max: max_instances } : {}),
                         },
                         ...(idle_duration ? { idle_duration } : {}),
+                        spot_policy,
                     },
                     profile: {},
                 },
@@ -185,7 +191,13 @@ export const FleetAdd: React.FC = () => {
     };
 
     const getDefaultFleetSummary = () => {
-        const summaryFields: Array<keyof IFleetWizardForm> = ['name', 'min_instances', 'max_instances', 'idle_duration'];
+        const summaryFields: Array<keyof IFleetWizardForm> = [
+            'name',
+            'min_instances',
+            'max_instances',
+            'idle_duration',
+            'spot_policy',
+        ];
 
         const result: string[] = [];
 
