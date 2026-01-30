@@ -99,7 +99,7 @@ If [authorization](#authorization) is not disabled, the service endpoint require
 
 ### Gateway
 
-Here are cases where a service may need a gateway:
+Here are cases where a service may need a [gateway](gateways.md):
 
 * To use [auto-scaling](#replicas-and-scaling) or [rate limits](#rate-limits)
 * To enable a support custom router, e.g. such as the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#)
