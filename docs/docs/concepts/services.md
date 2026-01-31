@@ -73,7 +73,7 @@ Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
 
 `dstack apply` automatically provisions instances and runs the service.
 
-If a [gateway](gateways.md) is not configured, the service’s endpoint will be accessible at
+If you do not have a [gateway](gateways.md) created, the service endpoint will be accessible at
 `<dstack server URL>/proxy/services/<project name>/<run name>/`.
 
 <div class="termy">
@@ -95,37 +95,50 @@ $ curl http://localhost:3000/proxy/services/main/llama31/v1/chat/completions \
 
 </div>
 
-If the service defines the [`model`](#model) property, the model can be accessed with
-the global OpenAI-compatible endpoint at `<dstack server URL>/proxy/models/<project name>/`,
-or via `dstack` UI.
-
-If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with
-`Bearer <dstack token>`.
-
-??? info "Gateway"
-    Running services for development purposes doesn’t require setting up a [gateway](gateways.md).
-
-    However, you'll need a gateway in the following cases:
-
-    * To use auto-scaling or rate limits
-    * To enable a support custom router, e.g. such as the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#)
-    * To enable HTTPS for the endpoint and map it to your domain
-    * If your service requires WebSockets
-    * If your service cannot work with a [path prefix](#path-prefix)
-
-    <!-- Note, if you're using [dstack Sky](https://sky.dstack.ai),
-    a gateway is already pre-configured for you. -->
-
-    If a [gateway](gateways.md) is configured, the service endpoint will be accessible at
-    `https://<run name>.<gateway domain>/`.
-
-    If the service defines the `model` property, the model will be available via the global OpenAI-compatible endpoint 
-    at `https://gateway.<gateway domain>/`.
+If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
 
 ## Configuration options
 
-!!! info "No commands"
-    If `commands` are not specified, `dstack` runs `image`’s entrypoint (or fails if none is set).
+<!-- !!! info "No commands"
+    If `commands` are not specified, `dstack` runs `image`’s entrypoint (or fails if none is set). -->
+
+### Gateway
+
+Here are cases where a service may need a [gateway](gateways.md):
+
+* To use [auto-scaling](#replicas-and-scaling) or [rate limits](#rate-limits)
+* To enable a support custom router, e.g. such as the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#)
+* To enable HTTPS for the endpoint and map it to your domain
+* If your service requires WebSockets
+* If your service cannot work with a [path prefix](#path-prefix)
+
+<!-- Note, if you're using [dstack Sky](https://sky.dstack.ai),
+a gateway is already pre-configured for you. -->
+
+If you want `dstack` to explicitly validate that a gateway is used, you can set the [`gateway`](../reference/dstack.yml/service.md#gateway) property in the service configuration to `true`. In this case, `dstack` will raise an error during `dstack apply` if a default gateway is not created.
+
+You can also set the `gateway` property to the name of a specific gateway, if required.
+
+If you have a [gateway](gateways.md) created, the service endpoint will be accessible at `https://<run name>.<gateway domain>/`:
+
+<div class="termy">
+
+```shell
+$ curl https://llama31.example.com/v1/chat/completions \
+    -H 'Content-Type: application/json' \
+    -H 'Authorization: Bearer &lt;dstack token&gt;' \
+    -d '{
+        "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "messages": [
+            {
+                "role": "user",
+                "content": "Compose a poem that explains the concept of recursion in programming."
+            }
+        ]
+    }'
+```
+
+</div>
 
 ### Replicas and scaling
 
@@ -219,12 +232,6 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 ??? info "Disaggregated serving"
     Native support for disaggregated prefill and decode, allowing both worker types to run within a single service, is coming soon.
-
-### Model
-
-If the service is running a chat model with an OpenAI-compatible interface,
-set the [`model`](#model) property to make the model accessible via `dstack`'s 
-global OpenAI-compatible endpoint, and also accessible via `dstack`'s UI.
 
 ### Authorization
 
@@ -364,7 +371,7 @@ set [`strip_prefix`](../reference/dstack.yml/service.md#strip_prefix) to `false`
 If your app cannot be configured to work with a path prefix, you can host it
 on a dedicated domain name by setting up a [gateway](gateways.md).
 
-### Rate limits { #rate-limits }
+### Rate limits
 
 If you have a [gateway](gateways.md), you can configure rate limits for your service
 using the [`rate_limits`](../reference/dstack.yml/service.md#rate_limits) property.
@@ -412,6 +419,11 @@ Limits apply to the whole service (all replicas) and per client (by IP). Clients
     ```
 
     </div>
+
+### Model
+
+If the service runs a model with an OpenAI-compatible interface, you can set the [`model`](#model) property to make the model accessible through `dstack`'s chat UI on the `Models` page. 
+In this case, `dstack` will use the service's `/v1/chat/completions` service.
 
 ### Resources
 

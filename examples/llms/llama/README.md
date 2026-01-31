@@ -171,7 +171,7 @@ at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
 <div class="termy">
 
 ```shell
-curl http://127.0.0.1:3000/proxy/models/main/chat/completions \
+curl http://127.0.0.1:3000/proxy/services/main/llama4-scout/v1/chat/completions \
     -X POST \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -H 'Content-Type: application/json' \
