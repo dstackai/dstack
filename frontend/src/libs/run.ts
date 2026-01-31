@@ -76,11 +76,11 @@ export const getRunError = (run: IRun): string | null => {
     return error ? capitalize(error) : null;
 };
 
-export const getRunProbe = (run: IRun): string | null => {
+export const getRunProbeStatuses = (run: IRun): StatusIndicatorProps.Type[] => {
     const job = run.jobs[0];
 
     if (!job) {
-        return '-';
+        return [];
     }
 
     return getJobProbesStatuses(run.jobs[0]);
