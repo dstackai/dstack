@@ -116,6 +116,12 @@ def on_post_build(config):
     with open(nojekyll_path, "w") as f:
         f.write("")
 
+    # Create _config.yml to explicitly include .well-known directory
+    # This ensures Jekyll (if it runs) includes the .well-known directory
+    config_yml_path = os.path.join(site_dir, "_config.yml")
+    with open(config_yml_path, "w") as f:
+        f.write('include: [".well-known"]\n')
+
     for root, _, files in os.walk(docs_dir):
         for file in files:
             if not file.endswith(".md"):
