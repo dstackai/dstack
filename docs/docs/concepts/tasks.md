@@ -1,3 +1,8 @@
+---
+title: Tasks
+description: Running commands for training and batch processing
+---
+
 # Tasks
 
 A task allows you to run arbitrary commands on one or more nodes. They are best suited for jobs like training or batch processing.

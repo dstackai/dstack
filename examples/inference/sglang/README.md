@@ -1,3 +1,8 @@
+---
+title: SGLang
+description: Deploying DeepSeek-R1-Distill-Llama models using SGLang on NVIDIA and AMD GPUs
+---
+
 # SGLang
 
 This example shows how to deploy DeepSeek-R1-Distill-Llama 8B and 70B using [SGLang](https://github.com/sgl-project/sglang) and `dstack`.

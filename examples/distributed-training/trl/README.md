@@ -1,3 +1,8 @@
+---
+title: TRL
+description: Distributed fine-tuning with TRL, Accelerate, and DeepSpeed
+---
+
 # TRL
 
 This example walks you through how to run distributed fine-tune using [TRL](https://github.com/huggingface/trl), [Accelerate](https://github.com/huggingface/accelerate) and [Deepspeed](https://github.com/deepspeedai/DeepSpeed).

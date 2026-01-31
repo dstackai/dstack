@@ -1,5 +1,6 @@
 ---
-title: Distributed workload orchestration on Crusoe with dstack
+title: Crusoe
+description: Setting up Crusoe clusters using Managed Kubernetes or VMs with InfiniBand support
 ---
 
 # Crusoe

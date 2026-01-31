@@ -1,6 +1,11 @@
+---
+title: AWS
+description: High-performance distributed training on AWS using Elastic Fabric Adapter (EFA)
+---
+
 # AWS
 
-In this guide, we’ll walk through how to run high-performance distributed training on AWS using [Amazon Elastic Fabric Adapter (EFA)](https://aws.amazon.com/hpc/efa/) with `dstack`.
+In this guide, we'll walk through how to run high-performance distributed training on AWS using [Amazon Elastic Fabric Adapter (EFA)](https://aws.amazon.com/hpc/efa/) with `dstack`.
 
 ## Overview
 

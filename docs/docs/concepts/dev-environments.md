@@ -1,3 +1,8 @@
+---
+title: Dev environments
+description: Provisioning remote instances for cloud-based development
+---
+
 # Dev environments
 
 A dev environment lets you provision an instance and access it with your desktop IDE.

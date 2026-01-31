@@ -152,6 +152,7 @@ def on_post_build(config):
                     shutil.copy2(src_path, dest_path)
 
     _write_well_known_skills(config, site_dir)
+    _generate_llms_files(config, site_dir)
 
 
 def _write_well_known_skills(config, site_dir):
@@ -199,3 +200,26 @@ def _write_well_known_skills(config, site_dir):
         json.dump(index, f, indent=2)
 
     log.info(f"Published skill: {name}")
+
+
+def _generate_llms_files(config, site_dir):
+    """Generate llms.txt and llms-full.txt using external script."""
+    repo_root = os.path.dirname(config["config_file_path"])
+
+    # Import and run the generator
+    hooks_dir = os.path.dirname(os.path.abspath(__file__))
+    gen_path = os.path.join(hooks_dir, "gen_llms_files.py")
+    spec = importlib.util.spec_from_file_location("gen_llms_files", gen_path)
+    if spec is None or spec.loader is None:
+        log.error(f"Cannot load {gen_path}")
+        return
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["gen_llms_files"] = module
+    spec.loader.exec_module(module)
+
+    try:
+        # Pass mkdocs config to generator
+        module.generate_llms_files(repo_root, site_dir, config)
+        log.info("Generated llms.txt and llms-full.txt")
+    except Exception as e:
+        log.error(f"Failed to generate llms files: {e}")

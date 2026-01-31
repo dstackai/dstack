@@ -1,6 +1,6 @@
 ---
 title: NVIDIA NIM
-description: "This example shows how to deploy DeepSeek-R1-Distill-Llama-8B to any cloud or on-premises environment using NVIDIA NIM and dstack."
+description: Deploying DeepSeek-R1-Distill-Llama-8B using NVIDIA NIM
 ---
 
 # NVIDIA NIM

@@ -1,3 +1,8 @@
+---
+title: Services
+description: Deploying models and web apps as endpoints
+---
+
 # Services
 
 Services allow you to deploy models or web apps as secure and scalable endpoints.

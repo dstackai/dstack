@@ -1,3 +1,8 @@
+---
+title: Installation
+description: How to install the dstack server and CLI
+---
+
 # Installation
 
 <!-- !!! info "dstack Sky"

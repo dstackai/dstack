@@ -1,3 +1,8 @@
+---
+title: NCCL/RCCL tests
+description: Running NCCL and RCCL tests to validate cluster network bandwidth
+---
+
 # NCCL/RCCL tests
 
 This example shows how to run [NCCL](https://github.com/NVIDIA/nccl-tests) or [RCCL](https://github.com/ROCm/rccl-tests) tests on a cluster using [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks).

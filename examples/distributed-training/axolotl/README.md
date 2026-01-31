@@ -1,3 +1,8 @@
+---
+title: Axolotl
+description: Distributed fine-tuning with Axolotl and FSDP across multiple nodes
+---
+
 # Axolotl
 
 This example walks you through how to run distributed fine-tune using [Axolotl](https://github.com/axolotl-ai-cloud/axolotl) and [distributed tasks](https://dstack.ai/docs/concepts/tasks#distributed-tasks).

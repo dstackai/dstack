@@ -1,5 +1,6 @@
 ---
-title: Distributed workload orchestration on Lambda with dstack
+title: Lambda
+description: Setting up Lambda clusters using Kubernetes or 1-Click Clusters with fast interconnect
 ---
 
 # Lambda

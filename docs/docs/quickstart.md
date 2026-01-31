@@ -1,3 +1,8 @@
+---
+title: Quickstart
+description: Quick guide to creating fleets and submitting runs
+---
+
 # Quickstart
 
 !!! info "Prerequsites"

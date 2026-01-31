@@ -1,3 +1,8 @@
+---
+title: Wan2.2
+description: Text-to-video generation using the Wan2.2 T2V-A14B foundational video model
+---
+
 # Wan2.2
 
 [Wan2.2](https://github.com/Wan-Video/Wan2.2) is an open-source SOTA foundational video model. This example shows how to run the T2V-A14B model variant via `dstack` for text-to-video generation.

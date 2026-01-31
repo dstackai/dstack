@@ -1,3 +1,8 @@
+---
+title: TRL
+description: Fine-tuning Llama with TRL using SFT and QLoRA
+---
+
 # TRL
 
 This example walks you through how to use [TRL](https://github.com/huggingface/trl) to fine-tune `Llama-3.1-8B` with `dstack` using SFT with QLoRA.

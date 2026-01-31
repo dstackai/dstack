@@ -1,3 +1,8 @@
+---
+title: Events
+description: Auditing resource state changes and operations
+---
+
 # Events
 
 Events provide a chronological record of notable state changes and operations affecting `dstack` resources. They are designed for auditing, debugging, and understanding the lifecycle of runs, jobs, fleets, and other resources.

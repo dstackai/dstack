@@ -1,3 +1,8 @@
+---
+title: Upgrade
+description: Upgrading to newer versions of dstack
+---
+
 # Upgrade guide
 
 <!-- TODO: Add general sections on how to migrate to newer releases and how major and minor versions compatibility  and deprecation policy is handled -->

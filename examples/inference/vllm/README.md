@@ -1,5 +1,6 @@
 ---
-description: "This example shows how to deploy Llama 3.1 to any cloud or on-premises environment using vLLM and dstack."
+title: vLLM
+description: Deploying Llama 3.1 8B using vLLM with OpenAI-compatible API
 ---
 
 # vLLM

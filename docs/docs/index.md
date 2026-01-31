@@ -1,3 +1,8 @@
+---
+title: What is dstack?
+description: Introduction to dstack and how it works
+---
+
 # What is dstack?
 
 `dstack` is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters. 

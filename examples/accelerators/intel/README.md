@@ -1,6 +1,11 @@
+---
+title: Intel Gaudi
+description: Deploying and fine-tuning models on Intel Gaudi accelerators using TGI, vLLM, and Optimum
+---
+
 # Intel Gaudi
 
-`dstack` supports running dev environments, tasks, and services on Intel Gaudi GPUs via 
+`dstack` supports running dev environments, tasks, and services on Intel Gaudi GPUs via
 [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets).
 
 ## Deployment
