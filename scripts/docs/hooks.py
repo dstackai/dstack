@@ -189,7 +189,11 @@ def _write_well_known_skills(config, site_dir):
     shutil.copy2(skill_src, os.path.join(site_dir, "skill.md"))
 
     index_path = os.path.join(site_dir, WELL_KNOWN_SKILLS_DIR, "index.json")
-    index = {"skills": [{"name": name, "description": description[:1024], "files": ["skill.md"]}]}
+    index = {
+        "skills": [
+            {"name": name, "description": description.strip()[:1024], "files": ["skill.md"]}
+        ]
+    }
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump(index, f, indent=2)
 
