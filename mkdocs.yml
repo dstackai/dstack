@@ -148,7 +148,8 @@ plugins:
           options:
             docstring_style: google
             show_source: false
-  - render_swagger
+  - render_swagger:
+      allow_arbitrary_locations: true
 
 # Extensions
 markdown_extensions:
