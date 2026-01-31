@@ -261,7 +261,7 @@ volumes:
 **Important: When displaying CLI output, keep it close to the original format. Prefer showing tables as-is rather than reformatting or summarizing.**
 
 **For run configurations (dev-environment, task, service):**
-1. Show the plan by running `echo "n" | dstack apply -f <dstack config file>`
+1. Show the plan by running `echo "n" | dstack apply -f <dstack config file>` and display output as-is
 2. Ask user for confirmation
 3. Once confirmed, run `dstack apply -f <dstack config file> -y -d` (detached mode with auto-confirm)
 4. Show run status with `dstack ps`
