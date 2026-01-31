@@ -8,21 +8,20 @@ description: |
 
 ## Overview
 
-`dstack` is a unified control plane that provisions and orchestrates GPU workloads across [GPU clouds and Kubernetes clusters](https://dstack.ai/docs/concepts/backends.md) or on-prem clusters (SSH fleets).
+`dstack` is a tool that allows to provision and orchestrate GPU workloads across [GPU clouds and Kubernetes clusters](https://dstack.ai/docs/concepts/backends.md) or on-prem clusters (SSH fleets).
 
 **When to use this skill:**
-- Running GPU workloads (development, training, batch jobs, inference) across GPU clouds or on-prem GPU clusters
-- Managing fleets of GPU instances (cloud or on-prem)
-- Creating, editing, and running dstack configurations
-- Troubleshooting GPU infrastructure and running workloads
+- Running/managing GPU workloads (dev environments, tasks for training or other batch jobs, services to run inference or deploy web apps)
+- Creating, editing, and running `dstack` configurations
+- Managing fleets of compute (instances/clusters)
 
 ## How it works
 
-dstack operates through three core components:
+`dstack` operates through three core components:
 
-1. `dstack` server - Control plane running locally, self-hosted, or via dstack Sky (managed)
-2. `dstack` CLI - Command-line tool for applying configurations and managing workloads
-3. `dstack` configuration files - YAML files  ending with `.dstack.yml`
+1. `dstack` server - Can run locally, remotely, or via dstack Sky (managed)
+2. `dstack` CLI - For applying configurations and managing resources; CLI can be pointed to the server and a particular default project (`~/.dstack/config.yml` or via `dstack project` CLI command); other CLI commands use the default project
+3. `dstack` configuration files - YAML files ending with `.dstack.yml`
 
 **Typical workflow:**
 ```bash
@@ -30,22 +29,62 @@ dstack operates through three core components:
 # 2. Apply configuration
 dstack apply -f train.dstack.yml
 
-# 3. dstack provisions infrastructure and runs workload
-# 4. Monitor with dstack ps, attach with dstack attach
+# 3. dstack prepares a plan, and once confirmed, provisions instances (according to created fleets) and runs workloads
+# 4. Monitor with `dstack ps`, `dstack logs`, `dstack attach`, etc. (these commands support various options).
 ```
 
-The CLI applies configurations via `dstack apply`, which provisions infrastructure, schedules workloads, and manages lifecycle. Runs can be "attached" mode (by default) - interactive, blocks terminal with port forwarding and SSH access, or detached (via `-d`) – background, non-interactive.
+By default, `dstack apply` requires a confirmation, and once first job within the run is `running` - it "attaches" establishes an SSH tunnel, forwards ports if any and streams logs in real-time; if you pass `-d`, it runs in the detached mode and exits once the run is submitted.
 
-**CRITICAL: Never propose dstack commands or command syntaxes that don't exist.**
-- Only use commands and syntaxes explicitly documented in this skill file or verified via `--help`
-- If uncertain about a command or its syntax, check the documentation or use `--help` rather than guessing
-- Do not invent or assume command names, flags, or argument patterns
- 
+**CRITICAL: Never propose `dstack` CLI commands or YAML syntaxes that don't exist.**
+- Only use CLI commands and YAML syntax explicitly documented in this skill file or verified via `--help`
+- If uncertain about a command or its syntax, check the links or use `--help`
+
+**NEVER do the following:**
+- Invent CLI flags not documented here or shown in `--help`
+- Guess YAML property names - verify in configuration reference links
+- Run `dstack apply` for runs without `-d` in automated contexts (blocks indefinitely)
+- Retry failed commands without addressing the underlying error
+- Summarize or reformat tabular CLI output - show it as-is
+- Use `echo "y" |` when `-y` flag is available
+- Assume a command succeeded without checking output for errors
+
+## Agent execution guidelines
+
+**This section provides critical guidance for AI agents executing dstack commands.**
+
+### Output accuracy
+- **NEVER reformat, summarize, or paraphrase CLI output.** Display tables, status output, and error messages exactly as returned.
+- When showing command results, use code blocks to preserve formatting.
+- If output is truncated due to length, indicate this clearly (e.g., "Output truncated. Full output shows X entries.").
+
+### Verification before execution
+- **When uncertain about any CLI flag or YAML property, run `dstack <command> --help` first.**
+- Never guess or invent flags. Example verification commands:
+  ```bash
+  dstack --help                               # List all commands
+  dstack apply --help <configuration tpye>    # Flags for apply per configuration type (dev-environment, task, service, fleet, etc)
+  dstack fleet --help                         # Fleet subcommands
+  dstack ps --help                            # Flags for ps
+  ```
+- If a command or flag isn't documented, it doesn't exist.
+
+### Command timing and confirmation handling
+
+**Commands that stream indefinitely (use timeout to capture output, then exit):**
+- `dstack attach` - maintains connection until interrupted
+- `dstack apply` without `-d` for runs - streams logs after provisioning
+
+**All other commands:** Use 10-60s timeout. Most complete within this range. **While waiting, monitor the output** - it may contain errors, warnings, or prompts requiring attention.
+
+**Confirmation handling:**
+- `dstack apply`, `dstack stop`, `dstack fleet delete` require confirmation
+- Use `-y` flag to auto-confirm when user has already approved
+- Use `echo "n" |` to preview `dstack apply` plan without executing (avoid `echo "y" |`, prefer `-y`)
+
 **Best practices:**
-- Prefer giving run configurations a `name` property for easier management and identification
 - Prefer modifying configuration files over passing parameters to `dstack apply` (unless it's an exception)
 - When user confirms deletion/stop operations, use `-y` flag to skip confirmation prompts
-- Many dstack commands require confirmation - pay attention to command output and respond appropriately rather than waiting indefinitely
+- Avoid waiting indefinitely; display essential output once command is finished (even if by timeout)
 
 ## Configuration types
 
@@ -53,10 +92,13 @@ The CLI applies configurations via `dstack apply`, which provisions infrastructu
 
 **Common parameters:** All run configurations (dev environments, tasks, services) support many parameters including:
 - **Git integration:** Clone repos automatically (`repo`), mount existing repos (`repos`), upload local files (`working_dir`)
-- **Docker support:** Use custom Docker images (`image`), enable Docker CLI inside workloads with `docker: true` (VM-based backends only)
+- **Docker support:** Use custom Docker images (`image`); Also if needed, use `docker: true` if you want to use `docker` from inside the container (VM-based backends only)
 - **Environment & secrets:** Set environment variables (`env`), reference secrets
-- **Storage:** Mount persistent volumes (`volumes`), specify disk size
+- **Storage:** Persistent network volumes (`volumes`), specify disk size
 - **Resources:** Define GPU, CPU, memory, and disk requirements
+
+**Best practices:**
+ - Prefer giving configurations a `name` property for easier management
 
 See configuration reference pages for complete parameter lists.
 
@@ -65,7 +107,9 @@ See configuration reference pages for complete parameter lists.
 
 ```yaml
 type: dev-environment
-python: "3.11"
+name: cursor
+
+python: "3.12"
 ide: vscode
 
 resources:
@@ -82,12 +126,14 @@ resources:
 
 ```yaml
 type: task
-python: "3.11"
+name: train
+
+python: "3.12"
 env:
   - HUGGING_FACE_HUB_TOKEN
 commands:
-  - pip install -r requirements.txt
-  - python train.py
+  - uv pip install -r requirements.txt
+  - uv run python train.py
 ports:
   - 8501  # Optional: expose ports for web apps
 
@@ -115,12 +161,14 @@ resources:
 
 ```yaml
 type: service
-python: "3.11"
+name: llama31
+
+python: "3.12"
 env:
   - HF_TOKEN
 commands:
-  - pip install vllm
-  - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct
+  - uv pip install vllm
+  - uv run vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct
 port: 8000
 model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
@@ -128,10 +176,9 @@ resources:
   gpu: 80GB
   disk: 200GB
 
-scaling:
-  metric: rps
-  target: 10
 ```
+
+Once a service is `running` and its health probes are green:
 
 **Service endpoints:**
 - Without gateway: `<dstack server URL>/proxy/services/<project name>/<run name>/`
@@ -172,7 +219,7 @@ nodes: 0..2  # Range: creates template when starting with 0, provisions on-deman
 
 resources:
   gpu: 24GB..  # 24GB or more
-  disk: 100GB
+  disk: 200GB
 
 spot_policy: auto  # auto (default), spot, or on-demand
 idle_duration: 5m  # Terminate idle instances after 5 minutes
@@ -196,8 +243,6 @@ ssh_config:
     - 192.168.1.10
     - 192.168.1.11
 ```
-
-**Requirements:** Hosts must have Docker, GPU drivers, passwordless sudo, and SSH port forwarding enabled.
 
 [Concept documentation](https://dstack.ai/docs/concepts/fleets.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/fleet.md)
 
@@ -258,23 +303,50 @@ volumes:
 
 **Workflow for applying configurations:**
 
-**Important: When displaying CLI output, keep it close to the original format. Prefer showing tables as-is rather than reformatting or summarizing.**
+> **Critical for agents:** Always show the plan first, wait for user confirmation, THEN execute. Never auto-execute without user approval.
 
-**For run configurations (dev-environment, task, service):**
-1. Show the plan by running `echo "n" | dstack apply -f <dstack config file>` and display output as-is
-2. Ask user for confirmation
-3. Once confirmed, run `dstack apply -f <dstack config file> -y -d` (detached mode with auto-confirm)
-4. Show run status with `dstack ps`
+**Step-by-step for run configurations (dev-environment, task, service):**
 
-**For other configurations (fleet, volume, gateway):**
-1. Show the plan by running `dstack apply -f <dstack config file>` (these don't support the "n" trick or `-d` flag)
-2. Ask user for confirmation
-3. Once confirmed, run `dstack apply -f <dstack config file> -y`
-4. Show status with the appropriate command:
-   - Fleets: `dstack fleet`
-   - Volumes: `dstack volume`
-   - Gateways: `dstack gateway`
+1. **Show plan:**
+   ```bash
+   echo "n" | dstack apply -f config.dstack.yml
+   ```
+   Display the FULL output including the offers table and cost estimate. **Do NOT summarize or reformat.**
 
+2. **Wait for user confirmation.** Do NOT proceed if:
+   - Output shows "No offers found" or similar errors
+   - Output shows validation errors
+   - User has not explicitly confirmed
+
+3. **Execute (only after user confirms):**
+   ```bash
+   dstack apply -f config.dstack.yml -y -d
+   ```
+
+4. **Verify submission:**
+   ```bash
+   dstack ps -v
+   ```
+   Show the run status. Look for the run name and status column.
+
+**Step-by-step for infrastructure (fleet, volume, gateway):**
+
+1. **Show plan:**
+   ```bash
+   echo "n" | dstack apply -f fleet.dstack.yml
+   ```
+   Display the FULL output. **Do NOT summarize or reformat.**
+
+2. **Wait for user confirmation.**
+
+3. **Execute:**
+   ```bash
+   dstack apply -f fleet.dstack.yml -y
+   ```
+
+4. **Verify:** Use `dstack fleet`, `dstack volume`, or `dstack gateway` respectively.
+
+**Common apply patterns:**
 ```bash
 # Apply and attach (interactive, blocks terminal with port forwarding)
 dstack apply -f train.dstack.yml
@@ -285,7 +357,7 @@ dstack apply -f train.dstack.yml -y
 # Apply detached (background, no attachment)
 dstack apply -f serve.dstack.yml -d
 
-# Force rerun
+# Force rerun (recreates even if run with same name exists)
 dstack apply -f finetune.dstack.yml --force
 
 # Override defaults (prefer modifying config file instead, unless it's an exception)
@@ -311,7 +383,7 @@ dstack fleet get my-fleet --json
 dstack fleet delete my-fleet -y
 
 # Delete specific instance from fleet (use -y when user already confirmed)
-dstack fleet delete-instance my-fleet <instance-id> -y
+dstack fleet delete my-fleet -i <instance num> -y
 ```
 
 ### Monitor Runs
@@ -347,7 +419,7 @@ dstack attach my-run-name --logs
 dstack attach my-run-name
 ```
 
-### View Logs
+### View logs
 
 ```bash
 # Stream logs (tail mode)
@@ -378,18 +450,33 @@ dstack stop my-run-name --abort
 
 ### Check available resources
 
-**Note:** `dstack offer` shows all available GPU instances from configured backends, not just those in fleets. Use it to discover what resources are available for provisioning.
+**Use `dstack offer` to verify GPU availability before provisioning:**
 
 ```bash
-# List available GPU offers from all backends
-dstack offer
+# List all available offers across backends
+dstack offer --json
 
-# Filter by backend
+# Filter by specific backend
 dstack offer --backend aws
 
-# Filter by GPU requirements
+# Filter by GPU type
 dstack offer --gpu A100
+
+# Filter by GPU memory
+dstack offer --gpu 24GB..80GB
+
+# JSON output for detailed inspection
+dstack offer --json
+
+# Combine filters
+dstack offer --backend aws --gpu A100:80GB
 ```
+
+**Note:** `dstack offer` shows all available GPU instances from configured backends, not just those matching configured fleets. Use it to check backend availability, but remember: an offer appearing here doesn't guarantee a fleet will provision it - fleets have their own resource constraints.
+
+### Expected Output Formats
+
+**Agents should display these tables as-is, preserving column alignment.**
 
 ## Troubleshooting
 
@@ -399,6 +486,7 @@ When diagnosing issues with dstack workloads or infrastructure:
    ```bash
    dstack fleet get my-fleet --json | jq .
    dstack run get my-run --json | jq .
+   dstack ps -n 10 --json | jq .
    ```
 
 2. **Check verbose run status:**
@@ -416,25 +504,22 @@ When diagnosing issues with dstack workloads or infrastructure:
    dstack attach my-run --logs  # See full output from start
    ```
 
-5. **Check fleet capacity:**
+5. **Verify resource availability:**
    ```bash
-   dstack fleet get my-fleet  # View current instances and utilization
-   ```
-
-6. **Verify resource availability:**
-   ```bash
-   dstack offer --backend aws --gpu A100  # Check if resources exist
+   dstack offer --backend aws --gpu A100 --spot-auto --json  # Check if resources exist
    ```
 
 Common issues:
-- **No capacity errors:** Check `dstack offer` for availability, adjust resource requirements, or enable more backends
-- **No matching fleet:** Ensure at least one fleet matches workload resource requirements; use `dstack fleet` to list configured fleets
+- **No offers:** Check `dstack offer` and ensure that at least one fleet matches requirements
+- **No fleet:** Ensure at least one fleet is created
 - **Configuration errors:** Validate YAML syntax; check `dstack apply` output for specific errors
 - **Provisioning timeouts:** Use `dstack ps -v` to see provisioning status; consider spot vs on-demand
 - **Connection issues:** Verify server status, check authentication, ensure network access to backends
-- **Resource mismatch:** Check that fleet resource specs (GPU type, memory, disk) are compatible with workload requirements
 
-[Troubleshooting guide](https://dstack.ai/docs/guides/troubleshooting.md)
+**When errors occur:**
+1. Display the full error message unchanged
+2. Do NOT retry the same command without addressing the error
+3. Refer to the [Troubleshooting guide](https://dstack.ai/docs/guides/troubleshooting.md) for guidance
 
 ## Additional Resources
 
@@ -458,4 +543,4 @@ Common issues:
 - [Google TPU](https://dstack.ai/examples/accelerators/tpu/index.md)
 - [Tenstorrent](https://dstack.ai/examples/accelerators/tenstorrent/index.md)
 
-**Full Documentation:** https://dstack.ai/llms-full.txt
+**Full documentation:** https://dstack.ai/llms-full.txt
