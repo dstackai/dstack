@@ -161,7 +161,6 @@ dev = [
     "mkdocs-gen-files; python_version >= '3.11'",
     "mkdocstrings[python]; python_version >= '3.11'",
     "mkdocs-render-swagger-plugin; python_version >= '3.11'",
-    "mkdocs-llmstxt-md; python_version >= '3.11'"
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,48 @@
+# dstack
+
+> dstack is an open-source control plane for GPU provisioning and orchestration across GPU clouds, Kubernetes, and on-prem clusters.
+
+## Getting started
+
+- [Overview](https://dstack.ai/docs/index.md): What dstack is
+- [Installation](https://dstack.ai/docs/index.md): How to set up the dstack server and the dstack CLI
+- [Quickstart](https://dstack.ai/docs/quickstart.md): How to get started and submit your first run
+
+## Concepts
+
+- [Backends](https://dstack.ai/docs/concepts/backends.md): How to configure backends - to connect dstack to cloud providers, Kubernetes clusters, etc
+- [Fleets](https://dstack.ai/docs/concepts/fleets.md): How to create and manage fleets - required before submitting runs
+- [Dev environments](https://dstack.ai/docs/concepts/dev-environments.md): How to create dev environments - for interactive development using a desktop IDE
+- [Tasks](https://dstack.ai/docs/concepts/tasks.md): How to run tasks - for training or fine-tuning, including distributed tasks
+- [Services](https://dstack.ai/docs/concepts/services.md): How to deploy services - for model inference or web apps
+- [Volumes](https://dstack.ai/docs/concepts/volumes.md): How to manage volumes - for persistent storage or caching
+- [Gateways](https://dstack.ai/docs/concepts/gateways.md): How to manage gateways - enabling auto-scaling, rate limits, and custom domains
+- [Secrets](https://dstack.ai/docs/concepts/secrets.md): How to manage secrets - for API keys or other sensitive data
+- [Projects](https://dstack.ai/docs/concepts/projects.md): How to manage projects - for managing separate teams
+- [Metrics](https://dstack.ai/docs/concepts/metrics.md): How to access metrics - for monitoring of runs/jobs/fleets, hardware usage (e.g. GPU util), etc
+- [Events](https://dstack.ai/docs/concepts/events.md): How to access events - aka audit log - for tracking state changes, resource creation/deletion, etc
+
+## Guides
+
+- [Server deployment](https://dstack.ai/docs/guides/server-deployment.md): Detailed guide on how to deploy the dstack server
+- [Troubleshooting](https://dstack.ai/docs/guides/troubleshooting.md): Common issues and how to troubleshoot them
+- [Protips](https://dstack.ai/docs/guides/protips.md): Pro tips - tips and tricks to use dstack more efficiently
+
+## Examples
+
+- [TRL](https://dstack.ai/examples/single-node-training/trl.md): TRL
+- [Axolotl](https://dstack.ai/examples/single-node-training/axolotl.md): Axolotl
+- [TRL](https://dstack.ai/examples/distributed-training/trl.md): TRL
+- [Axolotl](https://dstack.ai/examples/distributed-training/axolotl.md): Axolotl
+- [Ray+RAGEN](https://dstack.ai/examples/distributed-training/ray-ragen.md): Ray+RAGEN
+- [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests.md): NCCL/RCCL tests
+- [SGLang](https://dstack.ai/examples/inference/sglang.md): SGLang
+- [vLLM](https://dstack.ai/examples/inference/vllm.md): vLLM
+- [NIM](https://dstack.ai/examples/inference/nim.md): NIM
+- [TensorRT-LLM](https://dstack.ai/examples/inference/trtllm.md): TensorRT-LLM
+
+## Accelerators
+
+- [AMD](https://dstack.ai/examples/accelerators/amd.md): AMD
+- [TPU](https://dstack.ai/examples/accelerators/tpu.md): TPU
+- [Tenstorrent](https://dstack.ai/examples/accelerators/tenstorrent.md): Tenstorrent

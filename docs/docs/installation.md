@@ -63,11 +63,11 @@ The server can run on your laptop or any environment with access to the cloud an
         
     </div>
 
-For more details on server deployment options, see the [Server deployment](../guides/server-deployment.md) guide.
+For more details on server deployment options, see the [Server deployment](guides/server-deployment.md) guide.
 
 ### Configure backends
 
-> To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure [backends](../concepts/backends.md).
+> To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure [backends](concepts/backends.md).
 
 ## Set up the CLI
 
@@ -126,7 +126,7 @@ This configuration is stored in `~/.dstack/config.yml`.
 
 ### Check offers
 
-To verify that both the server and CLI are properly configured, use the [`dstack offer`](../reference/cli/dstack/offer.md#list-gpu-offers) command to list available GPU offers. If you don't see valid offers, ensure you've set up [backends](../concepts/backends.md).
+To verify that both the server and CLI are properly configured, use the [`dstack offer`](reference/cli/dstack/offer.md#list-gpu-offers) command to list available GPU offers. If you don't see valid offers, ensure you've set up [backends](concepts/backends.md).
 
 ??? info "Shell autocompletion"
 
@@ -195,8 +195,8 @@ To verify that both the server and CLI are properly configured, use the [`dstack
         > `autoload -Uz compinit && compinit`.
 
 !!! info "What's next?"
-    1. See [Backends](../concepts/backends.md)
-    2. Follow [Quickstart](../quickstart.md)
-    3. Check the [server deployment](../guides/server-deployment.md) guide
-    4. Browse [examples](../../examples.md)
+    1. See [Backends](concepts/backends.md)
+    2. Follow [Quickstart](quickstart.md)
+    3. Check the [server deployment](guides/server-deployment.md) guide
+    4. Browse [examples](../examples.md)
     5. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)

@@ -65,7 +65,7 @@ projects:
 
 </div>
 
-For more details, refer to [Installation](../../docs/installation/index.md).
+For more details, refer to [Installation](../../docs/installation.md).
 
 > Interested in fine-tuning or deploying DeepSeek on Vultr? Check out the corresponding [example](../../examples/llms/deepseek/index.md).
 

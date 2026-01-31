@@ -71,7 +71,7 @@ $ dstack server
 
 </div>
 
-For more details, see [Installation](../../docs/installation/index.md).
+For more details, see [Installation](../../docs/installation.md).
 
 Use the `dstack` CLI to
 manage [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md),
