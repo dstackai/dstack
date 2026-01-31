@@ -280,7 +280,7 @@ nav:
           - Plugins:
               - Python API: docs/reference/plugins/python/index.md
               - REST API: docs/reference/plugins/rest/index.md
-          - llms.txt: https://dstack.ai/llms.txt
+          - llms-full.txt: https://dstack.ai/llms-full.txt
           - skill.md: https://dstack.ai/skill.md
   - Examples:
       - examples.md
