@@ -124,9 +124,9 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-### Check offers
+<!-- ### Check offers -->
 
-To verify that both the server and CLI are properly configured, use the [`dstack offer`](reference/cli/dstack/offer.md#list-gpu-offers) command to list available GPU offers. If you don't see valid offers, ensure you've set up [backends](concepts/backends.md).
+<!-- To verify that both the server and CLI are properly configured, use the [`dstack offer`](reference/cli/dstack/offer.md#list-gpu-offers) command to list available GPU offers. If you don't see valid offers, ensure you've set up [backends](concepts/backends.md). -->
 
 ??? info "Shell autocompletion"
 
