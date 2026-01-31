@@ -111,6 +111,11 @@ def on_post_build(config):
     site_dir = config["site_dir"]
     docs_dir = config["docs_dir"]
 
+    # Create .nojekyll to prevent GitHub Pages from ignoring .well-known directory
+    nojekyll_path = os.path.join(site_dir, ".nojekyll")
+    with open(nojekyll_path, "w") as f:
+        f.write("")
+
     for root, _, files in os.walk(docs_dir):
         for file in files:
             if not file.endswith(".md"):
