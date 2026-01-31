@@ -1,3 +1,8 @@
+---
+title: Secrets
+description: Managing sensitive values and credentials
+---
+
 # Secrets
 
 Secrets allow centralized management of sensitive values such as API keys and credentials. They are project-scoped, managed by project admins, and can be referenced in run configurations to pass sensitive values to runs in a secure manner.

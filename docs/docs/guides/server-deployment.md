@@ -1,3 +1,8 @@
+---
+title: Server Deployment
+description: Deploying the dstack server
+---
+
 The `dstack` server can run on your laptop or any environment with access to the cloud and on-prem clusters you plan to use.
 
 The minimum hardware requirements for running the server are 1 CPU and 1GB of RAM.

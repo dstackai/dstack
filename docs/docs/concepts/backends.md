@@ -1,3 +1,8 @@
+---
+title: Backends
+description: Configuring cloud providers and Kubernetes clusters
+---
+
 # Backends
 
 Backends allow `dstack` to provision fleets across GPU clouds or Kubernetes clusters.

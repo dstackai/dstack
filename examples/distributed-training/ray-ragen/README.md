@@ -1,6 +1,11 @@
+---
+title: Ray + RAGEN
+description: Multi-node agent fine-tuning using RAGEN with Ray and verl for reinforcement learning
+---
+
 # Ray + RAGEN
 
-This example shows how use `dstack` and [RAGEN](https://github.com/RAGEN-AI/RAGEN) 
+This example shows how use `dstack` and [RAGEN](https://github.com/RAGEN-AI/RAGEN)
 to fine-tune an agent on multiple nodes.
 
 Under the hood `RAGEN` uses [verl](https://github.com/volcengine/verl) for Reinforcement Learning and [Ray](https://docs.ray.io/en/latest/) for distributed training.

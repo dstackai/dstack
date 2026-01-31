@@ -1,3 +1,8 @@
+---
+title: Projects
+description: Organizing teams and isolating resources
+---
+
 # Projects
 
 Projects enable the isolation of different teams and their resources. Each project can configure its own backends and

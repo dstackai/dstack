@@ -1,3 +1,8 @@
+---
+title: Axolotl
+description: Fine-tuning models with Axolotl using FSDP and QLoRA
+---
+
 # Axolotl
 
 This example shows how to use [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl) with `dstack` to fine-tune 4-bit Quantized `Llama-4-Scout-17B-16E` using SFT with FSDP and QLoRA.

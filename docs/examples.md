@@ -1,4 +1,6 @@
 ---
+title: Examples
+description: Collection of examples for training, inference, and clusters
 #template: examples.html
 hide:
    - navigation

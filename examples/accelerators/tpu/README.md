@@ -1,3 +1,8 @@
+---
+title: TPU
+description: Deploying and fine-tuning models on Google Cloud TPUs using Optimum TPU and vLLM
+---
+
 # TPU
 
 If you've configured the `gcp` backend in `dstack`, you can run dev environments, tasks, and services on [TPUs](https://cloud.google.com/tpu/docs/intro-to-tpu).

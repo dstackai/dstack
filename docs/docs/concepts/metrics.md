@@ -1,3 +1,8 @@
+---
+title: Metrics
+description: Tracking and monitoring system metrics
+---
+
 # Metrics
 
 `dstack` automatically tracks essential metrics, which you can access via the CLI and UI.

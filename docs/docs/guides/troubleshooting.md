@@ -1,3 +1,8 @@
+---
+title: Troubleshooting
+description: Common issues and how to resolve them
+---
+
 # Troubleshooting
 
 ## Reporting issues

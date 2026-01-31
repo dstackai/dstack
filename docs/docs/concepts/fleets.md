@@ -1,3 +1,8 @@
+---
+title: Fleets
+description: Managing pools of compute instances
+---
+
 # Fleets
 
 Before submitting runs, you must create a fleet. Fleets act as both pools of instances and templates for how those instances are provisioned.

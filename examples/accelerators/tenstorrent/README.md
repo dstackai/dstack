@@ -1,12 +1,11 @@
 ---
-title: "Tenstorrent"
-description: "You can now use SSH fleets to run dev environments, tasks, and services on Tenstorrent."  
-image: https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-min.png
+title: Tenstorrent
+description: Running dev environments, tasks, and services on Tenstorrent Wormhole accelerators
 ---
 
 # Tenstorrent
 
-`dstack` supports running dev environments, tasks, and services on Tenstorrent 
+`dstack` supports running dev environments, tasks, and services on Tenstorrent
 [Wormwhole](https://tenstorrent.com/en/hardware/wormhole) accelerators via SSH fleets.
 
 

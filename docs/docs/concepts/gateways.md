@@ -1,3 +1,8 @@
+---
+title: Gateways
+description: Managing ingress traffic and endpoints for services
+---
+
 # Gateways
 
 Gateways manage ingress traffic for running [services](services.md), handle auto-scaling and rate limits, enable HTTPS, and allow you to configure a custom domain. They also support custom routers, such as the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#).

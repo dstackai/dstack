@@ -1,3 +1,8 @@
+---
+title: Protips
+description: Tips and tricks for using dstack efficiently
+---
+
 # Protips
 
 Below are tips and tricks to use `dstack` more efficiently.

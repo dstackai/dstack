@@ -1,9 +1,14 @@
+---
+title: Tasks
+description: Running commands for training and batch processing
+---
+
 # Tasks
 
 A task allows you to run arbitrary commands on one or more nodes. They are best suited for jobs like training or batch processing.
 
 ??? info "Prerequisites"
-    Before running a task, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
+    Before running a task, make sure you’ve [installed](../installation.md) the server and CLI, and created a [fleet](fleets.md).
 
 ## Apply a configuration
 

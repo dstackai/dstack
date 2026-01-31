@@ -1,3 +1,8 @@
+---
+title: Volumes
+description: Managing persistent data storage
+---
+
 # Volumes
 
 Volumes enable data persistence between runs of dev environments, tasks, and services. 

@@ -1,3 +1,8 @@
+---
+title: What is dstack?
+description: Introduction to dstack and how it works
+---
+
 # What is dstack?
 
 `dstack` is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters. 
@@ -13,7 +18,7 @@ It streamlines development, training, and inference, and is compatible with any 
 
 #### 1. Set up the server
 
-> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky](https://sky.dstack.ai).
+> Before using `dstack`, ensure you've [installed](installation.md) the server, or signed up for [dstack Sky](https://sky.dstack.ai).
 
 #### 2. Define configurations
 
@@ -35,7 +40,7 @@ Apply the configuration either via the `dstack apply` CLI command (or through a 
 port-forwarding, ingress, and more.
 
 !!! info "Where do I start?"
-    1. Proceed to [installation](installation/index.md)
+    1. Proceed to [installation](installation.md)
     2. See [quickstart](quickstart.md)
     3. Browse [examples](/examples)
     4. Join [Discord](https://discord.gg/u8SmfwPpMd)

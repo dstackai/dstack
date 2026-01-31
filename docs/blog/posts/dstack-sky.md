@@ -69,7 +69,7 @@ Continue? [y/n]:
 </div>
 
 !!! info "Backends"
-    `dstack Sky` supports the same [backends](../../docs/installation/index.md) as the open-source version, except that you
+    `dstack Sky` supports the same [backends](../../docs/installation.md) as the open-source version, except that you
     don't need to set them up. By default, it uses all supported backends.
 
 You can use both on-demand and spot instances without needing to manage quotas, as they are automatically handled

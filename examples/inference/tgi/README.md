@@ -1,6 +1,6 @@
 ---
 title: HuggingFace TGI
-description: "This example shows how to deploy Llama 4 Scout to any cloud or on-premises environment using HuggingFace TGI and dstack."
+description: Deploying Llama 4 Scout using HuggingFace Text Generation Inference
 ---
 
 # HuggingFace TGI

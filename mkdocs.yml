@@ -13,6 +13,9 @@ edit_uri: edit/master/docs/
 #Copyright
 copyright: © 2025 dstack
 
+hooks:
+  - scripts/docs/hooks.py
+
 # Configuration
 theme:
   name: material
@@ -60,44 +63,6 @@ theme:
 
 # Plugins
 plugins:
-  - llmstxt-md:
-      enable_copy_button: false
-      sections:
-        Getting started:
-          - docs/index.md: What dstack is
-          - docs/installation/index.md: How to set up the dstack server and the dstack CLI
-          - docs/quickstart.md: How to get started and submit your first run
-        Concepts:
-          - docs/concepts/backends.md: How to configure backends - to connect dstack to cloud providers, Kubernetes clusters, etc
-          - docs/concepts/fleets.md: How to create and manage fleets - required before submitting runs
-          - docs/concepts/dev-environments.md: How to create dev environments - for interactive development using a desktop IDE
-          - docs/concepts/tasks.md: How to run tasks - for training or fine-tuning, including distributed tasks
-          - docs/concepts/services.md: How to deploy services - for model inference or web apps
-          - docs/concepts/volumes.md: How to manage volumes - for persistent storage or caching
-          - docs/concepts/gateways.md: How to manage gateways - enabling auto-scaling, rate limits, and custom domains
-          - docs/concepts/secrets.md: How to manage secrets - for API keys or other sensitive data
-          - docs/concepts/projects.md: How to manage projects - for managing separate teams
-          - docs/concepts/metrics.md: How to access metrics - for monitoring of runs/jobs/fleets, hardware usage (e.g. GPU util), etc
-          - docs/concepts/events.md: How to access events - aka audit log - for tracking state changes, resource creation/deletion, etc
-        Guides:
-          - docs/guides/server-deployment.md: Detailed guide on how to deploy the dstack server
-          - docs/guides/troubleshooting.md: Common issues and how to troubleshoot them
-          - docs/guides/protips.md: Pro tips - tips and tricks to use dstack more efficiently
-        Examples:
-          - examples/single-node-training/trl/index.md: TRL
-          - examples/single-node-training/axolotl/index.md: Axolotl
-          - examples/distributed-training/trl/index.md: TRL
-          - examples/distributed-training/axolotl/index.md: Axolotl
-          - examples/distributed-training/ray-ragen/index.md: Ray+RAGEN
-          - examples/clusters/nccl-rccl-tests/index.md: NCCL/RCCL tests
-          - examples/inference/sglang/index.md: SGLang
-          - examples/inference/vllm/index.md: vLLM
-          - examples/inference/nim/index.md: NIM
-          - examples/inference/trtllm/index.md: TensorRT-LLM
-        Accelerators:
-          - examples/accelerators/amd/index.md: AMD
-          - examples/accelerators/tpu/index.md: TPU
-          - examples/accelerators/tenstorrent/index.md: Tenstorrent
   - blog:
       blog_dir: blog
       post_url_format: "{slug}"
@@ -172,11 +137,10 @@ plugins:
         "docs/guides/migration.md": "docs/guides/upgrade.md"
   - typeset
   - gen-files:
+      # TODO: convert these to hooks (schema reference migrated)
       scripts: # always relative to mkdocs.yml
-        - scripts/docs/gen_examples.py
         - scripts/docs/gen_cli_reference.py
         - scripts/docs/gen_openapi_reference.py
-        - scripts/docs/gen_schema_reference.py
         - scripts/docs/gen_rest_plugin_spec_reference.py
   - mkdocstrings:
       handlers:
@@ -184,7 +148,8 @@ plugins:
           options:
             docstring_style: google
             show_source: false
-  - render_swagger
+  - render_swagger:
+      allow_arbitrary_locations: true
 
 # Extensions
 markdown_extensions:
@@ -258,7 +223,7 @@ nav:
   - Docs:
       - Getting started:
           - Overview: docs/index.md
-          - Installation: docs/installation/index.md
+          - Installation: docs/installation.md
           - Quickstart: docs/quickstart.md
       - Concepts:
           - Backends: docs/concepts/backends.md
@@ -316,6 +281,7 @@ nav:
               - Python API: docs/reference/plugins/python/index.md
               - REST API: docs/reference/plugins/rest/index.md
           - llms-full.txt: https://dstack.ai/llms-full.txt
+          - skill.md: https://dstack.ai/skill.md
   - Examples:
       - examples.md
       - Single-node training:

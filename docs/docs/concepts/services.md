@@ -1,9 +1,14 @@
+---
+title: Services
+description: Deploying models and web apps as endpoints
+---
+
 # Services
 
 Services allow you to deploy models or web apps as secure and scalable endpoints.
 
 ??? info "Prerequisites"
-    Before running a service, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
+    Before running a service, make sure you’ve [installed](../installation.md) the server and CLI, and created a [fleet](fleets.md).
 
 ## Apply a configuration
 

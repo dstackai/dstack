@@ -1,9 +1,14 @@
+---
+title: Dev environments
+description: Provisioning remote instances for cloud-based development
+---
+
 # Dev environments
 
 A dev environment lets you provision an instance and access it with your desktop IDE.
 
 ??? info "Prerequisites"
-    Before running a dev environment, make sure you’ve [installed](../installation/index.md) the server and CLI, and created a [fleet](fleets.md).
+    Before running a dev environment, make sure you’ve [installed](../installation.md) the server and CLI, and created a [fleet](fleets.md).
 
 ## Apply a configuration
 

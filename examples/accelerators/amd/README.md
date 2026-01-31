@@ -1,3 +1,8 @@
+---
+title: AMD
+description: Deploying and fine-tuning models on AMD MI300X GPUs using TGI, vLLM, and Axolotl
+---
+
 # AMD
 
 `dstack` supports running dev environments, tasks, and services on AMD GPUs.

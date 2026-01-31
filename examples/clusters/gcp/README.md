@@ -1,3 +1,8 @@
+---
+title: GCP
+description: Creating and using GPU clusters on GCP with GPUDirect-TCPX and RoCE support
+---
+
 # GCP
 
 This example shows how to create and use clusters on GCP.

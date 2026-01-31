@@ -1,6 +1,6 @@
 ---
 title: TensorRT-LLM
-description: "This example shows how to deploy Deepseek models to any cloud or on-premises environment using NVIDIA TensorRT-LLM and dstack."
+description: Deploying DeepSeek R1 and distilled models using NVIDIA TensorRT-LLM with Triton
 ---
 
 # TensorRT-LLM
