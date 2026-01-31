@@ -38,6 +38,12 @@ The CLI applies configurations via `dstack apply`, which provisions infrastructu
 
 **Important:** Use `--help` with any CLI command if uncertain about usage or available options.
 
+**Best practices:**
+- Prefer giving run configurations a `name` property for easier management and identification
+- Prefer modifying configuration files over passing parameters to `dstack apply` (unless it's an exception)
+- When user confirms deletion/stop operations, use `-y` flag to skip confirmation prompts
+- Many dstack commands require confirmation - pay attention to command output and respond appropriately rather than waiting indefinitely
+
 ## Configuration types
 
 `dstack` supports five main configuration types, each with specific use cases. Configuration files can be named `<name>.dstack.yml` or simply `.dstack.yml`.
@@ -241,9 +247,18 @@ volumes:
 
 ### Apply Configurations
 
+**Important behavior:**
+- `dstack apply` shows a plan with estimated costs and may ask for confirmation (respond with `y` or use `-y` flag to skip)
+- Once confirmed, it provisions infrastructure and streams real-time output to the terminal
+- In attached mode (default), the terminal blocks and shows output - use timeout or Ctrl+C to interrupt if you need to continue with other commands
+- In detached mode (`-d`), runs in background without blocking the terminal
+
 ```bash
 # Apply and attach (interactive, blocks terminal with port forwarding)
 dstack apply -f train.dstack.yml
+
+# Apply with automatic confirmation
+dstack apply -f train.dstack.yml -y
 
 # Apply detached (background, no attachment)
 dstack apply -f serve.dstack.yml -d
@@ -251,7 +266,7 @@ dstack apply -f serve.dstack.yml -d
 # Force rerun
 dstack apply -f finetune.dstack.yml --force
 
-# Override defaults
+# Override defaults (prefer modifying config file instead, unless it's an exception)
 dstack apply -f .dstack.yml --max-price 2.5
 ```
 
@@ -270,11 +285,11 @@ dstack fleet get my-fleet
 # Get fleet details as JSON (for troubleshooting)
 dstack fleet get my-fleet --json
 
-# Delete entire fleet
-dstack fleet delete my-fleet
+# Delete entire fleet (use -y when user already confirmed)
+dstack fleet delete my-fleet -y
 
-# Delete specific instance from fleet
-dstack fleet delete-instance my-fleet <instance-id>
+# Delete specific instance from fleet (use -y when user already confirmed)
+dstack fleet delete-instance my-fleet <instance-id> -y
 ```
 
 ### Monitor Runs
@@ -303,11 +318,11 @@ dstack run get my-run-name --json
 **Note:** `dstack apply` automatically attaches when run completes provisioning. Use `dstack attach` to reconnect after detaching or to access detached runs.
 
 ```bash
-# Attach to existing run (restores port forwarding + SSH)
-dstack attach my-run-name
-
-# Attach and replay logs from start
+# Attach and replay logs from start (preferred, unless asked otherwise)
 dstack attach my-run-name --logs
+
+# Attach without replaying logs (restores port forwarding + SSH only)
+dstack attach my-run-name
 ```
 
 ### View Logs
@@ -332,11 +347,14 @@ dstack logs my-run-name --job 0
 # Stop specific run
 dstack stop my-run-name
 
+# Stop with confirmation skipped (use when user already confirmed)
+dstack stop my-run-name -y
+
 # Abort (force stop)
 dstack stop my-run-name --abort
 
 # Stop all runs
-dstack stop --all
+dstack stop --all -y
 ```
 
 ### Check available resources
