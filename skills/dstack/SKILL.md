@@ -352,9 +352,6 @@ dstack stop my-run-name -y
 
 # Abort (force stop)
 dstack stop my-run-name --abort
-
-# Stop all runs
-dstack stop --all -y
 ```
 
 ### Check available resources
