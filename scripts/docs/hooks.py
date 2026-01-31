@@ -185,8 +185,9 @@ def _write_well_known_skills(config, site_dir):
     out_dir = os.path.join(site_dir, WELL_KNOWN_SKILLS_DIR, name)
     os.makedirs(out_dir, exist_ok=True)
     shutil.copy2(skill_src, os.path.join(out_dir, "SKILL.md"))
-    # Serve skill at site root (e.g. https://dstack.ai/skill.md) from skills/dstack/SKILL.md
+    # Serve skill at site root (both skill.md and SKILL.md) from skills/dstack/SKILL.md
     shutil.copy2(skill_src, os.path.join(site_dir, "skill.md"))
+    shutil.copy2(skill_src, os.path.join(site_dir, "SKILL.md"))
 
     index_path = os.path.join(site_dir, WELL_KNOWN_SKILLS_DIR, "index.json")
     index = {
