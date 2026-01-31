@@ -385,7 +385,7 @@ dstack fleet get my-fleet --json
 # Delete entire fleet (use -y when user already confirmed)
 dstack fleet delete my-fleet -y
 
-# Delete specific instance from fleet (use -y when user already confirmed)
+# IMPORTANT: When asked to delete an instance, always use -i <instance num> - do NOT delete the entire fleet (use -y when user already confirmed)
 dstack fleet delete my-fleet -i <instance num> -y
 ```
 
