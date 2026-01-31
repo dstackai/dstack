@@ -70,9 +70,12 @@ By default, `dstack apply` requires a confirmation, and once first job within th
 
 ### Command timing and confirmation handling
 
-**Commands that stream indefinitely (use timeout to capture output, then exit):**
+**Commands that run indefinitely (agents should avoid these):**
 - `dstack attach` - maintains connection until interrupted
 - `dstack apply` without `-d` for runs - streams logs after provisioning
+- `dstack ps -w` - watch mode, auto-refreshes until interrupted
+
+Instead, use `dstack ps -v` to check status, or `dstack apply -d` for detached mode.
 
 **All other commands:** Use 10-60s timeout. Most complete within this range. **While waiting, monitor the output** - it may contain errors, warnings, or prompts requiring attention.
 
@@ -291,9 +294,9 @@ volumes:
 
 [Concept documentation](https://dstack.ai/docs/concepts/volumes.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/volume.md)
 
-## Essential Commands
+## Essential CLI commands
 
-### Apply Configurations
+### Apply configurations
 
 **Important behavior:**
 - `dstack apply` shows a plan with estimated costs and may ask for confirmation (respond with `y` or use `-y` flag to skip)
@@ -323,7 +326,7 @@ volumes:
    dstack apply -f config.dstack.yml -y -d
    ```
 
-4. **Verify submission:**
+4. **Verify apply status:**
    ```bash
    dstack ps -v
    ```
@@ -386,7 +389,7 @@ dstack fleet delete my-fleet -y
 dstack fleet delete my-fleet -i <instance num> -y
 ```
 
-### Monitor Runs
+### Monitor runs
 
 ```bash
 # List all runs
@@ -397,9 +400,6 @@ dstack ps --json
 
 # Verbose output with full details
 dstack ps -v
-
-# Watch mode (auto-refresh)
-dstack ps -w
 
 # Get specific run details as JSON
 dstack run get my-run-name --json
@@ -523,12 +523,12 @@ Common issues:
 
 ## Additional Resources
 
-**Core Documentation:**
+**Core documentation:**
 - [Overview](https://dstack.ai/docs/overview.md)
 - [Installation](https://dstack.ai/docs/installation.md)
 - [Quickstart](https://dstack.ai/docs/quickstart.md)
 
-**Additional Concepts:**
+**Additional concepts:**
 - [Secrets](https://dstack.ai/docs/concepts/secrets.md) - Manage sensitive credentials
 - [Projects](https://dstack.ai/docs/concepts/projects.md) - Projects isolate the resources of different teams
 - [Metrics](https://dstack.ai/docs/concepts/metrics.md) - Track GPU utilization
