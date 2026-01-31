@@ -137,11 +137,10 @@ plugins:
         "docs/guides/migration.md": "docs/guides/upgrade.md"
   - typeset
   - gen-files:
-      # TODO: convert these to hooks
+      # TODO: convert these to hooks (schema reference migrated)
       scripts: # always relative to mkdocs.yml
         - scripts/docs/gen_cli_reference.py
         - scripts/docs/gen_openapi_reference.py
-        - scripts/docs/gen_schema_reference.py
         - scripts/docs/gen_rest_plugin_spec_reference.py
   - mkdocstrings:
       handlers:

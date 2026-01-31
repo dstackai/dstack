@@ -150,6 +150,15 @@ def sub_schema_reference(match: re.Match) -> str:
     )
 
 
+def expand_schema_references(text: str) -> str:
+    """Expand #SCHEMA# placeholders in markdown text. Used by hooks when gen-files is not used."""
+    return re.sub(
+        r"( *)#SCHEMA#\s+(dstack\.[.a-z_0-9A-Z]+)\s*((?:\n {4}[^\n]+)*)\n",
+        sub_schema_reference,
+        text,
+    )
+
+
 def process_file(file: File):
     if not fnmatch(file.src_uri, FILE_PATTERN):
         return
@@ -161,11 +170,7 @@ def process_file(file: File):
     #     overrides:
     #       name:
     #         required: true
-    text = re.sub(
-        r"( *)#SCHEMA#\s+(dstack\.[.a-z_0-9A-Z]+)\s*((?:\n {4}[^\n]+)*)\n",
-        sub_schema_reference,
-        text,
-    )
+    text = expand_schema_references(text)
     with mkdocs_gen_files.open(file.src_uri, "w") as f:
         f.write(text)
 

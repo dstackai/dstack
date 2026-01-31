@@ -1,8 +1,10 @@
+import importlib.util
 import json
 import logging
 import mimetypes
 import os
 import shutil
+import sys
 
 import yaml
 
@@ -13,6 +15,49 @@ log = logging.getLogger("mkdocs")
 WELL_KNOWN_SKILLS_DIR = ".well-known/skills"
 SKILL_PATH = ("skills", "dstack", "SKILL.md")
 DISABLE_EXAMPLES_ENV = "DSTACK_DOCS_DISABLE_EXAMPLES"
+SCHEMA_REFERENCE_PREFIX = "docs/reference/"
+
+
+def _expand_schema_references(text: str) -> str:
+    """Lazy load gen_schema_reference by file path so it works regardless of sys.path."""
+    hooks_dir = os.path.dirname(os.path.abspath(__file__))
+    gen_path = os.path.join(hooks_dir, "gen_schema_reference.py")
+    spec = importlib.util.spec_from_file_location("gen_schema_reference", gen_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load {gen_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["gen_schema_reference"] = module
+    spec.loader.exec_module(module)
+    return module.expand_schema_references(text)
+
+
+def _get_schema_expanded_content(rel_path, config, src_path=None):
+    """Return expanded markdown for reference/**/*.md that contain #SCHEMA#, else None.
+    If src_path is given (e.g. from on_post_build loop), read from it; else build path from config.
+    """
+    if not rel_path.startswith(SCHEMA_REFERENCE_PREFIX) or not rel_path.endswith(".md"):
+        log.debug(f"Skipping {rel_path}: not in {SCHEMA_REFERENCE_PREFIX} or not .md")
+        return None
+    if src_path is None:
+        repo_root = os.path.dirname(config["config_file_path"])
+        docs_dir = config["docs_dir"]
+        if not os.path.isabs(docs_dir):
+            docs_dir = os.path.join(repo_root, docs_dir)
+        src_path = os.path.join(docs_dir, rel_path.replace("/", os.sep))
+    if not os.path.isfile(src_path):
+        log.debug(f"Skipping {rel_path}: source file not found at {src_path}")
+        return None
+    try:
+        with open(src_path, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError as e:
+        log.debug(f"Skipping {rel_path}: error reading file: {e}")
+        return None
+    if "#SCHEMA#" not in text:
+        log.debug(f"Skipping {rel_path}: no #SCHEMA# placeholders found")
+        return None
+    log.debug(f"Expanding schema references in {rel_path}")
+    return _expand_schema_references(text)
 
 
 def _get_materialized_content(rel_path, config):
@@ -32,8 +77,15 @@ def _get_materialized_content(rel_path, config):
 
 
 def on_page_read_source(page, config):
-    """Use README content for example stubs when rendering HTML."""
-    return _get_materialized_content(page.file.src_uri, config)
+    """Use README content for example stubs and expanded schema for reference docs when rendering HTML."""
+    rel_path = page.file.src_uri
+    content = _get_materialized_content(rel_path, config)
+    if content is not None:
+        return content
+    content = _get_schema_expanded_content(rel_path, config)
+    if content is not None:
+        return content
+    return None
 
 
 def on_page_context(context, page, config, nav):
@@ -75,9 +127,18 @@ def on_post_build(config):
                 with open(dest_path, "w", encoding="utf-8") as f:
                     f.write(content)
             else:
+                # Check if this is a schema reference file that needs expansion
+                content = _get_schema_expanded_content(rel_path, config, src_path=src_path)
                 dest_path = os.path.join(site_dir, rel_path)
                 os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                shutil.copy2(src_path, dest_path)
+                if content is not None:
+                    # Write expanded schema content
+                    log.info(f"Expanding schema references in {rel_path}")
+                    with open(dest_path, "w", encoding="utf-8") as f:
+                        f.write(content)
+                else:
+                    # Just copy the file as-is
+                    shutil.copy2(src_path, dest_path)
 
     _write_well_known_skills(config, site_dir)
 
