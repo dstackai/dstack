@@ -36,8 +36,11 @@ dstack apply -f train.dstack.yml
 
 The CLI applies configurations via `dstack apply`, which provisions infrastructure, schedules workloads, and manages lifecycle. Runs can be "attached" mode (by default) - interactive, blocks terminal with port forwarding and SSH access, or detached (via `-d`) – background, non-interactive.
 
-**Important:** Use `--help` with any CLI command if uncertain about usage or available options.
-
+**CRITICAL: Never propose dstack commands or command syntaxes that don't exist.**
+- Only use commands and syntaxes explicitly documented in this skill file or verified via `--help`
+- If uncertain about a command or its syntax, check the documentation or use `--help` rather than guessing
+- Do not invent or assume command names, flags, or argument patterns
+ 
 **Best practices:**
 - Prefer giving run configurations a `name` property for easier management and identification
 - Prefer modifying configuration files over passing parameters to `dstack apply` (unless it's an exception)
@@ -252,6 +255,25 @@ volumes:
 - Once confirmed, it provisions infrastructure and streams real-time output to the terminal
 - In attached mode (default), the terminal blocks and shows output - use timeout or Ctrl+C to interrupt if you need to continue with other commands
 - In detached mode (`-d`), runs in background without blocking the terminal
+
+**Workflow for applying configurations:**
+
+**Important: When displaying CLI output, keep it close to the original format. Prefer showing tables as-is rather than reformatting or summarizing.**
+
+**For run configurations (dev-environment, task, service):**
+1. Show the plan by running `echo "n" | dstack apply -f <dstack config file>`
+2. Ask user for confirmation
+3. Once confirmed, run `dstack apply -f <dstack config file> -y -d` (detached mode with auto-confirm)
+4. Show run status with `dstack ps`
+
+**For other configurations (fleet, volume, gateway):**
+1. Show the plan by running `dstack apply -f <dstack config file>` (these don't support the "n" trick or `-d` flag)
+2. Ask user for confirmation
+3. Once confirmed, run `dstack apply -f <dstack config file> -y`
+4. Show status with the appropriate command:
+   - Fleets: `dstack fleet`
+   - Volumes: `dstack volume`
+   - Gateways: `dstack gateway`
 
 ```bash
 # Apply and attach (interactive, blocks terminal with port forwarding)
