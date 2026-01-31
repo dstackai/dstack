@@ -11,7 +11,7 @@ mimetypes.add_type("text/plain", ".md")
 log = logging.getLogger("mkdocs")
 
 WELL_KNOWN_SKILLS_DIR = ".well-known/skills"
-SKILL_SOURCE = "skill.md"
+SKILL_PATH = ("skills", "dstack", "SKILL.md")
 DISABLE_EXAMPLES_ENV = "DSTACK_DOCS_DISABLE_EXAMPLES"
 
 
@@ -79,12 +79,13 @@ def on_post_build(config):
                 os.makedirs(os.path.dirname(dest_path), exist_ok=True)
                 shutil.copy2(src_path, dest_path)
 
-    _write_well_known_skills(docs_dir, site_dir)
+    _write_well_known_skills(config, site_dir)
 
 
-def _write_well_known_skills(docs_dir, site_dir):
-    """Parse skill.md and write .well-known/skills/index.json. name and description come from frontmatter only."""
-    skill_src = os.path.join(docs_dir, SKILL_SOURCE)
+def _write_well_known_skills(config, site_dir):
+    """Parse skills/dstack/SKILL.md and write .well-known/skills/index.json. name and description come from frontmatter only."""
+    repo_root = os.path.dirname(config["config_file_path"])
+    skill_src = os.path.join(repo_root, *SKILL_PATH)
     if not os.path.isfile(skill_src):
         return
 
@@ -105,13 +106,15 @@ def _write_well_known_skills(docs_dir, site_dir):
 
     if not name or not description:
         log.warning(
-            "skill.md missing name or description in frontmatter; skipping .well-known/skills"
+            "skills/dstack/SKILL.md missing name or description in frontmatter; skipping .well-known/skills"
         )
         return
 
     out_dir = os.path.join(site_dir, WELL_KNOWN_SKILLS_DIR, name)
     os.makedirs(out_dir, exist_ok=True)
     shutil.copy2(skill_src, os.path.join(out_dir, "skill.md"))
+    # Serve skill at site root (e.g. https://dstack.ai/skill.md) from skills/dstack/SKILL.md
+    shutil.copy2(skill_src, os.path.join(site_dir, "skill.md"))
 
     index_path = os.path.join(site_dir, WELL_KNOWN_SKILLS_DIR, "index.json")
     index = {"skills": [{"name": name, "description": description[:1024], "files": ["skill.md"]}]}

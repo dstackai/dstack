@@ -1,6 +1,6 @@
 ---
 name: dstack
-description: >-
+description: |
   dstack is an open-source control plane for GPU provisioning and orchestration across GPU clouds, Kubernetes, and on-prem clusters.
 ---
 
