@@ -89,6 +89,12 @@ Instead, use `dstack ps -v` to check status, or `dstack apply -d` for detached m
 - When user confirms deletion/stop operations, use `-y` flag to skip confirmation prompts
 - Avoid waiting indefinitely; display essential output once command is finished (even if by timeout)
 
+### Interpreting user requests
+
+**"Run something":** When the user asks to "run" a workload (dev environment, task, or service), use `dstack apply` with the appropriate configuration. Note: `dstack run` only supports `dstack run get --json` for retrieving run details—it cannot start workloads.
+
+**"Connect to" or "open" a dev environment:** If a dev environment is already running, retrieve its IDE connection URL (`cursor://`, `vscode://`, etc.) from `dstack logs <run-name>` and provide it to the user.
+
 ## Configuration types
 
 `dstack` supports five main configuration types, each with specific use cases. Configuration files can be named `<name>.dstack.yml` or simply `.dstack.yml`.
@@ -102,6 +108,7 @@ Instead, use `dstack ps -v` to check status, or `dstack apply -d` for detached m
 
 **Best practices:**
  - Prefer giving configurations a `name` property for easier management
+ - When configurations need credentials (API keys, tokens), list only env var *names* in the `env` section (e.g., `- HF_TOKEN`), not values. Recommend storing actual values in a `.envrc` file alongside the configuration, applied via `source .envrc && dstack apply`.
 
 See configuration reference pages for complete parameter lists.
 
