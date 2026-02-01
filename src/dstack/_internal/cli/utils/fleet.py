@@ -151,10 +151,10 @@ def _format_price(price: Optional[float]) -> str:
 def _format_instance_gpu(instance: Instance) -> str:
     if instance.instance_type is None:
         return "-"
-    if (
-        instance.backend == BackendType.REMOTE
-        and instance.status in [InstanceStatus.PENDING, InstanceStatus.PROVISIONING]
-    ):
+    if instance.backend == BackendType.REMOTE and instance.status in [
+        InstanceStatus.PENDING,
+        InstanceStatus.PROVISIONING,
+    ]:
         return "-"
     return instance.instance_type.resources.pretty_format(gpu_only=True, include_spot=False) or "-"
 
@@ -162,10 +162,10 @@ def _format_instance_gpu(instance: Instance) -> str:
 def _format_instance_resources(instance: Instance) -> str:
     if instance.instance_type is None:
         return "-"
-    if (
-        instance.backend == BackendType.REMOTE
-        and instance.status in [InstanceStatus.PENDING, InstanceStatus.PROVISIONING]
-    ):
+    if instance.backend == BackendType.REMOTE and instance.status in [
+        InstanceStatus.PENDING,
+        InstanceStatus.PROVISIONING,
+    ]:
         return "-"
     return instance.instance_type.resources.pretty_format(include_spot=False)
 
@@ -196,9 +196,7 @@ def get_fleets_table(
         merged_profile = fleet.spec.merged_profile
 
         # Detect SSH fleet vs backend fleet
-        is_ssh_fleet = config.ssh_config is not None
-
-        if is_ssh_fleet:
+        if config.ssh_config is not None:
             # SSH fleet: fixed number of hosts, no cloud billing
             nodes = str(len(config.ssh_config.hosts))
             backend = "ssh"
@@ -261,7 +259,9 @@ def get_fleets_table(
                     instance.instance_type is not None
                     and instance.instance_type.resources is not None
                 ):
-                    instance_spot = "spot" if instance.instance_type.resources.spot else "on-demand"
+                    instance_spot = (
+                        "spot" if instance.instance_type.resources.spot else "on-demand"
+                    )
                 instance_price = _format_price(instance.price)
 
             instance_row: Dict[Union[str, int], Any] = {

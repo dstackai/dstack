@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import uuid4
 
-import pytest
 from rich.table import Table
 from rich.text import Text
 
@@ -19,7 +18,6 @@ from dstack._internal.core.models.fleets import (
     SSHHostParams,
     SSHParams,
 )
-from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Disk,
     Gpu,
@@ -428,7 +426,9 @@ class TestGetFleetsTable:
             name="active", status=FleetStatus.ACTIVE, instances=[active_instance]
         )
 
-        terminating_instance = create_test_instance(instance_num=0, status=InstanceStatus.TERMINATING)
+        terminating_instance = create_test_instance(
+            instance_num=0, status=InstanceStatus.TERMINATING
+        )
         terminating_fleet = create_backend_fleet(
             name="terminating", status=FleetStatus.TERMINATING, instances=[terminating_instance]
         )
