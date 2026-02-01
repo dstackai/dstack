@@ -285,22 +285,4 @@ def get_fleets_table(
 
             add_row_from_dict(table, instance_row, style="secondary")
 
-        # If fleet has no instances and is not terminating, show placeholder
-        if len(fleet.instances) == 0 and fleet.status != FleetStatus.TERMINATING:
-            empty_row: Dict[Union[str, int], Any] = {
-                "NAME": "   (no instances)",
-                "NODES": "",
-                "BACKEND": "",
-                "PRICE": "",
-                "SPOT": "",
-                "STATUS": "",
-                "CREATED": "",
-            }
-            if verbose:
-                empty_row["RESOURCES"] = ""
-                empty_row["ERROR"] = ""
-            else:
-                empty_row["GPU"] = ""
-            add_row_from_dict(table, empty_row, style="secondary")
-
     return table

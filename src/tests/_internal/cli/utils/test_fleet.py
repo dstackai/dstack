@@ -206,10 +206,7 @@ def create_ssh_fleet(
 
 
 class TestGetFleetsTable:
-    """Tests for get_fleets_table function."""
-
     def test_backend_fleet_without_verbose(self):
-        """Test backend fleet display without verbose mode."""
         instance = create_test_instance(
             instance_num=0,
             backend=BackendType.AWS,
@@ -232,7 +229,6 @@ class TestGetFleetsTable:
 
         assert len(cells) == 2  # 1 fleet row + 1 instance row
 
-        # Fleet row
         fleet_row = cells[0]
         assert fleet_row["NAME"] == "my-cloud"
         assert fleet_row["NODES"] == "0..4"
@@ -241,7 +237,6 @@ class TestGetFleetsTable:
         assert fleet_row["PRICE"] == "-"  # no max_price set
         assert fleet_row["STATUS"] == "active"
 
-        # Instance row
         instance_row = cells[1]
         assert "instance=0" in instance_row["NAME"]
         assert instance_row["BACKEND"] == "aws (us-east-1)"
@@ -250,7 +245,6 @@ class TestGetFleetsTable:
         assert instance_row["STATUS"] == "idle"
 
     def test_backend_fleet_with_verbose(self):
-        """Test backend fleet display with verbose mode."""
         instance = create_test_instance(
             instance_num=0,
             backend=BackendType.GCP,
@@ -275,7 +269,6 @@ class TestGetFleetsTable:
 
         assert len(cells) == 2
 
-        # Fleet row
         fleet_row = cells[0]
         assert fleet_row["NAME"] == "my-cloud"
         assert fleet_row["NODES"] == "1 (cluster)"
@@ -284,7 +277,6 @@ class TestGetFleetsTable:
         assert fleet_row["PRICE"] == "$0..$2"
         assert fleet_row["STATUS"] == "active"
 
-        # Instance row
         instance_row = cells[1]
         assert "instance=0" in instance_row["NAME"]
         assert instance_row["BACKEND"] == "gcp (us-west4)"
@@ -292,7 +284,6 @@ class TestGetFleetsTable:
         assert instance_row["PRICE"] == "$1.25"
 
     def test_ssh_fleet_without_verbose(self):
-        """Test SSH fleet display without verbose mode."""
         instance1 = create_test_instance(
             instance_num=0,
             backend=BackendType.REMOTE,
@@ -326,16 +317,14 @@ class TestGetFleetsTable:
 
         assert len(cells) == 3  # 1 fleet row + 2 instance rows
 
-        # Fleet row
         fleet_row = cells[0]
         assert fleet_row["NAME"] == "my-ssh"
-        assert fleet_row["NODES"] == "2"  # Number of hosts
+        assert fleet_row["NODES"] == "2"
         assert fleet_row["BACKEND"] == "ssh"
         assert fleet_row["SPOT"] == "-"
         assert fleet_row["PRICE"] == "-"
         assert fleet_row["STATUS"] == "active"
 
-        # Instance rows
         for i, instance_row in enumerate(cells[1:], start=0):
             assert f"instance={i}" in instance_row["NAME"]
             assert instance_row["BACKEND"] == "ssh"
@@ -343,7 +332,6 @@ class TestGetFleetsTable:
             assert instance_row["PRICE"] == "-"
 
     def test_ssh_fleet_with_verbose(self):
-        """Test SSH fleet display with verbose mode."""
         instance = create_test_instance(
             instance_num=0,
             backend=BackendType.REMOTE,
@@ -364,7 +352,6 @@ class TestGetFleetsTable:
 
         assert len(cells) == 2
 
-        # Fleet row
         fleet_row = cells[0]
         assert fleet_row["NAME"] == "my-ssh"
         assert fleet_row["NODES"] == "1 (cluster)"
@@ -372,7 +359,6 @@ class TestGetFleetsTable:
         assert fleet_row["SPOT"] == "-"
         assert fleet_row["PRICE"] == "-"
 
-        # Instance row
         instance_row = cells[1]
         assert "instance=0" in instance_row["NAME"]
         assert instance_row["BACKEND"] == "ssh"
@@ -380,7 +366,6 @@ class TestGetFleetsTable:
         assert instance_row["PRICE"] == "-"
 
     def test_mixed_fleets(self):
-        """Test display of mixed backend and SSH fleets."""
         backend_instance = create_test_instance(
             instance_num=0,
             backend=BackendType.AWS,
@@ -417,31 +402,26 @@ class TestGetFleetsTable:
 
         assert len(cells) == 4  # 2 fleet rows + 2 instance rows
 
-        # Backend fleet
         assert cells[0]["NAME"] == "cloud-fleet"
         assert cells[0]["NODES"] == "0..2"
         assert cells[0]["BACKEND"] == "aws"
         assert cells[0]["SPOT"] == "spot"
 
-        # Backend instance
         assert "instance=0" in cells[1]["NAME"]
         assert cells[1]["SPOT"] == "spot"
         assert cells[1]["PRICE"] == "$0.75"
 
-        # SSH fleet
         assert cells[2]["NAME"] == "ssh-fleet"
         assert cells[2]["NODES"] == "1"
         assert cells[2]["BACKEND"] == "ssh"
         assert cells[2]["SPOT"] == "-"
         assert cells[2]["PRICE"] == "-"
 
-        # SSH instance
         assert "instance=0" in cells[3]["NAME"]
         assert cells[3]["SPOT"] == "-"
         assert cells[3]["PRICE"] == "-"
 
     def test_fleet_status_colors(self):
-        """Test that fleet statuses have correct colors."""
         # Add instances to avoid placeholder rows affecting row indices
         active_instance = create_test_instance(instance_num=0, status=InstanceStatus.IDLE)
         active_fleet = create_backend_fleet(
@@ -455,16 +435,14 @@ class TestGetFleetsTable:
 
         table = get_fleets_table([active_fleet, terminating_fleet], verbose=False)
 
-        # Active fleet (row 0) should be bold white
         active_style = get_table_cell_style(table, "STATUS", 0)
         assert active_style == "bold white"
 
-        # Terminating fleet (row 2, after active fleet's instance) should be bold blue
+        # Row 2 (after active fleet's instance)
         terminating_style = get_table_cell_style(table, "STATUS", 2)
         assert terminating_style == "bold deep_sky_blue1"
 
     def test_instance_status_colors(self):
-        """Test that instance statuses have correct colors."""
         idle_instance = create_test_instance(instance_num=0, status=InstanceStatus.IDLE)
         busy_instance = create_test_instance(instance_num=1, status=InstanceStatus.BUSY)
 
@@ -475,27 +453,22 @@ class TestGetFleetsTable:
 
         table = get_fleets_table([fleet], verbose=False)
 
-        # Idle should be bold green
         idle_style = get_table_cell_style(table, "STATUS", 1)
         assert idle_style == "bold sea_green3"
 
-        # Busy should be bold white
         busy_style = get_table_cell_style(table, "STATUS", 2)
         assert busy_style == "bold white"
 
-    def test_empty_fleet_placeholder(self):
-        """Test that fleets with no instances show placeholder."""
+    def test_empty_fleet(self):
         fleet = create_backend_fleet(name="empty-fleet", instances=[])
 
         table = get_fleets_table([fleet], verbose=False)
         cells = get_table_cells(table)
 
-        assert len(cells) == 2
+        assert len(cells) == 1
         assert cells[0]["NAME"] == "empty-fleet"
-        assert "(no instances)" in cells[1]["NAME"]
 
     def test_fleet_with_max_price(self):
-        """Test fleet with max_price configured."""
         fleet = create_backend_fleet(
             name="priced-fleet",
             max_price=5.0,
@@ -507,7 +480,6 @@ class TestGetFleetsTable:
         assert cells[0]["PRICE"] == "$0..$5"
 
     def test_fleet_with_multiple_backends(self):
-        """Test fleet with multiple backends configured."""
         fleet = create_backend_fleet(
             name="multi-backend",
             backends=[BackendType.AWS, BackendType.GCP, BackendType.AZURE],
@@ -519,7 +491,6 @@ class TestGetFleetsTable:
         assert cells[0]["BACKEND"] == "aws, gcp, azure"
 
     def test_fleet_with_any_backend(self):
-        """Test fleet with no backends configured (any backend)."""
         fleet = create_backend_fleet(
             name="any-backend",
             backends=None,
