@@ -5,12 +5,15 @@ from abc import ABC, abstractmethod
 from pathlib import PurePosixPath
 from typing import Dict, List, Optional
 
+import orjson
 from cachetools import TTLCache, cached
 
 from dstack._internal import settings
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
+    DEFAULT_MODEL_PROBE_TIMEOUT,
+    DEFAULT_MODEL_PROBE_URL,
     DEFAULT_PROBE_INTERVAL,
     DEFAULT_PROBE_METHOD,
     DEFAULT_PROBE_READY_AFTER,
@@ -18,6 +21,7 @@ from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_URL,
     DEFAULT_REPLICA_GROUP_NAME,
     LEGACY_REPO_DIR,
+    HTTPHeaderSpec,
     PortMapping,
     ProbeConfig,
     PythonVersion,
@@ -394,7 +398,13 @@ class JobConfigurator(ABC):
 
     def _probes(self) -> list[ProbeSpec]:
         if isinstance(self.run_spec.configuration, ServiceConfiguration):
-            return list(map(_probe_config_to_spec, self.run_spec.configuration.probes or []))
+            probes = self.run_spec.configuration.probes
+            if probes is not None:
+                return list(map(_probe_config_to_spec, probes))
+            # Generate default probe if model is set
+            model = self.run_spec.configuration.model
+            if model is not None:
+                return [_default_model_probe_spec(model.name)]
         return []
 
 
@@ -444,6 +454,28 @@ def _probe_config_to_spec(c: ProbeConfig) -> ProbeSpec:
         method=c.method if c.method is not None else DEFAULT_PROBE_METHOD,
         headers=c.headers,
         body=c.body,
+    )
+
+
+def _default_model_probe_spec(model_name: str) -> ProbeSpec:
+    body = orjson.dumps(
+        {
+            "model": model_name,
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 1,
+        }
+    ).decode("utf-8")
+    return ProbeSpec(
+        type="http",
+        method="post",
+        url=DEFAULT_MODEL_PROBE_URL,
+        headers=[
+            HTTPHeaderSpec(name="Content-Type", value="application/json"),
+        ],
+        body=body,
+        timeout=DEFAULT_MODEL_PROBE_TIMEOUT,
+        interval=DEFAULT_PROBE_INTERVAL,
+        ready_after=DEFAULT_PROBE_READY_AFTER,
     )
 
 

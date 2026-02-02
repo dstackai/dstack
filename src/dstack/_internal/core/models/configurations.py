@@ -937,35 +937,6 @@ class ServiceConfigurationParams(CoreModel):
         return v
 
     @root_validator()
-    def set_default_probes_for_model(cls, values):
-        model = values.get("model")
-        probes = values.get("probes")
-        if model is not None and probes is None:
-            body = orjson.dumps(
-                {
-                    "model": model.name,
-                    "messages": [{"role": "user", "content": "hi"}],
-                    "max_tokens": 1,
-                }
-            ).decode("utf-8")
-            values["probes"] = [
-                ProbeConfig(
-                    type="http",
-                    method="post",
-                    url=DEFAULT_MODEL_PROBE_URL,
-                    headers=[
-                        HTTPHeaderSpec(name="Content-Type", value="application/json"),
-                    ],
-                    body=body,
-                    timeout=DEFAULT_MODEL_PROBE_TIMEOUT,
-                )
-            ]
-        elif probes is None:
-            # Probes omitted and model not set: normalize to empty list for downstream.
-            values["probes"] = []
-        return values
-
-    @root_validator()
     def validate_scaling(cls, values):
         scaling = values.get("scaling")
         replicas = values.get("replicas")
