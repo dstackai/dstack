@@ -41,10 +41,6 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
     const [getItems, { isLoading, isFetching }] = useLazyQuery({ ...args } as Args);
 
     const getDataRequest = (params: Args) => {
-        if (isEqual(params, lastRequestParams.current)) {
-            return Promise.reject();
-        }
-
         const request = getItems({
             limit,
             ...params,
@@ -90,36 +86,40 @@ export const useInfiniteScroll = <DataItem, Args extends InfinityListArgs>({
             return;
         }
 
-        try {
-            isLoadingRef.current = true;
+        const requestParams = {
+            ...argsProp,
+            ...getPaginationParams(data[data.length - 1]),
+        };
 
-            const result = await getDataRequest({
-                ...argsProp,
-                ...getPaginationParams(data[data.length - 1]),
-            } as Args);
+        if (!isEqual(requestParams, lastRequestParams.current)) {
+            try {
+                isLoadingRef.current = true;
 
-            let listResponse: ListResponse<DataItem>;
+                const result = await getDataRequest(requestParams as Args);
 
-            if ('data' in result) {
-                listResponse = result.data;
-                setTotalCount(result.total_count);
-            } else {
-                listResponse = result;
-                setTotalCount();
+                let listResponse: ListResponse<DataItem>;
+
+                if ('data' in result) {
+                    listResponse = result.data;
+                    setTotalCount(result.total_count);
+                } else {
+                    listResponse = result;
+                    setTotalCount();
+                }
+
+                if (listResponse.length > 0) {
+                    setData((prev) => [...prev, ...listResponse]);
+                } else {
+                    isDisabledMoreRef.current = true;
+                }
+            } catch (e) {
+                console.log(e);
             }
 
-            if (listResponse.length > 0) {
-                setData((prev) => [...prev, ...listResponse]);
-            } else {
-                isDisabledMoreRef.current = true;
-            }
-        } catch (e) {
-            console.log(e);
+            setTimeout(() => {
+                isLoadingRef.current = false;
+            }, 50);
         }
-
-        setTimeout(() => {
-            isLoadingRef.current = false;
-        }, 50);
     };
 
     useLayoutEffect(() => {
