@@ -233,16 +233,6 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 ??? info "Disaggregated serving"
     Native support for disaggregated prefill and decode, allowing both worker types to run within a single service, is coming soon.
 
-### Model
-
-If the service is running a chat model with an OpenAI-compatible interface (i.e., `/v1/chat/completions`),
-set the [`model`](../reference/dstack.yml/service.md#model) property to make the model accessible via `dstack`'s 
-global OpenAI-compatible endpoint, and also accessible via `dstack`'s UI.
-
-When `model` is set, `dstack` automatically configures [`probes`](#probes) to verify model health.
-To customize or disable this, set `probes` explicitly.
-
-
 ### Authorization
 
 By default, the service enables authorization, meaning the service endpoint requires a `dstack` user token.
@@ -341,8 +331,6 @@ Probes are executed for each service replica while the replica is `running`. A p
 ??? info "Model"
     If you set the [`model`](#model) property but don't explicitly configure `probes`, 
     `dstack` automatically configures a default probe that tests the model using the `/v1/chat/completions` API.
-    This default probe sends a minimal chat completion request to verify the model is responding correctly.
-
     To disable probes entirely when `model` is set, explicitly set `probes` to an empty list.
 
 See the [reference](../reference/dstack.yml/service.md#probes) for more probe configuration options.
@@ -441,6 +429,9 @@ Limits apply to the whole service (all replicas) and per client (by IP). Clients
 
 If the service runs a model with an OpenAI-compatible interface, you can set the [`model`](#model) property to make the model accessible through `dstack`'s chat UI on the `Models` page. 
 In this case, `dstack` will use the service's `/v1/chat/completions` service.
+
+When `model` is set, `dstack` automatically configures [`probes`](#probes) to verify model health.
+To customize or disable this, set `probes` explicitly.
 
 ### Resources
 
