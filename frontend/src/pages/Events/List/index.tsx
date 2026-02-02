@@ -24,12 +24,19 @@ export const EventList = () => {
         },
     ]);
 
-    const { filteringRequestParams, propertyFilterQuery, onChangePropertyFilter, filteringOptions, filteringProperties } =
-        useFilters();
+    const {
+        filteringRequestParams,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
+        isLoadingFilters,
+    } = useFilters();
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
         args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
+        skip: isLoadingFilters,
 
         getPaginationParams: (lastEvent) => ({
             prev_recorded_at: lastEvent.recorded_at,
@@ -47,13 +54,15 @@ export const EventList = () => {
 
     const { columns } = useColumnsDefinitions();
 
+    const loading = isLoadingFilters || isLoading;
+
     return (
         <Table
             {...collectionProps}
             variant="full-page"
             columnDefinitions={columns}
             items={items}
-            loading={isLoading}
+            loading={loading}
             loadingText={t('common.loading')}
             stickyHeader={true}
             selectionType="multi"
@@ -64,7 +73,7 @@ export const EventList = () => {
                         <SpaceBetween size="xs" direction="horizontal">
                             <Button
                                 iconName="refresh"
-                                disabled={isLoading}
+                                disabled={loading}
                                 ariaLabel={t('common.refresh')}
                                 onClick={refreshList}
                             />

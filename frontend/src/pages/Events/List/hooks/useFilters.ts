@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { omit } from 'lodash';
 
 import type { PropertyFilterProps } from 'components';
 
@@ -77,8 +78,8 @@ const targetTypes = [
 
 export const useFilters = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const { data: projectsData } = useGetProjectsQuery({});
-    const { data: usersData } = useGetUserListQuery({});
+    const { data: projectsData, isLoading: isLoadingProjects } = useGetProjectsQuery({});
+    const { data: usersData, isLoading: isLoadingUsers } = useGetUserListQuery({});
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
         requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
@@ -243,51 +244,65 @@ export const useFilters = () => {
             arrayFieldKeys: multipleChoiseKeys,
         });
 
+        const targetProjects = params[filterKeys.TARGET_PROJECTS]
+            ?.map((name: string) => projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'])
+            .filter(Boolean);
+
+        const withInProjects = params[filterKeys.WITHIN_PROJECTS]
+            ?.map((name: string) => projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'])
+            .filter(Boolean);
+
+        const targetUsers = params[filterKeys.TARGET_USERS]
+            ?.map((name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'])
+            .filter(Boolean);
+
+        const actors = params[filterKeys.ACTORS]
+            ?.map((name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'])
+            .filter(Boolean);
+
+        const includeTargetTypes = params[filterKeys.INCLUDE_TARGET_TYPES]
+            ?.map((selectedLabel: string) => targetTypes?.find(({ label }) => label === selectedLabel)?.['value'])
+            .filter(Boolean);
+
         const mappedFields = {
-            ...(params[filterKeys.TARGET_PROJECTS] && Array.isArray(params[filterKeys.TARGET_PROJECTS])
+            ...(targetProjects?.length
                 ? {
-                      [filterKeys.TARGET_PROJECTS]: params[filterKeys.TARGET_PROJECTS]?.map(
-                          (name: string) =>
-                              projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'],
-                      ),
+                      [filterKeys.TARGET_PROJECTS]: targetProjects,
                   }
                 : {}),
-            ...(params[filterKeys.WITHIN_PROJECTS] && Array.isArray(params[filterKeys.WITHIN_PROJECTS])
+            ...(withInProjects?.length
                 ? {
-                      [filterKeys.WITHIN_PROJECTS]: params[filterKeys.WITHIN_PROJECTS]?.map(
-                          (name: string) =>
-                              projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'],
-                      ),
+                      [filterKeys.WITHIN_PROJECTS]: withInProjects,
                   }
                 : {}),
 
-            ...(params[filterKeys.TARGET_USERS] && Array.isArray(params[filterKeys.TARGET_USERS])
+            ...(targetUsers?.length
                 ? {
-                      [filterKeys.TARGET_USERS]: params[filterKeys.TARGET_USERS]?.map(
-                          (name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'],
-                      ),
+                      [filterKeys.TARGET_USERS]: targetUsers,
                   }
                 : {}),
 
-            ...(params[filterKeys.ACTORS] && Array.isArray(params[filterKeys.ACTORS])
+            ...(actors?.length
                 ? {
-                      [filterKeys.ACTORS]: params[filterKeys.ACTORS]?.map(
-                          (name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'],
-                      ),
+                      [filterKeys.ACTORS]: actors,
                   }
                 : {}),
 
-            ...(params[filterKeys.INCLUDE_TARGET_TYPES] && Array.isArray(params[filterKeys.INCLUDE_TARGET_TYPES])
+            ...(includeTargetTypes?.length
                 ? {
-                      [filterKeys.INCLUDE_TARGET_TYPES]: params[filterKeys.INCLUDE_TARGET_TYPES]?.map(
-                          (selectedLabel: string) => targetTypes?.find(({ label }) => label === selectedLabel)?.['value'],
-                      ),
+                      [filterKeys.INCLUDE_TARGET_TYPES]: includeTargetTypes,
                   }
                 : {}),
         };
 
         return {
-            ...params,
+            ...omit(params, [
+                filterKeys.TARGET_PROJECTS,
+                filterKeys.WITHIN_PROJECTS,
+                filterKeys.TARGET_USERS,
+                filterKeys.ACTORS,
+                filterKeys.INCLUDE_TARGET_TYPES,
+            ]),
             ...mappedFields,
         } as Partial<TRunsRequestParams>;
     }, [propertyFilterQuery, usersData, projectsData]);
@@ -299,5 +314,6 @@ export const useFilters = () => {
         onChangePropertyFilter,
         filteringOptions,
         filteringProperties,
+        isLoadingFilters: isLoadingProjects || isLoadingUsers,
     } as const;
 };
