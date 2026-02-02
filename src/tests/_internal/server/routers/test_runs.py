@@ -63,6 +63,7 @@ from dstack._internal.server.testing.common import (
     get_fleet_spec,
     get_job_provisioning_data,
     get_run_spec,
+    list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
 from tests._internal.server.background.tasks.test_process_running_jobs import settings
@@ -2085,6 +2086,7 @@ class TestSubmitService:
             "specified_gateway_in_run_conf",
             "expected_service_url",
             "expected_model_url",
+            "is_gateway",
         ),
         [
             pytest.param(
@@ -2092,6 +2094,7 @@ class TestSubmitService:
                 None,
                 "https://test-service.default-gateway.example",
                 "https://gateway.default-gateway.example",
+                True,
                 id="submits-to-default-gateway",
             ),
             pytest.param(
@@ -2099,6 +2102,7 @@ class TestSubmitService:
                 True,
                 "https://test-service.default-gateway.example",
                 "https://gateway.default-gateway.example",
+                True,
                 id="submits-to-default-gateway-when-gateway-true",
             ),
             pytest.param(
@@ -2106,6 +2110,7 @@ class TestSubmitService:
                 "non-default-gateway",
                 "https://test-service.non-default-gateway.example",
                 "https://gateway.non-default-gateway.example",
+                True,
                 id="submits-to-specified-gateway",
             ),
             pytest.param(
@@ -2113,6 +2118,7 @@ class TestSubmitService:
                 None,
                 "/proxy/services/test-project/test-service/",
                 "/proxy/models/test-project/",
+                False,
                 id="submits-in-server-when-no-default-gateway",
             ),
             pytest.param(
@@ -2120,6 +2126,7 @@ class TestSubmitService:
                 False,
                 "/proxy/services/test-project/test-service/",
                 "/proxy/models/test-project/",
+                False,
                 id="submits-in-server-when-specified",
             ),
         ],
@@ -2130,9 +2137,10 @@ class TestSubmitService:
         session: AsyncSession,
         client: AsyncClient,
         existing_gateways: List[Tuple[str, bool]],
-        specified_gateway_in_run_conf: str,
+        specified_gateway_in_run_conf: Union[str, bool, None],
         expected_service_url: str,
         expected_model_url: str,
+        is_gateway: bool,
     ) -> None:
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user, name="test-project")
@@ -2171,6 +2179,8 @@ class TestSubmitService:
         assert response.status_code == 200
         assert response.json()["service"]["url"] == expected_service_url
         assert response.json()["service"]["model"]["base_url"] == expected_model_url
+        events = await list_events(session)
+        assert ("Service registered in gateway" in {e.message for e in events}) == is_gateway
 
     @pytest.mark.asyncio
     async def test_return_error_if_specified_gateway_not_exists(
