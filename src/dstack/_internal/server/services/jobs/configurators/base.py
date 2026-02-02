@@ -444,6 +444,7 @@ def _probe_config_to_spec(c: ProbeConfig) -> ProbeSpec:
         method=c.method if c.method is not None else DEFAULT_PROBE_METHOD,
         headers=c.headers,
         body=c.body,
+        until_ready=c.until_ready,
     )
 
 

@@ -247,6 +247,7 @@ class ProbeSpec(CoreModel):
     timeout: int
     interval: int
     ready_after: int
+    until_ready: bool = False
 
 
 class JobSpec(CoreModel):

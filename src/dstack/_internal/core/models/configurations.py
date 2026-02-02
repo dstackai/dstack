@@ -372,6 +372,16 @@ class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
             ),
         ),
     ] = None
+    until_ready: Annotated[
+        bool,
+        Field(
+            description=(
+                "If `true`, the probe will stop being executed as soon as it reaches the"
+                " `ready_after` threshold of successful executions."
+                " Defaults to `false`"
+            ),
+        ),
+    ] = False
 
     @validator("timeout", pre=True)
     def parse_timeout(cls, v: Optional[Union[int, str]]) -> Optional[int]:

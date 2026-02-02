@@ -163,6 +163,67 @@ class TestProcessProbes:
             + PROCESSING_OVERHEAD_TIMEOUT
         )
 
+    async def test_deactivates_probe_when_until_ready_and_ready_after_reached(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(
+                    port=80,
+                    image="nginx",
+                    probes=[
+                        ProbeConfig(
+                            type="http", url="/until_ready", until_ready=True, ready_after=3
+                        ),
+                        ProbeConfig(type="http", url="/regular", until_ready=False, ready_after=3),
+                    ],
+                ),
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance=instance,
+            instance_assigned=True,
+        )
+
+        probe_until_ready = await create_probe(session, job, probe_num=0, success_streak=3)
+        probe_regular = await create_probe(session, job, probe_num=1, success_streak=3)
+
+        with patch(
+            "dstack._internal.server.background.tasks.process_probes.PROBES_SCHEDULER"
+        ) as scheduler_mock:
+            await process_probes()
+
+        await session.refresh(probe_until_ready)
+        await session.refresh(probe_regular)
+
+        assert not probe_until_ready.active
+        assert probe_until_ready.success_streak == 3
+
+        assert probe_regular.active
+        assert probe_regular.success_streak == 3
+        assert scheduler_mock.add_job.call_count == 1  # only the regular probe was scheduled
+
 
 # TODO: test probe success and failure
 # (skipping for now - a bit difficult to test and most of the logic will be mocked)
