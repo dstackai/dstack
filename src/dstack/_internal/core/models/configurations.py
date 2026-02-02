@@ -854,7 +854,11 @@ class ServiceConfigurationParams(CoreModel):
     rate_limits: Annotated[list[RateLimit], Field(description="Rate limiting rules")] = []
     probes: Annotated[
         Optional[list[ProbeConfig]],
-        Field(description="List of probes used to determine job health"),
+        Field(
+            description="The list of probes to determine service health. "
+            "If `model` is set, defaults to a `/v1/chat/completions` probe. "
+            "Set explicitly to override."
+        ),
     ] = None  # None = omitted (may get default when model is set); [] = explicit empty
 
     replicas: Annotated[
