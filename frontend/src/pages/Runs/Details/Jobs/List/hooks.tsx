@@ -15,6 +15,7 @@ import {
     getJobListItemRegion,
     getJobListItemResources,
     getJobListItemSpot,
+    getJobProbesStatuses,
     getJobStatus,
     getJobStatusMessage,
     getJobSubmittedAt,
@@ -65,6 +66,14 @@ export const useColumnsDefinitions = ({
                         {getJobStatusMessage(item)}
                     </StatusIndicator>
                 );
+            },
+        },
+        {
+            id: 'probe',
+            header: t('projects.run.probe'),
+            cell: (item: IJob) => {
+                const statuses = getJobProbesStatuses(item);
+                return statuses.map((statusType, index) => <StatusIndicator key={index} type={statusType} />);
             },
         },
         {

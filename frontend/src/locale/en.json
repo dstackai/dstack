@@ -402,6 +402,7 @@
       "priority": "Priority",
       "provider_name": "Provider",
       "status": "Status",
+      "probe": "Probes",
       "submitted_at": "Submitted",
       "finished_at": "Finished",
       "metrics": {
@@ -477,6 +478,7 @@
         "offer": "Offer",
         "offer_description": "Select an offer for the dev environment.",
         "name": "Name",
+        "name_description": "The name of the run, e.g. 'my-dev-env'",
         "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",
         "name_placeholder": "Optional",
         "ide": "IDE",

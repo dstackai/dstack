@@ -7,7 +7,14 @@ import { format } from 'date-fns';
 import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { getRunError, getRunPriority, getRunStatusMessage, getStatusIconColor, getStatusIconType } from 'libs/run';
+import {
+    getRunError,
+    getRunPriority,
+    getRunProbeStatuses,
+    getRunStatusMessage,
+    getStatusIconColor,
+    getStatusIconType,
+} from 'libs/run';
 import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
@@ -65,6 +72,14 @@ export const RunDetails = () => {
 
     const statusMessage = getRunStatusMessage(runData);
 
+    const renderRobeStatuses = () => {
+        const statuses = getRunProbeStatuses(runData);
+
+        if (!statuses.length) return '-';
+
+        return statuses.map((statusType, index) => <StatusIndicator key={index} type={statusType} />);
+    };
+
     return (
         <>
             <Container header={<Header variant="h2">{t('common.general')}</Header>}>
@@ -112,6 +127,7 @@ export const RunDetails = () => {
 
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
+
                         <div>
                             <StatusIndicator
                                 type={getStatusIconType(status, terminationReason)}
@@ -121,6 +137,13 @@ export const RunDetails = () => {
                             </StatusIndicator>
                         </div>
                     </div>
+
+                    {runData.jobs.length <= 1 && (
+                        <div>
+                            <Box variant="awsui-key-label">{t('projects.run.probe')}</Box>
+                            <div>{renderRobeStatuses()}</div>
+                        </div>
+                    )}
 
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.error')}</Box>

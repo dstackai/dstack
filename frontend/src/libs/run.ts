@@ -4,6 +4,7 @@ import { StatusIndicatorProps } from '@cloudscape-design/components';
 import { capitalize } from 'libs';
 
 import { finishedRunStatuses } from '../pages/Runs/constants';
+import { getJobProbesStatuses } from '../pages/Runs/Details/Jobs/List/helpers';
 
 import { IModelExtended } from '../pages/Models/List/types';
 
@@ -73,6 +74,16 @@ export const getRunStatusMessage = (run: IRun): string => {
 export const getRunError = (run: IRun): string | null => {
     const error = run.error ?? run.latest_job_submission?.error ?? null;
     return error ? capitalize(error) : null;
+};
+
+export const getRunProbeStatuses = (run: IRun): StatusIndicatorProps.Type[] => {
+    const job = run.jobs[0];
+
+    if (!job) {
+        return [];
+    }
+
+    return getJobProbesStatuses(run.jobs[0]);
 };
 
 export const getRunPriority = (run: IRun): number | null => {
