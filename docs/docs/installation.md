@@ -109,30 +109,6 @@ Once the server is up, you can access it via the `dstack` CLI.
     (or `Use Git and optional Unix tools from the Command Prompt`), and 
     `Use bundled OpenSSH`.
 
-### Configure the default project
-
-To point the CLI to the `dstack` server, configure it
-with the server address, user token, and project name:
-
-<div class="termy">
-
-```shell
-$ dstack project add \
-    --name main \
-    --url http://127.0.0.1:3000 \
-    --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
-    
-Configuration is updated at ~/.dstack/config.yml
-```
-
-</div>
-
-This configuration is stored in `~/.dstack/config.yml`.
-
-<!-- ### Check offers -->
-
-<!-- To verify that both the server and CLI are properly configured, use the [`dstack offer`](reference/cli/dstack/offer.md#list-gpu-offers) command to list available GPU offers. If you don't see valid offers, ensure you've set up [backends](concepts/backends.md). -->
-
 ??? info "Shell autocompletion"
 
     `dstack` supports shell autocompletion for `bash` and `zsh`.
@@ -199,9 +175,41 @@ This configuration is stored in `~/.dstack/config.yml`.
         > If you get an error similar to `2: command not found: compdef`, then add the following line to the beginning of your `~/.zshrc` file:
         > `autoload -Uz compinit && compinit`.
 
+### Configure the default project
+
+To point the CLI to the `dstack` server, configure it
+with the server address, user token, and project name:
+
+<div class="termy">
+
+```shell
+$ dstack project add \
+    --name main \
+    --url http://127.0.0.1:3000 \
+    --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
+    
+Configuration is updated at ~/.dstack/config.yml
+```
+
+</div>
+
+This configuration is stored in `~/.dstack/config.yml`.
+
+### Install agent skills
+
+Install [skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the `dstack` CLI and edit configuration files.
+
+<div class="termy">
+
+```shell
+$ npx skills add dstackai/dstack
+```
+
+</div>
+
+Agent skills are experimental. Share your feedback via [GitHub issues](https://github.com/dstackai/dstack/issues).
+
 !!! info "What's next?"
     1. See [Backends](concepts/backends.md)
     2. Follow [Quickstart](quickstart.md)
     3. Check the [server deployment](guides/server-deployment.md) guide
-    4. Browse [examples](../examples.md)
-    5. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)
