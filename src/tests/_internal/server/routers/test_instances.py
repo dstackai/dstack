@@ -395,3 +395,87 @@ class TestCompatibility:
         )
         # Must convert legacy "Fleet has too many instances" to "max_instances_limit"
         assert resp.json()[0]["termination_reason"] == "max_instances_limit"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestGetInstance:
+    async def test_returns_instance_by_id(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session, owner=user)
+        await add_project_member(
+            session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        fleet = await create_fleet(session, project)
+        instance = await create_instance(session=session, project=project, fleet=fleet)
+
+        resp = await client.post(
+            f"/api/project/{project.name}/instances/get",
+            headers=get_auth_headers(user.token),
+            json={"id": str(instance.id)},
+        )
+        assert resp.status_code == 200
+        resp_data = resp.json()
+        assert resp_data["id"] == str(instance.id)
+        assert resp_data["project_name"] == project.name
+        assert resp_data["fleet_name"] == fleet.name
+
+    async def test_returns_400_if_instance_not_found(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session, owner=user)
+        await add_project_member(
+            session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        resp = await client.post(
+            f"/api/project/{project.name}/instances/get",
+            headers=get_auth_headers(user.token),
+            json={"id": str(uuid.uuid4())},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"][0]["code"] == "resource_not_exists"
+
+    async def test_returns_400_if_instance_exists_in_different_project(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session, global_role=GlobalRole.USER)
+
+        project1 = await create_project(session, owner=user, name="p1")
+        project2 = await create_project(session, owner=user, name="p2")
+
+        await add_project_member(
+            session, project=project1, user=user, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session, project=project2, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        fleet = await create_fleet(session, project2)
+        instance = await create_instance(session=session, project=project2, fleet=fleet)
+
+        resp = await client.post(
+            f"/api/project/{project1.name}/instances/get",
+            headers=get_auth_headers(user.token),
+            json={"id": str(instance.id)},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"][0]["code"] == "resource_not_exists"
+
+    async def test_returns_403_if_not_project_member(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session, name="non_member", global_role=GlobalRole.USER)
+        project = await create_project(session)
+        fleet = await create_fleet(session, project)
+        instance = await create_instance(session=session, project=project, fleet=fleet)
+
+        resp = await client.post(
+            f"/api/project/{project.name}/instances/get",
+            headers=get_auth_headers(user.token),
+            json={"id": str(instance.id)},
+        )
+        assert resp.status_code == 403
