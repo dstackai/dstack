@@ -1105,26 +1105,10 @@ projects:
 </div>
 
 ??? info "Community Cloud"
-    By default, `dstack` considers instance offers from both the Secure Cloud and the
-    [Community Cloud](https://docs.runpod.io/references/faq/#secure-cloud-vs-community-cloud).
-
-    You can tell them apart by their regions.
-    Secure Cloud regions contain datacenter IDs such as `CA-MTL-3`.
-    Community Cloud regions contain country codes such as `CA`.
-
-    <div class="termy">
-
-    ```shell
-    $ dstack apply -f .dstack.yml -b runpod
-
-     #  BACKEND  REGION    INSTANCE               SPOT  PRICE
-     1  runpod   CA        NVIDIA A100 80GB PCIe  yes   $0.6
-     2  runpod   CA-MTL-3  NVIDIA A100 80GB PCIe  yes   $0.82
-    ```
-
-    </div>
-
-    If you don't want to use the Community Cloud, set `community_cloud: false` in the backend settings.
+    By default, `dstack` considers instance offers only from the Secure Cloud.
+    To also include the
+    [Community Cloud](https://docs.runpod.io/references/faq/#secure-cloud-vs-community-cloud),
+    set `community_cloud: true` in the backend settings.
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -1136,7 +1120,23 @@ projects:
             creds:
               type: api_key
               api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
-            community_cloud: false
+            community_cloud: true
+    ```
+
+    </div>
+
+    You can tell Secure Cloud and Community Cloud apart by their regions.
+    Secure Cloud regions contain datacenter IDs such as `CA-MTL-3`.
+    Community Cloud regions contain country codes such as `CA`.
+
+    <div class="termy">
+
+    ```shell
+    $ dstack apply -f .dstack.yml -b runpod
+
+     #  BACKEND  REGION    INSTANCE               SPOT  PRICE
+     1  runpod   CA        NVIDIA A100 80GB PCIe  yes   $0.6
+     2  runpod   CA-MTL-3  NVIDIA A100 80GB PCIe  yes   $0.82
     ```
 
     </div>
