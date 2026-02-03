@@ -4,7 +4,7 @@ from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 
-RUNPOD_COMMUNITY_CLOUD_DEFAULT = True
+RUNPOD_COMMUNITY_CLOUD_DEFAULT = False
 
 
 class RunpodAPIKeyCreds(CoreModel):
