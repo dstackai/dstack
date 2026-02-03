@@ -33,6 +33,10 @@ async def list_events(
 
     The results are paginated. To get the next page, pass `recorded_at` and `id` of
     the last event from the previous page as `prev_recorded_at` and `prev_id`.
+
+    NOTE: Some events may become available in the API with a delay after their `recorded_at`.
+    This should be taken into account when using the API to monitor recent events,
+    so that delayed events are not missed during pagination.
     """
     return CustomORJSONResponse(
         await events_services.list_events(

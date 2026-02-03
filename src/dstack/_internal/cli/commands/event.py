@@ -2,7 +2,12 @@ import argparse
 from dataclasses import asdict
 
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.services.events import EventListFilters, EventPaginator, print_event
+from dstack._internal.cli.services.events import (
+    EventListFilters,
+    EventPaginator,
+    EventTracker,
+    print_event,
+)
 from dstack._internal.cli.utils.common import (
     get_start_time,
 )
@@ -29,6 +34,12 @@ class EventCommand(APIBaseCommand):
         list_parser.set_defaults(subfunc=self._list)
 
         for parser in [self._parser, list_parser]:
+            parser.add_argument(
+                "-w",
+                "--watch",
+                help="Watch events in realtime",
+                action="store_true",
+            )
             parser.add_argument(
                 "--since",
                 help=(
@@ -106,7 +117,11 @@ class EventCommand(APIBaseCommand):
         since = get_start_time(args.since)
         filters = _build_filters(args, self.api)
 
-        if since is not None:
+        if args.watch:
+            events = EventTracker(
+                client=self.api.client.events, filters=filters, since=since
+            ).stream_forever()
+        elif since is not None:
             events = EventPaginator(self.api.client.events).list(
                 filters=filters, since=since, ascending=True
             )
