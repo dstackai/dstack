@@ -403,7 +403,7 @@ class JobConfigurator(ABC):
                 return list(map(_probe_config_to_spec, probes))
             # Generate default probe if model is set
             model = self.run_spec.configuration.model
-            if model is not None:
+            if isinstance(model, OpenAIChatModel):
                 return [_default_model_probe_spec(model.name)]
         return []
 
