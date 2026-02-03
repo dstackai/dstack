@@ -765,27 +765,6 @@ projects:
 
 </div>
 
-### CUDO
-
-Log into your [CUDO Compute](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
-
-Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: cudo
-        project_id: my-cudo-project
-        creds:
-          type: api_key
-          api_key: 7487240a466624b48de22865589
-```
-
-</div>
-
 ### OCI
 
 There are two ways to configure OCI: using client credentials or using the default credentials.

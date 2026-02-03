@@ -241,23 +241,6 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
             type:
                 required: true
 
-##### `projects[n].backends[type=cudo]` { #cudo data-toc-label="cudo" }
-
-#SCHEMA# dstack._internal.core.backends.cudo.models.CudoBackendConfigWithCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-        item_id_prefix: cudo-
-
-###### `projects[n].backends[type=cudo].creds` { #cudo-creds data-toc-label="creds" }
-
-#SCHEMA# dstack._internal.core.backends.cudo.models.CudoAPIKeyCreds
-    overrides:
-        show_root_heading: false
-        type:
-            required: true
-
 ##### `projects[n].backends[type=verda]` { #verda data-toc-label="verda" }
 
 #SCHEMA# dstack._internal.core.backends.verda.models.VerdaBackendConfigWithCreds

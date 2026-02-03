@@ -81,20 +81,6 @@ hide:
     </span>
 
     <span class="feature-cell" target="_blank">
-        <img width="35" style="padding: 4px 0 2px" src="/assets/images/cudo-logo.svg">
-        <h3>
-            CUDO
-        </h3>
-    </span>    
-
-    <!-- <span class="feature-cell" target="_blank">
-        <img width="35" style="padding: 0" src="/assets/images/tensordock-logo.svg">
-        <h3>
-            TensorDock
-        </h3>
-    </span> -->
-
-    <span class="feature-cell" target="_blank">
         <img width="42" src="/assets/images/verda-logo.svg">
         <h3>
             Verda
