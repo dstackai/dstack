@@ -94,13 +94,13 @@ def validate_run_spec_and_set_defaults(
             raise ServerClientError(
                 "Scheduled services with autoscaling to zero are not supported"
             )
-        if len(run_spec.configuration.probes) > settings.MAX_PROBES_PER_JOB:
+        if len(run_spec.configuration.probes or []) > settings.MAX_PROBES_PER_JOB:
             raise ServerClientError(
                 f"Cannot configure more than {settings.MAX_PROBES_PER_JOB} probes"
             )
         if any(
             p.timeout is not None and p.timeout > settings.MAX_PROBE_TIMEOUT
-            for p in run_spec.configuration.probes
+            for p in (run_spec.configuration.probes or [])
         ):
             raise ServerClientError(
                 f"Probe timeout cannot be longer than {settings.MAX_PROBE_TIMEOUT}s"

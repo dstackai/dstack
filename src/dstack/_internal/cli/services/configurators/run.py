@@ -354,7 +354,7 @@ class BaseRunConfigurator(
                     password=interpolator.interpolate_or_error(conf.registry_auth.password),
                 )
             if isinstance(conf, ServiceConfiguration):
-                for probe in conf.probes:
+                for probe in conf.probes or []:
                     for header in probe.headers:
                         header.value = interpolator.interpolate_or_error(header.value)
                     if probe.url:

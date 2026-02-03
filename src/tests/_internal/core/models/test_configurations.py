@@ -7,12 +7,53 @@ from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfigurationParams,
     RepoSpec,
+    ServiceConfiguration,
     parse_run_configuration,
 )
 from dstack._internal.core.models.resources import Range
 
 
 class TestParseConfiguration:
+    def test_service_model_probes_none_when_omitted(self):
+        """When model is set but probes omitted, probes should remain None.
+        The default probe is generated server-side in the job configurator."""
+        conf = {
+            "type": "service",
+            "commands": ["python3 -m http.server"],
+            "port": 8000,
+            "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        }
+        parsed = parse_run_configuration(conf)
+        assert isinstance(parsed, ServiceConfiguration)
+        assert parsed.probes is None
+
+    def test_service_model_does_not_override_explicit_probes(self):
+        conf = {
+            "type": "service",
+            "commands": ["python3 -m http.server"],
+            "port": 8000,
+            "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+            "probes": [{"type": "http", "url": "/health"}],
+        }
+        parsed = parse_run_configuration(conf)
+        assert isinstance(parsed, ServiceConfiguration)
+        assert parsed.probes is not None
+        assert len(parsed.probes) == 1
+        assert parsed.probes[0].url == "/health"
+
+    def test_service_model_explicit_empty_probes_no_default(self):
+        conf = {
+            "type": "service",
+            "commands": ["python3 -m http.server"],
+            "port": 8000,
+            "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+            "probes": [],
+        }
+        parsed = parse_run_configuration(conf)
+        assert isinstance(parsed, ServiceConfiguration)
+        assert parsed.probes is not None
+        assert len(parsed.probes) == 0
+
     def test_services_replicas_and_scaling(self):
         def test_conf(replicas: Any, scaling: Optional[Any] = None):
             conf = {

@@ -56,6 +56,8 @@ DEFAULT_PROBE_READY_AFTER = 1
 DEFAULT_PROBE_METHOD = "get"
 MAX_PROBE_URL_LEN = 2048
 DEFAULT_REPLICA_GROUP_NAME = "0"
+DEFAULT_MODEL_PROBE_TIMEOUT = 30
+DEFAULT_MODEL_PROBE_URL = "/v1/chat/completions"
 
 
 class RunConfigurationType(str, Enum):
@@ -851,9 +853,13 @@ class ServiceConfigurationParams(CoreModel):
     ] = None
     rate_limits: Annotated[list[RateLimit], Field(description="Rate limiting rules")] = []
     probes: Annotated[
-        list[ProbeConfig],
-        Field(description="List of probes used to determine job health"),
-    ] = []
+        Optional[list[ProbeConfig]],
+        Field(
+            description="The list of probes to determine service health. "
+            "If `model` is set, defaults to a `/v1/chat/completions` probe. "
+            "Set explicitly to override"
+        ),
+    ] = None  # None = omitted (may get default when model is set); [] = explicit empty
 
     replicas: Annotated[
         Optional[Union[List[ReplicaGroup], Range[int]]],
@@ -895,7 +901,9 @@ class ServiceConfigurationParams(CoreModel):
         return v
 
     @validator("probes")
-    def validate_probes(cls, v: list[ProbeConfig]) -> list[ProbeConfig]:
+    def validate_probes(cls, v: Optional[list[ProbeConfig]]) -> Optional[list[ProbeConfig]]:
+        if v is None:
+            return v
         if has_duplicates(v):
             # Using a custom validator instead of Field(unique_items=True) to avoid Pydantic bug:
             # https://github.com/pydantic/pydantic/issues/3765

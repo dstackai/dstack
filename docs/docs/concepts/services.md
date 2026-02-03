@@ -290,7 +290,7 @@ $ dstack ps --verbose
 
 </div>
 
-??? info "Probe statuses"
+??? info "Status"
     The following symbols are used for probe statuses:
 
     - `×` &mdash; the last probe execution failed.
@@ -327,6 +327,11 @@ Probes are executed for each service replica while the replica is `running`. A p
     ```
 
     </div>
+
+??? info "Model"
+    If you set the [`model`](#model) property but don't explicitly configure `probes`, 
+    `dstack` automatically configures a default probe that tests the model using the `/v1/chat/completions` API.
+    To disable probes entirely when `model` is set, explicitly set `probes` to an empty list.
 
 See the [reference](../reference/dstack.yml/service.md#probes) for more probe configuration options.
 
@@ -424,6 +429,9 @@ Limits apply to the whole service (all replicas) and per client (by IP). Clients
 
 If the service runs a model with an OpenAI-compatible interface, you can set the [`model`](#model) property to make the model accessible through `dstack`'s chat UI on the `Models` page. 
 In this case, `dstack` will use the service's `/v1/chat/completions` service.
+
+When `model` is set, `dstack` automatically configures [`probes`](#probes) to verify model health.
+To customize or disable this, set `probes` explicitly.
 
 ### Resources
 
