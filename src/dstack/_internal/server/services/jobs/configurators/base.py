@@ -43,6 +43,7 @@ from dstack._internal.core.models.runs import (
     Retry,
     RunSpec,
 )
+from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeMountPoint
 from dstack._internal.core.services.profiles import get_retry
