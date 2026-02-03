@@ -82,6 +82,7 @@ def configure_logging():
     stdout_handler.setLevel(settings.CLI_LOG_LEVEL)
     dstack_logger.addHandler(stdout_handler)
 
+    log_file = get_dstack_dir() / "logs" / "cli" / "latest.log"
     try:
         log_file = _get_cli_log_file()
         file_handler = logging.FileHandler(log_file)
@@ -93,8 +94,8 @@ def configure_logging():
         )
         file_handler.setLevel(settings.CLI_FILE_LOG_LEVEL)
         dstack_logger.addHandler(file_handler)
-    except PermissionError as e:
-        console.print(f"[warning]Warning: Cannot write to CLI log file: {e}[/]")
+    except PermissionError:
+        console.print(f"[warning]Couldn't write to {log_file} due to a permissions problem.[/]")
 
     # the logger allows all messages, filtering is done by the handlers
     dstack_logger.setLevel(logging.DEBUG)
