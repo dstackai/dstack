@@ -857,7 +857,7 @@ class ServiceConfigurationParams(CoreModel):
         Field(
             description="The list of probes to determine service health. "
             "If `model` is set, defaults to a `/v1/chat/completions` probe. "
-            "Set explicitly to override."
+            "Set explicitly to override"
         ),
     ] = None  # None = omitted (may get default when model is set); [] = explicit empty
 
