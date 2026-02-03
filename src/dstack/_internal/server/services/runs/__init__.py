@@ -37,6 +37,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
     ServiceSpec,
 )
+from dstack._internal.core.services.diff import format_diff_fields_for_event
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
@@ -258,11 +259,11 @@ async def get_run(
     raise ServerClientError("run_name or id must be specified")
 
 
-async def get_run_by_name(
+async def get_run_model_by_name(
     session: AsyncSession,
     project: ProjectModel,
     run_name: str,
-) -> Optional[Run]:
+) -> Optional[RunModel]:
     res = await session.execute(
         select(RunModel)
         .where(
@@ -274,7 +275,15 @@ async def get_run_by_name(
         .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
         .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
     )
-    run_model = res.scalar()
+    return res.scalar()
+
+
+async def get_run_by_name(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_name: str,
+) -> Optional[Run]:
+    run_model = await get_run_model_by_name(session=session, project=project, run_name=run_name)
     if run_model is None:
         return None
     return run_model_to_run(run_model, return_in_api=True)
@@ -386,24 +395,25 @@ async def apply_plan(
             project=project,
             run_spec=run_spec,
         )
-    current_resource = await get_run_by_name(
+    current_resource_model = await get_run_model_by_name(
         session=session,
         project=project,
         run_name=run_spec.run_name,
     )
-    if current_resource is None or current_resource.status.is_finished():
+    if current_resource_model is None or current_resource_model.status.is_finished():
         return await submit_run(
             session=session,
             user=user,
             project=project,
             run_spec=run_spec,
         )
+    current_resource = run_model_to_run(current_resource_model, return_in_api=True)
 
     # For backward compatibility (current_resource may has been submitted before
     # some fields, e.g., CPUSpec.arch, were added)
     set_resources_defaults(current_resource.run_spec.configuration.resources)
     try:
-        check_can_update_run_spec(current_resource.run_spec, run_spec)
+        spec_diff = check_can_update_run_spec(current_resource.run_spec, run_spec)
     except ServerClientError:
         # The except is only needed to raise an appropriate error if run is active
         if not current_resource.status.is_finished():
@@ -420,6 +430,7 @@ async def apply_plan(
             raise ServerClientError(
                 "Failed to apply plan. Resource has been changed. Try again or use force apply."
             )
+    new_deployment_num = current_resource.deployment_num + 1
     # FIXME: potentially long write transaction
     # Avoid getting run_model after update
     await session.execute(
@@ -428,8 +439,17 @@ async def apply_plan(
         .values(
             run_spec=run_spec.json(),
             priority=run_spec.configuration.priority,
-            deployment_num=current_resource.deployment_num + 1,
+            deployment_num=new_deployment_num,
         )
+    )
+    events.emit(
+        session,
+        (
+            f"Run updated. Deployment: {new_deployment_num}."
+            f" Changed fields: {format_diff_fields_for_event(spec_diff)}"
+        ),
+        actor=events.UserActor.from_user(user),
+        targets=[events.Target.from_model(current_resource_model)],
     )
     run = await get_run_by_name(
         session=session,
