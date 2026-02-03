@@ -181,6 +181,14 @@ export const ROUTES = {
             TEMPLATE: `/users/:userName/projects`,
             FORMAT: (userName: string) => buildRoute(ROUTES.USER.PROJECTS.TEMPLATE, { userName }),
         },
+        EVENTS: {
+            TEMPLATE: `/users/:userName/events`,
+            FORMAT: (userName: string) => buildRoute(ROUTES.USER.EVENTS.TEMPLATE, { userName }),
+        },
+        ACTIVITY: {
+            TEMPLATE: `/users/:userName/activity`,
+            FORMAT: (userName: string) => buildRoute(ROUTES.USER.ACTIVITY.TEMPLATE, { userName }),
+        },
         BILLING: {
             LIST: {
                 TEMPLATE: `/users/:userName/billing`,

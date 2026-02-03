@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 
-import { Box, ConfirmationDialog, ContentLayout, NavigateLink, SpaceBetween, Tabs } from 'components';
+import { Box, ConfirmationDialog, ContentLayout, SpaceBetween, Tabs } from 'components';
 import { DetailsHeader } from 'components';
 
 import { useNotifications /* usePermissionGuard*/ } from 'hooks';
@@ -15,6 +15,8 @@ import { UserDetailsTabTypeEnum } from './types';
 
 export { Settings as UserSettings } from './Settings';
 export { Billing as UserBilling } from './Billing';
+export { Events as UserEvents } from './Events';
+export { Activity as UserActivity } from './Activity';
 export { UserProjectList as UserProjects } from './Projects';
 
 export const UserDetails: React.FC = () => {
@@ -71,6 +73,18 @@ export const UserDetails: React.FC = () => {
             href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
             content: <Outlet />,
         },
+        {
+            label: t('users.events'),
+            id: UserDetailsTabTypeEnum.EVENTS,
+            href: ROUTES.USER.EVENTS.FORMAT(paramUserName),
+            content: <Outlet />,
+        },
+        {
+            label: t('users.activity'),
+            id: UserDetailsTabTypeEnum.ACTIVITY,
+            href: ROUTES.USER.ACTIVITY.FORMAT(paramUserName),
+            content: <Outlet />,
+        },
         process.env.UI_VERSION === 'sky' && {
             label: t('billing.title'),
             id: UserDetailsTabTypeEnum.BILLING,
@@ -87,17 +101,6 @@ export const UserDetails: React.FC = () => {
                         title={paramUserName}
                         // deleteAction={isAvailableDeleteUser ? toggleDeleteConfirm : undefined}
                         // deleteDisabled={isDeleting}
-                        actionButtons={
-                            <>
-                                <NavigateLink href={ROUTES.EVENTS.LIST + `?target_users=${paramUserName}`}>
-                                    {t('users.events')}
-                                </NavigateLink>
-
-                                <NavigateLink href={ROUTES.EVENTS.LIST + `?actors=${paramUserName}`}>
-                                    {t('users.activity')}
-                                </NavigateLink>
-                            </>
-                        }
                     />
                 }
             >

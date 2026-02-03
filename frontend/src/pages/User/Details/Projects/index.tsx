@@ -29,6 +29,10 @@ export const UserProjectList: React.FC = () => {
             text: paramUserName,
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
         },
+        {
+            text: t('users.projects'),
+            href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
+        },
     ]);
 
     const renderEmptyMessage = (): React.ReactNode => {

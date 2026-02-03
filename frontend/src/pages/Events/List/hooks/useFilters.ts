@@ -10,23 +10,7 @@ import { useGetUserListQuery } from 'services/user';
 
 import { filterLastElementByPrefix } from '../helpers';
 
-type RequestParamsKeys = keyof Pick<
-    TEventListRequestParams,
-    | 'target_projects'
-    | 'target_users'
-    | 'target_fleets'
-    | 'target_instances'
-    | 'target_runs'
-    | 'target_jobs'
-    | 'target_volumes'
-    | 'target_gateways'
-    | 'target_secrets'
-    | 'within_projects'
-    | 'within_fleets'
-    | 'within_runs'
-    | 'include_target_types'
-    | 'actors'
->;
+type RequestParamsKeys = keyof TEventListFilters;
 
 const filterKeys: Record<string, RequestParamsKeys> = {
     TARGET_PROJECTS: 'target_projects',
@@ -76,7 +60,95 @@ const targetTypes = [
     { label: 'Secret', value: 'secret' },
 ];
 
-export const useFilters = () => {
+const baseFilteringProperties = [
+    {
+        key: filterKeys.TARGET_PROJECTS,
+        operators: ['='],
+        propertyLabel: 'Target projects',
+        groupValuesLabel: 'Project ids',
+    },
+    {
+        key: filterKeys.TARGET_USERS,
+        operators: ['='],
+        propertyLabel: 'Target users',
+        groupValuesLabel: 'Project ids',
+    },
+    {
+        key: filterKeys.TARGET_FLEETS,
+        operators: ['='],
+        propertyLabel: 'Target fleet IDs',
+    },
+    {
+        key: filterKeys.TARGET_INSTANCES,
+        operators: ['='],
+        propertyLabel: 'Target instance IDs',
+    },
+    {
+        key: filterKeys.TARGET_RUNS,
+        operators: ['='],
+        propertyLabel: 'Target run IDs',
+    },
+    {
+        key: filterKeys.TARGET_JOBS,
+        operators: ['='],
+        propertyLabel: 'Target job IDs',
+    },
+    {
+        key: filterKeys.TARGET_VOLUMES,
+        operators: ['='],
+        propertyLabel: 'Target volume IDs',
+    },
+    {
+        key: filterKeys.TARGET_GATEWAYS,
+        operators: ['='],
+        propertyLabel: 'Target gateway IDs',
+    },
+    {
+        key: filterKeys.TARGET_SECRETS,
+        operators: ['='],
+        propertyLabel: 'Target secret IDs',
+    },
+
+    {
+        key: filterKeys.WITHIN_PROJECTS,
+        operators: ['='],
+        propertyLabel: 'Within projects',
+        groupValuesLabel: 'Project ids',
+    },
+
+    {
+        key: filterKeys.WITHIN_FLEETS,
+        operators: ['='],
+        propertyLabel: 'Within fleet IDs',
+    },
+
+    {
+        key: filterKeys.WITHIN_RUNS,
+        operators: ['='],
+        propertyLabel: 'Within run IDs',
+    },
+
+    {
+        key: filterKeys.INCLUDE_TARGET_TYPES,
+        operators: ['='],
+        propertyLabel: 'Target types',
+        groupValuesLabel: 'Target type values',
+    },
+
+    {
+        key: filterKeys.ACTORS,
+        operators: ['='],
+        propertyLabel: 'Actors',
+    },
+];
+
+export const useFilters = ({
+    permanentFilters,
+    withSearchParams,
+}: {
+    permanentFilters?: Partial<TEventListFilters>;
+    withSearchParams?: boolean;
+}) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { data: projectsData, isLoading: isLoadingProjects } = useGetProjectsQuery({});
     const { data: usersData, isLoading: isLoadingUsers } = useGetUserListQuery({});
@@ -86,7 +158,9 @@ export const useFilters = () => {
     );
 
     const clearFilter = () => {
-        setSearchParams({});
+        if (withSearchParams) {
+            setSearchParams({});
+        }
         setPropertyFilterQuery(EMPTY_QUERY);
     };
 
@@ -133,88 +207,6 @@ export const useFilters = () => {
         setSearchParams(searchParams);
     };
 
-    const filteringProperties = [
-        {
-            key: filterKeys.TARGET_PROJECTS,
-            operators: ['='],
-            propertyLabel: 'Target projects',
-            groupValuesLabel: 'Project ids',
-        },
-        {
-            key: filterKeys.TARGET_USERS,
-            operators: ['='],
-            propertyLabel: 'Target users',
-            groupValuesLabel: 'Project ids',
-        },
-        {
-            key: filterKeys.TARGET_FLEETS,
-            operators: ['='],
-            propertyLabel: 'Target fleet IDs',
-        },
-        {
-            key: filterKeys.TARGET_INSTANCES,
-            operators: ['='],
-            propertyLabel: 'Target instance IDs',
-        },
-        {
-            key: filterKeys.TARGET_RUNS,
-            operators: ['='],
-            propertyLabel: 'Target run IDs',
-        },
-        {
-            key: filterKeys.TARGET_JOBS,
-            operators: ['='],
-            propertyLabel: 'Target job IDs',
-        },
-        {
-            key: filterKeys.TARGET_VOLUMES,
-            operators: ['='],
-            propertyLabel: 'Target volume IDs',
-        },
-        {
-            key: filterKeys.TARGET_GATEWAYS,
-            operators: ['='],
-            propertyLabel: 'Target gateway IDs',
-        },
-        {
-            key: filterKeys.TARGET_SECRETS,
-            operators: ['='],
-            propertyLabel: 'Target secret IDs',
-        },
-
-        {
-            key: filterKeys.WITHIN_PROJECTS,
-            operators: ['='],
-            propertyLabel: 'Within projects',
-            groupValuesLabel: 'Project ids',
-        },
-
-        {
-            key: filterKeys.WITHIN_FLEETS,
-            operators: ['='],
-            propertyLabel: 'Within fleet IDs',
-        },
-
-        {
-            key: filterKeys.WITHIN_RUNS,
-            operators: ['='],
-            propertyLabel: 'Within run IDs',
-        },
-
-        {
-            key: filterKeys.INCLUDE_TARGET_TYPES,
-            operators: ['='],
-            propertyLabel: 'Target types',
-            groupValuesLabel: 'Target type values',
-        },
-
-        {
-            key: filterKeys.ACTORS,
-            operators: ['='],
-            propertyLabel: 'Actors',
-        },
-    ];
-
     const onChangePropertyFilterHandle = ({ tokens, operation }: PropertyFilterProps.Query) => {
         let filteredTokens = [...tokens];
 
@@ -226,7 +218,9 @@ export const useFilters = () => {
             }
         });
 
-        setSearchParamsHandle({ tokens: filteredTokens });
+        if (withSearchParams) {
+            setSearchParamsHandle({ tokens: filteredTokens });
+        }
 
         setPropertyFilterQuery({
             operation,
@@ -238,30 +232,86 @@ export const useFilters = () => {
         onChangePropertyFilterHandle(detail);
     };
 
+    const filteringProperties = useMemo(() => {
+        const permanentFiltersKeysMap = new Map<string, string>();
+
+        for (const prefix of onlyOneFilterGroupPrefixes) {
+            console.log({ prefix });
+            const permanentFilterKey = Object.keys(permanentFilters ?? {}).find((filterKey) => filterKey.startsWith(prefix));
+
+            if (permanentFilterKey) {
+                permanentFiltersKeysMap.set(prefix, permanentFilterKey);
+            }
+        }
+
+        if (permanentFiltersKeysMap.size === 0) {
+            return baseFilteringProperties;
+        }
+
+        return baseFilteringProperties.filter(({ key }) => {
+            const propertyPrefix = onlyOneFilterGroupPrefixes.find((prefix) => key.startsWith(prefix));
+
+            if (!propertyPrefix) {
+                return true;
+            }
+
+            if (permanentFiltersKeysMap.has(propertyPrefix)) {
+                return key === permanentFiltersKeysMap.get(propertyPrefix);
+            }
+
+            return true;
+        });
+    }, [permanentFilters]);
+
     const filteringRequestParams = useMemo(() => {
         const params = tokensToRequestParams<RequestParamsKeys>({
             tokens: propertyFilterQuery.tokens,
             arrayFieldKeys: multipleChoiseKeys,
         });
 
-        const targetProjects = params[filterKeys.TARGET_PROJECTS]
-            ?.map((name: string) => projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'])
+        const filterParamsWithPermanentFitters = (filterKey: RequestParamsKeys): string[] => {
+            let paramsFilter = params[filterKey] ?? '';
+            const permanentFilter = permanentFilters?.[filterKey] ?? '';
+
+            if (!Array.isArray(paramsFilter) && typeof paramsFilter === 'object') {
+                paramsFilter = '';
+            }
+
+            if (Array.isArray(paramsFilter) && Array.isArray(permanentFilter)) {
+                return [...paramsFilter, ...permanentFilter];
+            }
+
+            if (Array.isArray(paramsFilter) && !Array.isArray(permanentFilter)) {
+                return [...paramsFilter, permanentFilter];
+            }
+
+            if (!Array.isArray(paramsFilter) && Array.isArray(permanentFilter)) {
+                return [paramsFilter, ...permanentFilter];
+            }
+
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-expect-error
+            return [paramsFilter, permanentFilter];
+        };
+
+        const targetProjects = filterParamsWithPermanentFitters(filterKeys.TARGET_PROJECTS)
+            .map((name: string) => projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'])
             .filter(Boolean);
 
-        const withInProjects = params[filterKeys.WITHIN_PROJECTS]
-            ?.map((name: string) => projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'])
+        const withInProjects = filterParamsWithPermanentFitters(filterKeys.WITHIN_PROJECTS)
+            .map((name: string) => projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'])
             .filter(Boolean);
 
-        const targetUsers = params[filterKeys.TARGET_USERS]
-            ?.map((name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'])
+        const targetUsers = filterParamsWithPermanentFitters(filterKeys.TARGET_USERS)
+            .map((name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'])
             .filter(Boolean);
 
-        const actors = params[filterKeys.ACTORS]
-            ?.map((name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'])
+        const actors = filterParamsWithPermanentFitters(filterKeys.ACTORS)
+            .map((name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'])
             .filter(Boolean);
 
-        const includeTargetTypes = params[filterKeys.INCLUDE_TARGET_TYPES]
-            ?.map((selectedLabel: string) => targetTypes?.find(({ label }) => label === selectedLabel)?.['value'])
+        const includeTargetTypes = filterParamsWithPermanentFitters(filterKeys.INCLUDE_TARGET_TYPES)
+            .map((selectedLabel: string) => targetTypes?.find(({ label }) => label === selectedLabel)?.['value'])
             .filter(Boolean);
 
         const mappedFields = {
@@ -303,9 +353,10 @@ export const useFilters = () => {
                 filterKeys.ACTORS,
                 filterKeys.INCLUDE_TARGET_TYPES,
             ]),
+            ...permanentFilters,
             ...mappedFields,
-        } as Partial<TRunsRequestParams>;
-    }, [propertyFilterQuery, usersData, projectsData]);
+        } as TEventListFilters;
+    }, [propertyFilterQuery, usersData, projectsData, permanentFilters]);
 
     return {
         filteringRequestParams,

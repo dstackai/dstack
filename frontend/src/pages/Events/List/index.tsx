@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table } from 'components';
+import { Loader, PropertyFilter, Table } from 'components';
+import { TableProps } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useInfiniteScroll } from 'hooks';
@@ -14,7 +15,18 @@ import { useFilters } from './hooks/useFilters';
 
 import styles from '../../Runs/List/styles.module.scss';
 
-export const EventList = () => {
+type RenderHeaderArgs = {
+    refreshAction?: () => void;
+    disabledRefresh?: boolean;
+};
+
+type EventListProps = Pick<TableProps, 'variant'> & {
+    withSearchParams?: boolean;
+    renderHeader?: (args: RenderHeaderArgs) => React.ReactNode;
+    permanentFilters?: Partial<TEventListFilters>;
+};
+
+export const EventList: React.FC<EventListProps> = ({ withSearchParams, permanentFilters, renderHeader, ...props }) => {
     const { t } = useTranslation();
 
     useBreadcrumbs([
@@ -31,7 +43,7 @@ export const EventList = () => {
         filteringOptions,
         filteringProperties,
         isLoadingFilters,
-    } = useFilters();
+    } = useFilters({ permanentFilters, withSearchParams });
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
@@ -58,31 +70,14 @@ export const EventList = () => {
 
     return (
         <Table
+            {...props}
             {...collectionProps}
-            variant="full-page"
             columnDefinitions={columns}
             items={items}
             loading={loading}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            selectionType="multi"
-            header={
-                <Header
-                    variant="awsui-h1-sticky"
-                    actions={
-                        <SpaceBetween size="xs" direction="horizontal">
-                            <Button
-                                iconName="refresh"
-                                disabled={loading}
-                                ariaLabel={t('common.refresh')}
-                                onClick={refreshList}
-                            />
-                        </SpaceBetween>
-                    }
-                >
-                    {t('navigation.events')}
-                </Header>
-            }
+            header={renderHeader?.({ refreshAction: refreshList, disabledRefresh: loading })}
             filter={
                 <div className={styles.selectFilters}>
                     <div className={styles.propertyFilter}>

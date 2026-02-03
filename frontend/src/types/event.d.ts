@@ -1,6 +1,6 @@
 declare type TEventTargetType = 'project' | 'user' | 'fleet' | 'instance' | 'run' | 'job' | 'volume' | 'gateway' | 'secret';
 
-declare type TEventListRequestParams = Omit<TBaseRequestListParams, 'prev_created_at'> & {
+declare type TEventListFilters = {
     prev_recorded_at?: string;
     target_projects?: string[];
     target_users?: string[];
@@ -17,6 +17,7 @@ declare type TEventListRequestParams = Omit<TBaseRequestListParams, 'prev_create
     include_target_types?: TEventTargetType[];
     actors?: string[];
 };
+declare type TEventListRequestParams = Omit<TBaseRequestListParams, 'prev_created_at'> & TEventListFilters;
 
 declare interface IEventTarget {
     type: 'project' | 'user' | 'fleet' | 'instance' | 'run' | 'job' | 'volume' | 'gateway' | 'secret';
