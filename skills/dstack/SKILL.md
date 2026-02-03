@@ -8,35 +8,33 @@ description: |
 
 ## Overview
 
-`dstack` is a tool that allows to provision and orchestrate GPU workloads across [GPU clouds and Kubernetes clusters](https://dstack.ai/docs/concepts/backends.md) or on-prem clusters (SSH fleets).
+`dstack` provisions and orchestrates workloads across GPU clouds, Kubernetes, and on-prem via fleets.
 
 **When to use this skill:**
-- Running/managing GPU workloads (dev environments, tasks for training or other batch jobs, services to run inference or deploy web apps)
-- Creating, editing, and running `dstack` configurations
-- Managing fleets of compute (instances/clusters)
+- Running or managing dev environments, tasks, or services on dstack
+- Creating, editing, or applying `*.dstack.yml` configurations
+- Managing fleets, volumes, and resource availability
 
 ## How it works
 
 `dstack` operates through three core components:
 
 1. `dstack` server - Can run locally, remotely, or via dstack Sky (managed)
-2. `dstack` CLI - For applying configurations and managing resources; CLI can be pointed to the server and a particular default project (`~/.dstack/config.yml` or via `dstack project` CLI command); other CLI commands use the default project
+2. `dstack` CLI - Applies configurations and manages resources; the CLI can be pointed to a server and default project (`~/.dstack/config.yml` or via `dstack project`)
 3. `dstack` configuration files - YAML files ending with `.dstack.yml`
 
-**Typical workflow:**
-```bash
-# 1. Define configuration in YAML file (e.g., train.dstack.yml, .dstack.yml, llama-serve.dstack.yml)
-# 2. Apply configuration
-dstack apply -f train.dstack.yml
+`dstack apply` plans, provisions cloud resources, and schedules containers/runners. By default it attaches when the run reaches `running` (opens SSH tunnel, forwards ports, streams logs). With `-d`, it submits and exits.
 
-# 3. dstack prepares a plan, and once confirmed, provisions instances (according to created fleets) and runs workloads
-# 4. Monitor with `dstack ps`, `dstack logs`, `dstack attach`, etc. (these commands support various options).
-```
+## Quick agent flow (detached runs)
 
-By default, `dstack apply` requires a confirmation, and once first job within the run is `running` - it "attaches" establishes an SSH tunnel, forwards ports if any and streams logs in real-time; if you pass `-d`, it runs in the detached mode and exits once the run is submitted.
+1) Show plan: `echo "n" | dstack apply -f <config>`
+2) If plan is OK and user confirms, apply detached: `dstack apply -f <config> -y -d`
+3) Check status once: `dstack ps -v`
+4) If dev-environment or task with ports and running: attach to surface IDE link/ports/SSH alias (agent runs attach in background); ask to open link
+5) If attach fails in sandbox: request escalation; if not approved, ask the user to run `dstack attach` locally and share the output
 
 **CRITICAL: Never propose `dstack` CLI commands or YAML syntaxes that don't exist.**
-- Only use CLI commands and YAML syntax explicitly documented in this skill file or verified via `--help`
+- Only use CLI commands and YAML syntax documented here or verified via `--help`
 - If uncertain about a command or its syntax, check the links or use `--help`
 
 **NEVER do the following:**
@@ -49,8 +47,6 @@ By default, `dstack apply` requires a confirmation, and once first job within th
 - Assume a command succeeded without checking output for errors
 
 ## Agent execution guidelines
-
-**This section provides critical guidance for AI agents executing dstack commands.**
 
 ### Output accuracy
 - **NEVER reformat, summarize, or paraphrase CLI output.** Display tables, status output, and error messages exactly as returned.
@@ -70,47 +66,88 @@ By default, `dstack apply` requires a confirmation, and once first job within th
 
 ### Command timing and confirmation handling
 
-**Commands that run indefinitely (agents should avoid these):**
-- `dstack attach` - maintains connection until interrupted
-- `dstack apply` without `-d` for runs - streams logs after provisioning
-- `dstack ps -w` - watch mode, auto-refreshes until interrupted
+**Commands that stream indefinitely in the foreground:**
+- `dstack attach`
+- `dstack apply` without `-d` for runs
+- `dstack ps -w`
 
-Instead, use `dstack ps -v` to check status, or `dstack apply -d` for detached mode.
+Agents should avoid blocking: use `-d`, timeouts, or background attach. When attach is needed, run it in the background by default (`nohup ...`), but describe it to the user simply as "attach" unless they ask for a live foreground session. Prefer `dstack ps -v` and poll in a loop if the user wants to watch status.
 
 **All other commands:** Use 10-60s timeout. Most complete within this range. **While waiting, monitor the output** - it may contain errors, warnings, or prompts requiring attention.
 
 **Confirmation handling:**
 - `dstack apply`, `dstack stop`, `dstack fleet delete` require confirmation
 - Use `-y` flag to auto-confirm when user has already approved
+- For `dstack stop`, always use `-y` after the user confirms to avoid interactive prompts
 - Use `echo "n" |` to preview `dstack apply` plan without executing (avoid `echo "y" |`, prefer `-y`)
 
 **Best practices:**
 - Prefer modifying configuration files over passing parameters to `dstack apply` (unless it's an exception)
 - When user confirms deletion/stop operations, use `-y` flag to skip confirmation prompts
-- Avoid waiting indefinitely; display essential output once command is finished (even if by timeout)
+
+### Detached run follow-up (after `-d`)
+
+After submitting a run with `-d` (dev-environment, task, service), first determine whether submission failed. If the apply output shows errors (validation, no offers, etc.), stop and surface the error.
+
+If the run was submitted, do a quick status check with `dstack ps -v`, then guide the user through relevant next steps:
+If you need to prompt for next actions, be explicit about the dstack step and command (avoid vague questions). When speaking to the user, refer to the action as "attach" (not "background attach").
+- **Monitor status:** Report the current status (provisioning/pulling/running/finished) and offer to keep watching. Poll `dstack ps -v` every 10-20s if the user wants updates.
+- **Attach when running:** For agents, run attach in the background by default so the session does not block. Use it to capture IDE links/SSH alias or enable port forwarding; when describing the action to the user, just say "attach".
+- **Dev environments or tasks with ports:** Once `running`, attach to surface the IDE link/port forwarding/SSH alias, then ask whether to open the IDE link. Never open links without explicit approval.
+- **Services:** Prefer using service endpoints. Attach only if the user explicitly needs port forwarding or full log replay.
+- **Tasks without ports:** Default to `dstack logs` for progress; attach only if full log replay is required.
+
+### Attaching behavior (blocking vs non-blocking)
+
+`dstack attach` runs until interrupted and blocks the terminal. **Agents must avoid indefinite blocking.** If a brief attach is needed, use a timeout to capture initial output (IDE link, SSH alias) and then detach.
+
+Note: `dstack attach` writes SSH alias info under `~/.dstack/ssh/config` (and may update `~/.ssh/config`) to enable `ssh <run-name>`, IDE connections, port forwarding, and real-time logs (`dstack attach --logs`). If the sandbox cannot write there, the alias will not be created.
+
+**Background attach (non-blocking default for agents):**
+```bash
+nohup dstack attach <run-name> --logs > /tmp/<run-name>.attach.log 2>&1 & echo $! > /tmp/<run-name>.attach.pid
+```
+Then read the output:
+```bash
+tail -n 50 /tmp/<run-name>.attach.log
+```
+Offer live follow only if asked:
+```bash
+tail -f /tmp/<run-name>.attach.log
+```
+Stop the background attach (preferred):
+```bash
+kill "$(cat /tmp/<run-name>.attach.pid)"
+```
+If the PID file is missing, fall back to a specific match (avoid killing all attaches):
+```bash
+pkill -f "dstack attach <run-name>"
+```
+**Why this helps:** it keeps the attach session alive (including port forwarding) while the agent remains usable. IDE links and SSH instructions appear in the log file -- surface them and ask whether to open the link (`open "<link>"` on macOS, `xdg-open "<link>"` on Linux) only after explicit approval.
+
+If background attach fails in the sandbox (permissions writing `~/.dstack` or `~/.ssh`, timeouts), request escalation to run attach outside the sandbox. If not approved, ask the user to run attach locally and share the IDE link/SSH alias.
 
 ### Interpreting user requests
 
-**"Run something":** When the user asks to "run" a workload (dev environment, task, or service), use `dstack apply` with the appropriate configuration. Note: `dstack run` only supports `dstack run get --json` for retrieving run details—it cannot start workloads.
+**"Run something":** When the user asks to run a workload (dev environment, task, service), use `dstack apply` with the appropriate configuration. Note: `dstack run` only supports `dstack run get --json` for retrieving run details -- it cannot start workloads.
 
-**"Connect to" or "open" a dev environment:** If a dev environment is already running, retrieve its IDE connection URL (`cursor://`, `vscode://`, etc.) from `dstack logs <run-name>` and provide it to the user.
+**"Connect to" or "open" a dev environment:** If a dev environment is already running, use `dstack attach <run-name> --logs` (agent runs it in the background by default) to surface the IDE URL (`cursor://`, `vscode://`, etc.) and SSH alias. If sandboxed attach fails, request escalation or ask the user to run attach locally and share the link.
 
 ## Configuration types
 
-`dstack` supports five main configuration types, each with specific use cases. Configuration files can be named `<name>.dstack.yml` or simply `.dstack.yml`.
+`dstack` supports five main configuration types. Configuration files can be named `<name>.dstack.yml` or simply `.dstack.yml`.
 
 **Common parameters:** All run configurations (dev environments, tasks, services) support many parameters including:
 - **Git integration:** Clone repos automatically (`repo`), mount existing repos (`repos`), upload local files (`working_dir`)
-- **Docker support:** Use custom Docker images (`image`); Also if needed, use `docker: true` if you want to use `docker` from inside the container (VM-based backends only)
-- **Environment & secrets:** Set environment variables (`env`), reference secrets
+- **File upload:** `files` (see concept docs for examples)
+- **Docker support:** Use custom Docker images (`image`); use `docker: true` if you want to use Docker from inside the container (VM-based backends only)
+- **Environment:** Set environment variables (`env`), often via `.envrc`. Secrets are supported but less common.
 - **Storage:** Persistent network volumes (`volumes`), specify disk size
 - **Resources:** Define GPU, CPU, memory, and disk requirements
 
 **Best practices:**
- - Prefer giving configurations a `name` property for easier management
- - When configurations need credentials (API keys, tokens), list only env var *names* in the `env` section (e.g., `- HF_TOKEN`), not values. Recommend storing actual values in a `.envrc` file alongside the configuration, applied via `source .envrc && dstack apply`.
-
-See configuration reference pages for complete parameter lists.
+- Prefer giving configurations a `name` property for easier management
+- When configurations need credentials (API keys, tokens), list only env var names in the `env` section (e.g., `- HF_TOKEN`), not values. Recommend storing actual values in a `.envrc` file alongside the configuration, applied via `source .envrc && dstack apply`.
 
 ### 1. Dev environments
 **Use for:** Interactive development with IDE integration (VS Code, Cursor, etc.).
@@ -124,7 +161,6 @@ ide: vscode
 
 resources:
   gpu: 80GB
-  disk: 500GB
 ```
 
 [Concept documentation](https://dstack.ai/docs/concepts/dev-environments.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/dev-environment.md)
@@ -132,7 +168,7 @@ resources:
 ### 2. Tasks
 **Use for:** Batch jobs, training runs, fine-tuning, web applications, any executable workload.
 
-**Key features:** Distributed training (multi-node), port forwarding for web apps.
+**Key features:** Distributed training (multi-node) and port forwarding for web apps.
 
 ```yaml
 type: task
@@ -148,19 +184,12 @@ ports:
   - 8501  # Optional: expose ports for web apps
 
 resources:
-  gpu: A100:40GB:2  # Two 40GB A100s
-  disk: 200GB
+  gpu: A100:40GB:2
 ```
 
-**Port forwarding:** When you specify `ports`, `dstack apply` automatically forwards them to `localhost` while attached. Use `dstack attach <run-name>` to reconnect and restore port forwarding. The run name becomes an SSH alias (e.g., `ssh <run-name>`) for direct access.
+**Port forwarding:** When you specify `ports`, `dstack apply` forwards them to `localhost` while attached. Use `dstack attach <run-name>` to reconnect and restore port forwarding. The run name becomes an SSH alias (e.g., `ssh <run-name>`) for direct access.
 
-**Examples:**
-- [Single-node training (TRL)](https://dstack.ai/examples/single-node-training/trl/index.md)
-- [Single-node training (Axolotl)](https://dstack.ai/examples/single-node-training/axolotl/index.md)
-- [Distributed training (TRL)](https://dstack.ai/examples/distributed-training/trl/index.md)
-- [Distributed training (Axolotl)](https://dstack.ai/examples/distributed-training/axolotl/index.md)
-- [Distributed training (Ray+RAGEN)](https://dstack.ai/examples/distributed-training/ray-ragen/index.md)
-- [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/index.md)
+**Distributed training:** Multi-node tasks are supported (e.g., via `nodes`) and require fleets that support inter-node communication (see `placement: cluster` in fleets).
 
 [Concept documentation](https://dstack.ai/docs/concepts/tasks.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/task.md)
 
@@ -185,63 +214,36 @@ model: meta-llama/Meta-Llama-3.1-8B-Instruct
 resources:
   gpu: 80GB
   disk: 200GB
-
 ```
-
-Once a service is `running` and its health probes are green:
 
 **Service endpoints:**
 - Without gateway: `<dstack server URL>/proxy/services/<project name>/<run name>/`
 - With gateway: `https://<run name>.<gateway domain>/`
-
-**Example:**
-```bash
-curl http://localhost:3000/proxy/services/<project name>/<run name>/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <dstack token>' \
-  -d '{"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "messages": [{"role": "user", "content": "Hello!"}]}'
-```
-
-**Gateways:** Set up a [gateway](https://dstack.ai/docs/concepts/gateways.md) before running services to enable custom domains, HTTPS, auto-scaling rate limits, and production-grade endpoint management. Use the `dstack gateway` CLI command to manage gateways.
-
-**Examples:**
-- [SGLang](https://dstack.ai/examples/inference/sglang/index.md)
-- [vLLM](https://dstack.ai/examples/inference/vllm/index.md)
-- [NIM](https://dstack.ai/examples/inference/nim/index.md)
-- [TensorRT-LLM](https://dstack.ai/examples/inference/trtllm/index.md)
+- For OpenAI-compatible models, use the `/v1/...` paths under the service URL and pass the dstack token in the `Authorization` header.
 
 [Concept documentation](https://dstack.ai/docs/concepts/services.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/service.md)
 
 ### 4. Fleets
-**Use for:** Pre-provisioning infrastructure for workloads, managing on-premises GPU servers, creating auto-scaling instance pools.
-
-**Important:** Workloads (dev environments, tasks, services) only run if their resource requirements match at least one configured fleet. Without matching fleets, provisioning will fail.
-
-dstack supports two fleet types:
-
-#### Backend fleets (Cloud/Kubernetes)
-Dynamically provision instances from configured [backends](https://dstack.ai/docs/concepts/backends.md). Use the `nodes` property for on-demand scaling:
+**Use for:** Pre-provisioning infrastructure for workloads, managing on-prem GPU servers, creating auto-scaling instance pools.
 
 ```yaml
 type: fleet
 name: my-fleet
-nodes: 0..2  # Range: creates template when starting with 0, provisions on-demand
+nodes: 0..2
 
 resources:
-  gpu: 24GB..  # 24GB or more
+  gpu: 24GB..
   disk: 200GB
 
-spot_policy: auto  # auto (default), spot, or on-demand
-idle_duration: 5m  # Terminate idle instances after 5 minutes
+spot_policy: auto
+idle_duration: 5m
 ```
 
-**On-demand provisioning:** When `nodes` is a range (e.g., `0..2`, `1..10`), dstack creates an instance template. Instances are provisioned automatically when workloads need them, scaling between min and max. Set `idle_duration` to terminate idle instances.
+**On-demand provisioning:** When `nodes` is a range (e.g., `0..2`), dstack creates a template and provisions instances on demand within the min/max. Use `idle_duration` to terminate idle instances.
 
-**Additional options:** Fleets support many configuration options including `placement: cluster` for multi-node distributed workloads requiring inter-node communication (e.g., multi-GPU training), `blocks` for resource isolation, environment variables, and more. See the configuration reference for complete details.
+**Distributed workloads:** Use `placement: cluster` for fleets intended for multi-node tasks that require inter-node networking.
 
-#### SSH fleets (on-prem or pre-provisioned clusters)
-Use existing GPU servers accessible via SSH:
-
+**SSH fleet (on-prem or pre-provisioned):**
 ```yaml
 type: fleet
 name: on-prem-fleet
@@ -257,14 +259,8 @@ ssh_config:
 [Concept documentation](https://dstack.ai/docs/concepts/fleets.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/fleet.md)
 
 ### 5. Volumes
-**Use for:** Persistent storage for datasets, model checkpoints, training artifacts that persist across runs and can be shared between workloads.
+**Use for:** Persistent storage for datasets, model checkpoints, training artifacts.
 
-dstack supports two types of volumes:
-
-#### Network Volumes
-Backend-specific persistent volumes (AWS EBS, GCP Persistent Disk, etc.) that can be attached to any dev environment, task, or service.
-
-**Define a network volume:**
 ```yaml
 type: volume
 name: my-volume
@@ -276,28 +272,20 @@ resources:
   disk: 500GB
 ```
 
-**Attach to workloads via `volumes` property:**
-```yaml
-type: task
-# ... other config
-volumes:
-  - name: my-volume
-    path: /volume_data
-```
-
-#### Instance Volumes
-Faster local volumes using the instance's root disk. Ideal for ephemeral storage, caching, or maximum I/O performance without persistence across instances.
-
-**Attach instance volumes via `volumes` property:**
+**Instance volumes (local, ephemeral, often optional):**
 ```yaml
 type: dev-environment
 # ... other config
 volumes:
-  - name: my-instance-volume
-    path: /cache_data
+  - instance_path: /dstack-cache/pip
+    path: /root/.cache/pip
+    optional: true
+  - instance_path: /dstack-cache/huggingface
+    path: /root/.cache/huggingface
+    optional: true
 ```
 
-**Note:** Volumes can be attached to dev environments, tasks, and services using the `volumes` property. Network volumes persist independently, while instance volumes are tied to the instance lifecycle.
+**Attach to runs:** Use `volumes` in dev environments, tasks, and services. Network volumes persist independently; instance volumes are tied to the instance lifecycle.
 
 [Concept documentation](https://dstack.ai/docs/concepts/volumes.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/volume.md)
 
@@ -306,16 +294,11 @@ volumes:
 ### Apply configurations
 
 **Important behavior:**
-- `dstack apply` shows a plan with estimated costs and may ask for confirmation (respond with `y` or use `-y` flag to skip)
-- Once confirmed, it provisions infrastructure and streams real-time output to the terminal
-- In attached mode (default), the terminal blocks and shows output - use timeout or Ctrl+C to interrupt if you need to continue with other commands
+- `dstack apply` shows a plan with estimated costs and may ask for confirmation
+- In attached mode (default), the terminal blocks and shows output
 - In detached mode (`-d`), runs in background without blocking the terminal
 
-**Workflow for applying configurations:**
-
-> **Critical for agents:** Always show the plan first, wait for user confirmation, THEN execute. Never auto-execute without user approval.
-
-**Step-by-step for run configurations (dev-environment, task, service):**
+**Workflow for applying run configurations (dev-environment, task, service):**
 
 1. **Show plan:**
    ```bash
@@ -337,9 +320,8 @@ volumes:
    ```bash
    dstack ps -v
    ```
-   Show the run status. Look for the run name and status column.
 
-**Step-by-step for infrastructure (fleet, volume, gateway):**
+**Workflow for infrastructure (fleet, volume, gateway):**
 
 1. **Show plan:**
    ```bash
@@ -356,25 +338,7 @@ volumes:
 
 4. **Verify:** Use `dstack fleet`, `dstack volume`, or `dstack gateway` respectively.
 
-**Common apply patterns:**
-```bash
-# Apply and attach (interactive, blocks terminal with port forwarding)
-dstack apply -f train.dstack.yml
-
-# Apply with automatic confirmation
-dstack apply -f train.dstack.yml -y
-
-# Apply detached (background, no attachment)
-dstack apply -f serve.dstack.yml -d
-
-# Force rerun (recreates even if run with same name exists)
-dstack apply -f finetune.dstack.yml --force
-
-# Override defaults (prefer modifying config file instead, unless it's an exception)
-dstack apply -f .dstack.yml --max-price 2.5
-```
-
-### Fleet Management
+### Fleet management
 
 ```bash
 # Create/update fleet
@@ -392,7 +356,7 @@ dstack fleet get my-fleet --json
 # Delete entire fleet (use -y when user already confirmed)
 dstack fleet delete my-fleet -y
 
-# IMPORTANT: When asked to delete an instance, always use -i <instance num> - do NOT delete the entire fleet (use -y when user already confirmed)
+# Delete specific instance from fleet (use -y when user already confirmed)
 dstack fleet delete my-fleet -i <instance num> -y
 ```
 
@@ -402,21 +366,17 @@ dstack fleet delete my-fleet -i <instance num> -y
 # List all runs
 dstack ps
 
-# JSON output (for troubleshooting/scripting)
-dstack ps --json
-
 # Verbose output with full details
 dstack ps -v
+
+# JSON output (for troubleshooting/scripting)
+dstack ps --json
 
 # Get specific run details as JSON
 dstack run get my-run-name --json
 ```
 
 ### Attach to runs
-
-**What is attaching?** Attaching connects to an existing run to restore port forwarding (for tasks/services with ports) and enable SSH access. The run name becomes an SSH alias (e.g., `ssh my-run-name`) configured in `~/.dstack/ssh/config` (included to `~/.ssh/config`).
-
-**Note:** `dstack apply` automatically attaches when run completes provisioning. Use `dstack attach` to reconnect after detaching or to access detached runs.
 
 ```bash
 # Attach and replay logs from start (preferred, unless asked otherwise)
@@ -445,10 +405,7 @@ dstack logs my-run-name --job 0
 ### Stop runs
 
 ```bash
-# Stop specific run
-dstack stop my-run-name
-
-# Stop with confirmation skipped (use when user already confirmed)
+# Stop specific run (use -y after user confirms)
 dstack stop my-run-name -y
 
 # Abort (force stop)
@@ -456,8 +413,6 @@ dstack stop my-run-name --abort
 ```
 
 ### Check available resources
-
-**Use `dstack offer` to verify GPU availability before provisioning:**
 
 ```bash
 # List all available offers across backends
@@ -472,18 +427,11 @@ dstack offer --gpu A100
 # Filter by GPU memory
 dstack offer --gpu 24GB..80GB
 
-# JSON output for detailed inspection
-dstack offer --json
-
 # Combine filters
 dstack offer --backend aws --gpu A100:80GB
 ```
 
-**Note:** `dstack offer` shows all available GPU instances from configured backends, not just those matching configured fleets. Use it to check backend availability, but remember: an offer appearing here doesn't guarantee a fleet will provision it - fleets have their own resource constraints.
-
-### Expected Output Formats
-
-**Agents should display these tables as-is, preserving column alignment.**
+**Note:** `dstack offer` lists offers across backends regardless of configured fleets.
 
 ## Troubleshooting
 
@@ -498,22 +446,22 @@ When diagnosing issues with dstack workloads or infrastructure:
 
 2. **Check verbose run status:**
    ```bash
-   dstack ps -v  # Shows provisioning state, instance details, errors
+   dstack ps -v
    ```
 
 3. **Examine logs with debug output:**
    ```bash
-   dstack logs my-run -d  # Includes additional runner logs
+   dstack logs my-run -d
    ```
 
 4. **Attach with log replay:**
    ```bash
-   dstack attach my-run --logs  # See full output from start
+   dstack attach my-run --logs
    ```
 
 5. **Verify resource availability:**
    ```bash
-   dstack offer --backend aws --gpu A100 --spot-auto --json  # Check if resources exist
+   dstack offer --backend aws --gpu A100 --spot-auto --json
    ```
 
 Common issues:
@@ -528,7 +476,7 @@ Common issues:
 2. Do NOT retry the same command without addressing the error
 3. Refer to the [Troubleshooting guide](https://dstack.ai/docs/guides/troubleshooting.md) for guidance
 
-## Additional Resources
+## Additional resources
 
 **Core documentation:**
 - [Overview](https://dstack.ai/docs/overview.md)
@@ -536,13 +484,13 @@ Common issues:
 - [Quickstart](https://dstack.ai/docs/quickstart.md)
 
 **Additional concepts:**
-- [Secrets](https://dstack.ai/docs/concepts/secrets.md) - Manage sensitive credentials
-- [Projects](https://dstack.ai/docs/concepts/projects.md) - Projects isolate the resources of different teams
-- [Metrics](https://dstack.ai/docs/concepts/metrics.md) - Track GPU utilization
-- [Events](https://dstack.ai/docs/concepts/events.md) - Monitor system events
+- [Secrets](https://dstack.ai/docs/concepts/secrets.md)
+- [Projects](https://dstack.ai/docs/concepts/projects.md)
+- [Metrics](https://dstack.ai/docs/concepts/metrics.md)
+- [Events](https://dstack.ai/docs/concepts/events.md)
 
 **Guides:**
-- [Server deployment](https://dstack.ai/docs/guides/server-deployment.md) (for server administration)
+- [Server deployment](https://dstack.ai/docs/guides/server-deployment.md)
 - [Pro tips](https://dstack.ai/docs/guides/protips.md)
 
 **Accelerator-specific examples:**
