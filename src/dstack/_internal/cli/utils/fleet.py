@@ -15,6 +15,124 @@ def print_fleets_table(fleets: List[Fleet], verbose: bool = False) -> None:
     console.print()
 
 
+def get_fleets_table(
+    fleets: List[Fleet], verbose: bool = False, format_date: DateFormatter = pretty_date
+) -> Table:
+    table = Table(box=None)
+
+    # Columns
+    table.add_column("NAME", style="bold", no_wrap=True)
+    table.add_column("NODES")
+    if verbose:
+        table.add_column("RESOURCES")
+    else:
+        table.add_column("GPU")
+    table.add_column("SPOT")
+    table.add_column("BACKEND")
+    table.add_column("PRICE")
+    table.add_column("STATUS", no_wrap=True)
+    table.add_column("CREATED", no_wrap=True)
+    if verbose:
+        table.add_column("ERROR")
+
+    for fleet in fleets:
+        # Fleet row
+        config = fleet.spec.configuration
+        merged_profile = fleet.spec.merged_profile
+
+        # Detect SSH fleet vs backend fleet
+        if config.ssh_config is not None:
+            # SSH fleet: fixed number of hosts, no cloud billing
+            nodes = str(len(config.ssh_config.hosts))
+            backend = "ssh"
+            spot_policy = "-"
+            max_price = "-"
+        else:
+            # Backend fleet: dynamic nodes, cloud billing
+            nodes = _format_nodes(config.nodes)
+            backend = _format_backends(config.backends)
+            spot_policy = "-"
+            if merged_profile and merged_profile.spot_policy:
+                spot_policy = merged_profile.spot_policy.value
+            # Format as "$0..$X.XX" range, or "-" if not set
+            if merged_profile and merged_profile.max_price is not None:
+                max_price = f"$0..{_format_price(merged_profile.max_price)}"
+            else:
+                max_price = "-"
+
+        # In verbose mode, append placement to nodes if cluster
+        if verbose and config.placement and config.placement.value == "cluster":
+            nodes = f"{nodes} (cluster)"
+
+        fleet_row: Dict[Union[str, int], Any] = {
+            "NAME": fleet.name,
+            "NODES": nodes,
+            "BACKEND": backend,
+            "PRICE": max_price,
+            "SPOT": spot_policy,
+            "STATUS": _format_fleet_status(fleet),
+            "CREATED": format_date(fleet.created_at),
+        }
+
+        if verbose:
+            fleet_row["RESOURCES"] = config.resources.pretty_format() if config.resources else "-"
+            fleet_row["ERROR"] = ""
+        else:
+            fleet_row["GPU"] = _format_fleet_gpu(config.resources)
+
+        add_row_from_dict(table, fleet_row)
+
+        # Instance rows (indented)
+        for instance in fleet.instances:
+            # Check if this is an SSH instance
+            is_ssh_instance = instance.backend == BackendType.REMOTE
+
+            # Format backend with region (and AZ in verbose mode)
+            if verbose and instance.availability_zone:
+                # In verbose mode, show AZ instead of region (AZ is more specific)
+                backend_with_region = _format_backend(instance.backend, instance.availability_zone)
+            else:
+                backend_with_region = _format_backend(instance.backend, instance.region)
+
+            # Get spot info from instance resources (not applicable to SSH)
+            if is_ssh_instance:
+                instance_spot = "-"
+                instance_price = "-"
+            else:
+                instance_spot = "-"
+                if (
+                    instance.instance_type is not None
+                    and instance.instance_type.resources is not None
+                ):
+                    instance_spot = (
+                        "spot" if instance.instance_type.resources.spot else "on-demand"
+                    )
+                instance_price = _format_price(instance.price)
+
+            instance_row: Dict[Union[str, int], Any] = {
+                "NAME": f"   instance={instance.instance_num}",
+                "NODES": "",
+                "BACKEND": backend_with_region,
+                "PRICE": instance_price,
+                "SPOT": instance_spot,
+                "STATUS": _format_instance_status(instance),
+                "CREATED": format_date(instance.created),
+            }
+
+            if verbose:
+                instance_row["RESOURCES"] = _format_instance_resources(instance)
+                error = ""
+                if instance.status == InstanceStatus.TERMINATED and instance.termination_reason:
+                    error = instance.termination_reason
+                instance_row["ERROR"] = error
+            else:
+                instance_row["GPU"] = _format_instance_gpu(instance)
+
+            add_row_from_dict(table, instance_row, style="secondary")
+
+    return table
+
+
 def _format_nodes(nodes: Optional[FleetNodesSpec]) -> str:
     """Format nodes spec as '0..1', '3', '2..10', etc."""
     if nodes is None:
@@ -168,121 +286,3 @@ def _format_instance_resources(instance: Instance) -> str:
     ]:
         return "-"
     return instance.instance_type.resources.pretty_format(include_spot=False)
-
-
-def get_fleets_table(
-    fleets: List[Fleet], verbose: bool = False, format_date: DateFormatter = pretty_date
-) -> Table:
-    table = Table(box=None)
-
-    # Columns
-    table.add_column("NAME", style="bold", no_wrap=True)
-    table.add_column("NODES")
-    if verbose:
-        table.add_column("RESOURCES")
-    else:
-        table.add_column("GPU")
-    table.add_column("SPOT")
-    table.add_column("BACKEND")
-    table.add_column("PRICE")
-    table.add_column("STATUS", no_wrap=True)
-    table.add_column("CREATED", no_wrap=True)
-    if verbose:
-        table.add_column("ERROR")
-
-    for fleet in fleets:
-        # Fleet row
-        config = fleet.spec.configuration
-        merged_profile = fleet.spec.merged_profile
-
-        # Detect SSH fleet vs backend fleet
-        if config.ssh_config is not None:
-            # SSH fleet: fixed number of hosts, no cloud billing
-            nodes = str(len(config.ssh_config.hosts))
-            backend = "ssh"
-            spot_policy = "-"
-            max_price = "-"
-        else:
-            # Backend fleet: dynamic nodes, cloud billing
-            nodes = _format_nodes(config.nodes)
-            backend = _format_backends(config.backends)
-            spot_policy = "-"
-            if merged_profile and merged_profile.spot_policy:
-                spot_policy = merged_profile.spot_policy.value
-            # Format as "$0..$X.XX" range, or "-" if not set
-            if merged_profile and merged_profile.max_price is not None:
-                max_price = f"$0..{_format_price(merged_profile.max_price)}"
-            else:
-                max_price = "-"
-
-        # In verbose mode, append placement to nodes if cluster
-        if verbose and config.placement and config.placement.value == "cluster":
-            nodes = f"{nodes} (cluster)"
-
-        fleet_row: Dict[Union[str, int], Any] = {
-            "NAME": fleet.name,
-            "NODES": nodes,
-            "BACKEND": backend,
-            "PRICE": max_price,
-            "SPOT": spot_policy,
-            "STATUS": _format_fleet_status(fleet),
-            "CREATED": format_date(fleet.created_at),
-        }
-
-        if verbose:
-            fleet_row["RESOURCES"] = config.resources.pretty_format() if config.resources else "-"
-            fleet_row["ERROR"] = ""
-        else:
-            fleet_row["GPU"] = _format_fleet_gpu(config.resources)
-
-        add_row_from_dict(table, fleet_row)
-
-        # Instance rows (indented)
-        for instance in fleet.instances:
-            # Check if this is an SSH instance
-            is_ssh_instance = instance.backend == BackendType.REMOTE
-
-            # Format backend with region (and AZ in verbose mode)
-            if verbose and instance.availability_zone:
-                # In verbose mode, show AZ instead of region (AZ is more specific)
-                backend_with_region = _format_backend(instance.backend, instance.availability_zone)
-            else:
-                backend_with_region = _format_backend(instance.backend, instance.region)
-
-            # Get spot info from instance resources (not applicable to SSH)
-            if is_ssh_instance:
-                instance_spot = "-"
-                instance_price = "-"
-            else:
-                instance_spot = "-"
-                if (
-                    instance.instance_type is not None
-                    and instance.instance_type.resources is not None
-                ):
-                    instance_spot = (
-                        "spot" if instance.instance_type.resources.spot else "on-demand"
-                    )
-                instance_price = _format_price(instance.price)
-
-            instance_row: Dict[Union[str, int], Any] = {
-                "NAME": f"   instance={instance.instance_num}",
-                "NODES": "",
-                "BACKEND": backend_with_region,
-                "PRICE": instance_price,
-                "SPOT": instance_spot,
-                "STATUS": _format_instance_status(instance),
-                "CREATED": format_date(instance.created),
-            }
-
-            if verbose:
-                instance_row["RESOURCES"] = _format_instance_resources(instance)
-                error = ""
-                if instance.status == InstanceStatus.TERMINATED and instance.termination_reason:
-                    error = instance.termination_reason
-                instance_row["ERROR"] = error
-            else:
-                instance_row["GPU"] = _format_instance_gpu(instance)
-
-            add_row_from_dict(table, instance_row, style="secondary")
-
-    return table
