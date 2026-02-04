@@ -513,7 +513,7 @@ it has been inactive in `dstack ps --verbose` (or `-v`).
 ```shell
 $ dstack ps -v
  NAME    BACKEND  RESOURCES       PRICE    STATUS                 SUBMITTED
- vscode  cudo     2xCPU, 8GB,     $0.0286  running                8 mins ago
+ vscode  runpod   2xCPU, 8GB,     $0.0286  running                8 mins ago
                   100.0GB (disk)           (inactive for 2m 34s)
 ```
 
