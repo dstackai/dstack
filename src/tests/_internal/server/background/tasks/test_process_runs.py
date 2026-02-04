@@ -35,6 +35,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_job_provisioning_data,
     get_run_spec,
+    list_events,
 )
 from dstack._internal.utils import common
 
@@ -666,6 +667,10 @@ class TestRollingDeployment:
         assert run.jobs[1].status == job_statuses[1]
         assert run.jobs[1].replica_num == 1
         assert run.jobs[1].deployment_num == 1  # updated
+        events = await list_events(session)
+        assert len(events) == 2
+        assert events[0].message == "Job updated. Deployment: 1"
+        assert events[1].message == "Job updated. Deployment: 1"
 
     async def test_not_updates_deployment_num_in_place_for_finished_replica(
         self, test_db, session: AsyncSession
@@ -697,6 +702,11 @@ class TestRollingDeployment:
         assert run.jobs[1].status == JobStatus.TERMINATED
         assert run.jobs[1].replica_num == 1
         assert run.jobs[1].deployment_num == 0  # not updated
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Job updated. Deployment: 1"
+        assert len(events[0].targets) == 1
+        assert events[0].targets[0].entity_id == run.jobs[0].id
 
     async def test_starts_new_replica(self, test_db, session: AsyncSession) -> None:
         run = await make_run(session, status=RunStatus.RUNNING, replicas=2, image="old")

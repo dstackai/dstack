@@ -30,6 +30,7 @@ from dstack._internal.server.models import (
     RunModel,
     UserModel,
 )
+from dstack._internal.server.services import events
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_specs_from_run_spec,
@@ -661,6 +662,12 @@ async def _update_jobs_to_new_deployment_in_place(
         if can_update_all_jobs:
             for job_model in job_models:
                 job_model.deployment_num = run_model.deployment_num
+                events.emit(
+                    session,
+                    f"Job updated. Deployment: {job_model.deployment_num}",
+                    actor=events.SystemActor(),
+                    targets=[events.Target.from_model(job_model)],
+                )
 
 
 async def _should_retry_job(
