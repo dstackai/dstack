@@ -163,6 +163,28 @@ async def get_instance_health_checks(
     return health_checks
 
 
+async def get_instance(
+    session: AsyncSession,
+    project: ProjectModel,
+    instance_id: uuid.UUID,
+) -> Optional[Instance]:
+    res = await session.execute(
+        select(InstanceModel)
+        .where(
+            InstanceModel.id == instance_id,
+            InstanceModel.project_id == project.id,
+        )
+        .options(
+            joinedload(InstanceModel.fleet).load_only(FleetModel.name),
+            joinedload(InstanceModel.project).load_only(ProjectModel.name),
+        )
+    )
+    instance_model = res.scalar_one_or_none()
+    if instance_model is None:
+        return None
+    return instance_model_to_instance(instance_model)
+
+
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     instance = Instance(
         id=instance_model.id,

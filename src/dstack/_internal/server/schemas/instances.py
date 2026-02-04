@@ -7,6 +7,10 @@ from dstack._internal.core.models.health import HealthCheck, HealthStatus
 from dstack._internal.server.schemas.runner import InstanceHealthResponse
 
 
+class GetInstanceRequest(CoreModel):
+    id: UUID
+
+
 class ListInstancesRequest(CoreModel):
     project_names: Optional[list[str]] = None
     fleet_ids: Optional[list[UUID]] = None

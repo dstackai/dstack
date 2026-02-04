@@ -1,15 +1,17 @@
-from typing import List
+from typing import Annotated, List
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.instances as instances_services
+from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.instances import Instance
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.instances import (
     GetInstanceHealthChecksRequest,
     GetInstanceHealthChecksResponse,
+    GetInstanceRequest,
     ListInstancesRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
@@ -75,3 +77,21 @@ async def get_instance_health_checks(
         limit=body.limit,
     )
     return CustomORJSONResponse(GetInstanceHealthChecksResponse(health_checks=health_checks))
+
+
+@project_router.post("/get", response_model=Instance)
+async def get_instance(
+    body: GetInstanceRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
+):
+    """
+    Returns an instance given its ID.
+    """
+    _, project = user_project
+    instance = await instances_services.get_instance(
+        session=session, project=project, instance_id=body.id
+    )
+    if instance is None:
+        raise ResourceNotExistsError()
+    return CustomORJSONResponse(instance)
