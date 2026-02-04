@@ -77,21 +77,25 @@ def configure_logging():
     dstack_logger = logging.getLogger("dstack")
     dstack_logger.handlers.clear()
 
-    log_file = _get_cli_log_file()
-
     stdout_handler = DstackRichHandler(console=console)
     stdout_handler.setFormatter(logging.Formatter(fmt="%(message)s", datefmt="[%X]"))
     stdout_handler.setLevel(settings.CLI_LOG_LEVEL)
     dstack_logger.addHandler(stdout_handler)
 
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setFormatter(
-        logging.Formatter(
-            fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    log_file = get_dstack_dir() / "logs" / "cli" / "latest.log"
+    try:
+        log_file = _get_cli_log_file()
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(
+            logging.Formatter(
+                fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
         )
-    )
-    file_handler.setLevel(settings.CLI_FILE_LOG_LEVEL)
-    dstack_logger.addHandler(file_handler)
+        file_handler.setLevel(settings.CLI_FILE_LOG_LEVEL)
+        dstack_logger.addHandler(file_handler)
+    except PermissionError:
+        console.print(f"[warning]Couldn't write to {log_file} due to a permissions problem.[/]")
 
     # the logger allows all messages, filtering is done by the handlers
     dstack_logger.setLevel(logging.DEBUG)
