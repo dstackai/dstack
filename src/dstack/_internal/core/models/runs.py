@@ -191,6 +191,7 @@ class JobTerminationReason(str, Enum):
         error_mapping = {
             JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
             JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
+            JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED: "waiting runner limit exceeded",
             JobTerminationReason.VOLUME_ERROR: "volume error",
             JobTerminationReason.GATEWAY_ERROR: "gateway error",
             JobTerminationReason.SCALED_DOWN: "scaled down",
