@@ -941,6 +941,53 @@ class TestListRuns:
             },
         ]
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "client_version,expected_probes",
+        [
+            ("0.20.7", []),
+            ("0.20.8", None),
+            (None, None),
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_patches_service_configuration_probes_for_old_clients(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        expected_probes: Optional[list],
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+
+        service_conf = ServiceConfiguration(
+            commands=["echo hello"],
+            port=80,
+            probes=None,  # This should be patched to [] for clients prior to 0.20.8
+        )
+        run_spec = get_run_spec(
+            configuration=service_conf,
+            repo_id=repo.name,
+        )
+        await create_run(session=session, project=project, repo=repo, user=user, run_spec=run_spec)
+
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        response = await client.post(
+            "/api/runs/list",
+            headers=headers,
+            json={"project_name": project.name},
+        )
+
+        assert response.status_code == 200
+        runs_list = response.json()
+        assert len(runs_list) == 1
+        assert runs_list[0]["run_spec"]["configuration"]["probes"] == expected_probes
+
 
 class TestGetRun:
     @pytest.mark.asyncio
@@ -1019,6 +1066,53 @@ class TestGetRun:
         )
         assert response.status_code == 200, response.json()
         assert response.json()["id"] == str(run.id)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "client_version,expected_probes",
+        [
+            ("0.20.7", []),
+            ("0.20.8", None),
+            (None, None),
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_patches_service_configuration_probes_for_old_clients(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        expected_probes: Optional[list],
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+
+        service_conf = ServiceConfiguration(
+            commands=["echo hello"],
+            port=80,
+            probes=None,  # This should be patched to [] for clients prior to 0.20.8
+        )
+        run_spec = get_run_spec(
+            configuration=service_conf,
+            repo_id=repo.name,
+        )
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get",
+            headers=headers,
+            json={"run_name": run.run_name},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["run_spec"]["configuration"]["probes"] == expected_probes
 
 
 class TestGetRunPlan:
@@ -1477,6 +1571,64 @@ class TestGetRunPlan:
         assert user.ssh_public_key == run_spec_ssh_public_key
         assert user.ssh_private_key is not None
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "client_version,expected_probes",
+        [
+            ("0.20.7", []),
+            ("0.20.8", None),
+            (None, None),
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_patches_service_configuration_probes_for_old_clients(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        expected_probes: Optional[list],
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+
+        service_conf = ServiceConfiguration(
+            commands=["echo hello"],
+            port=80,
+            probes=None,  # This should be patched to [] for clients prior to 0.20.8
+        )
+        run_spec = get_run_spec(
+            run_name="test-service",
+            configuration=service_conf,
+            repo_id=repo.name,
+        )
+        await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            run_name="test-service",
+        )
+
+        body = {"run_spec": run_spec.dict()}
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get_plan",
+            headers=headers,
+            json=body,
+        )
+
+        assert response.status_code == 200
+        run_plan = response.json()
+        assert run_plan["run_spec"]["configuration"]["probes"] == expected_probes
+        assert (
+            run_plan["current_resource"]["run_spec"]["configuration"]["probes"] == expected_probes
+        )
+
 
 class TestApplyPlan:
     @pytest.mark.asyncio
@@ -1667,6 +1819,57 @@ class TestApplyPlan:
         await session.refresh(user)
         assert user.ssh_public_key == run_spec_ssh_public_key
         assert user.ssh_private_key is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "client_version,expected_probes",
+        [
+            ("0.20.7", []),  # Prior to 0.20.8, probes=None should be patched to []
+            ("0.20.8", None),  # 0.20.8 and later should keep probes=None
+            (None, None),  # None client version should keep probes=None
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_patches_service_configuration_probes_for_old_clients(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        expected_probes: Optional[list],
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+
+        service_conf = ServiceConfiguration(
+            commands=["echo hello"],
+            port=80,
+            probes=None,  # This should be patched to [] for clients prior to 0.20.8
+        )
+        run_spec = get_run_spec(
+            run_name="test-service",
+            configuration=service_conf,
+            repo_id=repo.name,
+        )
+
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        response = await client.post(
+            f"/api/project/{project.name}/runs/apply",
+            headers=headers,
+            json={
+                "plan": {
+                    "run_spec": run_spec.dict(),
+                    "current_resource": None,
+                },
+                "force": False,
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["run_spec"]["configuration"]["probes"] == expected_probes
 
 
 class TestSubmitRun:
