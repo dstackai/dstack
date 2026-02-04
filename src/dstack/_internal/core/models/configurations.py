@@ -54,6 +54,7 @@ DEFAULT_PROBE_TIMEOUT = 10
 DEFAULT_PROBE_INTERVAL = 15
 DEFAULT_PROBE_READY_AFTER = 1
 DEFAULT_PROBE_METHOD = "get"
+DEFAULT_PROBE_UNTIL_READY = False
 MAX_PROBE_URL_LEN = 2048
 DEFAULT_REPLICA_GROUP_NAME = "0"
 
@@ -373,15 +374,15 @@ class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
         ),
     ] = None
     until_ready: Annotated[
-        bool,
+        Optional[bool],
         Field(
             description=(
                 "If `true`, the probe will stop being executed as soon as it reaches the"
                 " `ready_after` threshold of successful executions."
-                " Defaults to `false`"
+                f" Defaults to `{str(DEFAULT_PROBE_UNTIL_READY).lower()}`"
             ),
         ),
-    ] = False
+    ] = None
 
     @validator("timeout", pre=True)
     def parse_timeout(cls, v: Optional[Union[int, str]]) -> Optional[int]:
