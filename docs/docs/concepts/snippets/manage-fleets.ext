@@ -1,22 +1,3 @@
-### Creation policy
-
-By default, when you run `dstack apply` with a dev environment, task, or service,
-if no `idle` instances from the available fleets meet the requirements, `dstack` provisions a new instance
-using configured backends.
-
-To ensure `dstack apply` doesn't provision a new instance but reuses an existing one,
-pass `-R` (or `--reuse`) to `dstack apply`.
-
-<div class="termy">
-
-```shell
-$ dstack apply -R -f examples/.dstack.yml
-```
-
-</div>
-
-Or, set [`creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
-
 ### Idle duration
 
 If a run provisions a new instance, the instance stays `idle` for 5 minutes by default and can be reused within that time.
