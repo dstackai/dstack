@@ -68,6 +68,9 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
             configuration_excludes["probes"] = {"__all__": probe_excludes}
             if all(p.until_ready is None for p in run_spec.configuration.probes):
                 probe_excludes["until_ready"] = True
+        elif run_spec.configuration.probes is None:
+            # Servers prior to 0.20.8 do not support probes=None
+            configuration_excludes["probes"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
