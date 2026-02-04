@@ -48,6 +48,7 @@ from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.schemas.runs import ApplyRunPlanRequest
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.services.runs import run_model_to_run
+from dstack._internal.server.services.runs.spec import validate_run_spec_and_set_defaults
 from dstack._internal.server.testing.common import (
     create_backend,
     create_fleet,
@@ -1549,6 +1550,7 @@ class TestApplyPlan:
         repo = await create_repo(session=session, project_id=project.id)
         run_spec = get_run_spec(
             run_name="test-service",
+            configuration_path="old.dstack.yml",
             repo_id=repo.name,
             configuration=ServiceConfiguration(
                 type="service",
@@ -1557,6 +1559,8 @@ class TestApplyPlan:
                 replicas=Range(min=1, max=1),
             ),
         )
+        # set defaults to avoid phantom changes being detected
+        validate_run_spec_and_set_defaults(user, run_spec)
         run_model = await create_run(
             session=session,
             project=project,
@@ -1566,6 +1570,7 @@ class TestApplyPlan:
             run_spec=run_spec,
         )
         run = run_model_to_run(run_model)
+        run_spec.configuration_path = "new.dstack.yml"
         run_spec.configuration.replicas = Range(min=2, max=2)
         response = await client.post(
             f"/api/project/{project.name}/runs/apply",
@@ -1586,8 +1591,15 @@ class TestApplyPlan:
         updated_run = run_model_to_run(run_model)
         assert run.deployment_num == 0
         assert updated_run.deployment_num == 1
+        assert run.run_spec.configuration_path == "old.dstack.yml"
+        assert updated_run.run_spec.configuration_path == "new.dstack.yml"
         assert run.run_spec.configuration.replicas == Range(min=1, max=1)
         assert updated_run.run_spec.configuration.replicas == Range(min=2, max=2)
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == (
+            "Run updated. Deployment: 1. Changed fields: configuration_path, configuration.replicas"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

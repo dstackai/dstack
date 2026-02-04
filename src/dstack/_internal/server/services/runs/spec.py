@@ -4,7 +4,7 @@ from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, 
 from dstack._internal.core.models.runs import LEGACY_REPO_DIR, AnyRunConfiguration, RunSpec
 from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.core.services import validate_dstack_resource_name
-from dstack._internal.core.services.diff import diff_models
+from dstack._internal.core.services.diff import ModelDiff, diff_models
 from dstack._internal.server import settings
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
@@ -117,7 +117,13 @@ def validate_run_spec_and_set_defaults(
         run_spec.configuration.working_dir = LEGACY_REPO_DIR
 
 
-def check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
+def check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> ModelDiff:
+    """
+    Check if in-place update is possible.
+
+    Returns the diff if it is possible.
+    Raises ServerClientError otherwise.
+    """
     spec_diff = diff_models(current_run_spec, new_run_spec)
     changed_spec_fields = list(spec_diff.keys())
     updatable_spec_fields = _UPDATABLE_SPEC_FIELDS + _TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS.get(
@@ -133,9 +139,10 @@ def check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
     # are the same (the same id => hash => content and the same container path), the order of
     # unpacking matters when one path is a subpath of another.
     ignore_files = current_run_spec.file_archives == new_run_spec.file_archives
-    _check_can_update_configuration(
+    spec_diff["configuration"] = _check_can_update_configuration(
         current_run_spec.configuration, new_run_spec.configuration, ignore_files
     )
+    return spec_diff
 
 
 def can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bool:
@@ -167,7 +174,13 @@ def check_run_spec_requires_instance_mounts(run_spec: RunSpec) -> bool:
 
 def _check_can_update_configuration(
     current: AnyRunConfiguration, new: AnyRunConfiguration, ignore_files: bool
-) -> None:
+) -> ModelDiff:
+    """
+    Check if in-place update is possible.
+
+    Returns the diff if it is possible.
+    Raises ServerClientError otherwise.
+    """
     if current.type != new.type:
         raise ServerClientError(
             f"Configuration type changed from {current.type} to {new.type}, cannot update"
@@ -189,3 +202,4 @@ def _check_can_update_configuration(
             raise ServerClientError(
                 f"Failed to update fields {changed_fields}. Can only update {updatable_fields}"
             )
+    return diff
