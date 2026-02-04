@@ -18,6 +18,7 @@ from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_METHOD,
     DEFAULT_PROBE_READY_AFTER,
     DEFAULT_PROBE_TIMEOUT,
+    DEFAULT_PROBE_UNTIL_READY,
     DEFAULT_PROBE_URL,
     DEFAULT_REPLICA_GROUP_NAME,
     LEGACY_REPO_DIR,
@@ -455,6 +456,7 @@ def _probe_config_to_spec(c: ProbeConfig) -> ProbeSpec:
         method=c.method if c.method is not None else DEFAULT_PROBE_METHOD,
         headers=c.headers,
         body=c.body,
+        until_ready=c.until_ready if c.until_ready is not None else DEFAULT_PROBE_UNTIL_READY,
     )
 
 

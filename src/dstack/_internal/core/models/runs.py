@@ -17,6 +17,7 @@ from dstack._internal.core.models.common import (
 )
 from dstack._internal.core.models.configurations import (
     DEFAULT_PROBE_METHOD,
+    DEFAULT_PROBE_UNTIL_READY,
     DEFAULT_REPLICA_GROUP_NAME,
     LEGACY_REPO_DIR,
     AnyRunConfiguration,
@@ -247,6 +248,7 @@ class ProbeSpec(CoreModel):
     timeout: int
     interval: int
     ready_after: int
+    until_ready: bool = DEFAULT_PROBE_UNTIL_READY
 
 
 class JobSpec(CoreModel):

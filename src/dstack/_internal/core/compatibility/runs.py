@@ -1,7 +1,9 @@
 from typing import Optional
 
 from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeExcludeSetType
+from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.runs import (
+    DEFAULT_PROBE_UNTIL_READY,
     DEFAULT_REPLICA_GROUP_NAME,
     ApplyRunPlanInput,
     JobSpec,
@@ -60,12 +62,12 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     configuration_excludes: IncludeExcludeDictType = {}
     profile_excludes: IncludeExcludeSetType = set()
 
-    # Add excludes like this:
-    #
-    # if run_spec.configuration.tags is None:
-    #     configuration_excludes["tags"] = True
-    # if run_spec.profile is not None and run_spec.profile.tags is None:
-    #     profile_excludes.add("tags")
+    if isinstance(run_spec.configuration, ServiceConfiguration):
+        if run_spec.configuration.probes:
+            probe_excludes: IncludeExcludeDictType = {}
+            configuration_excludes["probes"] = {"__all__": probe_excludes}
+            if all(p.until_ready is None for p in run_spec.configuration.probes):
+                probe_excludes["until_ready"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
@@ -83,4 +85,10 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
     spec_excludes: IncludeExcludeDictType = {}
     if all(s.replica_group == DEFAULT_REPLICA_GROUP_NAME for s in job_specs):
         spec_excludes["replica_group"] = True
+
+    probe_excludes: IncludeExcludeDictType = {}
+    spec_excludes["probes"] = {"__all__": probe_excludes}
+    if all(all(p.until_ready == DEFAULT_PROBE_UNTIL_READY for p in s.probes) for s in job_specs):
+        probe_excludes["until_ready"] = True
+
     return spec_excludes

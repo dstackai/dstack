@@ -73,12 +73,15 @@ async def process_probes():
                 else:
                     job_spec: JobSpec = JobSpec.__response__.parse_raw(probe.job.job_spec_data)
                     probe_spec = job_spec.probes[probe.probe_num]
-                    # Schedule the next probe execution in case this execution is interrupted
-                    probe.due = get_current_datetime() + _get_probe_async_processing_timeout(
-                        probe_spec
-                    )
-                    # Execute the probe asynchronously outside of the DB session
-                    PROBES_SCHEDULER.add_job(partial(_process_probe_async, probe, probe_spec))
+                    if probe_spec.until_ready and probe.success_streak >= probe_spec.ready_after:
+                        probe.active = False
+                    else:
+                        # Schedule the next probe execution in case this execution is interrupted
+                        probe.due = get_current_datetime() + _get_probe_async_processing_timeout(
+                            probe_spec
+                        )
+                        # Execute the probe asynchronously outside of the DB session
+                        PROBES_SCHEDULER.add_job(partial(_process_probe_async, probe, probe_spec))
             await session.commit()
         finally:
             probe_lockset.difference_update(probe_ids)
