@@ -36,12 +36,7 @@ export const UserProjectList: React.FC = () => {
     ]);
 
     const renderEmptyMessage = (): React.ReactNode => {
-        return (
-            <ListEmptyMessage
-                title={t('projects.empty_message_title')}
-                message={t('projects.empty_message_text')}
-            ></ListEmptyMessage>
-        );
+        return <ListEmptyMessage title={t('projects.empty_message_title')} message={t('projects.empty_message_text')} />;
     };
 
     const filteredData = useMemo<IProject[]>(() => {
@@ -78,7 +73,6 @@ export const UserProjectList: React.FC = () => {
     return (
         <Table
             {...collectionProps}
-            variant="borderless"
             columnDefinitions={columns}
             items={items}
             loading={isLoading || isFetching}

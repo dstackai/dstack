@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Box, Button, ColumnLayout, Header, Link, Loader, Popover, SpaceBetween, StatusIndicator } from 'components';
+import { Box, Button, ColumnLayout, Container, Header, Link, Loader, Popover, SpaceBetween, StatusIndicator } from 'components';
 import { PermissionGuard } from 'components/PermissionGuard';
 
 import { useAppSelector, useBreadcrumbs, usePermissionGuard } from 'hooks';
@@ -51,18 +51,20 @@ export const Settings: React.FC = () => {
     };
 
     return (
-        <div>
-            <Header
-                variant="h2"
-                actions={
-                    <Button onClick={editUserHandler} disabled={isDisabledUserEditing()}>
-                        {t('common.edit')}
-                    </Button>
-                }
-            >
-                {t('users.account_settings')}
-            </Header>
-
+        <Container
+            header={
+                <Header
+                    variant="h2"
+                    actions={
+                        <Button onClick={editUserHandler} disabled={isDisabledUserEditing()}>
+                            {t('common.edit')}
+                        </Button>
+                    }
+                >
+                    {t('users.account_settings')}
+                </Header>
+            }
+        >
             {isLoading && <Loader />}
 
             {data && (
@@ -105,6 +107,6 @@ export const Settings: React.FC = () => {
                     </SpaceBetween>
                 </ColumnLayout>
             )}
-        </div>
+        </Container>
     );
 };

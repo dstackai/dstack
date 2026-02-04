@@ -696,8 +696,7 @@
     "account_settings": "User settings",
     "settings": "Settings",
     "projects": "Projects",
-    "events": "User events",
-    "activity": "User activity",
+    "events": "Events",
     "create": {
       "page_title": "Create user",
       "error_notification": "Create user error",

@@ -24,9 +24,16 @@ type EventListProps = Pick<TableProps, 'variant'> & {
     withSearchParams?: boolean;
     renderHeader?: (args: RenderHeaderArgs) => React.ReactNode;
     permanentFilters?: Partial<TEventListFilters>;
+    showFilters?: boolean;
 };
 
-export const EventList: React.FC<EventListProps> = ({ withSearchParams, permanentFilters, renderHeader, ...props }) => {
+export const EventList: React.FC<EventListProps> = ({
+    withSearchParams,
+    permanentFilters,
+    renderHeader,
+    showFilters = true,
+    ...props
+}) => {
     const { t } = useTranslation();
 
     useBreadcrumbs([
@@ -79,24 +86,26 @@ export const EventList: React.FC<EventListProps> = ({ withSearchParams, permanen
             stickyHeader={true}
             header={renderHeader?.({ refreshAction: refreshList, disabledRefresh: loading })}
             filter={
-                <div className={styles.selectFilters}>
-                    <div className={styles.propertyFilter}>
-                        <PropertyFilter
-                            query={propertyFilterQuery}
-                            onChange={onChangePropertyFilter}
-                            expandToViewport
-                            hideOperations
-                            i18nStrings={{
-                                clearFiltersText: t('common.clearFilter'),
-                                filteringAriaLabel: t('projects.run.filter_property_placeholder'),
-                                filteringPlaceholder: t('projects.run.filter_property_placeholder'),
-                                operationAndText: 'and',
-                            }}
-                            filteringOptions={filteringOptions}
-                            filteringProperties={filteringProperties}
-                        />
+                showFilters && (
+                    <div className={styles.selectFilters}>
+                        <div className={styles.propertyFilter}>
+                            <PropertyFilter
+                                query={propertyFilterQuery}
+                                onChange={onChangePropertyFilter}
+                                expandToViewport
+                                hideOperations
+                                i18nStrings={{
+                                    clearFiltersText: t('common.clearFilter'),
+                                    filteringAriaLabel: t('projects.run.filter_property_placeholder'),
+                                    filteringPlaceholder: t('projects.run.filter_property_placeholder'),
+                                    operationAndText: 'and',
+                                }}
+                                filteringOptions={filteringOptions}
+                                filteringProperties={filteringProperties}
+                            />
+                        </div>
                     </div>
-                </div>
+                )
             }
             footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
         />

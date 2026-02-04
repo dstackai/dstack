@@ -236,7 +236,6 @@ export const useFilters = ({
         const permanentFiltersKeysMap = new Map<string, string>();
 
         for (const prefix of onlyOneFilterGroupPrefixes) {
-            console.log({ prefix });
             const permanentFilterKey = Object.keys(permanentFilters ?? {}).find((filterKey) => filterKey.startsWith(prefix));
 
             if (permanentFilterKey) {
