@@ -182,7 +182,7 @@
     "repositories": "Repositories",
     "runs": "Runs",
     "tags": "Tags",
-    "events": "Project events",
+    "events": "Events",
     "settings": "Settings",
     "join": "Join",
     "leave_confirm_title": "Leave project",

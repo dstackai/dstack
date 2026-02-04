@@ -17,7 +17,7 @@ import { FleetInspect } from 'pages/Fleets/Details/Inspect';
 import { InstanceList } from 'pages/Instances';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
-import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
+import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectEvents, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
 import {
@@ -85,6 +85,10 @@ export const router = createBrowserRouter([
                     {
                         index: true,
                         element: <ProjectSettings />,
+                    },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.EVENTS.TEMPLATE,
+                        element: <ProjectEvents />,
                     },
                     {
                         path: ROUTES.PROJECT.BACKEND.ADD.TEMPLATE,

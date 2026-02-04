@@ -54,9 +54,7 @@ export const Events: React.FC = () => {
                                 <Button onClick={goToEventsPage}>{t('common.full_view')}</Button>
                             </SpaceBetween>
                         }
-                    >
-                        {/*{t('navigation.events')}*/}
-                    </Header>
+                    />
                 );
             }}
             permanentFilters={{ [filterParamName]: [paramUserName] }}
