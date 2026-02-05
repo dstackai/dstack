@@ -14,7 +14,7 @@ export const Events: React.FC = () => {
     const params = useParams();
     const paramUserName = params.userName ?? '';
     const navigate = useNavigate();
-    const [filterParamName, setFilterParamName] = useState<keyof TEventListFilters>('target_users');
+    const [filterParamName, setFilterParamName] = useState<keyof TEventListFilters>('actors');
 
     useBreadcrumbs([
         {
@@ -47,8 +47,8 @@ export const Events: React.FC = () => {
                                     selectedId={filterParamName}
                                     onChange={({ detail }) => setFilterParamName(detail.selectedId as keyof TEventListFilters)}
                                     options={[
-                                        { text: 'Target user', id: 'target_users' },
                                         { text: 'Actor', id: 'actors' },
+                                        { text: 'Target user', id: 'target_users' },
                                     ]}
                                 />
                                 <Button onClick={goToEventsPage}>{t('common.full_view')}</Button>
