@@ -11,6 +11,8 @@ def patch_run_plan(run_plan: RunPlan, client_version: Optional[Version]) -> None
     if client_version is None:
         return
     patch_run_spec(run_plan.run_spec, client_version)
+    if run_plan.effective_run_spec is not None:
+        patch_run_spec(run_plan.effective_run_spec, client_version)
     if run_plan.current_resource is not None:
         patch_run(run_plan.current_resource, client_version)
     for job_plan in run_plan.job_plans:

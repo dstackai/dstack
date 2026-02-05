@@ -1625,6 +1625,7 @@ class TestGetRunPlan:
         assert response.status_code == 200
         run_plan = response.json()
         assert run_plan["run_spec"]["configuration"]["probes"] == expected_probes
+        assert run_plan["effective_run_spec"]["configuration"]["probes"] == expected_probes
         assert (
             run_plan["current_resource"]["run_spec"]["configuration"]["probes"] == expected_probes
         )
