@@ -182,6 +182,7 @@
     "repositories": "Repositories",
     "runs": "Runs",
     "tags": "Tags",
+    "events": "Events",
     "settings": "Settings",
     "join": "Join",
     "leave_confirm_title": "Leave project",
@@ -697,6 +698,7 @@
     "account_settings": "User settings",
     "settings": "Settings",
     "projects": "Projects",
+    "events": "Events",
     "create": {
       "page_title": "Create user",
       "error_notification": "Create user error",

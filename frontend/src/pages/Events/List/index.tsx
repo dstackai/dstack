@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table } from 'components';
+import { Loader, PropertyFilter, Table } from 'components';
+import { TableProps } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useInfiniteScroll } from 'hooks';
@@ -14,7 +15,25 @@ import { useFilters } from './hooks/useFilters';
 
 import styles from '../../Runs/List/styles.module.scss';
 
-export const EventList = () => {
+type RenderHeaderArgs = {
+    refreshAction?: () => void;
+    disabledRefresh?: boolean;
+};
+
+type EventListProps = Pick<TableProps, 'variant'> & {
+    withSearchParams?: boolean;
+    renderHeader?: (args: RenderHeaderArgs) => React.ReactNode;
+    permanentFilters?: Partial<TEventListFilters>;
+    showFilters?: boolean;
+};
+
+export const EventList: React.FC<EventListProps> = ({
+    withSearchParams,
+    permanentFilters,
+    renderHeader,
+    showFilters = true,
+    ...props
+}) => {
     const { t } = useTranslation();
 
     useBreadcrumbs([
@@ -24,12 +43,19 @@ export const EventList = () => {
         },
     ]);
 
-    const { filteringRequestParams, propertyFilterQuery, onChangePropertyFilter, filteringOptions, filteringProperties } =
-        useFilters();
+    const {
+        filteringRequestParams,
+        propertyFilterQuery,
+        onChangePropertyFilter,
+        filteringOptions,
+        filteringProperties,
+        isLoadingFilters,
+    } = useFilters({ permanentFilters, withSearchParams });
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
         args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
+        skip: isLoadingFilters,
 
         getPaginationParams: (lastEvent) => ({
             prev_recorded_at: lastEvent.recorded_at,
@@ -47,52 +73,39 @@ export const EventList = () => {
 
     const { columns } = useColumnsDefinitions();
 
+    const loading = isLoadingFilters || isLoading;
+
     return (
         <Table
+            {...props}
             {...collectionProps}
-            variant="full-page"
             columnDefinitions={columns}
             items={items}
-            loading={isLoading}
+            loading={loading}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            selectionType="multi"
-            header={
-                <Header
-                    variant="awsui-h1-sticky"
-                    actions={
-                        <SpaceBetween size="xs" direction="horizontal">
-                            <Button
-                                iconName="refresh"
-                                disabled={isLoading}
-                                ariaLabel={t('common.refresh')}
-                                onClick={refreshList}
-                            />
-                        </SpaceBetween>
-                    }
-                >
-                    {t('navigation.events')}
-                </Header>
-            }
+            header={renderHeader?.({ refreshAction: refreshList, disabledRefresh: loading })}
             filter={
-                <div className={styles.selectFilters}>
-                    <div className={styles.propertyFilter}>
-                        <PropertyFilter
-                            query={propertyFilterQuery}
-                            onChange={onChangePropertyFilter}
-                            expandToViewport
-                            hideOperations
-                            i18nStrings={{
-                                clearFiltersText: t('common.clearFilter'),
-                                filteringAriaLabel: t('projects.run.filter_property_placeholder'),
-                                filteringPlaceholder: t('projects.run.filter_property_placeholder'),
-                                operationAndText: 'and',
-                            }}
-                            filteringOptions={filteringOptions}
-                            filteringProperties={filteringProperties}
-                        />
+                showFilters && (
+                    <div className={styles.selectFilters}>
+                        <div className={styles.propertyFilter}>
+                            <PropertyFilter
+                                query={propertyFilterQuery}
+                                onChange={onChangePropertyFilter}
+                                expandToViewport
+                                hideOperations
+                                i18nStrings={{
+                                    clearFiltersText: t('common.clearFilter'),
+                                    filteringAriaLabel: t('projects.run.filter_property_placeholder'),
+                                    filteringPlaceholder: t('projects.run.filter_property_placeholder'),
+                                    operationAndText: 'and',
+                                }}
+                                filteringOptions={filteringOptions}
+                                filteringProperties={filteringProperties}
+                            />
+                        </div>
                     </div>
-                </div>
+                )
             }
             footer={<Loader show={isLoadingMore} padding={{ vertical: 'm' }} />}
         />

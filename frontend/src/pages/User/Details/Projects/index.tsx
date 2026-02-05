@@ -29,15 +29,14 @@ export const UserProjectList: React.FC = () => {
             text: paramUserName,
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
         },
+        {
+            text: t('users.projects'),
+            href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
+        },
     ]);
 
     const renderEmptyMessage = (): React.ReactNode => {
-        return (
-            <ListEmptyMessage
-                title={t('projects.empty_message_title')}
-                message={t('projects.empty_message_text')}
-            ></ListEmptyMessage>
-        );
+        return <ListEmptyMessage title={t('projects.empty_message_title')} message={t('projects.empty_message_text')} />;
     };
 
     const filteredData = useMemo<IProject[]>(() => {
@@ -74,7 +73,6 @@ export const UserProjectList: React.FC = () => {
     return (
         <Table
             {...collectionProps}
-            variant="borderless"
             columnDefinitions={columns}
             items={items}
             loading={isLoading || isFetching}

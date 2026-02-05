@@ -17,7 +17,7 @@ import { FleetInspect } from 'pages/Fleets/Details/Inspect';
 import { InstanceList } from 'pages/Instances';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
-import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
+import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectEvents, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
 import {
@@ -33,7 +33,7 @@ import { RunInspect } from 'pages/Runs/Details/Inspect';
 import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
 import { EventsList as JobEvents } from 'pages/Runs/Details/Jobs/Events';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
-import { UserBilling, UserProjects, UserSettings } from 'pages/User/Details';
+import { UserBilling, UserEvents, UserProjects, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
 import { EventList } from './pages/Events';
@@ -85,6 +85,10 @@ export const router = createBrowserRouter([
                     {
                         index: true,
                         element: <ProjectSettings />,
+                    },
+                    {
+                        path: ROUTES.PROJECT.DETAILS.EVENTS.TEMPLATE,
+                        element: <ProjectEvents />,
                     },
                     {
                         path: ROUTES.PROJECT.BACKEND.ADD.TEMPLATE,
@@ -257,6 +261,10 @@ export const router = createBrowserRouter([
                     {
                         path: ROUTES.USER.PROJECTS.TEMPLATE,
                         element: <UserProjects />,
+                    },
+                    {
+                        path: ROUTES.USER.EVENTS.TEMPLATE,
+                        element: <UserEvents />,
                     },
                     process.env.UI_VERSION === 'sky' && {
                         path: ROUTES.USER.BILLING.LIST.TEMPLATE,

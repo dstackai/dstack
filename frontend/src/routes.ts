@@ -23,6 +23,11 @@ export const ROUTES = {
                 FORMAT: (projectName: string) => buildRoute(ROUTES.PROJECT.DETAILS.SETTINGS.TEMPLATE, { projectName }),
             },
 
+            EVENTS: {
+                TEMPLATE: `/projects/:projectName/events`,
+                FORMAT: (projectName: string) => buildRoute(ROUTES.PROJECT.DETAILS.EVENTS.TEMPLATE, { projectName }),
+            },
+
             RUNS: {
                 DETAILS: {
                     TEMPLATE: `/projects/:projectName/runs/:runId`,
@@ -180,6 +185,10 @@ export const ROUTES = {
         PROJECTS: {
             TEMPLATE: `/users/:userName/projects`,
             FORMAT: (userName: string) => buildRoute(ROUTES.USER.PROJECTS.TEMPLATE, { userName }),
+        },
+        EVENTS: {
+            TEMPLATE: `/users/:userName/events`,
+            FORMAT: (userName: string) => buildRoute(ROUTES.USER.EVENTS.TEMPLATE, { userName }),
         },
         BILLING: {
             LIST: {
