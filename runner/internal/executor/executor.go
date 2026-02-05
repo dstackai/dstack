@@ -296,7 +296,7 @@ func (ex *RunExecutor) SetJobState(ctx context.Context, state types.JobState) {
 }
 
 func (ex *RunExecutor) SetJobStateWithTerminationReason(
-	ctx context.Context, state types.JobState, termination_reason types.TerminationReason, termination_message string,
+	ctx context.Context, state types.JobState, terminationReason types.TerminationReason, terminationMessage string,
 ) {
 	ex.mu.Lock()
 	ex.jobStateHistory = append(
@@ -304,11 +304,14 @@ func (ex *RunExecutor) SetJobStateWithTerminationReason(
 		schemas.JobStateEvent{
 			State:              state,
 			Timestamp:          ex.timestamp.Next(),
-			TerminationReason:  termination_reason,
-			TerminationMessage: termination_message,
+			TerminationReason:  terminationReason,
+			TerminationMessage: terminationMessage,
 		},
 	)
 	ex.mu.Unlock()
+	if terminationReason != "" {
+		ctx = log.AppendArgsCtx(ctx, "termination_reason", terminationReason, "termination_message", terminationMessage)
+	}
 	log.Info(ctx, "Job state changed", "new", state)
 }
 
