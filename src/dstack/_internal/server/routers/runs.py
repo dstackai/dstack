@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.runs import Run, RunPlan
-from dstack._internal.server.compatibility.common import patch_offers_list
+from dstack._internal.server.compatibility.runs import patch_run, patch_run_plan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
@@ -52,6 +52,7 @@ async def list_runs(
     body: ListRunsRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
+    client_version: Optional[Version] = Depends(get_client_version),
 ):
     """
     Returns all runs visible to user sorted by descending `submitted_at`.
@@ -62,22 +63,23 @@ async def list_runs(
     The results are paginated. To get the next page, pass `submitted_at` and `id` of
     the last run from the previous page as `prev_submitted_at` and `prev_run_id`.
     """
-    return CustomORJSONResponse(
-        await runs.list_user_runs(
-            session=session,
-            user=user,
-            project_name=body.project_name,
-            repo_id=body.repo_id,
-            username=body.username,
-            only_active=body.only_active,
-            include_jobs=body.include_jobs,
-            job_submissions_limit=body.job_submissions_limit,
-            prev_submitted_at=body.prev_submitted_at,
-            prev_run_id=body.prev_run_id,
-            limit=body.limit,
-            ascending=body.ascending,
-        )
+    run_list = await runs.list_user_runs(
+        session=session,
+        user=user,
+        project_name=body.project_name,
+        repo_id=body.repo_id,
+        username=body.username,
+        only_active=body.only_active,
+        include_jobs=body.include_jobs,
+        job_submissions_limit=body.job_submissions_limit,
+        prev_submitted_at=body.prev_submitted_at,
+        prev_run_id=body.prev_run_id,
+        limit=body.limit,
+        ascending=body.ascending,
     )
+    for run in run_list:
+        patch_run(run, client_version)
+    return CustomORJSONResponse(run_list)
 
 
 @project_router.post(
@@ -88,6 +90,7 @@ async def get_run(
     body: GetRunRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    client_version: Optional[Version] = Depends(get_client_version),
 ):
     """
     Returns a run given `run_name` or `id`.
@@ -103,6 +106,7 @@ async def get_run(
     )
     if run is None:
         raise ResourceNotExistsError("Run not found")
+    patch_run(run, client_version)
     return CustomORJSONResponse(run)
 
 
@@ -132,8 +136,7 @@ async def get_plan(
         max_offers=body.max_offers,
         legacy_repo_dir=legacy_repo_dir,
     )
-    for job_plan in run_plan.job_plans:
-        patch_offers_list(job_plan.offers, client_version)
+    patch_run_plan(run_plan, client_version)
     return CustomORJSONResponse(run_plan)
 
 
@@ -146,6 +149,7 @@ async def apply_plan(
     session: Annotated[AsyncSession, Depends(get_session)],
     user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
     legacy_repo_dir: Annotated[bool, Depends(use_legacy_repo_dir)],
+    client_version: Annotated[Optional[Version], Depends(get_client_version)],
 ):
     """
     Creates a new run or updates an existing run.
@@ -156,16 +160,16 @@ async def apply_plan(
     user, project = user_project
     if not user.ssh_public_key and not body.plan.run_spec.ssh_key_pub:
         await users.refresh_ssh_key(session=session, actor=user)
-    return CustomORJSONResponse(
-        await runs.apply_plan(
-            session=session,
-            user=user,
-            project=project,
-            plan=body.plan,
-            force=body.force,
-            legacy_repo_dir=legacy_repo_dir,
-        )
+    run = await runs.apply_plan(
+        session=session,
+        user=user,
+        project=project,
+        plan=body.plan,
+        force=body.force,
+        legacy_repo_dir=legacy_repo_dir,
     )
+    patch_run(run, client_version)
+    return CustomORJSONResponse(run)
 
 
 @project_router.post("/stop")
