@@ -18,8 +18,8 @@ type Executor interface {
 	SetJobStateWithTerminationReason(
 		ctx context.Context,
 		state types.JobState,
-		termination_reason types.TerminationReason,
-		termination_message string,
+		terminationReason types.TerminationReason,
+		terminationMessage string,
 	)
 	SetRunnerState(state string)
 	WriteFileArchive(id string, src io.Reader) error
