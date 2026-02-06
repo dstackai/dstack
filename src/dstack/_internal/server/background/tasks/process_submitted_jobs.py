@@ -110,7 +110,6 @@ from dstack._internal.server.services.placement import (
     get_fleet_placement_group_models,
     get_placement_group_model_for_job,
     placement_group_model_to_placement_group_optional,
-    schedule_fleet_placement_groups_deletion,
 )
 from dstack._internal.server.services.runs import (
     run_model_to_run,
@@ -846,15 +845,9 @@ async def _run_jobs_on_new_instances(
         finally:
             if fleet_model is not None and len(fleet_model.instances) == 0:
                 # Clean up placement groups that did not end up being used.
-                # Flush to update still uncommitted placement groups.
-                await session.flush()
-                await schedule_fleet_placement_groups_deletion(
-                    session=session,
-                    fleet_id=fleet_model.id,
-                    except_placement_group_ids=(
-                        [placement_group_model.id] if placement_group_model is not None else []
-                    ),
-                )
+                for pg in placement_group_models:
+                    if placement_group_model is None or pg.id != placement_group_model.id:
+                        pg.fleet_deleted = True
     return None
 
 
