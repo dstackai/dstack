@@ -33,6 +33,7 @@ class Database:
         self.session_maker = async_sessionmaker(
             bind=self.engine,  # type: ignore[assignment]
             expire_on_commit=False,
+            autoflush=False,
             class_=AsyncSession,
         )
 
