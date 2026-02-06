@@ -224,9 +224,9 @@ resources:
 - Example (with gateway):
   ```bash
   curl -sS -X POST "https://<run name>.<gateway domain>/v1/chat/completions" \
-    -H "Authorization: Bearer $DSTACK_TOKEN" \
+    -H "Authorization: Bearer <dstack token>" \
     -H "Content-Type: application/json" \
-    -d '{"model":"<model-id>","messages":[{"role":"user","content":"Hello"}],"max_tokens":64}'
+    -d '{"model":"<model name>","messages":[{"role":"user","content":"Hello"}],"max_tokens":64}'
 
 [Concept documentation](https://dstack.ai/docs/concepts/services.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/service.md)
 
