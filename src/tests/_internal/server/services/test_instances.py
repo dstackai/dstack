@@ -40,7 +40,7 @@ class TestSwitchInstanceStatus:
         instance.termination_reason_message = "Some err"
         instances_services.switch_instance_status(session, instance, InstanceStatus.TERMINATING)
         instances_services.switch_instance_status(session, instance, InstanceStatus.TERMINATED)
-
+        await session.commit()
         events = await list_events(session)
         assert len(events) == 2
         assert {e.message for e in events} == {
@@ -61,7 +61,7 @@ class TestSwitchInstanceStatus:
         instance.termination_reason = InstanceTerminationReason.ERROR
         instance.termination_reason_message = "Some err"
         instances_services.switch_instance_status(session, instance, InstanceStatus.TERMINATED)
-
+        await session.commit()
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == (

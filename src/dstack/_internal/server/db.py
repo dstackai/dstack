@@ -33,6 +33,8 @@ class Database:
         self.session_maker = async_sessionmaker(
             bind=self.engine,  # type: ignore[assignment]
             expire_on_commit=False,
+            # Disable autoflush to avoid accidental long write transactions on SQLite.
+            autoflush=False,
             class_=AsyncSession,
         )
 
