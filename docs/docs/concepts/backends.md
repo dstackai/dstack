@@ -1049,7 +1049,7 @@ projects:
       verbs: ["get", "create"]
     - apiGroups: [""]
       resources: ["pods"]
-      verbs: ["get", "create", "delete"]
+      verbs: ["get", "create", "delete", "list"]
     - apiGroups: [""]
       resources: ["services"]
       verbs: ["get", "create", "delete"]
