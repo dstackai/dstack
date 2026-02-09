@@ -320,7 +320,7 @@ class AWSCompute(
                 vpc_id=vpc_id,
             )
             try:
-                response = ec2_resource.create_instances(
+                response = ec2_resource.create_instances(  # pyright: ignore[reportAttributeAccessIssue]
                     **aws_resources.create_instances_struct(
                         disk_size=disk_size,
                         image_id=image_id,
@@ -525,7 +525,7 @@ class AWSCompute(
             allocate_public_ip=configuration.public_ip,
         )
         try:
-            response = ec2_resource.create_instances(**instance_struct)
+            response = ec2_resource.create_instances(**instance_struct)  # pyright: ignore[reportAttributeAccessIssue]
         except botocore.exceptions.ClientError as e:
             msg = f"AWS Error: {e.response['Error']['Code']}"
             if e.response["Error"].get("Message"):
