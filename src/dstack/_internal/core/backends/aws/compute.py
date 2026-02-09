@@ -48,6 +48,7 @@ from dstack._internal.core.errors import (
     NoCapacityError,
     PlacementGroupInUseError,
     PlacementGroupNotSupportedError,
+    ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
@@ -291,10 +292,10 @@ class AWSCompute(
                     }
                     if reservation.get("ReservationType") == "capacity-block":
                         is_capacity_block = True
-
         except botocore.exceptions.ClientError as e:
             logger.warning("Got botocore.exceptions.ClientError: %s", e)
             raise NoCapacityError()
+
         tried_zones = set()
         for subnet_id, az in subnet_id_to_az_map.items():
             if az in tried_zones:
@@ -344,26 +345,23 @@ class AWSCompute(
                     )
                 )
                 instance = response[0]
-                instance.wait_until_running()
-                instance.reload()  # populate instance.public_ip_address
                 if instance_offer.instance.resources.spot:  # it will not terminate the instance
                     ec2_client.cancel_spot_instance_requests(
                         SpotInstanceRequestIds=[instance.spot_instance_request_id]
                     )
-                hostname = _get_instance_ip(instance, allocate_public_ip)
                 return JobProvisioningData(
                     backend=instance_offer.backend,
                     instance_type=instance_offer.instance,
                     instance_id=instance.instance_id,
                     public_ip_enabled=allocate_public_ip,
-                    hostname=hostname,
-                    internal_ip=instance.private_ip_address,
+                    hostname=None,
+                    internal_ip=None,
                     region=instance_offer.region,
                     availability_zone=az,
                     reservation=instance.capacity_reservation_id,
                     price=instance_offer.price,
                     username=username,
-                    ssh_port=22,
+                    ssh_port=None,
                     dockerized=True,  # because `dstack-shim` is used
                     ssh_proxy=None,
                     backend_data=None,
@@ -375,6 +373,45 @@ class AWSCompute(
                     raise ComputeError(f"Invalid AWS request: {msg}")
                 continue
         raise NoCapacityError()
+
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ):
+        ec2_resource = self.session.resource("ec2", region_name=provisioning_data.region)
+        instance = ec2_resource.Instance(provisioning_data.instance_id)  # pyright: ignore[reportAttributeAccessIssue]
+        try:
+            instance.load()
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+                logger.debug(
+                    "Instance %s not found. Waiting for the instance to appear"
+                    " or to timeout if the instance is manually deleted.",
+                    provisioning_data.instance_id,
+                )
+                # Instance may be created but not yet visible to due AWS eventual consistency,
+                # so we wait instead of failing immediately.
+                return
+            raise e
+
+        state = instance.state.get("Name")
+        if state == "pending":
+            return
+        if state in [None, "shutting-down", "terminated", "stopping", "stopped"]:
+            raise ProvisioningError(
+                f"Failed to get instance IP address. Instance state is {state}."
+            )
+        if state != "running":
+            raise ProvisioningError(
+                f"Failed to get instance IP address. Unknown instance state {state}."
+            )
+
+        hostname = _get_instance_ip(instance, self.config.allocate_public_ips)
+        provisioning_data.hostname = hostname
+        provisioning_data.internal_ip = instance.private_ip_address
+        provisioning_data.ssh_port = 22
 
     def create_placement_group(
         self,
