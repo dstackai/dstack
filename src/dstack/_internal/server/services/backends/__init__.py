@@ -361,7 +361,7 @@ async def get_backend_offers(
             if not exclude_not_available or offer.availability.is_available():
                 yield (backend, offer)
 
-    logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
+    logger.debug("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
     tasks = [run_async(get_offers_tracked, backend, requirements) for backend in backends]
     offers_by_backend = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):

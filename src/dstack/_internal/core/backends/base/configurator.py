@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Generic, List, Optional, TypeVar
+from typing import Any, ClassVar, Generic, List, NoReturn, Optional, TypeVar
 from uuid import UUID
 
 from dstack._internal.core.backends.base.backend import Backend
@@ -110,7 +110,7 @@ class Configurator(ABC, Generic[BackendConfigWithoutCredsT, BackendConfigWithCre
 
 def raise_invalid_credentials_error(
     fields: Optional[List[List[str]]] = None, details: Optional[Any] = None
-):
+) -> NoReturn:
     msg = BackendInvalidCredentialsError.msg
     if details:
         msg += f": {details}"

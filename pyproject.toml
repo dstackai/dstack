@@ -101,6 +101,7 @@ include = [
     "src/dstack/plugins",
     "src/dstack/_internal/server",
     "src/dstack/_internal/core/services",
+    "src/dstack/_internal/core/backends/aws",
     "src/dstack/_internal/core/backends/kubernetes",
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/cli/services/configurators",
