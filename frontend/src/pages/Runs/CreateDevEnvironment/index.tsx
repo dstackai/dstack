@@ -13,7 +13,9 @@ import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetwe
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { copyToClipboard, getServerError } from 'libs';
+import { generateSecurePassword } from 'libs/password';
 import { ROUTES } from 'routes';
+import { useGetProjectGatewaysQuery } from 'services/gateway';
 import { useApplyRunMutation } from 'services/run';
 
 import { OfferList } from 'pages/Offers/List';
@@ -21,8 +23,6 @@ import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAler
 
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
-import { generateSecurePassword } from '../../../libs/password';
-import { useGetProjectGatewaysQuery } from '../../../services/gateway';
 import { ENV_TYPE_OPTIONS, FORM_FIELD_NAMES, IDE_CODER_OPTION, IDE_OPTIONS } from './constants';
 
 import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
