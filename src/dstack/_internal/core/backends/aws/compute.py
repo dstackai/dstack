@@ -301,25 +301,25 @@ class AWSCompute(
             if az in tried_zones:
                 continue
             tried_zones.add(az)
+            logger.debug("Trying provisioning %s in %s", instance_offer.instance.name, az)
+            image_id, username = self._get_image_id_and_username(
+                ec2_client=ec2_client,
+                region=instance_offer.region,
+                gpu_name=(
+                    instance_offer.instance.resources.gpus[0].name
+                    if len(instance_offer.instance.resources.gpus) > 0
+                    else None
+                ),
+                instance_type=instance_offer.instance.name,
+                image_config=self.config.os_images,
+            )
+            security_group_id = self._create_security_group(
+                ec2_client=ec2_client,
+                region=instance_offer.region,
+                project_id=project_name,
+                vpc_id=vpc_id,
+            )
             try:
-                logger.debug("Trying provisioning %s in %s", instance_offer.instance.name, az)
-                image_id, username = self._get_image_id_and_username(
-                    ec2_client=ec2_client,
-                    region=instance_offer.region,
-                    gpu_name=(
-                        instance_offer.instance.resources.gpus[0].name
-                        if len(instance_offer.instance.resources.gpus) > 0
-                        else None
-                    ),
-                    instance_type=instance_offer.instance.name,
-                    image_config=self.config.os_images,
-                )
-                security_group_id = self._create_security_group(
-                    ec2_client=ec2_client,
-                    region=instance_offer.region,
-                    project_id=project_name,
-                    vpc_id=vpc_id,
-                )
                 response = ec2_resource.create_instances(
                     **aws_resources.create_instances_struct(
                         disk_size=disk_size,
@@ -344,34 +344,35 @@ class AWSCompute(
                         is_capacity_block=is_capacity_block,
                     )
                 )
-                instance = response[0]
-                if instance_offer.instance.resources.spot:  # it will not terminate the instance
-                    ec2_client.cancel_spot_instance_requests(
-                        SpotInstanceRequestIds=[instance.spot_instance_request_id]
-                    )
-                return JobProvisioningData(
-                    backend=instance_offer.backend,
-                    instance_type=instance_offer.instance,
-                    instance_id=instance.instance_id,
-                    public_ip_enabled=allocate_public_ip,
-                    hostname=None,
-                    internal_ip=None,
-                    region=instance_offer.region,
-                    availability_zone=az,
-                    reservation=instance.capacity_reservation_id,
-                    price=instance_offer.price,
-                    username=username,
-                    ssh_port=None,
-                    dockerized=True,  # because `dstack-shim` is used
-                    ssh_proxy=None,
-                    backend_data=None,
-                )
             except botocore.exceptions.ClientError as e:
                 logger.warning("Got botocore.exceptions.ClientError: %s", e)
                 if e.response["Error"]["Code"] == "InvalidParameterValue":
                     msg = e.response["Error"].get("Message", "")
                     raise ComputeError(f"Invalid AWS request: {msg}")
                 continue
+            instance = response[0]
+            if instance_offer.instance.resources.spot:
+                # it will not terminate the instance
+                ec2_client.cancel_spot_instance_requests(
+                    SpotInstanceRequestIds=[instance.spot_instance_request_id]
+                )
+            return JobProvisioningData(
+                backend=instance_offer.backend,
+                instance_type=instance_offer.instance,
+                instance_id=instance.instance_id,
+                public_ip_enabled=allocate_public_ip,
+                hostname=None,
+                internal_ip=None,
+                region=instance_offer.region,
+                availability_zone=az,
+                reservation=instance.capacity_reservation_id,
+                price=instance_offer.price,
+                username=username,
+                ssh_port=None,
+                dockerized=True,  # because `dstack-shim` is used
+                ssh_proxy=None,
+                backend_data=None,
+            )
         raise NoCapacityError()
 
     def update_provisioning_data(
