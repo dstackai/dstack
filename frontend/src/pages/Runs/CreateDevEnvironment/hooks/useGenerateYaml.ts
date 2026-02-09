@@ -15,10 +15,10 @@ export const useGenerateYaml = ({ formValues }: UseGenerateYamlArgs) => {
             return '';
         }
 
-        const { name, ide, image, python, offer, docker, repo_url, repo_path, working_dir } = formValues;
+        const { name, ide, image, python, offer, docker, repo_url, repo_path, working_dir, env_type, password } = formValues;
 
-        return jsYaml.dump({
-            type: 'dev-environment',
+        let baseJson = {
+            type: env_type === 'web' ? 'service' : 'dev-environment',
             ...(name ? { name } : {}),
             ide,
             ...(docker ? { docker } : {}),
@@ -38,10 +38,32 @@ export const useGenerateYaml = ({ formValues }: UseGenerateYamlArgs) => {
             ...(working_dir ? { working_dir } : {}),
             backends: offer.backends,
             spot_policy: 'auto',
-        });
+        };
+
+        if (env_type === 'web') {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { ide, ...props } = baseJson;
+
+            baseJson = {
+                ...props,
+
+                auth: false,
+                env: [`PASSWORD=${password}`, 'BIND_ADDR=0.0.0.0:8080'],
+                commands: [
+                    'curl -fsSL https://code-server.dev/install.sh | sh -s -- --method standalone --prefix /tmp/code-server',
+                    '/tmp/code-server/bin/code-server --bind-addr $BIND_ADDR --auth password --disable-telemetry --disable-update-check .',
+                ],
+                port: 8080,
+                gateway: true,
+            };
+        }
+
+        return jsYaml.dump(baseJson);
     }, [
         formValues.name,
+        formValues.env_type,
         formValues.ide,
+        formValues.password,
         formValues.offer,
         formValues.python,
         formValues.image,

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -7,12 +7,12 @@ import * as yup from 'yup';
 import { Box, Link, WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import { TabsProps, ToggleProps } from 'components';
+import { Button, FormSelectProps, Popover, StatusIndicator, TabsProps, ToggleProps } from 'components';
 import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Tabs, Toggle, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
-import { getServerError } from 'libs';
+import { copyToClipboard, getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { useApplyRunMutation } from 'services/run';
 
@@ -21,7 +21,9 @@ import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAler
 
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
-import { FORM_FIELD_NAMES, IDE_OPTIONS } from './constants';
+import { generateSecurePassword } from '../../../libs/password';
+import { useGetProjectGatewaysQuery } from '../../../services/gateway';
+import { ENV_TYPE_OPTIONS, FORM_FIELD_NAMES, IDE_CODER_OPTION, IDE_OPTIONS } from './constants';
 
 import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
 
@@ -56,6 +58,11 @@ const envValidationSchema = yup.object({
             // eslint-disable-next-line no-useless-escape
             .matches(/^(https?):\/\/([^\s\/?#]+)((?:\/[^\s?#]*)*)(?::\/(.*))?$/i, urlFormatError)
             .required(requiredFieldError),
+    }),
+
+    password: yup.string().when('ide', {
+        is: 'coder',
+        then: yup.string().required(requiredFieldError),
     }),
 });
 
@@ -109,6 +116,14 @@ export const CreateDevEnvironment: React.FC = () => {
 
     const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: selectedProject ?? '' });
 
+    const { data: gatewaysData, isLoading: isLoadingGateways } = useGetProjectGatewaysQuery(
+        { projectName: selectedProject ?? '' },
+        { skip: !selectedProject },
+    );
+
+    const hasGateways = useMemo<boolean>(() => {
+        return !isLoadingGateways && !!gatewaysData?.length;
+    }, [isLoadingGateways, gatewaysData]);
     const projectHavingFleetMap = useCheckingForFleetsInProjects({ projectNames: selectedProject ? [selectedProject] : [] });
     const projectDontHasFleets = !!selectedProject && !projectHavingFleetMap[selectedProject];
 
@@ -142,6 +157,14 @@ export const CreateDevEnvironment: React.FC = () => {
     const onCancelHandler = () => {
         navigate(ROUTES.RUNS.LIST);
     };
+
+    const ideOptions = useMemo(() => {
+        if (formValues.env_type === 'web') {
+            return [...IDE_OPTIONS, IDE_CODER_OPTION];
+        }
+
+        return IDE_OPTIONS;
+    }, [formValues.env_type]);
 
     const validateOffer = async () => {
         return await trigger(['offer']);
@@ -216,6 +239,14 @@ export const CreateDevEnvironment: React.FC = () => {
         setValue('offer', newSelectedOffers?.[0] ?? null);
     };
 
+    const onChangeEventType: FormSelectProps<typeof ENV_TYPE_OPTIONS>['onChange'] = ({ detail }) => {
+        if (detail.selectedOption.value === 'web') {
+            setValue('ide', 'coder');
+        } else {
+            setValue('ide', 'cursor');
+        }
+    };
+
     const onSubmitWizard = async () => {
         const isValid = await trigger();
 
@@ -273,6 +304,16 @@ export const CreateDevEnvironment: React.FC = () => {
     useEffect(() => {
         setValue('config_yaml', yaml);
     }, [yaml]);
+
+    useEffect(() => {
+        if (!formValues.env_type && hasGateways) {
+            setValue('env_type', 'web');
+            setValue('ide', 'coder');
+            setValue('password', generateSecurePassword(20));
+        }
+    }, [hasGateways, formValues.env_type]);
+
+    const isDisabledIdeField = loading || formValues.env_type === 'web';
 
     return (
         <form className={cn({ [styles.wizardForm]: activeStepIndex === 0 })} onSubmit={handleSubmit(onSubmit)}>
@@ -333,13 +374,56 @@ export const CreateDevEnvironment: React.FC = () => {
                                         disabled={loading}
                                     />
 
+                                    {hasGateways && (
+                                        <FormSelect
+                                            label={t('runs.dev_env.wizard.env_type')}
+                                            description={t('runs.dev_env.wizard.env_type_description')}
+                                            constraintText={t('runs.dev_env.wizard.env_type__constraint')}
+                                            placeholder={t('runs.dev_env.wizard.env_type__placeholder')}
+                                            control={control}
+                                            name="env_type"
+                                            options={ENV_TYPE_OPTIONS}
+                                            onChange={onChangeEventType}
+                                            disabled={loading}
+                                        />
+                                    )}
+
                                     <FormSelect
                                         label={t('runs.dev_env.wizard.ide')}
                                         description={t('runs.dev_env.wizard.ide_description')}
                                         control={control}
                                         name="ide"
-                                        options={IDE_OPTIONS}
+                                        options={ideOptions}
+                                        disabled={isDisabledIdeField}
+                                    />
+
+                                    <FormInput
+                                        label={t('runs.dev_env.wizard.password')}
+                                        description={t('runs.dev_env.wizard.password_description')}
+                                        placeholder={t('runs.dev_env.wizard.password_placeholder')}
+                                        control={control}
+                                        name="password"
+                                        type="password"
                                         disabled={loading}
+                                        secondaryControl={
+                                            <Popover
+                                                dismissButton={false}
+                                                position="top"
+                                                size="small"
+                                                triggerType="custom"
+                                                content={<StatusIndicator type="success">Password copied</StatusIndicator>}
+                                            >
+                                                <Button
+                                                    disabled={loading}
+                                                    formAction="none"
+                                                    iconName="copy"
+                                                    variant="link"
+                                                    onClick={() => {
+                                                        copyToClipboard(formValues?.password ?? '');
+                                                    }}
+                                                />
+                                            </Popover>
+                                        }
                                     />
 
                                     <Tabs

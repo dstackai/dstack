@@ -2,13 +2,13 @@ import { useCallback } from 'react';
 import jsYaml from 'js-yaml';
 
 import { useNotifications } from 'hooks';
+import { getPathWithoutProtocol, getRepoDirFromUrl, getRepoName, getRepoUrlWithOutDir, slugify } from 'libs/repo';
 import { useInitRepoMutation, useLazyGetRepoQuery } from 'services/repo';
 
-import { getPathWithoutProtocol, getRepoDirFromUrl, getRepoName, getRepoUrlWithOutDir, slugify } from '../../../../libs/repo';
 import { getRunSpecConfigurationResources } from '../helpers/getRunSpecConfigurationResources';
 
 // TODO add next fields: volumes, repos,
-const supportedFields: (keyof TDevEnvironmentConfiguration)[] = [
+const supportedFields: (keyof TDevEnvironmentConfiguration | keyof TServiceConfiguration)[] = [
     'type',
     'init',
     'inactivity_duration',
@@ -33,6 +33,10 @@ const supportedFields: (keyof TDevEnvironmentConfiguration)[] = [
     'utilization_policy',
     'fleets',
     'repos',
+    'auth',
+    'commands',
+    'port',
+    'gateway',
 ];
 
 export const useGetRunSpecFromYaml = ({ projectName = '' }) => {

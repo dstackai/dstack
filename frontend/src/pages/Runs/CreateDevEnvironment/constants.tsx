@@ -12,8 +12,10 @@ export const CONFIG_INFO = {
 
 export const FORM_FIELD_NAMES = {
     offer: 'offer',
+    env_type: 'offer',
     name: 'name',
     ide: 'ide',
+    password: 'password',
     config_yaml: 'config_yaml',
     docker: 'docker',
     image: 'image',
@@ -23,6 +25,17 @@ export const FORM_FIELD_NAMES = {
     repo_path: 'repo_path',
     working_dir: 'working_dir',
 } as const satisfies Record<IRunEnvironmentFormKeys, IRunEnvironmentFormKeys>;
+
+export const ENV_TYPE_OPTIONS = [
+    {
+        label: 'Web',
+        value: 'web',
+    },
+    {
+        label: 'Desktop',
+        value: 'desktop',
+    },
+] as const;
 
 export const IDE_OPTIONS = [
     {
@@ -38,6 +51,11 @@ export const IDE_OPTIONS = [
         value: 'windsurf',
     },
 ] as const;
+
+export const IDE_CODER_OPTION = {
+    label: 'Coder',
+    value: 'coder',
+} as const;
 
 export const IDE_DISPLAY_NAMES: Record<string, string> = {
     cursor: 'Cursor',
