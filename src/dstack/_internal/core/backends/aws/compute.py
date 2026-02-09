@@ -353,9 +353,18 @@ class AWSCompute(
             instance = response[0]
             if instance_offer.instance.resources.spot:
                 # it will not terminate the instance
-                ec2_client.cancel_spot_instance_requests(
-                    SpotInstanceRequestIds=[instance.spot_instance_request_id]
-                )
+                try:
+                    ec2_client.cancel_spot_instance_requests(
+                        SpotInstanceRequestIds=[instance.spot_instance_request_id]
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to cancel spot instance request. The instance will be terminated."
+                    )
+                    self.terminate_instance(
+                        instance_id=instance.instance_id, region=instance_offer.region
+                    )
+                    raise NoCapacityError()
             return JobProvisioningData(
                 backend=instance_offer.backend,
                 instance_type=instance_offer.instance,
