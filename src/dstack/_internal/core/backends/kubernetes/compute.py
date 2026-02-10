@@ -1,3 +1,4 @@
+import random
 import shlex
 import subprocess
 import tempfile
@@ -748,7 +749,7 @@ def _check_and_configure_jump_pod_service(
                     "Failed to acquire an IP for jump pod automatically."
                     " Specify proxy_jump.hostname for Kubernetes backend."
                 )
-            jump_pod_hostname = cluster_external_ips[0]
+            jump_pod_hostname = random.choice(cluster_external_ips)
             logger.info(
                 (
                     "Jump pod %s is running on node %s which has no external IP,"
@@ -915,6 +916,10 @@ def _run_ssh_command(
                 "none",
                 "-o",
                 "StrictHostKeyChecking=no",
+                "-o",
+                # The same timeout as in core.services.ssh.tunnel.SSH_DEFAULT_OPTIONS,
+                # which is used, for example, by server.services.runner.ssh.runner_ssh_tunnel()
+                "ConnectTimeout=3",
                 "-i",
                 f.name,
                 "-p",
