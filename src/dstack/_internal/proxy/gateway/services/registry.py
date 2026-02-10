@@ -394,9 +394,34 @@ async def apply_entrypoint(
     await nginx.register(config, acme)
 
 
+async def _migrate_cors_enabled(repo: GatewayProxyRepo) -> None:
+    """Migrate services registered before the cors_enabled field was added.
+
+    Old gateway versions didn't persist cors_enabled on services. This derives it
+    from the associated model's format so that CORS is enabled for openai-format
+    models on gateway restart without requiring service re-registration.
+    """
+    services = await repo.list_services()
+    openai_run_names: set[tuple[str, str]] = set()
+    for service in services:
+        for model in await repo.list_models(service.project_name):
+            if model.run_name == service.run_name and isinstance(
+                model.format_spec, models.OpenAIChatModelFormat
+            ):
+                openai_run_names.add((service.project_name, service.run_name))
+    for service in services:
+        if (
+            not service.cors_enabled
+            and (service.project_name, service.run_name) in openai_run_names
+        ):
+            updated = models.Service(**{**service.dict(), "cors_enabled": True})
+            await repo.set_service(updated)
+
+
 async def apply_all(
     repo: GatewayProxyRepo, nginx: Nginx, service_conn_pool: ServiceConnectionPool
 ) -> None:
+    await _migrate_cors_enabled(repo)
     service_tasks = [
         apply_service(
             service=service,
