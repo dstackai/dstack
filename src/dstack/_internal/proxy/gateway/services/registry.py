@@ -47,6 +47,7 @@ async def register_service(
     service_conn_pool: ServiceConnectionPool,
     router: Optional[AnyRouterConfig] = None,
 ) -> None:
+    cors_enabled = model is not None and model.type == "chat" and model.format == "openai"
     service = models.Service(
         project_name=project_name,
         run_name=run_name,
@@ -57,6 +58,7 @@ async def register_service(
         client_max_body_size=client_max_body_size,
         replicas=(),
         router=router,
+        cors_enabled=cors_enabled,
     )
 
     async with lock:
@@ -73,6 +75,15 @@ async def register_service(
 
         logger.debug("Registering service %s", service.fmt())
 
+        await apply_service(
+            service=service,
+            old_service=None,
+            repo=repo,
+            nginx=nginx,
+            service_conn_pool=service_conn_pool,
+        )
+        await repo.set_service(service)
+
         if model is not None:
             await repo.set_model(
                 models.ChatModel(
@@ -83,20 +94,6 @@ async def register_service(
                     format_spec=model_schema_to_format_spec(model),
                 ),
             )
-
-        try:
-            await apply_service(
-                service=service,
-                old_service=None,
-                repo=repo,
-                nginx=nginx,
-                service_conn_pool=service_conn_pool,
-            )
-        except Exception:
-            if model is not None:
-                await repo.delete_models_by_run(project_name, run_name)
-            raise
-        await repo.set_service(service)
 
     logger.info("Service %s is registered now", service.fmt())
 
@@ -266,13 +263,9 @@ async def apply_service(
         ReplicaConfig(id=replica.id, socket=conn.app_socket_path)
         for replica, conn in replica_conns.items()
     ]
-    chat_model = await repo.get_model_by_run(service.project_name, service.run_name)
-    cors_enabled = (
-        isinstance(chat_model.format_spec, models.OpenAIChatModelFormat)
-        if chat_model is not None
-        else False
+    service_config = await get_nginx_service_config(
+        service, replica_configs, cors_enabled=service.cors_enabled
     )
-    service_config = await get_nginx_service_config(service, replica_configs, cors_enabled)
     await nginx.register(service_config, (await repo.get_config()).acme_settings)
     return replica_failures
 
