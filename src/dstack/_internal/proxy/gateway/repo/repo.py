@@ -64,6 +64,13 @@ class GatewayProxyRepo(BaseProxyRepo):
         async with self.writer():
             self._state.models.setdefault(model.project_name, {})[model.name] = model
 
+    async def get_model_by_run(self, project_name: str, run_name: str) -> Optional[ChatModel]:
+        async with self.reader():
+            for model in self._state.models.get(project_name, {}).values():
+                if model.run_name == run_name:
+                    return model
+            return None
+
     async def delete_models_by_run(self, project_name: str, run_name: str) -> None:
         async with self.writer():
             project_models = self._state.models.get(project_name, {})

@@ -1,8 +1,7 @@
 import pytest
 
 from dstack._internal.core.models.configurations import (
-    DEFAULT_MODEL_PROBE_TIMEOUT,
-    DEFAULT_MODEL_PROBE_URL,
+    OPENAI_MODEL_PROBE_TIMEOUT,
     ProbeConfig,
     ServiceConfiguration,
 )
@@ -35,8 +34,8 @@ class TestProbes:
         probe = probes[0]
         assert probe.type == "http"
         assert probe.method == "post"
-        assert probe.url == DEFAULT_MODEL_PROBE_URL
-        assert probe.timeout == DEFAULT_MODEL_PROBE_TIMEOUT
+        assert probe.url == "/v1/chat/completions"
+        assert probe.timeout == OPENAI_MODEL_PROBE_TIMEOUT
         assert len(probe.headers) == 1
         assert probe.headers[0].name == "Content-Type"
         assert probe.headers[0].value == "application/json"
