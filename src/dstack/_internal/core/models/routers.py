@@ -32,6 +32,11 @@ def merge_router_config_for_service(
     gateway_router: Optional[AnyRouterConfig],
     service_router_config: Optional[AnyRouterConfig],
 ) -> Optional[AnyRouterConfig]:
+    """Merge gateway and service router config.
+
+    Gateway router config supplies the router type; service router config supplies
+    policy and pd_disaggregation. The result combines both.
+    """
     if gateway_router is None:
         return None
     if service_router_config is None:

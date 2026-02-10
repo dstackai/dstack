@@ -90,7 +90,7 @@ class Router(ABC):
         """
         ...
 
-    def add_worker_to_router(
+    async def add_worker_to_router(
         self,
         url: str,
         worker_type: str = "regular",

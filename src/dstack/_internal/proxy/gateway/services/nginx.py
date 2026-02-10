@@ -98,7 +98,6 @@ class Nginx:
         self._next_router_port: int = self._ROUTER_PORT_MIN
         # Tracking of worker ports to avoid conflicts across router instances
         self._allocated_worker_ports: set[int] = set()
-        # Domain -> list of worker URLs (used for remove_replicas; non-PD URLs are gateway-local)
         self._domain_to_worker_urls: Dict[str, list[str]] = {}
         self._next_worker_port: int = self._WORKER_PORT_MIN
 

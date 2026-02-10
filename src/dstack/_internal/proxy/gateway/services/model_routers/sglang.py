@@ -9,7 +9,6 @@ import psutil
 
 from dstack._internal.core.models.routers import RouterType, SGLangRouterConfig
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
-from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 from .base import Router, RouterContext
@@ -174,7 +173,7 @@ class SglangRouter(Router):
                 self.context.port,
             )
 
-        # Add workers: poll /server_info and register with discovered type
+        # Add workers
         for worker_url in sorted(workers_to_add):
             success = await self.register_worker(worker_url)
             if not success:
@@ -199,7 +198,7 @@ class SglangRouter(Router):
             logger.exception("Error getting sglang router workers")
             return []
 
-    def add_worker_to_router(
+    async def add_worker_to_router(
         self,
         url: str,
         worker_type: str = "regular",
@@ -209,8 +208,8 @@ class SglangRouter(Router):
             payload: dict = {"url": url, "worker_type": worker_type}
             if bootstrap_port is not None:
                 payload["bootstrap_port"] = bootstrap_port
-            with httpx.Client(timeout=5.0) as client:
-                response = client.post(
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(
                     f"http://{self.context.host}:{self.context.port}/workers",
                     json=payload,
                 )
@@ -268,8 +267,7 @@ class SglangRouter(Router):
                     url,
                     worker_type,
                 )
-                return await run_async(
-                    self.add_worker_to_router,
+                return await self.add_worker_to_router(
                     url,
                     worker_type,
                     bootstrap_port,

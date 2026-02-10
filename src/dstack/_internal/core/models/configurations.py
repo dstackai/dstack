@@ -890,7 +890,7 @@ class ServiceConfigurationParams(CoreModel):
         Optional[AnyRouterConfig],
         Field(
             description=(
-                "Router configuration for the service (e.g. routing policy and pd_disaggregation). "
+                "Router configuration for the service. Currently supports routing policy and pd_disaggregation. "
             ),
         ),
     ] = None
