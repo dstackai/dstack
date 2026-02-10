@@ -9,8 +9,6 @@ from kubernetes.config import (
 )
 from typing_extensions import ParamSpec
 
-from dstack._internal.utils.common import get_or_error
-
 T = TypeVar("T")
 P = ParamSpec("P")
 
@@ -52,30 +50,3 @@ def call_api_method(
         if e.status not in expected:
             raise
     return None
-
-
-def get_cluster_public_ip(api: CoreV1Api) -> Optional[str]:
-    """
-    Returns public IP of any cluster node.
-    """
-    public_ips = get_cluster_public_ips(api)
-    if len(public_ips) == 0:
-        return None
-    return public_ips[0]
-
-
-def get_cluster_public_ips(api: CoreV1Api) -> list[str]:
-    """
-    Returns public IPs of all cluster nodes.
-    """
-    public_ips = []
-    for node in api.list_node().items:
-        node_status = get_or_error(node.status)
-        addresses = get_or_error(node_status.addresses)
-
-        # Look for an external IP address
-        for address in addresses:
-            if address.type == "ExternalIP":
-                public_ips.append(address.address)
-
-    return public_ips

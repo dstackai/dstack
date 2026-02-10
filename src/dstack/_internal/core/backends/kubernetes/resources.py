@@ -61,12 +61,11 @@ class PodPhase(str, Enum):
     FAILED = "Failed"
     UNKNOWN = "Unknown"  # Deprecated: It isn't being set since 2015
 
-    @classmethod
-    def finished_statuses(cls) -> list["PodPhase"]:
-        return [cls.SUCCEEDED, cls.FAILED]
-
     def is_finished(self):
-        return self in self.finished_statuses()
+        return self in [self.SUCCEEDED, self.FAILED]
+
+    def is_running(self):
+        return self == self.RUNNING
 
 
 class TaintEffect(str, Enum):
