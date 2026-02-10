@@ -52,7 +52,7 @@ from dstack._internal.core.backends.kubernetes.utils import (
     get_api_from_config_data,
 )
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.errors import ComputeError, ProvisioningError
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
@@ -723,7 +723,7 @@ def _check_and_configure_jump_pod_service(
     )
     jump_pod_phase = PodPhase(get_or_error(get_or_error(jump_pod.status).phase))
     if jump_pod_phase.is_finished():
-        raise ComputeError(f"Jump pod {jump_pod_name} is unexpectedly finished")
+        raise ProvisioningError(f"Jump pod {jump_pod_name} is unexpectedly finished")
     if not jump_pod_phase.is_running():
         logger.debug("Jump pod %s is not running yet", jump_pod_name)
         return None
@@ -744,7 +744,7 @@ def _check_and_configure_jump_pod_service(
                 cluster_external_ips.extend(node_external_ips)
         if jump_pod_hostname is None:
             if not cluster_external_ips:
-                raise ComputeError(
+                raise ProvisioningError(
                     "Failed to acquire an IP for jump pod automatically."
                     " Specify proxy_jump.hostname for Kubernetes backend."
                 )
@@ -765,9 +765,9 @@ def _check_and_configure_jump_pod_service(
     )
     jump_pod_service_ports = get_or_error(jump_pod_service.spec).ports
     if not jump_pod_service_ports:
-        raise ComputeError("Jump pod service %s ports are empty", jump_pod_service_name)
+        raise ProvisioningError("Jump pod service %s ports are empty", jump_pod_service_name)
     if (jump_pod_port := jump_pod_service_ports[0].node_port) is None:
-        raise ComputeError("Jump pod service %s port is not set", jump_pod_service_name)
+        raise ProvisioningError("Jump pod service %s port is not set", jump_pod_service_name)
 
     ssh_exit_status, ssh_output = _run_ssh_command(
         hostname=jump_pod_hostname,
