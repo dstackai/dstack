@@ -222,7 +222,7 @@ resources:
 - Without gateway: `<dstack server URL>/proxy/services/f/<run name>/`
 - With gateway: `https://<run name>.<gateway domain>/`
 - Authentication: Unless `auth` is `false`, include `Authorization: Bearer <DSTACK_TOKEN>` on all service requests.
-- Model endpoint: If `model` is set, `service.model.base_url` from `dstack run get <run name> --json` provides the model endpoint. For OpenAI-compatible models (default when `model` is a string), this will be `<dstack server URL>/proxy/services/<project>/<run name>/v1` (no gateway) or `https://<run name>.<gateway domain>/v1` (with gateway).
+- Model endpoint: If `model` is set, `service.model.base_url` from `dstack run get <run name> --json` provides the model endpoint. For OpenAI-compatible models (the default, unless format is set otherwise), this will be `service.url` + `/v1`.
 - Example (with gateway):
   ```bash
   curl -sS -X POST "https://<run name>.<gateway domain>/v1/chat/completions" \
