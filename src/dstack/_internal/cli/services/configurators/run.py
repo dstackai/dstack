@@ -56,6 +56,7 @@ from dstack._internal.core.services.repos import (
     InvalidRepoCredentialsError,
     get_repo_creds_and_default_branch,
 )
+from dstack._internal.core.services.ssh.ports import PortUsedError
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
@@ -168,6 +169,13 @@ class BaseRunConfigurator(
                 )
         except ServerClientError as e:
             raise CLIError(e.msg)
+        except PortUsedError as e:
+            console.print(
+                f"[error]Failed to submit: port [code]{e.port}[/code] is already in use."
+                f" Use [code]-p[/code] in [code]dstack apply[/code] to override the local"
+                f" port mapping, e.g. [code]-p {e.port + 1}:{e.port}[/code].[/]"
+            )
+            exit(1)
 
         if command_args.detach:
             detach_message = f"Run [code]{run.name}[/] submitted, detaching..."
@@ -206,7 +214,16 @@ class BaseRunConfigurator(
                         configurator_args, _BIND_ADDRESS_ARG, None
                     )
                     try:
-                        if run.attach(bind_address=bind_address):
+                        try:
+                            attached = run.attach(bind_address=bind_address)
+                        except PortUsedError as e:
+                            console.print(
+                                f"[error]Failed to attach: port [code]{e.port}[/code] is already in use."
+                                f" Use [code]-p[/code] in [code]dstack attach[/code] to override the local"
+                                f" port mapping, e.g. [code]-p {e.port + 1}:{e.port}[/code].[/]"
+                            )
+                            exit(1)
+                        if attached:
                             for entry in run.logs():
                                 sys.stdout.buffer.write(entry)
                                 sys.stdout.buffer.flush()
