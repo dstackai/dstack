@@ -83,19 +83,15 @@ def get_friendly_type(annotation: Type) -> str:
         parts.sort(key=_type_sort_key)
         return " | ".join(parts)
 
-    # Handle Literal — show quoted values
+    # Handle Literal — show as enum (specific values are in the field description)
     if get_origin(annotation) is Literal:
-        values = get_args(annotation)
-        return " | ".join(f'"{v}"' for v in values)
+        return "enum"
 
     # Handle list
     if get_origin(annotation) is list:
         args = get_args(annotation)
         if args:
             inner = get_friendly_type(args[0])
-            # Simplify lists of enum/literal values to list[str]
-            if inner.startswith('"') and " | " in inner:
-                inner = "str"
             return f"list[{inner}]"
         return "list"
 
@@ -105,7 +101,7 @@ def get_friendly_type(annotation: Type) -> str:
 
     # Handle concrete classes
     if inspect.isclass(annotation):
-        # Enum — show quoted values
+        # Enum — list values
         if issubclass(annotation, Enum):
             values = [e.value for e in annotation]
             return " | ".join(f'"{v}"' for v in values)
@@ -163,6 +159,47 @@ def get_friendly_type(annotation: Type) -> str:
     return str(annotation)
 
 
+_JSON_SCHEMA_TYPE_MAP = {
+    "string": "str",
+    "integer": "int",
+    "number": "float",
+    "boolean": "bool",
+    "array": "list",
+    "object": "object",
+}
+
+
+def _enrich_type_from_schema(friendly_type: str, prop_schema: Dict[str, Any]) -> str:
+    """Enrich the friendly type with extra accepted types from the JSON schema.
+
+    Models may define ``schema_extra`` that adds ``anyOf`` entries for fields
+    that accept alternative input types (e.g., duration fields typed as ``int``
+    but also accepting ``str`` like ``"5m"``).
+    """
+    any_of = prop_schema.get("anyOf")
+    if not any_of:
+        return friendly_type
+    # Only consider string/integer — the most common alternative input types.
+    # Skip boolean (typically a backward-compat artifact) and object/array.
+    _ENRICHABLE = {"string": "str", "integer": "int"}
+    schema_types = set()
+    for entry in any_of:
+        mapped = _ENRICHABLE.get(entry.get("type", ""))
+        if mapped:
+            schema_types.add(mapped)
+    # Add any schema types not already present in the friendly type
+    current_parts = [p.strip() for p in friendly_type.split(" | ")]
+    new_parts = schema_types - set(current_parts)
+    if not new_parts:
+        return friendly_type
+    all_parts = list(set(current_parts) | new_parts)
+    # If str is now present, enum is redundant
+    if "str" in all_parts and "enum" in all_parts:
+        all_parts.remove("enum")
+    all_parts.sort(key=_type_sort_key)
+    return " | ".join(all_parts)
+
+
 def generate_schema_reference(
     model_path: str,
     *,
@@ -183,14 +220,21 @@ def generate_schema_reference(
                 "",
             ]
         )
+    # Get JSON schema to detect extra accepted types from schema_extra
+    try:
+        schema_props = cls.schema().get("properties", {})
+    except Exception:
+        schema_props = {}
     for name, field in cls.__fields__.items():
         default = field.default
         if isinstance(default, Enum):
             default = default.value
+        friendly_type = get_friendly_type(field.annotation)
+        friendly_type = _enrich_type_from_schema(friendly_type, schema_props.get(name, {}))
         values = dict(
             name=name,
             description=field.field_info.description,
-            type=get_friendly_type(field.annotation),
+            type=friendly_type,
             default=default,
             required=field.required,
         )
