@@ -57,7 +57,7 @@ def _type_sort_key(t: str) -> tuple:
 def get_friendly_type(annotation: Type) -> str:
     """Get a user-friendly type string for documentation.
 
-    Produces types like: ``int | str``, ``"rps"``, ``list[object]``, ``"spot" | "on-demand" | "auto"``.
+    Produces types like: ``int | str``, ``"vscode" | "cursor"``, ``list[object]``.
     """
     # Unwrap Annotated
     if get_origin(annotation) is Annotated:
@@ -83,9 +83,10 @@ def get_friendly_type(annotation: Type) -> str:
         parts.sort(key=_type_sort_key)
         return " | ".join(parts)
 
-    # Handle Literal — show as enum (specific values are in the field description)
+    # Handle Literal — list values
     if get_origin(annotation) is Literal:
-        return "enum"
+        values = get_args(annotation)
+        return " | ".join(f'"{v}"' for v in values)
 
     # Handle list
     if get_origin(annotation) is list:
@@ -184,6 +185,9 @@ def _enrich_type_from_schema(friendly_type: str, prop_schema: Dict[str, Any]) ->
     _ENRICHABLE = {"string": "str", "integer": "int"}
     schema_types = set()
     for entry in any_of:
+        # Skip entries with enum constraints — those are already captured as literal values
+        if "enum" in entry:
+            continue
         mapped = _ENRICHABLE.get(entry.get("type", ""))
         if mapped:
             schema_types.add(mapped)
@@ -193,9 +197,9 @@ def _enrich_type_from_schema(friendly_type: str, prop_schema: Dict[str, Any]) ->
     if not new_parts:
         return friendly_type
     all_parts = list(set(current_parts) | new_parts)
-    # If str is now present, enum is redundant
-    if "str" in all_parts and "enum" in all_parts:
-        all_parts.remove("enum")
+    # If str is now present, single-value literals are redundant
+    if "str" in all_parts:
+        all_parts = [p for p in all_parts if not p.startswith('"') or p in all_parts]
     all_parts.sort(key=_type_sort_key)
     return " | ".join(all_parts)
 
