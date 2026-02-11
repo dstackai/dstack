@@ -12,8 +12,12 @@ from dstack._internal.cli.services.configurators.run import (
     print_finished_message,
 )
 from dstack._internal.cli.utils.common import console, get_start_time
+from dstack._internal.cli.utils.rich import MultiItemStatus
+from dstack._internal.cli.utils.run import get_runs_table
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.runs import RunStatus
+from dstack._internal.core.services.ssh.ports import PortUsedError
 from dstack._internal.utils.common import get_or_error
 from dstack.api._public.runs import Run
 
@@ -76,15 +80,39 @@ class AttachCommand(APIBaseCommand):
         run = self.api.runs.get(args.run_name)
         if run is None:
             raise CLIError(f"Run {args.run_name} not found")
+
+        # Show live progress while waiting for the run to be ready
+        if _is_provisioning(run):
+            with MultiItemStatus(f"Attaching to [code]{run.name}[/]...", console=console) as live:
+                while _is_provisioning(run):
+                    live.update(get_runs_table([run]))
+                    time.sleep(5)
+                    run.refresh()
+            console.print(get_runs_table([run], verbose=run.status == RunStatus.FAILED))
+            console.print(
+                f"\nProvisioning [code]{run.name}[/] completed [secondary]({run.status.value})[/]"
+            )
+
+        if run.status.is_finished() and run.status != RunStatus.DONE:
+            raise CLIError(f"Run {args.run_name} is {run.status.value}")
+
         exit_code = 0
         try:
-            attached = run.attach(
-                ssh_identity_file=args.ssh_identity_file,
-                bind_address=args.host,
-                ports_overrides=args.ports,
-                replica_num=args.replica,
-                job_num=args.job,
-            )
+            try:
+                attached = run.attach(
+                    ssh_identity_file=args.ssh_identity_file,
+                    bind_address=args.host,
+                    ports_overrides=args.ports,
+                    replica_num=args.replica,
+                    job_num=args.job,
+                )
+            except PortUsedError as e:
+                console.print(
+                    f"[error]Failed to attach: port [code]{e.port}[/code] is already in use."
+                    f" Use [code]-p[/code] in [code]dstack attach[/code] to override the local"
+                    f" port mapping, e.g. [code]-p {e.port + 1}:{e.port}[/code].[/]"
+                )
+                exit(1)
             if not attached:
                 raise CLIError(f"Failed to attach to run {args.run_name}")
             _print_attached_message(
@@ -159,3 +187,11 @@ def _print_attached_message(
     output += f"To connect to the run via SSH, use `ssh {name}`.\n"
     output += "Press Ctrl+C to detach..."
     console.print(output)
+
+
+def _is_provisioning(run: Run) -> bool:
+    return run.status in (
+        RunStatus.SUBMITTED,
+        RunStatus.PENDING,
+        RunStatus.PROVISIONING,
+    )
