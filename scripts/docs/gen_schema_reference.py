@@ -23,24 +23,181 @@ logger = logging.getLogger("mkdocs.plugins.dstack.schema")
 logger.info("Generating schema reference...")
 
 
-def get_type(annotation: Type) -> str:
+def _is_linkable_type(annotation: Any) -> bool:
+    """Check if a type annotation contains a BaseModel subclass (excluding Range)."""
+    if inspect.isclass(annotation):
+        return issubclass(annotation, BaseModel) and not issubclass(annotation, Range)
+    origin = get_origin(annotation)
+    if origin is Annotated:
+        return _is_linkable_type(get_args(annotation)[0])
+    if origin is Union:
+        return any(_is_linkable_type(arg) for arg in get_args(annotation))
+    if origin is list:
+        args = get_args(annotation)
+        return bool(args) and _is_linkable_type(args[0])
+    return False
+
+
+def _type_sort_key(t: str) -> tuple:
+    """Sort key for type parts: primitives first, then literals, then compound types."""
+    order = {"bool": 0, "int": 1, "float": 2, "str": 3}
+    if t in order:
+        return (0, order[t])
+    if t.startswith('"'):
+        return (1, t)
+    if t.startswith("list"):
+        return (2, t)
+    if t == "dict":
+        return (3, "")
+    if t == "object":
+        return (4, "")
+    return (5, t)
+
+
+def get_friendly_type(annotation: Type) -> str:
+    """Get a user-friendly type string for documentation.
+
+    Produces types like: ``int | str``, ``"rps"``, ``list[object]``, ``"spot" | "on-demand" | "auto"``.
+    """
+    # Unwrap Annotated
     if get_origin(annotation) is Annotated:
-        return get_type(get_args(annotation)[0])
+        return get_friendly_type(get_args(annotation)[0])
+
+    # Handle Union (including Optional)
     if get_origin(annotation) is Union:
-        # Optional is Union with None.
-        # We don't want to show Optional[A, None] but just Optional[A]
-        if annotation.__name__ == "Optional":
-            args = ",".join(get_type(arg) for arg in get_args(annotation)[:-1])
-        else:
-            args = ",".join(get_type(arg) for arg in get_args(annotation))
-        return f"{annotation.__name__}[{args}]"
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if not args:
+            return ""
+        parts: list = []
+        for arg in args:
+            friendly = get_friendly_type(arg)
+            # Split compound types (e.g., "int | str" from Range) to deduplicate,
+            # but avoid splitting types that contain brackets (e.g., list[...])
+            if "[" not in friendly:
+                for part in friendly.split(" | "):
+                    if part and part not in parts:
+                        parts.append(part)
+            else:
+                if friendly and friendly not in parts:
+                    parts.append(friendly)
+        parts.sort(key=_type_sort_key)
+        return " | ".join(parts)
+
+    # Handle Literal — show as enum (specific values are in the field description)
     if get_origin(annotation) is Literal:
-        return str(annotation).split(".", maxsplit=1)[-1]
+        return "enum"
+
+    # Handle list
     if get_origin(annotation) is list:
-        return f"List[{get_type(get_args(annotation)[0])}]"
+        args = get_args(annotation)
+        if args:
+            inner = get_friendly_type(args[0])
+            return f"list[{inner}]"
+        return "list"
+
+    # Handle dict
     if get_origin(annotation) is dict:
-        return f"Dict[{get_type(get_args(annotation)[0])}, {get_type(get_args(annotation)[1])}]"
-    return annotation.__name__
+        return "dict"
+
+    # Handle concrete classes
+    if inspect.isclass(annotation):
+        # Enum — list values
+        if issubclass(annotation, Enum):
+            values = [e.value for e in annotation]
+            return " | ".join(f'"{v}"' for v in values)
+
+        # Range — depends on inner type parameter
+        if issubclass(annotation, Range):
+            min_field = annotation.__fields__.get("min")
+            if min_field and inspect.isclass(min_field.type_):
+                # Range[Memory] → str, Range[int] → int | str
+                if issubclass(min_field.type_, float):
+                    return "str"
+            return "int | str"
+
+        # Memory (float subclass that parses "8GB" strings)
+        from dstack._internal.core.models.resources import Memory as _Memory
+
+        if issubclass(annotation, _Memory):
+            return "str"
+
+        # BaseModel subclass (not Range)
+        if issubclass(annotation, BaseModel) and not issubclass(annotation, Range):
+            # Root models (with __root__ field) — resolve from the root type
+            if "__root__" in annotation.__fields__:
+                return get_friendly_type(annotation.__fields__["__root__"].annotation)
+            # Models with custom __get_validators__ accept primitive input (int, str)
+            # in addition to the full object form (e.g., GPUSpec, CPUSpec, DiskSpec)
+            if "__get_validators__" in annotation.__dict__:
+                return "int | str | object"
+            return "object"
+
+        # ComputeCapability (tuple subclass that parses "7.5" strings)
+        if annotation.__name__ == "ComputeCapability":
+            return "float | str"
+
+        # Constrained and primitive types — check MRO
+        # bool must come before int (bool is a subclass of int)
+        if issubclass(annotation, bool):
+            return "bool"
+        if issubclass(annotation, int):
+            # Duration (int subclass that parses "5m" strings)
+            if annotation.__name__ == "Duration":
+                return "int | str"
+            return "int"
+        if issubclass(annotation, float):
+            return "float"
+        if issubclass(annotation, str):
+            return "str"
+        if issubclass(annotation, (list, tuple)):
+            return "list"
+        if issubclass(annotation, dict):
+            return "dict"
+
+        return annotation.__name__
+
+    return str(annotation)
+
+
+_JSON_SCHEMA_TYPE_MAP = {
+    "string": "str",
+    "integer": "int",
+    "number": "float",
+    "boolean": "bool",
+    "array": "list",
+    "object": "object",
+}
+
+
+def _enrich_type_from_schema(friendly_type: str, prop_schema: Dict[str, Any]) -> str:
+    """Enrich the friendly type with extra accepted types from the JSON schema.
+
+    Models may define ``schema_extra`` that adds ``anyOf`` entries for fields
+    that accept alternative input types (e.g., duration fields typed as ``int``
+    but also accepting ``str`` like ``"5m"``).
+    """
+    any_of = prop_schema.get("anyOf")
+    if not any_of:
+        return friendly_type
+    # Only consider string/integer — the most common alternative input types.
+    # Skip boolean (typically a backward-compat artifact) and object/array.
+    _ENRICHABLE = {"string": "str", "integer": "int"}
+    schema_types = set()
+    for entry in any_of:
+        mapped = _ENRICHABLE.get(entry.get("type", ""))
+        if mapped:
+            schema_types.add(mapped)
+    # Add any schema types not already present in the friendly type
+    current_parts = [p.strip() for p in friendly_type.split(" | ")]
+    new_parts = schema_types - set(current_parts)
+    if not new_parts:
+        return friendly_type
+    all_parts = list(set(current_parts) | new_parts)
+    # If str is now present, enum is redundant
+    if "str" in all_parts and "enum" in all_parts:
+        all_parts.remove("enum")
+    all_parts.sort(key=_type_sort_key)
+    return " | ".join(all_parts)
 
 
 def generate_schema_reference(
@@ -63,14 +220,21 @@ def generate_schema_reference(
                 "",
             ]
         )
+    # Get JSON schema to detect extra accepted types from schema_extra
+    try:
+        schema_props = cls.schema().get("properties", {})
+    except Exception:
+        schema_props = {}
     for name, field in cls.__fields__.items():
         default = field.default
         if isinstance(default, Enum):
             default = default.value
+        friendly_type = get_friendly_type(field.annotation)
+        friendly_type = _enrich_type_from_schema(friendly_type, schema_props.get(name, {}))
         values = dict(
             name=name,
             description=field.field_info.description,
-            type=get_type(field.annotation),
+            type=friendly_type,
             default=default,
             required=field.required,
         )
@@ -84,11 +248,7 @@ def generate_schema_reference(
                 if field.annotation.__name__ == "Annotated":
                     if field_type.__name__ in ["Optional", "List", "list", "Union"]:
                         field_type = get_args(field_type)[0]
-                base_model = (
-                    inspect.isclass(field_type)
-                    and issubclass(field_type, BaseModel)
-                    and not issubclass(field_type, Range)
-                )
+                base_model = _is_linkable_type(field_type)
             else:
                 base_model = False
             _defaults = (
@@ -114,29 +274,27 @@ def generate_schema_reference(
                 if not base_model
                 else f"[`{values['name']}`](#{item_id_prefix}{link_name})"
             )
-            item_optional_marker = "(Optional)" if not values["required"] else ""
+            item_required_marker = "(Required)" if values["required"] else "(Optional)"
+            item_type_display = f"`{values['type']}`" if values.get("type") else ""
             item_description = (values["description"]).replace("\n", "<br>") + "."
             item_default = _defaults if not values["required"] else _must_be
             item_id = f"#{values['name']}" if not base_model else f"#_{values['name']}"
             item_toc_label = f"data-toc-label='{values['name']}'"
             item_css_cass = "class='reference-item'"
-            rows.append(
-                prefix
-                + " ".join(
-                    [
-                        f"###### {item_header}",
-                        "-",
-                        item_optional_marker,
-                        item_description,
-                        item_default,
-                        "{",
-                        item_id,
-                        item_toc_label,
-                        item_css_cass,
-                        "}",
-                    ]
-                )
-            )
+            parts = [
+                f"###### {item_header}",
+                "-",
+                item_required_marker,
+                item_type_display,
+                item_description,
+                item_default,
+                "{",
+                item_id,
+                item_toc_label,
+                item_css_cass,
+                "}",
+            ]
+            rows.append(prefix + " ".join(p for p in parts if p))
     return "\n".join(rows)
 
 

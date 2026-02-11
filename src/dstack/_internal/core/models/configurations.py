@@ -322,7 +322,10 @@ class ProbeConfigConfig(CoreConfig):
 
 
 class ProbeConfig(generate_dual_core_model(ProbeConfigConfig)):
-    type: Literal["http"]  # expect other probe types in the future, namely `exec`
+    type: Annotated[
+        Literal["http"],
+        Field(description="The probe type. Must be `http`"),
+    ]  # expect other probe types in the future, namely `exec`
     url: Annotated[
         Optional[str], Field(description=f"The URL to request. Defaults to `{DEFAULT_PROBE_URL}`")
     ] = None
