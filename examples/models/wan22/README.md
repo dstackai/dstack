@@ -103,10 +103,10 @@ cloud resources and run the configuration.
 ```shell
 $ dstack apply -f examples/models/wan22/.dstack.yml
 
- #  BACKEND              RESOURCES                                        INSTANCE TYPE   PRICE
- 1  datacrunch (FIN-01)  cpu=30 mem=120GB disk=200GB H100:80GB:1 (spot)   1H100.80S.30V   $0.99
- 2  datacrunch (FIN-01)  cpu=30 mem=120GB disk=200GB H100:80GB:1 (spot)   1H100.80S.30V   $0.99
- 3  datacrunch (FIN-02)  cpu=44 mem=182GB disk=200GB H200:141GB:1 (spot)  1H200.141S.44V  $0.99
+ #  BACKEND         RESOURCES                                        INSTANCE TYPE   PRICE
+ 1  verda (FIN-01)  cpu=30 mem=120GB disk=200GB H100:80GB:1 (spot)   1H100.80S.30V   $0.99
+ 2  verda (FIN-01)  cpu=30 mem=120GB disk=200GB H100:80GB:1 (spot)   1H100.80S.30V   $0.99
+ 3  verda (FIN-02)  cpu=44 mem=182GB disk=200GB H200:141GB:1 (spot)  1H200.141S.44V  $0.99
 
 ---> 100%
 
@@ -125,10 +125,10 @@ If you want you can override the default GPU, spot policy, and even the prompt v
 $ PROMPT=...
 $ dstack apply -f examples/models/wan22/.dstack.yml --spot --gpu H100,H200:8
 
- #  BACKEND              RESOURCES                                          INSTANCE TYPE    PRICE
- 1  aws (us-east-2)      cpu=192 mem=2048GB disk=300GB H100:80GB:8 (spot)   p5.48xlarge      $6.963
- 2  datacrunch (FIN-02)  cpu=176 mem=1480GB disk=300GB H100:80GB:8 (spot)   8H100.80S.176V   $7.93
- 3  datacrunch (ICE-01)  cpu=176 mem=1450GB disk=300GB H200:141GB:8 (spot)  8H200.141S.176V  $7.96
+ #  BACKEND          RESOURCES                                          INSTANCE TYPE    PRICE
+ 1  aws (us-east-2)  cpu=192 mem=2048GB disk=300GB H100:80GB:8 (spot)   p5.48xlarge      $6.963
+ 2  verda (FIN-02)   cpu=176 mem=1480GB disk=300GB H100:80GB:8 (spot)   8H100.80S.176V   $7.93
+ 3  verda (ICE-01)   cpu=176 mem=1450GB disk=300GB H200:141GB:8 (spot)  8H200.141S.176V  $7.96
  
 ---> 100%
 

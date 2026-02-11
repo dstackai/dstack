@@ -853,7 +853,7 @@ Then, go ahead and configure the backend:
 projects:
   - name: main
     backends:
-      - type: datacrunch
+      - type: verda
         creds:
           type: api_key
           client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
