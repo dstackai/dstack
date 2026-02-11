@@ -286,6 +286,10 @@ def get_instance_requirements(instance_model: InstanceModel) -> Requirements:
     return Requirements.__response__.parse_raw(instance_model.requirements)
 
 
+def is_ssh_instance(instance_model: InstanceModel) -> bool:
+    return instance_model.remote_connection_info is not None
+
+
 def get_instance_remote_connection_info(
     instance_model: InstanceModel,
 ) -> Optional[RemoteConnectionInfo]:
@@ -299,11 +303,11 @@ def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, O
     Returns a pair of SSH private keys: host key and optional proxy jump key.
     """
     host_private_key = instance_model.project.ssh_private_key
-    if instance_model.remote_connection_info is None:
+    rci = get_instance_remote_connection_info(instance_model)
+    if rci is None:
         # Cloud instance
         return host_private_key, None
     # SSH instance
-    rci = RemoteConnectionInfo.__response__.parse_raw(instance_model.remote_connection_info)
     if rci.ssh_proxy is None:
         return host_private_key, None
     if rci.ssh_proxy_keys is None:

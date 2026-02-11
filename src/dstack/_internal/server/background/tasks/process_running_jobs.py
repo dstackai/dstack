@@ -18,7 +18,6 @@ from dstack._internal.core.models.configurations import DevEnvironmentConfigurat
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import (
     InstanceStatus,
-    RemoteConnectionInfo,
     SSHConnectionParams,
 )
 from dstack._internal.core.models.metrics import Metric
@@ -54,7 +53,10 @@ from dstack._internal.server.schemas.runner import GPUDevice, TaskStatus
 from dstack._internal.server.services import events, services
 from dstack._internal.server.services import files as files_services
 from dstack._internal.server.services import logs as logs_services
-from dstack._internal.server.services.instances import get_instance_ssh_private_keys
+from dstack._internal.server.services.instances import (
+    get_instance_remote_connection_info,
+    get_instance_ssh_private_keys,
+)
 from dstack._internal.server.services.jobs import (
     find_job,
     get_job_attached_volumes,
@@ -870,14 +872,11 @@ async def _maybe_register_replica(
     ssh_head_proxy: Optional[SSHConnectionParams] = None
     ssh_head_proxy_private_key: Optional[str] = None
     instance = common_utils.get_or_error(job_model.instance)
-    if instance.remote_connection_info is not None:
-        rci: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
-            instance.remote_connection_info
-        )
-        if rci.ssh_proxy is not None:
-            ssh_head_proxy = rci.ssh_proxy
-            ssh_head_proxy_keys = common_utils.get_or_error(rci.ssh_proxy_keys)
-            ssh_head_proxy_private_key = ssh_head_proxy_keys[0].private
+    rci = get_instance_remote_connection_info(instance)
+    if rci is not None and rci.ssh_proxy is not None:
+        ssh_head_proxy = rci.ssh_proxy
+        ssh_head_proxy_keys = common_utils.get_or_error(rci.ssh_proxy_keys)
+        ssh_head_proxy_private_key = ssh_head_proxy_keys[0].private
     try:
         await services.register_replica(
             session,
@@ -1090,9 +1089,8 @@ def _submit_job_to_runner(
         None if repo_credentials is None else repo_credentials.clone_url,
     )
     instance = job_model.instance
-    if instance is not None and instance.remote_connection_info is not None:
-        remote_info = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
-        instance_env = remote_info.env
+    if instance is not None and (rci := get_instance_remote_connection_info(instance)) is not None:
+        instance_env = rci.env
     else:
         instance_env = None
 

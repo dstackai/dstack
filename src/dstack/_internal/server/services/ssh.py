@@ -4,10 +4,11 @@ from typing import Optional
 import dstack._internal.server.services.jobs as jobs_services
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import RemoteConnectionInfo, SSHConnectionParams
+from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.core.services.ssh.tunnel import SSH_DEFAULT_OPTIONS, SocketPair, SSHTunnel
 from dstack._internal.server.models import JobModel
+from dstack._internal.server.services.instances import get_instance_remote_connection_info
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.path import FileContent
 
@@ -46,11 +47,10 @@ def container_ssh_tunnel(
     ssh_head_proxy: Optional[SSHConnectionParams] = None
     ssh_head_proxy_private_key: Optional[str] = None
     instance = get_or_error(job.instance)
-    if instance.remote_connection_info is not None:
-        rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
-        if rci.ssh_proxy is not None:
-            ssh_head_proxy = rci.ssh_proxy
-            ssh_head_proxy_private_key = get_or_error(rci.ssh_proxy_keys)[0].private
+    rci = get_instance_remote_connection_info(instance)
+    if rci is not None and rci.ssh_proxy is not None:
+        ssh_head_proxy = rci.ssh_proxy
+        ssh_head_proxy_private_key = get_or_error(rci.ssh_proxy_keys)[0].private
     ssh_proxies = []
     if ssh_head_proxy is not None:
         ssh_head_proxy_private_key = get_or_error(ssh_head_proxy_private_key)
