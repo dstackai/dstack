@@ -106,6 +106,7 @@ ssh_config:
 </div>
 
 Pass the fleet configuration to `dstack apply`:
+
 <div class="termy">
 
 ```shell

@@ -86,7 +86,7 @@ If, for some reason, you’d like to use dstack with Nebius’s managed Kubernet
 ### Create a cluster
 
 1. Go to `Compute` → `Kubernetes` and click `Create cluster`. Make sure to enable `Public endpoint`.
-2. Go to `Node groups` and click `Create node group`. Make sure to enable `Assign public IPv4 addresses` and `Install NVIDIA GPU drivers and other components`. Select the appropriate instance type, specify the `Number of nodes`, and set `Node storage` to at least `100GB`. Make sure to click `Create` under `GPU cluster` if you plan to use a fast interconnect.
+2. Go to `Node groups` and click `Create node group`. Make sure to enable `Assign public IPv4 addresses` and `Install NVIDIA GPU drivers and other components`. Select the appropriate instance type, specify the `Number of nodes`, and set `Node storage` to at least `120 GiB`. Make sure to click `Create` under `GPU cluster` if you plan to use a fast interconnect.
 3. Go to `Applications`, find `NVIDIA Device Plugin`, and click `Deploy`.
 4. Wait until the nodes are provisioned.
 
