@@ -122,6 +122,16 @@ hide:
             Set up Crusoe clusters with optimized networking
         </p>
     </a>
+    <a href="/examples/clusters/nebius"
+       class="feature-cell sky">
+        <h3>
+            Nebius
+        </h3>
+
+        <p>
+            Set up Nebius clusters with optimized networking
+        </p>
+    </a>
     <a href="/examples/clusters/nccl-rccl-tests"
        class="feature-cell sky">
         <h3>
