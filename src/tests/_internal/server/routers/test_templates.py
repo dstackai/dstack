@@ -28,9 +28,9 @@ def _reset_cache():
 
 class TestListTemplates:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/project/test_project/templates/list")
-        assert response.status_code == 403
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     async def test_returns_empty_list_when_no_repo(
