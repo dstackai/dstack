@@ -115,7 +115,12 @@ class BaseRunConfigurator(
             if len(self.api.client.fleets.list(self.api.project)) == 0:
                 no_fleets = True
 
-        print_run_plan(run_plan, max_offers=configurator_args.max_offers, no_fleets=no_fleets)
+        print_run_plan(
+            run_plan,
+            max_offers=configurator_args.max_offers,
+            no_fleets=no_fleets,
+            verbose=command_args.verbose,
+        )
 
         confirm_message = "Submit a new run?"
         if conf.name:
