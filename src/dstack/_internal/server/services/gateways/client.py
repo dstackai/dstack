@@ -99,6 +99,7 @@ class GatewayClient:
         assert jpd is not None
         assert jpd.hostname is not None
         assert jpd.ssh_port is not None
+        payload["internal_ip"] = jpd.internal_ip
         if not jpd.dockerized:
             payload.update(
                 {

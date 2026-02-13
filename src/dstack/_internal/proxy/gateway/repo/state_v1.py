@@ -98,6 +98,7 @@ def parse_replica(replica: dict) -> Replica:
         ssh_destination=replica["ssh_host"],
         ssh_port=replica["ssh_port"],
         ssh_proxy=ssh_proxy,
+        internal_ip=replica.get("internal_ip"),
     )
 
 

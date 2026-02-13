@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-sglang = ["sglang-router==0.2.1"]
+sglang = ["sglang-router==0.3.2"]
 
 [tool.setuptools.package-data]
 "dstack.gateway" = [

@@ -19,6 +19,10 @@ class SGLangRouterConfig(CoreModel):
             description="The routing policy. Options: `random`, `round_robin`, `cache_aware`, `power_of_two`"
         ),
     ] = "cache_aware"
+    pd_disaggregation: Annotated[
+        bool,
+        Field(description="Enable PD disaggregation mode for the SGLang router"),
+    ] = False
 
 
 AnyRouterConfig = SGLangRouterConfig
