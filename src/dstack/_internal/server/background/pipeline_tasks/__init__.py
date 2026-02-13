@@ -1,0 +1,45 @@
+from dstack._internal.server.background.pipeline_tasks.base import Pipeline
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+class PipelineManager:
+    def __init__(self) -> None:
+        self._pipelines: list[Pipeline] = []  # Pipelines will go here
+        self._hinter = PipelineHinter(self._pipelines)
+
+    def start(self):
+        for pipeline in self._pipelines:
+            pipeline.start()
+
+    def shutdown(self):
+        for pipeline in self._pipelines:
+            pipeline.shutdown()
+
+    @property
+    def hinter(self):
+        return self._hinter
+
+
+class PipelineHinter:
+    def __init__(self, pipelines: list[Pipeline]) -> None:
+        self._pipelines = pipelines
+        self._hint_fetch_map = {p.hint_fetch_model_name: p for p in self._pipelines}
+
+    def hint_fetch(self, model_name: str):
+        pipeline = self._hint_fetch_map.get(model_name)
+        if pipeline is None:
+            logger.warning("Model %s not registered for fetch hints", model_name)
+            return
+        pipeline.hint_fetch()
+
+
+def start_pipeline_tasks() -> PipelineManager:
+    """
+    Start tasks processed by fetch-workers pipelines based on db + in-memory queues.
+    Suitable for tasks that run frequently and need to lock rows for a long time.
+    """
+    pipeline_manager = PipelineManager()
+    pipeline_manager.start()
+    return pipeline_manager

@@ -23,6 +23,7 @@ from dstack._internal.core.services.configs import update_default_project
 from dstack._internal.proxy.lib.deps import get_injector_from_app
 from dstack._internal.proxy.lib.routers import model_proxy
 from dstack._internal.server import settings
+from dstack._internal.server.background.pipeline_tasks import start_pipeline_tasks
 from dstack._internal.server.background.scheduled_tasks import start_scheduled_tasks
 from dstack._internal.server.background.scheduled_tasks.probes import PROBES_SCHEDULER
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
@@ -163,8 +164,10 @@ async def lifespan(app: FastAPI):
     if settings.SERVER_S3_BUCKET is not None or settings.SERVER_GCS_BUCKET is not None:
         init_default_storage()
     scheduler = None
+    pipeline_manager = None
     if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
         scheduler = start_scheduled_tasks()
+        pipeline_manager = start_pipeline_tasks()
     else:
         logger.info("Background processing is disabled")
     PROBES_SCHEDULER.start()
@@ -191,6 +194,8 @@ async def lifespan(app: FastAPI):
     yield
     if scheduler is not None:
         scheduler.shutdown()
+    if pipeline_manager is not None:
+        pipeline_manager.shutdown()
     PROBES_SCHEDULER.shutdown(wait=False)
     await gateway_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
