@@ -66,6 +66,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec
+from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import get_or_error
@@ -862,7 +863,9 @@ def _wait_for_load_balancer_address(
         time.sleep(1)
 
 
-def _get_gateway_commands(authorized_keys: List[str], router: Optional[str] = None) -> List[str]:
+def _get_gateway_commands(
+    authorized_keys: List[str], router: Optional[RouterType] = None
+) -> List[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
     gateway_commands = " && ".join(get_dstack_gateway_commands(router=router))
     quoted_gateway_commands = shlex.quote(gateway_commands)

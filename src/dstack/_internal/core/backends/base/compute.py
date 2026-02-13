@@ -39,6 +39,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
+from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -923,7 +924,7 @@ def get_run_shim_script(
     ]
 
 
-def get_gateway_user_data(authorized_key: str, router: Optional[str] = None) -> str:
+def get_gateway_user_data(authorized_key: str, router: Optional[RouterType] = None) -> str:
     return get_cloud_config(
         package_update=True,
         packages=[
@@ -1035,7 +1036,7 @@ def get_latest_runner_build() -> Optional[str]:
     return None
 
 
-def get_dstack_gateway_wheel(build: str, router: Optional[str] = None) -> str:
+def get_dstack_gateway_wheel(build: str, router: Optional[RouterType] = None) -> str:
     channel = "release" if settings.DSTACK_RELEASE else "stgn"
     base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
     if build == "latest":
@@ -1044,11 +1045,11 @@ def get_dstack_gateway_wheel(build: str, router: Optional[str] = None) -> str:
     wheel = f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
     # Build package spec with extras if router is specified
     if router:
-        return f"dstack-gateway[{router}] @ {wheel}"
+        return f"dstack-gateway[{router.value}] @ {wheel}"
     return f"dstack-gateway @ {wheel}"
 
 
-def get_dstack_gateway_commands(router: Optional[str] = None) -> List[str]:
+def get_dstack_gateway_commands(router: Optional[RouterType] = None) -> List[str]:
     build = get_dstack_runner_version() or "latest"
     gateway_package = get_dstack_gateway_wheel(build, router)
     return [
