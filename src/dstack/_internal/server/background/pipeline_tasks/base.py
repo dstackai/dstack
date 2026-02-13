@@ -50,15 +50,18 @@ class Pipeline(ABC):
         self._lock_timeout = lock_timeout
         self._heartbeat_trigger = heartbeat_trigger
         self._queue = asyncio.Queue[PipelineItem](maxsize=self._queue_maxsize)
+        self._tasks: list[asyncio.Task] = []
 
     def start(self):
-        asyncio.create_task(self._heartbeater.start())
+        self._tasks.append(asyncio.create_task(self._heartbeater.start()))
         for worker in self._workers:
-            asyncio.create_task(worker.start())
-        asyncio.create_task(self._fetcher.start())
+            self._tasks.append(asyncio.create_task(worker.start()))
+        self._tasks.append(asyncio.create_task(self._fetcher.start()))
 
     def shutdown(self):
         self._fetcher.shutdown()
+        for worker in self._workers:
+            worker.shutdown()
         self._heartbeater.shutdown()
 
     def hint_fetch(self):
@@ -244,15 +247,21 @@ class Worker(ABC):
     ) -> None:
         self._queue = queue
         self._heartbeater = heartbeater
+        self._running = False
 
     async def start(self):
-        while True:
+        self._running = True
+        while self._running:
             item = await self._queue.get()
             try:
                 await self.process(item)
             except Exception:
                 logger.exception("Unexpected exception when processing item")
-            await self._heartbeater.untrack(item)
+            finally:
+                await self._heartbeater.untrack(item)
+
+    def shutdown(self):
+        self._running = False
 
     @abstractmethod
     async def process(self, item: PipelineItem):
