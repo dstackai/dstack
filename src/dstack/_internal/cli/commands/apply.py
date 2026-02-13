@@ -62,6 +62,12 @@ class ApplyCommand(APIBaseCommand):
             help="Exit immediately after submitting configuration",
             action="store_true",
         )
+        self._parser.add_argument(
+            "-v",
+            "--verbose",
+            help="Show all plan properties including those with default values",
+            action="store_true",
+        )
 
     def _command(self, args: argparse.Namespace):
         try:
