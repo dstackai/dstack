@@ -132,7 +132,10 @@ class TestValidateGPUVendorAndImage:
     def test_no_gpu(self):
         conf = self.prepare_conf()
         self.validate(conf)
-        assert conf.resources.gpu is None
+        assert conf.resources.gpu is not None
+        assert conf.resources.gpu.vendor is None
+        assert conf.resources.gpu.name is None
+        assert conf.resources.gpu.count.min == 0
 
     def test_zero_gpu(self):
         conf = self.prepare_conf(gpu_spec="0")

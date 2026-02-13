@@ -390,6 +390,9 @@ class BaseRunConfigurator(
             return
         if gpu_spec.count.max == 0:
             return
+        # No specific GPU requested (default: 0..)
+        if gpu_spec.name is None and gpu_spec.vendor is None and gpu_spec.count.min == 0:
+            return
         has_amd_gpu: bool
         has_tt_gpu: bool
         vendor = gpu_spec.vendor

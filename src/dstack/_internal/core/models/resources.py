@@ -319,6 +319,9 @@ class GPUSpec(generate_dual_core_model(GPUSpecConfig)):
         return gpuhunt.AcceleratorVendor.cast(v)
 
 
+DEFAULT_GPU_SPEC = GPUSpec(count=Range[int](min=0, max=None))
+
+
 class DiskSpecConfig(CoreConfig):
     @staticmethod
     def schema_extra(schema: Dict[str, Any]):
@@ -387,7 +390,8 @@ class ResourcesSpec(generate_dual_core_model(ResourcesSpecConfig)):
             "you may need to configure this"
         ),
     ] = None
-    gpu: Annotated[Optional[GPUSpec], Field(description="The GPU requirements")] = None
+    # Optional for backward compatibility
+    gpu: Annotated[Optional[GPUSpec], Field(description="The GPU requirements")] = DEFAULT_GPU_SPEC
     disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
 
     def pretty_format(self) -> str:

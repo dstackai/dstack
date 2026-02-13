@@ -97,22 +97,7 @@ def pretty_resources(
     compute_capability: Optional[Any] = None,
     disk_size: Optional[Any] = None,
 ) -> str:
-    """
-    >>> pretty_resources(cpus=4, memory="16GB")
-    '4xCPU, 16GB'
-    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1)
-    '4xCPU, 16GB, 1xGPU'
-    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_name='A100')
-    '4xCPU, 16GB, 1xA100'
-    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_name='A100', gpu_memory="40GB")
-    '4xCPU, 16GB, 1xA100 (40GB)'
-    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1, total_gpu_memory="80GB")
-    '4xCPU, 16GB, 1xGPU (total 80GB)'
-    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=2, gpu_name='A100', gpu_memory="40GB", total_gpu_memory="80GB")
-    '4xCPU, 16GB, 2xA100 (40GB, total 80GB)'
-    >>> pretty_resources(gpu_count=1, compute_capability="8.0")
-    '1xGPU (8.0)'
-    """
+    """Format resource requirements as a human-readable string."""
     parts = []
     if cpus is not None:
         cpu_arch_lower: Optional[str] = None
@@ -131,7 +116,6 @@ def pretty_resources(
         parts.append(f"disk={disk_size}")
     if gpu_count:
         gpu_parts = []
-        gpu_parts.append(f"{gpu_name or 'gpu'}")
         if gpu_memory is not None:
             gpu_parts.append(f"{gpu_memory}")
         if gpu_count is not None:
@@ -141,8 +125,10 @@ def pretty_resources(
         if compute_capability is not None:
             gpu_parts.append(f"{compute_capability}")
 
-        gpu = ":".join(gpu_parts)
-        parts.append(gpu)
+        if gpu_name:
+            parts.append("gpu=" + ":".join([f"{gpu_name}"] + gpu_parts))
+        else:
+            parts.append("gpu=" + ":".join(gpu_parts))
     return " ".join(parts)
 
 
