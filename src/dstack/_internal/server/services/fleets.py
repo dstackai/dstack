@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
-from typing import List, Literal, Optional, Tuple, TypeVar, Union, cast
+from typing import List, Literal, Optional, Tuple, TypeVar, Union
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +32,6 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceStatus,
     InstanceTerminationReason,
-    RemoteConnectionInfo,
     SSHConnectionParams,
     SSHKey,
 )
@@ -1106,9 +1105,8 @@ async def _check_ssh_hosts_not_yet_added(
             # ignore instances belonging to the same fleet -- in-place update/recreate
             if current_fleet_id is not None and instance.fleet_id == current_fleet_id:
                 continue
-            instance_conn_info = RemoteConnectionInfo.parse_raw(
-                cast(str, instance.remote_connection_info)
-            )
+            instance_conn_info = get_instance_remote_connection_info(instance)
+            assert instance_conn_info is not None
             existing_hosts.add(instance_conn_info.host)
 
         instances_already_in_fleet = []

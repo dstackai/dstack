@@ -11,7 +11,9 @@ RESERVED_PORTS_END = 10999
 
 
 class PortUsedError(DstackError):
-    pass
+    def __init__(self, port: int):
+        self.port = port
+        super().__init__(f"Port {port} is already in use")
 
 
 class PortsLock:
@@ -28,10 +30,10 @@ class PortsLock:
             if not local_port:  # None or 0
                 continue
             if local_port in assigned_ports:
-                raise PortUsedError(f"Port {local_port} is already in use")
+                raise PortUsedError(local_port)
             sock = self._listen(local_port)
             if sock is None:
-                raise PortUsedError(f"Port {local_port} is already in use")
+                raise PortUsedError(local_port)
             self.sockets[remote_port] = sock
             assigned_ports.add(local_port)
 

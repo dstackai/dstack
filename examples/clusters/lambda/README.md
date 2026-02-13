@@ -5,18 +5,17 @@ description: Setting up Lambda clusters using Kubernetes or 1-Click Clusters wit
 
 # Lambda
 
-[Lambda](https://lambda.ai/) offers two ways to use clusters with a fast interconnect:
+`dstack` allows using Lambda clusters with fast interconnect via two ways:
 
-* [Kubernetes](#kubernetes) – Lets you interact with clusters through the Kubernetes API and includes support for NVIDIA GPU operators and related tools.
-* [1-Click Clusters (1CC)](#1-click-clusters) – Gives you direct access to clusters in the form of bare-metal nodes.
-
-Both options use the same underlying networking infrastructure. This example walks you through how to set up Lambda clusters to use with `dstack`.
+* [Kubernetes](#kubernetes) – If you create a Kubernetes cluster on Lambda and configure a `kubernetes` backend and create a backend fleet in `dstack`, `dstack` lets you fully use this cluster through `dstack`.
+* [VMs](#vms) – If you create a 1CC cluster on Lambda and create an SSH fleet in `dstack`, `dstack` lets you fully use this cluster through `dstack`.
 
 ## Kubernetes
 
-!!! info "Prerequsisites"
-    1. Follow the instructions in [Lambda's guide](https://docs.lambda.ai/public-cloud/1-click-clusters/managed-kubernetes/#accessing-mk8s) on accessing MK8s.
-    2. Go to `Firewall` → `Edit rules`, click `Add rule`, and allow ingress traffic on port `30022`. This port will be used by the `dstack` server to access the jump host.
+### Prerequsisites
+
+1. Follow the instructions in [Lambda's guide](https://docs.lambda.ai/public-cloud/1-click-clusters/managed-kubernetes/#accessing-mk8s) on accessing MK8s.
+2. Go to `Firewall` → `Edit rules`, click `Add rule`, and allow ingress traffic on port `30022`. This port will be used by the `dstack` server to access the jump host.
 
 ### Configure the backend
 
@@ -75,8 +74,9 @@ Once the fleet is created, you can run [dev environments](https://dstack.ai/docs
 
 Another way to work with Lambda clusters is through [1CC](https://lambda.ai/1-click-clusters). While `dstack` supports automated cluster provisioning via [VM-based backends](https://dstack.ai/docs/concepts/backends#vm-based), there is currently no programmatic way to provision Lambda 1CCs. As a result, to use a 1CC cluster with `dstack`, you must use [SSH fleets](https://dstack.ai/docs/concepts/fleets).
 
-!!! info "Prerequsisites"
-    1.  Follow the instructions in [Lambda's guide](https://docs.lambda.ai/public-cloud/1-click-clusters/) on working with 1-Click Clusters
+### Prerequsisites
+
+1.  Follow the instructions in [Lambda's guide](https://docs.lambda.ai/public-cloud/1-click-clusters/) on working with 1-Click Clusters
 
 ### Create a fleet
 
@@ -171,11 +171,11 @@ $ dstack apply -f lambda-nccl-tests.dstack.yml
 Provisioning...
 ---> 100%
 
-# nccl-tests version 2.17.6 nccl-headers=22602 nccl-library=22602
-# Collective test starting: all_reduce_perf
-#
-#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong
-#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)
+  nccl-tests version 2.17.6 nccl-headers=22602 nccl-library=22602
+  Collective test starting: all_reduce_perf
+
+        size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong
+         (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)
            8             2     float     sum      -1    36.50    0.00    0.00       0    36.16    0.00    0.00       0
           16             4     float     sum      -1    35.55    0.00    0.00       0    35.49    0.00    0.00       0
           32             8     float     sum      -1    35.49    0.00    0.00       0    36.28    0.00    0.00       0
@@ -205,8 +205,8 @@ Provisioning...
    536870912     134217728     float     sum      -1  1625.63  330.25  619.23       0  1687.31  318.18  596.59       0
   1073741824     268435456     float     sum      -1  2972.25  361.26  677.35       0  2971.33  361.37  677.56       0
   2147483648     536870912     float     sum      -1  5784.75  371.23  696.06       0  5728.40  374.88  702.91       0
-# Out of bounds values : 0 OK
-# Avg bus bandwidth    : 137.179
+  Out of bounds values : 0 OK
+  Avg bus bandwidth    : 137.179
 ```
 
 </div>

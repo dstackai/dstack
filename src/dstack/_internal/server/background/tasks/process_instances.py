@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import logging
 from datetime import timedelta
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 
 import gpuhunt
 import requests
@@ -86,8 +86,10 @@ from dstack._internal.server.services.instances import (
     get_instance_configuration,
     get_instance_profile,
     get_instance_provisioning_data,
+    get_instance_remote_connection_info,
     get_instance_requirements,
     get_instance_ssh_private_keys,
+    is_ssh_instance,
     remove_dangling_tasks_from_instance,
     switch_instance_status,
 )
@@ -244,7 +246,7 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         instance = res.unique().scalar_one()
 
     if instance.status == InstanceStatus.PENDING:
-        if instance.remote_connection_info is not None:
+        if is_ssh_instance(instance):
             await _add_remote(session, instance)
         else:
             await _create_instance(
@@ -323,7 +325,8 @@ async def _add_remote(session: AsyncSession, instance: InstanceModel) -> None:
         return
 
     try:
-        remote_details = RemoteConnectionInfo.parse_raw(cast(str, instance.remote_connection_info))
+        remote_details = get_instance_remote_connection_info(instance)
+        assert remote_details is not None
         # Prepare connection key
         try:
             pkeys = _ssh_keys_to_pkeys(remote_details.ssh_keys)
@@ -775,7 +778,7 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
             )
         return
 
-    if instance.termination_deadline is None:
+    if not is_ssh_instance(instance) and instance.termination_deadline is None:
         instance.termination_deadline = get_current_datetime() + TERMINATION_DEADLINE_OFFSET
 
     if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
@@ -789,7 +792,7 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
             switch_instance_status(session, instance, InstanceStatus.TERMINATING)
     elif instance.status.is_available():
         deadline = instance.termination_deadline
-        if get_current_datetime() > deadline:
+        if deadline is not None and get_current_datetime() > deadline:
             instance.termination_reason = InstanceTerminationReason.UNREACHABLE
             switch_instance_status(session, instance, InstanceStatus.TERMINATING)
 

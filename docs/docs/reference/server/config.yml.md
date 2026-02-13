@@ -14,8 +14,6 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
 #SCHEMA# dstack._internal.server.services.config.ProjectConfig
     overrides:
         show_root_heading: false
-        backends:
-            type: 'Union[AWSBackendConfigWithCreds, AzureBackendConfigWithCreds, GCPBackendConfigWithCreds, HotAisleBackendConfigWithCreds, LambdaBackendConfigWithCreds, NebiusBackendConfigWithCreds, RunpodBackendConfigWithCreds, VastAIBackendConfigWithCreds, KubernetesConfig]'
 
 #### `projects[n].backends` { #backends data-toc-label="backends" }
 

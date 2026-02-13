@@ -1,24 +1,25 @@
 ---
 title: Crusoe
-description: Setting up Crusoe clusters using Managed Kubernetes or VMs with InfiniBand support
+description: Using Crusoe clusters with InfiniBand support via Kubernetes or VMs
 ---
 
 # Crusoe
 
-Crusoe offers two ways to use clusters with fast interconnect:
+`dstack` allows using Crusoe clusters with fast interconnect via two ways:
 
-* [Crusoe Managed Kubernetes](#kubernetes) – Lets you interact with clusters through the Kubernetes API and includes support for NVIDIA and AMD GPU operators and related tools.
-* [Virtual Machines (VMs)](#vms) – Gives you direct access to clusters in the form of virtual machines with NVIDIA and AMD GPUs.
+* [Kubernetes](#kubernetes) – If you create a Kubernetes cluster on Crusoe and configure a `kubernetes` backend and create a backend fleet in `dstack`, `dstack` lets you fully use this cluster through `dstack`.
+* [VMs](#vms) – If you create a VM cluster on Crusoe and create an SSH fleet in `dstack`, `dstack` lets you fully use this cluster through `dstack`.
+  
+## Kubernetes
 
-Both options use the same underlying networking infrastructure. This example walks you through how to set up Crusoe clusters to use with `dstack`.
+### Create a cluster
 
-## Crusoe Managed Kubernetes { #kubernetes }
+1. Go `Networking` → `Firewall Rules`, click `Create Firewall Rule`, and allow ingress traffic on port `30022`. This port will be used by the `dstack` server to access the jump host.
+2. Go to `Orchestration` and click `Create Cluster`. Make sure to enable the `NVIDIA GPU Operator` add-on.
+3. Go the the cluster, and click `Create Node Pool`. Select the right type of the instance, and  `Desired Number of Nodes`.
+4. Wait until nodes are provisioned.
 
-!!! info "Prerequsisites"
-    1. Go `Networking` → `Firewall Rules`, click `Create Firewall Rule`, and allow ingress traffic on port `30022`. This port will be used by the `dstack` server to access the jump host.
-    2. Go to `Orchestration` and click `Create Cluster`. Make sure to enable the `NVIDIA GPU Operator` add-on.
-    3. Go the the cluster, and click `Create Node Pool`. Select the right type of the instance. If you intend to auto-scale the cluster, make sure to set `Desired Number of Nodes` at least to `1`, since `dstack` doesn't currently support clusters that scale down to `0` nodes.
-    4. Wait until at least one node is running.
+> Even if you enable `autoscaling`, `dstack` can use only the nodes that are already provisioned.
 
 ### Configure the backend
 
@@ -56,7 +57,7 @@ backends: [kubernetes]
 
 resources:
   # Specify requirements to filter nodes
-  gpu: 1..8
+  gpu: 8
 ```
     
 </div>
@@ -75,12 +76,13 @@ Once the fleet is created, you can run [dev environments](https://dstack.ai/docs
 
 ## VMs
 
-Another way to work with Crusoe clusters is through VMs. While `dstack` typically supports VM-based compute providers via [dedicated backends](https://dstack.ai/docs/concepts/backends#vm-based) that automate provisioning, Crusoe does not yet have [such a backend](https://github.com/dstackai/dstack/issues/3378). As a result, to use a VM-based Crusoe cluster with `dstack`, you should use [SSH fleets](https://dstack.ai/docs/concepts/fleets).
+Another way to work with Crusoe clusters is through VMs. While `dstack` typically supports VM-based compute providers via [dedicated backends](https://dstack.ai/docs/concepts/backends#vm-based) that automate provisioning, Crusoe does not yet have [such a backend](https://github.com/dstackai/dstack/issues/3378). As a result, to use a VM-based Crusoe cluster with `dstack`, you should use [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets).
 
-!!! info "Prerequsisites"
-    1. Go to `Compute`, then `Instances`, and click `Create Instance`. Make sure to select the right instance type and VM image (that [support interconnect](https://docs.crusoecloud.com/networking/infiniband/managing-infiniband-networks/index.html)). Make sure to create as many instances as needed.
+### Create instances
 
-### Create a fleet
+1. Go to `Compute`, then `Instances`, and click `Create Instance`. Make sure to select the right instance type and VM image (that [support interconnect](https://docs.crusoecloud.com/networking/infiniband/managing-infiniband-networks/index.html)). Make sure to create as many instances as needed.
+
+### Create a `dstack` fleet
 
 Follow the standard instructions for setting up an [SSH fleet](https://dstack.ai/docs/concepts/fleets/#ssh-fleets):
 
@@ -115,9 +117,9 @@ $ dstack apply -f crusoe-fleet.dstack.yml
 
 Once the fleet is created, you can run [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), and [services](https://dstack.ai/docs/concepts/services).
 
-## Run NCCL tests
+## NCCL tests
 
-Use a [distributed task](https://dstack.ai/docs/concepts/tasks#distributed-task) that runs NCCL tests to validate cluster network bandwidth.
+Use a [distributed task](https://dstack.ai/docs/concepts/tasks#distributed-tasks) that runs NCCL tests to validate cluster network bandwidth.
 
 === "Crusoe Managed Kubernetes"
 
@@ -253,9 +255,9 @@ Provisioning...
 
 nccl-tests provisioning completed (running)
 
-#                                                              out-of-place                       in-place
-#       size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong
-#        (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)
+out-of-place                       in-place
+        size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong
+         (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)
            8             2     float     sum      -1    27.70    0.00    0.00       0    29.82    0.00    0.00       0
           16             4     float     sum      -1    28.78    0.00    0.00       0    28.99    0.00    0.00       0
           32             8     float     sum      -1    28.49    0.00    0.00       0    28.16    0.00    0.00       0
@@ -285,8 +287,8 @@ nccl-tests provisioning completed (running)
    536870912     134217728     float     sum      -1  5300.49  101.29  189.91       0  5314.91  101.01  189.40       0
   1073741824     268435456     float     sum      -1  10472.2  102.53  192.25       0  10485.6  102.40  192.00       0
   2147483648     536870912     float     sum      -1  20749.1  103.50  194.06       0  20745.7  103.51  194.09       0
-# Out of bounds values : 0 OK
-# Avg bus bandwidth    : 53.7387
+  Out of bounds values : 0 OK
+  Avg bus bandwidth    : 53.7387
 ```
 
 </div>

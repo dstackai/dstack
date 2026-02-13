@@ -853,7 +853,7 @@ Then, go ahead and configure the backend:
 projects:
   - name: main
     backends:
-      - type: datacrunch
+      - type: verda
         creds:
           type: api_key
           client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
@@ -1049,13 +1049,13 @@ projects:
       verbs: ["get", "create"]
     - apiGroups: [""]
       resources: ["pods"]
-      verbs: ["get", "create", "delete"]
+      verbs: ["get", "create", "delete", "list"]
     - apiGroups: [""]
       resources: ["services"]
       verbs: ["get", "create", "delete"]
     - apiGroups: [""]
       resources: ["nodes"]
-      verbs: ["list"]
+      verbs: ["list", "get"]
     ```
     
     Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
