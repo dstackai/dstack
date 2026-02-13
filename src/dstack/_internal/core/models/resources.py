@@ -401,6 +401,7 @@ class ResourcesSpec(generate_dual_core_model(ResourcesSpecConfig)):
         if self.gpu:
             gpu = self.gpu
             resources.update(
+                gpu_vendor=gpu.vendor,
                 gpu_name=",".join(gpu.name) if gpu.name else None,
                 gpu_count=gpu.count,
                 gpu_memory=gpu.memory,

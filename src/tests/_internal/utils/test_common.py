@@ -247,6 +247,12 @@ class TestPrettyResources:
     def test_gpu_count_without_name(self):
         assert pretty_resources(cpus=4, memory="16GB", gpu_count=1) == "cpu=4 mem=16GB gpu=1"
 
+    def test_gpu_count_with_vendor(self):
+        assert (
+            pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_vendor="nvidia")
+            == "cpu=4 mem=16GB gpu=nvidia:1"
+        )
+
     def test_gpu_count_with_name(self):
         assert (
             pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_name="A100")
@@ -296,6 +302,15 @@ class TestPrettyResources:
         assert (
             pretty_resources(cpus=2, memory="8GB", disk_size="100GB", gpu_count="0..")
             == "cpu=2 mem=8GB disk=100GB gpu=0.."
+        )
+
+    def test_gpu_zero_count_range_with_vendor(self):
+        """Default GPU spec with nvidia vendor should display gpu=nvidia:0.."""
+        assert (
+            pretty_resources(
+                cpus=2, memory="8GB", disk_size="100GB", gpu_count="0..", gpu_vendor="nvidia"
+            )
+            == "cpu=2 mem=8GB disk=100GB gpu=nvidia:0.."
         )
 
 

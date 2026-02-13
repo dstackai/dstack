@@ -47,6 +47,10 @@ from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.schemas.runs import ApplyRunPlanRequest
 from dstack._internal.server.services.projects import add_project_member
+from dstack._internal.server.services.resources import (
+    set_gpu_vendor_default,
+    set_resources_defaults,
+)
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.services.runs.spec import validate_run_spec_and_set_defaults
 from dstack._internal.server.testing.common import (
@@ -1534,6 +1538,13 @@ class TestGetRunPlan:
             run_spec=run_spec,
         )
         run = run_model_to_run(run_model)
+        # Apply the same defaults the server applies to current_resource
+        set_resources_defaults(run.run_spec.configuration.resources)
+        set_gpu_vendor_default(
+            run.run_spec.configuration.resources,
+            image=run.run_spec.configuration.image,
+            docker=getattr(run.run_spec.configuration, "docker", None),
+        )
         run_spec.configuration = new_conf
         response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",

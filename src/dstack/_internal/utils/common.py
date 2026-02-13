@@ -91,6 +91,7 @@ def pretty_resources(
     cpus: Optional[Any] = None,
     memory: Optional[Any] = None,
     gpu_count: Optional[Any] = None,
+    gpu_vendor: Optional[Any] = None,
     gpu_name: Optional[Any] = None,
     gpu_memory: Optional[Any] = None,
     total_gpu_memory: Optional[Any] = None,
@@ -127,6 +128,9 @@ def pretty_resources(
 
         if gpu_name:
             parts.append("gpu=" + ":".join([f"{gpu_name}"] + gpu_parts))
+        elif gpu_vendor:
+            vendor_str = gpu_vendor.value if isinstance(gpu_vendor, enum.Enum) else str(gpu_vendor)
+            parts.append("gpu=" + ":".join([vendor_str] + gpu_parts))
         else:
             parts.append("gpu=" + ":".join(gpu_parts))
     return " ".join(parts)
