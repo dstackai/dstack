@@ -1,3 +1,5 @@
+import asyncio
+
 from dstack._internal.server.background.pipeline_tasks.base import Pipeline
 from dstack._internal.utils.logging import get_logger
 
@@ -16,6 +18,18 @@ class PipelineManager:
     def shutdown(self):
         for pipeline in self._pipelines:
             pipeline.shutdown()
+
+    async def drain(self):
+        results = await asyncio.gather(
+            *[p.drain() for p in self._pipelines], return_exceptions=True
+        )
+        for pipeline, result in zip(self._pipelines, results):
+            if isinstance(result, BaseException):
+                logger.error(
+                    "Unexpected exception when draining pipeline %r",
+                    pipeline,
+                    exc_info=(type(result), result, result.__traceback__),
+                )
 
     @property
     def hinter(self):

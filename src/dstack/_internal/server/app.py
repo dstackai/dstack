@@ -197,6 +197,8 @@ async def lifespan(app: FastAPI):
         pipeline_manager.shutdown()
     if scheduler is not None:
         scheduler.shutdown()
+    if pipeline_manager is not None:
+        await pipeline_manager.drain()
     await gateway_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
     await service_conn_pool.remove_all()

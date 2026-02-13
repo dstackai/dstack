@@ -31,6 +31,10 @@ class PipelineModel(Protocol):
     __table__: ClassVar[Any]
 
 
+class PipelineError(Exception):
+    pass
+
+
 class Pipeline(ABC):
     def __init__(
         self,
@@ -51,18 +55,55 @@ class Pipeline(ABC):
         self._heartbeat_trigger = heartbeat_trigger
         self._queue = asyncio.Queue[PipelineItem](maxsize=self._queue_maxsize)
         self._tasks: list[asyncio.Task] = []
+        self._running = False
+        self._shutdown = False
 
     def start(self):
+        """
+        Starts all pipeline tasks.
+        """
+        if self._running:
+            return
+        if self._shutdown:
+            raise PipelineError("Cannot start pipeline after shutdown.")
+        self._running = True
         self._tasks.append(asyncio.create_task(self._heartbeater.start()))
         for worker in self._workers:
             self._tasks.append(asyncio.create_task(worker.start()))
         self._tasks.append(asyncio.create_task(self._fetcher.start()))
 
     def shutdown(self):
-        self._fetcher.shutdown()
+        """
+        Stops the pipeline from processing new items and signals running tasks to cancel.
+        """
+        if self._shutdown:
+            return
+        self._shutdown = True
+        self._running = False
+        self._fetcher.stop()
         for worker in self._workers:
-            worker.shutdown()
-        self._heartbeater.shutdown()
+            worker.stop()
+        self._heartbeater.stop()
+        for task in self._tasks:
+            if not task.done():
+                task.cancel()
+
+    async def drain(self):
+        """
+        Waits for all pipeline tasks to finish cleanup after shutdown.
+        """
+        if not self._shutdown:
+            raise PipelineError("Cannot drain running pipeline. Call `shutdown()` first.")
+        results = await asyncio.gather(*self._tasks, return_exceptions=True)
+        for task, result in zip(self._tasks, results):
+            if isinstance(result, BaseException) and not isinstance(
+                result, asyncio.CancelledError
+            ):
+                logger.error(
+                    "Unexpected exception when draining pipeline task %r",
+                    task,
+                    exc_info=(type(result), result, result.__traceback__),
+                )
 
     def hint_fetch(self):
         self._fetcher.hint()
@@ -116,7 +157,7 @@ class Heartbeater(Generic[ModelT]):
                 logger.exception("Unexpected exception when running heartbeat")
             await asyncio.sleep(self._heartbeat_delay)
 
-    def shutdown(self):
+    def stop(self):
         self._running = False
 
     async def track(self, item: PipelineItem):
@@ -223,7 +264,7 @@ class Fetcher(ABC):
                 self._queue.put_nowait(item)  # should never raise
                 await self._heartbeater.track(item)
 
-    def shutdown(self):
+    def stop(self):
         self._running = False
 
     def hint(self):
@@ -260,7 +301,7 @@ class Worker(ABC):
             finally:
                 await self._heartbeater.untrack(item)
 
-    def shutdown(self):
+    def stop(self):
         self._running = False
 
     @abstractmethod
