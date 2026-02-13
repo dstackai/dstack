@@ -74,7 +74,10 @@ class OfferCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        conf = TaskConfiguration(commands=[":"])
+        # Set image and user so that the server (a) does not default gpu.vendor
+        # to nvidia — `dstack offer` should show all vendors, and (b) does not
+        # attempt to pull image config from the Docker registry.
+        conf = TaskConfiguration(commands=[":"], image="scratch", user="root")
 
         configurator = OfferConfigurator(api_client=self.api)
         configurator.apply_args(conf, args)

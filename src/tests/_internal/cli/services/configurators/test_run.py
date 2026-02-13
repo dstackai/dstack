@@ -132,10 +132,31 @@ class TestValidateGPUVendorAndImage:
     def test_no_gpu(self):
         conf = self.prepare_conf()
         self.validate(conf)
-        assert conf.resources.gpu is None
+        assert conf.resources.gpu is not None
+        # Vendor is not written to spec for compatibility with older servers.
+        # The server infers nvidia in set_resources_defaults().
+        assert conf.resources.gpu.vendor is None
+        assert conf.resources.gpu.name is None
+        assert conf.resources.gpu.count.min == 0
 
     def test_zero_gpu(self):
         conf = self.prepare_conf(gpu_spec="0")
+        self.validate(conf)
+        assert conf.resources.gpu.vendor is None
+
+    def test_gpu_no_vendor_no_image_defaults_to_nvidia(self):
+        """Vendor is inferred as nvidia for validation but NOT written to spec."""
+        conf = self.prepare_conf(gpu_spec="1")
+        self.validate(conf)
+        assert conf.resources.gpu.vendor is None
+
+    def test_gpu_no_vendor_with_image_no_default(self):
+        conf = self.prepare_conf(gpu_spec="1", image="my-custom-image")
+        self.validate(conf)
+        assert conf.resources.gpu.vendor is None
+
+    def test_gpu_no_vendor_docker_true_no_default(self):
+        conf = self.prepare_conf(gpu_spec="1", docker=True)
         self.validate(conf)
         assert conf.resources.gpu.vendor is None
 

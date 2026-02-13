@@ -13,6 +13,7 @@ from dstack._internal.utils.common import (
     make_proxy_url,
     parse_memory,
     pretty_date,
+    pretty_resources,
     sizeof_fmt,
 )
 
@@ -237,6 +238,80 @@ def test_concat_url_path(a: str, b: str, result: str) -> None:
 )
 def test_make_proxy_url(server_url, proxy_url, expected_url):
     assert make_proxy_url(server_url, proxy_url) == expected_url
+
+
+class TestPrettyResources:
+    def test_cpu_and_memory(self):
+        assert pretty_resources(cpus=4, memory="16GB") == "cpu=4 mem=16GB"
+
+    def test_gpu_count_without_name(self):
+        assert pretty_resources(cpus=4, memory="16GB", gpu_count=1) == "cpu=4 mem=16GB gpu=1"
+
+    def test_gpu_count_with_vendor(self):
+        assert (
+            pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_vendor="nvidia")
+            == "cpu=4 mem=16GB gpu=nvidia:1"
+        )
+
+    def test_gpu_count_with_name(self):
+        assert (
+            pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_name="A100")
+            == "cpu=4 mem=16GB gpu=A100:1"
+        )
+
+    def test_gpu_with_name_and_memory(self):
+        assert (
+            pretty_resources(
+                cpus=4, memory="16GB", gpu_count=1, gpu_name="A100", gpu_memory="40GB"
+            )
+            == "cpu=4 mem=16GB gpu=A100:40GB:1"
+        )
+
+    def test_gpu_with_total_memory_without_name(self):
+        assert (
+            pretty_resources(cpus=4, memory="16GB", gpu_count=1, total_gpu_memory="80GB")
+            == "cpu=4 mem=16GB gpu=1:80GB"
+        )
+
+    def test_gpu_with_name_memory_and_total_memory(self):
+        assert (
+            pretty_resources(
+                cpus=4,
+                memory="16GB",
+                gpu_count=2,
+                gpu_name="A100",
+                gpu_memory="40GB",
+                total_gpu_memory="80GB",
+            )
+            == "cpu=4 mem=16GB gpu=A100:40GB:2:80GB"
+        )
+
+    def test_gpu_with_compute_capability(self):
+        assert pretty_resources(gpu_count=1, compute_capability="8.0") == "gpu=1:8.0"
+
+    def test_disk(self):
+        assert (
+            pretty_resources(cpus=2, memory="8GB", disk_size="100GB") == "cpu=2 mem=8GB disk=100GB"
+        )
+
+    def test_no_gpu(self):
+        assert pretty_resources(cpus=2, memory="8GB") == "cpu=2 mem=8GB"
+
+    def test_gpu_zero_count_range(self):
+        """Default GPU spec (0..) should display gpu=0.."""
+        assert (
+            pretty_resources(cpus=2, memory="8GB", disk_size="100GB", gpu_count="0..")
+            == "cpu=2 mem=8GB disk=100GB gpu=0.."
+        )
+
+    def test_gpu_zero_count_range_with_vendor(self):
+        """Default GPU spec with nvidia vendor should display gpu=nvidia:0.."""
+        assert (
+            pretty_resources(
+                cpus=2, memory="8GB", disk_size="100GB", gpu_count="0..", gpu_vendor="nvidia"
+            )
+            == "cpu=2 mem=8GB disk=100GB gpu=nvidia:0.."
+        )
 
 
 class TestSizeofFmt:
