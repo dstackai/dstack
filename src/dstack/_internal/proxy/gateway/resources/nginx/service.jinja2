@@ -24,6 +24,17 @@ server {
 
     {% for location in locations %}
     location {{ location.prefix }} {
+        {% if cors_enabled %}
+        # Handle CORS preflight before auth (rewrite phase runs before access phase)
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '*' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD' always;
+            add_header 'Access-Control-Allow-Headers' '*' always;
+            add_header 'Access-Control-Max-Age' '600' always;
+            return 204;
+        }
+        {% endif %}
+
         {% if auth %}
         auth_request /_dstack_auth;
         {% endif %}
@@ -46,6 +57,15 @@ server {
     location @websocket {
         set $dstack_replica_hit 1;
         {% if replicas %}
+        {% if cors_enabled %}
+        proxy_hide_header 'Access-Control-Allow-Origin';
+        proxy_hide_header 'Access-Control-Allow-Methods';
+        proxy_hide_header 'Access-Control-Allow-Headers';
+        proxy_hide_header 'Access-Control-Allow-Credentials';
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD' always;
+        add_header 'Access-Control-Allow-Headers' '*' always;
+        {% endif %}
         proxy_pass http://{{ domain }}.upstream;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;
@@ -60,6 +80,15 @@ server {
     location @ {
         set $dstack_replica_hit 1;
         {% if replicas %}
+        {% if cors_enabled %}
+        proxy_hide_header 'Access-Control-Allow-Origin';
+        proxy_hide_header 'Access-Control-Allow-Methods';
+        proxy_hide_header 'Access-Control-Allow-Headers';
+        proxy_hide_header 'Access-Control-Allow-Credentials';
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD' always;
+        add_header 'Access-Control-Allow-Headers' '*' always;
+        {% endif %}
         proxy_pass http://{{ domain }}.upstream;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header Host $host;

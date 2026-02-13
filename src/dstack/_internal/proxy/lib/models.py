@@ -59,6 +59,7 @@ class Service(ImmutableModel):
     strip_prefix: bool = True  # only used in-server
     replicas: tuple[Replica, ...]
     router: Optional[AnyRouterConfig] = None
+    cors_enabled: bool = False  # only used on gateways; enabled for openai-format models
 
     @property
     def domain_safe(self) -> str:
