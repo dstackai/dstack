@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.volumes import VolumeProvisioningData, VolumeStatus
-from dstack._internal.server.background.tasks.process_volumes import process_submitted_volumes
+from dstack._internal.server.background.scheduled_tasks.volumes import process_submitted_volumes
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_project,

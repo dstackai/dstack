@@ -23,8 +23,8 @@ from dstack._internal.core.services.configs import update_default_project
 from dstack._internal.proxy.lib.deps import get_injector_from_app
 from dstack._internal.proxy.lib.routers import model_proxy
 from dstack._internal.server import settings
-from dstack._internal.server.background import start_background_tasks
-from dstack._internal.server.background.tasks.process_probes import PROBES_SCHEDULER
+from dstack._internal.server.background.scheduled_tasks import start_scheduled_tasks
+from dstack._internal.server.background.scheduled_tasks.probes import PROBES_SCHEDULER
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
     auth,
@@ -164,7 +164,7 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     scheduler = None
     if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
-        scheduler = start_background_tasks()
+        scheduler = start_scheduled_tasks()
     else:
         logger.info("Background processing is disabled")
     PROBES_SCHEDULER.start()

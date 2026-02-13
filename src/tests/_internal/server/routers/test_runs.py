@@ -67,7 +67,7 @@ from dstack._internal.server.testing.common import (
     list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
-from tests._internal.server.background.tasks.test_process_running_jobs import settings
+from tests._internal.server.background.scheduled_tasks.test_process_running_jobs import settings
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
 

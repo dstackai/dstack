@@ -37,7 +37,7 @@ from dstack._internal.core.models.volumes import (
     VolumeStatus,
 )
 from dstack._internal.server import settings as server_settings
-from dstack._internal.server.background.tasks.process_running_jobs import (
+from dstack._internal.server.background.scheduled_tasks.running_jobs import (
     _patch_base_image_for_aws_efa,
     process_running_jobs,
 )

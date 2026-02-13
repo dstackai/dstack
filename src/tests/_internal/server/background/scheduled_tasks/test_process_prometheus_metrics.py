@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.background.tasks.process_prometheus_metrics import (
+from dstack._internal.server.background.scheduled_tasks.prometheus_metrics import (
     collect_prometheus_metrics,
     delete_prometheus_metrics,
 )

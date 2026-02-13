@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.server.background.tasks.process_compute_groups import (
+from dstack._internal.server.background.scheduled_tasks.compute_groups import (
     ComputeGroupStatus,
     process_compute_groups,
 )
