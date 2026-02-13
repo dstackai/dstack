@@ -79,7 +79,7 @@ class Router(ABC):
         ...
 
     @abstractmethod
-    async def update_replicas(self, replica_urls: List[str]) -> None:
+    def update_replicas(self, replica_urls: List[str]) -> None:
         """Update replicas for service, replacing the current set.
 
         Args:
@@ -90,7 +90,7 @@ class Router(ABC):
         """
         ...
 
-    async def add_worker_to_router(
+    def add_worker_to_router(
         self,
         url: str,
         worker_type: str = "regular",
@@ -108,6 +108,6 @@ class Router(ABC):
         """
         raise NotImplementedError
 
-    async def register_worker(self, url: str) -> bool:
+    def register_worker(self, url: str) -> bool:
         """Register worker with one attempt (no polling). Returns True if ready and added."""
         raise NotImplementedError

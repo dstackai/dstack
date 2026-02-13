@@ -19,6 +19,7 @@ from dstack._internal.proxy.gateway.services.model_routers import (
     RouterContext,
     get_router,
 )
+from dstack._internal.proxy.lib import models
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
@@ -149,10 +150,13 @@ class Nginx:
 
                     if conf.router.pd_disaggregation:
                         # PD path: replica_urls from internal_ip (router talks directly to workers)
+                        if any(not r.internal_ip for r in conf.replicas):
+                            raise ProxyError(
+                                "PD disaggregation requires internal IP for all replicas."
+                            )
                         replica_urls = [
                             f"http://{replica.internal_ip}:{replica.port}"
                             for replica in conf.replicas
-                            if replica.internal_ip
                         ]
                         self._domain_to_worker_urls[conf.domain] = replica_urls
                     else:
@@ -172,7 +176,7 @@ class Nginx:
                         self._domain_to_worker_urls[conf.domain] = replica_urls
 
                     try:
-                        await router.update_replicas(replica_urls)
+                        await run_async(router.update_replicas, replica_urls)
                     except Exception as e:
                         logger.exception(
                             "Failed to add replicas to router for domain=%s: %s",
@@ -185,7 +189,7 @@ class Nginx:
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
-    async def unregister(self, domain: str) -> None:
+    async def unregister(self, domain: str, service: models.Service) -> None:
         logger.debug("Unregistering domain %s", domain)
         conf_path = self._conf_dir / self.get_config_name(domain)
         if not conf_path.exists():
@@ -199,7 +203,11 @@ class Nginx:
                 if domain in self._domain_to_worker_urls:
                     worker_urls = self._domain_to_worker_urls[domain]
                     await run_async(router.remove_replicas, worker_urls)
-                    self._discard_ports(worker_urls)
+                    pd_disaggregation = (
+                        service.router.pd_disaggregation if service.router else False
+                    )
+                    if not pd_disaggregation:
+                        self._discard_ports(worker_urls)
                     del self._domain_to_worker_urls[domain]
                     logger.debug("Removed worker URLs for domain %s", domain)
                 # Stop and kill the router

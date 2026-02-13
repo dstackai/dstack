@@ -26,6 +26,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel, RunModel
@@ -91,6 +92,15 @@ async def _register_service_in_gateway(
         raise ServerClientError("Gateway status is not running")
 
     gateway_configuration = get_gateway_configuration(gateway)
+    if (
+        run_spec.configuration.router is not None
+        and run_spec.configuration.router.type == RouterType.SGLANG
+    ):
+        if gateway_configuration.router != RouterType.SGLANG:
+            raise ServerClientError(
+                f"Service requires a SGLang gateway but gateway '{gateway.name}' "
+                "does not have the SGLang router configured."
+            )
     service_https = _get_service_https(run_spec, gateway_configuration)
     router = run_spec.configuration.router
     service_protocol = "https" if service_https else "http"
@@ -152,6 +162,14 @@ async def _register_service_in_gateway(
 
 def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> ServiceSpec:
     assert run_spec.configuration.type == "service"
+    if (
+        run_spec.configuration.router is not None
+        and run_spec.configuration.router.type == RouterType.SGLANG
+    ):
+        raise ServerClientError(
+            "Service with SGLang router configuration requires a gateway. "
+            "Please configure a gateway with the SGLang router enabled."
+        )
     if run_spec.configuration.https != SERVICE_HTTPS_DEFAULT:
         # Note: if the user sets `https: <default-value>`, it will be ignored silently
         # TODO: in 0.19, make `https` Optional to be able to tell if it was set or omitted

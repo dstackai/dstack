@@ -116,7 +116,7 @@ async def unregister_service(
             ids=(r.id for r in service.replicas),
             service_conn_pool=service_conn_pool,
         )
-        await nginx.unregister(service.domain_safe)
+        await nginx.unregister(service.domain_safe, service)
         await repo.delete_models_by_run(project_name, run_name)
         await repo.delete_service(project_name, run_name)
 

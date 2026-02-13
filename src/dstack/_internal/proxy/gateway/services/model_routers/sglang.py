@@ -141,7 +141,7 @@ class SglangRouter(Router):
         for replica_url in replica_urls:
             self._remove_worker_from_router(replica_url)
 
-    async def update_replicas(self, replica_urls: List[str]) -> None:
+    def update_replicas(self, replica_urls: List[str]) -> None:
         """Update replicas for service, replacing the current set."""
         # Query router to get current worker URLs
         current_workers = self._get_router_workers()
@@ -175,7 +175,7 @@ class SglangRouter(Router):
 
         # Add workers
         for worker_url in sorted(workers_to_add):
-            success = await self.register_worker(worker_url)
+            success = self.register_worker(worker_url)
             if not success:
                 logger.warning("Failed to add worker %s, continuing with others", worker_url)
 
@@ -198,7 +198,7 @@ class SglangRouter(Router):
             logger.exception("Error getting sglang router workers")
             return []
 
-    async def add_worker_to_router(
+    def add_worker_to_router(
         self,
         url: str,
         worker_type: str = "regular",
@@ -208,8 +208,8 @@ class SglangRouter(Router):
             payload: dict = {"url": url, "worker_type": worker_type}
             if bootstrap_port is not None:
                 payload["bootstrap_port"] = bootstrap_port
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.post(
+            with httpx.Client(timeout=5.0) as client:
+                response = client.post(
                     f"http://{self.context.host}:{self.context.port}/workers",
                     json=payload,
                 )
@@ -242,11 +242,11 @@ class SglangRouter(Router):
             logger.exception("Error adding worker %s", url)
             return False
 
-    async def register_worker(self, url: str) -> bool:
+    def register_worker(self, url: str) -> bool:
         server_info_url = f"{url}/server_info"
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.get(server_info_url)
+            with httpx.Client(timeout=10) as client:
+                resp = client.get(server_info_url)
                 if resp.status_code != 200:
                     return False
                 data = resp.json()
@@ -267,7 +267,7 @@ class SglangRouter(Router):
                     url,
                     worker_type,
                 )
-                return await self.add_worker_to_router(
+                return self.add_worker_to_router(
                     url,
                     worker_type,
                     bootstrap_port,
