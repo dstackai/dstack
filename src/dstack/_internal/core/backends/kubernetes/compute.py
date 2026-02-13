@@ -50,7 +50,6 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Memory
-from dstack._internal.core.models.routers import AnyRouterConfig
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import get_or_error, parse_memory
@@ -1002,9 +1001,7 @@ def _add_authorized_key_to_jump_pod(
     )
 
 
-def _get_gateway_commands(
-    authorized_keys: List[str], router: Optional[AnyRouterConfig] = None
-) -> List[str]:
+def _get_gateway_commands(authorized_keys: List[str], router: Optional[str] = None) -> List[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
     gateway_commands = " && ".join(get_dstack_gateway_commands(router=router))
     quoted_gateway_commands = shlex.quote(gateway_commands)

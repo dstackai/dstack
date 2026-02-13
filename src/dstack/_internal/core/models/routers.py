@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field
 from typing_extensions import Annotated
@@ -26,23 +26,3 @@ class SGLangRouterConfig(CoreModel):
 
 
 AnyRouterConfig = SGLangRouterConfig
-
-
-def merge_router_config_for_service(
-    gateway_router: Optional[AnyRouterConfig],
-    service_router_config: Optional[AnyRouterConfig],
-) -> Optional[AnyRouterConfig]:
-    """Merge gateway and service router config.
-
-    Gateway router config supplies the router type; service router config supplies
-    policy and pd_disaggregation. The result combines both.
-    """
-    if gateway_router is None:
-        return None
-    if service_router_config is None:
-        return gateway_router
-    return SGLangRouterConfig(
-        type=gateway_router.type,
-        policy=service_router_config.policy,
-        pd_disaggregation=service_router_config.pd_disaggregation,
-    )

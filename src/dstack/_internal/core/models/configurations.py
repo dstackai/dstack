@@ -886,11 +886,11 @@ class ServiceConfigurationParams(CoreModel):
             )
         ),
     ] = None
-    router_config: Annotated[
+    router: Annotated[
         Optional[AnyRouterConfig],
         Field(
             description=(
-                "Router configuration for the service. Currently supports routing policy and pd_disaggregation. "
+                "Router configuration for the service. Requires a gateway with matching router enabled. "
             ),
         ),
     ] = None
