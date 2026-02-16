@@ -196,6 +196,8 @@ async def lifespan(app: FastAPI):
     if pipeline_manager is not None:
         pipeline_manager.shutdown()
     if scheduler is not None:
+        # Note: Scheduler does not cancel currently running jobs, so scheduled tasks cannot do cleanup.
+        # TODO: Track and cancel scheduled tasks.
         scheduler.shutdown()
     if pipeline_manager is not None:
         await pipeline_manager.drain()

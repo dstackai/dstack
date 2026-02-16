@@ -27,6 +27,7 @@ class PipelineModel(Protocol):
     lock_expires_at: Mapped[Optional[datetime]]
     lock_token: Mapped[Optional[uuid.UUID]]
 
+    __tablename__: str
     __mapper__: ClassVar[Any]
     __table__: ClassVar[Any]
 
@@ -171,42 +172,56 @@ class Heartbeater(Generic[ModelT]):
                 del self._items[item.id]
 
     async def heartbeat(self):
-        updated_items: list[PipelineItem] = []
+        items_to_update: list[PipelineItem] = []
         now = get_current_datetime()
         items = list(self._items.values())
+        failed_to_heartbeat_count = 0
         for item in items:
             if item.lock_expires_at < now:
-                logger.warning(
-                    "Failed to heartbeat item %s in time."
-                    " The item is expected to be processed on another fetch iteration.",
-                    item.id,
-                )
+                failed_to_heartbeat_count += 1
                 await self.untrack(item)
             elif item.lock_expires_at < now + self._hearbeat_margin:
-                updated_items.append(item)
-        if len(updated_items) == 0:
+                items_to_update.append(item)
+        if failed_to_heartbeat_count > 0:
+            logger.warning(
+                "Failed to heartbeat %d %s items in time."
+                " The items are expected to be processed on another fetch iteration.",
+                failed_to_heartbeat_count,
+                self._model_type.__tablename__,
+            )
+        if len(items_to_update) == 0:
             return
-        logger.debug("Updating lock_expires_at for items: %s", [str(r.id) for r in updated_items])
+        logger.debug(
+            "Updating lock_expires_at for items: %s", [str(r.id) for r in items_to_update]
+        )
         async with get_session_ctx() as session:
             per_item_filters = [
                 and_(
                     self._model_type.id == item.id, self._model_type.lock_token == item.lock_token
                 )
-                for item in updated_items
+                for item in items_to_update
             ]
             res = await session.execute(
                 update(self._model_type)
                 .where(or_(*per_item_filters))
                 .values(lock_expires_at=now + self._lock_timeout)
+                .returning(self._model_type.id)
             )
-            if res.rowcount == 0:  # pyright: ignore[reportAttributeAccessIssue]
-                logger.warning(
-                    "Failed to update lock_expires_at: lock_token changed."
-                    " The item is expected to be processed and updated on another fetch iteration."
-                )
-                return
-        for item in updated_items:
-            item.lock_expires_at = now + self._lock_timeout
+            updated_ids = set(res.scalars().all())
+        failed_to_update_count = 0
+        for item in items_to_update:
+            if item.id in updated_ids:
+                item.lock_expires_at = now + self._lock_timeout
+            else:
+                failed_to_update_count += 1
+                await self.untrack(item)
+        if failed_to_update_count > 0:
+            logger.warning(
+                "Failed to update %s lock_expires_at of %d items: lock_token changed."
+                " The items are expected to be processed and updated on another fetch iteration.",
+                self._model_type.__tablename__,
+                failed_to_update_count,
+            )
 
 
 class Fetcher(ABC):
