@@ -175,7 +175,7 @@ class SglangRouter(Router):
 
         # Add workers
         for worker_url in sorted(workers_to_add):
-            success = self.register_worker(worker_url)
+            success = self._register_worker(worker_url)
             if not success:
                 logger.warning("Failed to add worker %s, continuing with others", worker_url)
 
@@ -198,7 +198,7 @@ class SglangRouter(Router):
             logger.exception("Error getting sglang router workers")
             return []
 
-    def add_worker_to_router(
+    def _add_worker_to_router(
         self,
         url: str,
         worker_type: str = "regular",
@@ -242,7 +242,10 @@ class SglangRouter(Router):
             logger.exception("Error adding worker %s", url)
             return False
 
-    def register_worker(self, url: str) -> bool:
+    def _register_worker(self, url: str) -> bool:
+        if not self.config.pd_disaggregation:
+            return self._add_worker_to_router(url, "regular", None)
+
         server_info_url = f"{url}/server_info"
         try:
             with httpx.Client(timeout=10) as client:
@@ -267,7 +270,7 @@ class SglangRouter(Router):
                     url,
                     worker_type,
                 )
-                return self.add_worker_to_router(
+                return self._add_worker_to_router(
                     url,
                     worker_type,
                     bootstrap_port,
@@ -287,7 +290,7 @@ class SglangRouter(Router):
                     if worker_id and isinstance(worker_id, str):
                         break
             if not worker_id:
-                logger.exception("No worker id found for url %s", worker_url)
+                logger.error("No worker id found for url %s", worker_url)
                 return False
             with httpx.Client(timeout=5.0) as client:
                 response = client.delete(

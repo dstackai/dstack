@@ -31,9 +31,7 @@ def _get_gateway_configuration_excludes(
 ) -> IncludeExcludeDictType:
     configuration_excludes: IncludeExcludeDictType = {}
 
-    # Add excludes like this:
-    #
-    # if configuration.tags is None:
-    #     configuration_excludes["tags"] = True
+    if configuration.router is None:
+        configuration_excludes["router"] = True
 
     return configuration_excludes

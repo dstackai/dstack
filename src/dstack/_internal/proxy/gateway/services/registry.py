@@ -237,6 +237,13 @@ async def register_model_entrypoint(
     logger.info("Entrypoint %s is now registered in project %s", domain, project_name)
 
 
+def _uses_pd_disaggregation(service: models.Service) -> bool:
+    """PD disaggregation: router talks to replicas via internal_ip, no SSH tunnels needed."""
+    return (
+        service.router is not None and getattr(service.router, "pd_disaggregation", False) is True
+    )
+
+
 async def apply_service(
     service: models.Service,
     old_service: Optional[models.Service],
@@ -256,18 +263,31 @@ async def apply_service(
             ),
             service_conn_pool=service_conn_pool,
         )
-    replica_conns, replica_failures = await get_or_add_replica_connections(
-        service, repo, service_conn_pool
-    )
-    replica_configs = [
-        ReplicaConfig(
-            id=replica.id,
-            socket=conn.app_socket_path,
-            port=replica.app_port,
-            internal_ip=replica.internal_ip,
+    if _uses_pd_disaggregation(service):
+        replica_conns = {}
+        replica_failures = {}
+        replica_configs = [
+            ReplicaConfig(
+                id=replica.id,
+                socket=Path("/dev/null"),
+                port=replica.app_port,
+                internal_ip=replica.internal_ip,
+            )
+            for replica in service.replicas
+        ]
+    else:
+        replica_conns, replica_failures = await get_or_add_replica_connections(
+            service, repo, service_conn_pool
         )
-        for replica, conn in replica_conns.items()
-    ]
+        replica_configs = [
+            ReplicaConfig(
+                id=replica.id,
+                socket=conn.app_socket_path,
+                port=replica.app_port,
+                internal_ip=replica.internal_ip,
+            )
+            for replica, conn in replica_conns.items()
+        ]
     service_config = await get_nginx_service_config(service, replica_configs)
     await nginx.register(service_config, (await repo.get_config()).acme_settings)
     return replica_failures

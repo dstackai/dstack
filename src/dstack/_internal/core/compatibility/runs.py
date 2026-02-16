@@ -72,6 +72,12 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
             # Servers prior to 0.20.8 do not support probes=None
             configuration_excludes["probes"] = True
 
+        router = run_spec.configuration.router
+        if router is None:
+            configuration_excludes["router"] = True
+        elif router.pd_disaggregation is False:
+            configuration_excludes["router"] = {"pd_disaggregation": True}
+
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:
