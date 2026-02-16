@@ -6,7 +6,7 @@ import (
 
 type DockerParameters interface {
 	DockerPrivileged() bool
-	DockerShellCommands([]string) []string
+	DockerShellCommands(authorizedKeys []string, runnerHttpAddress string) []string
 	DockerMounts(string) ([]mount.Mount, error)
 	DockerPorts() []int
 	MakeRunnerDir(name string) (string, error)

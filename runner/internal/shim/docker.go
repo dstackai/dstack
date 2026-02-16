@@ -806,8 +806,6 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 	}
 	mounts = append(mounts, instanceMounts...)
 
-	ports := d.dockerParams.DockerPorts()
-
 	// Set the environment variables
 	envVars := []string{}
 	if d.dockerParams.DockerPJRTDevice() != "" {
@@ -827,9 +825,19 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 		}
 	}
 
+	networkMode := getNetworkMode(task.config.NetworkMode)
+	ports := d.dockerParams.DockerPorts()
+
+	// Bridge mode - all interfaces
+	runnerHttpAddress := ""
+	if networkMode.IsHost() {
+		runnerHttpAddress = "localhost"
+	}
+	shellCommands := d.dockerParams.DockerShellCommands(task.config.ContainerSshKeys, runnerHttpAddress)
+
 	containerConfig := &container.Config{
 		Image:        task.config.ImageName,
-		Cmd:          []string{strings.Join(d.dockerParams.DockerShellCommands(task.config.ContainerSshKeys), " && ")},
+		Cmd:          []string{strings.Join(shellCommands, " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
 		ExposedPorts: exposePorts(ports),
 		Env:          envVars,
@@ -843,7 +851,7 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 	}
 	hostConfig := &container.HostConfig{
 		Privileged:   task.config.Privileged || d.dockerParams.DockerPrivileged(),
-		NetworkMode:  getNetworkMode(task.config.NetworkMode),
+		NetworkMode:  networkMode,
 		PortBindings: bindPorts(ports),
 		Mounts:       mounts,
 		ShmSize:      task.config.ShmSize,
@@ -1182,7 +1190,7 @@ func (c *CLIArgs) DockerPJRTDevice() string {
 	return c.Docker.PJRTDevice
 }
 
-func (c *CLIArgs) DockerShellCommands(publicKeys []string) []string {
+func (c *CLIArgs) DockerShellCommands(authorizedKeys []string, runnerHttpAddress string) []string {
 	commands := getSSHShellCommands()
 	runnerCommand := []string{
 		consts.RunnerBinaryPath,
@@ -1192,7 +1200,10 @@ func (c *CLIArgs) DockerShellCommands(publicKeys []string) []string {
 		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
 		"--ssh-port", strconv.Itoa(c.Runner.SSHPort),
 	}
-	for _, key := range publicKeys {
+	if runnerHttpAddress != "" {
+		runnerCommand = append(runnerCommand, "--http-address", runnerHttpAddress)
+	}
+	for _, key := range authorizedKeys {
 		runnerCommand = append(runnerCommand, "--ssh-authorized-key", fmt.Sprintf("'%s'", key))
 	}
 	return append(commands, strings.Join(runnerCommand, " "))
