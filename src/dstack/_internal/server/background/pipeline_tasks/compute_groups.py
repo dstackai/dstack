@@ -237,7 +237,8 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _T
     result = _TerminateResult()
     if (
         compute_group_model.last_termination_retry_at is not None
-        and _next_termination_retry_at(compute_group_model) > get_current_datetime()
+        and _next_termination_retry_at(compute_group_model.last_termination_retry_at)
+        > get_current_datetime()
     ):
         return result
     compute_group = compute_group_model_to_compute_group(compute_group_model)
@@ -266,8 +267,12 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _T
         if compute_group_model.first_termination_retry_at is None:
             result.compute_group_update_map["first_termination_retry_at"] = get_current_datetime()
         result.compute_group_update_map["last_termination_retry_at"] = get_current_datetime()
-        if _next_termination_retry_at(compute_group_model) < _get_termination_deadline(
-            compute_group_model
+        if _next_termination_retry_at(
+            result.compute_group_update_map["last_termination_retry_at"]
+        ) < _get_termination_deadline(
+            result.compute_group_update_map.get(
+                "first_termination_retry_at", compute_group_model.first_termination_retry_at
+            )
         ):
             logger.warning(
                 "Failed to terminate compute group %s. Will retry. Error: %r",
@@ -293,14 +298,12 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _T
     )
 
 
-def _next_termination_retry_at(compute_group_model: ComputeGroupModel) -> datetime:
-    assert compute_group_model.last_termination_retry_at is not None
-    return compute_group_model.last_termination_retry_at + TERMINATION_RETRY_TIMEOUT
+def _next_termination_retry_at(last_termination_retry_at: datetime) -> datetime:
+    return last_termination_retry_at + TERMINATION_RETRY_TIMEOUT
 
 
-def _get_termination_deadline(compute_group_model: ComputeGroupModel) -> datetime:
-    assert compute_group_model.first_termination_retry_at is not None
-    return compute_group_model.first_termination_retry_at + TERMINATION_RETRY_MAX_DURATION
+def _get_termination_deadline(first_termination_retry_at: datetime) -> datetime:
+    return first_termination_retry_at + TERMINATION_RETRY_MAX_DURATION
 
 
 def _get_terminated_result() -> _TerminateResult:

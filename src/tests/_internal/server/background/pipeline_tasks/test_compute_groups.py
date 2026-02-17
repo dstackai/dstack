@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -7,9 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.compute_groups import ComputeGroupStatus
-from dstack._internal.server.background.scheduled_tasks.compute_groups import (
-    process_compute_groups,
-)
+from dstack._internal.server.background.pipeline_tasks.base import PipelineItem
+from dstack._internal.server.background.pipeline_tasks.compute_groups import ComputeGroupWorker
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_compute_group,
@@ -18,10 +18,17 @@ from dstack._internal.server.testing.common import (
 )
 
 
-class TestProcessComputeGroups:
+@pytest.fixture
+def worker() -> ComputeGroupWorker:
+    return ComputeGroupWorker(queue=Mock(), heartbeater=Mock())
+
+
+class TestComputeGroupWorker:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_terminates_compute_group(self, test_db, session: AsyncSession):
+    async def test_terminates_compute_group(
+        self, test_db, session: AsyncSession, worker: ComputeGroupWorker
+    ):
         project = await create_project(session)
         fleet = await create_fleet(session=session, project=project)
         compute_group = await create_compute_group(
@@ -35,7 +42,7 @@ class TestProcessComputeGroups:
             backend_mock.compute.return_value = compute_mock
             m.return_value = backend_mock
             backend_mock.TYPE = BackendType.RUNPOD
-            await process_compute_groups()
+            await worker.process(cast(PipelineItem, compute_group))
             compute_mock.terminate_compute_group.assert_called_once()
         await session.refresh(compute_group)
         assert compute_group.status == ComputeGroupStatus.TERMINATED
@@ -43,7 +50,9 @@ class TestProcessComputeGroups:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_retries_compute_group_termination(self, test_db, session: AsyncSession):
+    async def test_retries_compute_group_termination(
+        self, test_db, session: AsyncSession, worker: ComputeGroupWorker
+    ):
         project = await create_project(session)
         fleet = await create_fleet(session=session, project=project)
         compute_group = await create_compute_group(
@@ -59,7 +68,7 @@ class TestProcessComputeGroups:
             m.return_value = backend_mock
             backend_mock.TYPE = BackendType.RUNPOD
             compute_mock.terminate_compute_group.side_effect = BackendError()
-            await process_compute_groups()
+            await worker.process(cast(PipelineItem, compute_group))
             compute_mock.terminate_compute_group.assert_called_once()
         await session.refresh(compute_group)
         assert compute_group.status != ComputeGroupStatus.TERMINATED
@@ -77,7 +86,7 @@ class TestProcessComputeGroups:
             m.return_value = backend_mock
             backend_mock.TYPE = BackendType.RUNPOD
             compute_mock.terminate_compute_group.side_effect = BackendError()
-            await process_compute_groups()
+            await worker.process(cast(PipelineItem, compute_group))
             compute_mock.terminate_compute_group.assert_called_once()
         await session.refresh(compute_group)
         assert compute_group.status == ComputeGroupStatus.TERMINATED
