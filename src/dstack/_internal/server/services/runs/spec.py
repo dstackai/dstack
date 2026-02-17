@@ -8,7 +8,10 @@ from dstack._internal.core.services.diff import ModelDiff, diff_models
 from dstack._internal.server import settings
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
-from dstack._internal.server.services.resources import set_resources_defaults
+from dstack._internal.server.services.resources import (
+    set_gpu_vendor_default,
+    set_resources_defaults,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -108,6 +111,11 @@ def validate_run_spec_and_set_defaults(
     if run_spec.configuration.priority is None:
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
     set_resources_defaults(run_spec.configuration.resources)
+    set_gpu_vendor_default(
+        run_spec.configuration.resources,
+        image=run_spec.configuration.image,
+        docker=getattr(run_spec.configuration, "docker", None),
+    )
     if run_spec.ssh_key_pub is None:
         if user.ssh_public_key:
             run_spec.ssh_key_pub = user.ssh_public_key
