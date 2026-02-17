@@ -43,6 +43,7 @@ from dstack._internal.server.background.scheduled_tasks.terminating_jobs import 
 from dstack._internal.server.background.scheduled_tasks.volumes import (
     process_submitted_volumes,
 )
+from dstack._internal.settings import FeatureFlags
 
 _scheduler = AsyncIOScheduler()
 
@@ -105,7 +106,8 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(
         process_idle_volumes, IntervalTrigger(seconds=60, jitter=10), max_instances=1
     )
-    _scheduler.add_job(process_placement_groups, IntervalTrigger(seconds=30, jitter=5))
+    if not FeatureFlags.PIPELINE_PROCESSING_ENABLED:
+        _scheduler.add_job(process_placement_groups, IntervalTrigger(seconds=30, jitter=5))
     _scheduler.add_job(
         process_fleets,
         IntervalTrigger(seconds=10, jitter=2),
@@ -146,11 +148,12 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
             kwargs={"batch_size": 5},
             max_instances=2 if replica == 0 else 1,
         )
-        _scheduler.add_job(
-            process_compute_groups,
-            IntervalTrigger(seconds=15, jitter=2),
-            kwargs={"batch_size": 1},
-            max_instances=2 if replica == 0 else 1,
-        )
+        if not FeatureFlags.PIPELINE_PROCESSING_ENABLED:
+            _scheduler.add_job(
+                process_compute_groups,
+                IntervalTrigger(seconds=15, jitter=2),
+                kwargs={"batch_size": 1},
+                max_instances=2 if replica == 0 else 1,
+            )
     _scheduler.start()
     return _scheduler
