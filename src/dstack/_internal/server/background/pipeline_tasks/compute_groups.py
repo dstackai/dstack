@@ -293,8 +293,7 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _T
     return _TerminateResult(
         compute_group_update_map=result.compute_group_update_map
         | terminated_result.compute_group_update_map,
-        instances_update_map=result.instances_update_map
-        | terminated_result.compute_group_update_map,
+        instances_update_map=result.instances_update_map | terminated_result.instances_update_map,
     )
 
 

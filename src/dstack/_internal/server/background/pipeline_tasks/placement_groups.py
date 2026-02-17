@@ -115,6 +115,8 @@ class PlacementGroupFetcher(Fetcher):
                     .where(
                         PlacementGroupModel.fleet_deleted == True,
                         PlacementGroupModel.deleted == False,
+                        PlacementGroupModel.last_processed_at
+                        <= now - self._min_processing_interval,
                         or_(
                             PlacementGroupModel.lock_expires_at.is_(None),
                             PlacementGroupModel.lock_expires_at < now,
