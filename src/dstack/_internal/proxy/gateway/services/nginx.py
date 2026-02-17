@@ -72,6 +72,7 @@ class ServiceConfig(SiteConfig):
     replicas: list[ReplicaConfig]
     router: Optional[AnyRouterConfig] = None
     router_port: Optional[int] = None
+    cors_enabled: bool = False
 
 
 class ModelEntrypointConfig(SiteConfig):
