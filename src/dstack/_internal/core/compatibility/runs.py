@@ -2,6 +2,7 @@ from typing import Optional
 
 from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeExcludeSetType
 from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.routers import SGLangRouterConfig
 from dstack._internal.core.models.runs import (
     DEFAULT_PROBE_UNTIL_READY,
     DEFAULT_REPLICA_GROUP_NAME,
@@ -75,7 +76,7 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         router = run_spec.configuration.router
         if router is None:
             configuration_excludes["router"] = True
-        elif router.pd_disaggregation is False:
+        elif isinstance(router, SGLangRouterConfig) and router.pd_disaggregation is False:
             configuration_excludes["router"] = {"pd_disaggregation": True}
 
     if configuration_excludes:
