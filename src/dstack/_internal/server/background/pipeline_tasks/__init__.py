@@ -8,7 +8,11 @@ logger = get_logger(__name__)
 
 class PipelineManager:
     def __init__(self) -> None:
-        self._pipelines: list[Pipeline] = []  # Pipelines will go here
+        self._pipelines: list[Pipeline] = [
+            # Pipelines go here:
+            # PlacementGroupPipeline(),
+            # ComputeGroupPipeline(),
+        ]
         self._hinter = PipelineHinter(self._pipelines)
 
     def start(self):

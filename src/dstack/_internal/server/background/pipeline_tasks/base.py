@@ -21,6 +21,8 @@ class PipelineItem(Protocol):
     lock_expires_at: datetime
     lock_token: uuid.UUID
 
+    __tablename__: str
+
 
 class PipelineModel(Protocol):
     id: Mapped[uuid.UUID]
@@ -309,12 +311,14 @@ class Worker(ABC):
         self._running = True
         while self._running:
             item = await self._queue.get()
+            logger.debug("Processing %s item %s", item.__tablename__, item.id)
             try:
                 await self.process(item)
             except Exception:
                 logger.exception("Unexpected exception when processing item")
             finally:
                 await self._heartbeater.untrack(item)
+            logger.debug("Processed %s item %s", item.__tablename__, item.id)
 
     def stop(self):
         self._running = False
@@ -322,3 +326,18 @@ class Worker(ABC):
     @abstractmethod
     async def process(self, item: PipelineItem):
         pass
+
+
+UpdateMap = dict[str, Any]
+
+
+def get_unlock_update_map() -> UpdateMap:
+    return {
+        "lock_expires_at": None,
+        "lock_token": None,
+        "lock_owner": None,
+    }
+
+
+def get_processed_update_map() -> UpdateMap:
+    return {"last_processed_at": get_current_datetime()}

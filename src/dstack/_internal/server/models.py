@@ -196,6 +196,12 @@ class BaseModel(DeclarativeBase):
     metadata = MetaData(naming_convention=constraint_naming_convention)
 
 
+class PipelineModelMixin:
+    lock_expires_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    lock_token: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
+    lock_owner: Mapped[Optional[str]] = mapped_column(String(100))
+
+
 class UserModel(BaseModel):
     __tablename__ = "users"
 
@@ -768,7 +774,7 @@ class VolumeAttachmentModel(BaseModel):
     attachment_data: Mapped[Optional[str]] = mapped_column(Text)
 
 
-class PlacementGroupModel(BaseModel):
+class PlacementGroupModel(PipelineModelMixin, BaseModel):
     __tablename__ = "placement_groups"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -795,7 +801,7 @@ class PlacementGroupModel(BaseModel):
     provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
 
 
-class ComputeGroupModel(BaseModel):
+class ComputeGroupModel(PipelineModelMixin, BaseModel):
     __tablename__ = "compute_groups"
 
     id: Mapped[uuid.UUID] = mapped_column(
