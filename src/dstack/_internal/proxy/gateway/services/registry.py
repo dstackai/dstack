@@ -263,9 +263,7 @@ async def apply_service(
         ReplicaConfig(id=replica.id, socket=conn.app_socket_path)
         for replica, conn in replica_conns.items()
     ]
-    service_config = await get_nginx_service_config(
-        service, replica_configs, cors_enabled=service.cors_enabled
-    )
+    service_config = await get_nginx_service_config(service, replica_configs)
     await nginx.register(service_config, (await repo.get_config()).acme_settings)
     return replica_failures
 
@@ -309,7 +307,7 @@ async def stop_replica_connections(
 
 
 async def get_nginx_service_config(
-    service: models.Service, replicas: Iterable[ReplicaConfig], cors_enabled: bool = False
+    service: models.Service, replicas: Iterable[ReplicaConfig]
 ) -> ServiceConfig:
     limit_req_zones: list[LimitReqZoneConfig] = []
     locations: list[LocationConfig] = []
@@ -378,7 +376,7 @@ async def get_nginx_service_config(
         locations=locations,
         replicas=sorted(replicas, key=lambda r: r.id),  # sort for reproducible configs
         router=service.router,
-        cors_enabled=cors_enabled,
+        cors_enabled=service.cors_enabled,
     )
 
 
