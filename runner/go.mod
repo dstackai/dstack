@@ -23,6 +23,7 @@ require (
 	github.com/urfave/cli/v3 v3.6.1
 	golang.org/x/crypto v0.22.0
 	golang.org/x/sys v0.26.0
+	kernel.org/pub/linux/libs/security/libcap/cap v1.2.77
 )
 
 require (
@@ -84,4 +85,5 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.1 // indirect
+	kernel.org/pub/linux/libs/security/libcap/psx v1.2.77 // indirect
 )
