@@ -50,12 +50,12 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>The orchestration layer for modern ML teams</h1>
+                <h1>The new GPU-native orchestration</h1>
 
                 <p>
-                    <span class="highlight">dstack</span> provides ML teams with a unified control plane for GPU provisioning and orchestration
-                    across cloud, Kubernetes, and on-prem. It streamlines development, training, and inference — reducing costs 3–7x and
-                    preventing lock-in.
+                    <span class="highlight">dstack</span> is a GPU-native orchestration built for modern AI teams. It simplifies
+                    GPU provisioning and workload management across clouds, Kubernetes, and on-prem —
+                    through a single unified control plane.
                 </p>
             </div>
 
@@ -82,22 +82,21 @@
                 </div>
             </div>
             <div class="tx-landing__hero_button_container_text" style="text-align: center; font-size: 85%; margin-top: 1.25rem">
-                One control plane for GPUs across cloud, Kubernetes, and on-prem.
+                Reduce GPU costs by 3–7× and eliminate vendor lock-in.
             </div>
         </div>
 
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>An open platform for GPU orchestration</h2>
+                    <h2>A unified control plane for GPU orchestration</h2>
                     <p>
-                        Managing AI infrastructure requires efficient GPU orchestration, whether workloads run
-                        on a single GPU cloud, across multiple GPU providers, or on-prem clusters.
+                        Managing AI infrastructure requires efficient GPU orchestration tightly integrated with open-source training and
+                        inference frameworks.
                     </p>
 
                     <p>
-                        <span class="highlight">dstack</span> provides an open stack for GPU orchestration that streamlines development, training,
-                        and inference, and can be used with any hardware, open-source tools, and frameworks.
+                        <span class="highlight">dstack</span> provides a unified control plane&mdash;so workloads stay portable, reproducible, and infrastructure remains interchangeable.
                     </p>
 
                     <!-- TODO: Add `Why dstack?` -->
@@ -173,22 +172,21 @@
                 <div class="block margin">
                     <h2>Native integration with GPU clouds</h2>
                     <p>
-                        <span class="highlight">dstack</span> natively integrates with top GPU clouds—automating cluster provisioning and
-                        workload orchestration to maximize efficiency and minimize overhead.
+                        <span class="highlight">dstack</span> natively integrates with leading GPU clouds for fast, efficient provisioning.
                     </p>
                     
                     <p>
-                        It can provision and manage VM clusters through native integrations or via <span class="highlight">Kubernetes</span>.
+                        It can provision and manage GPU VMs directly through cloud APIs, or operate through <span class="highlight">Kubernetes</span> when required.
                     </p>
 
                     <p>
-                        <a href="/docs/concepts/backends" target="_blank" class="md-button md-button-secondary small">
+                        <a href="/docs/concepts/backends" target="_blank" class="md-button md-button-secondary">
                             <span>Backends</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
+                            <!-- <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
                                     <path
                                         d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z"
                                         fill-rule="nonzero" fill="currentColor" class="fill-main"></path>
-                                </svg></span>
+                                </svg></span> -->
                         </a>
                     </p>
                 </div>
@@ -201,34 +199,31 @@
                     <h2>Easy to use with on-prem clusters</h2>
                     
                     <p>
-                        For provisioned <span class="highlight">Kubernetes</span> clusters, connect them to <span class="highlight">dstack</span> using the <span
-                            class="highlight">Kubernetes</span> backend.
-                        If you run vanilla bare-metal servers or VMs without <span class="highlight">Kubernetes</span>, use <span class="highlight">SSH fleets</span>
-                        instead.
+                        If you already run <span class="highlight">Kubernetes</span> on-prem, connect your cluster to <span class="highlight">dstack</span> using the <span class="highlight">Kubernetes</span> backend.
+                    </p>
+
+                    <p>
+                        For bare-metal servers or VMs without <span class="highlight">Kubernetes</span>, use <span class="highlight">SSH fleets</span> to orchestrate GPUs directly.
                     </p>
                     
                     <p>
-                        <a href="/docs/concepts/backends#ssh-fleets" target="_blank" class="md-button md-button-secondary small">
+                        <a href="/docs/concepts/backends#ssh-fleets" target="_blank" class="md-button md-button-secondary">
                             <span>SSH fleets</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
+                            <!-- <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
                                     <path
                                         d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z"
                                         fill-rule="nonzero" fill="currentColor" class="fill-main"></path>
-                                </svg></span>
+                                </svg></span> -->
                         </a>
 
-                        <a href="/docs/concepts/backends#kubernetes" target="_blank" class="md-button md-button-secondary small">
+                        <a href="/docs/concepts/backends#kubernetes" target="_blank" class="md-button md-button-secondary">
                             <span>Kubernetes</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
+                            <!-- <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
                                     <path
                                         d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z"
                                         fill-rule="nonzero" fill="currentColor" class="fill-main"></path>
-                                </svg></span>
+                                </svg></span> -->
                         </a>
-                    </p>
-                    
-                    <p>
-                        Either way, connecting existing on-prem clusters to <span class="highlight">dstack</span> takes just minutes.
                     </p>
                 </div>
 
@@ -250,18 +245,19 @@
                 <div class="block margin left">
                     <h2>Dev environments</h2>
                     <p>
-                        Before training or deployment, ML engineers explore and debug their code.
+                        Before training or deploying models, ML engineers need interactive GPU access to experiment and debug.
                     </p>
 
-                    <p><span class="highlight">dstack</span>'s dev environments make it easy to connect your 
-                        desktop IDE to powerful cloud or on-prem GPUs—streamlining the entire development loop.
+                    <p><span class="highlight">dstack</span>'s dev environments let you connect desktop IDEs such as <span class="highlight">VS
+                        Code</span>, <span class="highlight">Cursor</span>, and
+                    <span class="highlight">Windsurf</span> directly to cloud or on-prem GPUs.
                     </p>
 
                     <p>
                         <a href="/docs/dev-environments" target="_blank"
-                           class="md-button md-button-secondary small">
+                           class="md-button md-button-secondary">
                            <span>Dev environments</span>
-                           <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                           <!-- <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span> -->
                         </a>
                     </p>
                 </div>
@@ -274,18 +270,19 @@
                     <h2>Single-node &amp; distributed tasks</h2>
 
                     <p>
-                        Move from single-instance experiments to multi-node distributed training without friction. <span
-                            class="highlight">dstack</span> lets you define complex jobs with a simple configuration, 
-                            handling the scheduling and orchestration for you.
+                        Run training or batch workloads on a single GPU, or scale to multi-GPU and multi-node clusters using simple task configurations.
+                        <span class="highlight">dstack</span> automates cluster provisioning, resource allocation, and job scheduling.                    
                     </p>
 
-                    <p>This allows your team to focus on research while ensuring that expensive cluster resources are utilized efficiently.</p>
+                    <p>
+                        During execution, <span class="highlight">dstack</span> reports GPU utilization, memory usage, and GPU health metrics for each job.
+                    </p>
 
                     <p>
                         <a href="/docs/concepts/tasks" target="_blank"
-                            class="md-button md-button-secondary small">
+                            class="md-button md-button-secondary">
                             <span>Tasks</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                            <!-- <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span> -->
                         </a>
                     </p>
                 </div>
@@ -308,23 +305,27 @@
                     <h2>Scalable model inference</h2>
 
                     <p>
-                        With <span class="highlight">dstack</span>, you can easily deploy any model as a secure,
-                        auto-scaling OpenAI-compatible endpoint, all while using your custom code, Docker image, and
-                        serving framework.
+                        With <span class="highlight">dstack</span>, you can deploy models as secure,
+                        auto-scaling, OpenAI-compatible endpoints, integrating with top open-source serving frameworks.                    
+                    </p>
+
+                    <p>
+                        <span class="highlight">dstack</span> supports disaggregated prefill/decode and cache-aware routing, providing
+                        production-grade, optimized inference.
                     </p>
 
                     <p>
                         <a href="/docs/concepts/services" target="_blank"
-                            class="md-button md-button-secondary small">
+                            class="md-button md-button-secondary">
                             <span>Services</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                            <!-- <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span> -->
                         </a>
 
-                        <a href="/docs/concepts/gateways" target="_blank"
-                            class="md-button md-button-secondary small">
+                        <!-- <a href="/docs/concepts/gateways" target="_blank"
+                            class="md-button md-button-secondary">
                             <span>Gateways</span>
                             <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
-                        </a>
+                        </a> -->
                     </p>
                 </div>
             </div>
@@ -332,7 +333,7 @@
 
         <div class="tx-landing__trusted_by">
             <div class="tx-landing__highlights_text">
-                <h2>Loved by world-class ML teams</h2>
+                <h2>Loved by world-class AI teams</h2>
 
                 <div class="tx-landing__quotes_grid">
                     <div class="cell">
@@ -581,17 +582,17 @@
 
                     <p>
                         <a href="/docs/quickstart" target="_blank"
-                           class="md-button md-button-secondary small"
+                           class="md-button md-button-secondary"
                             style="margin-right: 10px">
                             <span>Quickstart</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                            <!-- <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span> -->
                         </a>
 
                         <a href="/docs/installation" target="_blank"
-                           class="md-button md-button-secondary small"
+                           class="md-button md-button-secondary"
                             style="margin-right: 10px">
                             <span>Installation</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                            <!-- <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span> -->
                         </a>
                     </p>
                 </div>
@@ -617,7 +618,7 @@
                     <div class="tx-landing__bottom_cta_card_button_panel">
                         <div>
                             <a href="https://sky.dstack.ai" target="_blank"
-                                class="md-button md-button--primary sky external small">
+                                class="md-button md-button--primary sky external">
                                 <span>Sign up free</span>
                             </a>
                         </div>
@@ -641,7 +642,7 @@
                     <div class="tx-landing__bottom_cta_card_button_panel">
                         <div>
                             <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
-                                class="md-button md-button--primary external small">
+                                class="md-button md-button--primary external">
                                 <span>Book a demo</span>
                             </a>
                         </div>
