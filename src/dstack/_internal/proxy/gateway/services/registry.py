@@ -118,7 +118,7 @@ async def unregister_service(
             ids=(r.id for r in service.replicas),
             service_conn_pool=service_conn_pool,
         )
-        await nginx.unregister(service.domain_safe, service)
+        await nginx.unregister(service)
         await repo.delete_models_by_run(project_name, run_name)
         await repo.delete_service(project_name, run_name)
 
@@ -241,9 +241,7 @@ async def register_model_entrypoint(
 
 def _uses_pd_disaggregation(service: models.Service) -> bool:
     """PD disaggregation: router talks to replicas via internal_ip, no SSH tunnels needed."""
-    return (
-        service.router is not None and getattr(service.router, "pd_disaggregation", False) is True
-    )
+    return service.router is not None and service.router.pd_disaggregation
 
 
 async def apply_service(

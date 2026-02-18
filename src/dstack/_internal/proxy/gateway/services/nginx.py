@@ -190,7 +190,8 @@ class Nginx:
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
-    async def unregister(self, domain: str, service: models.Service) -> None:
+    async def unregister(self, service: models.Service) -> None:
+        domain = service.domain_safe
         logger.debug("Unregistering domain %s", domain)
         conf_path = self._conf_dir / self.get_config_name(domain)
         if not conf_path.exists():
