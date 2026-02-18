@@ -491,6 +491,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		}
 		cmd.SysProcAttr.Credential = creds
 	}
+
 	envMap := NewEnvMap(ParseEnvList(os.Environ()), jobEnvs, ex.secrets)
 	// `env` interpolation feature is postponed to some future release
 	envMap.Update(ex.jobSpec.Env, false)
