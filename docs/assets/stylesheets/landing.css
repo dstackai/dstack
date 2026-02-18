@@ -17,6 +17,98 @@
     /*letter-spacing: -3px;*/
 }
 
+.tx-landing__hero_text h1.glitch {
+    position: relative;
+    animation: glitch-skew 10s infinite linear;
+}
+
+.tx-landing__hero_text h1.glitch::before,
+.tx-landing__hero_text h1.glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: white;
+    overflow: hidden;
+    clip-path: inset(0 0 100% 0);
+}
+
+.tx-landing__hero_text h1.glitch::before {
+    text-shadow: -3px 0 rgba(0, 72, 255, 0.8);
+    animation: glitch-1 10s infinite linear;
+}
+
+.tx-landing__hero_text h1.glitch::after {
+    text-shadow: 3px 0 rgba(206, 0, 255, 0.8);
+    animation: glitch-2 10s infinite linear;
+}
+
+@keyframes glitch-1 {
+    0%, 9%, 15%, 54%, 60%, 100% {
+        clip-path: inset(0 0 100% 0);
+        transform: translate(0);
+    }
+    10%   { clip-path: inset(5% 0 88% 0);   transform: translate(6px, 0); }
+    10.5% { clip-path: inset(8% 0 85% 0);   transform: translate(-8px, 1px); }
+    11%   { clip-path: inset(0% 0 100% 0);  transform: translate(0); }
+    11.5% { clip-path: inset(12% 0 80% 0);  transform: translate(9px, -1px); }
+    12%   { clip-path: inset(3% 0 90% 0);   transform: translate(-6px, 0); }
+    12.5% { clip-path: inset(0% 0 100% 0);  transform: translate(0); }
+    13%   { clip-path: inset(7% 0 86% 0);   transform: translate(7px, 1px); }
+    13.5% { clip-path: inset(10% 0 83% 0);  transform: translate(-9px, 0); }
+    14%   { clip-path: inset(4% 0 89% 0);   transform: translate(5px, -1px); }
+
+    55%   { clip-path: inset(58% 0 34% 0);  transform: translate(-7px, 0); }
+    55.5% { clip-path: inset(62% 0 30% 0);  transform: translate(9px, 1px); }
+    56%   { clip-path: inset(0% 0 100% 0);  transform: translate(0); }
+    56.5% { clip-path: inset(55% 0 38% 0);  transform: translate(-8px, -1px); }
+    57%   { clip-path: inset(60% 0 32% 0);  transform: translate(6px, 0); }
+    57.5% { clip-path: inset(0% 0 100% 0);  transform: translate(0); }
+    58%   { clip-path: inset(63% 0 28% 0);  transform: translate(-7px, 1px); }
+    58.5% { clip-path: inset(56% 0 36% 0);  transform: translate(8px, 0); }
+    59%   { clip-path: inset(61% 0 31% 0);  transform: translate(-6px, -1px); }
+}
+
+@keyframes glitch-2 {
+    0%, 10.5%, 16.5%, 55.5%, 61.5%, 100% {
+        clip-path: inset(0 0 100% 0);
+        transform: translate(0);
+    }
+    11%   { clip-path: inset(30% 0 62% 0);  transform: translate(-7px, 1px); }
+    11.5% { clip-path: inset(35% 0 57% 0);  transform: translate(9px, 0); }
+    12%   { clip-path: inset(0% 0 100% 0);  transform: translate(0); }
+    12.5% { clip-path: inset(33% 0 59% 0);  transform: translate(8px, 0); }
+    13%   { clip-path: inset(38% 0 54% 0);  transform: translate(-9px, 1px); }
+    13.5% { clip-path: inset(0% 0 100% 0);  transform: translate(0); }
+    14%   { clip-path: inset(31% 0 61% 0);  transform: translate(6px, -1px); }
+    14.5% { clip-path: inset(36% 0 56% 0);  transform: translate(-8px, 0); }
+    15%   { clip-path: inset(34% 0 58% 0);  transform: translate(7px, 1px); }
+    15.5% { clip-path: inset(32% 0 60% 0);  transform: translate(-6px, 0); }
+
+    56%   { clip-path: inset(78% 0 14% 0);  transform: translate(7px, 0); }
+    56.5% { clip-path: inset(82% 0 10% 0);  transform: translate(-9px, -1px); }
+    57%   { clip-path: inset(0% 0 100% 0);  transform: translate(0); }
+    57.5% { clip-path: inset(75% 0 17% 0);  transform: translate(8px, 1px); }
+    58%   { clip-path: inset(80% 0 12% 0);  transform: translate(-6px, 0); }
+    58.5% { clip-path: inset(0% 0 100% 0);  transform: translate(0); }
+    59%   { clip-path: inset(83% 0 9% 0);   transform: translate(-8px, 0); }
+    59.5% { clip-path: inset(77% 0 15% 0);  transform: translate(7px, -1px); }
+    60%   { clip-path: inset(81% 0 11% 0);  transform: translate(-6px, 1px); }
+    60.5% { clip-path: inset(79% 0 13% 0);  transform: translate(8px, 0); }
+}
+
+@keyframes glitch-skew {
+    0%, 9%, 16%, 54%, 62%, 100% {
+        transform: skew(0deg) scaleX(1);
+    }
+    11%   { transform: skew(0.5deg) scaleX(1.001); }
+    13%   { transform: skew(-0.4deg) scaleX(0.999); }
+    56%   { transform: skew(-0.5deg) scaleX(1.001); }
+    58%   { transform: skew(0.4deg) scaleX(0.999); }
+}
+
 .tx-landing__hero_text h1 strong {
     font-weight: 800;
 }
@@ -31,7 +123,7 @@
 
 .tx-landing .highlight {
     display: inline-block;
-    border-radius: 3px;
+    border-radius: 0;
     padding: 1px 5px;
     border: 0.5px solid rgba(0, 0, 0, 0.33);
 }
@@ -111,7 +203,7 @@
     }
 
     .tx-landing__hero_text h1 {
-        font-size: 3.2rem;
+        font-size: 2.9rem;
         max-width: 36rem;
         line-height: 1.1;
     }
@@ -245,7 +337,7 @@
     font-size: 20px;
     font-weight: 400 !important;
     text-align: center;
-    border-radius: 3px;
+    border-radius: 0;
     border-color: transparent;
     margin-right: 5px;
 }
@@ -297,7 +389,7 @@
 [data-md-color-primary=white] .md-header__buttons .md-button--primary, [data-md-color-primary=white].md-header__buttons .md-button--primary:hover,
 [data-md-color-primary=white] .md-typeset .md-button--primary, [data-md-color-primary=white] .md-typeset .md-button--primary:hover {
     background: rgba(0, 0, 0, 0.87);
-    border-radius: 3px;
+    border-radius: 0;
     font-weight: 400 !important;
     /*margin-right: 10px;*/
 }
@@ -354,7 +446,7 @@
     background: transparent;
     color: rgba(0, 0, 0, 0.87);
     border: 0.5px solid rgba(0, 0, 0, 0.87);
-    border-radius: 3px;
+    border-radius: 0;
 }
 
 .md-header__buttons .md-button-secondary:hover,
@@ -383,7 +475,7 @@
 }
 
 .tx-landing__highlights_text h2 {
-    font-size: 2.3em;
+    font-size: 2em;
     max-width: 600px;
     font-weight: 700;
     margin-top: 0;
@@ -424,7 +516,7 @@
         width: 50%;
 
         &.enterprise {
-            border-radius: 3px;
+            border-radius: 0;
             border-top-right-radius: 0;
             border-bottom-right-radius: 0
         }
@@ -516,7 +608,7 @@
 
 .tx-landing__highlights_grid .feature-cell {
     padding: 30px 40px;
-    border-radius: 3px;
+    border-radius: 0;
     border-color: rgba(0, 0, 0, 0.75);
     border-width: 0.5px;
     border-style: dotted;
@@ -770,7 +862,7 @@
 }
 
 .tx-landing__major_feature h2 {
-    font-size: 2em;
+    font-size: 1.7em;
     max-width: 500px;
     margin-top: 0;
     margin-bottom: 1.5em;
@@ -1022,7 +1114,7 @@
 .md-header__buttons .md-button--primary.sky, .md-header__buttons .md-button--primary.sky:hover,
 .md-typeset .md-button--primary.sky, .md-typeset .md-button--primary.sky:hover {
     background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
-    border-radius: 3px;
+    border-radius: 0;
     border: 1px solid transparent;
 }
 
@@ -1126,7 +1218,7 @@
 
 .tx-landing__quotes_grid .cell {
     padding: 23px 23px 13px;
-    border-radius: 3px;
+    border-radius: 0;
     border-color: rgba(0, 0, 0, 0.75);
     border-width: 0.5px;
     border-style: solid;
@@ -1137,27 +1229,10 @@
     }
 }
 
-.tx-landing h1,
-.tx-landing h2,
-.tx-landing h3,
-.tx-landing h4,
-.tx-landing h5,
-.tx-landing h6 {
-    font-family: 'Geist Pixel Circle', var(--md-text-font-family);
-}
-
-.tx-faq__item-title {
+.tx-landing__hero_text h1 {
     font-family: 'Geist Pixel Square', var(--md-text-font-family);
 }
 
 .md-header__title {
-    font-family: 'Geist Pixel Square', var(--md-text-font-family);
-}
-
-.md-header__buttons .md-button {
-    font-family: 'Geist Pixel Square', var(--md-text-font-family);
-}
-
-.tx-landing .md-button {
     font-family: 'Geist Pixel Square', var(--md-text-font-family);
 }

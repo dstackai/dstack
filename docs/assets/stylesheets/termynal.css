@@ -34,7 +34,7 @@
     font-size: 14px;
     /* font-family: 'Fira Mono', Consolas, Menlo, Monaco, 'Courier New', Courier, monospace; */
     font-family: var(--md-code-font-family) !important;
-    border-radius: 3px;
+    border-radius: 0;
     padding: 45px 25px 25px;
     /*padding: 75px 45px 35px;*/
     position: relative;

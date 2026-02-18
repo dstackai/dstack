@@ -174,7 +174,7 @@
     border-style: solid;
     border-color: rgba(0, 0, 0, 0.87);
     border-width: 1px;
-    border-radius: 3px;
+    border-radius: 0;
     box-shadow: none;
     padding: .6rem .8rem;
     background: none;
@@ -184,14 +184,14 @@
     border-style: solid;
     border-color: rgba(0, 0, 0, 0.87);
     border-width: 1px;
-    border-radius: 3px;
+    border-radius: 0;
     box-shadow: none;
     padding: .6rem .8rem;
     /*background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05));*/
 }
 
 .md-typeset iframe {
-    border-radius: 3px;
+    border-radius: 0;
 }
 
 [dir=ltr] .md-typeset :is(.admonition,details) blockquote {
@@ -331,6 +331,22 @@
 }
 
 @font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(../fonts/Geist-Variable.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(../fonts/GeistMono-Variable.woff2) format('woff2');
+}
+
+@font-face {
   font-family: 'Geist Pixel Square';
   font-style: normal;
   font-weight: 400;
@@ -453,10 +469,10 @@ h4.doc-heading {
 .md-typeset pre > code {
     background-color: rgb(21, 22, 29);
     padding: 65px 30px 35px 40px;
-    border-radius: 3px;
+    border-radius: 0;
     font-size: 15px;
 
-    /*border-radius: 3px;*/
+    /*border-radius: 0;*/
     /*border-top: 1px solid #dce0e6;*/
     /*background-color: rgba(0,0,0,.87);*/
     /*padding: 15px 20px;*/
@@ -485,7 +501,7 @@ h4.doc-heading {
 @media screen and (min-width: 60em) {
     [data-md-color-primary=white] .md-search__form {
         background-color: transparent;
-        border-radius: 3px;
+        border-radius: 0;
         border: 0.5px solid rgba(0, 0, 0, 0.87);
         height: 1.84rem;
     }
@@ -678,8 +694,8 @@ code .md-code__nav:hover .md-code__button {
 }
 
 body {
-    --md-text-font-family: metro-web, Metro, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    --md-code-font-family: Fira Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+    --md-text-font-family: Geist, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    --md-code-font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
 }
 
 .md-content {
@@ -1033,7 +1049,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 .md-typeset .highlight :is(.nd,.ni,.nl,.nt),
 .md-typeset .highlight :is(.k,.kd,.kn,.kp,.kr,.kt),
 .md-typeset .highlight :is(.nc,.ne,.nf,.nn) {
-    font-weight: 100;
+    font-weight: 400;
 }
 
 .md-typeset .tabbed-labels>label > code {
@@ -1052,7 +1068,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 @media screen and (min-width: 76.1875em) {
     .md-typeset .tabbed-block > .highlight:first-child > pre > code, .md-typeset .tabbed-block > pre:first-child > code {
-        border-radius: 3px;
+        border-radius: 0;
     }
 }
 
@@ -1072,7 +1088,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     background: none;
     z-index: 1;
     padding: 5px;
-    border-radius: 3px;
+    border-radius: 0;
     border: 1px dotted black;
     bottom: -0.7px;
     top: -0.7px;
@@ -1109,7 +1125,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     height: 100%;
     background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.025), rgb(0 114 255 / 0.25%), rgba(0, 42, 255, 0.0125));
     z-index: 1;
-    border-radius: 3px;
+    border-radius: 0;
     border: 0.5px solid rgba(0,0,0, 0.5);
     overflow: unset;
 }
@@ -1150,7 +1166,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     display: block;
     margin: 0;
     padding: 1rem 1.4rem;
-    border-radius: 3px;
+    border-radius: 0;
     border: rgba(0,0,0,0.6) 0.5px solid;
 }
 
@@ -1575,7 +1591,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     font-weight: 500 !important;
     padding: 0.4em 1.5em;
     font-size: 17px;
-    border-radius: 3px;
+    border-radius: 0;
     white-space: nowrap;
 }
 
@@ -1623,7 +1639,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     border: none;
     color: var(--md-default-fg-color);
     padding: 8px 25px;
-    border-radius: 3px;
+    border-radius: 0;
     background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05));
 }
 

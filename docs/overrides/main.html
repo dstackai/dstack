@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
 {% block extrahead %}
+<link rel="preload" href="{{ 'assets/fonts/Geist-Variable.woff2' | url }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ 'assets/fonts/GeistMono-Variable.woff2' | url }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{{ 'assets/fonts/GeistPixel-Square.woff2' | url }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{{ 'assets/fonts/GeistPixel-Circle.woff2' | url }}" as="font" type="font/woff2" crossorigin>
 {% endblock %}
