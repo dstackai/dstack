@@ -27,7 +27,7 @@ from dstack._internal.core.models.volumes import (
     VolumeMountPoint,
     VolumeStatus,
 )
-from dstack._internal.server.background.tasks.process_submitted_jobs import (
+from dstack._internal.server.background.scheduled_tasks.submitted_jobs import (
     _prepare_job_runtime_data,
     process_submitted_jobs,
 )

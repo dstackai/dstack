@@ -39,7 +39,7 @@ from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobStatus,
 )
-from dstack._internal.server.background.tasks.process_instances import (
+from dstack._internal.server.background.scheduled_tasks.instances import (
     delete_instance_health_checks,
     process_instances,
 )
@@ -101,7 +101,7 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(reachable=True)
             await process_instances()
@@ -130,7 +130,7 @@ class TestCheckShim:
         health_reason = "Shim problem"
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(reachable=False, message=health_reason)
             await process_instances()
@@ -177,7 +177,7 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(reachable=True)
             await process_instances()
@@ -202,7 +202,7 @@ class TestCheckShim:
         )
         health_status = "SSH connection fail"
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(reachable=False, message=health_status)
             await process_instances()
@@ -232,7 +232,7 @@ class TestCheckShim:
         )
         health_status = "SSH connection fail"
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(reachable=False, message=health_status)
             await process_instances()
@@ -257,7 +257,7 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(reachable=True)
             await process_instances()
@@ -283,7 +283,7 @@ class TestCheckShim:
 
         health_status = "Not ok"
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(reachable=False, message=health_status)
             await process_instances()
@@ -347,7 +347,7 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(reachable=True)
             await process_instances()
@@ -378,7 +378,7 @@ class TestCheckShim:
         )
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(reachable=False)
             await process_instances()
@@ -412,7 +412,7 @@ class TestCheckShim:
         )
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+            "dstack._internal.server.background.scheduled_tasks.instances._check_instance_inner"
         ) as healthcheck:
             healthcheck.return_value = InstanceCheck(
                 reachable=True, health_response=health_response
@@ -440,7 +440,7 @@ class TestRemoveDanglingTasks:
     @pytest.fixture
     def disable_maybe_install_components(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            "dstack._internal.server.background.tasks.process_instances._maybe_install_components",
+            "dstack._internal.server.background.scheduled_tasks.instances._maybe_install_components",
             Mock(return_value=None),
         )
 
@@ -607,7 +607,7 @@ class TestTerminate:
         if error is not None:
             terminate_instance.side_effect = error
         with patch(
-            "dstack._internal.server.background.tasks.process_instances.backends_services.get_project_backend_by_type"
+            "dstack._internal.server.background.scheduled_tasks.instances.backends_services.get_project_backend_by_type"
         ) as get_backend:
             get_backend.return_value = backend
             yield terminate_instance
@@ -1153,7 +1153,7 @@ class TestAddSSHInstance:
     def deploy_instance_mock(self, monkeypatch: pytest.MonkeyPatch, host_info: dict):
         mock = Mock(return_value=(InstanceCheck(reachable=True), host_info, GoArchType.AMD64))
         monkeypatch.setattr(
-            "dstack._internal.server.background.tasks.process_instances._deploy_instance", mock
+            "dstack._internal.server.background.scheduled_tasks.instances._deploy_instance", mock
         )
         return mock
 
@@ -1262,7 +1262,7 @@ class BaseTestMaybeInstallComponents:
     def debug_task_log(self, caplog: pytest.LogCaptureFixture) -> pytest.LogCaptureFixture:
         caplog.set_level(
             level=logging.DEBUG,
-            logger="dstack._internal.server.background.tasks.process_instances",
+            logger="dstack._internal.server.background.scheduled_tasks.instances",
         )
         return caplog
 
@@ -1308,7 +1308,7 @@ class TestMaybeInstallRunner(BaseTestMaybeInstallComponents):
     def get_dstack_runner_version_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
         mock = Mock(return_value=self.EXPECTED_VERSION)
         monkeypatch.setattr(
-            "dstack._internal.server.background.tasks.process_instances.get_dstack_runner_version",
+            "dstack._internal.server.background.scheduled_tasks.instances.get_dstack_runner_version",
             mock,
         )
         return mock
@@ -1317,7 +1317,7 @@ class TestMaybeInstallRunner(BaseTestMaybeInstallComponents):
     def get_dstack_runner_download_url_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
         mock = Mock(return_value="https://example.com/runner")
         monkeypatch.setattr(
-            "dstack._internal.server.background.tasks.process_instances.get_dstack_runner_download_url",
+            "dstack._internal.server.background.scheduled_tasks.instances.get_dstack_runner_download_url",
             mock,
         )
         return mock
@@ -1424,7 +1424,7 @@ class TestMaybeInstallShim(BaseTestMaybeInstallComponents):
     def get_dstack_shim_version_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
         mock = Mock(return_value=self.EXPECTED_VERSION)
         monkeypatch.setattr(
-            "dstack._internal.server.background.tasks.process_instances.get_dstack_shim_version",
+            "dstack._internal.server.background.scheduled_tasks.instances.get_dstack_shim_version",
             mock,
         )
         return mock
@@ -1433,7 +1433,7 @@ class TestMaybeInstallShim(BaseTestMaybeInstallComponents):
     def get_dstack_shim_download_url_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
         mock = Mock(return_value="https://example.com/shim")
         monkeypatch.setattr(
-            "dstack._internal.server.background.tasks.process_instances.get_dstack_shim_download_url",
+            "dstack._internal.server.background.scheduled_tasks.instances.get_dstack_shim_download_url",
             mock,
         )
         return mock
@@ -1547,7 +1547,7 @@ class TestMaybeRestartShim(BaseTestMaybeInstallComponents):
     def maybe_install_runner_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
         mock = Mock(return_value=False)
         monkeypatch.setattr(
-            "dstack._internal.server.background.tasks.process_instances._maybe_install_runner",
+            "dstack._internal.server.background.scheduled_tasks.instances._maybe_install_runner",
             mock,
         )
         return mock
@@ -1556,7 +1556,7 @@ class TestMaybeRestartShim(BaseTestMaybeInstallComponents):
     def maybe_install_shim_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
         mock = Mock(return_value=False)
         monkeypatch.setattr(
-            "dstack._internal.server.background.tasks.process_instances._maybe_install_shim",
+            "dstack._internal.server.background.scheduled_tasks.instances._maybe_install_shim",
             mock,
         )
         return mock

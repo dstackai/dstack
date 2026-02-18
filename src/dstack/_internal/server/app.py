@@ -23,8 +23,9 @@ from dstack._internal.core.services.configs import update_default_project
 from dstack._internal.proxy.lib.deps import get_injector_from_app
 from dstack._internal.proxy.lib.routers import model_proxy
 from dstack._internal.server import settings
-from dstack._internal.server.background import start_background_tasks
-from dstack._internal.server.background.tasks.process_probes import PROBES_SCHEDULER
+from dstack._internal.server.background.pipeline_tasks import start_pipeline_tasks
+from dstack._internal.server.background.scheduled_tasks import start_scheduled_tasks
+from dstack._internal.server.background.scheduled_tasks.probes import PROBES_SCHEDULER
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
     auth,
@@ -163,8 +164,11 @@ async def lifespan(app: FastAPI):
     if settings.SERVER_S3_BUCKET is not None or settings.SERVER_GCS_BUCKET is not None:
         init_default_storage()
     scheduler = None
+    pipeline_manager = None
     if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
-        scheduler = start_background_tasks()
+        scheduler = start_scheduled_tasks()
+        pipeline_manager = start_pipeline_tasks()
+        app.state.pipeline_manager = pipeline_manager
     else:
         logger.info("Background processing is disabled")
     PROBES_SCHEDULER.start()
@@ -189,9 +193,15 @@ async def lifespan(app: FastAPI):
     for func in _ON_STARTUP_HOOKS:
         await func(app)
     yield
-    if scheduler is not None:
-        scheduler.shutdown()
     PROBES_SCHEDULER.shutdown(wait=False)
+    if pipeline_manager is not None:
+        pipeline_manager.shutdown()
+    if scheduler is not None:
+        # Note: Scheduler does not cancel currently running jobs, so scheduled tasks cannot do cleanup.
+        # TODO: Track and cancel scheduled tasks.
+        scheduler.shutdown()
+    if pipeline_manager is not None:
+        await pipeline_manager.drain()
     await gateway_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
     await service_conn_pool.remove_all()

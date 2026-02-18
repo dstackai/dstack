@@ -6,7 +6,7 @@ from dstack._internal.core.models.fleets import FleetNodesSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.background.tasks.process_fleets import process_fleets
+from dstack._internal.server.background.scheduled_tasks.fleets import process_fleets
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (

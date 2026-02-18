@@ -8,7 +8,7 @@ from freezegun import freeze_time
 from pydantic import parse_obj_as
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import dstack._internal.server.background.tasks.process_runs as process_runs
+import dstack._internal.server.background.scheduled_tasks.runs as process_runs
 from dstack._internal.core.models.configurations import (
     ProbeConfig,
     ServiceConfiguration,
@@ -100,7 +100,7 @@ class TestProcessRuns:
         expected_duration = (current_time - run.submitted_at).total_seconds()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_runs.run_metrics"
+            "dstack._internal.server.background.scheduled_tasks.runs.run_metrics"
         ) as mock_run_metrics:
             await process_runs.process_runs()
 
@@ -131,7 +131,7 @@ class TestProcessRuns:
         await create_job(session=session, run=run, status=JobStatus.PULLING)
 
         with patch(
-            "dstack._internal.server.background.tasks.process_runs.run_metrics"
+            "dstack._internal.server.background.scheduled_tasks.runs.run_metrics"
         ) as mock_run_metrics:
             await process_runs.process_runs()
 
@@ -198,7 +198,7 @@ class TestProcessRuns:
         with (
             patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
             patch(
-                "dstack._internal.server.background.tasks.process_runs.run_metrics"
+                "dstack._internal.server.background.scheduled_tasks.runs.run_metrics"
             ) as mock_run_metrics,
         ):
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
@@ -297,7 +297,7 @@ class TestProcessRunsReplicas:
         expected_duration = (current_time - run.submitted_at).total_seconds()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_runs.run_metrics"
+            "dstack._internal.server.background.scheduled_tasks.runs.run_metrics"
         ) as mock_run_metrics:
             await process_runs.process_runs()
 
@@ -351,7 +351,7 @@ class TestProcessRunsReplicas:
         with (
             patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
             patch(
-                "dstack._internal.server.background.tasks.process_runs.run_metrics"
+                "dstack._internal.server.background.scheduled_tasks.runs.run_metrics"
             ) as mock_run_metrics,
         ):
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)

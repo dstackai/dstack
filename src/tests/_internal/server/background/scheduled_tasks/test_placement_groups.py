@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.server.background.tasks.process_placement_groups import (
+from dstack._internal.server.background.scheduled_tasks.placement_groups import (
     process_placement_groups,
 )
 from dstack._internal.server.testing.common import (

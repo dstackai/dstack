@@ -47,3 +47,6 @@ class FeatureFlags:
     # DSTACK_FF_AUTOCREATED_FLEETS_ENABLED enables legacy autocreated fleets:
     # If there are no fleet suitable for the run, a new fleet is created automatically instead of an error.
     AUTOCREATED_FLEETS_ENABLED = os.getenv("DSTACK_FF_AUTOCREATED_FLEETS_ENABLED") is not None
+    # DSTACK_FF_PIPELINE_PROCESSING_ENABLED enables new pipeline-based processing tasks (background/pipeline_tasks/)
+    # instead of scheduler-based processing tasks (background/scheduled_tasks/) for tasks that implement pipelines.
+    PIPELINE_PROCESSING_ENABLED = os.getenv("DSTACK_FF_PIPELINE_PROCESSING_ENABLED") is not None

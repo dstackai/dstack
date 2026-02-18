@@ -77,7 +77,7 @@ def get_default_python_verison() -> str:
 def get_default_image(nvcc: bool = False) -> str:
     """
     Note: May be overridden by dstack (e.g., EFA-enabled version for AWS EFA-capable instances).
-    See `dstack._internal.server.background.tasks.process_running_jobs._patch_base_image_for_aws_efa` for details.
+    See `dstack._internal.server.background.scheduled_tasks.running_jobs._patch_base_image_for_aws_efa` for details.
 
     Args:
         nvcc: If True, returns 'devel' variant, otherwise 'base'.

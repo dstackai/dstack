@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.configurations import ProbeConfig, ServiceConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus
-from dstack._internal.server.background.tasks.process_probes import (
+from dstack._internal.server.background.scheduled_tasks.probes import (
     PROCESSING_OVERHEAD_TIMEOUT,
     SSH_CONNECT_TIMEOUT,
     process_probes,
@@ -140,7 +140,7 @@ class TestProcessProbes:
         processing_time = datetime(2025, 1, 1, 0, 0, 1, tzinfo=timezone.utc)
         with freeze_time(processing_time):
             with patch(
-                "dstack._internal.server.background.tasks.process_probes.PROBES_SCHEDULER"
+                "dstack._internal.server.background.scheduled_tasks.probes.PROBES_SCHEDULER"
             ) as scheduler_mock:
                 await process_probes()
                 assert scheduler_mock.add_job.call_count == 2
@@ -210,7 +210,7 @@ class TestProcessProbes:
         probe_regular = await create_probe(session, job, probe_num=1, success_streak=3)
 
         with patch(
-            "dstack._internal.server.background.tasks.process_probes.PROBES_SCHEDULER"
+            "dstack._internal.server.background.scheduled_tasks.probes.PROBES_SCHEDULER"
         ) as scheduler_mock:
             await process_probes()
 

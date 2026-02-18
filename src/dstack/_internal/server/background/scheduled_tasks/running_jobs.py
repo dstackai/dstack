@@ -37,7 +37,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
-from dstack._internal.server.background.tasks.common import get_provisioning_timeout
+from dstack._internal.server.background.scheduled_tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,

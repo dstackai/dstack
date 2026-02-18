@@ -10,7 +10,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
 from dstack._internal.core.models.volumes import VolumeStatus
-from dstack._internal.server.background.tasks.process_terminating_jobs import (
+from dstack._internal.server.background.scheduled_tasks.terminating_jobs import (
     process_terminating_jobs,
 )
 from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel

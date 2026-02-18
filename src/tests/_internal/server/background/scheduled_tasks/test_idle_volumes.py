@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.volumes import VolumeStatus
-from dstack._internal.server.background.tasks.process_idle_volumes import (
+from dstack._internal.server.background.scheduled_tasks.idle_volumes import (
     _get_idle_time,
     _should_delete_volume,
     process_idle_volumes,

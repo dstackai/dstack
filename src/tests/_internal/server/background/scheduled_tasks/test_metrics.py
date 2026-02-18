@@ -10,7 +10,7 @@ from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server import settings
-from dstack._internal.server.background.tasks.process_metrics import (
+from dstack._internal.server.background.scheduled_tasks.metrics import (
     collect_metrics,
     delete_metrics,
 )

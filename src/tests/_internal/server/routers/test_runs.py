@@ -12,6 +12,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal import settings
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import (
@@ -71,7 +72,6 @@ from dstack._internal.server.testing.common import (
     list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
-from tests._internal.server.background.tasks.test_process_running_jobs import settings
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
 

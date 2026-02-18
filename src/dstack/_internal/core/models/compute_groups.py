@@ -12,6 +12,13 @@ class ComputeGroupStatus(str, enum.Enum):
     RUNNING = "running"
     TERMINATED = "terminated"
 
+    @classmethod
+    def finished_statuses(cls) -> List["ComputeGroupStatus"]:
+        return [cls.TERMINATED]
+
+    def is_finished(self):
+        return self in self.finished_statuses()
+
 
 class ComputeGroupProvisioningData(CoreModel):
     compute_group_id: str

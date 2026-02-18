@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.gateways import GatewayProvisioningData, GatewayStatus
-from dstack._internal.server.background.tasks.process_gateways import process_gateways
+from dstack._internal.server.background.scheduled_tasks.gateways import process_gateways
 from dstack._internal.server.testing.common import (
     AsyncContextManager,
     ComputeMockSpec,
