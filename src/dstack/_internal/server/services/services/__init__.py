@@ -26,6 +26,11 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.models.routers import (
+    AnyServiceRouterConfig,
+    RouterType,
+    SGLangServiceRouterConfig,
+)
 from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.server import settings
@@ -43,6 +48,41 @@ from dstack._internal.server.services.services.options import get_service_option
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _gateway_has_sglang_router(config: GatewayConfiguration) -> bool:
+    return config.router is not None and config.router.type == RouterType.SGLANG.value
+
+
+def _build_service_router_config(
+    gateway_configuration: GatewayConfiguration,
+    service_configuration: ServiceConfiguration,
+) -> Optional[AnyServiceRouterConfig]:
+    """
+    Build router config from gateway (type, policy) + service (pd_disaggregation, policy override).
+    Service's policy overrides gateway's if present. Keeps backward compat: SGLang enabled
+    automatically when gateway has it configured.
+    """
+    if not _gateway_has_sglang_router(gateway_configuration):
+        return None
+
+    gateway_router = gateway_configuration.router
+    assert gateway_router is not None  # ensured by _gateway_has_sglang_router
+    router_type = gateway_router.type
+    policy = gateway_router.policy
+
+    service_router = service_configuration.router
+    if service_router is not None and isinstance(service_router, SGLangServiceRouterConfig):
+        policy = service_router.policy
+        pd_disaggregation = service_router.pd_disaggregation
+    else:
+        pd_disaggregation = False
+
+    return SGLangServiceRouterConfig(
+        type=router_type,
+        policy=policy,
+        pd_disaggregation=pd_disaggregation,
+    )
 
 
 async def register_service(session: AsyncSession, run_model: RunModel, run_spec: RunSpec):
@@ -92,8 +132,20 @@ async def _register_service_in_gateway(
         raise ServerClientError("Gateway status is not running")
 
     gateway_configuration = get_gateway_configuration(gateway)
+
+    # Check: service specifies SGLang router but gateway does not have it
+    service_router = run_spec.configuration.router
+    service_wants_sglang = service_router is not None and isinstance(
+        service_router, SGLangServiceRouterConfig
+    )
+    if service_wants_sglang and not _gateway_has_sglang_router(gateway_configuration):
+        raise ServerClientError(
+            "Service requires gateway with SGLang router but gateway "
+            f"'{gateway.name}' does not have the SGLang router configured."
+        )
+
     service_https = _get_service_https(run_spec, gateway_configuration)
-    router = gateway_configuration.router
+    router = _build_service_router_config(gateway_configuration, run_spec.configuration)
     service_protocol = "https" if service_https else "http"
 
     if service_https and gateway_configuration.certificate is None:
@@ -158,6 +210,14 @@ async def _register_service_in_gateway(
 
 def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> ServiceSpec:
     assert run_spec.configuration.type == "service"
+    if (
+        run_spec.configuration.router is not None
+        and run_spec.configuration.router.type == RouterType.SGLANG
+    ):
+        raise ServerClientError(
+            "Service with SGLang router configuration requires a gateway. "
+            "Please configure a gateway with the SGLang router enabled."
+        )
     if run_spec.configuration.https != SERVICE_HTTPS_DEFAULT:
         # Note: if the user sets `https: <default-value>`, it will be ignored silently
         # TODO: in 0.19, make `https` Optional to be able to tell if it was set or omitted

@@ -2,13 +2,12 @@ import shutil
 import subprocess
 import sys
 import time
-import urllib.parse
 from typing import List, Optional
 
 import httpx
 import psutil
 
-from dstack._internal.core.models.routers import RouterType, SGLangRouterConfig
+from dstack._internal.core.models.routers import AnyServiceRouterConfig, RouterType
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.utils.logging import get_logger
 
@@ -22,7 +21,7 @@ class SglangRouter(Router):
 
     TYPE = RouterType.SGLANG
 
-    def __init__(self, config: SGLangRouterConfig, context: RouterContext):
+    def __init__(self, config: AnyServiceRouterConfig, context: RouterContext):
         """Initialize SGLang router.
 
         Args:
@@ -68,6 +67,8 @@ class SglangRouter(Router):
                 "--policy",
                 self.config.policy,
             ]
+            if self.config.pd_disaggregation:
+                cmd.append("--pd-disaggregation")
 
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -174,7 +175,7 @@ class SglangRouter(Router):
 
         # Add workers
         for worker_url in sorted(workers_to_add):
-            success = self._add_worker_to_router(worker_url)
+            success = self._register_worker(worker_url)
             if not success:
                 logger.warning("Failed to add worker %s, continuing with others", worker_url)
 
@@ -197,9 +198,16 @@ class SglangRouter(Router):
             logger.exception("Error getting sglang router workers")
             return []
 
-    def _add_worker_to_router(self, worker_url: str) -> bool:
+    def _add_worker_to_router(
+        self,
+        url: str,
+        worker_type: str = "regular",
+        bootstrap_port: Optional[int] = None,
+    ) -> bool:
         try:
-            payload = {"url": worker_url, "worker_type": "regular"}
+            payload: dict = {"url": url, "worker_type": worker_type}
+            if bootstrap_port is not None:
+                payload["bootstrap_port"] = bootstrap_port
             with httpx.Client(timeout=5.0) as client:
                 response = client.post(
                     f"http://{self.context.host}:{self.context.port}/workers",
@@ -209,8 +217,9 @@ class SglangRouter(Router):
                     response_data = response.json()
                     if response_data.get("status") == "accepted":
                         logger.info(
-                            "Worker %s accepted by sglang router on port %s",
-                            worker_url,
+                            "Worker %s (type=%s) accepted by sglang router on port %s",
+                            url,
+                            worker_type,
                             self.context.port,
                         )
                         return True
@@ -224,21 +233,68 @@ class SglangRouter(Router):
                 else:
                     logger.error(
                         "Failed to add worker %s: status %d, %s",
-                        worker_url,
+                        url,
                         response.status_code,
                         response.text,
                     )
                     return False
         except Exception:
-            logger.exception("Error adding worker %s", worker_url)
+            logger.exception("Error adding worker %s", url)
+            return False
+
+    def _register_worker(self, url: str) -> bool:
+        if not self.config.pd_disaggregation:
+            return self._add_worker_to_router(url, "regular", None)
+
+        server_info_url = f"{url}/server_info"
+        try:
+            with httpx.Client(timeout=10) as client:
+                resp = client.get(server_info_url)
+                if resp.status_code != 200:
+                    return False
+                data = resp.json()
+                if data.get("status") != "ready":
+                    return False
+                disaggregation_mode = data.get("disaggregation_mode", "")
+                if disaggregation_mode == "prefill":
+                    worker_type = "prefill"
+                    bootstrap_port = data.get("disaggregation_bootstrap_port")
+                elif disaggregation_mode == "decode":
+                    worker_type = "decode"
+                    bootstrap_port = None
+                else:
+                    worker_type = "regular"
+                    bootstrap_port = None
+                logger.info(
+                    "Registering worker %s (type=%s)",
+                    url,
+                    worker_type,
+                )
+                return self._add_worker_to_router(
+                    url,
+                    worker_type,
+                    bootstrap_port,
+                )
+        except Exception:
+            logger.exception("Error registering worker %s", url)
             return False
 
     def _remove_worker_from_router(self, worker_url: str) -> bool:
         try:
-            encoded_url = urllib.parse.quote(worker_url, safe="")
+            current_workers = self._get_router_workers()
+            worker_id = None
+            for worker in current_workers:
+                url = worker.get("url")
+                if url and isinstance(url, str) and url == worker_url:
+                    worker_id = worker.get("id")
+                    if worker_id and isinstance(worker_id, str):
+                        break
+            if not worker_id:
+                logger.error("No worker id found for url %s", worker_url)
+                return False
             with httpx.Client(timeout=5.0) as client:
                 response = client.delete(
-                    f"http://{self.context.host}:{self.context.port}/workers/{encoded_url}"
+                    f"http://{self.context.host}:{self.context.port}/workers/{worker_id}"
                 )
                 if response.status_code == 202:
                     response_data = response.json()

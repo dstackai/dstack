@@ -111,6 +111,7 @@ class ServerProxyRepo(BaseProxyRepo):
                 ssh_proxy=ssh_proxy,
                 ssh_head_proxy=ssh_head_proxy,
                 ssh_head_proxy_private_key=ssh_head_proxy_private_key,
+                internal_ip=jpd.internal_ip,
             )
             replicas.append(replica)
         return Service(

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyRouterConfig
+from dstack._internal.core.models.routers import AnyServiceRouterConfig
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 
 
@@ -27,6 +27,7 @@ class Replica(ImmutableModel):
     # Optional outer proxy, a head node/bastion
     ssh_head_proxy: Optional[SSHConnectionParams] = None
     ssh_head_proxy_private_key: Optional[str] = None
+    internal_ip: Optional[str] = None
 
 
 class IPAddressPartitioningKey(ImmutableModel):
@@ -58,7 +59,7 @@ class Service(ImmutableModel):
     client_max_body_size: int  # only enforced on gateways
     strip_prefix: bool = True  # only used in-server
     replicas: tuple[Replica, ...]
-    router: Optional[AnyRouterConfig] = None
+    router: Optional[AnyServiceRouterConfig] = None
     cors_enabled: bool = False  # only used on gateways; enabled for openai-format models
 
     @property

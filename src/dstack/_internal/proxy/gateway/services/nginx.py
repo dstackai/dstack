@@ -5,12 +5,13 @@ import tempfile
 from asyncio import Lock
 from pathlib import Path
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 import jinja2
 from pydantic import BaseModel
 from typing_extensions import Literal
 
-from dstack._internal.core.models.routers import AnyRouterConfig, RouterType
+from dstack._internal.core.models.routers import AnyServiceRouterConfig, RouterType
 from dstack._internal.proxy.gateway.const import PROXY_PORT_ON_GATEWAY
 from dstack._internal.proxy.gateway.models import ACMESettings
 from dstack._internal.proxy.gateway.services.model_routers import (
@@ -18,6 +19,7 @@ from dstack._internal.proxy.gateway.services.model_routers import (
     RouterContext,
     get_router,
 )
+from dstack._internal.proxy.lib import models
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
@@ -43,6 +45,8 @@ class SiteConfig(BaseModel):
 class ReplicaConfig(BaseModel):
     id: str
     socket: Path
+    port: int
+    internal_ip: Optional[str] = None
 
 
 class LimitReqZoneConfig(BaseModel):
@@ -70,7 +74,7 @@ class ServiceConfig(SiteConfig):
     limit_req_zones: list[LimitReqZoneConfig]
     locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
-    router: Optional[AnyRouterConfig] = None
+    router: Optional[AnyServiceRouterConfig] = None
     router_port: Optional[int] = None
     cors_enabled: bool = False
 
@@ -96,7 +100,7 @@ class Nginx:
         self._next_router_port: int = self._ROUTER_PORT_MIN
         # Tracking of worker ports to avoid conflicts across router instances
         self._allocated_worker_ports: set[int] = set()
-        self._domain_to_worker_ports: Dict[str, list[int]] = {}
+        self._domain_to_worker_urls: Dict[str, list[str]] = {}
         self._next_worker_port: int = self._WORKER_PORT_MIN
 
     async def register(self, conf: SiteConfig, acme: ACMESettings) -> None:
@@ -145,33 +149,40 @@ class Nginx:
                             del self._domain_to_router[conf.domain]
                             raise
 
-                    allocated_ports = self._allocate_worker_ports(len(conf.replicas))
-                    replica_urls = [
-                        f"http://{router.context.host}:{port}" for port in allocated_ports
-                    ]
-
-                    # Write router workers config
-                    try:
+                    if conf.router.pd_disaggregation:
+                        # PD path: replica_urls from internal_ip (router talks directly to workers)
+                        if any(not r.internal_ip for r in conf.replicas):
+                            raise ProxyError(
+                                "PD disaggregation requires internal IP for all replicas."
+                            )
+                        replica_urls = [
+                            f"http://{replica.internal_ip}:{replica.port}"
+                            for replica in conf.replicas
+                        ]
+                        self._domain_to_worker_urls[conf.domain] = replica_urls
+                    else:
+                        # Non-PD path: allocate gateway-local ports, nginx proxies to replica sockets
+                        allocated_ports = self._allocate_worker_ports(len(conf.replicas))
+                        replica_urls = [
+                            f"http://{router.context.host}:{port}" for port in allocated_ports
+                        ]
                         if conf.replicas:
-                            await run_async(self.write_router_workers_conf, conf, allocated_ports)
-                            # Discard old worker ports if domain already has allocated ports (required for scaling case)
-                            if conf.domain in self._domain_to_worker_ports:
-                                old_worker_ports = self._domain_to_worker_ports[conf.domain]
-                                for port in old_worker_ports:
-                                    self._allocated_worker_ports.discard(port)
-                            self._domain_to_worker_ports[conf.domain] = allocated_ports
-                    except Exception as e:
-                        logger.exception(
-                            "write_router_workers_conf failed for domain=%s: %s", conf.domain, e
-                        )
-                        raise
+                            await run_async(
+                                self.write_router_workers_conf,
+                                conf,
+                                allocated_ports,
+                            )
+                        if conf.domain in self._domain_to_worker_urls:
+                            self._discard_ports(self._domain_to_worker_urls[conf.domain])
+                        self._domain_to_worker_urls[conf.domain] = replica_urls
 
-                    # Update replicas to router (actual HTTP API calls to add workers)
                     try:
                         await run_async(router.update_replicas, replica_urls)
                     except Exception as e:
                         logger.exception(
-                            "Failed to add replicas to router for domain=%s: %s", conf.domain, e
+                            "Failed to add replicas to router for domain=%s: %s",
+                            conf.domain,
+                            e,
                         )
                         raise
 
@@ -179,7 +190,8 @@ class Nginx:
 
         logger.info("Registered %s domain %s", conf.type, conf.domain)
 
-    async def unregister(self, domain: str) -> None:
+    async def unregister(self, service: models.Service) -> None:
+        domain = service.domain_safe
         logger.debug("Unregistering domain %s", domain)
         conf_path = self._conf_dir / self.get_config_name(domain)
         if not conf_path.exists():
@@ -190,12 +202,16 @@ class Nginx:
             if domain in self._domain_to_router:
                 router = self._domain_to_router[domain]
                 # Remove all workers for this domain
-                if domain in self._domain_to_worker_ports:
-                    worker_ports = self._domain_to_worker_ports[domain]
-                    replica_urls = [
-                        f"http://{router.context.host}:{port}" for port in worker_ports
-                    ]
-                    await run_async(router.remove_replicas, replica_urls)
+                if domain in self._domain_to_worker_urls:
+                    worker_urls = self._domain_to_worker_urls[domain]
+                    await run_async(router.remove_replicas, worker_urls)
+                    pd_disaggregation = (
+                        service.router.pd_disaggregation if service.router else False
+                    )
+                    if not pd_disaggregation:
+                        self._discard_ports(worker_urls)
+                    del self._domain_to_worker_urls[domain]
+                    logger.debug("Removed worker URLs for domain %s", domain)
                 # Stop and kill the router
                 await run_async(router.stop)
                 # Remove from mappings
@@ -203,14 +219,6 @@ class Nginx:
                 if router_port in self._router_port_to_domain:
                     del self._router_port_to_domain[router_port]
                 del self._domain_to_router[domain]
-
-                # Discard worker ports for this domain
-                if domain in self._domain_to_worker_ports:
-                    worker_ports = self._domain_to_worker_ports[domain]
-                    for port in worker_ports:
-                        self._allocated_worker_ports.discard(port)
-                    del self._domain_to_worker_ports[domain]
-                    logger.debug("Freed worker ports %s for domain %s", worker_ports, domain)
 
                 # Remove workers config file
                 workers_conf_path = self._conf_dir / f"router-workers.{domain}.conf"
@@ -403,6 +411,12 @@ class Nginx:
             self._next_worker_port = self._WORKER_PORT_MIN  # Wrap around
 
         return allocated
+
+    def _discard_ports(self, urls: list[str]) -> None:
+        for u in urls:
+            parsed = urlparse(u)
+            if parsed.port is not None and parsed.port in self._allocated_worker_ports:
+                self._allocated_worker_ports.discard(parsed.port)
 
     def write_global_conf(self) -> None:
         conf = read_package_resource("00-log-format.conf")

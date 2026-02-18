@@ -6,7 +6,7 @@ from typing import Iterable, Optional
 
 import dstack._internal.proxy.gateway.schemas.registry as schemas
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyRouterConfig, RouterType
+from dstack._internal.core.models.routers import AnyServiceRouterConfig, RouterType
 from dstack._internal.proxy.gateway import models as gateway_models
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import (
@@ -45,7 +45,7 @@ async def register_service(
     repo: GatewayProxyRepo,
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
-    router: Optional[AnyRouterConfig] = None,
+    router: Optional[AnyServiceRouterConfig] = None,
 ) -> None:
     cors_enabled = model is not None and model.type == "chat" and model.format == "openai"
     service = models.Service(
@@ -118,7 +118,7 @@ async def unregister_service(
             ids=(r.id for r in service.replicas),
             service_conn_pool=service_conn_pool,
         )
-        await nginx.unregister(service.domain_safe)
+        await nginx.unregister(service)
         await repo.delete_models_by_run(project_name, run_name)
         await repo.delete_service(project_name, run_name)
 
@@ -138,6 +138,7 @@ async def register_replica(
     repo: GatewayProxyRepo,
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
+    internal_ip: Optional[str] = None,
 ) -> None:
     replica = models.Replica(
         id=replica_id,
@@ -147,6 +148,7 @@ async def register_replica(
         ssh_proxy=ssh_proxy,
         ssh_head_proxy=ssh_head_proxy,
         ssh_head_proxy_private_key=ssh_head_proxy_private_key,
+        internal_ip=internal_ip,
     )
 
     async with lock:
@@ -237,6 +239,11 @@ async def register_model_entrypoint(
     logger.info("Entrypoint %s is now registered in project %s", domain, project_name)
 
 
+def _uses_pd_disaggregation(service: models.Service) -> bool:
+    """PD disaggregation: router talks to replicas via internal_ip, no SSH tunnels needed."""
+    return service.router is not None and service.router.pd_disaggregation
+
+
 async def apply_service(
     service: models.Service,
     old_service: Optional[models.Service],
@@ -256,13 +263,31 @@ async def apply_service(
             ),
             service_conn_pool=service_conn_pool,
         )
-    replica_conns, replica_failures = await get_or_add_replica_connections(
-        service, repo, service_conn_pool
-    )
-    replica_configs = [
-        ReplicaConfig(id=replica.id, socket=conn.app_socket_path)
-        for replica, conn in replica_conns.items()
-    ]
+    if _uses_pd_disaggregation(service):
+        replica_conns = {}
+        replica_failures = {}
+        replica_configs = [
+            ReplicaConfig(
+                id=replica.id,
+                socket=Path("/dev/null"),
+                port=replica.app_port,
+                internal_ip=replica.internal_ip,
+            )
+            for replica in service.replicas
+        ]
+    else:
+        replica_conns, replica_failures = await get_or_add_replica_connections(
+            service, repo, service_conn_pool
+        )
+        replica_configs = [
+            ReplicaConfig(
+                id=replica.id,
+                socket=conn.app_socket_path,
+                port=replica.app_port,
+                internal_ip=replica.internal_ip,
+            )
+            for replica, conn in replica_conns.items()
+        ]
     service_config = await get_nginx_service_config(service, replica_configs)
     await nginx.register(service_config, (await repo.get_config()).acme_settings)
     return replica_failures
