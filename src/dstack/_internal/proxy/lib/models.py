@@ -59,12 +59,8 @@ class Service(ImmutableModel):
     client_max_body_size: int  # only enforced on gateways
     strip_prefix: bool = True  # only used in-server
     replicas: tuple[Replica, ...]
-<<<<<<< add_pd_disaggregated_inference
     router: Optional[AnyServiceRouterConfig] = None
-=======
-    router: Optional[AnyRouterConfig] = None
     cors_enabled: bool = False  # only used on gateways; enabled for openai-format models
->>>>>>> master
 
     @property
     def domain_safe(self) -> str:
