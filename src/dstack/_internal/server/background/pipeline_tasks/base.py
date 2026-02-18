@@ -3,6 +3,7 @@ import math
 import random
 import uuid
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, ClassVar, Generic, Optional, Protocol, Sequence, TypeVar
 
@@ -16,22 +17,22 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class PipelineItem(Protocol):
+@dataclass
+class PipelineItem:
+    __tablename__: str
     id: uuid.UUID
     lock_expires_at: datetime
     lock_token: uuid.UUID
-
-    __tablename__: str
+    prev_lock_expired: bool
 
 
 class PipelineModel(Protocol):
-    id: Mapped[uuid.UUID]
-    lock_expires_at: Mapped[Optional[datetime]]
-    lock_token: Mapped[Optional[uuid.UUID]]
-
     __tablename__: str
     __mapper__: ClassVar[Any]
     __table__: ClassVar[Any]
+    id: Mapped[uuid.UUID]
+    lock_expires_at: Mapped[Optional[datetime]]
+    lock_token: Mapped[Optional[uuid.UUID]]
 
 
 class PipelineError(Exception):

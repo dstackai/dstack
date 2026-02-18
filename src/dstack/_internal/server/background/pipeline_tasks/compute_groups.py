@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Sequence, cast
+from typing import Sequence
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only
@@ -142,12 +142,23 @@ class ComputeGroupFetcher(Fetcher):
                 compute_group_models = list(res.scalars().all())
                 lock_expires_at = get_current_datetime() + self._lock_timeout
                 lock_token = uuid.uuid4()
+                items = []
                 for compute_group_model in compute_group_models:
+                    prev_lock_expired = compute_group_model.lock_expires_at is not None
                     compute_group_model.lock_expires_at = lock_expires_at
                     compute_group_model.lock_token = lock_token
                     compute_group_model.lock_owner = ComputeGroupPipeline.__name__
+                    items.append(
+                        PipelineItem(
+                            __tablename__=ComputeGroupModel.__tablename__,
+                            id=compute_group_model.id,
+                            lock_expires_at=lock_expires_at,
+                            lock_token=lock_token,
+                            prev_lock_expired=prev_lock_expired,
+                        )
+                    )
                 await session.commit()
-        return [cast(PipelineItem, r) for r in compute_group_models]
+        return items
 
 
 class ComputeGroupWorker(Worker):

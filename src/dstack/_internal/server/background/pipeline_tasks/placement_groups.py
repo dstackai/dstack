@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from datetime import timedelta
-from typing import Sequence, cast
+from typing import Sequence
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only
@@ -140,12 +140,23 @@ class PlacementGroupFetcher(Fetcher):
                 placement_group_models = list(res.scalars().all())
                 lock_expires_at = get_current_datetime() + self._lock_timeout
                 lock_token = uuid.uuid4()
+                items = []
                 for placement_group_model in placement_group_models:
+                    prev_lock_expired = placement_group_model.lock_expires_at is not None
                     placement_group_model.lock_expires_at = lock_expires_at
                     placement_group_model.lock_token = lock_token
                     placement_group_model.lock_owner = PlacementGroupPipeline.__name__
+                    items.append(
+                        PipelineItem(
+                            __tablename__=PlacementGroupModel.__tablename__,
+                            id=placement_group_model.id,
+                            lock_expires_at=lock_expires_at,
+                            lock_token=lock_token,
+                            prev_lock_expired=prev_lock_expired,
+                        )
+                    )
                 await session.commit()
-        return [cast(PipelineItem, r) for r in placement_group_models]
+        return items
 
 
 class PlacementGroupWorker(Worker):

@@ -1,5 +1,5 @@
+import uuid
 from datetime import datetime, timezone
-from typing import cast
 from unittest.mock import Mock, patch
 
 import pytest
@@ -10,6 +10,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.compute_groups import ComputeGroupStatus
 from dstack._internal.server.background.pipeline_tasks.base import PipelineItem
 from dstack._internal.server.background.pipeline_tasks.compute_groups import ComputeGroupWorker
+from dstack._internal.server.models import ComputeGroupModel
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_compute_group,
@@ -21,6 +22,18 @@ from dstack._internal.server.testing.common import (
 @pytest.fixture
 def worker() -> ComputeGroupWorker:
     return ComputeGroupWorker(queue=Mock(), heartbeater=Mock())
+
+
+def _compute_group_to_pipeline_item(compute_group: ComputeGroupModel) -> PipelineItem:
+    assert compute_group.lock_token is not None
+    assert compute_group.lock_expires_at is not None
+    return PipelineItem(
+        __tablename__=compute_group.__tablename__,
+        id=compute_group.id,
+        lock_token=compute_group.lock_token,
+        lock_expires_at=compute_group.lock_expires_at,
+        prev_lock_expired=False,
+    )
 
 
 class TestComputeGroupWorker:
@@ -36,13 +49,16 @@ class TestComputeGroupWorker:
             project=project,
             fleet=fleet,
         )
+        compute_group.lock_token = uuid.uuid4()
+        compute_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
         with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
             backend_mock = Mock()
             compute_mock = Mock(spec=ComputeMockSpec)
             backend_mock.compute.return_value = compute_mock
             m.return_value = backend_mock
             backend_mock.TYPE = BackendType.RUNPOD
-            await worker.process(cast(PipelineItem, compute_group))
+            await worker.process(_compute_group_to_pipeline_item(compute_group))
             compute_mock.terminate_compute_group.assert_called_once()
         await session.refresh(compute_group)
         assert compute_group.status == ComputeGroupStatus.TERMINATED
@@ -61,6 +77,9 @@ class TestComputeGroupWorker:
             fleet=fleet,
             last_processed_at=datetime(2023, 1, 2, 3, 0, tzinfo=timezone.utc),
         )
+        compute_group.lock_token = uuid.uuid4()
+        compute_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
         with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
             backend_mock = Mock()
             compute_mock = Mock(spec=ComputeMockSpec)
@@ -68,7 +87,7 @@ class TestComputeGroupWorker:
             m.return_value = backend_mock
             backend_mock.TYPE = BackendType.RUNPOD
             compute_mock.terminate_compute_group.side_effect = BackendError()
-            await worker.process(cast(PipelineItem, compute_group))
+            await worker.process(_compute_group_to_pipeline_item(compute_group))
             compute_mock.terminate_compute_group.assert_called_once()
         await session.refresh(compute_group)
         assert compute_group.status != ComputeGroupStatus.TERMINATED
@@ -78,6 +97,8 @@ class TestComputeGroupWorker:
         compute_group.first_termination_retry_at = datetime(2023, 1, 2, 3, 0, tzinfo=timezone.utc)
         compute_group.last_termination_retry_at = datetime(2023, 1, 2, 4, 0, tzinfo=timezone.utc)
         compute_group.last_processed_at = datetime(2023, 1, 2, 4, 0, tzinfo=timezone.utc)
+        compute_group.lock_token = uuid.uuid4()
+        compute_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
         with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
             backend_mock = Mock()
@@ -86,7 +107,7 @@ class TestComputeGroupWorker:
             m.return_value = backend_mock
             backend_mock.TYPE = BackendType.RUNPOD
             compute_mock.terminate_compute_group.side_effect = BackendError()
-            await worker.process(cast(PipelineItem, compute_group))
+            await worker.process(_compute_group_to_pipeline_item(compute_group))
             compute_mock.terminate_compute_group.assert_called_once()
         await session.refresh(compute_group)
         assert compute_group.status == ComputeGroupStatus.TERMINATED
