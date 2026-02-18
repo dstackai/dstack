@@ -894,11 +894,14 @@ def _get_gateway_commands(
         # regenerate host keys
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
-        # start sshd
-        "/usr/sbin/sshd -p 22 -o PermitUserEnvironment=yes",
-        # run gateway
+        # install gateway
         f"su ubuntu -c {quoted_gateway_commands}",
-        "sleep infinity",
+        # start docker-systemctl-replacement as an init replacement (PID 1), which
+        # - starts and supervises enabled services (sshd, nginx, dstack.gateway)
+        # - stops running services on SIGTERM (graceful shutdown)
+        # - reaps orphan processes
+        # See: https://github.com/gdraheim/docker-systemctl-replacement/blob/b18d67e521f0d1cf1d705dbb8e0416bef23e377c/INIT-DAEMON.md
+        "exec systemctl default",
     ]
     return commands
 
