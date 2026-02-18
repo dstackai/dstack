@@ -236,16 +236,25 @@ func (ex *RunExecutor) restoreRepoDir(ctx context.Context, tmpDir string) error 
 
 func (ex *RunExecutor) chownRepoDir(ctx context.Context) error {
 	log.Trace(ctx, "Chowning repo dir")
+	exists, err := common.PathExists(ex.repoDir)
+	// We consider all errors here non-fatal
+	if err != nil {
+		log.Warning(ctx, "Failed to check if repo dir exists", "err", err)
+		return nil
+	}
+	if !exists {
+		log.Trace(ctx, "Repo dir does not exist")
+		return nil
+	}
 	return filepath.WalkDir(
 		ex.repoDir,
 		func(p string, d fs.DirEntry, err error) error {
-			// We consider walk/chown errors non-fatal
 			if err != nil {
-				log.Debug(ctx, "Error while walking repo dir", "path", p, "err", err)
+				log.Warning(ctx, "Error while walking repo dir", "path", p, "err", err)
 				return nil
 			}
 			if err := os.Chown(p, ex.jobUser.Uid, ex.jobUser.Gid); err != nil {
-				log.Debug(ctx, "Error while chowning repo dir", "path", p, "err", err)
+				log.Warning(ctx, "Error while chowning repo dir", "path", p, "err", err)
 			}
 			return nil
 		},
