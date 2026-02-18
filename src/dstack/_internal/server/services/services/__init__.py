@@ -5,6 +5,7 @@ Application logic related to `type: service` runs.
 import json
 import uuid
 from datetime import datetime
+from functools import partial
 from typing import Optional
 
 import httpx
@@ -33,6 +34,7 @@ from dstack._internal.core.models.routers import (
 )
 from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.core.models.services import OpenAIChatModel
+from dstack._internal.proxy.gateway.const import SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services import events
@@ -177,7 +179,8 @@ async def _register_service_in_gateway(
     try:
         logger.debug("%s: registering service as %s", fmt(run_model), service_spec.url)
         async with conn.client() as client:
-            await client.register_service(
+            do_register = partial(
+                client.register_service,
                 project=run_model.project.name,
                 run_name=run_model.run_name,
                 domain=domain,
@@ -190,6 +193,26 @@ async def _register_service_in_gateway(
                 ssh_private_key=run_model.project.ssh_private_key,
                 router=router,
             )
+            try:
+                await do_register()
+            except GatewayError as e:
+                if e.msg == SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE.format(
+                    ref=f"{run_model.project.name}/{run_model.run_name}"
+                ):
+                    # Happens if there was a communication issue with the gateway when last unregistering
+                    logger.warning(
+                        "Service %s/%s is dangling on gateway %s, unregistering and re-registering",
+                        run_model.project.name,
+                        run_model.run_name,
+                        gateway.name,
+                    )
+                    await client.unregister_service(
+                        project=run_model.project.name,
+                        run_name=run_model.run_name,
+                    )
+                    await do_register()
+                else:
+                    raise
     except SSHError:
         raise ServerClientError("Gateway tunnel is not working")
     except httpx.RequestError as e:
