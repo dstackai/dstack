@@ -125,5 +125,6 @@ async def sqlite_commit(session: AsyncSession):
 def _run_alembic_upgrade(connection):
     alembic_cfg = config.Config()
     alembic_cfg.set_main_option("script_location", settings.ALEMBIC_MIGRATIONS_LOCATION)
+    alembic_cfg.set_main_option("recursive_version_locations", "true")
     alembic_cfg.attributes["connection"] = connection
     command.upgrade(alembic_cfg, "head")
