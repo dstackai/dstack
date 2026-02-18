@@ -11,6 +11,8 @@ export const CONFIG_INFO = {
 };
 
 export const FORM_FIELD_NAMES = {
+    project: 'project',
+    template: 'template',
     offer: 'offer',
     name: 'name',
     ide: 'ide',

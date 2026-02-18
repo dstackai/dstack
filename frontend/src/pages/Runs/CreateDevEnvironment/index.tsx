@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -12,9 +12,11 @@ import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetwe
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
+import { useProjectFilter } from 'hooks/useProjectFilter';
 import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { useApplyRunMutation } from 'services/run';
+import { useGetAllTemplatesQuery } from 'services/templates';
 
 import { OfferList } from 'pages/Offers/List';
 import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
@@ -38,6 +40,8 @@ enum DockerPythonTabs {
 }
 
 const envValidationSchema = yup.object({
+    project: yup.string().required(requiredFieldError),
+    template: yup.string().required(requiredFieldError),
     offer: yup.object().required(requiredFieldError),
     name: yup.string().matches(/^[a-z][a-z0-9-]{1,40}$/, namesFieldError),
     ide: yup.string().required(requiredFieldError),
@@ -103,14 +107,7 @@ export const CreateDevEnvironment: React.FC = () => {
     const [pushNotification] = useNotifications();
     const [activeStepIndex, setActiveStepIndex] = useState(0);
     const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
-    const [selectedProject, setSelectedProject] = useState<IProject['project_name'] | null>(
-        () => searchParams.get('project_name') ?? null,
-    );
-
-    const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: selectedProject ?? '' });
-
-    const projectHavingFleetMap = useCheckingForFleetsInProjects({ projectNames: selectedProject ? [selectedProject] : [] });
-    const projectDontHasFleets = !!selectedProject && !projectHavingFleetMap[selectedProject];
+    const { projectOptions, isLoadingProjectOptions } = useProjectFilter({ localStorePrefix: 'run-env-list-projects' });
 
     const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
 
@@ -131,6 +128,7 @@ export const CreateDevEnvironment: React.FC = () => {
     const formMethods = useForm<IRunEnvironmentFormValues>({
         resolver,
         defaultValues: {
+            project: searchParams.get('project_name') ?? undefined,
             ide: 'cursor',
             docker: false,
             repo_enabled: false,
@@ -139,20 +137,49 @@ export const CreateDevEnvironment: React.FC = () => {
     const { handleSubmit, control, trigger, setValue, watch, formState, getValues } = formMethods;
     const formValues = watch();
 
+    const projectHavingFleetMap = useCheckingForFleetsInProjects({
+        projectNames: formValues.project ? [formValues.project] : [],
+    });
+
+    const projectDontHasFleets = !!formValues.project && !projectHavingFleetMap[formValues.project];
+    const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: formValues.project ?? '' });
+
+    const { data: templatesData, isLoading: isLoadingTemplates } = useGetAllTemplatesQuery(
+        { projectName: formValues.project ?? '' },
+        { skip: !formValues.project },
+    );
+
+    const templateOptions = useMemo(() => {
+        if (!templatesData) {
+            return [];
+        }
+
+        return templatesData.map((template) => ({
+            label: template.title,
+            value: template.id,
+        }));
+    }, [templatesData]);
+
+    console.log({ formValues });
+
     const onCancelHandler = () => {
         navigate(ROUTES.RUNS.LIST);
+    };
+
+    const validateProjectAndTemplate = async () => {
+        return await trigger(['project', 'template']);
     };
 
     const validateOffer = async () => {
         return await trigger(['offer']);
     };
 
-    const validateSecondStep = async () => {
-        const secondStepFields = Object.keys(FORM_FIELD_NAMES).filter(
-            (fieldName) => !['offer', 'config_yaml'].includes(fieldName),
+    const validateConfigParams = async () => {
+        const paramFields = Object.keys(FORM_FIELD_NAMES).filter(
+            (fieldName) => !['offer', 'config_yaml', 'project', 'template'].includes(fieldName),
         ) as IRunEnvironmentFormKeys[];
 
-        return await trigger(secondStepFields);
+        return await trigger(paramFields);
     };
 
     const validateConfig = async () => {
@@ -166,7 +193,7 @@ export const CreateDevEnvironment: React.FC = () => {
         requestedStepIndex: number;
         reason: WizardProps.NavigationReason;
     }) => {
-        const stepValidators = [validateOffer, validateSecondStep, validateConfig];
+        const stepValidators = [validateProjectAndTemplate, validateOffer, validateConfigParams, validateConfig];
 
         if (reason === 'next') {
             if (projectDontHasFleets) {
@@ -235,7 +262,7 @@ export const CreateDevEnvironment: React.FC = () => {
         }
 
         const requestParams: TRunApplyRequestParams = {
-            project_name: selectedProject ?? '',
+            project_name: formValues.project,
             plan: {
                 run_spec: runSpec,
             },
@@ -278,7 +305,7 @@ export const CreateDevEnvironment: React.FC = () => {
         <form className={cn({ [styles.wizardForm]: activeStepIndex === 0 })} onSubmit={handleSubmit(onSubmit)}>
             <NoFleetProjectAlert
                 className={styles.noFleetAlert}
-                projectName={selectedProject ?? ''}
+                projectName={formValues.project ?? ''}
                 show={projectDontHasFleets}
             />
 
@@ -298,6 +325,42 @@ export const CreateDevEnvironment: React.FC = () => {
                 submitButtonText={t('runs.dev_env.wizard.submit')}
                 steps={[
                     {
+                        title: 'Template',
+                        content: (
+                            <Container>
+                                <SpaceBetween direction="vertical" size="l">
+                                    <FormSelect
+                                        label={t('runs.dev_env.wizard.project')}
+                                        description={t('runs.dev_env.wizard.project_description')}
+                                        control={control}
+                                        name="project"
+                                        options={projectOptions}
+                                        disabled={loading}
+                                        empty={t('runs.dev_env.wizard.project_empty')}
+                                        loadingText={t('runs.dev_env.wizard.project_loading')}
+                                        statusType={isLoadingProjectOptions ? 'loading' : undefined}
+                                    />
+
+                                    <FormSelect
+                                        label={t('runs.dev_env.wizard.template')}
+                                        description={t('runs.dev_env.wizard.template_description')}
+                                        placeholder={
+                                            !formValues.project ? t('runs.dev_env.wizard.template_placeholder') : undefined
+                                        }
+                                        control={control}
+                                        name="template"
+                                        options={templateOptions}
+                                        disabled={loading}
+                                        empty={t('runs.dev_env.wizard.template_empty')}
+                                        loadingText={t('runs.dev_env.wizard.template_loading')}
+                                        statusType={isLoadingTemplates ? 'loading' : undefined}
+                                    />
+                                </SpaceBetween>
+                            </Container>
+                        ),
+                    },
+
+                    {
                         title: 'Resources',
                         content: (
                             <>
@@ -306,13 +369,15 @@ export const CreateDevEnvironment: React.FC = () => {
                                     description={t('runs.dev_env.wizard.offer_description')}
                                     errorText={formState.errors.offer?.message}
                                 />
+
                                 {formState.errors.offer?.message && <br />}
+
                                 <OfferList
-                                    onChangeProjectName={(projectName) => setSelectedProject(projectName)}
                                     selectionType="single"
                                     withSearchParams={false}
                                     selectedItems={selectedOffers}
                                     onSelectionChange={onChangeOffer}
+                                    permanentFilters={{ project_name: formValues.project ?? '' }}
                                 />
                             </>
                         ),

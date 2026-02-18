@@ -1,4 +1,6 @@
 export interface IRunEnvironmentFormValues {
+    project: IProject['project_name'];
+    template: string;
     offer: IGpu;
     name: string;
     ide: 'cursor' | 'vscode' | 'windsurf';

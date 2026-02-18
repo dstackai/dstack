@@ -14,12 +14,13 @@ import {
 
 import { getPropertyFilterOptions } from '../helpers';
 
-type Args = {
+type RequestParamsKeys = 'project_name' | 'gpu_name' | 'gpu_count' | 'gpu_memory' | 'backend' | 'spot_policy' | 'group_by';
+
+export type UseFiltersArgs = {
     gpus: IGpu[];
     withSearchParams?: boolean;
+    permanentFilters?: Partial<Record<RequestParamsKeys, string>>;
 };
-
-type RequestParamsKeys = 'project_name' | 'gpu_name' | 'gpu_count' | 'gpu_memory' | 'backend' | 'spot_policy' | 'group_by';
 
 export const filterKeys: Record<string, RequestParamsKeys> = {
     PROJECT_NAME: 'project_name',
@@ -30,7 +31,7 @@ export const filterKeys: Record<string, RequestParamsKeys> = {
     SPOT_POLICY: 'spot_policy',
 };
 
-const multipleChoiseKeys: RequestParamsKeys[] = ['gpu_name', 'backend'];
+const multipleChoiceKeys: RequestParamsKeys[] = ['gpu_name', 'backend'];
 
 const spotPolicyOptions = [
     {
@@ -47,13 +48,46 @@ const spotPolicyOptions = [
     },
 ];
 
+const filteringProperties = [
+    {
+        key: filterKeys.PROJECT_NAME,
+        operators: ['='],
+        propertyLabel: 'Project',
+    },
+    {
+        key: filterKeys.GPU_NAME,
+        operators: ['='],
+        propertyLabel: 'GPU name',
+    },
+    {
+        key: filterKeys.GPU_COUNT,
+        operators: ['<=', '>='],
+        propertyLabel: 'GPU count',
+    },
+    {
+        key: filterKeys.GPU_MEMORY,
+        operators: ['<=', '>='],
+        propertyLabel: 'GPU memory',
+    },
+    {
+        key: filterKeys.BACKEND,
+        operators: ['='],
+        propertyLabel: 'Backend',
+    },
+    {
+        key: filterKeys.SPOT_POLICY,
+        operators: ['='],
+        propertyLabel: 'Spot policy',
+    },
+];
+
 const gpuFilterOption = { label: 'GPU', value: 'gpu' };
 
 const defaultGroupByOptions = [{ ...gpuFilterOption }, { label: 'Backend', value: 'backend' }];
 
 const groupByRequestParamName: RequestParamsKeys = 'group_by';
 
-export const useFilters = ({ gpus, withSearchParams = true }: Args) => {
+export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {} }: UseFiltersArgs) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { projectOptions } = useProjectFilter({ localStorePrefix: 'offers-list-projects' });
     const projectNameIsChecked = useRef(false);
@@ -133,6 +167,11 @@ export const useFilters = ({ gpus, withSearchParams = true }: Args) => {
         });
     }, [groupBy]);
 
+    const filteringPropertiesForShowing = useMemo(() => {
+        const permanentFilterKeys = Object.keys(permanentFilters);
+        return filteringProperties.filter(({ key }) => !permanentFilterKeys.includes(key));
+    }, [permanentFilters]);
+
     const setSearchParamsHandle = ({
         tokens,
         groupBy,
@@ -151,43 +190,10 @@ export const useFilters = ({ gpus, withSearchParams = true }: Args) => {
         setSearchParams(searchParams);
     };
 
-    const filteringProperties = [
-        {
-            key: filterKeys.PROJECT_NAME,
-            operators: ['='],
-            propertyLabel: 'Project',
-        },
-        {
-            key: filterKeys.GPU_NAME,
-            operators: ['='],
-            propertyLabel: 'GPU name',
-        },
-        {
-            key: filterKeys.GPU_COUNT,
-            operators: ['<=', '>='],
-            propertyLabel: 'GPU count',
-        },
-        {
-            key: filterKeys.GPU_MEMORY,
-            operators: ['<=', '>='],
-            propertyLabel: 'GPU memory',
-        },
-        {
-            key: filterKeys.BACKEND,
-            operators: ['='],
-            propertyLabel: 'Backend',
-        },
-        {
-            key: filterKeys.SPOT_POLICY,
-            operators: ['='],
-            propertyLabel: 'Spot policy',
-        },
-    ];
-
     const onChangePropertyFilterHandle = ({ tokens, operation }: PropertyFilterProps.Query) => {
         const filteredTokens = tokens.filter((token, tokenIndex) => {
             return (
-                multipleChoiseKeys.includes(token.propertyKey as RequestParamsKeys) ||
+                multipleChoiceKeys.includes(token.propertyKey as RequestParamsKeys) ||
                 !tokens.some((item, index) => token.propertyKey === item.propertyKey && index > tokenIndex)
             );
         });
@@ -227,12 +233,13 @@ export const useFilters = ({ gpus, withSearchParams = true }: Args) => {
     const filteringRequestParams = useMemo(() => {
         const params = tokensToRequestParams<RequestParamsKeys>({
             tokens: propertyFilterQuery.tokens,
-            arrayFieldKeys: multipleChoiseKeys,
+            arrayFieldKeys: multipleChoiceKeys,
         });
 
         return {
             ...params,
-        } as Partial<TRunsRequestParams>;
+            ...permanentFilters,
+        };
     }, [propertyFilterQuery]);
 
     useEffect(() => {
@@ -261,7 +268,7 @@ export const useFilters = ({ gpus, withSearchParams = true }: Args) => {
         propertyFilterQuery,
         onChangePropertyFilter,
         filteringOptions,
-        filteringProperties,
+        filteringProperties: filteringPropertiesForShowing,
         groupBy,
         groupByOptions,
         onChangeGroupBy,
