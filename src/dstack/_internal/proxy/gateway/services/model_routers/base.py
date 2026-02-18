@@ -4,7 +4,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
-from dstack._internal.core.models.routers import AnyRouterConfig
+from dstack._internal.core.models.routers import AnyServiceRouterConfig
 
 
 class RouterContext(BaseModel):
@@ -29,7 +29,7 @@ class Router(ABC):
     def __init__(
         self,
         context: RouterContext,
-        config: Optional[AnyRouterConfig] = None,
+        config: Optional[AnyServiceRouterConfig] = None,
     ):
         """Initialize router with context.
 

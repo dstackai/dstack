@@ -6,7 +6,7 @@ from typing import Iterable, Optional
 
 import dstack._internal.proxy.gateway.schemas.registry as schemas
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyRouterConfig, RouterType
+from dstack._internal.core.models.routers import AnyServiceRouterConfig, RouterType
 from dstack._internal.proxy.gateway import models as gateway_models
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import (
@@ -45,7 +45,7 @@ async def register_service(
     repo: GatewayProxyRepo,
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
-    router: Optional[AnyRouterConfig] = None,
+    router: Optional[AnyServiceRouterConfig] = None,
 ) -> None:
     service = models.Service(
         project_name=project_name,

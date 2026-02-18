@@ -11,7 +11,7 @@ import jinja2
 from pydantic import BaseModel
 from typing_extensions import Literal
 
-from dstack._internal.core.models.routers import AnyRouterConfig, RouterType
+from dstack._internal.core.models.routers import AnyServiceRouterConfig, RouterType
 from dstack._internal.proxy.gateway.const import PROXY_PORT_ON_GATEWAY
 from dstack._internal.proxy.gateway.models import ACMESettings
 from dstack._internal.proxy.gateway.services.model_routers import (
@@ -74,7 +74,7 @@ class ServiceConfig(SiteConfig):
     limit_req_zones: list[LimitReqZoneConfig]
     locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
-    router: Optional[AnyRouterConfig] = None
+    router: Optional[AnyServiceRouterConfig] = None
     router_port: Optional[int] = None
 
 

@@ -28,7 +28,7 @@ from dstack._internal.core.models.profiles import (
     parse_off_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
-from dstack._internal.core.models.routers import AnyRouterConfig
+from dstack._internal.core.models.routers import AnyServiceRouterConfig
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
@@ -890,7 +890,7 @@ class ServiceConfigurationParams(CoreModel):
         ),
     ] = None
     router: Annotated[
-        Optional[AnyRouterConfig],
+        Optional[AnyServiceRouterConfig],
         Field(
             description=(
                 "Router configuration for the service. Requires a gateway with matching router enabled. "

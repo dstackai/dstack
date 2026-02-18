@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Literal, Union
+from typing import Literal
 
 from pydantic import Field
 from typing_extensions import Annotated
@@ -11,7 +11,7 @@ class RouterType(str, Enum):
     SGLANG = "sglang"
 
 
-class GatewayRouterConfig(CoreModel):
+class SGLangGatewayRouterConfig(CoreModel):
     """Gateway-level router configuration. type and policy only. pd_disaggregation is service-level."""
 
     type: Annotated[
@@ -29,7 +29,7 @@ class GatewayRouterConfig(CoreModel):
     ] = "cache_aware"
 
 
-class SGLangRouterConfig(CoreModel):
+class SGLangServiceRouterConfig(CoreModel):
     type: Annotated[Literal["sglang"], Field(description="The router type")] = "sglang"
     policy: Annotated[
         Literal["random", "round_robin", "cache_aware", "power_of_two"],
@@ -43,4 +43,5 @@ class SGLangRouterConfig(CoreModel):
     ] = False
 
 
-AnyRouterConfig = Union[SGLangRouterConfig, GatewayRouterConfig]
+AnyServiceRouterConfig = SGLangServiceRouterConfig
+AnyGatewayRouterConfig = SGLangGatewayRouterConfig

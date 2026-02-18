@@ -26,7 +26,11 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import RouterType, SGLangRouterConfig
+from dstack._internal.core.models.routers import (
+    AnyServiceRouterConfig,
+    RouterType,
+    SGLangServiceRouterConfig,
+)
 from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel, RunModel
@@ -52,7 +56,7 @@ def _gateway_has_sglang_router(config: GatewayConfiguration) -> bool:
 def _build_service_router_config(
     gateway_configuration: GatewayConfiguration,
     service_configuration: ServiceConfiguration,
-) -> Optional[SGLangRouterConfig]:
+) -> Optional[AnyServiceRouterConfig]:
     """
     Build router config from gateway (type, policy) + service (pd_disaggregation, policy override).
     Service's policy overrides gateway's if present. Keeps backward compat: SGLang enabled
@@ -67,13 +71,13 @@ def _build_service_router_config(
     policy = gateway_router.policy
 
     service_router = service_configuration.router
-    if service_router is not None and isinstance(service_router, SGLangRouterConfig):
+    if service_router is not None and isinstance(service_router, SGLangServiceRouterConfig):
         policy = service_router.policy
         pd_disaggregation = service_router.pd_disaggregation
     else:
         pd_disaggregation = False
 
-    return SGLangRouterConfig(
+    return SGLangServiceRouterConfig(
         type=router_type,
         policy=policy,
         pd_disaggregation=pd_disaggregation,
@@ -128,16 +132,14 @@ async def _register_service_in_gateway(
 
     gateway_configuration = get_gateway_configuration(gateway)
 
-    # Check: service wants pd_disaggregation but gateway has no SGLang router
+    # Check: service specifies SGLang router but gateway does not have it
     service_router = run_spec.configuration.router
-    service_pd_disaggregation = (
-        service_router is not None
-        and isinstance(service_router, SGLangRouterConfig)
-        and service_router.pd_disaggregation
+    service_wants_sglang = service_router is not None and isinstance(
+        service_router, SGLangServiceRouterConfig
     )
-    if service_pd_disaggregation and not _gateway_has_sglang_router(gateway_configuration):
+    if service_wants_sglang and not _gateway_has_sglang_router(gateway_configuration):
         raise ServerClientError(
-            "Service requires gateway with SGLang router for pd_disaggregation but gateway "
+            "Service requires gateway with SGLang router but gateway "
             f"'{gateway.name}' does not have the SGLang router configured."
         )
 

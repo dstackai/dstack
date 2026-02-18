@@ -9,7 +9,7 @@ from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.configurations import RateLimit
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.models.routers import AnyRouterConfig
+from dstack._internal.core.models.routers import AnyServiceRouterConfig
 from dstack._internal.core.models.runs import JobSpec, JobSubmission, Run, get_service_port
 from dstack._internal.proxy.gateway.schemas.stats import ServiceStats
 from dstack._internal.server import settings
@@ -46,7 +46,7 @@ class GatewayClient:
         options: dict,
         rate_limits: list[RateLimit],
         ssh_private_key: str,
-        router: Optional[AnyRouterConfig] = None,
+        router: Optional[AnyServiceRouterConfig] = None,
     ):
         if "openai" in options:
             entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"

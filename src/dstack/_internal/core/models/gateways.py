@@ -8,7 +8,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.routers import GatewayRouterConfig
+from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.utils.tags import tags_validator
 
 
@@ -63,7 +63,7 @@ class GatewayConfiguration(CoreModel):
         ),
     ] = None
     router: Annotated[
-        Optional[GatewayRouterConfig],
+        Optional[AnyGatewayRouterConfig],
         Field(
             description=(
                 "The router configuration for this gateway. "
@@ -139,7 +139,7 @@ class GatewayComputeConfiguration(CoreModel):
     ssh_key_pub: str
     certificate: Optional[AnyGatewayCertificate] = None
     tags: Optional[Dict[str, str]] = None
-    router: Optional[GatewayRouterConfig] = None
+    router: Optional[AnyGatewayRouterConfig] = None
 
 
 class GatewayProvisioningData(CoreModel):

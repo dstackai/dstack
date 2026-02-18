@@ -7,7 +7,7 @@ from typing import List, Optional
 import httpx
 import psutil
 
-from dstack._internal.core.models.routers import RouterType, SGLangRouterConfig
+from dstack._internal.core.models.routers import AnyServiceRouterConfig, RouterType
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.utils.logging import get_logger
 
@@ -21,7 +21,7 @@ class SglangRouter(Router):
 
     TYPE = RouterType.SGLANG
 
-    def __init__(self, config: SGLangRouterConfig, context: RouterContext):
+    def __init__(self, config: AnyServiceRouterConfig, context: RouterContext):
         """Initialize SGLang router.
 
         Args:

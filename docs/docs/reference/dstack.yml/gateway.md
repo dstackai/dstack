@@ -14,7 +14,7 @@ The `gateway` configuration type allows creating and updating [gateways](../../c
 
 === "SGLang Model Gateway"
 
-    #SCHEMA# dstack._internal.core.models.routers.SGLangRouterConfig
+    #SCHEMA# dstack._internal.core.models.routers.SGLangGatewayRouterConfig
         overrides:
           show_root_heading: false
           type:
