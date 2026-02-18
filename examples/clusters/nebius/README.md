@@ -201,7 +201,7 @@ Pass the configuration to `dstack apply`:
 <div class="termy">
 
 ```shell
-$ dstack apply -f crusoe-nccl-tests.dstack.yml
+$ dstack apply -f nebius-nccl-tests.dstack.yml
 
 Provisioning...
 ---> 100%

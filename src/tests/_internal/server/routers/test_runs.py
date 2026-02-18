@@ -48,6 +48,10 @@ from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.schemas.runs import ApplyRunPlanRequest
 from dstack._internal.server.services.projects import add_project_member
+from dstack._internal.server.services.resources import (
+    set_gpu_vendor_default,
+    set_resources_defaults,
+)
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.services.runs.spec import validate_run_spec_and_set_defaults
 from dstack._internal.server.testing.common import (
@@ -588,6 +592,7 @@ def get_service_run_spec(
     repo_id: str,
     run_name: Optional[str] = None,
     gateway: Optional[Union[bool, str]] = None,
+    model: Union[str, dict] = "test-model",
 ) -> dict:
     return {
         "configuration": {
@@ -595,7 +600,7 @@ def get_service_run_spec(
             "commands": ["python -m http.server"],
             "port": 8000,
             "gateway": gateway,
-            "model": "test-model",
+            "model": model,
             "repos": [
                 {
                     "url": "https://github.com/dstackai/dstack",
@@ -1534,6 +1539,13 @@ class TestGetRunPlan:
             run_spec=run_spec,
         )
         run = run_model_to_run(run_model)
+        # Apply the same defaults the server applies to current_resource
+        set_resources_defaults(run.run_spec.configuration.resources)
+        set_gpu_vendor_default(
+            run.run_spec.configuration.resources,
+            image=run.run_spec.configuration.image,
+            docker=getattr(run.run_spec.configuration, "docker", None),
+        )
         run_spec.configuration = new_conf
         response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",
@@ -2303,47 +2315,68 @@ class TestSubmitService:
             "expected_service_url",
             "expected_model_url",
             "is_gateway",
+            "model",
         ),
         [
             pytest.param(
                 [("default-gateway", True), ("non-default-gateway", False)],
                 None,
                 "https://test-service.default-gateway.example",
-                "https://gateway.default-gateway.example",
+                "https://test-service.default-gateway.example/v1",
                 True,
+                "test-model",
                 id="submits-to-default-gateway",
             ),
             pytest.param(
                 [("default-gateway", True), ("non-default-gateway", False)],
                 True,
                 "https://test-service.default-gateway.example",
-                "https://gateway.default-gateway.example",
+                "https://test-service.default-gateway.example/v1",
                 True,
+                "test-model",
                 id="submits-to-default-gateway-when-gateway-true",
             ),
             pytest.param(
                 [("default-gateway", True), ("non-default-gateway", False)],
                 "non-default-gateway",
                 "https://test-service.non-default-gateway.example",
-                "https://gateway.non-default-gateway.example",
+                "https://test-service.non-default-gateway.example/v1",
                 True,
+                "test-model",
                 id="submits-to-specified-gateway",
             ),
             pytest.param(
                 [("non-default-gateway", False)],
                 None,
                 "/proxy/services/test-project/test-service/",
-                "/proxy/models/test-project/",
+                "/proxy/services/test-project/test-service/v1",
                 False,
+                "test-model",
                 id="submits-in-server-when-no-default-gateway",
             ),
             pytest.param(
                 [("default-gateway", True)],
                 False,
                 "/proxy/services/test-project/test-service/",
-                "/proxy/models/test-project/",
+                "/proxy/services/test-project/test-service/v1",
                 False,
+                "test-model",
                 id="submits-in-server-when-specified",
+            ),
+            pytest.param(
+                [("default-gateway", True)],
+                None,
+                "https://test-service.default-gateway.example",
+                "https://gateway.default-gateway.example",
+                True,
+                {
+                    "type": "chat",
+                    "name": "test-model",
+                    "format": "tgi",
+                    "chat_template": "test",
+                    "eos_token": "</s>",
+                },
+                id="submits-tgi-model-to-gateway",
             ),
         ],
     )
@@ -2357,6 +2390,7 @@ class TestSubmitService:
         expected_service_url: str,
         expected_model_url: str,
         is_gateway: bool,
+        model: Union[str, dict],
     ) -> None:
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user, name="test-project")
@@ -2386,6 +2420,7 @@ class TestSubmitService:
             repo_id=repo.name,
             run_name="test-service",
             gateway=specified_gateway_in_run_conf,
+            model=model,
         )
         response = await client.post(
             f"/api/project/{project.name}/runs/submit",
