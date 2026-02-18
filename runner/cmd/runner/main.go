@@ -31,6 +31,7 @@ func main() {
 
 func mainInner() int {
 	var tempDir string
+	var httpAddress string
 	var httpPort int
 	var sshPort int
 	var sshAuthorizedKeys []string
@@ -61,6 +62,13 @@ func mainInner() int {
 						Destination: &tempDir,
 						TakesFile:   true,
 					},
+					&cli.StringFlag{
+						Name:        "http-address",
+						Usage:       "Set a http bind address",
+						Value:       "",
+						DefaultText: "all interfaces",
+						Destination: &httpAddress,
+					},
 					&cli.IntFlag{
 						Name:        "http-port",
 						Usage:       "Set a http port",
@@ -86,7 +94,7 @@ func mainInner() int {
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return start(ctx, tempDir, httpPort, sshPort, sshAuthorizedKeys, logLevel, Version)
+					return start(ctx, logLevel, tempDir, httpAddress, httpPort, sshPort, sshAuthorizedKeys)
 				},
 			},
 		},
@@ -103,7 +111,12 @@ func mainInner() int {
 	return 0
 }
 
-func start(ctx context.Context, tempDir string, httpPort int, sshPort int, sshAuthorizedKeys []string, logLevel int, version string) error {
+func start(
+	ctx context.Context,
+	logLevel int, tempDir string,
+	httpAddress string, httpPort int,
+	sshPort int, sshAuthorizedKeys []string,
+) error {
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return fmt.Errorf("create temp directory: %w", err)
 	}
@@ -191,7 +204,7 @@ func start(ctx context.Context, tempDir string, httpPort int, sshPort int, sshAu
 		return fmt.Errorf("create executor: %w", err)
 	}
 
-	server, err := api.NewServer(ctx, fmt.Sprintf(":%d", httpPort), version, ex)
+	server, err := api.NewServer(ctx, fmt.Sprintf("%s:%d", httpAddress, httpPort), Version, ex)
 	if err != nil {
 		return fmt.Errorf("create server: %w", err)
 	}

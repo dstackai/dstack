@@ -110,7 +110,7 @@ func (c *dockerParametersMock) DockerPJRTDevice() string {
 	return ""
 }
 
-func (c *dockerParametersMock) DockerShellCommands(publicKeys []string) []string {
+func (c *dockerParametersMock) DockerShellCommands(authorizedKeys []string, runnerHttpAddress string) []string {
 	commands := make([]string, 0)
 	if c.sshShellCommands {
 		commands = append(commands, getSSHShellCommands()...)

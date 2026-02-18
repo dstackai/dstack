@@ -323,9 +323,11 @@ class ProfileParams(CoreModel):
         Field(
             description=(
                 "Time to wait before terminating idle instances."
-                " Instances are not terminated if the fleet is already at `nodes.min`."
+                " When the run reuses an existing fleet instance, the fleet's `idle_duration` applies."
+                " When the run provisions a new instance, the shorter of the fleet's and run's values is used."
                 " Defaults to `5m` for runs and `3d` for fleets."
-                " Use `off` for unlimited duration"
+                " Use `off` for unlimited duration."
+                " Only applied for VM-based backends"
             )
         ),
     ] = None

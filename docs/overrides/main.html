@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 
+{% block extrahead %}
+<link rel="preload" href="{{ 'assets/fonts/GeistPixel-Square.woff2' | url }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ 'assets/fonts/GeistPixel-Circle.woff2' | url }}" as="font" type="font/woff2" crossorigin>
+{% endblock %}
+
 {% block container %}
 <div class="md-content" data-md-component="content">
   {% if "navigation.path" in features %}

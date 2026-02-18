@@ -65,7 +65,10 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.probes import is_probe_ready
 from dstack._internal.server.services.projects import list_user_project_models
-from dstack._internal.server.services.resources import set_resources_defaults
+from dstack._internal.server.services.resources import (
+    set_gpu_vendor_default,
+    set_resources_defaults,
+)
 from dstack._internal.server.services.runs.plan import get_job_plans
 from dstack._internal.server.services.runs.spec import (
     can_update_run_spec,
@@ -343,8 +346,8 @@ async def get_plan(
         )
         if current_resource is not None:
             # For backward compatibility (current_resource may has been submitted before
-            # some fields, e.g., CPUSpec.arch, were added)
-            set_resources_defaults(current_resource.run_spec.configuration.resources)
+            # some fields, e.g., CPUSpec.arch, gpu.vendor were added)
+            _set_run_resources_defaults(current_resource.run_spec)
             if not current_resource.status.is_finished() and can_update_run_spec(
                 current_resource.run_spec, effective_run_spec
             ):
@@ -354,7 +357,7 @@ async def get_plan(
         session=session,
         project=project,
         profile=profile,
-        run_spec=run_spec,
+        run_spec=effective_run_spec,
         max_offers=max_offers,
     )
     run_plan = RunPlan(
@@ -410,8 +413,8 @@ async def apply_plan(
     current_resource = run_model_to_run(current_resource_model, return_in_api=True)
 
     # For backward compatibility (current_resource may has been submitted before
-    # some fields, e.g., CPUSpec.arch, were added)
-    set_resources_defaults(current_resource.run_spec.configuration.resources)
+    # some fields, e.g., CPUSpec.arch, gpu.vendor were added)
+    _set_run_resources_defaults(current_resource.run_spec)
     try:
         spec_diff = check_can_update_run_spec(current_resource.run_spec, run_spec)
     except ServerClientError:
@@ -421,7 +424,7 @@ async def apply_plan(
         raise
     if not force:
         if plan.current_resource is not None:
-            set_resources_defaults(plan.current_resource.run_spec.configuration.resources)
+            _set_run_resources_defaults(plan.current_resource.run_spec)
         if (
             plan.current_resource is None
             or plan.current_resource.id != current_resource.id
@@ -780,6 +783,16 @@ def run_model_to_run(
     )
     run.cost = _get_run_cost(run)
     return run
+
+
+def _set_run_resources_defaults(run_spec: RunSpec) -> None:
+    """Apply resource defaults to a run spec, including GPU vendor inference."""
+    set_resources_defaults(run_spec.configuration.resources)
+    set_gpu_vendor_default(
+        run_spec.configuration.resources,
+        image=run_spec.configuration.image,
+        docker=getattr(run_spec.configuration, "docker", None),
+    )
 
 
 def _get_run_jobs_with_submissions(

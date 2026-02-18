@@ -32,6 +32,7 @@ from dstack._internal.core.models.routers import (
     SGLangServiceRouterConfig,
 )
 from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
+from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services import events
@@ -158,10 +159,15 @@ async def _register_service_in_gateway(
     wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     if wildcard_domain is None:
         raise ServerClientError("Domain is required for gateway")
+    service_url = f"{service_protocol}://{run_model.run_name}.{wildcard_domain}"
+    if isinstance(run_spec.configuration.model, OpenAIChatModel):
+        model_url = service_url + run_spec.configuration.model.prefix
+    else:
+        model_url = f"{gateway_protocol}://gateway.{wildcard_domain}"
     service_spec = get_service_spec(
         configuration=run_spec.configuration,
-        service_url=f"{service_protocol}://{run_model.run_name}.{wildcard_domain}",
-        model_url=f"{gateway_protocol}://gateway.{wildcard_domain}",
+        service_url=service_url,
+        model_url=model_url,
     )
 
     domain = service_spec.get_domain()
@@ -233,10 +239,15 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
             "Rate limits are not supported when running services without a gateway."
             " Please configure a gateway or remove `rate_limits` from the service configuration"
         )
+    service_url = f"/proxy/services/{run_model.project.name}/{run_model.run_name}/"
+    if isinstance(run_spec.configuration.model, OpenAIChatModel):
+        model_url = service_url.rstrip("/") + run_spec.configuration.model.prefix
+    else:
+        model_url = f"/proxy/models/{run_model.project.name}/"
     return get_service_spec(
         configuration=run_spec.configuration,
-        service_url=f"/proxy/services/{run_model.project.name}/{run_model.run_name}/",
-        model_url=f"/proxy/models/{run_model.project.name}/",
+        service_url=service_url,
+        model_url=model_url,
     )
 
 
