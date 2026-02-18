@@ -391,10 +391,14 @@ class BaseRunConfigurator(
         Infers GPU vendor if not set. Defaults to Nvidia when using the default
         CUDA image. Requires explicit `image` if the vendor is AMD or Tenstorrent.
 
-        NOTE: We don't set the inferred vendor on gpu_spec for compatibility with
-        older servers. Servers set the vendor using the same logic in
-        set_resources_defaults(). The inferred vendor is used here only for
-        validation and display (see _infer_gpu_vendor).
+        When vendor is inferred from GPU name (e.g. A100 -> nvidia), it is written to
+        gpu_spec. When vendor is inferred from image context (no name, no vendor, default
+        CUDA image -> nvidia), it is NOT written to gpu_spec because 0.19.x servers
+        (gpuhunt <0.1.12) break on vendor=nvidia + min_gpu_count=0. The server applies
+        the same default in set_gpu_vendor_default().
+
+        TODO: This entire method should move to the server (set_resources_defaults)
+        so that defaults and validation are equal for CLI and API users.
         """
         gpu_spec = conf.resources.gpu
         if gpu_spec is None:
@@ -439,11 +443,8 @@ class BaseRunConfigurator(
                 # Set vendor inferred from name on the spec (server needs it for filtering).
                 gpu_spec.vendor = vendor
             else:
-                # No vendor or name specified. Default to Nvidia if using the default
-                # CUDA image, since it's only compatible with Nvidia GPUs.
-                # We don't set the inferred vendor on the spec — the server does the
-                # same inference in set_resources_defaults() for compatibility with
-                # older servers that don't handle vendor + count.min=0 correctly.
+                # No vendor or name specified. Default to Nvidia if using the
+                # default CUDA image, since it's only compatible with Nvidia GPUs.
                 if conf.image is None and conf.docker is not True:
                     vendor = gpuhunt.AcceleratorVendor.NVIDIA
                 has_amd_gpu = False

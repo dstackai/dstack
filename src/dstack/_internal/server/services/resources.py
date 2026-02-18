@@ -29,9 +29,17 @@ def set_gpu_vendor_default(
     docker: Optional[bool],
 ) -> None:
     """Default GPU vendor to Nvidia when using the default CUDA image,
-    since it's only compatible with Nvidia GPUs.
-    Mirrors the client-side logic in validate_gpu_vendor_and_image().
-    Should only be called for runs (not fleets) since fleets don't have image context."""
+    since it's only compatible with Nvidia GPUs. Only called for runs
+    (not fleets) since fleets don't have image context.
+
+    The client infers the same default for display and validation
+    (see validate_gpu_vendor_and_image) but does not write it to the spec
+    for 0.19.x server compatibility. This server-side function is what
+    actually sets the vendor before offer matching.
+
+    TODO: All resource defaults and validation (gpu vendor, cpu arch, memory,
+    disk, etc.) should be set here on the server, not split between client
+    and model-level defaults."""
     gpu = resources.gpu
     if (
         gpu is not None
