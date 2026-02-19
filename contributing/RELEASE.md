@@ -8,7 +8,10 @@ This is a `dstack` release guide and checklist for core maintainers.
     1. Compare changes to the previous release, e.g. [`https://github.com/dstackai/dstack/compare/0.19.39...master`](https://github.com/dstackai/dstack/compare/0.19.39...master).
     2. Test that `master` CLI works with the previous server release. PRs that add new model fields can potentially break client backward compatibility.
     3. Test that `master` server works with the previous CLI release.
-    4. Pay special attention to releases with DB migrations. Migrations should work with rolling deployments and avoid locking multiple tables. See [MIGRATIONS.md](MIGRATIONS.md).
+    4. Pay special attention to releases with DB migrations. See [MIGRATIONS.md](MIGRATIONS.md).
+      * Ensure migrations work with rolling deployments and do not lock multiple tables.
+      * Test applying migrations while old replicas do active processing.
+      * Test migrations can be retried if they fail. For example, concurrent index may fail and stay in invalid state.
 2. Create a tag, e.g. `git tag 0.19.40`.
 3. Push the tag to trigger the Release `workflow`, i.e. `git push --tags`.
 4. Generate GitHub release notes from the tag. Highlight major features, deprecations, breaking changes.
