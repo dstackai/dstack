@@ -113,6 +113,86 @@ curl http://127.0.0.1:3000/proxy/services/main/deepseek-r1/v1/chat/completions \
 
 > If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling or HTTPs, rate-limits, etc), the service endpoint will be available at `https://deepseek-r1.<gateway domain>/`.
 
+## PD-Disaggregation
+
+To run PD-Disaggregated inference using SGLang Model Gateway.
+
+Create a SGLang-enabled gateway in the same network where prefill and decode workers will be deployed. Here we are using a Kubernetes cluster to ensure the gateway and workers share the same network.
+
+```yaml
+type: gateway
+name: gateway-name
+
+backend: kubernetes
+region: any
+
+# This domain will be used to access the endpoint
+domain: example.com
+router:
+  type: sglang
+```
+
+After the gateway is ready, create a node group with at least two instances—one for the Prefill worker and one for the Decode worker—within the same Kubernetes cluster where the gateway is running. Then apply below service configuration to the GPU nodes.
+
+```yaml
+type: service
+name: prefill-decode
+image: lmsysorg/sglang:latest
+
+env:
+  - HF_TOKEN
+  - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+
+replicas:
+  - count: 1..4
+    scaling:
+      metric: rps
+      target: 3
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --disaggregation-mode prefill \
+          --disaggregation-transfer-backend mooncake \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --disaggregation-bootstrap-port 8998 \
+          --log-level debug \
+          > worker-server.log 2>&1
+    resources:
+      gpu: H200
+
+  - count: 1..8
+    scaling:
+      metric: rps
+      target: 2
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --disaggregation-mode decode \
+          --disaggregation-transfer-backend mooncake \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --log-level debug \
+          > worker-server.log 2>&1
+    resources:
+      gpu: H200
+
+port: 8000
+model: zai-org/GLM-4.5-Air-FP8
+
+# Custom probe is required for PD disaggregation
+probes:
+  - type: http
+    url: /health_generate
+    interval: 15s
+
+router:
+  type: sglang
+  pd_disaggregation: true
+```
+
 ## Source code
 
 The source-code of this example can be found in
