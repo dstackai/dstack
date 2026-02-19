@@ -102,7 +102,7 @@ $ dstack apply -f glm45air.dstack.yml
 
 ### Gateway
 
-Just like `dstack` relies on the SGLang router for cache-aware routing, Prefill–Decode disaggregation also requires a [gateway](https://chatgpt.com/docs/concepts/gateways.md#sglang) configured with the SGLang router.
+Just like `dstack` relies on the SGLang router for cache-aware routing, Prefill–Decode disaggregation also requires a [gateway](../../docs/concepts/gateways.md#sglang) configured with the SGLang router.
 
 <div editor-title="gateway-sglang.dstack.yml">
 
