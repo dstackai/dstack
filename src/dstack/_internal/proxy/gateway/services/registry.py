@@ -8,6 +8,7 @@ import dstack._internal.proxy.gateway.schemas.registry as schemas
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.routers import AnyServiceRouterConfig, RouterType
 from dstack._internal.proxy.gateway import models as gateway_models
+from dstack._internal.proxy.gateway.const import SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.services.nginx import (
     LimitReqConfig,
@@ -63,7 +64,7 @@ async def register_service(
 
     async with lock:
         if await repo.get_service(project_name, run_name) is not None:
-            raise ProxyError(f"Service {service.fmt()} is already registered")
+            raise ProxyError(SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE.format(ref=service.fmt()))
 
         old_project = await repo.get_project(project_name)
         new_project = models.Project(name=project_name, ssh_private_key=ssh_private_key)

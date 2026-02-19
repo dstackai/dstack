@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal import settings
+from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import (
@@ -2299,13 +2300,13 @@ class TestDeleteRuns:
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestSubmitService:
     @pytest.fixture(autouse=True)
-    def mock_gateway_connections(self) -> Generator[None, None, None]:
+    def mock_gateway_connection(self) -> Generator[AsyncMock, None, None]:
         with patch(
             "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
         ) as get_conn_mock:
             get_conn_mock.return_value.client = Mock()
             get_conn_mock.return_value.client.return_value = AsyncMock()
-            yield
+            yield get_conn_mock
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -2481,3 +2482,54 @@ class TestSubmitService:
                 }
             ]
         }
+
+    @pytest.mark.asyncio
+    async def test_unregister_dangling_service(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        mock_gateway_connection: AsyncMock,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user, name="test-project")
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            status=GatewayStatus.RUNNING,
+            wildcard_domain="example.com",
+        )
+        project.default_gateway_id = gateway.id
+        await session.commit()
+
+        client_mock = (
+            mock_gateway_connection.return_value.client.return_value.__aenter__.return_value
+        )
+        client_mock.register_service.side_effect = [
+            GatewayError("Service test-project/test-service is already registered"),
+            None,  # Second call succeeds
+        ]
+
+        response = await client.post(
+            "/api/project/test-project/runs/submit",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": get_service_run_spec(repo_id=repo.name, run_name="test-service")},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["service"]["url"] == "https://test-service.example.com"
+        # Verify that unregister_service was called to clean up the dangling service
+        client_mock.unregister_service.assert_called_once_with(
+            project=project.name,
+            run_name="test-service",
+        )
+        # Verify that register_service was called twice (first failed, then succeeded)
+        assert client_mock.register_service.call_count == 2
