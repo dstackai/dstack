@@ -1,6 +1,5 @@
 type: service
-name: prefill-decode-test
-https: false
+name: prefill-decode
 image: lmsysorg/sglang:latest
 
 env:
@@ -8,12 +7,11 @@ env:
   - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
 replicas:
-  - count: 1..2
+  - count: 1..4
     scaling:
       metric: rps
       target: 3
     commands:
-      - echo "Group Prefill" > /tmp/version.txt
       - |
           python -m sglang.launch_server \
             --model-path $MODEL_ID \
@@ -25,9 +23,11 @@ replicas:
     resources:
       gpu: 1
 
-  - count: 1
+  - count: 1..8
+    scaling:
+      metric: rps
+      target: 2
     commands:
-      - echo "Group Decode" > /tmp/version.txt
       - |
           python -m sglang.launch_server \
             --model-path $MODEL_ID \
@@ -48,5 +48,4 @@ probes:
 
 router:
   type: sglang
-  policy: round_robin
   pd_disaggregation: true
