@@ -231,7 +231,7 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
     > Properties such as `regions`, `port`, `image`, `env` and some other cannot be configured per replica group. This support is coming soon.
 
 ??? info "Disaggregated serving"
-    Native support for disaggregated prefill and decode, allowing both worker types to run within a single service, is coming soon.
+    Replica groups support disaggregated prefill and decode, allowing both worker types to run within a single service. To run PD disaggregated inference, refer to the [SGLang PD-Disaggregation](../../examples/inference/sglang/index.md#pd-disaggregation) example.
 
 ### Authorization
 

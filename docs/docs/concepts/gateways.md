@@ -119,9 +119,9 @@ router:
     * `round_robin` &mdash; Cycles through workers in order.                                                             
 
 
-> Currently, services using this type of gateway must run standard SGLang workers. See the [example](../../examples/inference/sglang/index.md).
+> Services using this type of gateway can run PD-disaggregated inference. To run PD disaggregation inference, refer to the [SGLang PD-Disaggregation](../../examples/inference/sglang/index.md#pd-disaggregation) example.
 >
-> Support for prefill/decode disaggregation and auto-scaling based on inter-token latency is coming soon.
+> Support for auto-scaling based on TTFT and ITL is coming soon.
 
 ### Public IP
 
