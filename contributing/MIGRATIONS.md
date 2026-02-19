@@ -47,3 +47,29 @@ These steps apply to **renaming a column** or **changing the type of a column**
 ### Altering multiple tables
 
 Altering a table requires Postgres to [take an ACCESS EXCLUSIVE lock](https://www.postgresql.org/docs/current/sql-altertable.html). (This applies not only to statements that rewrite the tables but also to statements that modify tables metadata.) Altering multiple tables can cause deadlocks due to conflict with read operations since the `dstack` server does not define an order for read operations. Altering multiple tables should be done in separate transactions/migrations.
+
+### Adding indexes
+
+Use `CREATE INDEX CONCURRENTLY` to avoid tacking exclusive lock on the table for a long time.
+For migrations that create multiple indexes, failures can leave the schema in a partial state
+(some indexes already created, some missing). On Postgres, concurrent index creation can also fail
+midway and leave an invalid index object with the same name. Retrying the migration then fails
+with "already exists".
+
+For retry-safe migrations, pre-drop indexes with `if_exists=True` before creating them again:
+
+```python
+with op.get_context().autocommit_block():
+    op.drop_index(
+        "ix_table_col",
+        table_name="table",
+        if_exists=True,
+        postgresql_concurrently=True,
+    )
+    op.create_index(
+        "ix_table_col",
+        "table",
+        ["col"],
+        postgresql_concurrently=True,
+    )
+```
