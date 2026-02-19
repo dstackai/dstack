@@ -19,6 +19,10 @@ logger = get_logger(__name__)
 
 @dataclass
 class PipelineItem:
+    """
+    Pipelines can work with this class or its subclass if the worker needs to access extra attributes.
+    """
+
     __tablename__: str
     id: uuid.UUID
     lock_expires_at: datetime
@@ -26,7 +30,14 @@ class PipelineItem:
     prev_lock_expired: bool
 
 
+ItemT = TypeVar("ItemT", bound=PipelineItem)
+
+
 class PipelineModel(Protocol):
+    """
+    Heartbeater can work with any DB model implementing this protocol.
+    """
+
     __tablename__: str
     __mapper__: ClassVar[Any]
     __table__: ClassVar[Any]
@@ -39,7 +50,7 @@ class PipelineError(Exception):
     pass
 
 
-class Pipeline(ABC):
+class Pipeline(Generic[ItemT], ABC):
     def __init__(
         self,
         workers_num: int,
@@ -57,7 +68,7 @@ class Pipeline(ABC):
         self._min_processing_interval = min_processing_interval
         self._lock_timeout = lock_timeout
         self._heartbeat_trigger = heartbeat_trigger
-        self._queue = asyncio.Queue[PipelineItem](maxsize=self._queue_maxsize)
+        self._queue = asyncio.Queue[ItemT](maxsize=self._queue_maxsize)
         self._tasks: list[asyncio.Task] = []
         self._running = False
         self._shutdown = False
@@ -119,27 +130,24 @@ class Pipeline(ABC):
 
     @property
     @abstractmethod
-    def _heartbeater(self) -> "Heartbeater":
+    def _heartbeater(self) -> "Heartbeater[ItemT]":
         pass
 
     @property
     @abstractmethod
-    def _fetcher(self) -> "Fetcher":
+    def _fetcher(self) -> "Fetcher[ItemT]":
         pass
 
     @property
     @abstractmethod
-    def _workers(self) -> Sequence["Worker"]:
+    def _workers(self) -> Sequence["Worker[ItemT]"]:
         pass
 
 
-ModelT = TypeVar("ModelT", bound=PipelineModel)
-
-
-class Heartbeater(Generic[ModelT]):
+class Heartbeater(Generic[ItemT]):
     def __init__(
         self,
-        model_type: type[ModelT],
+        model_type: type[PipelineModel],
         lock_timeout: timedelta,
         heartbeat_trigger: timedelta,
         heartbeat_delay: float = 1.0,
@@ -147,7 +155,7 @@ class Heartbeater(Generic[ModelT]):
         self._model_type = model_type
         self._lock_timeout = lock_timeout
         self._hearbeat_margin = heartbeat_trigger
-        self._items: dict[uuid.UUID, PipelineItem] = {}
+        self._items: dict[uuid.UUID, ItemT] = {}
         self._untrack_lock = asyncio.Lock()
         self._heartbeat_delay = heartbeat_delay
         self._running = False
@@ -164,10 +172,10 @@ class Heartbeater(Generic[ModelT]):
     def stop(self):
         self._running = False
 
-    async def track(self, item: PipelineItem):
+    async def track(self, item: ItemT):
         self._items[item.id] = item
 
-    async def untrack(self, item: PipelineItem):
+    async def untrack(self, item: ItemT):
         async with self._untrack_lock:
             tracked = self._items.get(item.id)
             # Prevent expired fetch iteration to unlock item processed by new iteration.
@@ -175,7 +183,7 @@ class Heartbeater(Generic[ModelT]):
                 del self._items[item.id]
 
     async def heartbeat(self):
-        items_to_update: list[PipelineItem] = []
+        items_to_update: list[ItemT] = []
         now = get_current_datetime()
         items = list(self._items.values())
         failed_to_heartbeat_count = 0
@@ -227,16 +235,16 @@ class Heartbeater(Generic[ModelT]):
             )
 
 
-class Fetcher(ABC):
+class Fetcher(Generic[ItemT], ABC):
     _DEFAULT_FETCH_DELAYS = [0.5, 1, 2, 5]
 
     def __init__(
         self,
-        queue: asyncio.Queue[PipelineItem],
+        queue: asyncio.Queue[ItemT],
         queue_desired_minsize: int,
         min_processing_interval: timedelta,
         lock_timeout: timedelta,
-        heartbeater: Heartbeater,
+        heartbeater: Heartbeater[ItemT],
         queue_check_delay: float = 1.0,
         fetch_delays: Optional[list[float]] = None,
     ) -> None:
@@ -289,7 +297,7 @@ class Fetcher(ABC):
         self._fetch_event.set()
 
     @abstractmethod
-    async def fetch(self, limit: int) -> list[PipelineItem]:
+    async def fetch(self, limit: int) -> list[ItemT]:
         pass
 
     def _next_fetch_delay(self, empty_fetch_count: int) -> float:
@@ -298,11 +306,11 @@ class Fetcher(ABC):
         return next_delay * (1 + jitter)
 
 
-class Worker(ABC):
+class Worker(Generic[ItemT], ABC):
     def __init__(
         self,
-        queue: asyncio.Queue[PipelineItem],
-        heartbeater: Heartbeater,
+        queue: asyncio.Queue[ItemT],
+        heartbeater: Heartbeater[ItemT],
     ) -> None:
         self._queue = queue
         self._heartbeater = heartbeater
@@ -325,7 +333,7 @@ class Worker(ABC):
         self._running = False
 
     @abstractmethod
-    async def process(self, item: PipelineItem):
+    async def process(self, item: ItemT):
         pass
 
 
