@@ -73,7 +73,7 @@ def run_migrations(connection: Connection):
         # lock_timeout is needed so that migrations that acquire locks
         # do not wait for locks forever, blocking live queries.
         # Better to fail and retry a deployment.
-        connection.execute(text("SET lock_timeout='10s';"))
+        connection.execute(text("SET lock_timeout='15s';"))
     connection.commit()
     context.configure(
         connection=connection,
