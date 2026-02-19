@@ -156,9 +156,7 @@ replicas:
           --disaggregation-transfer-backend mooncake \
           --host 0.0.0.0 \
           --port 8000 \
-          --disaggregation-bootstrap-port 8998 \
-          --log-level debug \
-          > worker-server.log 2>&1
+          --disaggregation-bootstrap-port 8998
     resources:
       gpu: H200
 
@@ -173,9 +171,7 @@ replicas:
           --disaggregation-mode decode \
           --disaggregation-transfer-backend mooncake \
           --host 0.0.0.0 \
-          --port 8000 \
-          --log-level debug \
-          > worker-server.log 2>&1
+          --port 8000
     resources:
       gpu: H200
 
@@ -195,8 +191,8 @@ router:
 
 ## Source code
 
-The source-code of this example can be found in
-[`examples/llms/deepseek/sglang`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/sglang).
+The source-code of these examples can be found in
+[`examples/llms/deepseek/sglang`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/sglang) and [`examples/inference/sglang`](https://github.com/dstackai/dstack/blob/master/examples/inference/sglang).
 
 ## What's next?
 
