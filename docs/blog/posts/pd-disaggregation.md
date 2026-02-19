@@ -126,7 +126,7 @@ router:
 
 * Because the SGLang router requires all workers to be on the same network, and `dstack` currently runs the router inside the gateway, the gateway and the service must be running in the same cluster.
 * Prefill–Decode disaggregation is currently available with the SGLang backend (vLLM support is coming).
-* Autoscaling supports RPS as the metric for now; TTFT and end-to-end latency metrics are planned next.
+* Autoscaling supports RPS as the metric for now; TTFT and ITL metrics are planned next.
 
 With native support for inference and now Prefill–Decode disaggregation, `dstack` makes it easier to run high-throughput, low-latency model serving across GPU clouds, and Kubernetes or bare-metal clusters.
 
