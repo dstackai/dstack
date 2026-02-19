@@ -25,7 +25,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import ComputeGroupModel, InstanceModel, ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.compute_groups import compute_group_model_to_compute_group
-from dstack._internal.server.services.instances import switch_instance_status
+from dstack._internal.server.services.instances import emit_instance_status_change_event
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
@@ -235,7 +235,12 @@ class ComputeGroupWorker(Worker[PipelineItem]):
                 .values(**terminate_result.instances_update_map)
             )
             for instance_model in compute_group_model.instances:
-                switch_instance_status(session, instance_model, InstanceStatus.TERMINATED)
+                emit_instance_status_change_event(
+                    session=session,
+                    instance_model=instance_model,
+                    old_status=instance_model.status,
+                    new_status=InstanceStatus.TERMINATED,
+                )
 
 
 @dataclass
