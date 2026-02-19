@@ -492,7 +492,7 @@ class JobModel(BaseModel):
     waiting_master_job: Mapped[Optional[bool]] = mapped_column(Boolean)
 
 
-class GatewayModel(BaseModel):
+class GatewayModel(PipelineModelMixin, BaseModel):
     __tablename__ = "gateways"
 
     id: Mapped[uuid.UUID] = mapped_column(

@@ -80,11 +80,41 @@ def switch_gateway_status(
         return
 
     gateway_model.status = new_status
+    emit_gateway_status_change_event(
+        session=session,
+        gateway_model=gateway_model,
+        old_status=old_status,
+        new_status=new_status,
+        status_message=gateway_model.status_message,
+        actor=actor,
+    )
 
-    msg = f"Gateway status changed {old_status.upper()} -> {new_status.upper()}"
-    if gateway_model.status_message is not None:
-        msg += f" ({gateway_model.status_message})"
+
+def emit_gateway_status_change_event(
+    session: AsyncSession,
+    gateway_model: GatewayModel,
+    old_status: GatewayStatus,
+    new_status: GatewayStatus,
+    status_message: Optional[str],
+    actor: events.AnyActor = events.SystemActor(),
+) -> None:
+    if old_status == new_status:
+        return
+    msg = get_gateway_status_change_message(
+        old_status=old_status,
+        new_status=new_status,
+        status_message=status_message,
+    )
     events.emit(session, msg, actor=actor, targets=[events.Target.from_model(gateway_model)])
+
+
+def get_gateway_status_change_message(
+    old_status: GatewayStatus, new_status: GatewayStatus, status_message: Optional[str]
+) -> str:
+    msg = f"Gateway status changed {old_status.upper()} -> {new_status.upper()}"
+    if status_message is not None:
+        msg += f" ({status_message})"
+    return msg
 
 
 GATEWAY_CONNECT_ATTEMPTS = 30
@@ -183,6 +213,7 @@ async def create_gateway(
         if configuration.name is None:
             configuration.name = await generate_gateway_name(session=session, project=project)
 
+        now = get_current_datetime()
         gateway = GatewayModel(
             id=uuid.uuid4(),
             name=configuration.name,
@@ -192,7 +223,8 @@ async def create_gateway(
             wildcard_domain=configuration.domain,
             configuration=configuration.json(),
             status=GatewayStatus.SUBMITTED,
-            last_processed_at=get_current_datetime(),
+            created_at=now,
+            last_processed_at=now,
         )
         session.add(gateway)
         events.emit(
