@@ -26,6 +26,7 @@ import (
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/common"
 	"github.com/dstackai/dstack/runner/internal/connections"
+	cap "github.com/dstackai/dstack/runner/internal/linux/capabilities"
 	linuxuser "github.com/dstackai/dstack/runner/internal/linux/user"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
@@ -467,10 +468,19 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 	cmd.Dir = ex.jobWorkingDir
 
-	// Strictly speaking, we need CAP_SETUID and CAP_GUID (for Cmd.Start()->
-	// Cmd.SysProcAttr.Credential) and CAP_CHOWN (for startCommand()->os.Chown()),
-	// but for the sake of simplicity we instead check if we are root or not
-	if ex.currentUser.IsRoot() {
+	// CAP_SET{UID,GID} for startCommand() -> Cmd.Start() -> set{uid,gid,groups} syscalls during fork-exec
+	// CAP_CHOWN for startCommand() -> os.Chown(pts.Name())
+	if missing, err := cap.Check(cap.SETUID, cap.SETGID, cap.CHOWN); err != nil {
+		log.Error(
+			ctx, "Failed to check capabilities, won't try to set process credentials",
+			"err", err, "user", ex.currentUser,
+		)
+	} else if len(missing) > 0 {
+		log.Info(
+			ctx, "Required capabilities are missing, cannot set process credentials",
+			"missing", missing, "user", ex.currentUser,
+		)
+	} else {
 		log.Trace(ctx, "Using credentials", "user", ex.jobUser)
 		if cmd.SysProcAttr == nil {
 			cmd.SysProcAttr = &syscall.SysProcAttr{}
@@ -480,8 +490,6 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 			return fmt.Errorf("prepare process credentials: %w", err)
 		}
 		cmd.SysProcAttr.Credential = creds
-	} else {
-		log.Info(ctx, "Current user is not root, cannot set process credentials", "user", ex.currentUser)
 	}
 
 	envMap := NewEnvMap(ParseEnvList(os.Environ()), jobEnvs, ex.secrets)
@@ -509,11 +517,15 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	// Note: we already set RLIMIT_MEMLOCK to unlimited in the shim if we've detected IB devices
 	// (see configureHpcNetworkingIfAvailable() function), but, as it's on the shim side, it only works
 	// with VM-based backends.
-	rlimitMemlock := unix.Rlimit{Cur: unix.RLIM_INFINITY, Max: unix.RLIM_INFINITY}
-	// TODO: Check if we have CAP_SYS_RESOURCE. In container environments, even root usually doesn't have
-	// this capability.
-	if err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, &rlimitMemlock); err != nil {
-		log.Error(ctx, "Failed to set resource limits", "err", err)
+	if ok, err := cap.Has(cap.SYS_RESOURCE); err != nil {
+		log.Error(ctx, "Failed to check capabilities, won't try to set resource limits", "err", err)
+	} else if !ok {
+		log.Info(ctx, "Required capability is missing, cannot set resource limits", "missing", cap.SYS_RESOURCE)
+	} else {
+		rlimitMemlock := unix.Rlimit{Cur: unix.RLIM_INFINITY, Max: unix.RLIM_INFINITY}
+		if err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, &rlimitMemlock); err != nil {
+			log.Error(ctx, "Failed to set resource limits", "err", err)
+		}
 	}
 
 	// HOME must be added after writeDstackProfile to avoid overriding the correct per-user value set by sshd
