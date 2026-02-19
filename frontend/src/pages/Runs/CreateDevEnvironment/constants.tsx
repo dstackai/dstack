@@ -24,6 +24,7 @@ export const FORM_FIELD_NAMES = {
     repo_url: 'repo_url',
     repo_path: 'repo_path',
     working_dir: 'working_dir',
+    password: 'password',
 } as const satisfies Record<IRunEnvironmentFormKeys, IRunEnvironmentFormKeys>;
 
 export const IDE_OPTIONS = [

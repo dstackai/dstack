@@ -2,14 +2,15 @@ import { useCallback } from 'react';
 import jsYaml from 'js-yaml';
 
 import { useNotifications } from 'hooks';
+import { getPathWithoutProtocol, getRepoDirFromUrl, getRepoName, getRepoUrlWithOutDir, slugify } from 'libs/repo';
 import { useInitRepoMutation, useLazyGetRepoQuery } from 'services/repo';
 
-import { getPathWithoutProtocol, getRepoDirFromUrl, getRepoName, getRepoUrlWithOutDir, slugify } from '../../../../libs/repo';
 import { getRunSpecConfigurationResources } from '../helpers/getRunSpecConfigurationResources';
 
 // TODO add next fields: volumes, repos,
-const supportedFields: (keyof TDevEnvironmentConfiguration)[] = [
+const supportedFields: (keyof TDevEnvironmentConfiguration | keyof TServiceConfiguration)[] = [
     'type',
+    'ide',
     'init',
     'inactivity_duration',
     'image',
@@ -33,6 +34,12 @@ const supportedFields: (keyof TDevEnvironmentConfiguration)[] = [
     'utilization_policy',
     'fleets',
     'repos',
+    'auth',
+    'commands',
+    'port',
+    'gateway',
+    'https',
+    'probes',
 ];
 
 export const useGetRunSpecFromYaml = ({ projectName = '' }) => {
@@ -115,14 +122,11 @@ export const useGetRunSpecFromYaml = ({ projectName = '' }) => {
 
             for (const fieldName of Object.keys(otherFields)) {
                 switch (fieldName) {
-                    case 'ide':
-                        runSpec.configuration.ide = otherFields[fieldName] as TIde;
-                        break;
                     case 'resources':
                         runSpec.configuration.resources = getRunSpecConfigurationResources(otherFields[fieldName]);
                         break;
                     case 'repos': {
-                        const repoData = await getRepoData(otherFields['repos'] as TEnvironmentConfigurationRepo[]);
+                        const repoData = await getRepoData(otherFields['repos'] as string[]);
                         Object.assign(runSpec, repoData);
                         break;
                     }
@@ -130,6 +134,11 @@ export const useGetRunSpecFromYaml = ({ projectName = '' }) => {
                         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                         // @ts-expect-error
                         if (!supportedFields.includes(fieldName)) {
+                            pushNotification({
+                                type: 'error',
+                                content: `Unsupported field: ${fieldName}`,
+                            });
+
                             throw new Error(`Unsupported field: ${fieldName}`);
                         }
                         // eslint-disable-next-line @typescript-eslint/ban-ts-comment

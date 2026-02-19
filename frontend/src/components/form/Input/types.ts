@@ -5,7 +5,7 @@ import { InputProps } from '@cloudscape-design/components/input';
 
 export type FormInputProps<T extends FieldValues> = Omit<InputProps, 'value' | 'name'> &
     Omit<FormFieldProps, 'errorText'> &
-    Pick<ControllerProps<T>, 'control' | 'name' | 'rules'> & {
+    Pick<ControllerProps<T>, 'control' | 'name' | 'rules' | 'defaultValue'> & {
         leftContent?: ReactNode;
         hotspotId?: string;
     };

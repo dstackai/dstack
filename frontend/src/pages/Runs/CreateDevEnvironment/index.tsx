@@ -1,14 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import cn from 'classnames';
-import * as yup from 'yup';
 import { Box, Link, WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import { TabsProps, ToggleProps } from 'components';
-import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Tabs, Toggle, Wizard } from 'components';
+import { Container, FormCodeEditor, FormField, FormSelect, SpaceBetween, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
@@ -21,84 +19,26 @@ import { useGetAllTemplatesQuery } from 'services/templates';
 import { OfferList } from 'pages/Offers/List';
 import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
+import { ParamsWizardStep } from './components/ParamsWizardStep';
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
-import { FORM_FIELD_NAMES, IDE_OPTIONS } from './constants';
+import { useYupValidationResolver } from './hooks/useValidationResolver';
+import { FORM_FIELD_NAMES } from './constants';
 
 import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
 
 import styles from './styles.module.scss';
 
-const requiredFieldError = 'This is a required field';
-const namesFieldError = 'Only latin characters, dashes, and digits';
-const urlFormatError = 'Only URLs';
-const workingDirFormatError = 'Must be an absolute path';
+const templateStepFieldNames: IRunEnvironmentFormKeys[] = [FORM_FIELD_NAMES.project, FORM_FIELD_NAMES.template];
+const offerStepFieldNames: IRunEnvironmentFormKeys[] = [FORM_FIELD_NAMES.offer];
+const configStepFieldNames: IRunEnvironmentFormKeys[] = [FORM_FIELD_NAMES.config_yaml];
 
-enum DockerPythonTabs {
-    DOCKER = 'docker',
-    PYTHON = 'python',
-}
-
-const envValidationSchema = yup.object({
-    project: yup.string().required(requiredFieldError),
-    template: yup.string().required(requiredFieldError),
-    offer: yup.object().required(requiredFieldError),
-    name: yup.string().matches(/^[a-z][a-z0-9-]{1,40}$/, namesFieldError),
-    ide: yup.string().required(requiredFieldError),
-    config_yaml: yup.string().required(requiredFieldError),
-    working_dir: yup.string().matches(/^\//, workingDirFormatError),
-
-    image: yup.string().when('docker', {
-        is: true,
-        then: yup.string().required(requiredFieldError),
-    }),
-
-    repo_url: yup.string().when('repo_enabled', {
-        is: true,
-        then: yup
-            .string()
-            // eslint-disable-next-line no-useless-escape
-            .matches(/^(https?):\/\/([^\s\/?#]+)((?:\/[^\s?#]*)*)(?::\/(.*))?$/i, urlFormatError)
-            .required(requiredFieldError),
-    }),
-});
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
-const useYupValidationResolver = (validationSchema) =>
-    useCallback(
-        async (data: IRunEnvironmentFormValues) => {
-            try {
-                const values = await validationSchema.validate(data, {
-                    abortEarly: false,
-                });
-
-                return {
-                    values,
-                    errors: {},
-                };
-            } catch (errors) {
-                return {
-                    values: {},
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-expect-error
-                    errors: errors.inner.reduce(
-                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                        // @ts-expect-error
-                        (allErrors, currentError) => ({
-                            ...allErrors,
-                            [currentError.path]: {
-                                type: currentError.type ?? 'validation',
-                                message: currentError.message,
-                            },
-                        }),
-                        {},
-                    ),
-                };
-            }
-        },
-        [validationSchema],
-    );
+const paramsStepFieldNames = Object.keys(FORM_FIELD_NAMES).filter(
+    (fieldName) =>
+        ![...templateStepFieldNames, ...offerStepFieldNames, ...configStepFieldNames].includes(
+            fieldName as IRunEnvironmentFormKeys,
+        ),
+) as IRunEnvironmentFormKeys[];
 
 export const CreateDevEnvironment: React.FC = () => {
     const { t } = useTranslation();
@@ -107,6 +47,7 @@ export const CreateDevEnvironment: React.FC = () => {
     const [pushNotification] = useNotifications();
     const [activeStepIndex, setActiveStepIndex] = useState(0);
     const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = useState<ITemplate | undefined>();
     const { projectOptions, isLoadingProjectOptions } = useProjectFilter({ localStorePrefix: 'run-env-list-projects' });
 
     const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
@@ -124,16 +65,15 @@ export const CreateDevEnvironment: React.FC = () => {
         },
     ]);
 
-    const resolver = useYupValidationResolver(envValidationSchema);
+    const resolver = useYupValidationResolver(selectedTemplate);
+
     const formMethods = useForm<IRunEnvironmentFormValues>({
         resolver,
         defaultValues: {
             project: searchParams.get('project_name') ?? undefined,
-            ide: 'cursor',
-            docker: false,
-            repo_enabled: false,
         },
     });
+
     const { handleSubmit, control, trigger, setValue, watch, formState, getValues } = formMethods;
     const formValues = watch();
 
@@ -160,31 +100,14 @@ export const CreateDevEnvironment: React.FC = () => {
         }));
     }, [templatesData]);
 
-    console.log({ formValues });
+    useEffect(() => {
+        setSelectedTemplate(templatesData?.find((t) => t.id === formValues.template));
+    }, [templatesData, formValues.template]);
 
-    const onCancelHandler = () => {
-        navigate(ROUTES.RUNS.LIST);
-    };
-
-    const validateProjectAndTemplate = async () => {
-        return await trigger(['project', 'template']);
-    };
-
-    const validateOffer = async () => {
-        return await trigger(['offer']);
-    };
-
-    const validateConfigParams = async () => {
-        const paramFields = Object.keys(FORM_FIELD_NAMES).filter(
-            (fieldName) => !['offer', 'config_yaml', 'project', 'template'].includes(fieldName),
-        ) as IRunEnvironmentFormKeys[];
-
-        return await trigger(paramFields);
-    };
-
-    const validateConfig = async () => {
-        return await trigger(['config_yaml']);
-    };
+    const validateProjectAndTemplate = async () => await trigger(templateStepFieldNames);
+    const validateOffer = async () => await trigger(offerStepFieldNames);
+    const validateConfigParams = async () => await trigger(paramsStepFieldNames);
+    const validateConfig = async () => await trigger(configStepFieldNames);
 
     const onNavigate = ({
         requestedStepIndex,
@@ -216,31 +139,10 @@ export const CreateDevEnvironment: React.FC = () => {
         onNavigate({ requestedStepIndex, reason });
     };
 
-    const toggleRepo: ToggleProps['onChange'] = ({ detail }) => {
-        setValue('repo_enabled', detail.checked);
-
-        if (!detail.checked) {
-            setValue('repo_url', '');
-            setValue('repo_path', '');
-        }
-    };
-
-    const onChangeTab: TabsProps['onChange'] = ({ detail }) => {
-        if (detail.activeTabId === DockerPythonTabs.DOCKER) {
-            setValue('python', '');
-        }
-
-        if (detail.activeTabId === DockerPythonTabs.PYTHON) {
-            setValue('image', '');
-        }
-
-        setValue('docker', detail.activeTabId === DockerPythonTabs.DOCKER);
-    };
-
     const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => {
         const newSelectedOffers = detail?.selectedItems ?? [];
         setSelectedOffers(newSelectedOffers);
-        setValue('offer', newSelectedOffers?.[0] ?? null);
+        setValue(FORM_FIELD_NAMES.offer, newSelectedOffers?.[0] ?? null);
     };
 
     const onSubmitWizard = async () => {
@@ -295,11 +197,15 @@ export const CreateDevEnvironment: React.FC = () => {
         }
     };
 
-    const yaml = useGenerateYaml({ formValues });
+    const yaml = useGenerateYaml({ formValues, template: selectedTemplate?.template });
 
     useEffect(() => {
-        setValue('config_yaml', yaml);
+        setValue(FORM_FIELD_NAMES.config_yaml, yaml);
     }, [yaml]);
+
+    const onCancelHandler = () => {
+        navigate(ROUTES.RUNS.LIST);
+    };
 
     return (
         <form className={cn({ [styles.wizardForm]: activeStepIndex === 0 })} onSubmit={handleSubmit(onSubmit)}>
@@ -333,12 +239,13 @@ export const CreateDevEnvironment: React.FC = () => {
                                         label={t('runs.dev_env.wizard.project')}
                                         description={t('runs.dev_env.wizard.project_description')}
                                         control={control}
-                                        name="project"
+                                        name={FORM_FIELD_NAMES.project}
                                         options={projectOptions}
                                         disabled={loading}
                                         empty={t('runs.dev_env.wizard.project_empty')}
                                         loadingText={t('runs.dev_env.wizard.project_loading')}
                                         statusType={isLoadingProjectOptions ? 'loading' : undefined}
+                                        onChange={() => setValue(FORM_FIELD_NAMES.template, '')}
                                     />
 
                                     <FormSelect
@@ -348,7 +255,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                             !formValues.project ? t('runs.dev_env.wizard.template_placeholder') : undefined
                                         }
                                         control={control}
-                                        name="template"
+                                        name={FORM_FIELD_NAMES.template}
                                         options={templateOptions}
                                         disabled={loading}
                                         empty={t('runs.dev_env.wizard.template_empty')}
@@ -385,107 +292,7 @@ export const CreateDevEnvironment: React.FC = () => {
 
                     {
                         title: 'Settings',
-                        content: (
-                            <Container>
-                                <SpaceBetween direction="vertical" size="l">
-                                    <FormInput
-                                        label={t('runs.dev_env.wizard.name')}
-                                        description={t('runs.dev_env.wizard.name_description')}
-                                        constraintText={t('runs.dev_env.wizard.name_constraint')}
-                                        placeholder={t('runs.dev_env.wizard.name_placeholder')}
-                                        control={control}
-                                        name="name"
-                                        disabled={loading}
-                                    />
-
-                                    <FormSelect
-                                        label={t('runs.dev_env.wizard.ide')}
-                                        description={t('runs.dev_env.wizard.ide_description')}
-                                        control={control}
-                                        name="ide"
-                                        options={IDE_OPTIONS}
-                                        disabled={loading}
-                                    />
-
-                                    <Tabs
-                                        onChange={onChangeTab}
-                                        tabs={[
-                                            {
-                                                label: t('runs.dev_env.wizard.python'),
-                                                id: DockerPythonTabs.PYTHON,
-                                                content: (
-                                                    <div>
-                                                        <FormInput
-                                                            label={t('runs.dev_env.wizard.python')}
-                                                            description={t('runs.dev_env.wizard.python_description')}
-                                                            placeholder={t('runs.dev_env.wizard.python_placeholder')}
-                                                            control={control}
-                                                            name="python"
-                                                            disabled={loading}
-                                                        />
-                                                    </div>
-                                                ),
-                                            },
-                                            {
-                                                label: t('runs.dev_env.wizard.docker'),
-                                                id: DockerPythonTabs.DOCKER,
-                                                content: (
-                                                    <div>
-                                                        <FormInput
-                                                            label={t('runs.dev_env.wizard.docker_image')}
-                                                            description={t('runs.dev_env.wizard.docker_image_description')}
-                                                            constraintText={t('runs.dev_env.wizard.docker_image_constraint')}
-                                                            placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
-                                                            control={control}
-                                                            name="image"
-                                                            disabled={loading}
-                                                        />
-                                                    </div>
-                                                ),
-                                            },
-                                        ]}
-                                    />
-
-                                    <FormInput
-                                        label={t('runs.dev_env.wizard.working_dir')}
-                                        description={t('runs.dev_env.wizard.working_dir_description')}
-                                        constraintText={t('runs.dev_env.wizard.working_dir_constraint')}
-                                        placeholder={t('runs.dev_env.wizard.working_dir_placeholder')}
-                                        control={control}
-                                        name="working_dir"
-                                        disabled={loading}
-                                    />
-
-                                    <Toggle checked={!!formValues.repo_enabled} onChange={toggleRepo}>
-                                        {t('runs.dev_env.wizard.repo')}
-                                    </Toggle>
-
-                                    {formValues.repo_enabled && (
-                                        <>
-                                            <FormInput
-                                                label={t('runs.dev_env.wizard.repo_url')}
-                                                description={t('runs.dev_env.wizard.repo_url_description')}
-                                                constraintText={t('runs.dev_env.wizard.repo_url_constraint')}
-                                                placeholder={t('runs.dev_env.wizard.repo_url_placeholder')}
-                                                control={control}
-                                                name="repo_url"
-                                                disabled={loading}
-                                            />
-
-                                            <FormInput
-                                                label={t('runs.dev_env.wizard.repo_path')}
-                                                description={t('runs.dev_env.wizard.repo_path_description')}
-                                                constraintText={t('runs.dev_env.wizard.repo_path_constraint')}
-                                                placeholder={t('runs.dev_env.wizard.repo_path_placeholder')}
-                                                control={control}
-                                                name="repo_path"
-                                                disabled={loading}
-                                            />
-                                        </>
-                                    )}
-                                </SpaceBetween>
-                            </Container>
-                        ),
+                        content: <ParamsWizardStep formMethods={formMethods} loading={loading} template={selectedTemplate} />,
                     },
 
                     {
@@ -507,7 +314,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                             .
                                         </Box>
                                     }
-                                    name="config_yaml"
+                                    name={FORM_FIELD_NAMES.config_yaml}
                                     language="yaml"
                                     loading={loading}
                                     editorContentHeight={600}
