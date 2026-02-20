@@ -9,7 +9,7 @@ This example shows how to deploy DeepSeek-R1-Distill-Llama 8B and 70B using [SGL
 
 ## Apply a configuration
 
-Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B using SgLang.
+Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B using SGLang.
 
 === "NVIDIA"
 
@@ -108,15 +108,106 @@ curl http://127.0.0.1:3000/proxy/services/main/deepseek-r1/v1/chat/completions \
 ```
 </div>
 
-!!! info "SGLang Model Gateway"
-    If you'd like to use a custom routing policy, e.g. by leveraging the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#), create a gateway with `router` set to `sglang`. Check out [gateways](https://dstack.ai/docs/concepts/gateways#router) for more details.
+!!! info "Router policy"
+    If you'd like to use a custom routing policy, create a gateway with `router` set to `sglang`. Check out [gateways](https://dstack.ai/docs/concepts/gateways#router) for more details.
 
-> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling or HTTPs, rate-limits, etc), the service endpoint will be available at `https://deepseek-r1.<gateway domain>/`.
+> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://deepseek-r1.<gateway domain>/`.
+
+## Configuration options
+
+### PD disaggregation
+
+If you create a gateway with the [`sglang` router](https://dstack.ai/docs/concepts/gateways/#sglang), you can run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html).
+
+<div editor-title="examples/inference/sglang/pd.dstack.yml">
+
+```yaml
+type: service
+name: prefill-decode
+image: lmsysorg/sglang:latest
+
+env:
+  - HF_TOKEN
+  - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+
+replicas:
+  - count: 1..4
+    scaling:
+      metric: rps
+      target: 3
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --disaggregation-mode prefill \
+          --disaggregation-transfer-backend mooncake \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --disaggregation-bootstrap-port 8998
+    resources:
+      gpu: H200
+
+  - count: 1..8
+    scaling:
+      metric: rps
+      target: 2
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --disaggregation-mode decode \
+          --disaggregation-transfer-backend mooncake \
+          --host 0.0.0.0 \
+          --port 8000
+    resources:
+      gpu: H200
+
+port: 8000
+model: zai-org/GLM-4.5-Air-FP8
+
+# Custom probe is required for PD disaggregation
+probes:
+  - type: http
+    url: /health_generate
+    interval: 15s
+
+router:
+  type: sglang
+  pd_disaggregation: true
+```
+
+</div>
+
+Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
+
+#### Gateway
+
+Note, running services with PD disaggregation currently requires the gateway to run in the same cluster as the service.
+
+For example, if you run services on the `kubernetes` backend, make sure to also create the gateway in the same backend:
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: gateway-name
+
+backend: kubernetes
+region: any
+
+domain: example.com
+router:
+  type: sglang
+```
+
+</div>
+
+<!-- TODO: Gateway creation using fleets is coming to simplify this. -->
 
 ## Source code
 
-The source-code of this example can be found in
-[`examples/llms/deepseek/sglang`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/sglang).
+The source-code of these examples can be found in
+[`examples/llms/deepseek/sglang`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/sglang) and [`examples/inference/sglang`](https://github.com/dstackai/dstack/blob/master/examples/inference/sglang).
 
 ## What's next?
 

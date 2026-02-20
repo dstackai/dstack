@@ -182,6 +182,8 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 > The `scaling` property requires creating a [gateway](gateways.md).
 
+<span id="replica-groups"></span>
+
 ??? info "Replica groups"
     A service can include multiple replica groups. Each group can define its own `commands`, `resources` requirements, and `scaling` rules.
 
@@ -230,8 +232,9 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
     > Properties such as `regions`, `port`, `image`, `env` and some other cannot be configured per replica group. This support is coming soon.
 
-??? info "Disaggregated serving"
-    Native support for disaggregated prefill and decode, allowing both worker types to run within a single service, is coming soon.
+### PD disaggregation
+
+If you create a gateway with the [`sglang` router](gateways.md#sglang), you can run SGLang with [Prefill-Decode disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html). See the [corresponding example](../../examples/inference/sglang/index.md#pd-disaggregation).
 
 ### Authorization
 
