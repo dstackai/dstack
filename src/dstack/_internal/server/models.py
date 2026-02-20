@@ -524,6 +524,8 @@ class GatewayModel(PipelineModelMixin, BaseModel):
 
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_gateways_project_id_name"),)
 
+    # TODO: Add pipeline index ("ix_gateways_pipeline_fetch_q") if gateways become soft-deleted.
+
 
 class GatewayComputeModel(BaseModel):
     __tablename__ = "gateway_computes"

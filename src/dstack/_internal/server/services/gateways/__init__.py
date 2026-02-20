@@ -58,6 +58,7 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
 from dstack._internal.utils.common import get_current_datetime, run_async
@@ -184,6 +185,7 @@ async def create_gateway(
     user: UserModel,
     project: ProjectModel,
     configuration: GatewayConfiguration,
+    pipeline_hinter: PipelineHinterProtocol,
 ) -> Gateway:
     spec = await apply_plugin_policies(
         user=user.name,
@@ -238,6 +240,7 @@ async def create_gateway(
             await set_default_gateway(
                 session=session, project=project, name=configuration.name, user=user
             )
+        pipeline_hinter.hint_fetch(GatewayModel.__name__)
         return gateway_model_to_gateway(gateway)
 
 
@@ -303,7 +306,8 @@ async def delete_gateways(
         )
         gateway_models = res.scalars().all()
         if len(gateway_models) != len(gateways_ids):
-            # TODO: Make the delete endpoint fully async without lock – put the request in queue and process in background.
+            # TODO: Make the delete endpoint fully async so we don't need to lock and error:
+            # put the request in queue and process in the background.
             raise ServerClientError(
                 "Failed to delete gateways: gateways are being processed currently. Try again later."
             )
