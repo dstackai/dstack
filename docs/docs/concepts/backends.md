@@ -1061,23 +1061,21 @@ projects:
     Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
 
 ??? info "Resources and offers"
-    [Resources](../concepts/tasks.md#resources) specified in the run configuration are translated to Kubernetes
-    [requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) as follows:
+    If you use ranges with [`resources`](../concepts/tasks.md#resources) (e.g. `gpu: 1..8` or `memory: 64GB..`) in fleet or run configurations, other backends collect and try all offers that satisfy the range.
 
-    - As with other backends, an exact value is translated to a range with the same lower and upper limits,
-      e.g., `cpu: 4` is the same as `cpu: 4..4`.
-    - The lower limit, if set, is used as a resource request, meaning that it is guaranteed that the container has at least the specified
-      amount of the resource.
-    - For resources other than `gpu`, the upper limit, if set, is used as a resource limit, meaning that the container is not allowed
-      to consume more resources than specified. If the upper limit is not set, the resource limit is also not set.
-    - For `gpu` resources, the upper limit is always ignored, and the resource limit is always set to the same value as the resource request,
-      that is, to the lower limit of the range.
+    The `kubernetes` backend handles it differently.
+    
+    * For `gpu`, if you specify a range (e.g. `gpu: 4..8`), the `kubernetes` backend only provisions pods with the GPU count equal to the lower limit (`4`). The upper limit of the GPU range is always ignored.
+    * For other resources such as `cpu`, `memory`, and `disk`, the `kubernetes` backend passes the lower and upper limits of the range as Kubernetes [requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) respectively. If the upper limit is not set, the Kubernetes limit is also not set.
 
-    For example, the following resources specification:
+    Example:
 
     <div editor-title=".dstack.yml">
 
     ```yaml
+    type: dev-environment
+    ide: vscode
+
     resources:
       cpu: 32..64
       memory: 1024GB
@@ -1087,35 +1085,16 @@ projects:
 
     </div>
 
-    is translated to:
+    This translates to the following Kubernetes resource spec:
 
-    | resource            | request  | limit     |
+    | Resource            | Request  | Limit     |
     |---------------------|----------|-----------|
     | `cpu`               | `32`     | `64`      |
     | `memory`            | `1024Gi` | `1024Gi`  |
     | `ephemeral-storage` | `100Gi`  | _not set_ |
     | `nvidia.com/gpu`    | `4`      | `4`       |
 
-    In offers, `dstack` uses resource requests as offer's resources.
-    With the resources spec as in the example above, offers would look like the following,
-    even if nodes have more available resources:
-
-    ```
-     #  BACKEND         RESOURCES                                 INSTANCE TYPE  PRICE
-     1  kubernetes (-)  cpu=32 mem=1024GB disk=100GB H100:80GB:4  h100x8         $0
-    ```
-
-    As a consequence, if you specify `gpu: 0` or don't specify `gpu` at all (the default value is `0`),
-    you won't see GPU resources in offers, even with GPU nodes. The same is true for the `dstack offer` command,
-    to see available GPU models, you should specify a miminum amount of GPUs > 0:
-
-    <div class="termy">
-
-    ```shell
-    $ dstack offer --gpu 1
-    ```
-
-    </div>
+    This applies to offers shown in `dstack apply` (run plans), during provisioning, and in `dstack offer`. Unlike other backends, offers for the `kubernetes` backend always reflect the lower limit of the range.
 
 > To learn more, see the [Lambda](../../examples/clusters/lambda/#kubernetes) and [Crusoe](../../examples/clusters/crusoe/#kubernetes) examples.
 
