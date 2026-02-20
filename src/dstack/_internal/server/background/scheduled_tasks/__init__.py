@@ -99,21 +99,23 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
         )
         _scheduler.add_job(delete_prometheus_metrics, IntervalTrigger(minutes=5), max_instances=1)
     _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
-    _scheduler.add_job(process_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5)
     _scheduler.add_job(
         process_submitted_volumes, IntervalTrigger(seconds=10, jitter=2), max_instances=5
     )
     _scheduler.add_job(
         process_idle_volumes, IntervalTrigger(seconds=60, jitter=10), max_instances=1
     )
-    if not FeatureFlags.PIPELINE_PROCESSING_ENABLED:
-        _scheduler.add_job(process_placement_groups, IntervalTrigger(seconds=30, jitter=5))
     _scheduler.add_job(
         process_fleets,
         IntervalTrigger(seconds=10, jitter=2),
         max_instances=1,
     )
     _scheduler.add_job(delete_instance_health_checks, IntervalTrigger(minutes=5), max_instances=1)
+    if not FeatureFlags.PIPELINE_PROCESSING_ENABLED:
+        _scheduler.add_job(
+            process_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5
+        )
+        _scheduler.add_job(process_placement_groups, IntervalTrigger(seconds=30, jitter=5))
     for replica in range(settings.SERVER_BACKGROUND_PROCESSING_FACTOR):
         # Add multiple copies of tasks if requested.
         # max_instances=1 for additional copies to avoid running too many tasks.

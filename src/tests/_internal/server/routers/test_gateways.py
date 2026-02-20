@@ -20,6 +20,15 @@ from dstack._internal.server.testing.common import (
     list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
+from dstack._internal.settings import FeatureFlags
+
+
+@pytest.fixture
+def patch_pipeline_processing_flag(monkeypatch: pytest.MonkeyPatch):
+    def _apply(enabled: bool):
+        monkeypatch.setattr(FeatureFlags, "PIPELINE_PROCESSING_ENABLED", enabled)
+
+    return _apply
 
 
 class TestListAndGetGateways:
@@ -455,9 +464,88 @@ class TestDeleteGateway:
         )
         assert response.status_code == 403
 
+
+class TestDeleteGatewayPipelineEnabled:
+    @pytest.fixture(autouse=True)
+    def _pipeline_processing_enabled(self, patch_pipeline_processing_flag):
+        patch_pipeline_processing_flag(True)
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_delete_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_marks_gateways_to_be_deleted(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend_aws = await create_backend(session, project.id)
+        backend_gcp = await create_backend(session, project.id, backend_type=BackendType.GCP)
+        gateway_compute_aws = await create_gateway_compute(
+            session=session,
+            backend_id=backend_aws.id,
+        )
+        gateway_aws = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend_aws.id,
+            name="gateway-aws",
+            gateway_compute_id=gateway_compute_aws.id,
+        )
+        gateway_compute_gcp = await create_gateway_compute(
+            session=session,
+            backend_id=backend_gcp.id,
+        )
+        gateway_gcp = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend_gcp.id,
+            name="gateway-gcp",
+            gateway_compute_id=gateway_compute_gcp.id,
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/delete",
+            json={"names": [gateway_aws.name, gateway_gcp.name]},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+
+        await session.refresh(gateway_aws)
+        await session.refresh(gateway_gcp)
+        await session.refresh(gateway_compute_aws)
+        await session.refresh(gateway_compute_gcp)
+        assert gateway_aws.to_be_deleted is True
+        assert gateway_gcp.to_be_deleted is True
+        assert gateway_compute_aws.active is True
+        assert gateway_compute_aws.deleted is False
+        assert gateway_compute_gcp.active is True
+        assert gateway_compute_gcp.deleted is False
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        assert {g["name"] for g in response.json()} == {"gateway-aws", "gateway-gcp"}
+
+        events = await list_events(session)
+        assert len(events) == 2
+        assert all(e.message == "Gateway marked for deletion" for e in events)
+        assert {e.targets[0].entity_name for e in events} == {"gateway-aws", "gateway-gcp"}
+        assert all(e.actor_user_id == user.id for e in events)
+
+
+class TestDeleteGatewayPipelineDisabled:
+    @pytest.fixture(autouse=True)
+    def _pipeline_processing_disabled(self, patch_pipeline_processing_flag):
+        patch_pipeline_processing_flag(False)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_deletes_gateways_synchronously(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -545,6 +633,7 @@ class TestDeleteGateway:
                 },
             }
         ]
+
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Gateway deleted"

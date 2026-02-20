@@ -167,8 +167,9 @@ async def lifespan(app: FastAPI):
     pipeline_manager = None
     if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
         scheduler = start_scheduled_tasks()
-        pipeline_manager = start_pipeline_tasks()
-        app.state.pipeline_manager = pipeline_manager
+        if core_settings.FeatureFlags.PIPELINE_PROCESSING_ENABLED:
+            pipeline_manager = start_pipeline_tasks()
+            app.state.pipeline_manager = pipeline_manager
     else:
         logger.info("Background processing is disabled")
     PROBES_SCHEDULER.start()
