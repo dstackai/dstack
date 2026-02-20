@@ -7,7 +7,7 @@ import { useCollection } from 'hooks';
 import { useGetGpusListQuery } from 'services/gpu';
 
 import { useEmptyMessages } from './hooks/useEmptyMessages';
-import { useFilters } from './hooks/useFilters';
+import { useFilters, UseFiltersArgs } from './hooks/useFilters';
 import { convertMiBToGB, rangeToObject, renderRange, renderRangeJSX, round } from './helpers';
 
 import styles from './styles.module.scss';
@@ -66,14 +66,22 @@ const getRequestParams = ({
     };
 };
 
-type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange' | 'selectedItems' | 'selectionType'> & {
-    withSearchParams?: boolean;
-    onChangeProjectName?: (value: string) => void;
-};
+type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange' | 'selectedItems' | 'selectionType'> &
+    Pick<UseFiltersArgs, 'permanentFilters' | 'defaultFilters'> & {
+        withSearchParams?: boolean;
+        onChangeProjectName?: (value: string) => void;
+    };
 
-export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChangeProjectName, ...props }) => {
+export const OfferList: React.FC<OfferListProps> = ({
+    withSearchParams,
+    onChangeProjectName,
+    permanentFilters,
+    defaultFilters,
+    ...props
+}) => {
     const { t } = useTranslation();
     const [requestParams, setRequestParams] = useState<TGpusListQueryParams | undefined>();
+
     const { data, isLoading, isFetching } = useGetGpusListQuery(
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
@@ -93,7 +101,7 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
         groupBy,
         groupByOptions,
         onChangeGroupBy,
-    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams });
+    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams, permanentFilters, defaultFilters });
 
     useEffect(() => {
         setRequestParams(

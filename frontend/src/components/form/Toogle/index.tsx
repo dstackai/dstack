@@ -11,6 +11,7 @@ export const FormToggle = <T extends FieldValues>({
     name,
     control,
     rules,
+    defaultValue,
     label,
     info,
     constraintText,
@@ -29,6 +30,7 @@ export const FormToggle = <T extends FieldValues>({
             name={name}
             control={control}
             rules={rules}
+            defaultValue={defaultValue}
             render={({ field: { onChange, value, ...fieldRest }, fieldState: { error } }) => {
                 return (
                     <FormField

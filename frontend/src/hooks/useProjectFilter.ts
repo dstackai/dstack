@@ -16,7 +16,7 @@ export const useProjectFilter = ({ localStorePrefix }: Args) => {
         null,
     );
 
-    const { data: projectsData } = useGetProjectsQuery({});
+    const { data: projectsData, isLoading } = useGetProjectsQuery({});
 
     const projectOptions = useMemo<SelectCSDProps.Options>(() => {
         if (!projectsData?.data?.length) return [];
@@ -40,5 +40,6 @@ export const useProjectFilter = ({ localStorePrefix }: Args) => {
         projectOptions,
         selectedProject,
         setSelectedProject,
+        isLoadingProjectOptions: isLoading,
     } as const;
 };
