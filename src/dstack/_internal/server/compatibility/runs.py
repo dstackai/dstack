@@ -2,7 +2,7 @@ from typing import Optional
 
 from packaging.version import Version
 
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.runs import Run, RunPlan, RunSpec
 from dstack._internal.server.compatibility.common import patch_offers_list
 
@@ -34,3 +34,10 @@ def patch_run_spec(run_spec: RunSpec, client_version: Optional[Version]) -> None
     ):
         if run_spec.configuration.probes is None:
             run_spec.configuration.probes = []
+    # Clients prior to 0.20.12 do not support https = None
+    if (
+        client_version < Version("0.20.12")
+        and isinstance(run_spec.configuration, ServiceConfiguration)
+        and run_spec.configuration.https is None
+    ):
+        run_spec.configuration.https = SERVICE_HTTPS_DEFAULT

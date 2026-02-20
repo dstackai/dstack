@@ -1,5 +1,9 @@
 from dstack._internal.core.errors import ServerClientError
-from dstack._internal.core.models.configurations import RUN_PRIORITY_DEFAULT, ServiceConfiguration
+from dstack._internal.core.models.configurations import (
+    RUN_PRIORITY_DEFAULT,
+    SERVICE_HTTPS_DEFAULT,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
 from dstack._internal.core.models.runs import LEGACY_REPO_DIR, AnyRunConfiguration, RunSpec
 from dstack._internal.core.models.volumes import InstanceMountPoint
@@ -203,6 +207,14 @@ def _check_can_update_configuration(
         # Currently, the client preserves the original file/dir name it the tarball, but it could
         # use some generic names like "file"/"directory" instead.
         updatable_fields.append("files")
+    if (
+        isinstance(current, ServiceConfiguration)
+        and isinstance(new, ServiceConfiguration)
+        and current.https in (None, SERVICE_HTTPS_DEFAULT)
+        and new.https in (None, SERVICE_HTTPS_DEFAULT)
+    ):
+        # Allow switching between `https: <explicit-default>` and unset `https`. Has no effect.
+        updatable_fields.append("https")
     diff = diff_models(current, new)
     changed_fields = list(diff.keys())
     for key in changed_fields:

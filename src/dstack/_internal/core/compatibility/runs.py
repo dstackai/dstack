@@ -78,6 +78,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
             configuration_excludes["router"] = True
         elif isinstance(router, SGLangServiceRouterConfig) and router.pd_disaggregation is False:
             configuration_excludes["router"] = {"pd_disaggregation": True}
+        if run_spec.configuration.https is None:
+            configuration_excludes["https"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
