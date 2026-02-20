@@ -1060,7 +1060,43 @@ projects:
     
     Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
 
-> To learn more, see the [Lambda](../../examples/clusters/lambda/#kubernetes) and [Lambda](../../examples/clusters/crusoe/#kubernetes) examples.
+??? info "Resources and offers"
+    If you use ranges with [`resources`](../concepts/tasks.md#resources) (e.g. `gpu: 1..8` or `memory: 64GB..`) in fleet or run configurations, other backends collect and try all offers that satisfy the range.
+
+    The `kubernetes` backend handles it differently.
+    
+    * For `gpu`, if you specify a range (e.g. `gpu: 4..8`), the `kubernetes` backend only provisions pods with the GPU count equal to the lower limit (`4`). The upper limit of the GPU range is always ignored.
+    * For other resources such as `cpu`, `memory`, and `disk`, the `kubernetes` backend passes the lower and upper limits of the range as Kubernetes [requests and limits](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#requests-and-limits) respectively. If the upper limit is not set, the Kubernetes limit is also not set.
+
+    Example:
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: dev-environment
+    ide: vscode
+
+    resources:
+      cpu: 32..64
+      memory: 1024GB
+      disk: 100GB..
+      gpu: nvidia:4..8
+    ```
+
+    </div>
+
+    This translates to the following Kubernetes resource spec:
+
+    | Resource            | Request  | Limit     |
+    |---------------------|----------|-----------|
+    | `cpu`               | `32`     | `64`      |
+    | `memory`            | `1024Gi` | `1024Gi`  |
+    | `ephemeral-storage` | `100Gi`  | _not set_ |
+    | `nvidia.com/gpu`    | `4`      | `4`       |
+
+    This applies to offers shown in `dstack apply` (run plans), during provisioning, and in `dstack offer`. Unlike other backends, offers for the `kubernetes` backend always reflect the lower limit of the range.
+
+> To learn more, see the [Lambda](../../examples/clusters/lambda/#kubernetes) and [Crusoe](../../examples/clusters/crusoe/#kubernetes) examples.
 
 ### RunPod
 
