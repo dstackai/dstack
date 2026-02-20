@@ -45,9 +45,9 @@ def _mock_run_model() -> MagicMock:
 
 
 class TestServiceConfigurationHttps:
-    def test_default_is_true(self) -> None:
+    def test_accepts_unset(self) -> None:
         conf = ServiceConfiguration(commands=["python serve.py"], port=8000)
-        assert conf.https is True
+        assert conf.https is None
 
     def test_accepts_auto(self) -> None:
         conf = ServiceConfiguration(commands=["python serve.py"], port=8000, https="auto")
@@ -96,5 +96,5 @@ class TestRegisterServiceInServerHttps:
 
     def test_rejects_explicit_false_without_gateway(self) -> None:
         run_spec = _service_run_spec(https=False)
-        with pytest.raises(ServerClientError, match="not applicable"):
+        with pytest.raises(ServerClientError, match="not allowed without a gateway"):
             _register_service_in_server(_mock_run_model(), run_spec)
