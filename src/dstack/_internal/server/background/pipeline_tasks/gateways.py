@@ -4,9 +4,10 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Optional, Sequence
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import joinedload, load_only
 
+from dstack._internal.core.backends.base.compute import ComputeWithGatewaySupport
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
@@ -24,14 +25,16 @@ from dstack._internal.server.models import (
     GatewayComputeModel,
     GatewayModel,
     ProjectModel,
+    UserModel,
 )
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import events
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import emit_gateway_status_change_event
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -40,6 +43,7 @@ logger = get_logger(__name__)
 @dataclass
 class GatewayPipelineItem(PipelineItem):
     status: GatewayStatus
+    to_be_deleted: bool
 
 
 class GatewayPipeline(Pipeline[GatewayPipelineItem]):
@@ -121,8 +125,11 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
                 res = await session.execute(
                     select(GatewayModel)
                     .where(
-                        GatewayModel.status.in_(
-                            [GatewayStatus.SUBMITTED, GatewayStatus.PROVISIONING]
+                        or_(
+                            GatewayModel.status.in_(
+                                [GatewayStatus.SUBMITTED, GatewayStatus.PROVISIONING]
+                            ),
+                            GatewayModel.to_be_deleted == True,
                         ),
                         or_(
                             GatewayModel.last_processed_at <= now - self._min_processing_interval,
@@ -143,9 +150,10 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
                     .options(
                         load_only(
                             GatewayModel.id,
-                            GatewayModel.status,
                             GatewayModel.lock_token,
                             GatewayModel.lock_expires_at,
+                            GatewayModel.status,
+                            GatewayModel.to_be_deleted,
                         )
                     )
                 )
@@ -166,6 +174,7 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
                             lock_token=lock_token,
                             prev_lock_expired=prev_lock_expired,
                             status=gateway_model.status,
+                            to_be_deleted=gateway_model.to_be_deleted,
                         )
                     )
                 await session.commit()
@@ -184,7 +193,9 @@ class GatewayWorker(Worker[GatewayPipelineItem]):
         )
 
     async def process(self, item: GatewayPipelineItem):
-        if item.status == GatewayStatus.SUBMITTED:
+        if item.to_be_deleted:
+            await _process_to_be_deleted_item(item)
+        elif item.status == GatewayStatus.SUBMITTED:
             await _process_submitted_item(item)
         elif item.status == GatewayStatus.PROVISIONING:
             await _process_provisioning_item(item)
@@ -235,6 +246,7 @@ async def _process_submitted_item(item: GatewayPipelineItem):
                 item.__tablename__,
                 item.id,
             )
+            # TODO: Clean up gateway_compute_model.
             return
         emit_gateway_status_change_event(
             session=session,
@@ -407,3 +419,132 @@ async def _process_provisioning_gateway(gateway_model: GatewayModel) -> _Provisi
     return _ProvisioningResult(
         gateway_update_map={"status": GatewayStatus.RUNNING},
     )
+
+
+async def _process_to_be_deleted_item(item: GatewayPipelineItem):
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            select(GatewayModel)
+            .where(
+                GatewayModel.id == item.id,
+                GatewayModel.lock_token == item.lock_token,
+            )
+            .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(GatewayModel.gateway_compute))
+            .options(
+                joinedload(GatewayModel.deleted_by_user).load_only(UserModel.id, UserModel.name)
+            )
+        )
+        gateway_model = res.unique().scalar_one_or_none()
+        if gateway_model is None:
+            logger.warning(
+                "Failed to process %s item %s: lock_token mismatch."
+                " The item is expected to be processed and updated on another fetch iteration.",
+                item.__tablename__,
+                item.id,
+            )
+            return
+
+    result = await _process_to_be_deleted_gateway(gateway_model)
+    async with get_session_ctx() as session:
+        if result.delete_gateway:
+            res = await session.execute(
+                delete(GatewayModel)
+                .where(
+                    GatewayModel.id == gateway_model.id,
+                    GatewayModel.lock_token == gateway_model.lock_token,
+                )
+                .returning(GatewayModel.id)
+            )
+            deleted_ids = list(res.scalars().all())
+            if len(deleted_ids) == 0:
+                logger.warning(
+                    "Failed to delete %s item %s after processing: lock_token changed."
+                    " The item is expected to be processed and deleted on another fetch iteration.",
+                    item.__tablename__,
+                    item.id,
+                )
+                return
+            actor = events.SystemActor()
+            if gateway_model.deleted_by_user is not None:
+                actor = events.UserActor.from_user(gateway_model.deleted_by_user)
+            events.emit(
+                session,
+                "Gateway deleted",
+                actor=actor,
+                targets=[events.Target.from_model(gateway_model)],
+            )
+        else:
+            res = await session.execute(
+                update(GatewayModel)
+                .where(
+                    GatewayModel.id == gateway_model.id,
+                    GatewayModel.lock_token == gateway_model.lock_token,
+                )
+                .values(**get_processed_update_map())
+                .returning(GatewayModel.id)
+            )
+            updated_ids = list(res.scalars().all())
+            if len(updated_ids) == 0:
+                logger.warning(
+                    "Failed to update %s item %s after processing: lock_token changed."
+                    " The item is expected to be processed and updated on another fetch iteration.",
+                    item.__tablename__,
+                    item.id,
+                )
+                return
+
+        if result.gateway_compute_update_map:
+            res = await session.execute(
+                update(GatewayComputeModel)
+                .where(GatewayComputeModel.id == gateway_model.gateway_compute_id)
+                .values(**result.gateway_compute_update_map)
+                .returning(GatewayComputeModel.id)
+            )
+            updated_ids = list(res.scalars().all())
+            if len(updated_ids) == 0:
+                logger.error(
+                    "Failed to update compute model %s for gateway %s."
+                    " This is unexpected and may happen only if the compute model was manually deleted.",
+                    gateway_model.id,
+                    item.id,
+                )
+                return
+
+
+@dataclass
+class _DeletedResult:
+    delete_gateway: bool
+    gateway_compute_update_map: UpdateMap = field(default_factory=dict)
+
+
+async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _DeletedResult:
+    backend = await backends_services.get_project_backend_by_type_or_error(
+        project=gateway_model.project, backend_type=gateway_model.backend.type
+    )
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithGatewaySupport)
+    gateway_compute_configuration = gateways_services.get_gateway_compute_configuration(
+        gateway_model
+    )
+    if gateway_model.gateway_compute is not None and gateway_compute_configuration is not None:
+        logger.info("Deleting gateway compute for %s...", gateway_model.name)
+        try:
+            await run_async(
+                compute.terminate_gateway,
+                gateway_model.gateway_compute.instance_id,
+                gateway_compute_configuration,
+                gateway_model.gateway_compute.backend_data,
+            )
+        except Exception:
+            logger.exception(
+                "Error when deleting gateway compute for %s",
+                gateway_model.name,
+            )
+            return _DeletedResult(delete_gateway=False)
+        logger.info("Deleted gateway compute for %s", gateway_model.name)
+    result = _DeletedResult(delete_gateway=True)
+    if gateway_model.gateway_compute is not None:
+        await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
+        result.gateway_compute_update_map = {"active": False, "deleted": True}
+    return result

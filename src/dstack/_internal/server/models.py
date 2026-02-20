@@ -521,6 +521,12 @@ class GatewayModel(PipelineModelMixin, BaseModel):
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="gateway")
 
+    to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    deleted_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    deleted_by_user: Mapped[Optional[UserModel]] = relationship(foreign_keys=[deleted_by_user_id])
+
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_gateways_project_id_name"),)
 
 

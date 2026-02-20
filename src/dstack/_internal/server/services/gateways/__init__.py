@@ -10,7 +10,6 @@ from typing import List, Optional, Sequence
 import httpx
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
@@ -50,7 +49,6 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events
 from dstack._internal.server.services.backends import (
     check_backend_type_available,
-    get_project_backend_by_type_or_error,
     get_project_backend_with_model_by_type_or_error,
 )
 from dstack._internal.server.services.gateways.connection import GatewayConnection
@@ -295,53 +293,24 @@ async def delete_gateways(
         res = await session.execute(
             select(GatewayModel)
             .where(
+                GatewayModel.id.in_(gateways_ids),
                 GatewayModel.project_id == project.id,
-                GatewayModel.name.in_(gateways_names),
+                GatewayModel.lock_expires_at.is_(None),
             )
-            .options(selectinload(GatewayModel.gateway_compute))
             .execution_options(populate_existing=True)
             .order_by(GatewayModel.id)  # take locks in order
-            .with_for_update(key_share=True)
+            .with_for_update(key_share=True, nowait=True)
         )
         gateway_models = res.scalars().all()
+        if len(gateway_models) != len(gateways_ids):
+            # TODO: Make the delete endpoint fully async without lock – put the request in queue and process in background.
+            raise ServerClientError(
+                "Failed to delete gateways: gateways are being processed currently. Try again later."
+            )
         for gateway_model in gateway_models:
-            backend = await get_project_backend_by_type_or_error(
-                project=project, backend_type=gateway_model.backend.type
-            )
-            compute = backend.compute()
-            assert isinstance(compute, ComputeWithGatewaySupport)
-            gateway_compute_configuration = get_gateway_compute_configuration(gateway_model)
-            if (
-                gateway_model.gateway_compute is not None
-                and gateway_compute_configuration is not None
-            ):
-                logger.info("Deleting gateway compute for %s...", gateway_model.name)
-                try:
-                    await run_async(
-                        compute.terminate_gateway,
-                        gateway_model.gateway_compute.instance_id,
-                        gateway_compute_configuration,
-                        gateway_model.gateway_compute.backend_data,
-                    )
-                except Exception:
-                    logger.exception(
-                        "Error when deleting gateway compute for %s",
-                        gateway_model.name,
-                    )
-                    continue
-                logger.info("Deleted gateway compute for %s", gateway_model.name)
-            if gateway_model.gateway_compute is not None:
-                await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
-                gateway_model.gateway_compute.active = False
-                gateway_model.gateway_compute.deleted = True
-                session.add(gateway_model.gateway_compute)
-            await session.delete(gateway_model)
-            events.emit(
-                session,
-                "Gateway deleted",
-                actor=events.UserActor.from_user(user),
-                targets=[events.Target.from_model(gateway_model)],
-            )
+            if not gateway_model.to_be_deleted:
+                gateway_model.to_be_deleted = True
+                gateway_model.deleted_by_user_id = user.id
         await session.commit()
 
 
