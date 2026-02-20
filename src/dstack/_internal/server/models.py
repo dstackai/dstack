@@ -508,6 +508,7 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     status: Mapped[GatewayStatus] = mapped_column(EnumAsString(GatewayStatus, 100))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
@@ -520,8 +521,6 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship(lazy="joined")
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="gateway")
-
-    to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_gateways_project_id_name"),)
 

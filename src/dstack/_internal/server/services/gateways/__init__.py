@@ -352,6 +352,8 @@ async def set_default_gateway(
     gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
     if gateway is None:
         raise ResourceNotExistsError()
+    if gateway.to_be_deleted:
+        raise ServerClientError("Cannot set gateway marked for deletion as default")
     if project.default_gateway_id == gateway.id:
         return
     previous_gateway = await get_project_default_gateway_model(session, project)
@@ -434,7 +436,10 @@ async def get_project_default_gateway_model(
     session: AsyncSession, project: ProjectModel
 ) -> Optional[GatewayModel]:
     res = await session.execute(
-        select(GatewayModel).where(GatewayModel.id == project.default_gateway_id)
+        select(GatewayModel).where(
+            GatewayModel.id == project.default_gateway_id,
+            GatewayModel.to_be_deleted == False,
+        )
     )
     return res.scalar_one_or_none()
 

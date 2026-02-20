@@ -96,6 +96,10 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
             raise ResourceNotExistsError(
                 f"Gateway {run_spec.configuration.gateway} does not exist"
             )
+        if gateway.to_be_deleted:
+            raise ResourceNotExistsError(
+                f"Gateway {run_spec.configuration.gateway} was marked for deletion"
+            )
     elif run_spec.configuration.gateway == False:
         gateway = None
     else:
