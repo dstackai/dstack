@@ -546,7 +546,7 @@ class BaseRunConfiguration(CoreModel):
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
         if v is not None and values.get("image"):
-            raise KeyError("`image` and `python` are mutually exclusive fields")
+            raise ValueError("`image` and `python` are mutually exclusive fields")
         if isinstance(v, float):
             v = str(v)
             if v == "3.1":
@@ -558,11 +558,11 @@ class BaseRunConfiguration(CoreModel):
     @validator("docker", pre=True, always=True)
     def _docker(cls, v, values) -> Optional[bool]:
         if v is True and values.get("image"):
-            raise KeyError("`image` and `docker` are mutually exclusive fields")
+            raise ValueError("`image` and `docker` are mutually exclusive fields")
         if v is True and values.get("python"):
-            raise KeyError("`python` and `docker` are mutually exclusive fields")
+            raise ValueError("`python` and `docker` are mutually exclusive fields")
         if v is True and values.get("nvcc"):
-            raise KeyError("`nvcc` and `docker` are mutually exclusive fields")
+            raise ValueError("`nvcc` and `docker` are mutually exclusive fields")
         # Ideally, we'd like to also prohibit privileged=False when docker=True,
         #   but it's not possible to do so without breaking backwards compatibility.
         return v
