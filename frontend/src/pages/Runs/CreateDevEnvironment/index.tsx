@@ -82,8 +82,6 @@ export const CreateDevEnvironment: React.FC = () => {
     const { handleSubmit, control, trigger, setValue, watch, formState, getValues, unregister } = formMethods;
     const formValues = watch();
 
-    console.log({ formValues });
-
     const projectHavingFleetMap = useCheckingForFleetsInProjects({
         projectNames: formValues.project ? [formValues.project] : [],
     });
