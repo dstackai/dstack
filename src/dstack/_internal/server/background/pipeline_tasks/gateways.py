@@ -210,11 +210,8 @@ async def _process_submitted_item(item: GatewayPipelineItem):
             )
             return
 
-    old_status = gateway_model.status
     result = await _process_submitted_gateway(gateway_model)
     update_map = result.update_map | get_processed_update_map() | get_unlock_update_map()
-    new_status = update_map.get("status", old_status)
-    new_status_message = update_map.get("status_message", gateway_model.status_message)
     async with get_session_ctx() as session:
         gateway_compute_model = result.gateway_compute_model
         if gateway_compute_model is not None:
@@ -242,9 +239,9 @@ async def _process_submitted_item(item: GatewayPipelineItem):
         emit_gateway_status_change_event(
             session=session,
             gateway_model=gateway_model,
-            old_status=old_status,
-            new_status=new_status,
-            status_message=new_status_message,
+            old_status=gateway_model.status,
+            new_status=update_map.get("status", gateway_model.status),
+            status_message=update_map.get("status_message", gateway_model.status_message),
         )
 
 
