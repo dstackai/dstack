@@ -1,13 +1,15 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     clear_events,
     create_backend,
     create_gateway,
@@ -18,6 +20,15 @@ from dstack._internal.server.testing.common import (
     list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
+from dstack._internal.settings import FeatureFlags
+
+
+@pytest.fixture
+def patch_pipeline_processing_flag(monkeypatch: pytest.MonkeyPatch):
+    def _apply(enabled: bool):
+        monkeypatch.setattr(FeatureFlags, "PIPELINE_PROCESSING_ENABLED", enabled)
+
+    return _apply
 
 
 class TestListAndGetGateways:
@@ -453,6 +464,12 @@ class TestDeleteGateway:
         )
         assert response.status_code == 403
 
+
+class TestDeleteGatewayPipelineEnabled:
+    @pytest.fixture(autouse=True)
+    def _pipeline_processing_enabled(self, patch_pipeline_processing_flag):
+        patch_pipeline_processing_flag(True)
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_marks_gateways_to_be_deleted(
@@ -517,6 +534,110 @@ class TestDeleteGateway:
         assert all(e.message == "Gateway marked for deletion" for e in events)
         assert {e.targets[0].entity_name for e in events} == {"gateway-aws", "gateway-gcp"}
         assert all(e.actor_user_id == user.id for e in events)
+
+
+class TestDeleteGatewayPipelineDisabled:
+    @pytest.fixture(autouse=True)
+    def _pipeline_processing_disabled(self, patch_pipeline_processing_flag):
+        patch_pipeline_processing_flag(False)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_deletes_gateways_synchronously(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend_aws = await create_backend(session, project.id)
+        backend_gcp = await create_backend(session, project.id, backend_type=BackendType.GCP)
+        gateway_compute_aws = await create_gateway_compute(
+            session=session,
+            backend_id=backend_aws.id,
+        )
+        gateway_aws = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend_aws.id,
+            name="gateway-aws",
+            gateway_compute_id=gateway_compute_aws.id,
+        )
+        gateway_compute_gcp = await create_gateway_compute(
+            session=session,
+            backend_id=backend_gcp.id,
+        )
+        gateway_gcp = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend_gcp.id,
+            name="gateway-gcp",
+            gateway_compute_id=gateway_compute_gcp.id,
+        )
+        with patch(
+            "dstack._internal.server.services.gateways.get_project_backend_by_type_or_error"
+        ) as m:
+            aws = Mock()
+            aws.compute.return_value = Mock(spec=ComputeMockSpec)
+            aws.compute.return_value.terminate_gateway.return_value = None  # success
+            gcp = Mock()
+            gcp.compute.return_value = Mock(spec=ComputeMockSpec)
+            gcp.compute.return_value.terminate_gateway.side_effect = DstackError()  # fail
+
+            def get_backend(project, backend_type):
+                return {BackendType.AWS: aws, BackendType.GCP: gcp}[backend_type]
+
+            m.side_effect = get_backend
+
+            response = await client.post(
+                f"/api/project/{project.name}/gateways/delete",
+                json={"names": [gateway_aws.name, gateway_gcp.name]},
+                headers=get_auth_headers(user.token),
+            )
+            aws.compute.return_value.terminate_gateway.assert_called_once()
+            gcp.compute.return_value.terminate_gateway.assert_called_once()
+            assert response.status_code == 200
+
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "id": str(gateway_gcp.id),
+                "backend": backend_gcp.type.value,
+                "created_at": response.json()[0]["created_at"],
+                "default": False,
+                "status": "submitted",
+                "status_message": None,
+                "instance_id": gateway_compute_gcp.instance_id,
+                "ip_address": gateway_compute_gcp.ip_address,
+                "hostname": gateway_compute_gcp.ip_address,
+                "name": gateway_gcp.name,
+                "region": gateway_gcp.region,
+                "wildcard_domain": gateway_gcp.wildcard_domain,
+                "configuration": {
+                    "type": "gateway",
+                    "name": gateway_gcp.name,
+                    "backend": backend_gcp.type.value,
+                    "region": gateway_gcp.region,
+                    "instance_type": None,
+                    "router": None,
+                    "domain": gateway_gcp.wildcard_domain,
+                    "default": False,
+                    "public_ip": True,
+                    "certificate": {"type": "lets-encrypt"},
+                    "tags": None,
+                },
+            }
+        ]
+
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway deleted"
+        assert events[0].targets[0].entity_name == "gateway-aws"
 
 
 class TestUpdateGateway:
