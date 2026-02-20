@@ -77,7 +77,10 @@ class GatewayConfiguration(CoreModel):
     public_ip: Annotated[bool, Field(description="Allocate public IP for the gateway")] = True
     certificate: Annotated[
         Optional[AnyGatewayCertificate],
-        Field(description="The SSL certificate configuration. Defaults to `type: lets-encrypt`"),
+        Field(
+            description="The SSL certificate configuration."
+            " Set to `null` to disable. Defaults to `type: lets-encrypt`"
+        ),
     ] = LetsEncryptGatewayCertificate()
     tags: Annotated[
         Optional[Dict[str, str]],

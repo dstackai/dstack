@@ -32,8 +32,6 @@ domain: example.com
 
 </div>
 
-A domain name is required to create a gateway.
-
 To create or update the gateway, simply call the [`dstack apply`](../reference/cli/dstack/apply.md) command:
 
 <div class="termy">
@@ -53,6 +51,12 @@ Provisioning...
 
 ## Configuration options
 
+### Domain
+
+A gateway requires a `domain` to be specified in the configuration before creation. The domain is used to generate service endpoints (e.g. `<run name>.<gateway domain>`).
+
+Once the gateway is created and assigned a hostname, configure your DNS by adding a wildcard record for `*.<gateway domain>` (e.g. `*.example.com`). The record should point to the gateway's hostname and should be of type `A` if the hostname is an IP address (most cases), or of type `CNAME` if the hostname is another domain (some private gateways and Kubernetes).
+
 ### Backend
 
 You can create gateways with the `aws`, `azure`, `gcp`, or `kubernetes` backends, but that does not limit where services run. A gateway can use one backend while services run on any other backend supported by dstack, including backends where gateways themselves cannot be created.
@@ -60,27 +64,6 @@ You can create gateways with the `aws`, `azure`, `gcp`, or `kubernetes` backends
 ??? info "Kubernetes"
     Gateways in `kubernetes` backend require an external load balancer. Managed Kubernetes solutions usually include a load balancer.
     For self-hosted Kubernetes, you must provide a load balancer by yourself.
-
-### Instance type
-
-By default, `dstack` provisions a small, low-cost instance for the gateway. If you expect to run high-traffic services, you can configure a larger instance type using the `instance_type` property.
-
-<div editor-title="gateway.dstack.yml">
-
-```yaml
-type: gateway
-name: example-gateway
-
-backend: aws
-region: eu-west-1
-
-# (Optional) Override the gateway instance type
-instance_type: t3.large
-
-domain: example.com
-```
-
-</div>
 
 ### Router
 
@@ -124,21 +107,65 @@ If you configure the `sglang` router, [services](../concepts/services.md) can ru
 
 
 
+### Certificate
+
+By default, when you run a service with a gateway, `dstack` provisions an SSL certificate via Let's Encrypt for the configured domain. This automatically enables HTTPS for the service endpoint.
+
+If you disable [public IP](#public-ip) (e.g. to make the gateway private) or if you simply don't need HTTPS, you can set `certificate` to `null`. 
+
+> Note, by default services set [`https`](../reference/dstack.yml/service.md#https) to `true` which requires a certificate. You can set `https` to `auto` to detect if the gateway supports HTTPS or not automatically.
+
+??? info "Certificate types"
+    `dstack` supports the following certificate types:
+
+    * `lets-encrypt` (default) — Automatic certificates via [Let's Encrypt](https://letsencrypt.org/). Requires a [public IP](#public-ip).
+    * `acm` — Certificates managed by [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/). AWS-only. TLS is terminated at the load balancer, not at the gateway.
+    * `null` — No certificate. Services will use HTTP.
+
 ### Public IP
 
-If you don't need/want a public IP for the gateway, you can set the `public_ip` to `false` (the default value is `true`), making the gateway private.
+If you don't need a public IP for the gateway, you can set `public_ip` to `false` (the default is `true`), making the gateway private.
+
 Private gateways are currently supported in `aws` and `gcp` backends.
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: private-gateway
+
+backend: aws
+region: eu-west-1
+domain: example.com
+
+public_ip: false
+certificate: null
+```
+
+</div>
+
+### Instance type
+
+By default, `dstack` provisions a small, low-cost instance for the gateway. If you expect to run high-traffic services, you can configure a larger instance type using the `instance_type` property.
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: example-gateway
+
+backend: aws
+region: eu-west-1
+
+instance_type: t3.large
+
+domain: example.com
+```
+
+</div>
 
 !!! info "Reference"
     For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).
-
-## Update DNS records
-
-Once the gateway is assigned a hostname, go to your domain's DNS settings
-and add a DNS record for `*.<gateway domain>`, e.g. `*.example.com`.
-The record should point to the gateway's hostname shown in `dstack`
-and should be of type `A` if the hostname is an IP address (most cases),
-or of type `CNAME` if the hostname is another domain (some private gateways and Kubernetes).
 
 ## Manage gateways
 

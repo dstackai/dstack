@@ -856,9 +856,13 @@ class ServiceConfigurationParams(CoreModel):
             )
         ),
     ] = None
-    https: Annotated[bool, Field(description="Enable HTTPS if running with a gateway")] = (
-        SERVICE_HTTPS_DEFAULT
-    )
+    https: Annotated[
+        Union[bool, Literal["auto"]],
+        Field(
+            description="Enable HTTPS if running with a gateway."
+            " Set to `auto` to determine automatically based on gateway configuration"
+        ),
+    ] = SERVICE_HTTPS_DEFAULT
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
 
     scaling: Annotated[

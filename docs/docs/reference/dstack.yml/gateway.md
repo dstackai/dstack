@@ -22,6 +22,8 @@ The `gateway` configuration type allows creating and updating [gateways](../../c
 
 ### `certificate`
 
+Set to `null` to disable certificates (e.g. for [private gateways](../../concepts/gateways.md#public-ip)).
+
 === "Let's encrypt"
 
     #SCHEMA# dstack._internal.core.models.gateways.LetsEncryptGatewayCertificate

@@ -22,7 +22,6 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
-    SERVICE_HTTPS_DEFAULT,
     ServiceConfiguration,
 )
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
@@ -241,7 +240,7 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
             "Service with SGLang router configuration requires a gateway. "
             "Please configure a gateway with the SGLang router enabled."
         )
-    if run_spec.configuration.https != SERVICE_HTTPS_DEFAULT:
+    if run_spec.configuration.https is False:
         # Note: if the user sets `https: <default-value>`, it will be ignored silently
         # TODO: in 0.19, make `https` Optional to be able to tell if it was set or omitted
         raise ServerClientError(
@@ -416,7 +415,14 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
 
 def _get_service_https(run_spec: RunSpec, configuration: GatewayConfiguration) -> bool:
     assert run_spec.configuration.type == "service"
-    if not run_spec.configuration.https:
+    https = run_spec.configuration.https
+    if https == "auto":
+        if configuration.certificate is None:
+            return False
+        if configuration.certificate.type == "acm":
+            return False
+        return True
+    if not https:
         return False
     if configuration.certificate is not None and configuration.certificate.type == "acm":
         return False
