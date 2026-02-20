@@ -20,7 +20,6 @@ from dstack._internal.server.testing.common import (
     create_gateway,
     create_gateway_compute,
     create_project,
-    create_user,
     list_events,
 )
 
@@ -194,7 +193,6 @@ class TestGatewayWorkerDeleted:
     async def test_deletes_gateway_and_marks_compute_deleted(
         self, test_db, session: AsyncSession, worker: GatewayWorker
     ):
-        user = await create_user(session=session)
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
         gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
@@ -208,7 +206,6 @@ class TestGatewayWorkerDeleted:
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         gateway.to_be_deleted = True
-        gateway.deleted_by_user_id = user.id
         await session.commit()
 
         with (
@@ -237,7 +234,6 @@ class TestGatewayWorkerDeleted:
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Gateway deleted"
-        assert events[0].actor_user_id == user.id
 
     async def test_keeps_gateway_if_terminate_fails(
         self, test_db, session: AsyncSession, worker: GatewayWorker

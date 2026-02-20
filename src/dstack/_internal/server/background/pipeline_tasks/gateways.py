@@ -25,7 +25,6 @@ from dstack._internal.server.models import (
     GatewayComputeModel,
     GatewayModel,
     ProjectModel,
-    UserModel,
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
@@ -431,9 +430,6 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
             )
             .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
             .options(joinedload(GatewayModel.gateway_compute))
-            .options(
-                joinedload(GatewayModel.deleted_by_user).load_only(UserModel.id, UserModel.name)
-            )
         )
         gateway_model = res.unique().scalar_one_or_none()
         if gateway_model is None:
@@ -465,13 +461,10 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
                     item.id,
                 )
                 return
-            actor = events.SystemActor()
-            if gateway_model.deleted_by_user is not None:
-                actor = events.UserActor.from_user(gateway_model.deleted_by_user)
             events.emit(
                 session,
                 "Gateway deleted",
-                actor=actor,
+                actor=events.SystemActor(),
                 targets=[events.Target.from_model(gateway_model)],
             )
         else:

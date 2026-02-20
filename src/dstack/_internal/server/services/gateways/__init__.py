@@ -310,7 +310,12 @@ async def delete_gateways(
         for gateway_model in gateway_models:
             if not gateway_model.to_be_deleted:
                 gateway_model.to_be_deleted = True
-                gateway_model.deleted_by_user_id = user.id
+                events.emit(
+                    session,
+                    "Gateway marked for deletion",
+                    actor=events.UserActor.from_user(user),
+                    targets=[events.Target.from_model(gateway_model)],
+                )
         await session.commit()
 
 
