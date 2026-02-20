@@ -9,7 +9,7 @@ This example shows how to deploy DeepSeek-R1-Distill-Llama 8B and 70B using [SGL
 
 ## Apply a configuration
 
-Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B using SgLang.
+Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B using SGLang.
 
 === "NVIDIA"
 
@@ -108,31 +108,18 @@ curl http://127.0.0.1:3000/proxy/services/main/deepseek-r1/v1/chat/completions \
 ```
 </div>
 
-!!! info "SGLang Model Gateway"
-    If you'd like to use a custom routing policy, e.g. by leveraging the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#), create a gateway with `router` set to `sglang`. Check out [gateways](https://dstack.ai/docs/concepts/gateways#router) for more details.
+!!! info "Router policy"
+    If you'd like to use a custom routing policy, create a gateway with `router` set to `sglang`. Check out [gateways](https://dstack.ai/docs/concepts/gateways#router) for more details.
 
-> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling or HTTPs, rate-limits, etc), the service endpoint will be available at `https://deepseek-r1.<gateway domain>/`.
+> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://deepseek-r1.<gateway domain>/`.
 
-## PD-Disaggregation
+## Configuration options
 
-To run PD-Disaggregated inference using SGLang Model Gateway.
+### PD disaggregation
 
-Create a SGLang-enabled gateway in the same network where prefill and decode workers will be deployed. Here we are using a Kubernetes cluster to ensure the gateway and workers share the same network.
+If you create a gateway with the [`sglang` router](https://dstack.ai/docs/concepts/gateways/#sglang), you can run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html).
 
-```yaml
-type: gateway
-name: gateway-name
-
-backend: kubernetes
-region: any
-
-# This domain will be used to access the endpoint
-domain: example.com
-router:
-  type: sglang
-```
-
-After the gateway is ready, create a node group with at least two instances—one for the Prefill worker and one for the Decode worker—within the same Kubernetes cluster where the gateway is running. Then apply below service configuration to the GPU nodes.
+<div editor-title="examples/inference/sglang/pd.dstack.yml">
 
 ```yaml
 type: service
@@ -188,6 +175,34 @@ router:
   type: sglang
   pd_disaggregation: true
 ```
+
+</div>
+
+Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
+
+#### Gateway
+
+Note, running services with PD disaggregation currently requires the gateway to run in the same cluster as the service.
+
+For example, if you run services on the `kubernetes` backend, make sure to also create the gateway in the same backend:
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: gateway-name
+
+backend: kubernetes
+region: any
+
+domain: example.com
+router:
+  type: sglang
+```
+
+</div>
+
+<!-- TODO: Gateway creation using fleets is coming to simplify this. -->
 
 ## Source code
 

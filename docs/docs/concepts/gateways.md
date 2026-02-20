@@ -110,7 +110,11 @@ router:
 
 </div>
 
-!!! info "Policy"
+If you configure the `sglang` router, [services](../concepts/services.md) can run either [standard SGLang workers](../../examples/inference/sglang/index.md) or [Prefill-Decode workers](../../examples/inference/sglang/index.md#pd-disaggregation) (aka PD disaggregation).
+
+> Note, if you want to run services with PD disaggregation, the gateway must currently run in the same cluster as the service.
+
+??? info "Policy"
     The `policy` property allows you to configure the routing policy:
 
     * `cache_aware` &mdash; Default policy; combines cache locality with load balancing, falling back to shortest queue. 
@@ -119,9 +123,6 @@ router:
     * `round_robin` &mdash; Cycles through workers in order.                                                             
 
 
-> Services using this type of gateway can run PD-disaggregated inference. To run PD disaggregation inference, refer to the [SGLang PD-Disaggregation](../../examples/inference/sglang/index.md#pd-disaggregation) example.
->
-> Support for auto-scaling based on TTFT and ITL is coming soon.
 
 ### Public IP
 
