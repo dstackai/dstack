@@ -67,14 +67,21 @@ const getRequestParams = ({
 };
 
 type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange' | 'selectedItems' | 'selectionType'> &
-    Pick<UseFiltersArgs, 'permanentFilters'> & {
+    Pick<UseFiltersArgs, 'permanentFilters' | 'defaultFilters'> & {
         withSearchParams?: boolean;
         onChangeProjectName?: (value: string) => void;
     };
 
-export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChangeProjectName, permanentFilters, ...props }) => {
+export const OfferList: React.FC<OfferListProps> = ({
+    withSearchParams,
+    onChangeProjectName,
+    permanentFilters,
+    defaultFilters,
+    ...props
+}) => {
     const { t } = useTranslation();
     const [requestParams, setRequestParams] = useState<TGpusListQueryParams | undefined>();
+
     const { data, isLoading, isFetching } = useGetGpusListQuery(
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
@@ -94,7 +101,7 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
         groupBy,
         groupByOptions,
         onChangeGroupBy,
-    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams, permanentFilters });
+    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams, permanentFilters, defaultFilters });
 
     useEffect(() => {
         setRequestParams(

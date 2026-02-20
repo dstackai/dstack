@@ -31,6 +31,8 @@ export const useGenerateYaml = ({ formValues, template }: UseGenerateYamlArgs) =
                       },
 
                       backends: offer.backends,
+                      ...(offer.spot.length === 1 ? { spot_policy: offer.spot[0] } : {}),
+                      ...(offer.spot.length > 1 ? { spot_policy: 'auto' } : {}),
                   }
                 : {}),
 
@@ -41,7 +43,6 @@ export const useGenerateYaml = ({ formValues, template }: UseGenerateYamlArgs) =
                 : {}),
 
             ...(working_dir ? { working_dir } : {}),
-            spot_policy: 'auto',
         });
     }, [formValues, template]);
 };

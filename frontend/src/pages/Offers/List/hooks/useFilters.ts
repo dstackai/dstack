@@ -20,6 +20,7 @@ export type UseFiltersArgs = {
     gpus: IGpu[];
     withSearchParams?: boolean;
     permanentFilters?: Partial<Record<RequestParamsKeys, string>>;
+    defaultFilters?: Partial<Record<RequestParamsKeys, string>>;
 };
 
 export const filterKeys: Record<string, RequestParamsKeys> = {
@@ -87,13 +88,13 @@ const defaultGroupByOptions = [{ ...gpuFilterOption }, { label: 'Backend', value
 
 const groupByRequestParamName: RequestParamsKeys = 'group_by';
 
-export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {} }: UseFiltersArgs) => {
+export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {}, defaultFilters }: UseFiltersArgs) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const { projectOptions } = useProjectFilter({ localStorePrefix: 'offers-list-projects' });
     const projectNameIsChecked = useRef(false);
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
-        requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
+        requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys, defaultFilterValues: defaultFilters }),
     );
 
     const [groupBy, setGroupBy] = useState<MultiselectProps.Options>(() => {

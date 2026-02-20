@@ -10,9 +10,9 @@ const workingDirFormatError = 'Must be an absolute path';
 
 export const useYupValidationResolver = (template?: ITemplate) => {
     const validationSchema = useMemo(() => {
-        const schema: Partial<Record<IRunEnvironmentFormKeys, yup.StringSchema>> = {
+        const schema: Partial<Record<IRunEnvironmentFormKeys, yup.StringSchema | yup.ArraySchema<yup.StringSchema>>> = {
             project: yup.string().required(requiredFieldError),
-            template: yup.string().required(requiredFieldError),
+            template: yup.array().min(1, requiredFieldError).of(yup.string()).required(requiredFieldError),
             config_yaml: yup.string().required(requiredFieldError),
         };
 

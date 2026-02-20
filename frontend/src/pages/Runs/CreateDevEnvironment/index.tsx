@@ -6,10 +6,11 @@ import cn from 'classnames';
 import { Box, Link, WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import { Container, FormCodeEditor, FormField, FormSelect, SpaceBetween, Wizard } from 'components';
+import { Container, FormCards, FormCodeEditor, FormField, FormSelect, FormSelectProps, SpaceBetween, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
+import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { useProjectFilter } from 'hooks/useProjectFilter';
 import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
@@ -45,6 +46,10 @@ export const CreateDevEnvironment: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
+    const [defaultProject, setDefaultProject] = useLocalStorageState<IProject['project_name'] | undefined>(
+        'createEnvironmentDefaultProject',
+        undefined,
+    );
     const [activeStepIndex, setActiveStepIndex] = useState(0);
     const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<ITemplate | undefined>();
@@ -74,8 +79,10 @@ export const CreateDevEnvironment: React.FC = () => {
         },
     });
 
-    const { handleSubmit, control, trigger, setValue, watch, formState, getValues } = formMethods;
+    const { handleSubmit, control, trigger, setValue, watch, formState, getValues, unregister } = formMethods;
     const formValues = watch();
+
+    console.log({ formValues });
 
     const projectHavingFleetMap = useCheckingForFleetsInProjects({
         projectNames: formValues.project ? [formValues.project] : [],
@@ -101,7 +108,14 @@ export const CreateDevEnvironment: React.FC = () => {
     }, [templatesData]);
 
     useEffect(() => {
-        setSelectedTemplate(templatesData?.find((t) => t.id === formValues.template));
+        if (!defaultProject && projectOptions?.[0]?.value) {
+            setValue(FORM_FIELD_NAMES.project, projectOptions[0].value);
+            setDefaultProject(projectOptions[0].value);
+        }
+    }, [defaultProject, projectOptions]);
+
+    useEffect(() => {
+        setSelectedTemplate(templatesData?.find((t) => t.id === formValues.template?.[0]));
     }, [templatesData, formValues.template]);
 
     const validateProjectAndTemplate = async () => await trigger(templateStepFieldNames);
@@ -130,6 +144,8 @@ export const CreateDevEnvironment: React.FC = () => {
                     window.scrollTo(0, 0);
                 }
             });
+        } else if (reason === 'step' && requestedStepIndex - activeStepIndex > 1) {
+            return;
         } else {
             setActiveStepIndex(requestedStepIndex);
         }
@@ -137,6 +153,15 @@ export const CreateDevEnvironment: React.FC = () => {
 
     const onNavigateHandler: WizardProps['onNavigate'] = ({ detail: { requestedStepIndex, reason } }) => {
         onNavigate({ requestedStepIndex, reason });
+    };
+
+    const onChangeProject: FormSelectProps<IRunEnvironmentFormValues>['onChange'] = ({ detail }) => {
+        setValue(FORM_FIELD_NAMES.template, []);
+        setDefaultProject(detail.selectedOption.value);
+    };
+
+    const onChangeTemplate = () => {
+        unregister(FORM_FIELD_NAMES.ide);
     };
 
     const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => {
@@ -245,22 +270,27 @@ export const CreateDevEnvironment: React.FC = () => {
                                         empty={t('runs.dev_env.wizard.project_empty')}
                                         loadingText={t('runs.dev_env.wizard.project_loading')}
                                         statusType={isLoadingProjectOptions ? 'loading' : undefined}
-                                        onChange={() => setValue(FORM_FIELD_NAMES.template, '')}
+                                        onChange={onChangeProject}
+                                        defaultValue={defaultProject}
                                     />
 
-                                    <FormSelect
+                                    <FormField
                                         label={t('runs.dev_env.wizard.template')}
                                         description={t('runs.dev_env.wizard.template_description')}
-                                        placeholder={
-                                            !formValues.project ? t('runs.dev_env.wizard.template_placeholder') : undefined
-                                        }
+                                        errorText={formState.errors.template?.message}
+                                    />
+
+                                    <FormCards
                                         control={control}
                                         name={FORM_FIELD_NAMES.template}
-                                        options={templateOptions}
-                                        disabled={loading}
-                                        empty={t('runs.dev_env.wizard.template_empty')}
-                                        loadingText={t('runs.dev_env.wizard.template_loading')}
-                                        statusType={isLoadingTemplates ? 'loading' : undefined}
+                                        items={templateOptions}
+                                        selectionType="single"
+                                        loading={isLoadingTemplates}
+                                        cardDefinition={{
+                                            header: (item) => item.label,
+                                        }}
+                                        cardsPerRow={[{ cards: 1 }, { minWidth: 400, cards: 2 }, { minWidth: 800, cards: 3 }]}
+                                        onSelectionChange={onChangeTemplate}
                                     />
                                 </SpaceBetween>
                             </Container>
@@ -285,6 +315,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                     selectedItems={selectedOffers}
                                     onSelectionChange={onChangeOffer}
                                     permanentFilters={{ project_name: formValues.project ?? '' }}
+                                    defaultFilters={{ spot_policy: 'on-demand' }}
                                 />
                             </>
                         ),
