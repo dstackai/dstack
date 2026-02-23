@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.server.background.pipeline_tasks.base import PipelineItem
 from dstack._internal.server.background.pipeline_tasks.placement_groups import PlacementGroupWorker
+from dstack._internal.server.models import PlacementGroupModel
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_fleet,
@@ -20,7 +21,7 @@ def worker() -> PlacementGroupWorker:
     return PlacementGroupWorker(queue=Mock(), heartbeater=Mock())
 
 
-def _placement_group_to_pipeline_item(placement_group) -> PipelineItem:
+def _placement_group_to_pipeline_item(placement_group: PlacementGroupModel) -> PipelineItem:
     assert placement_group.lock_token is not None
     assert placement_group.lock_expires_at is not None
     return PipelineItem(

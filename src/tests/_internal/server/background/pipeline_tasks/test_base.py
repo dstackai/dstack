@@ -21,7 +21,7 @@ def now() -> datetime:
 
 
 @pytest.fixture
-def heartbeater() -> Heartbeater[PlacementGroupModel]:
+def heartbeater() -> Heartbeater[PipelineItem]:
     return Heartbeater(
         model_type=PlacementGroupModel,
         lock_timeout=timedelta(seconds=30),
@@ -63,7 +63,7 @@ def _placement_group_to_pipeline_item(placement_group: PlacementGroupModel) -> P
 class TestHeartbeater:
     @pytest.mark.asyncio
     async def test_untrack_preserves_item_when_lock_token_mismatches(
-        self, heartbeater: Heartbeater[PlacementGroupModel], now: datetime
+        self, heartbeater: Heartbeater[PipelineItem], now: datetime
     ):
         item = PipelineItem(
             __tablename__=PlacementGroupModel.__tablename__,
@@ -93,7 +93,7 @@ class TestHeartbeater:
         self,
         test_db,
         session: AsyncSession,
-        heartbeater: Heartbeater[PlacementGroupModel],
+        heartbeater: Heartbeater[PipelineItem],
         now: datetime,
     ):
         placement_group = await _create_locked_placement_group(
@@ -122,7 +122,7 @@ class TestHeartbeater:
         self,
         test_db,
         session: AsyncSession,
-        heartbeater: Heartbeater[PlacementGroupModel],
+        heartbeater: Heartbeater[PipelineItem],
         now: datetime,
     ):
         original_lock_expires_at = now - timedelta(seconds=1)
@@ -150,7 +150,7 @@ class TestHeartbeater:
         self,
         test_db,
         session: AsyncSession,
-        heartbeater: Heartbeater[PlacementGroupModel],
+        heartbeater: Heartbeater[PipelineItem],
         now: datetime,
     ):
         original_lock_expires_at = now + timedelta(seconds=2)

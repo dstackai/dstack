@@ -10,7 +10,7 @@ from typing import List, Optional, Sequence
 import httpx
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 
 import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
@@ -42,6 +42,7 @@ from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
+    BackendModel,
     GatewayComputeModel,
     GatewayModel,
     ProjectModel,
@@ -60,8 +61,10 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
@@ -80,11 +83,41 @@ def switch_gateway_status(
         return
 
     gateway_model.status = new_status
+    emit_gateway_status_change_event(
+        session=session,
+        gateway_model=gateway_model,
+        old_status=old_status,
+        new_status=new_status,
+        status_message=gateway_model.status_message,
+        actor=actor,
+    )
 
-    msg = f"Gateway status changed {old_status.upper()} -> {new_status.upper()}"
-    if gateway_model.status_message is not None:
-        msg += f" ({gateway_model.status_message})"
+
+def emit_gateway_status_change_event(
+    session: AsyncSession,
+    gateway_model: GatewayModel,
+    old_status: GatewayStatus,
+    new_status: GatewayStatus,
+    status_message: Optional[str],
+    actor: events.AnyActor = events.SystemActor(),
+) -> None:
+    if old_status == new_status:
+        return
+    msg = get_gateway_status_change_message(
+        old_status=old_status,
+        new_status=new_status,
+        status_message=status_message,
+    )
     events.emit(session, msg, actor=actor, targets=[events.Target.from_model(gateway_model)])
+
+
+def get_gateway_status_change_message(
+    old_status: GatewayStatus, new_status: GatewayStatus, status_message: Optional[str]
+) -> str:
+    msg = f"Gateway status changed {old_status.upper()} -> {new_status.upper()}"
+    if status_message is not None:
+        msg += f" ({status_message})"
+    return msg
 
 
 GATEWAY_CONNECT_ATTEMPTS = 30
@@ -94,14 +127,25 @@ GATEWAY_CONFIGURE_DELAY = 3
 
 
 async def list_project_gateways(session: AsyncSession, project: ProjectModel) -> List[Gateway]:
-    gateways = await list_project_gateway_models(session=session, project=project)
+    gateways = await list_project_gateway_models(
+        session=session,
+        project=project,
+        load_gateway_compute=True,
+        load_backend_type=True,
+    )
     return [gateway_model_to_gateway(g) for g in gateways]
 
 
 async def get_gateway_by_name(
     session: AsyncSession, project: ProjectModel, name: str
 ) -> Optional[Gateway]:
-    gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
+    gateway = await get_project_gateway_model_by_name(
+        session=session,
+        project=project,
+        name=name,
+        load_gateway_compute=True,
+        load_backend_type=True,
+    )
     if gateway is None:
         return None
     return gateway_model_to_gateway(gateway)
@@ -156,6 +200,7 @@ async def create_gateway(
     user: UserModel,
     project: ProjectModel,
     configuration: GatewayConfiguration,
+    pipeline_hinter: PipelineHinterProtocol,
 ) -> Gateway:
     spec = await apply_plugin_policies(
         user=user.name,
@@ -183,6 +228,7 @@ async def create_gateway(
         if configuration.name is None:
             configuration.name = await generate_gateway_name(session=session, project=project)
 
+        now = get_current_datetime()
         gateway = GatewayModel(
             id=uuid.uuid4(),
             name=configuration.name,
@@ -192,7 +238,8 @@ async def create_gateway(
             wildcard_domain=configuration.domain,
             configuration=configuration.json(),
             status=GatewayStatus.SUBMITTED,
-            last_processed_at=get_current_datetime(),
+            created_at=now,
+            last_processed_at=now,
         )
         session.add(gateway)
         events.emit(
@@ -208,6 +255,15 @@ async def create_gateway(
             await set_default_gateway(
                 session=session, project=project, name=configuration.name, user=user
             )
+        pipeline_hinter.hint_fetch(GatewayModel.__name__)
+        gateway = await get_project_gateway_model_by_name(
+            session=session,
+            project=project,
+            name=configuration.name,
+            load_gateway_compute=True,
+            load_backend_type=True,
+        )
+        assert gateway is not None
         return gateway_model_to_gateway(gateway)
 
 
@@ -246,6 +302,86 @@ async def delete_gateways(
     gateways_names: List[str],
     user: UserModel,
 ):
+    # Keep both delete code paths while pipeline processing is behind a feature flag:
+    # - pipeline path marks gateways for async deletion by GatewayPipeline
+    # - sync path deletes gateway resources inline for non-pipeline processing
+    # TODO: Drop sync path after pipeline processing is enabled by default.
+    if FeatureFlags.PIPELINE_PROCESSING_ENABLED:
+        await _delete_gateways_pipeline(
+            session=session,
+            project=project,
+            gateways_names=gateways_names,
+            user=user,
+        )
+    else:
+        await _delete_gateways_sync(
+            session=session,
+            project=project,
+            gateways_names=gateways_names,
+            user=user,
+        )
+
+
+async def _delete_gateways_pipeline(
+    session: AsyncSession,
+    project: ProjectModel,
+    gateways_names: List[str],
+    user: UserModel,
+):
+    res = await session.execute(
+        select(GatewayModel).where(
+            GatewayModel.project_id == project.id,
+            GatewayModel.name.in_(gateways_names),
+        )
+    )
+    gateway_models = res.scalars().all()
+    gateways_ids = sorted([g.id for g in gateway_models])
+    await session.commit()
+    logger.info("Deleting gateways: %s", [g.name for g in gateway_models])
+    async with get_locker(get_db().dialect_name).lock_ctx(
+        GatewayModel.__tablename__, gateways_ids
+    ):
+        # Refetch after lock
+        res = await session.execute(
+            select(GatewayModel)
+            .where(
+                GatewayModel.id.in_(gateways_ids),
+                GatewayModel.project_id == project.id,
+                GatewayModel.lock_expires_at.is_(None),
+            )
+            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
+            .order_by(GatewayModel.id)  # take locks in order
+            .with_for_update(key_share=True, nowait=True, of=GatewayModel)
+            .execution_options(populate_existing=True)
+        )
+        gateway_models = res.scalars().all()
+        if len(gateway_models) != len(gateways_ids):
+            # TODO: Make the delete endpoint fully async so we don't need to lock and error:
+            # put the request in queue and process in the background.
+            raise ServerClientError(
+                "Failed to delete gateways: gateways are being processed currently. Try again later."
+            )
+        for gateway_model in gateway_models:
+            if gateway_model.backend.type == BackendType.DSTACK:
+                raise ServerClientError("Cannot delete dstack Sky gateway")
+        for gateway_model in gateway_models:
+            if not gateway_model.to_be_deleted:
+                gateway_model.to_be_deleted = True
+                events.emit(
+                    session,
+                    "Gateway marked for deletion",
+                    actor=events.UserActor.from_user(user),
+                    targets=[events.Target.from_model(gateway_model)],
+                )
+        await session.commit()
+
+
+async def _delete_gateways_sync(
+    session: AsyncSession,
+    project: ProjectModel,
+    gateways_names: List[str],
+    user: UserModel,
+):
     res = await session.execute(
         select(GatewayModel).where(
             GatewayModel.project_id == project.id,
@@ -266,10 +402,11 @@ async def delete_gateways(
                 GatewayModel.project_id == project.id,
                 GatewayModel.name.in_(gateways_names),
             )
-            .options(selectinload(GatewayModel.gateway_compute))
+            .options(joinedload(GatewayModel.gateway_compute))
+            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
             .execution_options(populate_existing=True)
             .order_by(GatewayModel.id)  # take locks in order
-            .with_for_update(key_share=True)
+            .with_for_update(key_share=True, of=GatewayModel)
         )
         gateway_models = res.scalars().all()
         for gateway_model in gateway_models:
@@ -346,6 +483,8 @@ async def set_default_gateway(
     gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
     if gateway is None:
         raise ResourceNotExistsError()
+    if gateway.to_be_deleted:
+        raise ServerClientError("Cannot set gateway marked for deletion as default")
     if project.default_gateway_id == gateway.id:
         return
     previous_gateway = await get_project_default_gateway_model(session, project)
@@ -375,20 +514,36 @@ async def set_default_gateway(
 
 
 async def list_project_gateway_models(
-    session: AsyncSession, project: ProjectModel
+    session: AsyncSession,
+    project: ProjectModel,
+    load_gateway_compute: bool = False,
+    load_backend_type: bool = False,
 ) -> Sequence[GatewayModel]:
-    res = await session.execute(select(GatewayModel).where(GatewayModel.project_id == project.id))
+    stmt = select(GatewayModel).where(GatewayModel.project_id == project.id)
+    if load_gateway_compute:
+        stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+    if load_backend_type:
+        stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
+    res = await session.execute(stmt)
     return res.scalars().all()
 
 
 async def get_project_gateway_model_by_name(
-    session: AsyncSession, project: ProjectModel, name: str
+    session: AsyncSession,
+    project: ProjectModel,
+    name: str,
+    load_gateway_compute: bool = False,
+    load_backend_type: bool = False,
 ) -> Optional[GatewayModel]:
-    res = await session.execute(
-        select(GatewayModel).where(
-            GatewayModel.project_id == project.id, GatewayModel.name == name
-        )
+    stmt = select(GatewayModel).where(
+        GatewayModel.project_id == project.id,
+        GatewayModel.name == name,
     )
+    if load_gateway_compute:
+        stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+    if load_backend_type:
+        stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
+    res = await session.execute(stmt)
     return res.scalar()
 
 
@@ -419,17 +574,28 @@ async def get_project_gateway_model_by_name_for_update(
             res = await session.execute(
                 select(GatewayModel)
                 .where(GatewayModel.id.in_([gateway_id]), *filters)
+                .options(joinedload(GatewayModel.gateway_compute))
+                .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
                 .with_for_update(key_share=True, of=GatewayModel)
             )
             yield res.scalar_one_or_none()
 
 
 async def get_project_default_gateway_model(
-    session: AsyncSession, project: ProjectModel
+    session: AsyncSession,
+    project: ProjectModel,
+    load_gateway_compute: bool = False,
+    load_backend_type: bool = False,
 ) -> Optional[GatewayModel]:
-    res = await session.execute(
-        select(GatewayModel).where(GatewayModel.id == project.default_gateway_id)
+    stmt = select(GatewayModel).where(
+        GatewayModel.id == project.default_gateway_id,
+        GatewayModel.to_be_deleted == False,
     )
+    if load_gateway_compute:
+        stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+    if load_backend_type:
+        stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
+    res = await session.execute(stmt)
     return res.scalar_one_or_none()
 
 
@@ -445,7 +611,12 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 async def get_or_add_gateway_connection(
     session: AsyncSession, gateway_id: uuid.UUID
 ) -> tuple[GatewayModel, GatewayConnection]:
-    gateway = await session.get(GatewayModel, gateway_id)
+    gateway = await session.get(
+        GatewayModel,
+        gateway_id,
+        options=[joinedload(GatewayModel.gateway_compute)],
+        populate_existing=True,
+    )
     if gateway is None:
         raise GatewayError("Gateway not found")
     if gateway.gateway_compute is None:

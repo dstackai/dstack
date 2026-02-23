@@ -492,7 +492,7 @@ class JobModel(BaseModel):
     waiting_master_job: Mapped[Optional[bool]] = mapped_column(Boolean)
 
 
-class GatewayModel(BaseModel):
+class GatewayModel(PipelineModelMixin, BaseModel):
     __tablename__ = "gateways"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -508,20 +508,23 @@ class GatewayModel(BaseModel):
     status: Mapped[GatewayStatus] = mapped_column(EnumAsString(GatewayStatus, 100))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
     backend_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("backends.id", ondelete="CASCADE"))
-    backend: Mapped["BackendModel"] = relationship(lazy="selectin")
+    backend: Mapped["BackendModel"] = relationship()
 
     gateway_compute_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateway_computes.id", ondelete="CASCADE")
     )
-    gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship(lazy="joined")
+    gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship()
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="gateway")
 
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_gateways_project_id_name"),)
+
+    # TODO: Add pipeline index ("ix_gateways_pipeline_fetch_q") if gateways become soft-deleted.
 
 
 class GatewayComputeModel(BaseModel):

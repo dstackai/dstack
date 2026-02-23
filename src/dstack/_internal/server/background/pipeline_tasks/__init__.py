@@ -2,10 +2,10 @@ import asyncio
 
 from dstack._internal.server.background.pipeline_tasks.base import Pipeline
 from dstack._internal.server.background.pipeline_tasks.compute_groups import ComputeGroupPipeline
+from dstack._internal.server.background.pipeline_tasks.gateways import GatewayPipeline
 from dstack._internal.server.background.pipeline_tasks.placement_groups import (
     PlacementGroupPipeline,
 )
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -13,12 +13,11 @@ logger = get_logger(__name__)
 
 class PipelineManager:
     def __init__(self) -> None:
-        self._pipelines: list[Pipeline] = []
-        if FeatureFlags.PIPELINE_PROCESSING_ENABLED:
-            self._pipelines += [
-                ComputeGroupPipeline(),
-                PlacementGroupPipeline(),
-            ]
+        self._pipelines: list[Pipeline] = [
+            ComputeGroupPipeline(),
+            GatewayPipeline(),
+            PlacementGroupPipeline(),
+        ]
         self._hinter = PipelineHinter(self._pipelines)
 
     def start(self):

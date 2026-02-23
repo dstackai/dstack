@@ -32,7 +32,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class PlacementGroupPipeline(Pipeline):
+class PlacementGroupPipeline(Pipeline[PipelineItem]):
     def __init__(
         self,
         workers_num: int = 10,
@@ -50,7 +50,7 @@ class PlacementGroupPipeline(Pipeline):
             lock_timeout=lock_timeout,
             heartbeat_trigger=heartbeat_trigger,
         )
-        self.__heartbeater = Heartbeater[PlacementGroupModel](
+        self.__heartbeater = Heartbeater[PipelineItem](
             model_type=PlacementGroupModel,
             lock_timeout=self._lock_timeout,
             heartbeat_trigger=self._heartbeat_trigger,
@@ -72,11 +72,11 @@ class PlacementGroupPipeline(Pipeline):
         return PlacementGroupModel.__name__
 
     @property
-    def _heartbeater(self) -> Heartbeater:
+    def _heartbeater(self) -> Heartbeater[PipelineItem]:
         return self.__heartbeater
 
     @property
-    def _fetcher(self) -> Fetcher:
+    def _fetcher(self) -> Fetcher[PipelineItem]:
         return self.__fetcher
 
     @property
@@ -84,14 +84,14 @@ class PlacementGroupPipeline(Pipeline):
         return self.__workers
 
 
-class PlacementGroupFetcher(Fetcher):
+class PlacementGroupFetcher(Fetcher[PipelineItem]):
     def __init__(
         self,
         queue: asyncio.Queue[PipelineItem],
         queue_desired_minsize: int,
         min_processing_interval: timedelta,
         lock_timeout: timedelta,
-        heartbeater: Heartbeater[PlacementGroupModel],
+        heartbeater: Heartbeater[PipelineItem],
         queue_check_delay: float = 1.0,
     ) -> None:
         super().__init__(
@@ -159,11 +159,11 @@ class PlacementGroupFetcher(Fetcher):
         return items
 
 
-class PlacementGroupWorker(Worker):
+class PlacementGroupWorker(Worker[PipelineItem]):
     def __init__(
         self,
         queue: asyncio.Queue[PipelineItem],
-        heartbeater: Heartbeater[PlacementGroupModel],
+        heartbeater: Heartbeater[PipelineItem],
     ) -> None:
         super().__init__(
             queue=queue,

@@ -25,7 +25,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import ComputeGroupModel, InstanceModel, ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.compute_groups import compute_group_model_to_compute_group
-from dstack._internal.server.services.instances import switch_instance_status
+from dstack._internal.server.services.instances import emit_instance_status_change_event
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
@@ -36,7 +36,7 @@ TERMINATION_RETRY_TIMEOUT = timedelta(seconds=60)
 TERMINATION_RETRY_MAX_DURATION = timedelta(minutes=15)
 
 
-class ComputeGroupPipeline(Pipeline):
+class ComputeGroupPipeline(Pipeline[PipelineItem]):
     def __init__(
         self,
         workers_num: int = 10,
@@ -54,7 +54,7 @@ class ComputeGroupPipeline(Pipeline):
             lock_timeout=lock_timeout,
             heartbeat_trigger=heartbeat_trigger,
         )
-        self.__heartbeater = Heartbeater[ComputeGroupModel](
+        self.__heartbeater = Heartbeater[PipelineItem](
             model_type=ComputeGroupModel,
             lock_timeout=self._lock_timeout,
             heartbeat_trigger=self._heartbeat_trigger,
@@ -76,11 +76,11 @@ class ComputeGroupPipeline(Pipeline):
         return ComputeGroupModel.__name__
 
     @property
-    def _heartbeater(self) -> Heartbeater:
+    def _heartbeater(self) -> Heartbeater[PipelineItem]:
         return self.__heartbeater
 
     @property
-    def _fetcher(self) -> Fetcher:
+    def _fetcher(self) -> Fetcher[PipelineItem]:
         return self.__fetcher
 
     @property
@@ -88,14 +88,14 @@ class ComputeGroupPipeline(Pipeline):
         return self.__workers
 
 
-class ComputeGroupFetcher(Fetcher):
+class ComputeGroupFetcher(Fetcher[PipelineItem]):
     def __init__(
         self,
         queue: asyncio.Queue[PipelineItem],
         queue_desired_minsize: int,
         min_processing_interval: timedelta,
         lock_timeout: timedelta,
-        heartbeater: Heartbeater[ComputeGroupModel],
+        heartbeater: Heartbeater[PipelineItem],
         queue_check_delay: float = 1.0,
     ) -> None:
         super().__init__(
@@ -161,11 +161,11 @@ class ComputeGroupFetcher(Fetcher):
         return items
 
 
-class ComputeGroupWorker(Worker):
+class ComputeGroupWorker(Worker[PipelineItem]):
     def __init__(
         self,
         queue: asyncio.Queue[PipelineItem],
-        heartbeater: Heartbeater[ComputeGroupModel],
+        heartbeater: Heartbeater[PipelineItem],
     ) -> None:
         super().__init__(
             queue=queue,
@@ -235,7 +235,12 @@ class ComputeGroupWorker(Worker):
                 .values(**terminate_result.instances_update_map)
             )
             for instance_model in compute_group_model.instances:
-                switch_instance_status(session, instance_model, InstanceStatus.TERMINATED)
+                emit_instance_status_change_event(
+                    session=session,
+                    instance_model=instance_model,
+                    old_status=instance_model.status,
+                    new_status=InstanceStatus.TERMINATED,
+                )
 
 
 @dataclass

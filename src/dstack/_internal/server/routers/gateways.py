@@ -13,6 +13,7 @@ from dstack._internal.server.security.permissions import (
     ProjectAdmin,
     ProjectMemberOrPublicAccess,
 )
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -54,6 +55,7 @@ async def create_gateway(
     body: schemas.CreateGatewayRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
 ):
     user, project = user_project
     return CustomORJSONResponse(
@@ -62,6 +64,7 @@ async def create_gateway(
             user=user,
             project=project,
             configuration=body.configuration,
+            pipeline_hinter=pipeline_hinter,
         )
     )
 
