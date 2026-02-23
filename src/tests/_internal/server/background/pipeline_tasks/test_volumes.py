@@ -19,6 +19,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     create_volume,
     get_volume_configuration,
+    get_volume_provisioning_data,
     list_events,
 )
 
@@ -38,12 +39,13 @@ def _volume_to_pipeline_item(volume_model: VolumeModel) -> VolumePipelineItem:
         lock_expires_at=volume_model.lock_expires_at,
         prev_lock_expired=False,
         status=volume_model.status,
+        to_be_deleted=volume_model.to_be_deleted,
     )
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-class TestVolumeWorker:
+class TestVolumeWorkerSubmitted:
     async def test_submitted_to_active(self, test_db, session: AsyncSession, worker: VolumeWorker):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -192,3 +194,143 @@ class TestVolumeWorker:
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Volume status changed SUBMITTED -> FAILED (Some error)"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestVolumeWorkerDeleted:
+    async def test_marks_volume_deleted(
+        self, test_db, session: AsyncSession, worker: VolumeWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(backend=BackendType.AWS),
+        )
+        volume.lock_token = uuid.uuid4()
+        volume.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        volume.to_be_deleted = True
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+        ) as get_backend_mock:
+            backend_mock = Mock()
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            get_backend_mock.return_value = backend_mock
+
+            await worker.process(_volume_to_pipeline_item(volume))
+
+            get_backend_mock.assert_called_once()
+            backend_mock.compute.return_value.delete_volume.assert_called_once()
+
+        await session.refresh(volume)
+        assert volume.deleted is True
+        assert volume.deleted_at is not None
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Volume deleted"
+
+    async def test_marks_external_volume_deleted_without_backend_call(
+        self, test_db, session: AsyncSession, worker: VolumeWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            configuration=get_volume_configuration(volume_id="vol-external-123"),
+        )
+        volume.lock_token = uuid.uuid4()
+        volume.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        volume.to_be_deleted = True
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+        ) as get_backend_mock:
+            await worker.process(_volume_to_pipeline_item(volume))
+            get_backend_mock.assert_not_called()
+
+        await session.refresh(volume)
+        assert volume.deleted is True
+        assert volume.deleted_at is not None
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Volume deleted"
+
+    async def test_marks_volume_deleted_if_backend_not_available(
+        self, test_db, session: AsyncSession, worker: VolumeWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(backend=BackendType.AWS),
+        )
+        volume.lock_token = uuid.uuid4()
+        volume.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        volume.to_be_deleted = True
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+        ) as get_backend_mock:
+            get_backend_mock.side_effect = BackendNotAvailable()
+            await worker.process(_volume_to_pipeline_item(volume))
+            get_backend_mock.assert_called_once()
+
+        await session.refresh(volume)
+        assert volume.deleted is True
+        assert volume.deleted_at is not None
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Volume deleted"
+
+    async def test_marks_volume_deleted_if_backend_delete_errors(
+        self, test_db, session: AsyncSession, worker: VolumeWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(backend=BackendType.AWS),
+        )
+        volume.lock_token = uuid.uuid4()
+        volume.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        volume.to_be_deleted = True
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.volumes.backends_services.get_project_backend_by_type_or_error"
+        ) as get_backend_mock:
+            backend_mock = Mock()
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value.delete_volume.side_effect = BackendError(
+                "Delete failed"
+            )
+            get_backend_mock.return_value = backend_mock
+
+            await worker.process(_volume_to_pipeline_item(volume))
+
+            get_backend_mock.assert_called_once()
+            backend_mock.compute.return_value.delete_volume.assert_called_once()
+
+        await session.refresh(volume)
+        assert volume.deleted is True
+        assert volume.deleted_at is not None
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Volume deleted"
