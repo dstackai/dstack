@@ -127,14 +127,23 @@ GATEWAY_CONFIGURE_DELAY = 3
 
 
 async def list_project_gateways(session: AsyncSession, project: ProjectModel) -> List[Gateway]:
-    gateways = await list_project_gateway_models(session=session, project=project)
+    gateways = await list_project_gateway_models(
+        session=session,
+        project=project,
+        load_gateway_compute=True,
+    )
     return [gateway_model_to_gateway(g) for g in gateways]
 
 
 async def get_gateway_by_name(
     session: AsyncSession, project: ProjectModel, name: str
 ) -> Optional[Gateway]:
-    gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
+    gateway = await get_project_gateway_model_by_name(
+        session=session,
+        project=project,
+        name=name,
+        load_gateway_compute=True,
+    )
     if gateway is None:
         return None
     return gateway_model_to_gateway(gateway)
@@ -494,20 +503,30 @@ async def set_default_gateway(
 
 
 async def list_project_gateway_models(
-    session: AsyncSession, project: ProjectModel
+    session: AsyncSession,
+    project: ProjectModel,
+    load_gateway_compute: bool = False,
 ) -> Sequence[GatewayModel]:
-    res = await session.execute(select(GatewayModel).where(GatewayModel.project_id == project.id))
+    stmt = select(GatewayModel).where(GatewayModel.project_id == project.id)
+    if load_gateway_compute:
+        stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+    res = await session.execute(stmt)
     return res.scalars().all()
 
 
 async def get_project_gateway_model_by_name(
-    session: AsyncSession, project: ProjectModel, name: str
+    session: AsyncSession,
+    project: ProjectModel,
+    name: str,
+    load_gateway_compute: bool = False,
 ) -> Optional[GatewayModel]:
-    res = await session.execute(
-        select(GatewayModel).where(
-            GatewayModel.project_id == project.id, GatewayModel.name == name
-        )
+    stmt = select(GatewayModel).where(
+        GatewayModel.project_id == project.id,
+        GatewayModel.name == name,
     )
+    if load_gateway_compute:
+        stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+    res = await session.execute(stmt)
     return res.scalar()
 
 
@@ -538,20 +557,24 @@ async def get_project_gateway_model_by_name_for_update(
             res = await session.execute(
                 select(GatewayModel)
                 .where(GatewayModel.id.in_([gateway_id]), *filters)
+                .options(joinedload(GatewayModel.gateway_compute))
                 .with_for_update(key_share=True, of=GatewayModel)
             )
             yield res.scalar_one_or_none()
 
 
 async def get_project_default_gateway_model(
-    session: AsyncSession, project: ProjectModel
+    session: AsyncSession,
+    project: ProjectModel,
+    load_gateway_compute: bool = False,
 ) -> Optional[GatewayModel]:
-    res = await session.execute(
-        select(GatewayModel).where(
-            GatewayModel.id == project.default_gateway_id,
-            GatewayModel.to_be_deleted == False,
-        )
+    stmt = select(GatewayModel).where(
+        GatewayModel.id == project.default_gateway_id,
+        GatewayModel.to_be_deleted == False,
     )
+    if load_gateway_compute:
+        stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+    res = await session.execute(stmt)
     return res.scalar_one_or_none()
 
 
@@ -567,7 +590,12 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 async def get_or_add_gateway_connection(
     session: AsyncSession, gateway_id: uuid.UUID
 ) -> tuple[GatewayModel, GatewayConnection]:
-    gateway = await session.get(GatewayModel, gateway_id)
+    gateway = await session.get(
+        GatewayModel,
+        gateway_id,
+        options=[joinedload(GatewayModel.gateway_compute)],
+        populate_existing=True,
+    )
     if gateway is None:
         raise GatewayError("Gateway not found")
     if gateway.gateway_compute is None:

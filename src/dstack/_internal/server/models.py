@@ -518,7 +518,7 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     gateway_compute_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateway_computes.id", ondelete="CASCADE")
     )
-    gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship(lazy="joined")
+    gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship()
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="gateway")
 

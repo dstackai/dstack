@@ -153,6 +153,7 @@ async def _process_provisioning_gateway(
     res = await session.execute(
         select(GatewayModel)
         .where(GatewayModel.id == gateway_model.id)
+        .options(joinedload(GatewayModel.gateway_compute))
         .execution_options(populate_existing=True)
     )
     gateway_model = res.unique().scalar_one()

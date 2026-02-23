@@ -90,7 +90,10 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
 
     if isinstance(run_spec.configuration.gateway, str):
         gateway = await get_project_gateway_model_by_name(
-            session=session, project=run_model.project, name=run_spec.configuration.gateway
+            session=session,
+            project=run_model.project,
+            name=run_spec.configuration.gateway,
+            load_gateway_compute=True,
         )
         if gateway is None:
             raise ResourceNotExistsError(
@@ -104,7 +107,9 @@ async def register_service(session: AsyncSession, run_model: RunModel, run_spec:
         gateway = None
     else:
         gateway = await get_project_default_gateway_model(
-            session=session, project=run_model.project
+            session=session,
+            project=run_model.project,
+            load_gateway_compute=True,
         )
         if gateway is None and run_spec.configuration.gateway == True:
             raise ResourceNotExistsError(

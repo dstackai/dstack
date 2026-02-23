@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.gateways import GatewayProvisioningData, GatewayStatus
@@ -77,6 +78,12 @@ class TestGatewayWorkerSubmitted:
             aws.compute.return_value.create_gateway.assert_called_once()
 
         await session.refresh(gateway)
+        res = await session.execute(
+            select(GatewayModel)
+            .where(GatewayModel.id == gateway.id)
+            .options(joinedload(GatewayModel.gateway_compute))
+        )
+        gateway = res.unique().scalar_one()
         assert gateway.status == GatewayStatus.PROVISIONING
         assert gateway.gateway_compute is not None
         assert gateway.gateway_compute.ip_address == "2.2.2.2"
