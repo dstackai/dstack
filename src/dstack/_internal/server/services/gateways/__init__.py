@@ -10,7 +10,7 @@ from typing import List, Optional, Sequence
 import httpx
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload
 
 import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
@@ -131,6 +131,7 @@ async def list_project_gateways(session: AsyncSession, project: ProjectModel) ->
         session=session,
         project=project,
         load_gateway_compute=True,
+        load_backend_type=True,
     )
     return [gateway_model_to_gateway(g) for g in gateways]
 
@@ -143,6 +144,7 @@ async def get_gateway_by_name(
         project=project,
         name=name,
         load_gateway_compute=True,
+        load_backend_type=True,
     )
     if gateway is None:
         return None
@@ -254,6 +256,14 @@ async def create_gateway(
                 session=session, project=project, name=configuration.name, user=user
             )
         pipeline_hinter.hint_fetch(GatewayModel.__name__)
+        gateway = await get_project_gateway_model_by_name(
+            session=session,
+            project=project,
+            name=configuration.name,
+            load_gateway_compute=True,
+            load_backend_type=True,
+        )
+        assert gateway is not None
         return gateway_model_to_gateway(gateway)
 
 
@@ -392,10 +402,11 @@ async def _delete_gateways_sync(
                 GatewayModel.project_id == project.id,
                 GatewayModel.name.in_(gateways_names),
             )
-            .options(selectinload(GatewayModel.gateway_compute))
+            .options(joinedload(GatewayModel.gateway_compute))
+            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
             .execution_options(populate_existing=True)
             .order_by(GatewayModel.id)  # take locks in order
-            .with_for_update(key_share=True)
+            .with_for_update(key_share=True, of=GatewayModel)
         )
         gateway_models = res.scalars().all()
         for gateway_model in gateway_models:
@@ -506,10 +517,13 @@ async def list_project_gateway_models(
     session: AsyncSession,
     project: ProjectModel,
     load_gateway_compute: bool = False,
+    load_backend_type: bool = False,
 ) -> Sequence[GatewayModel]:
     stmt = select(GatewayModel).where(GatewayModel.project_id == project.id)
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+    if load_backend_type:
+        stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
     return res.scalars().all()
 
@@ -519,6 +533,7 @@ async def get_project_gateway_model_by_name(
     project: ProjectModel,
     name: str,
     load_gateway_compute: bool = False,
+    load_backend_type: bool = False,
 ) -> Optional[GatewayModel]:
     stmt = select(GatewayModel).where(
         GatewayModel.project_id == project.id,
@@ -526,6 +541,8 @@ async def get_project_gateway_model_by_name(
     )
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+    if load_backend_type:
+        stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
     return res.scalar()
 
@@ -558,6 +575,7 @@ async def get_project_gateway_model_by_name_for_update(
                 select(GatewayModel)
                 .where(GatewayModel.id.in_([gateway_id]), *filters)
                 .options(joinedload(GatewayModel.gateway_compute))
+                .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
                 .with_for_update(key_share=True, of=GatewayModel)
             )
             yield res.scalar_one_or_none()
@@ -567,6 +585,7 @@ async def get_project_default_gateway_model(
     session: AsyncSession,
     project: ProjectModel,
     load_gateway_compute: bool = False,
+    load_backend_type: bool = False,
 ) -> Optional[GatewayModel]:
     stmt = select(GatewayModel).where(
         GatewayModel.id == project.default_gateway_id,
@@ -574,6 +593,8 @@ async def get_project_default_gateway_model(
     )
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+    if load_backend_type:
+        stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
     return res.scalar_one_or_none()
 

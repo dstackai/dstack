@@ -513,7 +513,7 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
     backend_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("backends.id", ondelete="CASCADE"))
-    backend: Mapped["BackendModel"] = relationship(lazy="selectin")
+    backend: Mapped["BackendModel"] = relationship()
 
     gateway_compute_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateway_computes.id", ondelete="CASCADE")

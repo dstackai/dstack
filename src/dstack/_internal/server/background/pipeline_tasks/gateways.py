@@ -23,6 +23,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
+    BackendModel,
     GatewayComputeModel,
     GatewayModel,
     ProjectModel,
@@ -210,6 +211,7 @@ async def _process_submitted_item(item: GatewayPipelineItem):
                 GatewayModel.lock_token == item.lock_token,
             )
             .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
         )
         gateway_model = res.unique().scalar_one_or_none()
         if gateway_model is None:
@@ -431,6 +433,7 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
             )
             .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
             .options(joinedload(GatewayModel.gateway_compute))
+            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
         )
         gateway_model = res.unique().scalar_one_or_none()
         if gateway_model is None:

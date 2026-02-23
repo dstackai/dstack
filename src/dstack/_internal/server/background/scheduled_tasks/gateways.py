@@ -7,7 +7,12 @@ from sqlalchemy.orm import joinedload, lazyload
 from dstack._internal.core.errors import BackendError, BackendNotAvailable, SSHError
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
+from dstack._internal.server.models import (
+    BackendModel,
+    GatewayComputeModel,
+    GatewayModel,
+    ProjectModel,
+)
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
@@ -109,6 +114,7 @@ async def _process_submitted_gateway(session: AsyncSession, gateway_model: Gatew
         select(GatewayModel)
         .where(GatewayModel.id == gateway_model.id)
         .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
         .execution_options(populate_existing=True)
     )
     gateway_model = res.unique().scalar_one()
