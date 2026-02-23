@@ -10,7 +10,7 @@ from typing import List, Optional, Sequence
 import httpx
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
@@ -42,6 +42,7 @@ from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
+    BackendModel,
     GatewayComputeModel,
     GatewayModel,
     ProjectModel,
@@ -329,9 +330,10 @@ async def _delete_gateways_pipeline(
                 GatewayModel.project_id == project.id,
                 GatewayModel.lock_expires_at.is_(None),
             )
-            .execution_options(populate_existing=True)
+            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
             .order_by(GatewayModel.id)  # take locks in order
-            .with_for_update(key_share=True, nowait=True)
+            .with_for_update(key_share=True, nowait=True, of=GatewayModel)
+            .execution_options(populate_existing=True)
         )
         gateway_models = res.scalars().all()
         if len(gateway_models) != len(gateways_ids):
@@ -340,6 +342,9 @@ async def _delete_gateways_pipeline(
             raise ServerClientError(
                 "Failed to delete gateways: gateways are being processed currently. Try again later."
             )
+        for gateway_model in gateway_models:
+            if gateway_model.backend.type == BackendType.DSTACK:
+                raise ServerClientError("Cannot delete dstack Sky gateway")
         for gateway_model in gateway_models:
             if not gateway_model.to_be_deleted:
                 gateway_model.to_be_deleted = True

@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.backends.base.compute import ComputeWithGatewaySupport
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
@@ -512,6 +513,7 @@ class _DeletedResult:
 
 
 async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _DeletedResult:
+    assert gateway_model.backend.type != BackendType.DSTACK
     backend = await backends_services.get_project_backend_by_type_or_error(
         project=gateway_model.project, backend_type=gateway_model.backend.type
     )
