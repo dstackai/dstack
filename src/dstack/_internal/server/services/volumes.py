@@ -13,6 +13,7 @@ from dstack._internal.core.errors import (
     ResourceExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeAttachment,
@@ -42,6 +43,7 @@ from dstack._internal.server.services.locking import (
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import list_user_project_models
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
 
@@ -296,6 +298,7 @@ async def create_volume(
             project=project,
             status=VolumeStatus.SUBMITTED,
             configuration=configuration.json(),
+            auto_cleanup_enabled=_get_autocleanup_enabled(configuration),
             attachments=[],
             created_at=now,
             last_processed_at=now,
@@ -313,6 +316,82 @@ async def create_volume(
 
 
 async def delete_volumes(
+    session: AsyncSession, project: ProjectModel, names: List[str], user: UserModel
+):
+    # Keep both delete code paths while pipeline processing is behind a feature flag:
+    # - pipeline path marks volumes for async deletion by VolumePipeline
+    # - sync path deletes volume inline for non-pipeline processing
+    # TODO: Drop sync path after pipeline processing is enabled by default.
+    if FeatureFlags.PIPELINE_PROCESSING_ENABLED:
+        await _delete_volumes_pipeline(
+            session=session,
+            project=project,
+            names=names,
+            user=user,
+        )
+    else:
+        await _delete_volumes_sync(
+            session=session,
+            project=project,
+            names=names,
+            user=user,
+        )
+
+
+async def _delete_volumes_pipeline(
+    session: AsyncSession, project: ProjectModel, names: List[str], user: UserModel
+):
+    res = await session.execute(
+        select(VolumeModel).where(
+            VolumeModel.project_id == project.id,
+            VolumeModel.name.in_(names),
+            VolumeModel.deleted == False,
+        )
+    )
+    volume_models = res.scalars().all()
+    volumes_ids = sorted([v.id for v in volume_models])
+    await session.commit()
+    logger.info("Deleting volumes: %s", [v.name for v in volume_models])
+    async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
+        # Refetch after lock
+        res = await session.execute(
+            select(VolumeModel)
+            .where(
+                VolumeModel.project_id == project.id,
+                VolumeModel.id.in_(volumes_ids),
+                VolumeModel.deleted == False,
+                VolumeModel.lock_expires_at.is_(None),
+            )
+            .options(selectinload(VolumeModel.attachments))
+            .execution_options(populate_existing=True)
+            .order_by(VolumeModel.id)  # take locks in order
+            .with_for_update(key_share=True, of=VolumeModel)
+        )
+        volume_models = res.scalars().unique().all()
+        if len(volume_models) != len(volumes_ids):
+            # TODO: Make the delete endpoint fully async so we don't need to lock and error:
+            # put the request in queue and process in the background.
+            raise ServerClientError(
+                "Failed to delete volumes: volumes are being processed currently. Try again later."
+            )
+        for volume_model in volume_models:
+            if len(volume_model.attachments) > 0:
+                raise ServerClientError(
+                    f"Failed to delete volume {volume_model.name}. Volume is in use."
+                )
+        for volume_model in volume_models:
+            if not volume_model.to_be_deleted:
+                volume_model.to_be_deleted = True
+                events.emit(
+                    session,
+                    message="Volume marked for deletion",
+                    actor=events.UserActor.from_user(user),
+                    targets=[events.Target.from_model(volume_model)],
+                )
+        await session.commit()
+
+
+async def _delete_volumes_sync(
     session: AsyncSession, project: ProjectModel, names: List[str], user: UserModel
 ):
     res = await session.execute(
@@ -532,3 +611,8 @@ def _get_volume_cost(volume: Volume) -> float:
         * volume.provisioning_data.price
         / _VOLUME_PRICING_PERIOD.total_seconds()
     )
+
+
+def _get_autocleanup_enabled(configuration: VolumeConfiguration) -> bool:
+    auto_cleanup_duration = parse_duration(configuration.auto_cleanup_duration)
+    return auto_cleanup_duration is not None and auto_cleanup_duration > 0

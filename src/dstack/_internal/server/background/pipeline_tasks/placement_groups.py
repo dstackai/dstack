@@ -230,6 +230,7 @@ async def _delete_placement_group(placement_group_model: PlacementGroupModel) ->
         backend_type=placement_group.provisioning_data.backend,
     )
     if backend is None:
+        # TODO: Retry deletion
         logger.error(
             "Failed to delete placement group %s. Backend not available. Please delete it manually.",
             placement_group.name,
@@ -245,6 +246,7 @@ async def _delete_placement_group(placement_group_model: PlacementGroupModel) ->
         )
         return {}
     except Exception:
+        # TODO: Retry deletion
         logger.exception(
             "Got exception when deleting placement group %s. Please delete it manually.",
             placement_group.name,

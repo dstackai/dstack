@@ -25,10 +25,12 @@ from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
     ProjectModel,
+    UserModel,
     VolumeAttachmentModel,
     VolumeModel,
 )
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import events
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.volumes import (
     emit_volume_status_change_event,
@@ -43,6 +45,7 @@ logger = get_logger(__name__)
 @dataclass
 class VolumePipelineItem(PipelineItem):
     status: VolumeStatus
+    to_be_deleted: bool
 
 
 class VolumePipeline(Pipeline[VolumePipelineItem]):
@@ -126,7 +129,12 @@ class VolumeFetcher(Fetcher[VolumePipelineItem]):
                     .where(
                         or_(
                             VolumeModel.status.in_([VolumeStatus.SUBMITTED]),
-                            # VolumeModel.to_be_deleted == True,
+                            # TODO: Process active volumes
+                            # and_(
+                            #     VolumeModel.status == VolumeStatus.ACTIVE,
+                            #     VolumeModel.auto_cleanup_enabled == True,
+                            # ),
+                            VolumeModel.to_be_deleted == True,
                         ),
                         VolumeModel.deleted == False,
                         or_(
@@ -151,6 +159,7 @@ class VolumeFetcher(Fetcher[VolumePipelineItem]):
                             VolumeModel.lock_token,
                             VolumeModel.lock_expires_at,
                             VolumeModel.status,
+                            VolumeModel.to_be_deleted,
                         )
                     )
                 )
@@ -171,6 +180,7 @@ class VolumeFetcher(Fetcher[VolumePipelineItem]):
                             lock_token=lock_token,
                             prev_lock_expired=prev_lock_expired,
                             status=volume_model.status,
+                            to_be_deleted=volume_model.to_be_deleted,
                         )
                     )
                 await session.commit()
@@ -189,7 +199,12 @@ class VolumeWorker(Worker[VolumePipelineItem]):
         )
 
     async def process(self, item: VolumePipelineItem):
-        await _process_submitted_item(item)
+        if item.to_be_deleted:
+            await _process_to_be_deleted_item(item)
+        elif item.status == VolumeStatus.SUBMITTED:
+            await _process_submitted_item(item)
+        elif item.status == VolumeStatus.ACTIVE:
+            pass
 
 
 async def _process_submitted_item(item: VolumePipelineItem):
@@ -318,5 +333,118 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _SubmittedResu
         update_map={
             "status": VolumeStatus.ACTIVE,
             "volume_provisioning_data": vpd.json(),
+        }
+    )
+
+
+async def _process_to_be_deleted_item(item: VolumePipelineItem):
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            select(VolumeModel)
+            .where(
+                VolumeModel.id == item.id,
+                VolumeModel.lock_token == item.lock_token,
+            )
+            .options(joinedload(VolumeModel.project).joinedload(ProjectModel.backends))
+            .options(joinedload(VolumeModel.user).load_only(UserModel.name))
+            .options(
+                joinedload(VolumeModel.attachments)
+                .joinedload(VolumeAttachmentModel.instance)
+                .joinedload(InstanceModel.fleet)
+                .load_only(FleetModel.name)
+            )
+        )
+        volume_model = res.unique().scalar_one_or_none()
+        if volume_model is None:
+            logger.warning(
+                "Failed to process %s item %s: lock_token mismatch."
+                " The item is expected to be processed and updated on another fetch iteration.",
+                item.__tablename__,
+                item.id,
+            )
+            return
+
+    result = await _process_to_be_deleted_volume(volume_model)
+    update_map = result.update_map | get_unlock_update_map()
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            update(VolumeModel)
+            .where(
+                VolumeModel.id == volume_model.id,
+                VolumeModel.lock_token == volume_model.lock_token,
+            )
+            .values(**update_map)
+            .returning(VolumeModel.id)
+        )
+        updated_ids = list(res.scalars().all())
+        if len(updated_ids) == 0:
+            logger.warning(
+                "Failed to update %s item %s after processing: lock_token changed."
+                " The item is expected to be processed and updated on another fetch iteration.",
+                item.__tablename__,
+                item.id,
+            )
+            return
+        events.emit(
+            session,
+            "Volume deleted",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(volume_model)],
+        )
+
+
+@dataclass
+class _DeletedResult:
+    update_map: UpdateMap = field(default_factory=dict)
+
+
+async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _DeletedResult:
+    volume = volume_model_to_volume(volume_model)
+    if volume.external:
+        return _get_deleted_result()
+    if volume.provisioning_data is None:
+        # The volume wasn't provisioned so there is nothing to delete
+        return _get_deleted_result()
+    if volume.provisioning_data.backend is None:
+        logger.error(
+            f"Failed to delete volume {volume_model.name}. volume.provisioning_data.backend is None."
+        )
+        return _get_deleted_result()
+    try:
+        backend = await backends_services.get_project_backend_by_type_or_error(
+            project=volume_model.project,
+            backend_type=volume.provisioning_data.backend,
+        )
+    except BackendNotAvailable:
+        # TODO: Retry deletion
+        logger.error(
+            f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
+            " Please terminate it manually to avoid unexpected charges.",
+        )
+        return _get_deleted_result()
+
+    compute = backend.compute()
+    assert isinstance(compute, ComputeWithVolumeSupport)
+    try:
+        await run_async(
+            compute.delete_volume,
+            volume=volume,
+        )
+    except Exception:
+        # TODO: Retry deletion
+        logger.exception(
+            "Got exception when deleting volume %s. Please terminate it manually to avoid unexpected charges.",
+            volume.name,
+        )
+    return _get_deleted_result()
+
+
+def _get_deleted_result() -> _DeletedResult:
+    now = get_current_datetime()
+    return _DeletedResult(
+        update_map={
+            "last_processed_at": now,
+            "deleted": True,
+            "deleted_at": now,
         }
     )

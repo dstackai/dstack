@@ -1069,10 +1069,12 @@ async def _attach_volume(
     compute = backend.compute()
     assert isinstance(compute, ComputeWithVolumeSupport)
     volume = volume_model_to_volume(volume_model)
-    # Refresh only to check if the volume wasn't deleted before the lock
+    # Refresh only to check if the volume wasn't deleted or marked for deletion before the lock
     await session.refresh(volume_model)
     if volume_model.deleted:
         raise ServerClientError("Cannot attach a deleted volume")
+    if volume_model.to_be_deleted:
+        raise ServerClientError("Cannot attach a volume marked for deletion")
     attachment_data = await common_utils.run_async(
         compute.attach_volume,
         volume=volume,

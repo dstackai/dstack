@@ -494,6 +494,79 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_fails_job_when_attaching_volume_marked_for_deletion(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        volume.to_be_deleted = True
+        await session.commit()
+        fleet = await create_fleet(session=session, project=project)
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="test-run",
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+
+        with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
+            backend_mock = Mock()
+            m.return_value = backend_mock
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value.attach_volume.return_value = VolumeAttachmentData()
+            # Submitted jobs processing happens in two steps
+            await process_submitted_jobs()
+            await process_submitted_jobs()
+            backend_mock.compute.return_value.attach_volume.assert_not_called()
+
+        await session.refresh(job)
+        res = await session.execute(
+            select(JobModel).options(
+                joinedload(JobModel.instance)
+                .joinedload(InstanceModel.volume_attachments)
+                .joinedload(VolumeAttachmentModel.volume)
+            )
+        )
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.VOLUME_ERROR
+        assert job.termination_reason_message == "Failed to attach volume"
+        assert job.instance is not None
+        assert len(job.instance.volume_attachments) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_assigns_job_to_shared_instance(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)
