@@ -39,6 +39,7 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.utils import common, random_names
@@ -58,11 +59,43 @@ def switch_volume_status(
         return
 
     volume_model.status = new_status
+    emit_volume_status_change_event(
+        session=session,
+        volume_model=volume_model,
+        old_status=old_status,
+        new_status=new_status,
+        status_message=volume_model.status_message,
+        actor=actor,
+    )
 
-    msg = f"Volume status changed {old_status.upper()} -> {new_status.upper()}"
-    if volume_model.status_message is not None:
-        msg += f" ({volume_model.status_message})"
+
+def emit_volume_status_change_event(
+    session: AsyncSession,
+    volume_model: VolumeModel,
+    old_status: VolumeStatus,
+    new_status: VolumeStatus,
+    status_message: Optional[str],
+    actor: events.AnyActor = events.SystemActor(),
+) -> None:
+    if old_status == new_status:
+        return
+    msg = get_volume_status_change_message(
+        old_status=old_status,
+        new_status=new_status,
+        status_message=status_message,
+    )
     events.emit(session, msg, actor=actor, targets=[events.Target.from_model(volume_model)])
+
+
+def get_volume_status_change_message(
+    old_status: VolumeStatus,
+    new_status: VolumeStatus,
+    status_message: Optional[str],
+) -> str:
+    msg = f"Volume status changed {old_status.upper()} -> {new_status.upper()}"
+    if status_message is not None:
+        msg += f" ({status_message})"
+    return msg
 
 
 async def list_volumes(
@@ -223,6 +256,7 @@ async def create_volume(
     project: ProjectModel,
     user: UserModel,
     configuration: VolumeConfiguration,
+    pipeline_hinter: PipelineHinterProtocol,
 ) -> Volume:
     spec = await apply_plugin_policies(
         user=user.name,
@@ -254,6 +288,7 @@ async def create_volume(
         else:
             configuration.name = await generate_volume_name(session=session, project=project)
 
+        now = common.get_current_datetime()
         volume_model = VolumeModel(
             id=uuid.uuid4(),
             name=configuration.name,
@@ -262,6 +297,8 @@ async def create_volume(
             status=VolumeStatus.SUBMITTED,
             configuration=configuration.json(),
             attachments=[],
+            created_at=now,
+            last_processed_at=now,
         )
         session.add(volume_model)
         events.emit(
@@ -271,6 +308,7 @@ async def create_volume(
             targets=[events.Target.from_model(volume_model)],
         )
         await session.commit()
+        pipeline_hinter.hint_fetch(VolumeModel.__name__)
         return volume_model_to_volume(volume_model)
 
 

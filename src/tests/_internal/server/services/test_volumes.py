@@ -10,7 +10,10 @@ from dstack._internal.server.services.volumes import (
     _get_volume_cost,
     _validate_volume_configuration,
 )
-from dstack._internal.server.testing.common import get_volume, get_volume_provisioning_data
+from dstack._internal.server.testing.common import (
+    get_volume,
+    get_volume_provisioning_data,
+)
 
 
 class TestValidateVolumeConfiguration:

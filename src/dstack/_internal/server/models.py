@@ -732,7 +732,7 @@ class InstanceHealthCheckModel(BaseModel):
     response: Mapped[str] = mapped_column(Text)
 
 
-class VolumeModel(BaseModel):
+class VolumeModel(PipelineModelMixin, BaseModel):
     __tablename__ = "volumes"
 
     id: Mapped[uuid.UUID] = mapped_column(
