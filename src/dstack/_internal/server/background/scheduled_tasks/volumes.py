@@ -33,6 +33,7 @@ async def process_submitted_volumes():
                 select(VolumeModel)
                 .where(
                     VolumeModel.status == VolumeStatus.SUBMITTED,
+                    VolumeModel.deleted == False,
                     VolumeModel.id.not_in(lockset),
                 )
                 .order_by(VolumeModel.last_processed_at.asc())
