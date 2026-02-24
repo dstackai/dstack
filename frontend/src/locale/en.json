@@ -471,8 +471,8 @@
         }
     },
     "runs": {
-        "launch": "Launch",
-        "dev_env": {
+        "launch_button": "Launch",
+        "launch": {
             "wizard": {
                 "title": "Launch",
                 "submit": "Apply",

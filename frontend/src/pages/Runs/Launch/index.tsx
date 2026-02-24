@@ -52,14 +52,14 @@ const paramsStepFieldNames = Object.keys(FORM_FIELD_NAMES).filter(
         ),
 ) as IRunEnvironmentFormKeys[];
 
-export const CreateDevEnvironment: React.FC = () => {
+export const Launch: React.FC = () => {
     const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
     const [openHelpPanel] = useHelpPanel();
     const [defaultProject, setDefaultProject] = useLocalStorageState<IProject['project_name'] | undefined>(
-        'createEnvironmentDefaultProject',
+        'launchDefaultProject',
         undefined,
     );
     const [activeStepIndex, setActiveStepIndex] = useState(0);
@@ -78,7 +78,7 @@ export const CreateDevEnvironment: React.FC = () => {
             href: ROUTES.RUNS.LIST,
         },
         {
-            text: t('runs.dev_env.wizard.title'),
+            text: t('runs.launch.wizard.title'),
             href: ROUTES.RUNS.CREATE_DEV_ENV,
         },
     ]);
@@ -214,7 +214,7 @@ export const CreateDevEnvironment: React.FC = () => {
             .then((data) => {
                 pushNotification({
                     type: 'success',
-                    content: t('runs.dev_env.wizard.success_notification'),
+                    content: t('runs.launch.wizard.success_notification'),
                 });
 
                 navigate(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.FORMAT(data.project_name, data.id));
@@ -272,7 +272,7 @@ export const CreateDevEnvironment: React.FC = () => {
                     optional: 'optional',
                 }}
                 onCancel={onCancelHandler}
-                submitButtonText={t('runs.dev_env.wizard.submit')}
+                submitButtonText={t('runs.launch.wizard.submit')}
                 steps={[
                     {
                         title: 'Template',
@@ -280,22 +280,22 @@ export const CreateDevEnvironment: React.FC = () => {
                             <Container>
                                 <SpaceBetween direction="vertical" size="l">
                                     <FormSelect
-                                        label={t('runs.dev_env.wizard.project')}
-                                        description={t('runs.dev_env.wizard.project_description')}
+                                        label={t('runs.launch.wizard.project')}
+                                        description={t('runs.launch.wizard.project_description')}
                                         control={control}
                                         name={FORM_FIELD_NAMES.project}
                                         options={projectOptions}
                                         disabled={loading}
-                                        empty={t('runs.dev_env.wizard.project_empty')}
-                                        loadingText={t('runs.dev_env.wizard.project_loading')}
+                                        empty={t('runs.launch.wizard.project_empty')}
+                                        loadingText={t('runs.launch.wizard.project_loading')}
                                         statusType={isLoadingProjectOptions ? 'loading' : undefined}
                                         onChange={onChangeProject}
                                         defaultValue={defaultProject}
                                     />
 
                                     <FormField
-                                        label={t('runs.dev_env.wizard.template')}
-                                        description={t('runs.dev_env.wizard.template_description')}
+                                        label={t('runs.launch.wizard.template')}
+                                        description={t('runs.launch.wizard.template_description')}
                                         errorText={formState.errors.template?.message}
                                     />
 
@@ -315,7 +315,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                                 },
                                                 {
                                                     id: 'configurationType',
-                                                    header: t('runs.dev_env.wizard.template_card_type'),
+                                                    header: t('runs.launch.wizard.template_card_type'),
                                                     content: (item) => item.configurationType ?? '-',
                                                 },
                                             ],
@@ -344,8 +344,8 @@ export const CreateDevEnvironment: React.FC = () => {
                                     <FormToggle
                                         control={control}
                                         defaultValue={false}
-                                        toggleLabel={t('runs.dev_env.wizard.gpu')}
-                                        toggleDescription={t('runs.dev_env.wizard.gpu_description')}
+                                        toggleLabel={t('runs.launch.wizard.gpu')}
+                                        toggleDescription={t('runs.launch.wizard.gpu_description')}
                                         errorText={
                                             formValues.gpu_enabled
                                                 ? formState.errors.offer?.message
@@ -369,8 +369,8 @@ export const CreateDevEnvironment: React.FC = () => {
                             <Container>
                                 <FormCodeEditor
                                     control={control}
-                                    label={t('runs.dev_env.wizard.configuration_label')}
-                                    description={t('runs.dev_env.wizard.configuration_description')}
+                                    label={t('runs.launch.wizard.configuration_label')}
+                                    description={t('runs.launch.wizard.configuration_description')}
                                     info={
                                         <InfoLink onFollow={() => openHelpPanel(CONFIGURATION_INFO)} />
                                     }

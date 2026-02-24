@@ -113,7 +113,7 @@ export const RunList: React.FC = () => {
     //     deleteRuns([...selectedItems]).catch(console.log);
     // };
 
-    const createEnvHandle = () => {
+    const launchHandle = () => {
         navigate(
             `${ROUTES.RUNS.CREATE_DEV_ENV}${
                 filteringRequestParams.project_name ? `?project_name=${filteringRequestParams.project_name}` : ''
@@ -148,7 +148,7 @@ export const RunList: React.FC = () => {
                         variant="awsui-h1-sticky"
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
-                                <Button onClick={createEnvHandle}>{t('runs.launch')}</Button>
+                                <Button onClick={launchHandle}>{t('runs.launch_button')}</Button>
 
                                 <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
                                     {t('common.abort')}

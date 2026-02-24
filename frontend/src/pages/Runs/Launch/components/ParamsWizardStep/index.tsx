@@ -75,10 +75,10 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
 
         return (
             <FormInput
-                label={t('runs.dev_env.wizard.name')}
-                description={t('runs.dev_env.wizard.name_description')}
-                constraintText={t('runs.dev_env.wizard.name_constraint')}
-                placeholder={t('runs.dev_env.wizard.name_placeholder')}
+                label={t('runs.launch.wizard.name')}
+                description={t('runs.launch.wizard.name_description')}
+                constraintText={t('runs.launch.wizard.name_constraint')}
+                placeholder={t('runs.launch.wizard.name_placeholder')}
                 control={control}
                 name={FORM_FIELD_NAMES.name}
                 disabled={loading}
@@ -98,8 +98,8 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
 
         return (
             <FormSelect
-                label={t('runs.dev_env.wizard.ide')}
-                description={t('runs.dev_env.wizard.ide_description')}
+                label={t('runs.launch.wizard.ide')}
+                description={t('runs.launch.wizard.ide_description')}
                 control={control}
                 name={FORM_FIELD_NAMES.ide}
                 options={IDE_OPTIONS}
@@ -120,14 +120,14 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
                 activeTabId={dockerPythonTab}
                 tabs={[
                     {
-                        label: t('runs.dev_env.wizard.python'),
+                        label: t('runs.launch.wizard.python'),
                         id: DockerPythonTabs.PYTHON,
                         content: (
                             <div>
                                 <FormInput
-                                    label={t('runs.dev_env.wizard.python')}
-                                    description={t('runs.dev_env.wizard.python_description')}
-                                    placeholder={t('runs.dev_env.wizard.python_placeholder')}
+                                    label={t('runs.launch.wizard.python')}
+                                    description={t('runs.launch.wizard.python_description')}
+                                    placeholder={t('runs.launch.wizard.python_placeholder')}
                                     control={control}
                                     name={FORM_FIELD_NAMES.python}
                                     disabled={loading}
@@ -136,15 +136,15 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
                         ),
                     },
                     {
-                        label: t('runs.dev_env.wizard.docker'),
+                        label: t('runs.launch.wizard.docker'),
                         id: DockerPythonTabs.DOCKER,
                         content: (
                             <div>
                                 <FormInput
-                                    label={t('runs.dev_env.wizard.docker_image')}
-                                    description={t('runs.dev_env.wizard.docker_image_description')}
-                                    constraintText={t('runs.dev_env.wizard.docker_image_constraint')}
-                                    placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
+                                    label={t('runs.launch.wizard.docker_image')}
+                                    description={t('runs.launch.wizard.docker_image_description')}
+                                    constraintText={t('runs.launch.wizard.docker_image_constraint')}
+                                    placeholder={t('runs.launch.wizard.docker_image_placeholder')}
                                     control={control}
                                     name={FORM_FIELD_NAMES.image}
                                     disabled={loading}
@@ -164,10 +164,10 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
 
         return (
             <FormInput
-                label={t('runs.dev_env.wizard.working_dir')}
-                description={t('runs.dev_env.wizard.working_dir_description')}
-                constraintText={t('runs.dev_env.wizard.working_dir_constraint')}
-                placeholder={t('runs.dev_env.wizard.working_dir_placeholder')}
+                label={t('runs.launch.wizard.working_dir')}
+                description={t('runs.launch.wizard.working_dir_description')}
+                constraintText={t('runs.launch.wizard.working_dir_constraint')}
+                placeholder={t('runs.launch.wizard.working_dir_placeholder')}
                 control={control}
                 name="working_dir"
                 disabled={loading}
@@ -185,7 +185,7 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
                 <FormToggle
                     control={control}
                     defaultValue={false}
-                    label={t('runs.dev_env.wizard.repo')}
+                    label={t('runs.launch.wizard.repo')}
                     name={FORM_FIELD_NAMES.repo_enabled}
                     disabled={loading}
                     onChange={toggleRepo}
@@ -194,20 +194,20 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
                 {isEnabledRepo && (
                     <SpaceBetween direction="vertical" size="l">
                         <FormInput
-                            label={t('runs.dev_env.wizard.repo_url')}
-                            description={t('runs.dev_env.wizard.repo_url_description')}
-                            constraintText={t('runs.dev_env.wizard.repo_url_constraint')}
-                            placeholder={t('runs.dev_env.wizard.repo_url_placeholder')}
+                            label={t('runs.launch.wizard.repo_url')}
+                            description={t('runs.launch.wizard.repo_url_description')}
+                            constraintText={t('runs.launch.wizard.repo_url_constraint')}
+                            placeholder={t('runs.launch.wizard.repo_url_placeholder')}
                             control={control}
                             name="repo_url"
                             disabled={loading}
                         />
 
                         <FormInput
-                            label={t('runs.dev_env.wizard.repo_path')}
-                            description={t('runs.dev_env.wizard.repo_path_description')}
-                            constraintText={t('runs.dev_env.wizard.repo_path_constraint')}
-                            placeholder={t('runs.dev_env.wizard.repo_path_placeholder')}
+                            label={t('runs.launch.wizard.repo_path')}
+                            description={t('runs.launch.wizard.repo_path_description')}
+                            constraintText={t('runs.launch.wizard.repo_path_constraint')}
+                            placeholder={t('runs.launch.wizard.repo_path_placeholder')}
                             control={control}
                             name="repo_path"
                             disabled={loading}
