@@ -198,6 +198,7 @@ class TestCheckShim:
             session=session,
             project=project,
             status=InstanceStatus.IDLE,
+            unreachable=False,
         )
         health_status = "SSH connection fail"
         with patch(
@@ -210,10 +211,38 @@ class TestCheckShim:
 
         assert instance is not None
         assert instance.status == InstanceStatus.IDLE
+        assert instance.unreachable
         assert instance.termination_deadline is not None
         assert instance.termination_deadline.replace(
             tzinfo=dt.timezone.utc
         ) > get_current_datetime() + dt.timedelta(minutes=19)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_check_shim_does_not_start_termination_deadline_with_ssh_instance(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.IDLE,
+            unreachable=False,
+            remote_connection_info=get_remote_connection_info(),
+        )
+        health_status = "SSH connection fail"
+        with patch(
+            "dstack._internal.server.background.tasks.process_instances._check_instance_inner"
+        ) as healthcheck:
+            healthcheck.return_value = InstanceCheck(reachable=False, message=health_status)
+            await process_instances()
+
+        await session.refresh(instance)
+
+        assert instance is not None
+        assert instance.status == InstanceStatus.IDLE
+        assert instance.unreachable
+        assert instance.termination_deadline is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

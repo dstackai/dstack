@@ -778,7 +778,7 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
             )
         return
 
-    if instance.termination_deadline is None:
+    if not is_ssh_instance(instance) and instance.termination_deadline is None:
         instance.termination_deadline = get_current_datetime() + TERMINATION_DEADLINE_OFFSET
 
     if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
@@ -792,7 +792,7 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
             switch_instance_status(session, instance, InstanceStatus.TERMINATING)
     elif instance.status.is_available():
         deadline = instance.termination_deadline
-        if get_current_datetime() > deadline:
+        if deadline is not None and get_current_datetime() > deadline:
             instance.termination_reason = InstanceTerminationReason.UNREACHABLE
             switch_instance_status(session, instance, InstanceStatus.TERMINATING)
 

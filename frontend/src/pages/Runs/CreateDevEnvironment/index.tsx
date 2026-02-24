@@ -1,116 +1,59 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import cn from 'classnames';
-import * as yup from 'yup';
 import { Box, Link, WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import { TabsProps, ToggleProps } from 'components';
-import { Container, FormCodeEditor, FormField, FormInput, FormSelect, SpaceBetween, Tabs, Toggle, Wizard } from 'components';
+import { Container, FormCards, FormCodeEditor, FormField, FormSelect, FormSelectProps, SpaceBetween, Wizard } from 'components';
 
 import { useBreadcrumbs, useNotifications } from 'hooks';
 import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
+import { useLocalStorageState } from 'hooks/useLocalStorageState';
+import { useProjectFilter } from 'hooks/useProjectFilter';
 import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { useApplyRunMutation } from 'services/run';
+import { useGetAllTemplatesQuery } from 'services/templates';
 
 import { OfferList } from 'pages/Offers/List';
 import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
+import { ParamsWizardStep } from './components/ParamsWizardStep';
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
-import { FORM_FIELD_NAMES, IDE_OPTIONS } from './constants';
+import { useYupValidationResolver } from './hooks/useValidationResolver';
+import { FORM_FIELD_NAMES } from './constants';
 
 import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
 
 import styles from './styles.module.scss';
 
-const requiredFieldError = 'This is a required field';
-const namesFieldError = 'Only latin characters, dashes, and digits';
-const urlFormatError = 'Only URLs';
-const workingDirFormatError = 'Must be an absolute path';
+const templateStepFieldNames: IRunEnvironmentFormKeys[] = [FORM_FIELD_NAMES.project, FORM_FIELD_NAMES.template];
+const offerStepFieldNames: IRunEnvironmentFormKeys[] = [FORM_FIELD_NAMES.offer];
+const configStepFieldNames: IRunEnvironmentFormKeys[] = [FORM_FIELD_NAMES.config_yaml];
 
-enum DockerPythonTabs {
-    DOCKER = 'docker',
-    PYTHON = 'python',
-}
-
-const envValidationSchema = yup.object({
-    offer: yup.object().required(requiredFieldError),
-    name: yup.string().matches(/^[a-z][a-z0-9-]{1,40}$/, namesFieldError),
-    ide: yup.string().required(requiredFieldError),
-    config_yaml: yup.string().required(requiredFieldError),
-    working_dir: yup.string().matches(/^\//, workingDirFormatError),
-
-    image: yup.string().when('docker', {
-        is: true,
-        then: yup.string().required(requiredFieldError),
-    }),
-
-    repo_url: yup.string().when('repo_enabled', {
-        is: true,
-        then: yup
-            .string()
-            // eslint-disable-next-line no-useless-escape
-            .matches(/^(https?):\/\/([^\s\/?#]+)((?:\/[^\s?#]*)*)(?::\/(.*))?$/i, urlFormatError)
-            .required(requiredFieldError),
-    }),
-});
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
-const useYupValidationResolver = (validationSchema) =>
-    useCallback(
-        async (data: IRunEnvironmentFormValues) => {
-            try {
-                const values = await validationSchema.validate(data, {
-                    abortEarly: false,
-                });
-
-                return {
-                    values,
-                    errors: {},
-                };
-            } catch (errors) {
-                return {
-                    values: {},
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-expect-error
-                    errors: errors.inner.reduce(
-                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                        // @ts-expect-error
-                        (allErrors, currentError) => ({
-                            ...allErrors,
-                            [currentError.path]: {
-                                type: currentError.type ?? 'validation',
-                                message: currentError.message,
-                            },
-                        }),
-                        {},
-                    ),
-                };
-            }
-        },
-        [validationSchema],
-    );
+const paramsStepFieldNames = Object.keys(FORM_FIELD_NAMES).filter(
+    (fieldName) =>
+        ![...templateStepFieldNames, ...offerStepFieldNames, ...configStepFieldNames].includes(
+            fieldName as IRunEnvironmentFormKeys,
+        ),
+) as IRunEnvironmentFormKeys[];
 
 export const CreateDevEnvironment: React.FC = () => {
     const { t } = useTranslation();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
+    const [defaultProject, setDefaultProject] = useLocalStorageState<IProject['project_name'] | undefined>(
+        'createEnvironmentDefaultProject',
+        undefined,
+    );
     const [activeStepIndex, setActiveStepIndex] = useState(0);
     const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
-    const [selectedProject, setSelectedProject] = useState<IProject['project_name'] | null>(
-        () => searchParams.get('project_name') ?? null,
-    );
-
-    const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: selectedProject ?? '' });
-
-    const projectHavingFleetMap = useCheckingForFleetsInProjects({ projectNames: selectedProject ? [selectedProject] : [] });
-    const projectDontHasFleets = !!selectedProject && !projectHavingFleetMap[selectedProject];
+    const [selectedTemplate, setSelectedTemplate] = useState<ITemplate | undefined>();
+    const { projectOptions, isLoadingProjectOptions } = useProjectFilter({ localStorePrefix: 'run-env-list-projects' });
 
     const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
 
@@ -127,37 +70,56 @@ export const CreateDevEnvironment: React.FC = () => {
         },
     ]);
 
-    const resolver = useYupValidationResolver(envValidationSchema);
+    const resolver = useYupValidationResolver(selectedTemplate);
+
     const formMethods = useForm<IRunEnvironmentFormValues>({
         resolver,
         defaultValues: {
-            ide: 'cursor',
-            docker: false,
-            repo_enabled: false,
+            project: searchParams.get('project_name') ?? undefined,
         },
     });
-    const { handleSubmit, control, trigger, setValue, watch, formState, getValues } = formMethods;
+
+    const { handleSubmit, control, trigger, setValue, watch, formState, getValues, unregister } = formMethods;
     const formValues = watch();
 
-    const onCancelHandler = () => {
-        navigate(ROUTES.RUNS.LIST);
-    };
+    const projectHavingFleetMap = useCheckingForFleetsInProjects({
+        projectNames: formValues.project ? [formValues.project] : [],
+    });
 
-    const validateOffer = async () => {
-        return await trigger(['offer']);
-    };
+    const projectDontHasFleets = !!formValues.project && !projectHavingFleetMap[formValues.project];
+    const [getRunSpecFromYaml] = useGetRunSpecFromYaml({ projectName: formValues.project ?? '' });
 
-    const validateSecondStep = async () => {
-        const secondStepFields = Object.keys(FORM_FIELD_NAMES).filter(
-            (fieldName) => !['offer', 'config_yaml'].includes(fieldName),
-        ) as IRunEnvironmentFormKeys[];
+    const { data: templatesData, isLoading: isLoadingTemplates } = useGetAllTemplatesQuery(
+        { projectName: formValues.project ?? '' },
+        { skip: !formValues.project },
+    );
 
-        return await trigger(secondStepFields);
-    };
+    const templateOptions = useMemo(() => {
+        if (!templatesData) {
+            return [];
+        }
 
-    const validateConfig = async () => {
-        return await trigger(['config_yaml']);
-    };
+        return templatesData.map((template) => ({
+            label: template.title,
+            value: template.id,
+        }));
+    }, [templatesData]);
+
+    useEffect(() => {
+        if (!defaultProject && projectOptions?.[0]?.value) {
+            setValue(FORM_FIELD_NAMES.project, projectOptions[0].value);
+            setDefaultProject(projectOptions[0].value);
+        }
+    }, [defaultProject, projectOptions]);
+
+    useEffect(() => {
+        setSelectedTemplate(templatesData?.find((t) => t.id === formValues.template?.[0]));
+    }, [templatesData, formValues.template]);
+
+    const validateProjectAndTemplate = async () => await trigger(templateStepFieldNames);
+    const validateOffer = async () => await trigger(offerStepFieldNames);
+    const validateConfigParams = async () => await trigger(paramsStepFieldNames);
+    const validateConfig = async () => await trigger(configStepFieldNames);
 
     const onNavigate = ({
         requestedStepIndex,
@@ -166,7 +128,7 @@ export const CreateDevEnvironment: React.FC = () => {
         requestedStepIndex: number;
         reason: WizardProps.NavigationReason;
     }) => {
-        const stepValidators = [validateOffer, validateSecondStep, validateConfig];
+        const stepValidators = [validateProjectAndTemplate, validateOffer, validateConfigParams, validateConfig];
 
         if (reason === 'next') {
             if (projectDontHasFleets) {
@@ -180,6 +142,8 @@ export const CreateDevEnvironment: React.FC = () => {
                     window.scrollTo(0, 0);
                 }
             });
+        } else if (reason === 'step' && requestedStepIndex - activeStepIndex > 1) {
+            return;
         } else {
             setActiveStepIndex(requestedStepIndex);
         }
@@ -189,31 +153,19 @@ export const CreateDevEnvironment: React.FC = () => {
         onNavigate({ requestedStepIndex, reason });
     };
 
-    const toggleRepo: ToggleProps['onChange'] = ({ detail }) => {
-        setValue('repo_enabled', detail.checked);
-
-        if (!detail.checked) {
-            setValue('repo_url', '');
-            setValue('repo_path', '');
-        }
+    const onChangeProject: FormSelectProps<IRunEnvironmentFormValues>['onChange'] = ({ detail }) => {
+        setValue(FORM_FIELD_NAMES.template, []);
+        setDefaultProject(detail.selectedOption.value);
     };
 
-    const onChangeTab: TabsProps['onChange'] = ({ detail }) => {
-        if (detail.activeTabId === DockerPythonTabs.DOCKER) {
-            setValue('python', '');
-        }
-
-        if (detail.activeTabId === DockerPythonTabs.PYTHON) {
-            setValue('image', '');
-        }
-
-        setValue('docker', detail.activeTabId === DockerPythonTabs.DOCKER);
+    const onChangeTemplate = () => {
+        unregister(FORM_FIELD_NAMES.ide);
     };
 
     const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => {
         const newSelectedOffers = detail?.selectedItems ?? [];
         setSelectedOffers(newSelectedOffers);
-        setValue('offer', newSelectedOffers?.[0] ?? null);
+        setValue(FORM_FIELD_NAMES.offer, newSelectedOffers?.[0] ?? null);
     };
 
     const onSubmitWizard = async () => {
@@ -235,7 +187,7 @@ export const CreateDevEnvironment: React.FC = () => {
         }
 
         const requestParams: TRunApplyRequestParams = {
-            project_name: selectedProject ?? '',
+            project_name: formValues.project,
             plan: {
                 run_spec: runSpec,
             },
@@ -268,17 +220,21 @@ export const CreateDevEnvironment: React.FC = () => {
         }
     };
 
-    const yaml = useGenerateYaml({ formValues });
+    const yaml = useGenerateYaml({ formValues, template: selectedTemplate?.template });
 
     useEffect(() => {
-        setValue('config_yaml', yaml);
+        setValue(FORM_FIELD_NAMES.config_yaml, yaml);
     }, [yaml]);
+
+    const onCancelHandler = () => {
+        navigate(ROUTES.RUNS.LIST);
+    };
 
     return (
         <form className={cn({ [styles.wizardForm]: activeStepIndex === 0 })} onSubmit={handleSubmit(onSubmit)}>
             <NoFleetProjectAlert
                 className={styles.noFleetAlert}
-                projectName={selectedProject ?? ''}
+                projectName={formValues.project ?? ''}
                 show={projectDontHasFleets}
             />
 
@@ -298,6 +254,48 @@ export const CreateDevEnvironment: React.FC = () => {
                 submitButtonText={t('runs.dev_env.wizard.submit')}
                 steps={[
                     {
+                        title: 'Template',
+                        content: (
+                            <Container>
+                                <SpaceBetween direction="vertical" size="l">
+                                    <FormSelect
+                                        label={t('runs.dev_env.wizard.project')}
+                                        description={t('runs.dev_env.wizard.project_description')}
+                                        control={control}
+                                        name={FORM_FIELD_NAMES.project}
+                                        options={projectOptions}
+                                        disabled={loading}
+                                        empty={t('runs.dev_env.wizard.project_empty')}
+                                        loadingText={t('runs.dev_env.wizard.project_loading')}
+                                        statusType={isLoadingProjectOptions ? 'loading' : undefined}
+                                        onChange={onChangeProject}
+                                        defaultValue={defaultProject}
+                                    />
+
+                                    <FormField
+                                        label={t('runs.dev_env.wizard.template')}
+                                        description={t('runs.dev_env.wizard.template_description')}
+                                        errorText={formState.errors.template?.message}
+                                    />
+
+                                    <FormCards
+                                        control={control}
+                                        name={FORM_FIELD_NAMES.template}
+                                        items={templateOptions}
+                                        selectionType="single"
+                                        loading={isLoadingTemplates}
+                                        cardDefinition={{
+                                            header: (item) => item.label,
+                                        }}
+                                        cardsPerRow={[{ cards: 1 }, { minWidth: 400, cards: 2 }, { minWidth: 800, cards: 3 }]}
+                                        onSelectionChange={onChangeTemplate}
+                                    />
+                                </SpaceBetween>
+                            </Container>
+                        ),
+                    },
+
+                    {
                         title: 'Resources',
                         content: (
                             <>
@@ -306,13 +304,16 @@ export const CreateDevEnvironment: React.FC = () => {
                                     description={t('runs.dev_env.wizard.offer_description')}
                                     errorText={formState.errors.offer?.message}
                                 />
+
                                 {formState.errors.offer?.message && <br />}
+
                                 <OfferList
-                                    onChangeProjectName={(projectName) => setSelectedProject(projectName)}
                                     selectionType="single"
                                     withSearchParams={false}
                                     selectedItems={selectedOffers}
                                     onSelectionChange={onChangeOffer}
+                                    permanentFilters={{ project_name: formValues.project ?? '' }}
+                                    defaultFilters={{ spot_policy: 'on-demand' }}
                                 />
                             </>
                         ),
@@ -320,107 +321,7 @@ export const CreateDevEnvironment: React.FC = () => {
 
                     {
                         title: 'Settings',
-                        content: (
-                            <Container>
-                                <SpaceBetween direction="vertical" size="l">
-                                    <FormInput
-                                        label={t('runs.dev_env.wizard.name')}
-                                        description={t('runs.dev_env.wizard.name_description')}
-                                        constraintText={t('runs.dev_env.wizard.name_constraint')}
-                                        placeholder={t('runs.dev_env.wizard.name_placeholder')}
-                                        control={control}
-                                        name="name"
-                                        disabled={loading}
-                                    />
-
-                                    <FormSelect
-                                        label={t('runs.dev_env.wizard.ide')}
-                                        description={t('runs.dev_env.wizard.ide_description')}
-                                        control={control}
-                                        name="ide"
-                                        options={IDE_OPTIONS}
-                                        disabled={loading}
-                                    />
-
-                                    <Tabs
-                                        onChange={onChangeTab}
-                                        tabs={[
-                                            {
-                                                label: t('runs.dev_env.wizard.python'),
-                                                id: DockerPythonTabs.PYTHON,
-                                                content: (
-                                                    <div>
-                                                        <FormInput
-                                                            label={t('runs.dev_env.wizard.python')}
-                                                            description={t('runs.dev_env.wizard.python_description')}
-                                                            placeholder={t('runs.dev_env.wizard.python_placeholder')}
-                                                            control={control}
-                                                            name="python"
-                                                            disabled={loading}
-                                                        />
-                                                    </div>
-                                                ),
-                                            },
-                                            {
-                                                label: t('runs.dev_env.wizard.docker'),
-                                                id: DockerPythonTabs.DOCKER,
-                                                content: (
-                                                    <div>
-                                                        <FormInput
-                                                            label={t('runs.dev_env.wizard.docker_image')}
-                                                            description={t('runs.dev_env.wizard.docker_image_description')}
-                                                            constraintText={t('runs.dev_env.wizard.docker_image_constraint')}
-                                                            placeholder={t('runs.dev_env.wizard.docker_image_placeholder')}
-                                                            control={control}
-                                                            name="image"
-                                                            disabled={loading}
-                                                        />
-                                                    </div>
-                                                ),
-                                            },
-                                        ]}
-                                    />
-
-                                    <FormInput
-                                        label={t('runs.dev_env.wizard.working_dir')}
-                                        description={t('runs.dev_env.wizard.working_dir_description')}
-                                        constraintText={t('runs.dev_env.wizard.working_dir_constraint')}
-                                        placeholder={t('runs.dev_env.wizard.working_dir_placeholder')}
-                                        control={control}
-                                        name="working_dir"
-                                        disabled={loading}
-                                    />
-
-                                    <Toggle checked={!!formValues.repo_enabled} onChange={toggleRepo}>
-                                        {t('runs.dev_env.wizard.repo')}
-                                    </Toggle>
-
-                                    {formValues.repo_enabled && (
-                                        <>
-                                            <FormInput
-                                                label={t('runs.dev_env.wizard.repo_url')}
-                                                description={t('runs.dev_env.wizard.repo_url_description')}
-                                                constraintText={t('runs.dev_env.wizard.repo_url_constraint')}
-                                                placeholder={t('runs.dev_env.wizard.repo_url_placeholder')}
-                                                control={control}
-                                                name="repo_url"
-                                                disabled={loading}
-                                            />
-
-                                            <FormInput
-                                                label={t('runs.dev_env.wizard.repo_path')}
-                                                description={t('runs.dev_env.wizard.repo_path_description')}
-                                                constraintText={t('runs.dev_env.wizard.repo_path_constraint')}
-                                                placeholder={t('runs.dev_env.wizard.repo_path_placeholder')}
-                                                control={control}
-                                                name="repo_path"
-                                                disabled={loading}
-                                            />
-                                        </>
-                                    )}
-                                </SpaceBetween>
-                            </Container>
-                        ),
+                        content: <ParamsWizardStep formMethods={formMethods} loading={loading} template={selectedTemplate} />,
                     },
 
                     {
@@ -442,7 +343,7 @@ export const CreateDevEnvironment: React.FC = () => {
                                             .
                                         </Box>
                                     }
-                                    name="config_yaml"
+                                    name={FORM_FIELD_NAMES.config_yaml}
                                     language="yaml"
                                     loading={loading}
                                     editorContentHeight={600}

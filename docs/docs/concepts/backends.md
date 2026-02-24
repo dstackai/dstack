@@ -1055,7 +1055,7 @@ projects:
       verbs: ["get", "create", "delete"]
     - apiGroups: [""]
       resources: ["nodes"]
-      verbs: ["list"]
+      verbs: ["list", "get"]
     ```
     
     Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.

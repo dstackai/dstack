@@ -5,6 +5,7 @@ export {
     getServerError,
 } from './serverErrors';
 import { format, formatDistanceToNowStrict } from 'date-fns';
+export { generateSecurePassword, generatePassword, generateSimplePassword } from './password';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function arrayToRecordByKeyName<T extends { [K in keyof T]: any }, K extends keyof T>(array: T[], selector: K) {
