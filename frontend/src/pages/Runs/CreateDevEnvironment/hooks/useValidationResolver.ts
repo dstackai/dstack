@@ -7,10 +7,13 @@ const requiredFieldError = 'This is a required field';
 const namesFieldError = 'Only latin characters, dashes, and digits';
 const urlFormatError = 'Only URLs';
 const workingDirFormatError = 'Must be an absolute path';
+const passwordNotCopiedError = 'Copy the password before proceeding';
 
 export const useYupValidationResolver = (template?: ITemplate) => {
     const validationSchema = useMemo(() => {
-        const schema: Partial<Record<IRunEnvironmentFormKeys, yup.StringSchema | yup.ArraySchema<yup.StringSchema>>> = {
+        const schema: Partial<
+            Record<IRunEnvironmentFormKeys, yup.StringSchema | yup.ArraySchema<yup.StringSchema> | yup.BooleanSchema>
+        > = {
             project: yup.string().required(requiredFieldError),
             template: yup.array().min(1, requiredFieldError).of(yup.string()).required(requiredFieldError),
             config_yaml: yup.string().required(requiredFieldError),
@@ -56,7 +59,20 @@ export const useYupValidationResolver = (template?: ITemplate) => {
                         break;
 
                     case 'env':
-                        schema['password'] = yup.string().required(requiredFieldError);
+                        if (param.value === '$random-password') {
+                            schema['password'] = yup
+                                .string()
+                                .required(requiredFieldError)
+                                .test(
+                                    'password-copied',
+                                    passwordNotCopiedError,
+                                    function () {
+                                        return this.parent.password_copied === true;
+                                    },
+                                );
+                        } else {
+                            schema['password'] = yup.string().required(requiredFieldError);
+                        }
                         break;
 
                     default:

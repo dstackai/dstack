@@ -101,7 +101,9 @@ export const CreateDevEnvironment: React.FC = () => {
 
         return templatesData.map((template) => ({
             label: template.title,
-            value: template.id,
+            value: template.name,
+            description: template.description,
+            configurationType: template.configuration?.type as string | undefined,
         }));
     }, [templatesData]);
 
@@ -113,7 +115,7 @@ export const CreateDevEnvironment: React.FC = () => {
     }, [defaultProject, projectOptions]);
 
     useEffect(() => {
-        setSelectedTemplate(templatesData?.find((t) => t.id === formValues.template?.[0]));
+        setSelectedTemplate(templatesData?.find((t) => t.name === formValues.template?.[0]));
     }, [templatesData, formValues.template]);
 
     const validateProjectAndTemplate = async () => await trigger(templateStepFieldNames);
@@ -220,7 +222,8 @@ export const CreateDevEnvironment: React.FC = () => {
         }
     };
 
-    const yaml = useGenerateYaml({ formValues, template: selectedTemplate?.template });
+    const envParam = selectedTemplate?.parameters?.find((p) => p.type === 'env');
+    const yaml = useGenerateYaml({ formValues, configuration: selectedTemplate?.configuration, envParam });
 
     useEffect(() => {
         setValue(FORM_FIELD_NAMES.config_yaml, yaml);
@@ -283,9 +286,21 @@ export const CreateDevEnvironment: React.FC = () => {
                                         name={FORM_FIELD_NAMES.template}
                                         items={templateOptions}
                                         selectionType="single"
+                                        entireCardClickable
                                         loading={isLoadingTemplates}
                                         cardDefinition={{
                                             header: (item) => item.label,
+                                            sections: [
+                                                {
+                                                    id: 'description',
+                                                    content: (item) => item.description ?? '',
+                                                },
+                                                {
+                                                    id: 'configurationType',
+                                                    header: t('runs.dev_env.wizard.template_card_type'),
+                                                    content: (item) => item.configurationType ?? '-',
+                                                },
+                                            ],
                                         }}
                                         cardsPerRow={[{ cards: 1 }, { minWidth: 400, cards: 2 }, { minWidth: 800, cards: 3 }]}
                                         onSelectionChange={onChangeTemplate}

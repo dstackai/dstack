@@ -148,7 +148,7 @@ export const RunList: React.FC = () => {
                         variant="awsui-h1-sticky"
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
-                                <Button onClick={createEnvHandle}>{t('common.new')}</Button>
+                                <Button onClick={createEnvHandle}>{t('runs.launch')}</Button>
 
                                 <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
                                     {t('common.abort')}

@@ -2,12 +2,13 @@ import React, { useMemo } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
-import { Button, StatusIndicator, TabsProps, ToggleProps } from 'components';
+import { Button, InfoLink, StatusIndicator, TabsProps, ToggleProps } from 'components';
 import { Container, FormInput, FormSelect, FormToggle, Popover, SpaceBetween, Tabs } from 'components';
 
+import { useHelpPanel } from 'hooks';
 import { copyToClipboard, generateSecurePassword } from 'libs';
 
-import { FORM_FIELD_NAMES, IDE_OPTIONS } from '../../constants';
+import { FORM_FIELD_NAMES, IDE_OPTIONS, PASSWORD_INFO } from '../../constants';
 
 import { IRunEnvironmentFormValues } from '../../types';
 
@@ -25,6 +26,7 @@ enum DockerPythonTabs {
 export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods, template, loading }) => {
     const { t } = useTranslation();
     const { control, setValue, watch, getValues } = formMethods;
+    const [openHelpPanel] = useHelpPanel();
 
     const [dockerPythonTab, setDockerPythonTab] = React.useState<DockerPythonTabs>(() => {
         if (getValues(FORM_FIELD_NAMES.image)) {
@@ -86,6 +88,7 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
 
     const copyPassword = () => {
         copyToClipboard(getValues(FORM_FIELD_NAMES.password) ?? '');
+        setValue(FORM_FIELD_NAMES.password_copied, true, { shouldValidate: true });
     };
 
     const renderIde = () => {
@@ -222,25 +225,47 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
             return null;
         }
 
+        const isRandomPassword = envParameter.value === '$random-password';
+
+        if (isRandomPassword) {
+            return (
+                <FormInput
+                    label={envParameter.title}
+                    info={<InfoLink onFollow={() => openHelpPanel(PASSWORD_INFO)} />}
+                    control={control}
+                    name={FORM_FIELD_NAMES.password}
+                    defaultValue={defaultPassword}
+                    type="password"
+                    disabled={loading}
+                    secondaryControl={
+                        <Popover
+                            dismissButton={false}
+                            position="top"
+                            size="small"
+                            triggerType="custom"
+                            content={<StatusIndicator type="success">Password copied</StatusIndicator>}
+                        >
+                            <Button
+                                disabled={loading}
+                                formAction="none"
+                                iconName="copy"
+                                variant="link"
+                                onClick={copyPassword}
+                            />
+                        </Popover>
+                    }
+                />
+            );
+        }
+
         return (
             <FormInput
                 label={envParameter.title}
                 control={control}
                 name={FORM_FIELD_NAMES.password}
-                defaultValue={defaultPassword}
+                defaultValue={envParameter.value ?? ''}
                 type="text"
                 disabled={loading}
-                secondaryControl={
-                    <Popover
-                        dismissButton={false}
-                        position="top"
-                        size="small"
-                        triggerType="custom"
-                        content={<StatusIndicator type="success">Password copied</StatusIndicator>}
-                    >
-                        <Button disabled={loading} formAction="none" iconName="copy" variant="link" onClick={copyPassword} />
-                    </Popover>
-                }
             />
         );
     };

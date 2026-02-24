@@ -8,10 +8,10 @@ declare type TTemplateParam = {
 };
 
 declare interface ITemplate {
-    type: 'ui-template';
-    id: string;
+    type: 'template';
+    name: string;
     title: string;
+    description?: string;
     parameters: TTemplateParam[];
-
-    template: object;
+    configuration: Record<string, unknown>;
 }

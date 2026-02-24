@@ -471,9 +471,10 @@
         }
     },
     "runs": {
+        "launch": "Launch",
         "dev_env": {
             "wizard": {
-                "title": "New dev environment",
+                "title": "Launch",
                 "submit": "Apply",
                 "project": "Project",
                 "project_description": "Select a project",
@@ -484,8 +485,9 @@
                 "template_empty": "No options",
                 "template_loading": "Loading options",
                 "template_placeholder": "Select a project to select a template",
+                "template_card_type": "Type",
                 "offer": "Offer",
-                "offer_description": "Select an offer for the dev environment.",
+                "offer_description": "Select an offer for the run.",
                 "name": "Name",
                 "name_description": "The name of the run, e.g. 'my-dev-env'",
                 "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",

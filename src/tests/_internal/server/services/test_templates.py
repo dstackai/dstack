@@ -59,17 +59,17 @@ class TestParseTemplates:
             templates_dir,
             "test.yml",
             {
-                "type": "ui-template",
-                "id": "test-template",
+                "type": "template",
+                "name": "test-template",
                 "title": "Test Template",
                 "parameters": [{"type": "name"}],
-                "template": {"type": "dev-environment"},
+                "configuration": {"type": "dev-environment"},
             },
         )
         templates_service._repo_path = tmp_path
         result = templates_service._parse_templates()
         assert len(result) == 1
-        assert result[0].id == "test-template"
+        assert result[0].name == "test-template"
         assert isinstance(result[0].parameters[0], NameUITemplateParameter)
 
     def test_parses_template_with_env_parameter(self, tmp_path: Path):
@@ -78,13 +78,13 @@ class TestParseTemplates:
             templates_dir,
             "test.yml",
             {
-                "type": "ui-template",
-                "id": "test",
+                "type": "template",
+                "name": "test",
                 "title": "Test",
                 "parameters": [
                     {"type": "env", "title": "Password", "name": "PASSWORD", "value": "secret"}
                 ],
-                "template": {"type": "service"},
+                "configuration": {"type": "service"},
             },
         )
         templates_service._repo_path = tmp_path
@@ -102,24 +102,24 @@ class TestParseTemplates:
             templates_dir,
             "valid.yml",
             {
-                "type": "ui-template",
-                "id": "valid",
+                "type": "template",
+                "name": "valid",
                 "title": "Valid",
-                "template": {"type": "task"},
+                "configuration": {"type": "task"},
             },
         )
         (templates_dir / "readme.txt").write_text("not a template")
         templates_service._repo_path = tmp_path
         result = templates_service._parse_templates()
         assert len(result) == 1
-        assert result[0].id == "valid"
+        assert result[0].name == "valid"
 
-    def test_skips_non_ui_template_type(self, tmp_path: Path):
+    def test_skips_non_template_type(self, tmp_path: Path):
         templates_dir = _create_templates_repo(tmp_path)
         _create_template_file(
             templates_dir,
             "other.yml",
-            {"type": "something-else", "id": "other", "title": "Other"},
+            {"type": "something-else", "name": "other", "title": "Other"},
         )
         templates_service._repo_path = tmp_path
         result = templates_service._parse_templates()
@@ -132,16 +132,16 @@ class TestParseTemplates:
             templates_dir,
             "good.yml",
             {
-                "type": "ui-template",
-                "id": "good",
+                "type": "template",
+                "name": "good",
                 "title": "Good",
-                "template": {"type": "task"},
+                "configuration": {"type": "task"},
             },
         )
         templates_service._repo_path = tmp_path
         result = templates_service._parse_templates()
         assert len(result) == 1
-        assert result[0].id == "good"
+        assert result[0].name == "good"
 
     def test_skips_template_with_unknown_parameter_type(self, tmp_path: Path):
         templates_dir = _create_templates_repo(tmp_path)
@@ -149,27 +149,27 @@ class TestParseTemplates:
             templates_dir,
             "bad_param.yml",
             {
-                "type": "ui-template",
-                "id": "bad-param",
+                "type": "template",
+                "name": "bad-param",
                 "title": "Bad Param",
                 "parameters": [{"type": "unknown_type"}],
-                "template": {"type": "task"},
+                "configuration": {"type": "task"},
             },
         )
         _create_template_file(
             templates_dir,
             "good.yml",
             {
-                "type": "ui-template",
-                "id": "good",
+                "type": "template",
+                "name": "good",
                 "title": "Good",
-                "template": {"type": "task"},
+                "configuration": {"type": "task"},
             },
         )
         templates_service._repo_path = tmp_path
         result = templates_service._parse_templates()
         assert len(result) == 1
-        assert result[0].id == "good"
+        assert result[0].name == "good"
 
     def test_parses_yaml_extension(self, tmp_path: Path):
         templates_dir = _create_templates_repo(tmp_path)
@@ -177,16 +177,16 @@ class TestParseTemplates:
             templates_dir,
             "test.yaml",
             {
-                "type": "ui-template",
-                "id": "yaml-ext",
+                "type": "template",
+                "name": "yaml-ext",
                 "title": "YAML Extension",
-                "template": {"type": "task"},
+                "configuration": {"type": "task"},
             },
         )
         templates_service._repo_path = tmp_path
         result = templates_service._parse_templates()
         assert len(result) == 1
-        assert result[0].id == "yaml-ext"
+        assert result[0].name == "yaml-ext"
 
     def test_returns_templates_sorted_by_filename(self, tmp_path: Path):
         templates_dir = _create_templates_repo(tmp_path)
@@ -194,27 +194,27 @@ class TestParseTemplates:
             templates_dir,
             "b.yml",
             {
-                "type": "ui-template",
-                "id": "b",
+                "type": "template",
+                "name": "b",
                 "title": "B",
-                "template": {"type": "task"},
+                "configuration": {"type": "task"},
             },
         )
         _create_template_file(
             templates_dir,
             "a.yml",
             {
-                "type": "ui-template",
-                "id": "a",
+                "type": "template",
+                "name": "a",
                 "title": "A",
-                "template": {"type": "task"},
+                "configuration": {"type": "task"},
             },
         )
         templates_service._repo_path = tmp_path
         result = templates_service._parse_templates()
         assert len(result) == 2
-        assert result[0].id == "a"
-        assert result[1].id == "b"
+        assert result[0].name == "a"
+        assert result[1].name == "b"
 
 
 class TestListTemplatesSync:
@@ -224,10 +224,10 @@ class TestListTemplatesSync:
             templates_dir,
             "test.yml",
             {
-                "type": "ui-template",
-                "id": "cached",
+                "type": "template",
+                "name": "cached",
                 "title": "Cached",
-                "template": {"type": "task"},
+                "configuration": {"type": "task"},
             },
         )
 
@@ -238,17 +238,14 @@ class TestListTemplatesSync:
             patch.object(templates_service, "_fetch_templates_repo"),
         ):
             templates_service._repo_path = tmp_path
-            # First call populates cache
             result1 = templates_service._list_templates_sync()
             assert len(result1) == 1
 
-            # Remove the file
             (templates_dir / "test.yml").unlink()
 
-            # Second call returns cached result
             result2 = templates_service._list_templates_sync()
             assert len(result2) == 1
-            assert result2[0].id == "cached"
+            assert result2[0].name == "cached"
 
     def test_refreshes_after_cache_clear(self, tmp_path: Path):
         templates_dir = _create_templates_repo(tmp_path)
@@ -256,10 +253,10 @@ class TestListTemplatesSync:
             templates_dir,
             "test.yml",
             {
-                "type": "ui-template",
-                "id": "original",
+                "type": "template",
+                "name": "original",
                 "title": "Original",
-                "template": {"type": "task"},
+                "configuration": {"type": "task"},
             },
         )
 
@@ -270,23 +267,20 @@ class TestListTemplatesSync:
             patch.object(templates_service, "_fetch_templates_repo"),
         ):
             templates_service._repo_path = tmp_path
-            # First call
             result1 = templates_service._list_templates_sync()
-            assert result1[0].id == "original"
+            assert result1[0].name == "original"
 
-            # Update the file and clear cache
             _create_template_file(
                 templates_dir,
                 "test.yml",
                 {
-                    "type": "ui-template",
-                    "id": "updated",
+                    "type": "template",
+                    "name": "updated",
                     "title": "Updated",
-                    "template": {"type": "task"},
+                    "configuration": {"type": "task"},
                 },
             )
             templates_service._templates_cache.clear()
 
-            # Next call refreshes
             result2 = templates_service._list_templates_sync()
-            assert result2[0].id == "updated"
+            assert result2[0].name == "updated"

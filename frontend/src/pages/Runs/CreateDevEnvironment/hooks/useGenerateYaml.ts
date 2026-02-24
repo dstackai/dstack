@@ -7,22 +7,31 @@ import { IRunEnvironmentFormValues } from '../types';
 
 export type UseGenerateYamlArgs = {
     formValues: IRunEnvironmentFormValues;
-    template?: ITemplate['template'];
+    configuration?: ITemplate['configuration'];
+    envParam?: TTemplateParam;
 };
 
-export const useGenerateYaml = ({ formValues, template }: UseGenerateYamlArgs) => {
+export const useGenerateYaml = ({ formValues, configuration, envParam }: UseGenerateYamlArgs) => {
     return useMemo(() => {
         const { name, ide, image, python, offer, docker, repo_url, repo_path, working_dir, password } = formValues;
 
+        const envEntries: string[] = [];
+        if (envParam?.name && password) {
+            envEntries.push(`${envParam.name}=${password}`);
+        }
+        if (configuration && 'env' in configuration) {
+            envEntries.push(...(configuration['env'] as string[]));
+        }
+
         return jsYaml.dump({
-            ...template,
+            ...configuration,
 
             ...(name ? { name } : {}),
             ...(ide ? { ide } : {}),
             ...(docker ? { docker } : {}),
             ...(image ? { image } : {}),
             ...(python ? { python } : {}),
-            ...(template && 'env' in template ? { env: [`PASSWORD=${password}`, ...(template['env'] as string[])] } : {}),
+            ...(envEntries.length > 0 ? { env: envEntries } : {}),
 
             ...(offer
                 ? {
@@ -44,5 +53,5 @@ export const useGenerateYaml = ({ formValues, template }: UseGenerateYamlArgs) =
 
             ...(working_dir ? { working_dir } : {}),
         });
-    }, [formValues, template]);
+    }, [formValues, configuration, envParam]);
 };

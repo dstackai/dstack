@@ -13,6 +13,7 @@ export interface IRunEnvironmentFormValues {
     repo_path?: string;
     working_dir?: string;
     password?: string;
+    password_copied?: boolean;
 }
 
 export type IRunEnvironmentFormKeys = keyof Required<IRunEnvironmentFormValues>;

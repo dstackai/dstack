@@ -87,8 +87,8 @@ def _parse_templates() -> List[UITemplate]:
             if not isinstance(data, dict):
                 logger.warning("Skipping %s: not a valid YAML mapping", entry.name)
                 continue
-            if data.get("type") != "ui-template":
-                logger.debug("Skipping %s: type is not 'ui-template'", entry.name)
+            if data.get("type") != "template":
+                logger.debug("Skipping %s: type is not 'template'", entry.name)
                 continue
             template = UITemplate.parse_obj(data)
             templates.append(template)

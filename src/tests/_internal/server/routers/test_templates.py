@@ -64,19 +64,20 @@ class TestListTemplates:
             (
                 "desktop-ide.yml",
                 {
-                    "type": "ui-template",
-                    "id": "desktop-ide",
+                    "type": "template",
+                    "name": "desktop-ide",
                     "title": "Desktop IDE",
+                    "description": "Access the instance from your desktop IDE.",
                     "parameters": [{"type": "name"}, {"type": "ide"}],
-                    "template": {"type": "dev-environment"},
+                    "configuration": {"type": "dev-environment"},
                 },
             ),
             (
                 "web-based-ide.yml",
                 {
-                    "type": "ui-template",
-                    "id": "web-based-ide",
-                    "title": "Web-based IDE",
+                    "type": "template",
+                    "name": "in-browser-ide",
+                    "title": "In-browser IDE",
                     "parameters": [
                         {"type": "name"},
                         {
@@ -86,7 +87,7 @@ class TestListTemplates:
                             "value": "$random-password",
                         },
                     ],
-                    "template": {"type": "service", "port": 8080},
+                    "configuration": {"type": "service", "port": 8080},
                 },
             ),
         ]:
@@ -108,9 +109,10 @@ class TestListTemplates:
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 2
-        assert data[0]["id"] == "desktop-ide"
-        assert data[0]["template"]["type"] == "dev-environment"
-        assert data[1]["id"] == "web-based-ide"
+        assert data[0]["name"] == "desktop-ide"
+        assert data[0]["description"] == "Access the instance from your desktop IDE."
+        assert data[0]["configuration"]["type"] == "dev-environment"
+        assert data[1]["name"] == "in-browser-ide"
         assert data[1]["parameters"][1]["type"] == "env"
         assert data[1]["parameters"][1]["name"] == "PASSWORD"
-        assert data[1]["template"]["port"] == 8080
+        assert data[1]["configuration"]["port"] == 8080

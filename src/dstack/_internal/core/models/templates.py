@@ -57,14 +57,15 @@ AnyUITemplateParameter = Annotated[
 
 
 class UITemplate(CoreModel):
-    type: Annotated[Literal["ui-template"], Field(description="The template type")]
-    id: Annotated[str, Field(description="The unique template identifier")]
+    type: Annotated[Literal["template"], Field(description="The template type")]
+    name: Annotated[str, Field(description="The unique template identifier")]
     title: Annotated[str, Field(description="The human-readable template name")]
+    description: Annotated[Optional[str], Field(description="The template description")] = None
     parameters: Annotated[
         List[AnyUITemplateParameter],
         Field(description="The template parameters"),
     ] = []
-    template: Annotated[
+    configuration: Annotated[
         Dict[str, Any],
         Field(description="The dstack run configuration"),
     ]

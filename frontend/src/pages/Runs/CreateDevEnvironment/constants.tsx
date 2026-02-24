@@ -10,6 +10,20 @@ export const CONFIG_INFO = {
     ),
 };
 
+export const PASSWORD_INFO = {
+    header: <h2>Password</h2>,
+    body: (
+        <>
+            <p>
+                A random password has been generated for this run. You will need it to access the run once it is
+                launched.
+            </p>
+
+            <p>Make sure to copy the password before proceeding. Only share it with those you want to give access to.</p>
+        </>
+    ),
+};
+
 export const FORM_FIELD_NAMES = {
     project: 'project',
     template: 'template',
@@ -25,6 +39,7 @@ export const FORM_FIELD_NAMES = {
     repo_path: 'repo_path',
     working_dir: 'working_dir',
     password: 'password',
+    password_copied: 'password_copied',
 } as const satisfies Record<IRunEnvironmentFormKeys, IRunEnvironmentFormKeys>;
 
 export const IDE_OPTIONS = [
