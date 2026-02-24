@@ -87,6 +87,7 @@ class TestListBackendTypes:
             "aws",
             "azure",
             "cloudrift",
+            "crusoe",
             "cudo",
             *(["datacrunch"] if sys.version_info >= (3, 10) else []),
             "digitalocean",
