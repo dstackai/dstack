@@ -27,7 +27,7 @@ BATCH_SIZE = 10
 MIN_COLLECT_INTERVAL_SECONDS = 9
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def collect_metrics():
     async with get_session_ctx() as session:
         res = await session.execute(
@@ -47,7 +47,7 @@ async def collect_metrics():
         await _collect_jobs_metrics(batch)
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def delete_metrics():
     now_timestamp_micro = int(get_current_datetime().timestamp() * 1_000_000)
     running_timestamp_micro_cutoff = (

@@ -26,6 +26,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.placement import placement_group_model_to_placement_group
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -103,6 +104,7 @@ class PlacementGroupFetcher(Fetcher[PipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
+    @sentry_utils.instrument_named_task("pipeline_tasks.PlacementGroupFetcher.fetch")
     async def fetch(self, limit: int) -> list[PipelineItem]:
         placement_group_lock, _ = get_locker(get_db().dialect_name).get_lockset(
             PlacementGroupModel.__tablename__
@@ -170,6 +172,7 @@ class PlacementGroupWorker(Worker[PipelineItem]):
             heartbeater=heartbeater,
         )
 
+    @sentry_utils.instrument_named_task("pipeline_tasks.PlacementGroupWorker.process")
     async def process(self, item: PipelineItem):
         async with get_session_ctx() as session:
             res = await session.execute(
@@ -230,6 +233,7 @@ async def _delete_placement_group(placement_group_model: PlacementGroupModel) ->
         backend_type=placement_group.provisioning_data.backend,
     )
     if backend is None:
+        # TODO: Retry deletion
         logger.error(
             "Failed to delete placement group %s. Backend not available. Please delete it manually.",
             placement_group.name,
@@ -245,6 +249,7 @@ async def _delete_placement_group(placement_group_model: PlacementGroupModel) ->
         )
         return {}
     except Exception:
+        # TODO: Retry deletion
         logger.exception(
             "Got exception when deleting placement group %s. Please delete it manually.",
             placement_group.name,

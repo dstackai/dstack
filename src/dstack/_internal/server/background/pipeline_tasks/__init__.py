@@ -6,6 +6,7 @@ from dstack._internal.server.background.pipeline_tasks.gateways import GatewayPi
 from dstack._internal.server.background.pipeline_tasks.placement_groups import (
     PlacementGroupPipeline,
 )
+from dstack._internal.server.background.pipeline_tasks.volumes import VolumePipeline
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -17,6 +18,7 @@ class PipelineManager:
             ComputeGroupPipeline(),
             GatewayPipeline(),
             PlacementGroupPipeline(),
+            VolumePipeline(),
         ]
         self._hinter = PipelineHinter(self._pipelines)
 

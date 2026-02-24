@@ -19,6 +19,7 @@ from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
 from dstack._internal.server.utils import sentry_utils
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils import common
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -26,7 +27,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def process_idle_volumes():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:
@@ -35,7 +36,9 @@ async def process_idle_volumes():
                 select(VolumeModel.id)
                 .where(
                     VolumeModel.status == VolumeStatus.ACTIVE,
+                    VolumeModel.auto_cleanup_enabled.is_not(False),
                     VolumeModel.deleted == False,
+                    VolumeModel.lock_expires_at.is_(None),
                     VolumeModel.id.not_in(lockset),
                 )
                 .order_by(VolumeModel.last_processed_at.asc())
@@ -90,23 +93,31 @@ def _get_idle_time(volume: VolumeModel) -> datetime.timedelta:
 
 
 async def _delete_idle_volumes(session: AsyncSession, volumes: List[VolumeModel]):
-    # Note: Multiple volumes are deleted in the same transaction,
-    # so long deletion of one volume may block processing other volumes.
     for volume_model in volumes:
         logger.info("Deleting idle volume %s", volume_model.name)
-        try:
-            await _delete_idle_volume(session, volume_model)
-        except Exception:
-            logger.exception("Error when deleting idle volume %s", volume_model.name)
-
-        volume_model.deleted = True
-        volume_model.deleted_at = get_current_datetime()
-        events.emit(
-            session=session,
-            message="Volume deleted due to exceeding auto_cleanup_duration",
-            actor=events.SystemActor(),
-            targets=[events.Target.from_model(volume_model)],
-        )
+        if FeatureFlags.PIPELINE_PROCESSING_ENABLED:
+            volume_model.to_be_deleted = True
+            events.emit(
+                session=session,
+                message="Volume marked for deletion due to exceeding auto_cleanup_duration",
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(volume_model)],
+            )
+        else:
+            try:
+                # Note: Multiple volumes are deleted in the same transaction,
+                # so long deletion of one volume may block processing other volumes.
+                await _delete_idle_volume(session, volume_model)
+            except Exception:
+                logger.exception("Error when deleting idle volume %s", volume_model.name)
+            volume_model.deleted = True
+            volume_model.deleted_at = get_current_datetime()
+            events.emit(
+                session=session,
+                message="Volume deleted due to exceeding auto_cleanup_duration",
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(volume_model)],
+            )
 
     await session.commit()
 

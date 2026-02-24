@@ -15,6 +15,7 @@ from dstack._internal.server.schemas.volumes import (
     ListVolumesRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -92,6 +93,7 @@ async def create_volume(
     body: CreateVolumeRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
 ):
     """
     Creates a volume given a volume configuration.
@@ -103,6 +105,7 @@ async def create_volume(
             project=project,
             user=user,
             configuration=body.configuration,
+            pipeline_hinter=pipeline_hinter,
         )
     )
 

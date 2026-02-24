@@ -17,6 +17,8 @@ from dstack._internal.utils.tags import tags_validator
 
 class VolumeStatus(str, Enum):
     SUBMITTED = "submitted"
+    # PROVISIONING is currently not used since on all backends supporting volumes,
+    # volumes become ACTIVE (ready to be used) almost immediately after provisioning.
     PROVISIONING = "provisioning"
     ACTIVE = "active"
     FAILED = "failed"

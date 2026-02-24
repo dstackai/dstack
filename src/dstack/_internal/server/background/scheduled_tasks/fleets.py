@@ -39,7 +39,7 @@ BATCH_SIZE = 10
 MIN_PROCESSING_INTERVAL = timedelta(seconds=30)
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def process_fleets():
     fleet_lock, fleet_lockset = get_locker(get_db().dialect_name).get_lockset(
         FleetModel.__tablename__

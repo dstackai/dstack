@@ -9,7 +9,7 @@ from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def delete_events():
     cutoff = get_current_datetime() - timedelta(seconds=settings.SERVER_EVENTS_TTL_SECONDS)
     stmt = delete(EventModel).where(EventModel.recorded_at < cutoff)

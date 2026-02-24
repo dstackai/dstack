@@ -6,13 +6,27 @@ import sentry_sdk
 from sentry_sdk.types import Event, Hint
 
 
-def instrument_background_task(f):
+def instrument_scheduled_task(f):
     @functools.wraps(f)
     async def wrapper(*args, **kwargs):
-        with sentry_sdk.start_transaction(name=f"background.{f.__name__}"):
-            return await f(*args, **kwargs)
+        with sentry_sdk.isolation_scope():
+            with sentry_sdk.start_transaction(name=f"scheduled_tasks.{f.__name__}"):
+                return await f(*args, **kwargs)
 
     return wrapper
+
+
+def instrument_named_task(name: str):
+    def decorator(f):
+        @functools.wraps(f)
+        async def wrapper(*args, **kwargs):
+            with sentry_sdk.isolation_scope():
+                with sentry_sdk.start_transaction(name=name):
+                    return await f(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 class AsyncioCancelledErrorFilterEventProcessor:

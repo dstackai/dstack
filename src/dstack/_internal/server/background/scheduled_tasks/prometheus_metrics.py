@@ -35,7 +35,7 @@ MIN_COLLECT_INTERVAL_SECONDS = 9
 METRICS_TTL_SECONDS = 600
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def collect_prometheus_metrics():
     now = get_current_datetime()
     cutoff = now - timedelta(seconds=MIN_COLLECT_INTERVAL_SECONDS)
@@ -63,7 +63,7 @@ async def collect_prometheus_metrics():
         await _collect_jobs_metrics(batch, now)
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def delete_prometheus_metrics():
     now = get_current_datetime()
     cutoff = now - timedelta(seconds=METRICS_TTL_SECONDS)

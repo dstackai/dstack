@@ -19,7 +19,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def process_placement_groups():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(
         PlacementGroupModel.__tablename__

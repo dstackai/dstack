@@ -164,7 +164,7 @@ def _get_effective_batch_size(batch_size: int) -> int:
     return batch_size
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def _process_next_submitted_job():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
@@ -1042,10 +1042,15 @@ async def _attach_volumes(
                     )
                     job_runtime_data.volume_names.append(volume.name)
                     break  # attach next mount point
-            except (ServerClientError, BackendError) as e:
-                logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
+            except ServerClientError as e:
+                logger.info("%s: failed to attach volume: %s", fmt(job_model), repr(e))
                 job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
-                job_model.termination_reason_message = "Failed to attach volume"
+                job_model.termination_reason_message = f"Failed to attach volume: {e.msg}"
+                switch_job_status(session, job_model, JobStatus.TERMINATING)
+            except BackendError as e:
+                logger.warning("%s: failed to attach volume: %s", fmt(job_model), repr(e))
+                job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
+                job_model.termination_reason_message = f"Failed to attach volume: {str(e)}"
                 switch_job_status(session, job_model, JobStatus.TERMINATING)
             except Exception:
                 logger.exception(
@@ -1053,7 +1058,7 @@ async def _attach_volumes(
                     fmt(job_model),
                 )
                 job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
-                job_model.termination_reason_message = "Failed to attach volume"
+                job_model.termination_reason_message = "Failed to attach volume: unexpected error"
                 switch_job_status(session, job_model, JobStatus.TERMINATING)
             finally:
                 job_model.job_runtime_data = job_runtime_data.json()
@@ -1069,10 +1074,14 @@ async def _attach_volume(
     compute = backend.compute()
     assert isinstance(compute, ComputeWithVolumeSupport)
     volume = volume_model_to_volume(volume_model)
-    # Refresh only to check if the volume wasn't deleted before the lock
+    # Refresh only to check if the volume wasn't deleted or marked for deletion before the lock
     await session.refresh(volume_model)
     if volume_model.deleted:
         raise ServerClientError("Cannot attach a deleted volume")
+    if volume_model.to_be_deleted:
+        raise ServerClientError("Cannot attach a volume marked for deletion")
+    if volume_model.lock_expires_at is not None:
+        raise ServerClientError("Cannot attach a volume locked for processing")
     attachment_data = await common_utils.run_async(
         compute.attach_volume,
         volume=volume,
