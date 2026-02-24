@@ -26,36 +26,39 @@ export const useGenerateYaml = ({ formValues, configuration, envParam, backends 
             envEntries.push(...(configuration['env'] as string[]));
         }
 
-        return jsYaml.dump({
-            ...configuration,
+        return jsYaml.dump(
+            {
+                ...configuration,
 
-            ...(name ? { name } : {}),
-            ...(ide ? { ide } : {}),
-            ...(docker ? { docker } : {}),
-            ...(image ? { image } : {}),
-            ...(python ? { python } : {}),
-            ...(envEntries.length > 0 ? { env: envEntries } : {}),
+                ...(name ? { name } : {}),
+                ...(ide ? { ide } : {}),
+                ...(docker ? { docker } : {}),
+                ...(image ? { image } : {}),
+                ...(python ? { python } : {}),
+                ...(envEntries.length > 0 ? { env: envEntries } : {}),
 
-            ...(gpuEnabled && offer
-                ? {
-                      resources: {
-                          gpu: `${offer.name}:${round(convertMiBToGB(offer.memory_mib))}GB:${renderRange(offer.count)}`,
-                      },
+                ...(gpuEnabled && offer
+                    ? {
+                          resources: {
+                              gpu: `${offer.name}:${round(convertMiBToGB(offer.memory_mib))}GB:${renderRange(offer.count)}`,
+                          },
 
-                      ...(backends && backends.length > 0 ? { backends } : {}),
-                      ...(offer.spot.length === 1 ? { spot_policy: offer.spot[0] } : {}),
-                      ...(offer.spot.length > 1 ? { spot_policy: 'auto' } : {}),
-                  }
-                : {}),
-            ...(!gpuEnabled ? { resources: { gpu: 0 } } : {}),
+                          ...(backends && backends.length > 0 ? { backends } : {}),
+                          ...(offer.spot.length === 1 ? { spot_policy: offer.spot[0] } : {}),
+                          ...(offer.spot.length > 1 ? { spot_policy: 'auto' } : {}),
+                      }
+                    : {}),
+                ...(!gpuEnabled ? { resources: { gpu: 0 } } : {}),
 
-            ...(repo_url || repo_path
-                ? {
-                      repos: [[repo_url?.trim(), repo_path?.trim()].filter(Boolean).join(':')],
-                  }
-                : {}),
+                ...(repo_url || repo_path
+                    ? {
+                          repos: [[repo_url?.trim(), repo_path?.trim()].filter(Boolean).join(':')],
+                      }
+                    : {}),
 
-            ...(working_dir ? { working_dir } : {}),
-        });
+                ...(working_dir ? { working_dir } : {}),
+            },
+            { lineWidth: -1 },
+        );
     }, [formValues, configuration, envParam, backends]);
 };

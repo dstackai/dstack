@@ -218,6 +218,7 @@ export const OfferList: React.FC<OfferListProps> = ({
             {...props}
             entireCardClickable
             items={disabled ? [] : items}
+            empty={disabled ? ' ' : undefined}
             cardDefinition={{
                 header: (gpu) => gpu.name,
                 sections,
