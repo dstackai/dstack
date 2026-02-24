@@ -720,6 +720,10 @@ async def get_job_configured_volume_models(
             )
             if volume_model is None:
                 raise ResourceNotExistsError(f"Volume {mount_point.name} not found")
+            if volume_model.to_be_deleted:
+                raise ServerClientError(
+                    f"Volume {mount_point.name} is marked for deletion and cannot be attached"
+                )
             mount_point_volume_models.append(volume_model)
         volume_models.append(mount_point_volume_models)
     return volume_models
@@ -729,7 +733,7 @@ def check_can_attach_job_volumes(volumes: List[List[Volume]]):
     """
     Performs basic checks if volumes can be attached.
     This is useful to show error ASAP (when user submits the run).
-    If the attachment is to fail anyway, the error will be handled when proccessing submitted jobs.
+    If the attachment is to fail anyway, the error will be handled when processing submitted jobs.
     """
     if len(volumes) == 0:
         return

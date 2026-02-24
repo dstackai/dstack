@@ -1042,10 +1042,15 @@ async def _attach_volumes(
                     )
                     job_runtime_data.volume_names.append(volume.name)
                     break  # attach next mount point
-            except (ServerClientError, BackendError) as e:
-                logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
+            except ServerClientError as e:
+                logger.info("%s: failed to attach volume: %s", fmt(job_model), repr(e))
                 job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
-                job_model.termination_reason_message = "Failed to attach volume"
+                job_model.termination_reason_message = f"Failed to attach volume: {e.msg}"
+                switch_job_status(session, job_model, JobStatus.TERMINATING)
+            except BackendError as e:
+                logger.warning("%s: failed to attach volume: %s", fmt(job_model), repr(e))
+                job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
+                job_model.termination_reason_message = f"Failed to attach volume: {str(e)}"
                 switch_job_status(session, job_model, JobStatus.TERMINATING)
             except Exception:
                 logger.exception(
@@ -1053,7 +1058,7 @@ async def _attach_volumes(
                     fmt(job_model),
                 )
                 job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
-                job_model.termination_reason_message = "Failed to attach volume"
+                job_model.termination_reason_message = "Failed to attach volume: unexpected error"
                 switch_job_status(session, job_model, JobStatus.TERMINATING)
             finally:
                 job_model.job_runtime_data = job_runtime_data.json()
@@ -1075,6 +1080,8 @@ async def _attach_volume(
         raise ServerClientError("Cannot attach a deleted volume")
     if volume_model.to_be_deleted:
         raise ServerClientError("Cannot attach a volume marked for deletion")
+    if volume_model.lock_expires_at is not None:
+        raise ServerClientError("Cannot attach a volume locked for processing")
     attachment_data = await common_utils.run_async(
         compute.attach_volume,
         volume=volume,
