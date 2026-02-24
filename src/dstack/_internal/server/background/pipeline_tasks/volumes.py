@@ -128,12 +128,7 @@ class VolumeFetcher(Fetcher[VolumePipelineItem]):
                     select(VolumeModel)
                     .where(
                         or_(
-                            VolumeModel.status.in_([VolumeStatus.SUBMITTED]),
-                            # TODO: Process active volumes
-                            # and_(
-                            #     VolumeModel.status == VolumeStatus.ACTIVE,
-                            #     VolumeModel.auto_cleanup_enabled == True,
-                            # ),
+                            VolumeModel.status == VolumeStatus.SUBMITTED,
                             VolumeModel.to_be_deleted == True,
                         ),
                         VolumeModel.deleted == False,
