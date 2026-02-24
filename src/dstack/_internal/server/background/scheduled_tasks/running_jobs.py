@@ -103,7 +103,7 @@ async def process_running_jobs(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def _process_next_running_job():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:

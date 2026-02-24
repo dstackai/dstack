@@ -24,7 +24,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def process_submitted_volumes():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:

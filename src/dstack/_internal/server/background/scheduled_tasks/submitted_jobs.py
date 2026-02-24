@@ -164,7 +164,7 @@ def _get_effective_batch_size(batch_size: int) -> int:
     return batch_size
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def _process_next_submitted_job():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:

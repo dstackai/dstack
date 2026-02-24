@@ -36,6 +36,7 @@ from dstack._internal.server.services.volumes import (
     emit_volume_status_change_event,
     volume_model_to_volume,
 )
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -119,6 +120,7 @@ class VolumeFetcher(Fetcher[VolumePipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
+    @sentry_utils.instrument_named_task("pipeline_tasks.VolumeFetcher.fetch")
     async def fetch(self, limit: int) -> list[VolumePipelineItem]:
         volume_lock, _ = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
         async with volume_lock:
@@ -193,6 +195,7 @@ class VolumeWorker(Worker[VolumePipelineItem]):
             heartbeater=heartbeater,
         )
 
+    @sentry_utils.instrument_named_task("pipeline_tasks.VolumeWorker.process")
     async def process(self, item: VolumePipelineItem):
         if item.to_be_deleted:
             await _process_to_be_deleted_item(item)

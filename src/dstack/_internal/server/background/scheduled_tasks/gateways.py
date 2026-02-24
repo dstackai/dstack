@@ -35,7 +35,7 @@ async def process_gateways_connections():
     await _process_active_connections()
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def process_gateways():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(GatewayModel.__tablename__)
     async with get_session_ctx() as session:

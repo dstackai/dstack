@@ -152,7 +152,7 @@ async def process_instances(batch_size: int = 1):
     await asyncio.gather(*tasks)
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def delete_instance_health_checks():
     now = get_current_datetime()
     cutoff = now - timedelta(seconds=server_settings.SERVER_INSTANCE_HEALTH_TTL_SECONDS)
@@ -163,7 +163,7 @@ async def delete_instance_health_checks():
         await session.commit()
 
 
-@sentry_utils.instrument_background_task
+@sentry_utils.instrument_scheduled_task
 async def _process_next_instance():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
     async with get_session_ctx() as session:
