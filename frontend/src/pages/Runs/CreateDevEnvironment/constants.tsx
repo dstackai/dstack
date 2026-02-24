@@ -1,11 +1,35 @@
 import React from 'react';
+import Link from '@cloudscape-design/components/link';
 
 import { IRunEnvironmentFormKeys } from './types';
-export const CONFIG_INFO = {
-    header: <h2>Credits history</h2>,
+export const CONFIGURATION_INFO = {
+    header: <h2>Configuration</h2>,
     body: (
         <>
-            <p>Available for only the global admin role</p>
+            <p>
+                This is the <code>dstack</code> run configuration generated from the template and your settings. You
+                can review and adjust it before launching.
+            </p>
+
+            <p>To learn more, see:</p>
+
+            <ul>
+                <li>
+                    <Link href="https://dstack.ai/docs/concepts/dev-environments" external>
+                        Dev environments
+                    </Link>
+                </li>
+                <li>
+                    <Link href="https://dstack.ai/docs/concepts/tasks" external>
+                        Tasks
+                    </Link>
+                </li>
+                <li>
+                    <Link href="https://dstack.ai/docs/concepts/services" external>
+                        Services
+                    </Link>
+                </li>
+            </ul>
         </>
     ),
 };

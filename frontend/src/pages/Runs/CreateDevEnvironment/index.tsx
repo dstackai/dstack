@@ -3,12 +3,22 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import cn from 'classnames';
-import { Box, Link, WizardProps } from '@cloudscape-design/components';
+import { WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
-import { Container, FormCards, FormCodeEditor, FormField, FormSelect, FormSelectProps, SpaceBetween, Wizard } from 'components';
+import {
+    Container,
+    FormCards,
+    FormCodeEditor,
+    FormField,
+    FormSelect,
+    FormSelectProps,
+    InfoLink,
+    SpaceBetween,
+    Wizard,
+} from 'components';
 
-import { useBreadcrumbs, useNotifications } from 'hooks';
+import { useBreadcrumbs, useHelpPanel, useNotifications } from 'hooks';
 import { useCheckingForFleetsInProjects } from 'hooks/useCheckingForFleetsInProjectsOfMember';
 import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { useProjectFilter } from 'hooks/useProjectFilter';
@@ -24,7 +34,7 @@ import { ParamsWizardStep } from './components/ParamsWizardStep';
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
 import { useYupValidationResolver } from './hooks/useValidationResolver';
-import { FORM_FIELD_NAMES } from './constants';
+import { CONFIGURATION_INFO, FORM_FIELD_NAMES } from './constants';
 
 import { IRunEnvironmentFormKeys, IRunEnvironmentFormValues } from './types';
 
@@ -46,6 +56,7 @@ export const CreateDevEnvironment: React.FC = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
+    const [openHelpPanel] = useHelpPanel();
     const [defaultProject, setDefaultProject] = useLocalStorageState<IProject['project_name'] | undefined>(
         'createEnvironmentDefaultProject',
         undefined,
@@ -345,18 +356,10 @@ export const CreateDevEnvironment: React.FC = () => {
                             <Container>
                                 <FormCodeEditor
                                     control={control}
-                                    description={
-                                        <Box>
-                                            Review the configuration file and adjust it if needed. See{' '}
-                                            <Link
-                                                href="https://docs.dstack.ai/docs/concepts/dev-environments"
-                                                target="_blank"
-                                                external
-                                            >
-                                                examples
-                                            </Link>
-                                            .
-                                        </Box>
+                                    label={t('runs.dev_env.wizard.configuration_label')}
+                                    description={t('runs.dev_env.wizard.configuration_description')}
+                                    info={
+                                        <InfoLink onFollow={() => openHelpPanel(CONFIGURATION_INFO)} />
                                     }
                                     name={FORM_FIELD_NAMES.config_yaml}
                                     language="yaml"
