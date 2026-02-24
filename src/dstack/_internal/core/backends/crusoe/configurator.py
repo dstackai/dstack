@@ -16,8 +16,6 @@ from dstack._internal.core.backends.crusoe.models import (
 from dstack._internal.core.backends.crusoe.resources import CrusoeClient
 from dstack._internal.core.models.backends.base import BackendType
 
-KNOWN_LOCATIONS = {"us-east1-a", "us-southcentral1-a", "eu-iceland1-a", "us-west1-a"}
-
 
 class CrusoeConfigurator(
     Configurator[
@@ -38,13 +36,16 @@ class CrusoeConfigurator(
                 details=str(e),
             )
         if config.regions:
-            invalid = set(config.regions) - KNOWN_LOCATIONS
+            try:
+                available = set(client.list_locations())
+            except Exception:
+                return
+            invalid = set(config.regions) - available
             if invalid:
                 raise_invalid_credentials_error(
                     fields=[["regions"]],
                     details=(
-                        f"Unknown regions: {sorted(invalid)}."
-                        f" Valid regions: {sorted(KNOWN_LOCATIONS)}"
+                        f"Unknown regions: {sorted(invalid)}. Valid regions: {sorted(available)}"
                     ),
                 )
 

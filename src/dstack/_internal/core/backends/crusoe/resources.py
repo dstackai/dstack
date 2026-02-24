@@ -136,6 +136,12 @@ class CrusoeClient:
         resp = self._request("GET", self._project_path("/quotas"))
         return resp.json().get("quotas", [])
 
+    # --- Location operations ---
+
+    def list_locations(self) -> List[str]:
+        resp = self._request("GET", "/locations")
+        return resp.json().get("items", [])
+
     # --- IB operations ---
 
     def list_ib_networks(self) -> List[dict]:
