@@ -36,7 +36,7 @@ async def process_idle_volumes():
                 select(VolumeModel.id)
                 .where(
                     VolumeModel.status == VolumeStatus.ACTIVE,
-                    VolumeModel.auto_cleanup_enabled != False,
+                    VolumeModel.auto_cleanup_enabled.is_not(False),
                     VolumeModel.deleted == False,
                     VolumeModel.lock_expires_at.is_(None),
                     VolumeModel.id.not_in(lockset),

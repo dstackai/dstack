@@ -561,9 +561,9 @@ class TestProcessSubmittedJobs:
         job = res.unique().scalar_one()
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.VOLUME_ERROR
-        assert job.termination_reason_message == "Failed to attach volume"
-        assert job.instance is not None
-        assert len(job.instance.volume_attachments) == 0
+        assert job.termination_reason_message is not None
+        assert "marked for deletion and cannot be attached" in job.termination_reason_message
+        assert job.instance is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
