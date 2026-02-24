@@ -769,6 +769,15 @@ class VolumeModel(PipelineModelMixin, BaseModel):
     # Deprecated in favor of VolumeAttachmentModel.attachment_data
     volume_attachment_data: Mapped[Optional[str]] = mapped_column(Text)
 
+    __table_args__ = (
+        Index(
+            "ix_volumes_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=deleted == false(),
+            sqlite_where=deleted == false(),
+        ),
+    )
+
 
 class VolumeAttachmentModel(BaseModel):
     __tablename__ = "volumes_attachments"
