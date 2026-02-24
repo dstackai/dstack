@@ -486,6 +486,8 @@
                 "template_loading": "Loading options",
                 "template_placeholder": "Select a project to select a template",
                 "template_card_type": "Type",
+                "gpu": "GPU",
+                "gpu_description": "Enable to select a GPU offer. Disable to run without a GPU.",
                 "offer": "Offer",
                 "offer_description": "Select an offer for the run.",
                 "name": "Name",

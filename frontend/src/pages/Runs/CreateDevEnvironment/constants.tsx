@@ -51,6 +51,7 @@ export const PASSWORD_INFO = {
 export const FORM_FIELD_NAMES = {
     project: 'project',
     template: 'template',
+    gpu_enabled: 'gpu_enabled',
     offer: 'offer',
     name: 'name',
     ide: 'ide',

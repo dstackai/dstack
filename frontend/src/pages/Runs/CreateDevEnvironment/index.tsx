@@ -13,6 +13,7 @@ import {
     FormField,
     FormSelect,
     FormSelectProps,
+    FormToggle,
     InfoLink,
     SpaceBetween,
     Wizard,
@@ -64,6 +65,7 @@ export const CreateDevEnvironment: React.FC = () => {
     const [activeStepIndex, setActiveStepIndex] = useState(0);
     const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<ITemplate | undefined>();
+    const [selectedBackends, setSelectedBackends] = useState<string[]>([]);
     const { projectOptions, isLoadingProjectOptions } = useProjectFilter({ localStorePrefix: 'run-env-list-projects' });
 
     const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
@@ -234,7 +236,12 @@ export const CreateDevEnvironment: React.FC = () => {
     };
 
     const envParam = selectedTemplate?.parameters?.find((p) => p.type === 'env');
-    const yaml = useGenerateYaml({ formValues, configuration: selectedTemplate?.configuration, envParam });
+    const yaml = useGenerateYaml({
+        formValues,
+        configuration: selectedTemplate?.configuration,
+        envParam,
+        backends: selectedBackends,
+    });
 
     useEffect(() => {
         setValue(FORM_FIELD_NAMES.config_yaml, yaml);
@@ -324,24 +331,30 @@ export const CreateDevEnvironment: React.FC = () => {
                     {
                         title: 'Resources',
                         content: (
-                            <>
-                                <FormField
-                                    label={t('runs.dev_env.wizard.offer')}
-                                    description={t('runs.dev_env.wizard.offer_description')}
-                                    errorText={formState.errors.offer?.message}
-                                />
-
-                                {formState.errors.offer?.message && <br />}
-
-                                <OfferList
-                                    selectionType="single"
-                                    withSearchParams={false}
-                                    selectedItems={selectedOffers}
-                                    onSelectionChange={onChangeOffer}
-                                    permanentFilters={{ project_name: formValues.project ?? '' }}
-                                    defaultFilters={{ spot_policy: 'on-demand' }}
-                                />
-                            </>
+                            <OfferList
+                                selectionType="single"
+                                disabled={!formValues.gpu_enabled}
+                                withSearchParams={false}
+                                selectedItems={selectedOffers}
+                                onSelectionChange={onChangeOffer}
+                                onChangeBackendFilter={setSelectedBackends}
+                                permanentFilters={{ project_name: formValues.project ?? '' }}
+                                defaultFilters={{ spot_policy: 'on-demand' }}
+                                header={
+                                    <FormToggle
+                                        control={control}
+                                        defaultValue={false}
+                                        toggleLabel={t('runs.dev_env.wizard.gpu')}
+                                        toggleDescription={t('runs.dev_env.wizard.gpu_description')}
+                                        errorText={
+                                            formValues.gpu_enabled
+                                                ? formState.errors.offer?.message
+                                                : undefined
+                                        }
+                                        name={FORM_FIELD_NAMES.gpu_enabled}
+                                    />
+                                }
+                            />
                         ),
                     },
 

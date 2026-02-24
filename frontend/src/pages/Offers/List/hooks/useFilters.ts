@@ -241,7 +241,7 @@ export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {
             ...params,
             ...permanentFilters,
         };
-    }, [propertyFilterQuery]);
+    }, [propertyFilterQuery, permanentFilters]);
 
     useEffect(() => {
         if (!projectNameIsChecked.current && projectOptions.length) {

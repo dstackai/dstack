@@ -23,6 +23,7 @@ export const FormToggle = <T extends FieldValues>({
     onChange: onChangeProp,
     toggleDescription,
     toggleInfo,
+    errorText: externalErrorText,
     ...props
 }: FormToggleProps<T>) => {
     return (
@@ -40,7 +41,7 @@ export const FormToggle = <T extends FieldValues>({
                         stretch={stretch}
                         constraintText={constraintText}
                         secondaryControl={secondaryControl}
-                        errorText={error?.message}
+                        errorText={error?.message || externalErrorText}
                     >
                         {leftContent}
 

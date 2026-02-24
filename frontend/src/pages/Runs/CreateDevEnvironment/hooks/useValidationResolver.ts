@@ -33,7 +33,10 @@ export const useYupValidationResolver = (template?: ITemplate) => {
                     case 'resources':
                         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                         // @ts-expect-error
-                        schema['offer'] = yup.object().required(requiredFieldError);
+                        schema['offer'] = yup.object().when('gpu_enabled', {
+                            is: true,
+                            then: yup.object().required(requiredFieldError),
+                        });
                         break;
 
                     case 'python_or_docker':

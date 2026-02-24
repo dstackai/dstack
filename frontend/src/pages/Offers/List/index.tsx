@@ -69,12 +69,16 @@ const getRequestParams = ({
 type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange' | 'selectedItems' | 'selectionType'> &
     Pick<UseFiltersArgs, 'permanentFilters' | 'defaultFilters'> & {
         withSearchParams?: boolean;
+        disabled?: boolean;
         onChangeProjectName?: (value: string) => void;
+        onChangeBackendFilter?: (backends: string[]) => void;
     };
 
 export const OfferList: React.FC<OfferListProps> = ({
     withSearchParams,
+    disabled,
     onChangeProjectName,
+    onChangeBackendFilter,
     permanentFilters,
     defaultFilters,
     ...props
@@ -87,7 +91,7 @@ export const OfferList: React.FC<OfferListProps> = ({
         // @ts-expect-error
         requestParams,
         {
-            skip: !requestParams || !requestParams['project_name'] || !requestParams['group_by']?.length,
+            skip: disabled || !requestParams || !requestParams['project_name'] || !requestParams['group_by']?.length,
         },
     );
 
@@ -117,6 +121,11 @@ export const OfferList: React.FC<OfferListProps> = ({
     useEffect(() => {
         onChangeProjectName?.(filteringRequestParams.project_name ?? '');
     }, [filteringRequestParams.project_name]);
+
+    useEffect(() => {
+        const backend = filteringRequestParams.backend;
+        onChangeBackendFilter?.(backend ? (Array.isArray(backend) ? backend : [backend]) : []);
+    }, [filteringRequestParams.backend]);
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,
@@ -208,15 +217,15 @@ export const OfferList: React.FC<OfferListProps> = ({
             {...collectionProps}
             {...props}
             entireCardClickable
-            items={items}
+            items={disabled ? [] : items}
             cardDefinition={{
                 header: (gpu) => gpu.name,
                 sections,
             }}
-            loading={isLoading || isFetching}
+            loading={!disabled && (isLoading || isFetching)}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            filter={
+            filter={disabled ? undefined : (
                 <div className={styles.selectFilters}>
                     <div className={styles.propertyFilter}>
                         <PropertyFilter
@@ -247,7 +256,7 @@ export const OfferList: React.FC<OfferListProps> = ({
                         />
                     </div>
                 </div>
-            }
+            )}
         />
     );
 };

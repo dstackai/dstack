@@ -9,11 +9,14 @@ export type UseGenerateYamlArgs = {
     formValues: IRunEnvironmentFormValues;
     configuration?: ITemplate['configuration'];
     envParam?: TTemplateParam;
+    backends?: string[];
 };
 
-export const useGenerateYaml = ({ formValues, configuration, envParam }: UseGenerateYamlArgs) => {
+export const useGenerateYaml = ({ formValues, configuration, envParam, backends }: UseGenerateYamlArgs) => {
     return useMemo(() => {
-        const { name, ide, image, python, offer, docker, repo_url, repo_path, working_dir, password } = formValues;
+        const { name, ide, image, python, offer, docker, repo_url, repo_path, working_dir, password, gpu_enabled } =
+            formValues;
+        const gpuEnabled = gpu_enabled === true;
 
         const envEntries: string[] = [];
         if (envParam?.name && password) {
@@ -33,17 +36,18 @@ export const useGenerateYaml = ({ formValues, configuration, envParam }: UseGene
             ...(python ? { python } : {}),
             ...(envEntries.length > 0 ? { env: envEntries } : {}),
 
-            ...(offer
+            ...(gpuEnabled && offer
                 ? {
                       resources: {
                           gpu: `${offer.name}:${round(convertMiBToGB(offer.memory_mib))}GB:${renderRange(offer.count)}`,
                       },
 
-                      backends: offer.backends,
+                      ...(backends && backends.length > 0 ? { backends } : {}),
                       ...(offer.spot.length === 1 ? { spot_policy: offer.spot[0] } : {}),
                       ...(offer.spot.length > 1 ? { spot_policy: 'auto' } : {}),
                   }
                 : {}),
+            ...(!gpuEnabled ? { resources: { gpu: 0 } } : {}),
 
             ...(repo_url || repo_path
                 ? {
@@ -53,5 +57,5 @@ export const useGenerateYaml = ({ formValues, configuration, envParam }: UseGene
 
             ...(working_dir ? { working_dir } : {}),
         });
-    }, [formValues, configuration, envParam]);
+    }, [formValues, configuration, envParam, backends]);
 };

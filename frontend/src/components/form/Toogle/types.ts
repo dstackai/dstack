@@ -4,7 +4,7 @@ import { FormFieldProps } from '@cloudscape-design/components/form-field';
 import { ToggleProps } from '@cloudscape-design/components/toggle';
 
 export type FormToggleProps<T extends FieldValues> = Omit<ToggleProps, 'value' | 'checked' | 'name'> &
-    Omit<FormFieldProps, 'errorText'> &
+    FormFieldProps &
     Pick<ControllerProps<T>, 'control' | 'name' | 'rules' | 'defaultValue'> & {
         toggleDescription?: ReactNode;
         leftContent?: ReactNode;
