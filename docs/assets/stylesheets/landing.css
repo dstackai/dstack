@@ -1135,7 +1135,7 @@
 }
 
 @media screen and (max-width: 44.984375em) {
-    .md-header__buttons .md-button:before, .md-header__buttons .md-button:after {
+    .md-header__buttons .md-button:not(.github):before, .md-header__buttons .md-button:not(.github):after {
         display: none !important;
     }
 
