@@ -5,6 +5,85 @@
 <link rel="preload" href="{{ 'assets/fonts/GeistMono-Variable.woff2' | url }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{{ 'assets/fonts/GeistPixel-Square.woff2' | url }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{{ 'assets/fonts/GeistPixel-Circle.woff2' | url }}" as="font" type="font/woff2" crossorigin>
+{#
+  Structured data (JSON-LD) for SEO.
+  - Homepage gets WebSite + Organization schema (helps Google show sitelinks and knowledge panel).
+  - All other pages get BreadcrumbList schema (helps Google show breadcrumb trails in results).
+  Breadcrumb URLs are resolved via _find_leaf_url because MkDocs nav sections don't have
+  their own URLs — we use the first descendant page's URL as a proxy.
+  Dedup by title to collapse nav levels duplicated by plugins (e.g. the blog plugin nests
+  "Blog" inside "Blog"). The current page is omitted when its title matches the last
+  ancestor (e.g. /examples/ is both the "Examples" section index and the page itself).
+#}
+{% macro _find_leaf_url(nav_item) -%}
+  {%- if nav_item.url -%}
+    /{{ nav_item.url }}
+  {%- elif nav_item.children -%}
+    {{ _find_leaf_url(nav_item.children | first) }}
+  {%- endif -%}
+{%- endmacro %}
+{% if page.is_homepage %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "name": "dstack",
+      "url": "https://dstack.ai/"
+    },
+    {
+      "@type": "Organization",
+      "name": "dstack",
+      "url": "https://dstack.ai/",
+      "logo": "https://dstack.ai/assets/images/dstack-logo-notext.svg",
+      "sameAs": [
+        "https://github.com/dstackai/dstack",
+        "https://discord.gg/u8SmfwPpMd",
+        "https://x.com/dstackai",
+        "https://www.linkedin.com/company/dstackai"
+      ]
+    }
+  ]
+}
+</script>
+{% elif page.ancestors | length > 0 %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://dstack.ai/"
+    }
+    {%- set pos = namespace(val=2) -%}
+    {%- set prev = namespace(title="") -%}
+    {%- for ancestor in page.ancestors | reverse -%}
+    {%- if ancestor.title != prev.title -%}
+    ,{
+      "@type": "ListItem",
+      "position": {{ pos.val }},
+      "name": "{{ ancestor.title | e }}",
+      "item": "https://dstack.ai{{ _find_leaf_url(ancestor) | trim }}"
+    }
+    {%- set pos.val = pos.val + 1 -%}
+    {%- endif -%}
+    {%- set prev.title = ancestor.title -%}
+    {%- endfor -%}
+    {%- if page.title != prev.title -%}
+    ,{
+      "@type": "ListItem",
+      "position": {{ pos.val }},
+      "name": "{{ page.title | e }}"
+    }
+    {%- endif -%}
+  ]
+}
+</script>
+{% endif %}
 {% endblock %}
 
 {% block container %}
