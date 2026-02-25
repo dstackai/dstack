@@ -8,8 +8,7 @@ import { DATE_TIME_FORMAT } from 'consts';
 import { formatBackend, getStatusIconType } from 'libs/fleet';
 import { formatInstanceStatusText, getHealthStatusIconType } from 'libs/instance';
 import { formatResources } from 'libs/resources';
-
-import { ROUTES } from '../../../../routes';
+import { ROUTES } from 'routes';
 
 export const useColumnsDefinitions = () => {
     const { t } = useTranslation();
@@ -20,9 +19,7 @@ export const useColumnsDefinitions = () => {
             header: t('fleets.instances.instance_name'),
             cell: (item) =>
                 item.project_name ? (
-                    <NavigateLink href={ROUTES.INSTANCES.DETAILS.FORMAT(item.project_name, item.id)}>
-                        {item.name}
-                    </NavigateLink>
+                    <NavigateLink href={ROUTES.INSTANCES.DETAILS.FORMAT(item.project_name, item.id)}>{item.name}</NavigateLink>
                 ) : (
                     item.name
                 ),
@@ -53,9 +50,7 @@ export const useColumnsDefinitions = () => {
             id: 'status',
             header: t('fleets.instances.status'),
             cell: (item) => (
-                <StatusIndicator type={getStatusIconType(item.status)}>
-                    {formatInstanceStatusText(item)}
-                </StatusIndicator>
+                <StatusIndicator type={getStatusIconType(item.status)}>{formatInstanceStatusText(item)}</StatusIndicator>
             ),
         },
         {

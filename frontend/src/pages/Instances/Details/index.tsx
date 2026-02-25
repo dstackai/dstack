@@ -75,11 +75,9 @@ export const InstanceDetailsPage: React.FC = () => {
                     <DetailsHeader
                         title={data?.name}
                         actionButtons={
-                            <>
-                                <Button onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
-                                    {t('common.delete')}
-                                </Button>
-                            </>
+                            <Button onClick={deleteClickHandle} disabled={isDisabledDeleteButton}>
+                                {t('common.delete')}
+                            </Button>
                         }
                     />
                 }
