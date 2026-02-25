@@ -631,6 +631,29 @@ gcloud projects list --format="json(projectId)"
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
 
+??? info "TPU"
+    By default, `dstack` does not include TPU offers.
+    To enable TPU provisioning, set `tpu` to `true` in the backend settings.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: gcp
+            project_id: gcp-project-id
+            creds:
+              type: default
+
+            tpu: true
+    ```
+
+    </div>
+
+    Make sure the required TPU permissions and the `serviceAccountUser` role are granted
+    (see "Required permissions" above).
+
 ### Lambda
 
 Log into your [Lambda Cloud](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
