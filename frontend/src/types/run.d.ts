@@ -45,13 +45,22 @@ declare type ProfileRetryRequest = {
     duration?: string | number;
 };
 
-declare type TDevEnvironmentConfiguration = {
-    type?: 'dev-environment';
-    ide: TIde;
-    version?: string;
-    init?: string[];
-    inactivity_duration?: string | number | boolean | 'off';
-    ports?: number[] | string[];
+declare type TRange = { min?: number; max?: number };
+
+declare type TResourceRequest = {
+    gpu?: TGPUResources | string | number;
+    cpu?: string | number | TRange;
+    memory?: string | number | TRange;
+    shm_size?: string | number;
+    disk?:
+        | string
+        | number
+        | {
+              size?: string | number | TRange;
+          };
+};
+
+declare type TBaseConfiguration = {
     name?: string;
     image?: string;
     user?: string;
@@ -68,22 +77,11 @@ declare type TDevEnvironmentConfiguration = {
     single_branch?: boolean;
     env?: string[];
     shell?: string;
-    resources?: {
-        gpu?: TGPUResources | string | number;
-        cpu?: string | number | { min?: number; max?: number };
-        memory?: string | number | { min?: number; max?: number };
-        shm_size?: string | number;
-        disk?:
-            | string
-            | number
-            | {
-                  size?: string | number | { min?: number; max?: number };
-              };
-    };
+    resources?: TResourceRequest;
     priority?: number;
     volumes?: Array<string | TVolumeMountPointRequest | TInstanceMountPointRequest>;
     docker?: boolean;
-    repos?: TEnvironmentConfigurationRepo[];
+    repos?: TEnvironmentConfigurationRepo[] | string[];
     files?: Array<TFilePathMappingRequest | string>;
     setup?: string[];
     backends?: string[];
@@ -109,11 +107,71 @@ declare type TDevEnvironmentConfiguration = {
     tags?: object;
 };
 
+declare type TRateLimitRequest = {
+    prefix?: string;
+    // key?: IPAddressPartitioningKeyRequest | HeaderPartitioningKeyRequest;
+    rps: number;
+    burst?: number;
+};
+
+declare type TProbeConfigRequest = {
+    type: 'http';
+    url?: string;
+    method?: 'get' | 'post' | 'put' | 'delete' | 'patch' | 'head';
+    headers?: {
+        name: string;
+        value: string;
+    }[];
+    body?: string;
+    timeout?: number | string;
+    interval?: number | string;
+    ready_after?: number;
+};
+
+declare type TScalingSpecRequest = {
+    metric: string;
+    threshold: number;
+};
+
+declare type TReplicaGroupRequest = {
+    name?: string;
+    count: TRange | number;
+    scaling?: TScalingSpecRequest;
+    resources?: TResourceRequest;
+    commands?: string[];
+};
+
+declare type TServiceConfiguration = TBaseConfiguration & {
+    type?: 'service';
+    port: number | string;
+    gateway?: boolean | string;
+    strip_prefix?: boolean;
+    model: string;
+    https?: boolean;
+    auth?: string;
+    commands?: string[];
+    rate_limits?: TRateLimitRequest[];
+    probes?: TProbeConfigRequest[];
+    replicas?: TRange | number | string;
+    scaling?: TScalingSpecRequest;
+    replica_groups?: TReplicaGroupRequest[];
+};
+
+declare type TDevEnvironmentConfiguration = TBaseConfiguration & {
+    type?: 'dev-environment';
+    ide: TIde;
+    version?: string;
+    init?: string[];
+    inactivity_duration?: string | number | boolean | 'off';
+    ports?: number[] | string[];
+};
+
 declare type TRunSpec = {
     run_name: string;
-    configuration: TDevEnvironmentConfiguration;
+    configuration: TDevEnvironmentConfiguration | TServiceConfiguration;
     ssh_key_pub?: string;
 };
+
 declare type TRunApplyRequestParams = {
     project_name: string;
     plan: {

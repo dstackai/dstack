@@ -1,776 +1,789 @@
 {
-  "dstack": "Dstack",
-  "common": {
-    "ok": "OK",
-    "loading": "Loading",
-    "add": "Add",
-    "yes": "Yes",
-    "no": "No",
-    "create": "Create",
-    "create_wit_text": "Create {{text}}",
-    "edit": "Edit",
-    "delete": "Delete",
-    "remove": "Remove",
-    "apply": "Apply",
-    "next": "Next",
-    "previous": "Back",
-    "settings": "Settings",
-    "match_count_with_value_one": "{{count}} match",
-    "match_count_with_value_other": "{{count}} matches",
-    "nomatch_message_title": "No matches",
-    "nomatch_message_text": "We can't find a match.",
-    "sign_out": "Sign out",
-    "cancel": "Cancel",
-    "save": "Save",
-    "send" : "Send",
-    "profile": "Profile",
-    "copied": "Copied",
-    "copy": "Copy",
-    "info": "Info",
-    "stop": "Stop",
-    "abort": "Abort",
-    "close": "Close",
-    "clearFilter": "Clear filter",
-    "server_error": "Server error: {{error}}",
-    "login": "Sign in",
-    "login_github": "Sign in with GitHub",
-    "login_okta": "Sign in with Okta",
-    "login_entra": "Sign in with EntraID",
-    "login_google": "Sign in with Google",
-    "general": "General",
-    "test": "Test",
-    "local_storage_unavailable": "Local Storage is unavailable",
-    "local_storage_unavailable_message": "Your browser doesn't support local storage",
-    "object": "Object",
-    "objects_other": "Objects",
-    "continue": "Continue",
-    "select_visible_columns": "Select visible columns",
-    "tutorial": "Tutorials",
-    "tutorial_other": "Take a tour",
-    "docs": "Docs",
-    "discord": "Discord",
-    "danger_zone": "Danger Zone",
-    "control_plane": "Control plane",
-    "refresh": "Refresh",
-    "quickstart": "Quickstart",
-    "ask_ai": "Ask AI",
-    "new": "New",
-    "full_view": "Full view"
-  },
-
-  "auth": {
-    "invalid_token": "Invalid token",
-    "you_are_not_logged_in": "You are not logged in",
-    "contact_to_administrator": "For getting the authorization token, contact to the administrator",
-    "sign_in_to_dstack": "Welcome to dstack Sky",
-    "sign_in_to_dstack_enterprise": "Welcome to dstack",
-    "authorization_failed": "Authorization is failed",
-    "try_again": "Please try again",
-    "login_by_token": "Sign in via a token",
-    "another_login_methods": "Other sign in options"
-  },
-
-  "navigation": {
-    "settings": "Settings",
-    "runs": "Runs",
-    "models": "Models",
-    "fleets": "Fleets",
-    "fleet": "Fleet",
-    "project": "project",
-    "project_other": "Projects",
-    "general": "General",
-    "users": "Users",
-    "user_settings": "User settings",
-    "account": "User",
-    "billing": "Billing",
-    "resources": "Resources",
-    "volumes": "Volumes",
-    "instances": "Instances",
-    "offers": "Offers",
-    "events": "Events"
-  },
-
-  "backend": {
-    "page_title_one": "Backend",
-    "page_title_other": "Backends",
-    "add_backend": "Add backend",
-    "edit_backend": "Edit backend",
-    "empty_message_title": "No backends",
-    "empty_message_text": "No backends to display.",
-    "type": {
-      "aws": "AWS",
-      "aws_description": "Run workflows and store data in Amazon Web Services ",
-      "gcp": "GCP",
-      "gcp_description": "Run workflows and store data in Google Cloud Platform",
-      "azure": "Azure",
-      "azure_description": "Run workflows and store data in Microsoft Azure",
-      "lambda": "Lambda",
-      "lambda_description": "Run workflows and store data in Lambda",
-      "local": "Local",
-      "local_description": "Run workflows and store data locally via Docker"
+    "dstack": "Dstack",
+    "common": {
+        "ok": "OK",
+        "loading": "Loading",
+        "add": "Add",
+        "yes": "Yes",
+        "no": "No",
+        "create": "Create",
+        "create_wit_text": "Create {{text}}",
+        "edit": "Edit",
+        "delete": "Delete",
+        "remove": "Remove",
+        "apply": "Apply",
+        "next": "Next",
+        "previous": "Back",
+        "settings": "Settings",
+        "match_count_with_value_one": "{{count}} match",
+        "match_count_with_value_other": "{{count}} matches",
+        "nomatch_message_title": "No matches",
+        "nomatch_message_text": "We can't find a match.",
+        "sign_out": "Sign out",
+        "cancel": "Cancel",
+        "save": "Save",
+        "send": "Send",
+        "profile": "Profile",
+        "copied": "Copied",
+        "copy": "Copy",
+        "info": "Info",
+        "stop": "Stop",
+        "abort": "Abort",
+        "close": "Close",
+        "clearFilter": "Clear filter",
+        "server_error": "Server error: {{error}}",
+        "login": "Sign in",
+        "login_github": "Sign in with GitHub",
+        "login_okta": "Sign in with Okta",
+        "login_entra": "Sign in with EntraID",
+        "login_google": "Sign in with Google",
+        "general": "General",
+        "test": "Test",
+        "local_storage_unavailable": "Local Storage is unavailable",
+        "local_storage_unavailable_message": "Your browser doesn't support local storage",
+        "object": "Object",
+        "objects_other": "Objects",
+        "continue": "Continue",
+        "select_visible_columns": "Select visible columns",
+        "tutorial": "Tutorials",
+        "tutorial_other": "Take a tour",
+        "docs": "Docs",
+        "discord": "Discord",
+        "danger_zone": "Danger Zone",
+        "control_plane": "Control plane",
+        "refresh": "Refresh",
+        "quickstart": "Quickstart",
+        "ask_ai": "Ask AI",
+        "new": "New",
+        "full_view": "Full view"
     },
 
-    "table": {
-      "region": "Region",
-      "bucket": "Storage"
+    "auth": {
+        "invalid_token": "Invalid token",
+        "you_are_not_logged_in": "You are not logged in",
+        "contact_to_administrator": "For getting the authorization token, contact to the administrator",
+        "sign_in_to_dstack": "Welcome to dstack Sky",
+        "sign_in_to_dstack_enterprise": "Welcome to dstack",
+        "authorization_failed": "Authorization is failed",
+        "try_again": "Please try again",
+        "login_by_token": "Sign in via a token",
+        "another_login_methods": "Other sign in options"
     },
 
-    "edit": {
-      "success_notification": "Project updating is successful",
-      "delete_backend_confirm_title": "Delete backend",
-      "delete_backend_confirm_message": "Are you sure you want to delete this backend?",
-      "delete_backends_confirm_title": "Delete backends",
-      "delete_backends_confirm_message": "Are you sure you want to delete these backends?"
+    "navigation": {
+        "settings": "Settings",
+        "runs": "Runs",
+        "models": "Models",
+        "fleets": "Fleets",
+        "fleet": "Fleet",
+        "project": "project",
+        "project_other": "Projects",
+        "general": "General",
+        "users": "Users",
+        "user_settings": "User settings",
+        "account": "User",
+        "billing": "Billing",
+        "resources": "Resources",
+        "volumes": "Volumes",
+        "instances": "Instances",
+        "offers": "Offers",
+        "events": "Events"
     },
 
-    "create": {
-      "success_notification": "Backend is created"
-    }
-  },
+    "backend": {
+        "page_title_one": "Backend",
+        "page_title_other": "Backends",
+        "add_backend": "Add backend",
+        "edit_backend": "Edit backend",
+        "empty_message_title": "No backends",
+        "empty_message_text": "No backends to display.",
+        "type": {
+            "aws": "AWS",
+            "aws_description": "Run workflows and store data in Amazon Web Services ",
+            "gcp": "GCP",
+            "gcp_description": "Run workflows and store data in Google Cloud Platform",
+            "azure": "Azure",
+            "azure_description": "Run workflows and store data in Microsoft Azure",
+            "lambda": "Lambda",
+            "lambda_description": "Run workflows and store data in Lambda",
+            "local": "Local",
+            "local_description": "Run workflows and store data locally via Docker"
+        },
 
-  "gateway": {
-    "page_title_one": "Gateway",
-    "page_title_other": "Gateways",
-    "add_gateway": "Add gateway",
-    "edit_gateway": "Edit gateway",
-    "empty_message_title": "No gateways",
-    "empty_message_text": "No gateways to display.",
+        "table": {
+            "region": "Region",
+            "bucket": "Storage"
+        },
 
-    "edit": {
-      "backend": "Backend",
-      "backend_description": "Select a backend",
-      "region": "Region",
-      "region_description": "Select a region",
-      "default": "Default",
-      "default_checkbox": "Turn on default",
-      "external_ip": "External IP",
-      "wildcard_domain": "Wildcard domain",
-      "wildcard_domain_description": "Specify the wildcard domain mapped to the external IP.",
-      "wildcard_domain_placeholder": "*.mydomain.com",
-      "delete_gateway_confirm_title": "Delete gateway",
-      "delete_gateway_confirm_message": "Are you sure you want to delete this gateway?",
-      "delete_gateways_confirm_title": "Delete gateways",
-      "delete_gateways_confirm_message": "Are you sure you want to delete these gateways?",
+        "edit": {
+            "success_notification": "Project updating is successful",
+            "delete_backend_confirm_title": "Delete backend",
+            "delete_backend_confirm_message": "Are you sure you want to delete this backend?",
+            "delete_backends_confirm_title": "Delete backends",
+            "delete_backends_confirm_message": "Are you sure you want to delete these backends?"
+        },
 
-      "validation": {
-        "wildcard_domain_format": "Should use next format: {{pattern}}"
-      }
-    },
-
-    "create": {
-      "success_notification": "Gateway is created",
-      "creating_notification": "The gateway is creating. It may take some time"
-    },
-
-    "update": {
-      "success_notification": "Gateway is updated"
-    },
-
-    "test_domain": {
-      "success_notification": "Domain is valid"
-    }
-  },
-
-  "projects": {
-    "page_title": "Projects",
-    "search_placeholder": "Find projects",
-    "empty_message_title": "No projects",
-    "empty_message_text": "No projects to display.",
-    "nomatch_message_title": "No matches",
-    "nomatch_message_text": "We can't find a match.",
-    "nomatch_message_button_label": "Clear filter",
-    "repositories": "Repositories",
-    "runs": "Runs",
-    "tags": "Tags",
-    "events": "Events",
-    "settings": "Settings",
-    "join": "Join",
-    "leave_confirm_title": "Leave project",
-    "leave_confirm_message": "Are you sure you want to leave this project?",
-    "leave": "Leave",
-    "join_success": "Successfully joined the project",
-    "leave_success": "Successfully left the project",
-    "join_error": "Failed to join project",
-    "leave_error": "Failed to leave project",
-    "card": {
-      "backend": "Backend",
-      "settings": "Settings"
-    },
-    "wizard": {
-      "submit": "Create"
-    },
-    "edit": {
-      "general": "General",
-      "project_name": "Name",
-      "owner": "Owner",
-      "project_name_description": "Only latin characters, dashes, underscores, and digits",
-      "project_type": "Project type",
-      "project_type_description": "Choose which project type you want to create",
-      "backends": "Backends",
-      "base_backends_description": "dstack will automatically collect offers from the following providers. Deselect providers you don’t want to use.",
-      "backends_description": "The following backends can be configured with your own cloud credentials in the project settings after the project is created.",
-      "create_default_fleet": "Create a default fleet",
-      "default_fleet": "Default fleet",
-      "default_fleet_description": "At least one fleet is required to run dev environments, tasks, or services.",
-      "is_public": "Public",
-      "is_public_description": "Allow any user join the project as a member",
-      "backend": "Backend",
-      "backend_config": "Backend config",
-      "backend_config_description": "Specify the backend config in the YAML format. Click Info for examples.",
-      "backend_type": "Type",
-      "backend_type_description": "Select a backend type",
-      "members_empty_message_title": "No members",
-      "members_empty_message_text": "Select project's members",
-      "update_members_success": "Members are updated",
-      "update_visibility_success": "Project visibility updated successfully",
-      "update_visibility_confirm_title": "Change project visibility",
-      "update_visibility_confirm_message": "Are you sure you want to change the project visibility? This will affect who can access this project.",
-      "change_visibility": "Change",
-      "project_visibility": "Visibility",
-      "project_visibility_description": "Control who can access this project",
-      "make_project_public": "Make project public",
-      "delete_project_confirm_title": "Delete project",
-      "delete_project_confirm_message": "Are you sure you want to delete this project?",
-      "delete_projects_confirm_title": "Delete projects",
-      "delete_projects_confirm_message": "Are you sure you want to delete these projects?",
-      "delete_this_project": "Delete this project",
-      "cli": "CLI",
-      "aws": {
-        "authorization": "Authorization",
-        "authorization_default": "Default credentials",
-        "authorization_access_key": "Access key",
-        "access_key": "Access key",
-        "access_key_id": "Access key ID",
-        "access_key_id_description": "Specify the AWS access key ID",
-        "secret_key": "Secret key",
-        "secret_key_id": "Secret access key",
-        "secret_key_id_description": "Specify the AWS secret access key",
-        "regions": "Regions",
-        "regions_description":  "Select regions to run workflows and store artifacts",
-        "regions_placeholder": "Select regions",
-        "s3_bucket_name": "Bucket",
-        "s3_bucket_name_description": "Select an S3 bucket to store artifacts",
-        "ec2_subnet_id": "Subnet",
-        "ec2_subnet_id_description": "Select a subnet to run workflows in",
-        "ec2_subnet_id_placeholder":  "Not selected",
-        "vpc_name": "VPC",
-        "vpc_name_description": "Enter a vpc"
-      },
-      "azure" : {
-        "authorization": "Authorization",
-        "authorization_default": "Default credentials",
-        "authorization_client": "Client secret",
-        "tenant_id": "Tenant ID",
-        "tenant_id_description": "Specify an Azure tenant ID",
-        "tenant_id_placeholder": "Not selected",
-        "client_id": "Client ID",
-        "client_id_description": "Specify an Azure client (application) ID",
-        "client_secret": "Client secret",
-        "client_secret_description": "Specify an Azure client (application) secret",
-        "subscription_id": "Subscription ID",
-        "subscription_id_description": "Select an Azure subscription ID",
-        "subscription_id_placeholder": "Not selected",
-        "locations": "Locations",
-        "locations_description": "Select locations to run workflows",
-        "locations_placeholder":  "Select locations",
-        "storage_account":  "Storage account",
-        "storage_account_description":  "Select an Azure storage account to store artifacts",
-        "storage_account_placeholder":  "Not selected"
-
-      },
-      "gcp": {
-        "authorization": "Authorization",
-        "authorization_default": "Default credentials",
-        "service_account": "Service account key",
-        "credentials_description": "Credentials description",
-        "credentials_placeholder": "Credentials placeholder",
-        "regions": "Regions",
-        "regions_description": "Select regions to run workflows and store artifacts",
-        "regions_placeholder": "Select regions",
-        "project_id": "Project Id",
-        "project_id_description": "Select a project id",
-        "project_id_placeholder": "Select a project Id"
-      },
-      "lambda": {
-        "api_key": "API key",
-        "api_key_description": "Specify the Lambda API key",
-        "regions": "Regions",
-        "regions_description": "Select regions to run workflows",
-        "regions_placeholder": "Select regions",
-        "storage_backend": {
-          "type": "Storage",
-          "type_description": "Select backend storage",
-          "type_placeholder": "Select type",
-          "credentials": {
-            "access_key_id": "Access key ID",
-            "access_key_id_description": "Specify the AWS access key ID",
-            "secret_key_id": "Secret access key",
-            "secret_key_id_description": "Specify the AWS secret access key"
-          },
-          "s3_bucket_name": "Bucket",
-          "s3_bucket_name_description": "Select an S3 bucket to store artifacts"
+        "create": {
+            "success_notification": "Backend is created"
         }
-      },
-      "local": {
-        "path": "Files path"
-      },
-      "members": {
-        "section_title": "Members",
-        "name": "User name",
-        "role": "Project role"
-      },
-      "secrets": {
-        "section_title": "Secrets",
-        "empty_message_title": "No secrets",
-        "empty_message_text": "No secrets to display.",
-        "name": "Secret name",
-        "value": "Secret value",
-        "create_secret": "Create secret",
-        "update_secret": "Update secret",
-        "delete_confirm_title": "Delete secret",
-        "delete_confirm_message": "Are you sure you want to delete the {{name}} secret?",
-        "multiple_delete_confirm_title": "Delete secrets",
-        "multiple_delete_confirm_message": "Are you sure you want to delete {{count}} secrets?",
-        "not_permissions_title": "No permissions",
-        "not_permissions_description": "You don't have permissions for managing secrets",
-        "validation": {
-          "secret_name_format": "Invalid secret name"
+    },
+
+    "gateway": {
+        "page_title_one": "Gateway",
+        "page_title_other": "Gateways",
+        "add_gateway": "Add gateway",
+        "edit_gateway": "Edit gateway",
+        "empty_message_title": "No gateways",
+        "empty_message_text": "No gateways to display.",
+
+        "edit": {
+            "backend": "Backend",
+            "backend_description": "Select a backend",
+            "region": "Region",
+            "region_description": "Select a region",
+            "default": "Default",
+            "default_checkbox": "Turn on default",
+            "external_ip": "External IP",
+            "wildcard_domain": "Wildcard domain",
+            "wildcard_domain_description": "Specify the wildcard domain mapped to the external IP.",
+            "wildcard_domain_placeholder": "*.mydomain.com",
+            "delete_gateway_confirm_title": "Delete gateway",
+            "delete_gateway_confirm_message": "Are you sure you want to delete this gateway?",
+            "delete_gateways_confirm_title": "Delete gateways",
+            "delete_gateways_confirm_message": "Are you sure you want to delete these gateways?",
+
+            "validation": {
+                "wildcard_domain_format": "Should use next format: {{pattern}}"
+            }
+        },
+
+        "create": {
+            "success_notification": "Gateway is created",
+            "creating_notification": "The gateway is creating. It may take some time"
+        },
+
+        "update": {
+            "success_notification": "Gateway is updated"
+        },
+
+        "test_domain": {
+            "success_notification": "Domain is valid"
         }
-      },
-      "error_notification": "Update project error",
-      "validation": {
-        "user_name_format": "Only letters, numbers, - or _"
-      },
-      "visibility": {
-        "private": "Private",
-        "public": "Public"
-      }
     },
-    "create": {
-      "page_title": "Create project",
-      "error_notification": "Create project error",
-      "success_notification": "Project is created"
+
+    "projects": {
+        "page_title": "Projects",
+        "search_placeholder": "Find projects",
+        "empty_message_title": "No projects",
+        "empty_message_text": "No projects to display.",
+        "nomatch_message_title": "No matches",
+        "nomatch_message_text": "We can't find a match.",
+        "nomatch_message_button_label": "Clear filter",
+        "repositories": "Repositories",
+        "runs": "Runs",
+        "tags": "Tags",
+        "events": "Events",
+        "settings": "Settings",
+        "join": "Join",
+        "leave_confirm_title": "Leave project",
+        "leave_confirm_message": "Are you sure you want to leave this project?",
+        "leave": "Leave",
+        "join_success": "Successfully joined the project",
+        "leave_success": "Successfully left the project",
+        "join_error": "Failed to join project",
+        "leave_error": "Failed to leave project",
+        "card": {
+            "backend": "Backend",
+            "settings": "Settings"
+        },
+        "wizard": {
+            "submit": "Create"
+        },
+        "edit": {
+            "general": "General",
+            "project_name": "Name",
+            "owner": "Owner",
+            "project_name_description": "Only latin characters, dashes, underscores, and digits",
+            "project_type": "Project type",
+            "project_type_description": "Choose which project type you want to create",
+            "backends": "Backends",
+            "base_backends_description": "dstack will automatically collect offers from the following providers. Deselect providers you don’t want to use.",
+            "backends_description": "The following backends can be configured with your own cloud credentials in the project settings after the project is created.",
+            "create_default_fleet": "Create a default fleet",
+            "default_fleet": "Default fleet",
+            "default_fleet_description": "At least one fleet is required to run dev environments, tasks, or services.",
+            "is_public": "Public",
+            "is_public_description": "Allow any user join the project as a member",
+            "backend": "Backend",
+            "backend_config": "Backend config",
+            "backend_config_description": "Specify the backend config in the YAML format. Click Info for examples.",
+            "backend_type": "Type",
+            "backend_type_description": "Select a backend type",
+            "members_empty_message_title": "No members",
+            "members_empty_message_text": "Select project's members",
+            "update_members_success": "Members are updated",
+            "update_visibility_success": "Project visibility updated successfully",
+            "update_visibility_confirm_title": "Change project visibility",
+            "update_visibility_confirm_message": "Are you sure you want to change the project visibility? This will affect who can access this project.",
+            "change_visibility": "Change",
+            "project_visibility": "Visibility",
+            "project_visibility_description": "Control who can access this project",
+            "make_project_public": "Make project public",
+            "delete_project_confirm_title": "Delete project",
+            "delete_project_confirm_message": "Are you sure you want to delete this project?",
+            "delete_projects_confirm_title": "Delete projects",
+            "delete_projects_confirm_message": "Are you sure you want to delete these projects?",
+            "delete_this_project": "Delete this project",
+            "cli": "CLI",
+            "aws": {
+                "authorization": "Authorization",
+                "authorization_default": "Default credentials",
+                "authorization_access_key": "Access key",
+                "access_key": "Access key",
+                "access_key_id": "Access key ID",
+                "access_key_id_description": "Specify the AWS access key ID",
+                "secret_key": "Secret key",
+                "secret_key_id": "Secret access key",
+                "secret_key_id_description": "Specify the AWS secret access key",
+                "regions": "Regions",
+                "regions_description": "Select regions to run workflows and store artifacts",
+                "regions_placeholder": "Select regions",
+                "s3_bucket_name": "Bucket",
+                "s3_bucket_name_description": "Select an S3 bucket to store artifacts",
+                "ec2_subnet_id": "Subnet",
+                "ec2_subnet_id_description": "Select a subnet to run workflows in",
+                "ec2_subnet_id_placeholder": "Not selected",
+                "vpc_name": "VPC",
+                "vpc_name_description": "Enter a vpc"
+            },
+            "azure": {
+                "authorization": "Authorization",
+                "authorization_default": "Default credentials",
+                "authorization_client": "Client secret",
+                "tenant_id": "Tenant ID",
+                "tenant_id_description": "Specify an Azure tenant ID",
+                "tenant_id_placeholder": "Not selected",
+                "client_id": "Client ID",
+                "client_id_description": "Specify an Azure client (application) ID",
+                "client_secret": "Client secret",
+                "client_secret_description": "Specify an Azure client (application) secret",
+                "subscription_id": "Subscription ID",
+                "subscription_id_description": "Select an Azure subscription ID",
+                "subscription_id_placeholder": "Not selected",
+                "locations": "Locations",
+                "locations_description": "Select locations to run workflows",
+                "locations_placeholder": "Select locations",
+                "storage_account": "Storage account",
+                "storage_account_description": "Select an Azure storage account to store artifacts",
+                "storage_account_placeholder": "Not selected"
+            },
+            "gcp": {
+                "authorization": "Authorization",
+                "authorization_default": "Default credentials",
+                "service_account": "Service account key",
+                "credentials_description": "Credentials description",
+                "credentials_placeholder": "Credentials placeholder",
+                "regions": "Regions",
+                "regions_description": "Select regions to run workflows and store artifacts",
+                "regions_placeholder": "Select regions",
+                "project_id": "Project Id",
+                "project_id_description": "Select a project id",
+                "project_id_placeholder": "Select a project Id"
+            },
+            "lambda": {
+                "api_key": "API key",
+                "api_key_description": "Specify the Lambda API key",
+                "regions": "Regions",
+                "regions_description": "Select regions to run workflows",
+                "regions_placeholder": "Select regions",
+                "storage_backend": {
+                    "type": "Storage",
+                    "type_description": "Select backend storage",
+                    "type_placeholder": "Select type",
+                    "credentials": {
+                        "access_key_id": "Access key ID",
+                        "access_key_id_description": "Specify the AWS access key ID",
+                        "secret_key_id": "Secret access key",
+                        "secret_key_id_description": "Specify the AWS secret access key"
+                    },
+                    "s3_bucket_name": "Bucket",
+                    "s3_bucket_name_description": "Select an S3 bucket to store artifacts"
+                }
+            },
+            "local": {
+                "path": "Files path"
+            },
+            "members": {
+                "section_title": "Members",
+                "name": "User name",
+                "role": "Project role"
+            },
+            "secrets": {
+                "section_title": "Secrets",
+                "empty_message_title": "No secrets",
+                "empty_message_text": "No secrets to display.",
+                "name": "Secret name",
+                "value": "Secret value",
+                "create_secret": "Create secret",
+                "update_secret": "Update secret",
+                "delete_confirm_title": "Delete secret",
+                "delete_confirm_message": "Are you sure you want to delete the {{name}} secret?",
+                "multiple_delete_confirm_title": "Delete secrets",
+                "multiple_delete_confirm_message": "Are you sure you want to delete {{count}} secrets?",
+                "not_permissions_title": "No permissions",
+                "not_permissions_description": "You don't have permissions for managing secrets",
+                "validation": {
+                    "secret_name_format": "Invalid secret name"
+                }
+            },
+            "error_notification": "Update project error",
+            "validation": {
+                "user_name_format": "Only letters, numbers, - or _"
+            },
+            "visibility": {
+                "private": "Private",
+                "public": "Public"
+            }
+        },
+        "create": {
+            "page_title": "Create project",
+            "error_notification": "Create project error",
+            "success_notification": "Project is created"
+        },
+        "repo": {
+            "search_placeholder": "Find repositories",
+            "empty_message_title": "No repositories",
+            "empty_message_text": "No repositories to display.",
+            "nomatch_message_title": "No matches",
+            "nomatch_message_text": "We can't find a match.",
+            "card": {
+                "owner": "Owner",
+                "last_run": "Last run",
+                "tags_count": "Tags count",
+                "directory": "Directory"
+            },
+            "secrets": {
+                "table_title": "Secrets",
+                "add_modal_title": "Add secret",
+                "update_modal_title": "Update secret",
+                "name": "Secret name",
+                "name_description": "Secret name",
+                "value": "Secret value",
+                "value_description": "Secret value",
+                "search_placeholder": "Find secrets",
+                "empty_message_title": "No secrets",
+                "empty_message_text": "No secrets to display."
+            }
+        },
+        "run": {
+            "list_page_title": "Runs",
+            "search_placeholder": "Find runs",
+            "empty_message_title": "No runs",
+            "empty_message_text": "No runs to display.",
+            "quickstart_message_text": "Check out the quickstart guide to get started with dstack",
+            "nomatch_message_title": "No matches",
+            "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
+            "filter_property_placeholder": "Filter by properties",
+            "project": "Project",
+            "project_placeholder": "Filtering by project",
+            "repo": "Repository",
+            "repo_placeholder": "Filtering by repository",
+            "user": "User",
+            "user_placeholder": "Filtering by user",
+            "active_only": "Active runs",
+            "log": "Logs",
+            "log_empty_message_title": "No logs",
+            "log_empty_message_text": "No logs to display.",
+            "inspect": "Inspect",
+            "run_name": "Name",
+            "workflow_name": "Workflow",
+            "configuration": "Configuration",
+            "instance": "Instance",
+            "priority": "Priority",
+            "provider_name": "Provider",
+            "status": "Status",
+            "probe": "Probes",
+            "submitted_at": "Submitted",
+            "finished_at": "Finished",
+            "metrics": {
+                "title": "Metrics",
+                "show_metrics": "Show metrics",
+                "cpu_utilization": "CPU utilization %",
+                "memory_used": "System memory used",
+                "per_each_cpu_utilization": "GPU utilization %",
+                "per_each_memory_used": "GPU memory used"
+            },
+            "jobs": "Jobs",
+            "job_name": "Job Name",
+            "cost": "Cost",
+            "backend": "Backend",
+            "region": "Region",
+            "instance_id": "Instance ID",
+            "schedule": "Schedule",
+            "next_run": "Next run",
+            "resources": "Resources",
+            "spot": "Spot",
+            "termination_reason": "Termination reason",
+            "price": "Price",
+            "error": "Error",
+            "artifacts": "Artifacts",
+            "artifacts_count": "Artifacts",
+            "hub_user_name": "User",
+            "service_url": "Service URL",
+            "statuses": {
+                "pending": "Pending",
+                "submitted": "Submitted",
+                "provisioning": "Provisioning",
+                "pulling": "Pulling",
+                "downloading": "Downloading",
+                "running": "Running",
+                "uploading": "Uploading",
+                "stopping": "Stopping",
+                "stopped": "Stopped",
+                "terminating": "Terminating",
+                "terminated": "Terminated",
+                "aborting": "Aborting",
+                "aborted": "Aborted",
+                "failed": "Failed",
+                "done": "Done",
+                "building": "Building"
+            }
+        },
+        "tag": {
+            "list_page_title": "Artifacts",
+            "search_placeholder": "Find tags",
+            "empty_message_title": "No tags",
+            "empty_message_text": "No tags to display.",
+            "tag_name": "Tag",
+            "run_name": "Run",
+            "artifacts": "Files"
+        },
+        "artifact": {
+            "list_page_title": "Artifacts",
+            "search_placeholder": "Find objects",
+            "empty_message_title": "No objects",
+            "empty_message_text": "No objects to display.",
+            "nomatch_message_title": "No matches",
+            "nomatch_message_text": "We can't find a match.",
+            "name": "Name",
+            "type": "Type",
+            "size": "Size"
+        }
     },
-    "repo": {
-      "search_placeholder": "Find repositories",
-      "empty_message_title": "No repositories",
-      "empty_message_text": "No repositories to display.",
-      "nomatch_message_title": "No matches",
-      "nomatch_message_text": "We can't find a match.",
-      "card": {
-        "owner": "Owner",
-        "last_run": "Last run",
-        "tags_count": "Tags count",
-        "directory": "Directory"
-      },
-      "secrets": {
-        "table_title": "Secrets",
-        "add_modal_title": "Add secret",
-        "update_modal_title": "Update secret",
-        "name": "Secret name",
-        "name_description": "Secret name",
-        "value": "Secret value",
-        "value_description": "Secret value",
-        "search_placeholder": "Find secrets",
-        "empty_message_title": "No secrets",
-        "empty_message_text": "No secrets to display."
-      }
+    "runs": {
+        "launch_button": "Launch",
+        "launch": {
+            "wizard": {
+                "title": "Launch",
+                "submit": "Apply",
+                "project": "Project",
+                "project_description": "Select a project",
+                "project_empty": "No options",
+                "project_loading": "Loading options",
+                "template": "Template",
+                "template_description": "Select a template",
+                "template_empty": "No options",
+                "template_loading": "Loading options",
+                "template_placeholder": "Select a project to select a template",
+                "template_card_type": "Type",
+                "gpu": "GPU",
+                "gpu_description": "Enable to select a GPU offer. Disable to run without a GPU.",
+                "offer": "Offer",
+                "offer_description": "Select an offer for the run.",
+                "name": "Name",
+                "name_description": "The name of the run, e.g. 'my-dev-env'",
+                "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",
+                "name_placeholder": "Optional",
+                "ide": "IDE",
+                "ide_description": "Select which IDE would you like to use with the dev environment.",
+                "docker": "Docker",
+                "docker_image": "Image",
+                "docker_image_description": "A Docker image name, e.g. 'lmsysorg/sglang:latest'",
+                "docker_image_constraint": "The image must be public",
+                "docker_image_placeholder": "Required",
+                "python": "Python",
+                "python_description": "The version of Python, e.g. '3.12'",
+                "python_placeholder": "Optional",
+                "repo": "Repo",
+                "working_dir": "Working dir",
+                "working_dir_description": "The absolute path to the working directory inside the container, e.g. '/home/user/project'",
+                "working_dir_placeholder": "Optional",
+                "working_dir_constraint": "By default, set to '/workflow'",
+                "repo_url": "URL",
+                "repo_url_description": "A URL of a Git repository, e.g. 'https://github.com/user/repo'",
+                "repo_url_constraint": "The repo must be public",
+                "repo_url_placeholder": "Required",
+                "repo_path": "Path",
+                "repo_path_description": "The path inside the container to clone the repository, e.g. '/home/user/project'",
+                "repo_path_placeholder": "Optional",
+                "repo_path_constraint": "By default, set to '/workflow'",
+                "config": "Configuration file",
+                "configuration_label": "Configuration",
+                "configuration_description": "Review and adjust the configuration if needed.",
+                "success_notification": "The run is submitted!"
+            }
+        }
     },
-    "run": {
-      "list_page_title": "Runs",
-      "search_placeholder": "Find runs",
-      "empty_message_title": "No runs",
-      "empty_message_text": "No runs to display.",
-      "quickstart_message_text": "Check out the quickstart guide to get started with dstack",
-      "nomatch_message_title": "No matches",
-      "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
-      "filter_property_placeholder": "Filter by properties",
-      "project": "Project",
-      "project_placeholder": "Filtering by project",
-      "repo": "Repository",
-      "repo_placeholder": "Filtering by repository",
-      "user": "User",
-      "user_placeholder": "Filtering by user",
-      "active_only": "Active runs",
-      "log": "Logs",
-      "log_empty_message_title": "No logs",
-      "log_empty_message_text": "No logs to display.",
-      "inspect": "Inspect",
-      "run_name": "Name",
-      "workflow_name": "Workflow",
-      "configuration": "Configuration",
-      "instance": "Instance",
-      "priority": "Priority",
-      "provider_name": "Provider",
-      "status": "Status",
-      "probe": "Probes",
-      "submitted_at": "Submitted",
-      "finished_at": "Finished",
-      "metrics": {
-        "title": "Metrics",
-        "show_metrics": "Show metrics",
-        "cpu_utilization": "CPU utilization %",
-        "memory_used": "System memory used",
-        "per_each_cpu_utilization": "GPU utilization %",
-        "per_each_memory_used": "GPU memory used"
-      },
-      "jobs": "Jobs",
-      "job_name": "Job Name",
-      "cost": "Cost",
-      "backend": "Backend",
-      "region": "Region",
-      "instance_id": "Instance ID",
-      "schedule": "Schedule",
-      "next_run": "Next run",
-      "resources": "Resources",
-      "spot": "Spot",
-      "termination_reason": "Termination reason",
-      "price": "Price",
-      "error": "Error",
-      "artifacts": "Artifacts",
-      "artifacts_count": "Artifacts",
-      "hub_user_name": "User",
-      "service_url": "Service URL",
-      "statuses": {
-        "pending": "Pending",
-        "submitted": "Submitted",
-        "provisioning": "Provisioning",
-        "pulling": "Pulling",
-        "downloading":  "Downloading",
-        "running": "Running",
-        "uploading":  "Uploading",
-        "stopping": "Stopping",
-        "stopped":  "Stopped",
-        "terminating": "Terminating",
-        "terminated":  "Terminated",
-        "aborting": "Aborting",
-        "aborted":  "Aborted",
-        "failed": "Failed",
-        "done":  "Done",
-        "building":  "Building"
-      }
+    "offer": {
+        "title": "Offers",
+        "filter_property_placeholder": "Filter by properties",
+        "backend": "Backend",
+        "backend_plural": "Backends",
+        "availability_not_available": "Not available",
+        "availability_no_quota": "No quota",
+        "availability_no_balance": "No balance",
+        "groupBy": "Group by properties",
+        "region": "Region",
+        "count": "Count",
+        "price": "$/GPU",
+        "memory_mib": "Memory",
+        "spot": "Spot policy",
+        "empty_message_title_select_project": "Select a project",
+        "empty_message_text_select_project": "Use the filter above to select a project",
+        "empty_message_title_select_groupBy": "Select a group by",
+        "empty_message_text_select_groupBy": "Use the field above to select a group by",
+        "empty_message_title": "No offers",
+        "empty_message_text": "No offers to display.",
+        "nomatch_message_title": "No matches",
+        "nomatch_message_text": "We can't find a match."
     },
-    "tag": {
-      "list_page_title": "Artifacts",
-      "search_placeholder": "Find tags",
-      "empty_message_title": "No tags",
-      "empty_message_text": "No tags to display.",
-      "tag_name": "Tag",
-      "run_name": "Run",
-      "artifacts": "Files"
+
+    "models": {
+        "model_name": "Name",
+        "url": "URL",
+        "gateway": "Gateway",
+        "type": "Type",
+        "run": "Run",
+        "resources": "Resources",
+        "price": "Price",
+        "submitted_at": "Submitted",
+        "user": "User",
+        "repository": "Repository",
+        "backend": "Backend",
+        "code": "Code",
+        "empty_message_title": "No models",
+        "empty_message_text": "No models to display.",
+        "nomatch_message_title": "No matches",
+        "nomatch_message_text": "We can't find a match.",
+        "nomatch_message_button_label": "Clear filter",
+
+        "details": {
+            "instructions": "System",
+            "instructions_description": "Specify system",
+            "message_placeholder": "Enter your question",
+            "chat_empty_title": "No messages yet",
+            "chat_empty_message": "Please start a chat",
+            "run_name": "Run name",
+            "view_code": "View code",
+            "view_code_description": "You can use the following code to start integrating your current prompt and settings into your application."
+        }
     },
-    "artifact": {
-      "list_page_title": "Artifacts",
-      "search_placeholder": "Find objects",
-      "empty_message_title": "No objects",
-      "empty_message_text": "No objects to display.",
-      "nomatch_message_title": "No matches",
-      "nomatch_message_text": "We can't find a match.",
-      "name": "Name",
-      "type": "Type",
-      "size": "Size"
-    }
-  },
-  "runs": {
-    "dev_env": {
-      "wizard": {
-        "title": "New dev environment",
-        "submit": "Apply",
-        "offer": "Offer",
-        "offer_description": "Select an offer for the dev environment.",
+
+    "fleets": {
+        "no_alert": {
+            "title": "No fleets",
+            "description": "The project has no fleets. Create one before submitting a run.",
+            "button_title": "Create a fleet"
+        },
+        "fleet": "Fleet",
+        "fleet_placeholder": "Filtering by fleet",
+        "fleet_name": "Fleet name",
+        "total_instances": "Number of instances",
+        "inspect": "Inspect",
+        "empty_message_title": "No fleets",
+        "empty_message_text": "No fleets to display.",
+        "nomatch_message_title": "No matches",
+        "nomatch_message_text": "We can't find a match.",
+        "nomatch_message_button_label": "Clear filter",
+        "active_only": "Active fleets",
+        "filter_property_placeholder": "Filter by properties",
+        "statuses": {
+            "active": "Active",
+            "submitted": "Submitted",
+            "failed": "Failed",
+            "terminating": "Terminating",
+            "terminated": "Terminated"
+        },
+        "create": {
+            "success_notification": "The fleet is created!"
+        },
+        "instances": {
+            "active_only": "Active instances",
+            "filter_property_placeholder": "Filter by properties",
+            "title": "Instances",
+            "empty_message_title": "No instances",
+            "empty_message_text": "No instances to display.",
+            "nomatch_message_title": "No matches",
+            "nomatch_message_text": "We can't find a match.",
+            "instance_name": "Instance",
+            "instance_num": "Instance num",
+            "created": "Created",
+            "status": "Status",
+            "project": "Project",
+            "hostname": "Host name",
+            "instance_type": "Type",
+            "statuses": {
+                "pending": "Pending",
+                "provisioning": "Provisioning",
+                "idle": "Idle",
+                "busy": "Busy",
+                "terminating": "Terminating",
+                "terminated": "Terminated"
+            },
+            "resources": "Resources",
+            "backend": "Backend",
+            "region": "Region",
+            "spot": "Spot",
+            "started": "Started",
+            "price": "Price"
+        },
+        "edit": {
+            "name": "Name",
+            "name_description": "The name of the fleet, e.g. 'my-fleet'",
+            "name_placeholder": "Optional",
+            "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",
+            "min_instances": "Min number of instances",
+            "min_instances_description": "Set it '0' to provision instances only when required",
+            "max_instances": "Max number of instances",
+            "max_instances_description": "Required only if you want to set an upper limit",
+            "max_instances_placeholder": "Optional",
+            "idle_duration": "Idle duration",
+            "idle_duration_description": "Example: '0s', '1m', '1h'",
+            "spot_policy": "Spot policy",
+            "spot_policy_description": "Set it to 'auto' to allow the use of both on-demand and spot instances"
+        }
+    },
+    "volume": {
+        "volumes": "Volumes",
+        "empty_message_title": "No volumes",
+        "empty_message_text": "No volumes to display.",
+        "nomatch_message_title": "No matches",
+        "nomatch_message_text": "We can't find a match.",
+        "delete_volumes_confirm_title": "Delete volumes",
+        "delete_volumes_confirm_message": "Are you sure you want to delete these volumes?",
+        "active_only": "Active volumes",
+        "filter_property_placeholder": "Filter by properties",
+
         "name": "Name",
-        "name_description": "The name of the run, e.g. 'my-dev-env'",
-        "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",
-        "name_placeholder": "Optional",
-        "ide": "IDE",
-        "ide_description": "Select which IDE would you like to use with the dev environment.",
-        "docker": "Docker",
-        "docker_image": "Image",
-        "docker_image_description": "A Docker image name, e.g. 'lmsysorg/sglang:latest'",
-        "docker_image_constraint": "The image must be public",
-        "docker_image_placeholder": "Required",
-        "python": "Python",
-        "python_description": "The version of Python, e.g. '3.12'",
-        "python_placeholder": "Optional",
-        "repo": "Repo",
-        "working_dir": "Working dir",
-        "working_dir_description": "The absolute path to the working directory inside the container, e.g. '/home/user/project'",
-        "working_dir_placeholder": "Optional",
-        "working_dir_constraint": "By default, set to '/workflow'",
-        "repo_url": "URL",
-        "repo_url_description": "A URL of a Git repository, e.g. 'https://github.com/user/repo'",
-        "repo_url_constraint": "The repo must be public",
-        "repo_url_placeholder": "Required",
-        "repo_path": "Path",
-        "repo_path_description": "The path inside the container to clone the repository, e.g. '/home/user/project'",
-        "repo_path_placeholder": "Optional",
-        "repo_path_constraint": "By default, set to '/workflow'",
-        "config": "Configuration file",
-        "config_description": "Review the configuration file and adjust it if needed. Click Info for examples.",
-        "success_notification": "The run is submitted!"
-      }
+        "project": "Project name",
+        "region": "Region",
+        "backend": "Backend",
+        "status": "Status",
+        "created": "Created",
+        "finished": "Finished",
+        "price": "Price (per month)",
+        "cost": "Cost",
+        "statuses": {
+            "failed": "Failed",
+            "submitted": "Submitted",
+            "provisioning": "Provisioning",
+            "active": "Active",
+            "deleted": "Deleted"
+        }
+    },
+
+    "events": {
+        "recorded_at": "Recorded At",
+        "actor": "Actor",
+        "targets": "Targets",
+        "message": "Message"
+    },
+
+    "users": {
+        "page_title": "Users",
+        "search_placeholder": "Find members",
+        "empty_message_title": "No members",
+        "empty_message_text": "No members to display.",
+        "nomatch_message_title": "No matches",
+        "nomatch_message_text": "We can't find a match.",
+        "user_name": "User name",
+        "user_name_description": "Only latin characters, dashes, underscores, and digits",
+        "global_role_description": "Whether the user is an administrator or not",
+        "email_description": "Enter user email",
+        "token": "Token",
+        "token_description": "Specify use your personal access token",
+        "global_role": "Global role",
+        "active": "Active",
+        "active_description": "Specify user activation",
+        "activated": "Activated",
+        "deactivated": "Deactivated",
+        "email": "Email",
+        "created_at": "Created at",
+        "account": "User",
+        "account_settings": "User settings",
+        "settings": "Settings",
+        "projects": "Projects",
+        "events": "Events",
+        "create": {
+            "page_title": "Create user",
+            "error_notification": "Create user error",
+            "success_notification": "User is created"
+        },
+        "edit": {
+            "error_notification": "Update user error",
+            "success_notification": "User updating is successful",
+            "refresh_token_success_notification": "Token rotating is successful",
+            "refresh_token_error_notification": "Token rotating error",
+            "refresh_token_confirm_title": "Rotate token",
+            "refresh_token_confirm_message": "Are you sure you want to rotate token?",
+            "refresh_token_button_label": "Rotate",
+            "validation": {
+                "user_name_format": "Only letters, numbers, - or _",
+                "email_format": "Incorrect email"
+            }
+        },
+
+        "manual_payments": {
+            "title": "Credits history",
+            "add_payment": "Add payment",
+            "empty_message_title": "No payments",
+            "empty_message_text": "No payments to display.",
+
+            "create": {
+                "success_notification": "Payment creating is successful"
+            },
+
+            "edit": {
+                "value": "Amount",
+                "value_description": "Enter amount here",
+                "description": "Description",
+                "description_description": "Describe payment here",
+                "created_at": "Created at"
+            }
+        },
+
+        "token_copied": "Token copied"
+    },
+    "billing": {
+        "title": "Billing",
+        "balance": "Balance",
+        "billing_history": "Billing history",
+        "payment_method": "Payment method",
+        "no_payment_method": "No payment method attached",
+        "top_up_balance": "Top up balance",
+        "edit_payment_method": "Edit payment method",
+        "payment_amount": "Payment amount",
+        "amount_description": "Minimum: ${{value}}",
+        "make_payment": "Make a payment",
+        "min_amount_error_message": "The amount is allowed to be more than {{value}}",
+        "payment_success_message": "Payment succeeded. There can be a short delay before the balance is updated."
+    },
+    "validation": {
+        "required": "This is required field"
+    },
+    "users_autosuggest": {
+        "placeholder": "Enter username or email to add member",
+        "entered_text": "Add member",
+        "loading": "Loading users",
+        "no_match": "No matches found"
+    },
+    "roles": {
+        "admin": "Admin",
+        "manager": "Manager",
+        "user": "User"
+    },
+    "confirm_dialog": {
+        "title": "Confirm delete",
+        "message": "Are you sure you want to delete?"
     }
-  },
-  "offer": {
-    "title": "Offers",
-    "filter_property_placeholder": "Filter by properties",
-    "backend": "Backend",
-    "backend_plural": "Backends",
-    "availability_not_available": "Not available",
-    "availability_no_quota": "No quota",
-    "availability_no_balance": "No balance",
-    "groupBy": "Group by properties",
-    "region": "Region",
-    "count": "Count",
-    "price": "$/GPU",
-    "memory_mib": "Memory",
-    "spot": "Spot policy",
-    "empty_message_title_select_project": "Select a project",
-    "empty_message_text_select_project": "Use the filter above to select a project",
-    "empty_message_title_select_groupBy": "Select a group by",
-    "empty_message_text_select_groupBy": "Use the field above to select a group by",
-    "empty_message_title": "No offers",
-    "empty_message_text": "No offers to display.",
-    "nomatch_message_title": "No matches",
-    "nomatch_message_text": "We can't find a match."
-  },
-
-  "models": {
-    "model_name": "Name",
-    "url": "URL",
-    "gateway": "Gateway",
-    "type": "Type",
-    "run": "Run",
-    "resources": "Resources",
-    "price": "Price",
-    "submitted_at": "Submitted",
-    "user": "User",
-    "repository": "Repository",
-    "backend": "Backend",
-    "code": "Code",
-    "empty_message_title": "No models",
-    "empty_message_text": "No models to display.",
-    "nomatch_message_title": "No matches",
-    "nomatch_message_text": "We can't find a match.",
-    "nomatch_message_button_label": "Clear filter",
-
-    "details": {
-      "instructions": "System",
-      "instructions_description": "Specify system",
-      "message_placeholder": "Enter your question",
-      "chat_empty_title": "No messages yet",
-      "chat_empty_message": "Please start a chat",
-      "run_name": "Run name",
-      "view_code": "View code",
-      "view_code_description": "You can use the following code to start integrating your current prompt and settings into your application."
-    }
-  },
-
-  "fleets": {
-    "no_alert": {
-      "title": "No fleets",
-      "description": "The project has no fleets. Create one before submitting a run.",
-      "button_title": "Create a fleet"
-    },
-    "fleet": "Fleet",
-    "fleet_placeholder": "Filtering by fleet",
-    "fleet_name": "Fleet name",
-    "total_instances": "Number of instances",
-    "inspect": "Inspect",
-    "empty_message_title": "No fleets",
-    "empty_message_text": "No fleets to display.",
-    "nomatch_message_title": "No matches",
-    "nomatch_message_text": "We can't find a match.",
-    "nomatch_message_button_label": "Clear filter",
-    "active_only": "Active fleets",
-    "filter_property_placeholder": "Filter by properties",
-    "statuses": {
-      "active": "Active",
-      "submitted": "Submitted",
-      "failed": "Failed",
-      "terminating": "Terminating",
-      "terminated": "Terminated"
-    },
-    "create": {
-      "success_notification": "The fleet is created!"
-    },
-    "instances": {
-      "active_only": "Active instances",
-      "filter_property_placeholder": "Filter by properties",
-      "title": "Instances",
-      "empty_message_title": "No instances",
-      "empty_message_text": "No instances to display.",
-      "nomatch_message_title": "No matches",
-      "nomatch_message_text": "We can't find a match.",
-      "instance_name": "Instance",
-      "instance_num": "Instance num",
-      "created": "Created",
-      "status": "Status",
-      "project": "Project",
-      "hostname": "Host name",
-      "instance_type": "Type",
-      "statuses": {
-        "pending": "Pending",
-        "provisioning": "Provisioning",
-        "idle": "Idle",
-        "busy": "Busy",
-        "terminating": "Terminating",
-        "terminated": "Terminated"
-      },
-      "resources": "Resources",
-      "backend": "Backend",
-      "region": "Region",
-      "spot": "Spot",
-      "started": "Started",
-      "price": "Price"
-    },
-    "edit": {
-      "name": "Name",
-      "name_description": "The name of the fleet, e.g. 'my-fleet'",
-      "name_placeholder": "Optional",
-      "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",
-      "min_instances": "Min number of instances",
-      "min_instances_description": "Set it '0' to provision instances only when required",
-      "max_instances": "Max number of instances",
-      "max_instances_description": "Required only if you want to set an upper limit",
-      "max_instances_placeholder": "Optional",
-      "idle_duration": "Idle duration",
-      "idle_duration_description": "Example: '0s', '1m', '1h'",
-      "spot_policy": "Spot policy",
-      "spot_policy_description": "Set it to 'auto' to allow the use of both on-demand and spot instances"
-    }
-  },
-  "volume": {
-    "volumes": "Volumes",
-    "empty_message_title": "No volumes",
-    "empty_message_text": "No volumes to display.",
-    "nomatch_message_title": "No matches",
-    "nomatch_message_text": "We can't find a match.",
-    "delete_volumes_confirm_title": "Delete volumes",
-    "delete_volumes_confirm_message": "Are you sure you want to delete these volumes?",
-    "active_only": "Active volumes",
-    "filter_property_placeholder": "Filter by properties",
-
-    "name": "Name",
-    "project": "Project name",
-    "region": "Region",
-    "backend": "Backend",
-    "status": "Status",
-    "created": "Created",
-    "finished": "Finished",
-    "price": "Price (per month)",
-    "cost": "Cost",
-    "statuses": {
-      "failed": "Failed",
-      "submitted": "Submitted",
-      "provisioning": "Provisioning",
-      "active":  "Active",
-      "deleted":  "Deleted"
-    }
-  },
-
-  "events": {
-    "recorded_at": "Recorded At",
-    "actor": "Actor",
-    "targets": "Targets",
-    "message": "Message"
-  },
-
-  "users": {
-    "page_title": "Users",
-    "search_placeholder": "Find members",
-    "empty_message_title": "No members",
-    "empty_message_text": "No members to display.",
-    "nomatch_message_title": "No matches",
-    "nomatch_message_text": "We can't find a match.",
-    "user_name": "User name",
-    "user_name_description": "Only latin characters, dashes, underscores, and digits",
-    "global_role_description": "Whether the user is an administrator or not",
-    "email_description": "Enter user email",
-    "token": "Token",
-    "token_description": "Specify use your personal access token",
-    "global_role": "Global role",
-    "active": "Active",
-    "active_description": "Specify user activation",
-    "activated": "Activated",
-    "deactivated": "Deactivated",
-    "email": "Email",
-    "created_at": "Created at",
-    "account": "User",
-    "account_settings": "User settings",
-    "settings": "Settings",
-    "projects": "Projects",
-    "events": "Events",
-    "create": {
-      "page_title": "Create user",
-      "error_notification": "Create user error",
-      "success_notification": "User is created"
-    },
-    "edit": {
-      "error_notification": "Update user error",
-      "success_notification": "User updating is successful",
-      "refresh_token_success_notification": "Token rotating is successful",
-      "refresh_token_error_notification": "Token rotating error",
-      "refresh_token_confirm_title": "Rotate token",
-      "refresh_token_confirm_message": "Are you sure you want to rotate token?",
-      "refresh_token_button_label": "Rotate",
-      "validation": {
-        "user_name_format": "Only letters, numbers, - or _",
-        "email_format": "Incorrect email"
-      }
-    },
-
-    "manual_payments": {
-      "title": "Credits history",
-      "add_payment": "Add payment",
-      "empty_message_title": "No payments",
-      "empty_message_text": "No payments to display.",
-
-      "create": {
-        "success_notification": "Payment creating is successful"
-      },
-
-      "edit": {
-        "value": "Amount",
-        "value_description": "Enter amount here",
-        "description": "Description",
-        "description_description": "Describe payment here",
-        "created_at": "Created at"
-      }
-    },
-
-    "token_copied": "Token copied"
-  },
-  "billing": {
-    "title": "Billing",
-    "balance": "Balance",
-    "billing_history": "Billing history",
-    "payment_method": "Payment method",
-    "no_payment_method": "No payment method attached",
-    "top_up_balance": "Top up balance",
-    "edit_payment_method": "Edit payment method",
-    "payment_amount": "Payment amount",
-    "amount_description": "Minimum: ${{value}}",
-    "make_payment": "Make a payment",
-    "min_amount_error_message": "The amount is allowed to be more than {{value}}",
-    "payment_success_message": "Payment succeeded. There can be a short delay before the balance is updated."
-  },
-  "validation": {
-    "required": "This is required field"
-  },
-  "users_autosuggest": {
-    "placeholder": "Enter username or email to add member",
-    "entered_text": "Add member",
-    "loading": "Loading users",
-    "no_match": "No matches found"
-  },
-  "roles": {
-    "admin": "Admin",
-    "manager": "Manager",
-    "user": "User"
-  },
-  "confirm_dialog": {
-    "title": "Confirm delete",
-    "message": "Are you sure you want to delete?"
-  }
 }

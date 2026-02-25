@@ -15,6 +15,7 @@ import { repoApi } from 'services/repo';
 import { runApi } from 'services/run';
 import { secretApi } from 'services/secrets';
 import { serverApi } from 'services/server';
+import { templateApi } from 'services/templates';
 import { userApi } from 'services/user';
 import { volumeApi } from 'services/volume';
 
@@ -42,6 +43,7 @@ export const store = configureStore({
         [repoApi.reducerPath]: repoApi.reducer,
         [mainApi.reducerPath]: mainApi.reducer,
         [eventApi.reducerPath]: eventApi.reducer,
+        [templateApi.reducerPath]: templateApi.reducer,
     },
 
     middleware: (getDefaultMiddleware) =>
@@ -62,6 +64,7 @@ export const store = configureStore({
             .concat(gpuApi.middleware)
             .concat(eventApi.middleware)
             .concat(repoApi.middleware)
+            .concat(templateApi.middleware)
             .concat(mainApi.middleware),
 });
 

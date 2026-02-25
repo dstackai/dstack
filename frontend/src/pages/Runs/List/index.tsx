@@ -1,9 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { ButtonDropdownProps } from '@cloudscape-design/components';
 
-import { Button, ButtonDropdown, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
+import { Button, Header, Loader, PropertyFilter, SpaceBetween, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useBreadcrumbs, useCollection, useInfiniteScroll } from 'hooks';
@@ -114,12 +113,12 @@ export const RunList: React.FC = () => {
     //     deleteRuns([...selectedItems]).catch(console.log);
     // };
 
-    const onFollowButtonDropdownLink: ButtonDropdownProps['onItemFollow'] = (event) => {
-        event.preventDefault();
-
-        if (event.detail.href) {
-            navigate(event.detail.href);
-        }
+    const launchHandle = () => {
+        navigate(
+            `${ROUTES.RUNS.CREATE_DEV_ENV}${
+                filteringRequestParams.project_name ? `?project_name=${filteringRequestParams.project_name}` : ''
+            }`,
+        );
     };
 
     const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
@@ -149,22 +148,7 @@ export const RunList: React.FC = () => {
                         variant="awsui-h1-sticky"
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
-                                <ButtonDropdown
-                                    items={[
-                                        {
-                                            text: 'Dev environment',
-                                            id: 'dev_env',
-                                            href: `${ROUTES.RUNS.CREATE_DEV_ENV}${
-                                                filteringRequestParams.project_name
-                                                    ? `?project_name=${filteringRequestParams.project_name}`
-                                                    : ''
-                                            }`,
-                                        },
-                                    ]}
-                                    onItemFollow={onFollowButtonDropdownLink}
-                                >
-                                    {t('common.new')}
-                                </ButtonDropdown>
+                                <Button onClick={launchHandle}>{t('runs.launch_button')}</Button>
 
                                 <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
                                     {t('common.abort')}

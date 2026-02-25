@@ -7,6 +7,6 @@ export type FormSelectOptions = ReadonlyArray<FormSelectOption>;
 
 export type FormSelectProps<T extends FieldValues> = Omit<SelectProps, 'value' | 'name' | 'selectedOption' | 'options'> &
     Omit<FormFieldProps, 'errorText'> &
-    Pick<ControllerProps<T>, 'control' | 'name' | 'rules'> & {
+    Pick<ControllerProps<T>, 'control' | 'name' | 'rules' | 'defaultValue'> & {
         options: ReadonlyArray<SelectProps.Option>;
     };

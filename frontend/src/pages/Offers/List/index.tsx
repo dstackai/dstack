@@ -7,7 +7,7 @@ import { useCollection } from 'hooks';
 import { useGetGpusListQuery } from 'services/gpu';
 
 import { useEmptyMessages } from './hooks/useEmptyMessages';
-import { useFilters } from './hooks/useFilters';
+import { useFilters, UseFiltersArgs } from './hooks/useFilters';
 import { convertMiBToGB, rangeToObject, renderRange, renderRangeJSX, round } from './helpers';
 
 import styles from './styles.module.scss';
@@ -66,20 +66,32 @@ const getRequestParams = ({
     };
 };
 
-type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange' | 'selectedItems' | 'selectionType'> & {
-    withSearchParams?: boolean;
-    onChangeProjectName?: (value: string) => void;
-};
+type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange' | 'selectedItems' | 'selectionType'> &
+    Pick<UseFiltersArgs, 'permanentFilters' | 'defaultFilters'> & {
+        withSearchParams?: boolean;
+        disabled?: boolean;
+        onChangeProjectName?: (value: string) => void;
+        onChangeBackendFilter?: (backends: string[]) => void;
+    };
 
-export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChangeProjectName, ...props }) => {
+export const OfferList: React.FC<OfferListProps> = ({
+    withSearchParams,
+    disabled,
+    onChangeProjectName,
+    onChangeBackendFilter,
+    permanentFilters,
+    defaultFilters,
+    ...props
+}) => {
     const { t } = useTranslation();
     const [requestParams, setRequestParams] = useState<TGpusListQueryParams | undefined>();
+
     const { data, isLoading, isFetching } = useGetGpusListQuery(
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         requestParams,
         {
-            skip: !requestParams || !requestParams['project_name'] || !requestParams['group_by']?.length,
+            skip: disabled || !requestParams || !requestParams['project_name'] || !requestParams['group_by']?.length,
         },
     );
 
@@ -93,7 +105,7 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
         groupBy,
         groupByOptions,
         onChangeGroupBy,
-    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams });
+    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams, permanentFilters, defaultFilters });
 
     useEffect(() => {
         setRequestParams(
@@ -109,6 +121,11 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
     useEffect(() => {
         onChangeProjectName?.(filteringRequestParams.project_name ?? '');
     }, [filteringRequestParams.project_name]);
+
+    useEffect(() => {
+        const backend = filteringRequestParams.backend;
+        onChangeBackendFilter?.(backend ? (Array.isArray(backend) ? backend : [backend]) : []);
+    }, [filteringRequestParams.backend]);
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,
@@ -213,15 +230,16 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
             {...collectionProps}
             {...props}
             entireCardClickable
-            items={items}
+            items={disabled ? [] : items}
+            empty={disabled ? ' ' : undefined}
             cardDefinition={{
                 header: (gpu) => gpu.name,
                 sections,
             }}
-            loading={isLoading || isFetching}
+            loading={!disabled && (isLoading || isFetching)}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            filter={
+            filter={disabled ? undefined : (
                 <div className={styles.selectFilters}>
                     <div className={styles.propertyFilter}>
                         <PropertyFilter
@@ -252,7 +270,7 @@ export const OfferList: React.FC<OfferListProps> = ({ withSearchParams, onChange
                         />
                     </div>
                 </div>
-            }
+            )}
         />
     );
 };
