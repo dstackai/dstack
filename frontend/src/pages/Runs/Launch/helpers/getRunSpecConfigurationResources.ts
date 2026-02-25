@@ -19,13 +19,14 @@ const parseRange = (rangeString: string) => {
 };
 
 export const getRunSpecConfigurationResources = (json: unknown): TDevEnvironmentConfiguration['resources'] => {
-    const { gpu, cpu, memory, shm_size, disk } = (json ?? {}) as { [key: string]: string };
+    const { gpu, cpu, memory, shm_size, disk } = (json ?? {}) as Record<string, unknown>;
     const result: TDevEnvironmentConfiguration['resources'] = {};
 
-    let gpuResources: TGPUResources = {};
-
-    if (typeof gpu === 'string') {
-        const attributes = ((gpu as string) ?? '').split(':');
+    if (typeof gpu === 'number') {
+        result['gpu'] = gpu;
+    } else if (typeof gpu === 'string') {
+        const gpuResources: TGPUResources = {};
+        const attributes = gpu.split(':');
 
         attributes.forEach((attribute, index) => {
             if (isVendor(attribute)) {
@@ -52,38 +53,43 @@ export const getRunSpecConfigurationResources = (json: unknown): TDevEnvironment
                 return;
             }
         });
-    } else if (typeof gpu === 'object') {
-        gpuResources = gpu;
+        result['gpu'] = gpuResources;
+    } else if (typeof gpu === 'object' && gpu !== null) {
+        result['gpu'] = gpu as TGPUResources;
     }
 
-    result['gpu'] = gpuResources;
-
-    if (memory && isMemory(memory)) {
+    if (typeof memory === 'string' && isMemory(memory)) {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
         result['memory'] = parseRange(memory);
     }
 
     if (shm_size) {
-        const shmSizeNum = parseInt(shm_size, 10);
+        const shmSizeStr = String(shm_size);
+        const shmSizeNum = parseInt(shmSizeStr, 10);
 
         if (!isNaN(shmSizeNum)) {
             result['shm_size'] = shmSizeNum;
         } else {
-            result['shm_size'] = shm_size;
+            result['shm_size'] = shmSizeStr;
         }
     }
 
     if (cpu) {
-        const cpuNum = parseInt(cpu, 10);
+        const cpuStr = String(cpu);
+        const cpuNum = parseInt(cpuStr, 10);
 
         if (!isNaN(cpuNum)) {
             result['cpu'] = cpuNum;
         } else {
-            result['cpu'] = cpu;
+            result['cpu'] = cpuStr;
         }
     }
 
-    if (disk && isMemory(disk)) {
+    if (typeof disk === 'string' && isMemory(disk)) {
         result['disk'] = {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-expect-error
             size: parseRange(disk),
         };
     }

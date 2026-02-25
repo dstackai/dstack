@@ -29,12 +29,12 @@ import {
     getRunListItemRegion,
     getRunListItemResources,
     getRunListItemSchedule,
-    getRunListItemServiceUrl,
     getRunListItemSpot,
 } from '../../List/helpers';
 import { EventsList } from '../Events/List';
 import { JobList } from '../Jobs/List';
 import { ConnectToRunWithDevEnvConfiguration } from './ConnectToRunWithDevEnvConfiguration';
+import { ConnectToServiceRun } from './ConnectToServiceRun';
 
 export const RunDetails = () => {
     const { t } = useTranslation();
@@ -47,7 +47,6 @@ export const RunDetails = () => {
         id: paramRunId,
     });
 
-    const serviceUrl = runData ? getRunListItemServiceUrl(runData) : null;
     const schedule = runData ? getRunListItemSchedule(runData) : null;
     const nextTriggeredAt = runData ? runData.next_triggered_at : null;
 
@@ -191,17 +190,6 @@ export const RunDetails = () => {
                     </div>
                 </ColumnLayout>
 
-                {serviceUrl && (
-                    <ColumnLayout columns={1} variant="text-grid">
-                        <div>
-                            <Box variant="awsui-key-label">{t('projects.run.service_url')}</Box>
-                            <div>
-                                <a href={serviceUrl}>{serviceUrl}</a>
-                            </div>
-                        </div>
-                    </ColumnLayout>
-                )}
-
                 {schedule && (
                     <ColumnLayout columns={4} variant="text-grid">
                         <div>
@@ -218,6 +206,10 @@ export const RunDetails = () => {
 
             {runData.run_spec.configuration.type === 'dev-environment' && !runIsStopped(runData.status) && (
                 <ConnectToRunWithDevEnvConfiguration run={runData} />
+            )}
+
+            {runData.run_spec.configuration.type === 'service' && !runIsStopped(runData.status) && (
+                <ConnectToServiceRun run={runData} />
             )}
 
             {runData.jobs.length > 1 && (

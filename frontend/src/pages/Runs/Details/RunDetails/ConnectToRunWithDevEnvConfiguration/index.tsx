@@ -19,7 +19,7 @@ import {
 import { copyToClipboard } from 'libs';
 
 import { useConfigProjectCliCommand } from 'pages/Project/hooks/useConfigProjectCliComand';
-import { getIDEDisplayName } from 'pages/Runs/CreateDevEnvironment/constants';
+import { getIDEDisplayName } from 'pages/Runs/Launch/constants';
 
 import styles from './styles.module.scss';
 

@@ -21,7 +21,7 @@ import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectEvents, Project
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
 import {
-    CreateDevEnvironment,
+    Launch,
     EventsList as RunEvents,
     JobLogs,
     JobMetrics,
@@ -176,7 +176,7 @@ export const router = createBrowserRouter([
 
             {
                 path: ROUTES.RUNS.CREATE_DEV_ENV,
-                element: <CreateDevEnvironment />,
+                element: <Launch />,
             },
 
             // Offers

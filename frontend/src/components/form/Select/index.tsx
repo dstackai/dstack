@@ -9,6 +9,7 @@ import { FormSelectProps } from './types';
 export const FormSelect = <T extends FieldValues>({
     name,
     rules,
+    defaultValue,
     control,
     label,
     info,
@@ -24,6 +25,7 @@ export const FormSelect = <T extends FieldValues>({
             name={name}
             control={control}
             rules={rules}
+            defaultValue={defaultValue}
             render={({ field: { onChange, ...fieldRest }, fieldState: { error } }) => {
                 const selectedOption = props.options?.find((i) => i.value === fieldRest.value) ?? null;
 
