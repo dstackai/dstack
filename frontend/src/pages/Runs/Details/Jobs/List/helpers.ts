@@ -3,9 +3,11 @@ import type { StatusIndicatorProps } from '@cloudscape-design/components/status-
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { capitalize } from 'libs';
+import { formatResources } from 'libs/resources';
 
 export const getJobListItemResources = (job: IJob) => {
-    return job.job_submissions?.[job.job_submissions.length - 1]?.job_provisioning_data?.instance_type?.resources?.description;
+    const resources = job.job_submissions?.[job.job_submissions.length - 1]?.job_provisioning_data?.instance_type?.resources;
+    return resources ? formatResources(resources) : '-';
 };
 
 export const getJobListItemSpot = (job: IJob) => {
@@ -31,7 +33,10 @@ export const getJobListItemRegion = (job: IJob) => {
 };
 
 export const getJobListItemBackend = (job: IJob) => {
-    return job.job_submissions?.[job.job_submissions.length - 1]?.job_provisioning_data?.backend ?? '-';
+    const backend = job.job_submissions?.[job.job_submissions.length - 1]?.job_provisioning_data?.backend;
+    if (!backend) return '-';
+    if (backend === 'remote') return 'ssh';
+    return backend;
 };
 
 export const getJobSubmittedAt = (job: IJob) => {

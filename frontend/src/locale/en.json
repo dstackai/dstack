@@ -584,6 +584,7 @@
             "button_title": "Create a fleet"
         },
         "fleet": "Fleet",
+        "fleet_column_name": "Name",
         "fleet_placeholder": "Filtering by fleet",
         "fleet_name": "Fleet name",
         "total_instances": "Number of instances",
@@ -613,12 +614,12 @@
             "empty_message_text": "No instances to display.",
             "nomatch_message_title": "No matches",
             "nomatch_message_text": "We can't find a match.",
-            "instance_name": "Instance",
-            "instance_num": "Instance num",
+            "instance_name": "Name",
+            "instance_num": "Num",
             "created": "Created",
             "status": "Status",
             "project": "Project",
-            "hostname": "Host name",
+            "hostname": "Hostname",
             "instance_type": "Type",
             "statuses": {
                 "pending": "Pending",
@@ -633,7 +634,12 @@
             "region": "Region",
             "spot": "Spot",
             "started": "Started",
-            "price": "Price"
+            "finished_at": "Finished at",
+            "price": "Price",
+            "termination_reason": "Termination reason",
+            "health": "Health",
+            "blocks": "Blocks",
+            "inspect": "Inspect"
         },
         "edit": {
             "name": "Name",

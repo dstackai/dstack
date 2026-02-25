@@ -228,6 +228,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         ),
         termination_reason_message=instance_model.termination_reason_message,
         created=instance_model.created_at,
+        finished_at=instance_model.finished_at,
         total_blocks=instance_model.total_blocks,
         busy_blocks=instance_model.busy_blocks,
     )

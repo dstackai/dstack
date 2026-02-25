@@ -10,7 +10,7 @@ import { Button, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } f
 import { DATE_TIME_FORMAT } from 'consts';
 import { useProjectFilter } from 'hooks/useProjectFilter';
 import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
-import { getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
+import { formatFleetBackend, formatFleetResources, getFleetInstancesLinkText, getFleetStatusIconType } from 'libs/fleet';
 import { ROUTES } from 'routes';
 
 export const useEmptyMessages = ({
@@ -51,7 +51,7 @@ export const useColumnsDefinitions = () => {
     const columns: TableProps.ColumnDefinition<IFleet>[] = [
         {
             id: 'fleet_name',
-            header: t('fleets.fleet'),
+            header: t('fleets.fleet_column_name'),
             cell: (item) => (
                 <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(item.project_name, item.id)}>{item.name}</NavigateLink>
             ),
@@ -73,6 +73,16 @@ export const useColumnsDefinitions = () => {
             ),
         },
         {
+            id: 'backend',
+            header: t('fleets.instances.backend'),
+            cell: (item) => formatFleetBackend(item.spec.configuration),
+        },
+        {
+            id: 'resources',
+            header: t('fleets.instances.resources'),
+            cell: (item) => formatFleetResources(item.spec.configuration.resources),
+        },
+        {
             id: 'instances',
             header: t('fleets.instances.title'),
             cell: (item) => (
@@ -82,20 +92,9 @@ export const useColumnsDefinitions = () => {
             ),
         },
         {
-            id: 'started',
-            header: t('fleets.instances.started'),
+            id: 'created',
+            header: t('fleets.instances.created'),
             cell: (item) => format(new Date(item.created_at), DATE_TIME_FORMAT),
-        },
-        {
-            id: 'price',
-            header: t('fleets.instances.price'),
-            cell: (item) => {
-                const price = getFleetPrice(item);
-
-                if (typeof price === 'number') return `$${price}`;
-
-                return '-';
-            },
         },
     ];
 

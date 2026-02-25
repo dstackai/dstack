@@ -1,6 +1,7 @@
 import { groupBy as _groupBy } from 'lodash';
 
 import { getBaseUrl } from 'App/helpers';
+import { formatResources } from 'libs/resources';
 
 import { finishedJobs, finishedRunStatuses } from '../constants';
 import { getJobStatus } from '../Details/Jobs/List/helpers';
@@ -14,7 +15,8 @@ export const getRunListItemResources = (run: IRun) => {
         return '-';
     }
 
-    return run.latest_job_submission?.job_provisioning_data?.instance_type?.resources?.description ?? '-';
+    const resources = run.latest_job_submission?.job_provisioning_data?.instance_type?.resources;
+    return resources ? formatResources(resources) : '-';
 };
 
 export const getRunListItemSpotLabelKey = (run: IRun) => {
@@ -84,7 +86,10 @@ export const getRunListItemBackend = (run: IRun) => {
         return '-';
     }
 
-    return run.latest_job_submission?.job_provisioning_data?.backend ?? '-';
+    const backend = run.latest_job_submission?.job_provisioning_data?.backend;
+    if (!backend) return '-';
+    if (backend === 'remote') return 'ssh';
+    return backend;
 };
 
 export const getRunListItemServiceUrl = (run: IRun) => {

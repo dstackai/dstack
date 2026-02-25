@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
+import { formatFleetBackend, formatFleetResources, getFleetInstancesLinkText, getFleetStatusIconType } from 'libs/fleet';
 import { ROUTES } from 'routes';
 import { useGetFleetDetailsQuery } from 'services/fleet';
 
@@ -25,14 +25,6 @@ export const FleetDetails = () => {
             refetchOnMountOrArgChange: true,
         },
     );
-
-    const renderPrice = (fleet: IFleet) => {
-        const price = getFleetPrice(fleet);
-
-        if (typeof price === 'number') return `$${price}`;
-
-        return '-';
-    };
 
     return (
         <>
@@ -71,6 +63,16 @@ export const FleetDetails = () => {
                         </div>
 
                         <div>
+                            <Box variant="awsui-key-label">{t('fleets.instances.backend')}</Box>
+                            <div>{formatFleetBackend(data.spec.configuration)}</div>
+                        </div>
+
+                        <div>
+                            <Box variant="awsui-key-label">{t('fleets.instances.resources')}</Box>
+                            <div>{formatFleetResources(data.spec.configuration.resources)}</div>
+                        </div>
+
+                        <div>
                             <Box variant="awsui-key-label">{t('fleets.instances.title')}</Box>
 
                             <div>
@@ -81,13 +83,8 @@ export const FleetDetails = () => {
                         </div>
 
                         <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.started')}</Box>
+                            <Box variant="awsui-key-label">{t('fleets.instances.created')}</Box>
                             <div>{format(new Date(data.created_at), DATE_TIME_FORMAT)}</div>
-                        </div>
-
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.price')}</Box>
-                            <div>{renderPrice(data)}</div>
                         </div>
                     </ColumnLayout>
                 </Container>

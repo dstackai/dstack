@@ -56,7 +56,7 @@ class Resources(CoreModel):
     spot: bool
     disk: Disk = Disk(size_mib=102400)  # the default value (100GB) for backward compatibility
     cpu_arch: Optional[gpuhunt.CPUArchitecture] = None
-    # TODO: make description a computed field after migrating to pydanticV2
+    # Deprecated: description is now generated client-side. TODO: remove in 0.21.
     description: str = ""
 
     @root_validator
@@ -339,6 +339,7 @@ class Instance(CoreModel):
     termination_reason: Optional[str] = None
     termination_reason_message: Optional[str] = None
     created: datetime.datetime
+    finished_at: Optional[datetime.datetime] = None
     region: Optional[str] = None
     availability_zone: Optional[str] = None
     price: Optional[float] = None
