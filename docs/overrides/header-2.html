@@ -61,8 +61,19 @@
     {% endif %}-->
 
     <div class="md-header__buttons">
-      <a href="https://github.com/dstackai/dstack" target="_blank" class="md-button md-button--primary github">GitHub</a>
-      <a href="https://sky.dstack.ai" target="_blank" class="md-button md-button--primary sky">dstack Sky</a>
+      <a id="gh-star-link" href="https://github.com/dstackai/dstack" target="_blank" class="md-button md-button--primary github external-skip">GitHub</a>
+      <script>
+        fetch("https://api.github.com/repos/dstackai/dstack")
+          .then(r => r.json())
+          .then(data => {
+            if (data.stargazers_count) {
+              document.getElementById("gh-star-link").textContent =
+                data.stargazers_count.toLocaleString("en-US");
+            }
+          })
+          .catch(() => {});
+      </script>
+      <a href="https://sky.dstack.ai" target="_blank" class="md-button md-button--primary sky external-skip">dstack Sky</a>
     </div>
   </nav>
   {% if "navigation.tabs.sticky" in features %}
