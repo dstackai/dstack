@@ -485,7 +485,12 @@ async def apply_plan(
                 .joinedload(InstanceModel.jobs)
                 .load_only(JobModel.id)
             )
-            .options(selectinload(FleetModel.runs))
+            # `is_fleet_in_use()` only needs active run presence/status.
+            .options(
+                selectinload(
+                    FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
+                ).load_only(RunModel.id, RunModel.status)
+            )
             .execution_options(populate_existing=True)
             .order_by(FleetModel.id)  # take locks in order
             .with_for_update(key_share=True)
