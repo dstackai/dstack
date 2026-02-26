@@ -35,7 +35,8 @@ type PullResponse struct {
 	LastUpdated       int64           `json:"last_updated"`
 	NoConnectionsSecs int64           `json:"no_connections_secs"`
 	HasMore           bool            `json:"has_more"`
-	// todo Result
+	WorkingDir        string          `json:"working_dir,omitempty"`
+	Username          string          `json:"username,omitempty"`
 }
 
 type Run struct {

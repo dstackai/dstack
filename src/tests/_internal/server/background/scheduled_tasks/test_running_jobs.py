@@ -1118,6 +1118,135 @@ class TestProcessRunningJobs:
             assert not job.registered
             assert not events
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_process_running_persists_runtime_data(
+        self, test_db, session: AsyncSession, tmp_path: Path
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=False),
+            job_runtime_data=get_job_runtime_data(),
+            instance=instance,
+            instance_assigned=True,
+        )
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel"),
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+            patch.object(server_settings, "SERVER_DIR_PATH", tmp_path),
+        ):
+            runner_client_mock = RunnerClientMock.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=1,
+                working_dir="/dstack/run",
+                username="root",
+            )
+            await process_running_jobs()
+        await session.refresh(job)
+        jrd = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        assert jrd.working_dir == "/dstack/run"
+        assert jrd.username == "root"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_process_running_does_not_overwrite_runtime_data(
+        self, test_db, session: AsyncSession, tmp_path: Path
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=False),
+            job_runtime_data=get_job_runtime_data(
+                working_dir="/original/path", username="originaluser"
+            ),
+            instance=instance,
+            instance_assigned=True,
+        )
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel"),
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+            patch.object(server_settings, "SERVER_DIR_PATH", tmp_path),
+        ):
+            runner_client_mock = RunnerClientMock.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=1,
+                working_dir="/new/path",
+                username="ubuntu",
+            )
+            await process_running_jobs()
+        await session.refresh(job)
+        jrd = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        assert jrd.working_dir == "/original/path"
+        assert jrd.username == "originaluser"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_process_running_handles_old_runner_without_runtime_fields(
+        self, test_db, session: AsyncSession, tmp_path: Path
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=False),
+            job_runtime_data=get_job_runtime_data(),
+            instance=instance,
+            instance_assigned=True,
+        )
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel"),
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+            patch.object(server_settings, "SERVER_DIR_PATH", tmp_path),
+        ):
+            runner_client_mock = RunnerClientMock.return_value
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=1,
+            )
+            await process_running_jobs()
+        await session.refresh(job)
+        jrd = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        assert jrd.working_dir is None
+        assert jrd.username is None
+
 
 class TestPatchBaseImageForAwsEfa:
     @staticmethod

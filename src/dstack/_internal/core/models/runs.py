@@ -352,6 +352,10 @@ class JobRuntimeData(CoreModel):
     volume_names: Optional[list[str]] = None  # None for backward compatibility
     # Virtual shared offer
     offer: Optional[InstanceOfferWithAvailability] = None  # None for backward compatibility
+    # Resolved working directory and OS username reported by the runner.
+    # None if the runner hasn't reported them yet or if it's an old runner.
+    working_dir: Optional[str] = None
+    username: Optional[str] = None
 
 
 class ClusterInfo(CoreModel):

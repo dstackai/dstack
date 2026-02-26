@@ -44,6 +44,8 @@ class PullResponse(CoreModel):
     runner_logs: List[LogEvent]
     last_updated: int
     no_connections_secs: Optional[int] = None  # Optional for compatibility with old runners
+    working_dir: Optional[str] = None  # Optional for compatibility with old runners
+    username: Optional[str] = None  # Optional for compatibility with old runners
 
 
 class SubmitBody(CoreModel):

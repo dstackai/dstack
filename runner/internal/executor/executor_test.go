@@ -353,6 +353,30 @@ func TestExecutor_LogsAnsiCodeHandling(t *testing.T) {
 	}
 }
 
+func TestGetHistory_IncludesWorkingDirAndUsername(t *testing.T) {
+	ex := makeTestExecutor(t)
+	resp := ex.GetHistory(0)
+	assert.NotEmpty(t, resp.WorkingDir)
+	assert.True(t, path.IsAbs(resp.WorkingDir))
+	assert.NotEmpty(t, resp.Username)
+}
+
+func TestGetHistory_BeforeRun(t *testing.T) {
+	baseDir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	tempDir := filepath.Join(baseDir, "temp")
+	require.NoError(t, os.Mkdir(tempDir, 0o700))
+	dstackDir := filepath.Join(baseDir, "dstack")
+	require.NoError(t, os.Mkdir(dstackDir, 0o755))
+	currentUser, err := linuxuser.FromCurrentProcess()
+	require.NoError(t, err)
+	ex, err := NewRunExecutor(tempDir, dstackDir, *currentUser, new(sshdMock))
+	require.NoError(t, err)
+	resp := ex.GetHistory(0)
+	assert.Empty(t, resp.WorkingDir)
+	assert.Empty(t, resp.Username)
+}
+
 type sshdMock struct{}
 
 func (d *sshdMock) Port() int {

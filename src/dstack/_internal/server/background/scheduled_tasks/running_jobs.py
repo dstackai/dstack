@@ -774,6 +774,18 @@ def _process_running(
         timestamp = job_model.runner_timestamp
     resp = runner_client.pull(timestamp)  # raises error if runner is down, causes retry
     job_model.runner_timestamp = resp.last_updated
+    if resp.working_dir or resp.username:
+        jrd = get_job_runtime_data(job_model)
+        if jrd is not None:
+            updated = False
+            if resp.working_dir and jrd.working_dir is None:
+                jrd.working_dir = resp.working_dir
+                updated = True
+            if resp.username and jrd.username is None:
+                jrd.username = resp.username
+                updated = True
+            if updated:
+                job_model.job_runtime_data = jrd.json()
     # may raise LogStorageError, causing a retry
     logs_services.write_logs(
         project=run_model.project,
