@@ -102,9 +102,43 @@ def switch_fleet_status(
         return
 
     fleet_model.status = new_status
+    emit_fleet_status_change_event(
+        session=session,
+        fleet_model=fleet_model,
+        old_status=old_status,
+        new_status=new_status,
+        status_message=fleet_model.status_message,
+        actor=actor,
+    )
 
-    msg = f"Fleet status changed {old_status.upper()} -> {new_status.upper()}"
+
+def emit_fleet_status_change_event(
+    session: AsyncSession,
+    fleet_model: FleetModel,
+    old_status: FleetStatus,
+    new_status: FleetStatus,
+    status_message: Optional[str],
+    actor: events.AnyActor = events.SystemActor(),
+) -> None:
+    if old_status == new_status:
+        return
+    msg = get_fleet_status_change_message(
+        old_status=old_status,
+        new_status=new_status,
+        status_message=status_message,
+    )
     events.emit(session, msg, actor=actor, targets=[events.Target.from_model(fleet_model)])
+
+
+def get_fleet_status_change_message(
+    old_status: FleetStatus,
+    new_status: FleetStatus,
+    status_message: Optional[str],
+) -> str:
+    msg = f"Fleet status changed {old_status.upper()} -> {new_status.upper()}"
+    if status_message is not None:
+        msg += f" ({status_message})"
+    return msg
 
 
 async def list_projects_with_no_active_fleets(

@@ -576,7 +576,7 @@ class PoolModel(BaseModel):
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="pool", lazy="selectin")
 
 
-class FleetModel(BaseModel):
+class FleetModel(PipelineModelMixin, BaseModel):
     __tablename__ = "fleets"
 
     id: Mapped[uuid.UUID] = mapped_column(
