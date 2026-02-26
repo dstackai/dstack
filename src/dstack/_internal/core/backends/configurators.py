@@ -36,6 +36,15 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.crusoe.configurator import (
+        CrusoeConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(CrusoeConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.cudo.configurator import (
         CudoConfigurator,
     )

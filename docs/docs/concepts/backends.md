@@ -929,6 +929,34 @@ projects:
     * `sizes` - read
     * `ssh_key` - create, read, update,delete
 
+### Crusoe Cloud
+
+Log into your [Crusoe Cloud](https://console.crusoecloud.com/) console and create an API key
+under your account settings. Note your project ID from the project settings page.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: crusoe
+      project_id: your-project-id
+      creds:
+        type: access_key
+        access_key: your-access-key
+        secret_key: your-secret-key
+      regions:
+        - us-east1-a
+        - us-southcentral1-a
+```
+
+</div>
+
+`regions` is optional. If not specified, all available Crusoe regions are used.
+
 ### Hot Aisle
 
 Log in to the SSH TUI as described in the [Hot Aisle Quick Start](https://hotaisle.xyz/quick-start/).

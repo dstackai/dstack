@@ -256,6 +256,9 @@ fluentbit = [
     "elasticsearch>=8.0.0",
     "dstack[server]",
 ]
+crusoe = [
+    "dstack[server]",
+]
 all = [
-    "dstack[gateway,server,aws,azure,gcp,verda,kubernetes,lambda,nebius,oci,fluentbit]",
+    "dstack[gateway,server,aws,azure,gcp,verda,kubernetes,lambda,nebius,oci,crusoe,fluentbit]",
 ]

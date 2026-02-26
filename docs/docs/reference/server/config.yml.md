@@ -335,6 +335,23 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         type:
             required: true
 
+##### `projects[n].backends[type=crusoe]` { #crusoe data-toc-label="crusoe" }
+
+#SCHEMA# dstack._internal.core.backends.crusoe.models.CrusoeBackendConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: crusoe-
+
+###### `projects[n].backends[type=crusoe].creds` { #crusoe-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.crusoe.models.CrusoeAccessKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ##### `projects[n].backends[type=hotaisle]` { #hotaisle data-toc-label="hotaisle" }
 
 #SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleBackendConfigWithCreds

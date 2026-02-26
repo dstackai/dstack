@@ -13,6 +13,47 @@ from dstack._internal.server.services.config import (
 )
 
 
+class TestCrusoeBackendConfig:
+    def test_config_parsing(self, tmp_path: Path):
+        config_yaml_path = tmp_path / "config.yml"
+        config_dict = {
+            "projects": [
+                {
+                    "name": "main",
+                    "backends": [
+                        {
+                            "type": "crusoe",
+                            "project_id": "test-project-id",
+                            "regions": ["us-east1-a"],
+                            "creds": {
+                                "type": "access_key",
+                                "access_key": "test-access-key",
+                                "secret_key": "test-secret-key",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        config_yaml_path.write_text(yaml.dump(config_dict))
+
+        with patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_yaml_path):
+            m = ServerConfigManager()
+            assert m.load_config()
+            assert m.config is not None
+            assert m.config.projects is not None
+            assert len(m.config.projects) > 0
+            assert m.config.projects[0].backends is not None
+            backend_file_cfg = m.config.projects[0].backends[0]
+            backend_cfg = file_config_to_config(backend_file_cfg)
+
+        assert backend_cfg.type == "crusoe"
+        assert backend_cfg.project_id == "test-project-id"
+        assert backend_cfg.regions == ["us-east1-a"]
+        assert backend_cfg.creds.access_key == "test-access-key"
+        assert backend_cfg.creds.secret_key == "test-secret-key"
+
+
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="Nebius requires Python 3.10")
 class TestNebiusBackendConfig:
     def test_with_filename(self, tmp_path: Path):
