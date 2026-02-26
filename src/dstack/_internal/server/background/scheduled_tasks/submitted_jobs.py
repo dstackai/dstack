@@ -13,7 +13,6 @@ from sqlalchemy.orm import (
     load_only,
     noload,
     selectinload,
-    with_loader_criteria,
 )
 
 from dstack._internal.core.backends.base.backend import Backend
@@ -223,9 +222,8 @@ async def _process_submitted_job(
         .where(JobModel.id == job_model.id)
         .options(joinedload(JobModel.instance))
         .options(
-            joinedload(JobModel.fleet).joinedload(FleetModel.instances),
-            with_loader_criteria(
-                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            joinedload(JobModel.fleet).selectinload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
             ),
         )
     )
@@ -236,9 +234,8 @@ async def _process_submitted_job(
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(RunModel.user).load_only(UserModel.name))
         .options(
-            joinedload(RunModel.fleet).joinedload(FleetModel.instances),
-            with_loader_criteria(
-                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            joinedload(RunModel.fleet).selectinload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
             ),
         )
     )

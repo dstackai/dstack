@@ -668,7 +668,7 @@ async def delete_fleets(
             .options(
                 selectinload(
                     FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
-                )
+                ).load_only(RunModel.status)
             )
             .execution_options(populate_existing=True)
         )
