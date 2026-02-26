@@ -22,7 +22,7 @@ class CrusoeBackendConfig(CoreModel):
         Literal["crusoe"],
         Field(description="The type of backend"),
     ] = "crusoe"
-    project_id: Annotated[str, Field(description="The Crusoe Cloud project ID")]
+    project_id: Annotated[str, Field(description="The Crusoe project ID")]
     regions: Annotated[
         Optional[List[str]],
         Field(description="The list of allowed Crusoe regions. Omit to use all regions"),

@@ -929,9 +929,9 @@ projects:
     * `sizes` - read
     * `ssh_key` - create, read, update,delete
 
-### Crusoe Cloud
+### Crusoe
 
-Log into your [Crusoe Cloud](https://console.crusoecloud.com/) console and create an API key
+Log into your [Crusoe](https://console.crusoecloud.com/) console and create an API key
 under your account settings. Note your project ID from the project settings page.
 
 Then, go ahead and configure the backend:
