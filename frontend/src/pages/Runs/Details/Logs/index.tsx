@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useListener } from 'react-bus';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import classNames from 'classnames';
@@ -10,6 +11,7 @@ import { useLazyGetProjectLogsQuery } from 'services/project';
 import { useGetRunQuery } from 'services/run';
 
 import { LogRow } from './components/LogRow';
+import { RUN_DETAILS_REFRESH_LIST_EVENT } from '../constants';
 import { decodeLogs, getJobSubmissionId } from './helpers';
 
 import { IProps } from './types';
@@ -115,6 +117,10 @@ export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSub
     useEffect(() => {
         getLogItems();
     }, []);
+
+    const refreshLogs = useCallback(() => getLogItems(), []);
+
+    useListener(RUN_DETAILS_REFRESH_LIST_EVENT, refreshLogs);
 
     useLayoutEffect(() => {
         if (logsForView.length && logsForView.length <= LIMIT_LOG_ROWS) {

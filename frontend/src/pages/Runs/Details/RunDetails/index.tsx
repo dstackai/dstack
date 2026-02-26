@@ -1,4 +1,5 @@
 import React from 'react';
+import { useListener } from 'react-bus';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -28,9 +29,9 @@ import {
     getRunListItemRegion,
     getRunListItemResources,
     getRunListItemSchedule,
-    getRunListItemServiceUrl,
     getRunListItemSpotLabelKey,
 } from '../../List/helpers';
+import { RUN_DETAILS_REFRESH_LIST_EVENT } from '../constants';
 import { EventsList } from '../Events/List';
 import { JobList } from '../Jobs/List';
 import { ConnectToRunWithDevEnvConfiguration } from './ConnectToRunWithDevEnvConfiguration';
@@ -42,10 +43,16 @@ export const RunDetails = () => {
     const paramProjectName = params.projectName ?? '';
     const paramRunId = params.runId ?? '';
 
-    const { data: runData, isLoading: isLoadingRun } = useGetRunQuery({
+    const {
+        data: runData,
+        isLoading: isLoadingRun,
+        refetch,
+    } = useGetRunQuery({
         project_name: paramProjectName,
         id: paramRunId,
     });
+
+    useListener(RUN_DETAILS_REFRESH_LIST_EVENT, refetch);
 
     const schedule = runData ? getRunListItemSchedule(runData) : null;
     const nextTriggeredAt = runData ? runData.next_triggered_at : null;
