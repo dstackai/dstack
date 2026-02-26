@@ -94,10 +94,12 @@ IMAGE_ROCM = "ubuntu-rocm:latest"
 IMAGE_BASE = "ubuntu22.04:latest"
 
 
-def _get_image(gpu_type: str) -> str:
+def _get_image(instance_name: str, gpu_type: str) -> str:
     if not gpu_type:
         return IMAGE_BASE
-    if "SXM" in gpu_type:
+    # Check instance name for SXM -- gpu_type from gpuhunt is normalized (e.g. "A100")
+    # and doesn't contain "SXM", but instance names like "a100-80gb-sxm-ib.8x" do.
+    if "-sxm" in instance_name.lower():
         return IMAGE_SXM_DOCKER
     if "MI3" in gpu_type:
         return IMAGE_ROCM
@@ -216,7 +218,7 @@ class CrusoeCompute(
         gpus = instance_offer.instance.resources.gpus
         gpu_type = gpus[0].name if gpus else ""
         instance_type_name = instance_offer.instance.name
-        image = _get_image(gpu_type)
+        image = _get_image(instance_type_name, gpu_type)
 
         needs_data_disk = not _has_ephemeral_disk(instance_offer)
         # Always include storage setup: it auto-detects /dev/vdb (data disk) or
