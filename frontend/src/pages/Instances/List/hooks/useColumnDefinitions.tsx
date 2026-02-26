@@ -6,7 +6,7 @@ import { Icon, NavigateLink, StatusIndicator, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { formatBackend, getStatusIconType } from 'libs/fleet';
-import { formatInstanceStatusText, getHealthStatusIconType } from 'libs/instance';
+import { formatInstanceStatusText, getHealthStatusIconType, prettyEnumValue } from 'libs/instance';
 import { formatResources } from 'libs/resources';
 import { ROUTES } from 'routes';
 
@@ -54,12 +54,18 @@ export const useColumnsDefinitions = () => {
             ),
         },
         {
-            id: 'health',
-            header: t('fleets.instances.health'),
-            cell: (item) =>
-                item.status === 'idle' || item.status === 'busy' ? (
-                    <StatusIndicator type={item.unreachable ? 'error' : getHealthStatusIconType(item.health_status)} />
-                ) : null,
+            id: 'error',
+            header: t('projects.run.error'),
+            cell: (item) => {
+                if (item.unreachable) return <StatusIndicator type="error">Unreachable</StatusIndicator>;
+                if (item.health_status !== 'healthy')
+                    return (
+                        <StatusIndicator type={getHealthStatusIconType(item.health_status)}>
+                            {prettyEnumValue(item.health_status)}
+                        </StatusIndicator>
+                    );
+                return null;
+            },
         },
         {
             id: 'hostname',
@@ -70,6 +76,11 @@ export const useColumnsDefinitions = () => {
             id: 'backend',
             header: t('fleets.instances.backend'),
             cell: (item) => formatBackend(item.backend),
+        },
+        {
+            id: 'price',
+            header: t('fleets.instances.price'),
+            cell: (item) => (typeof item.price === 'number' ? `$${item.price}` : '-'),
         },
         {
             id: 'region',
@@ -97,9 +108,9 @@ export const useColumnsDefinitions = () => {
             cell: (item) => format(new Date(item.created), DATE_TIME_FORMAT),
         },
         {
-            id: 'price',
-            header: t('fleets.instances.price'),
-            cell: (item) => (typeof item.price === 'number' ? `$${item.price}` : '-'),
+            id: 'finished_at',
+            header: t('fleets.instances.finished_at'),
+            cell: (item) => (item.finished_at ? format(new Date(item.finished_at), DATE_TIME_FORMAT) : '-'),
         },
     ];
 

@@ -77,12 +77,14 @@ export const InstanceDetails = () => {
                         </div>
 
                         <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.health')}</Box>
+                            <Box variant="awsui-key-label">{t('projects.run.error')}</Box>
                             <div>
-                                {data.status === 'idle' || data.status === 'busy' ? (
-                                    <StatusIndicator
-                                        type={data.unreachable ? 'error' : getHealthStatusIconType(data.health_status)}
-                                    />
+                                {data.unreachable ? (
+                                    <StatusIndicator type="error">Unreachable</StatusIndicator>
+                                ) : data.health_status !== 'healthy' ? (
+                                    <StatusIndicator type={getHealthStatusIconType(data.health_status)}>
+                                        {prettyEnumValue(data.health_status)}
+                                    </StatusIndicator>
                                 ) : (
                                     '-'
                                 )}
@@ -140,17 +142,17 @@ export const InstanceDetails = () => {
                             <div>{typeof data.price === 'number' ? `$${data.price}` : '-'}</div>
                         </div>
 
-                        <div>
-                            <Box variant="awsui-key-label">{t('fleets.instances.hostname')}</Box>
-                            <div>{data.hostname ?? '-'}</div>
-                        </div>
-
                         {data.total_blocks !== null && (
                             <div>
                                 <Box variant="awsui-key-label">{t('fleets.instances.blocks')}</Box>
                                 <div>{data.total_blocks}</div>
                             </div>
                         )}
+
+                        <div>
+                            <Box variant="awsui-key-label">{t('fleets.instances.hostname')}</Box>
+                            <div>{data.hostname ?? '-'}</div>
+                        </div>
                     </ColumnLayout>
                 </Container>
             )}

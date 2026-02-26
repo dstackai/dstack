@@ -634,7 +634,7 @@
             "region": "Region",
             "spot": "Spot",
             "started": "Started",
-            "finished_at": "Finished at",
+            "finished_at": "Finished",
             "price": "Price",
             "termination_reason": "Termination reason",
             "health": "Health",

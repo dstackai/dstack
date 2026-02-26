@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { formatFleetBackend, formatFleetResources, getFleetInstancesLinkText, getFleetStatusIconType } from 'libs/fleet';
+import { formatFleetBackend, formatFleetResources, getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
 import { ROUTES } from 'routes';
 import { useGetFleetDetailsQuery } from 'services/fleet';
 
@@ -85,6 +85,11 @@ export const FleetDetails = () => {
                         <div>
                             <Box variant="awsui-key-label">{t('fleets.instances.created')}</Box>
                             <div>{format(new Date(data.created_at), DATE_TIME_FORMAT)}</div>
+                        </div>
+
+                        <div>
+                            <Box variant="awsui-key-label">{t('fleets.instances.price')}</Box>
+                            <div>{(() => { const p = getFleetPrice(data); return typeof p === 'number' ? `$${p}` : '-'; })()}</div>
                         </div>
                     </ColumnLayout>
                 </Container>

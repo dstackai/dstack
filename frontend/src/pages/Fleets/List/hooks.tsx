@@ -10,7 +10,7 @@ import { Button, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } f
 import { DATE_TIME_FORMAT } from 'consts';
 import { useProjectFilter } from 'hooks/useProjectFilter';
 import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
-import { formatFleetBackend, formatFleetResources, getFleetInstancesLinkText, getFleetStatusIconType } from 'libs/fleet';
+import { formatFleetBackend, formatFleetResources, getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
 import { ROUTES } from 'routes';
 
 export const useEmptyMessages = ({
@@ -95,6 +95,14 @@ export const useColumnsDefinitions = () => {
             id: 'created',
             header: t('fleets.instances.created'),
             cell: (item) => format(new Date(item.created_at), DATE_TIME_FORMAT),
+        },
+        {
+            id: 'price',
+            header: t('fleets.instances.price'),
+            cell: (item) => {
+                const price = getFleetPrice(item);
+                return typeof price === 'number' ? `$${price}` : '-';
+            },
         },
     ];
 
