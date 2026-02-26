@@ -32,6 +32,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
+    # TODO: Replace with a pinned gpuhunt release (e.g. gpuhunt==0.1.17) before merging.
     "gpuhunt @ git+https://github.com/dstackai/gpuhunt.git@main",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
@@ -54,6 +55,7 @@ build-backend = "hatchling.build"
 [project.scripts]
 dstack = "dstack._internal.cli.main:main"
 
+# TODO: Remove once gpuhunt is pinned to a release version.
 [tool.hatch.metadata]
 allow-direct-references = true
 
