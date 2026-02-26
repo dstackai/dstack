@@ -1,10 +1,10 @@
 import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from uuid import UUID
 
 import gpuhunt
-from pydantic import root_validator
+from pydantic import Field, root_validator
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
@@ -56,8 +56,11 @@ class Resources(CoreModel):
     spot: bool
     disk: Disk = Disk(size_mib=102400)  # the default value (100GB) for backward compatibility
     cpu_arch: Optional[gpuhunt.CPUArchitecture] = None
-    # TODO: make description a computed field after migrating to pydanticV2
-    description: str = ""
+    # Deprecated: description is now generated client-side. TODO: remove in 0.21.
+    description: Annotated[
+        str,
+        Field(description="Deprecated: generated client-side. Will be removed in 0.21."),
+    ] = ""
 
     @root_validator
     def _description(cls, values) -> Dict:
@@ -339,6 +342,7 @@ class Instance(CoreModel):
     termination_reason: Optional[str] = None
     termination_reason_message: Optional[str] = None
     created: datetime.datetime
+    finished_at: Optional[datetime.datetime] = None
     region: Optional[str] = None
     availability_zone: Optional[str] = None
     price: Optional[float] = None

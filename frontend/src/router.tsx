@@ -14,7 +14,10 @@ import { FleetAdd, FleetDetails, FleetList } from 'pages/Fleets';
 import { EventsList as FleetEventsList } from 'pages/Fleets/Details/Events';
 import { FleetDetails as FleetDetailsGeneral } from 'pages/Fleets/Details/FleetDetails';
 import { FleetInspect } from 'pages/Fleets/Details/Inspect';
-import { InstanceList } from 'pages/Instances';
+import { InstanceDetailsPage, InstanceList } from 'pages/Instances';
+import { InstanceDetails } from 'pages/Instances/Details/InstanceDetails';
+import { EventsList as InstanceEventsList } from 'pages/Instances/Details/Events';
+import { InstanceInspect } from 'pages/Instances/Details/Inspect';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
 import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectEvents, ProjectList, ProjectSettings } from 'pages/Project';
@@ -233,6 +236,24 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.INSTANCES.LIST,
                 element: <InstanceList />,
+            },
+            {
+                path: ROUTES.INSTANCES.DETAILS.TEMPLATE,
+                element: <InstanceDetailsPage />,
+                children: [
+                    {
+                        index: true,
+                        element: <InstanceDetails />,
+                    },
+                    {
+                        path: ROUTES.INSTANCES.DETAILS.EVENTS.TEMPLATE,
+                        element: <InstanceEventsList />,
+                    },
+                    {
+                        path: ROUTES.INSTANCES.DETAILS.INSPECT.TEMPLATE,
+                        element: <InstanceInspect />,
+                    },
+                ],
             },
 
             // Volumes

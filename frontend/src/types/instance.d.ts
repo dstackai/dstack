@@ -14,6 +14,8 @@ declare type TInstanceStatus =
     | 'terminating'
     | 'terminated';
 
+declare type THealthStatus = 'healthy' | 'warning' | 'failure';
+
 declare interface IInstance {
     id: string;
     fleet_name: string;
@@ -30,7 +32,15 @@ declare interface IInstance {
     job_status: TJobStatus | null;
     hostname: string;
     status: TInstanceStatus;
+    unreachable: boolean;
+    health_status: THealthStatus;
+    termination_reason: string | null;
+    termination_reason_message: string | null;
     created: DateTime;
+    finished_at: DateTime | null;
     region: string;
+    availability_zone: string | null;
     price: number | null;
+    total_blocks: number | null;
+    busy_blocks: number;
 }
