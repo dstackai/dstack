@@ -94,6 +94,11 @@ export const RunDetails = () => {
                     </div>
 
                     <div>
+                        <Box variant="awsui-key-label">{t('projects.run.configuration')}</Box>
+                        <div>{runData.run_spec.configuration_path}</div>
+                    </div>
+
+                    <div>
                         <Box variant="awsui-key-label">{t('projects.run.resources')}</Box>
                         <div>{getRunListItemResources(runData)}</div>
                     </div>

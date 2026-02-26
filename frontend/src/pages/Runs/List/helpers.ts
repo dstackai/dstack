@@ -1,6 +1,7 @@
 import { groupBy as _groupBy } from 'lodash';
 
 import { getBaseUrl } from 'App/helpers';
+import { formatBackend } from 'libs/fleet';
 import { formatResources } from 'libs/resources';
 
 import { finishedJobs, finishedRunStatuses } from '../constants';
@@ -86,10 +87,7 @@ export const getRunListItemBackend = (run: IRun) => {
         return '-';
     }
 
-    const backend = run.latest_job_submission?.job_provisioning_data?.backend;
-    if (!backend) return '-';
-    if (backend === 'remote') return 'ssh';
-    return backend;
+    return formatBackend(run.latest_job_submission?.job_provisioning_data?.backend);
 };
 
 export const getRunListItemServiceUrl = (run: IRun) => {

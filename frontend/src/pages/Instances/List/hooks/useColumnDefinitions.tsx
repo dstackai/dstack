@@ -96,6 +96,11 @@ export const useColumnsDefinitions = () => {
             header: t('fleets.instances.started'),
             cell: (item) => format(new Date(item.created), DATE_TIME_FORMAT),
         },
+        {
+            id: 'price',
+            header: t('fleets.instances.price'),
+            cell: (item) => (typeof item.price === 'number' ? `$${item.price}` : '-'),
+        },
     ];
 
     return { columns } as const;

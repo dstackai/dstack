@@ -136,6 +136,11 @@ export const InstanceDetails = () => {
                         </div>
 
                         <div>
+                            <Box variant="awsui-key-label">{t('fleets.instances.price')}</Box>
+                            <div>{typeof data.price === 'number' ? `$${data.price}` : '-'}</div>
+                        </div>
+
+                        <div>
                             <Box variant="awsui-key-label">{t('fleets.instances.hostname')}</Box>
                             <div>{data.hostname ?? '-'}</div>
                         </div>
