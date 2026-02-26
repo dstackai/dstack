@@ -225,7 +225,7 @@ async def list_projects_fleet_models(
         .where(*filters)
         .order_by(*order_by)
         .limit(limit)
-        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
     )
     fleet_models = list(res.unique().scalars().all())
     return fleet_models
@@ -256,7 +256,7 @@ async def list_project_fleet_models(
     res = await session.execute(
         select(FleetModel)
         .where(*filters)
-        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
     )
     return list(res.unique().scalars().all())
 
@@ -661,12 +661,12 @@ async def delete_fleets(
             select(FleetModel)
             .where(FleetModel.id.in_(fleets_ids))
             .options(
-                joinedload(FleetModel.instances.and_(InstanceModel.id.in_(instances_ids)))
-                .joinedload(InstanceModel.jobs)
+                selectinload(FleetModel.instances.and_(InstanceModel.id.in_(instances_ids)))
+                .selectinload(InstanceModel.jobs)
                 .load_only(JobModel.id)
             )
             .options(
-                joinedload(
+                selectinload(
                     FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
                 )
             )
