@@ -929,6 +929,37 @@ class TestDeleteFleets:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_when_fleet_locked(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+        )
+        fleet.instances.append(instance)
+        fleet.lock_expires_at = datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc)
+        await session.commit()
+
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/delete",
+            headers=get_auth_headers(user.token),
+            json={"names": [fleet.name]},
+        )
+        assert response.status_code == 400
+
+        await session.refresh(fleet)
+        await session.refresh(instance)
+        assert fleet.status != FleetStatus.TERMINATING
+        assert instance.status != InstanceStatus.TERMINATING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_forbids_if_no_permission_to_manage_ssh_fleets(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1052,6 +1083,38 @@ class TestDeleteFleetInstances:
 
         assert instance.status != InstanceStatus.TERMINATING
         assert fleet.status != FleetStatus.TERMINATING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_when_fleet_locked(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            instance_num=1,
+        )
+        fleet.instances.append(instance)
+        fleet.lock_expires_at = datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc)
+        await session.commit()
+
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/delete_instances",
+            headers=get_auth_headers(user.token),
+            json={"name": fleet.name, "instance_nums": [1]},
+        )
+        assert response.status_code == 400
+
+        await session.refresh(fleet)
+        await session.refresh(instance)
+        assert fleet.status != FleetStatus.TERMINATING
+        assert instance.status != InstanceStatus.TERMINATING
 
 
 class TestGetPlan:

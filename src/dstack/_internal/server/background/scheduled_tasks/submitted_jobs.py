@@ -581,6 +581,8 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
             # To avoid violating fleet placement cluster during master provisioning,
             # we must lock empty fleets and respect existing instances in non-empty fleets.
             # On SQLite always take the lock during master provisioning for simplicity.
+            # It's fine to lock fleets currently locked by pipelines (with lock_* fields set)
+            # since we won't update fleets – we only need to ensure there is no parallel provisioning.
             await exit_stack.enter_async_context(
                 get_locker(get_db().dialect_name).lock_ctx(
                     FleetModel.__tablename__, [fleet_model.id]
