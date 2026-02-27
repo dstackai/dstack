@@ -372,11 +372,10 @@ class _MaintainNodesResult:
 async def _process_fleet(fleet_model: FleetModel) -> _ProcessResult:
     result = _consolidate_fleet_state_with_spec(fleet_model)
     if result.new_instances_count > 0:
-        # Avoid auto-deleting empty fleets that are about to receive new instances.
+        # Avoid deleting fleets that are about to provision new instances.
         return result
-    # TODO: Drop fleets auto-deletion after dropping fleets auto-creation.
-    deleted = _autodelete_fleet(fleet_model)
-    if deleted:
+    delete = _should_delete_fleet(fleet_model)
+    if delete:
         result.fleet_update_map["status"] = FleetStatus.TERMINATED
         result.fleet_update_map["deleted"] = True
         result.fleet_update_map["deleted_at"] = NOW_PLACEHOLDER
@@ -481,7 +480,7 @@ def _maintain_fleet_nodes_in_min_max_range(
     return result
 
 
-def _autodelete_fleet(fleet_model: FleetModel) -> bool:
+def _should_delete_fleet(fleet_model: FleetModel) -> bool:
     if fleet_model.project.deleted:
         # It used to be possible to delete project with active resources:
         # https://github.com/dstackai/dstack/issues/3077
@@ -491,6 +490,7 @@ def _autodelete_fleet(fleet_model: FleetModel) -> bool:
     if is_fleet_in_use(fleet_model) or not is_fleet_empty(fleet_model):
         return False
 
+    # TODO: Drop non-terminating fleets auto-deletion after dropping fleets auto-creation.
     fleet_spec = get_fleet_spec(fleet_model)
     if (
         fleet_model.status != FleetStatus.TERMINATING
