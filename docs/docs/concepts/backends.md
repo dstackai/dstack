@@ -745,6 +745,175 @@ projects:
     Nebius is only supported if `dstack server` is running on Python 3.10 or higher.
 
 
+### Crusoe
+
+Log into your [Crusoe](https://console.crusoecloud.com/) console and create an API key
+under your account settings. Note your project ID from the project settings page.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: crusoe
+      project_id: your-project-id
+      creds:
+        type: access_key
+        access_key: your-access-key
+        secret_key: your-secret-key
+      regions:
+        - us-east1-a
+        - us-southcentral1-a
+```
+
+</div>
+
+`regions` is optional. If not specified, all available Crusoe regions are used.
+
+<span id="datacrunch"></span>
+
+### Verda (formerly DataCrunch) { #verda }
+
+Log into your [Verda](https://console.verda.com/signin) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: verda
+        creds:
+          type: api_key
+          client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
+          client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8
+```
+
+</div>
+
+### AMD Developer Cloud
+Log into your [AMD Developer Cloud](https://amd.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: amddevcloud
+      project_name: my-amd-project
+      creds:
+        type: api_key
+        api_key: ...
+```
+
+</div>
+
+??? info "Project"
+    If `project_name` is not set, the default project will be used.
+
+??? info "Required permissions"
+    The API key must have the following scopes assigned:
+
+    * `account` - read
+    * `droplet` - create, read, update, delete, admin
+    * `project` - create, read, update, delete
+    * `regions` - read
+    * `sizes` - read
+    * `ssh_key` - create, read, update, delete
+
+
+### Digital Ocean
+Log into your [Digital Ocean](https://cloud.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: digitalocean
+      project_name: my-digital-ocean-project
+      creds:
+        type: api_key
+        api_key: ...
+```
+
+</div>
+
+??? info "Project"
+    If `project_name` is not set, the default project will be used.
+
+??? info "Required permissions"
+    The API key must have the following scopes assigned:
+
+    * `account` - read
+    * `droplet` - create, read, update, delete, admin
+    * `project` - create, read, update, delete
+    * `regions` - read
+    * `sizes` - read
+    * `ssh_key` - create, read, update,delete
+
+### Hot Aisle
+
+Log in to the SSH TUI as described in the [Hot Aisle Quick Start](https://hotaisle.xyz/quick-start/).
+Create a new team and generate an API key for the member in the team.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: hotaisle
+      team_handle: hotaisle-team-handle
+      creds:
+        type: api_key
+        api_key: 9c27a4bb7a8e472fae12ab34.3f2e3c1db75b9a0187fd2196c6b3e56d2b912e1c439ba08d89e7b6fcd4ef1d3f
+```
+
+</div>
+
+??? info "Required permissions"
+    The API key must have the following roles assigned:
+
+    * **Owner role for the user** - Required for creating and managing SSH keys
+    * **Operator role for the team** - Required for managing virtual machines within the team
+
+
+### CloudRift
+
+Log into your [CloudRift](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
+
+Ensure you've created a project with CloudRift.
+
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: cloudrift
+        creds:
+          type: api_key
+          api_key: rift_2prgY1d0laOrf2BblTwx2B2d1zcf1zIp4tZYpj5j88qmNgz38pxNlpX3vAo
+```
+
+</div>
+
 ### Vultr
 
 Log into your [Vultr](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
@@ -839,174 +1008,11 @@ There are two ways to configure OCI: using client credentials or using the defau
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
 
-<span id="datacrunch"></span>
+SSH fleets support the same features as [VM-based](#vm-based) backends.
 
-### Verda (formerly DataCrunch) { #verda }
-
-Log into your [Verda](https://console.verda.com/signin) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: verda
-        creds:
-          type: api_key
-          client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
-          client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8
-```
-
-</div>
-
-### AMD Developer Cloud
-Log into your [AMD Developer Cloud](https://amd.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-    - type: amddevcloud
-      project_name: my-amd-project
-      creds:
-        type: api_key
-        api_key: ...
-```
-
-</div>
-
-??? info "Project"
-    If `project_name` is not set, the default project will be used.
-
-??? info "Required permissions"
-    The API key must have the following scopes assigned:
-
-    * `account` - read
-    * `droplet` - create, read, update, delete, admin
-    * `project` - create, read, update, delete
-    * `regions` - read
-    * `sizes` - read
-    * `ssh_key` - create, read, update, delete
-
-
-### Digital Ocean
-Log into your [Digital Ocean](https://cloud.digitalocean.com/login) account. Click `API` in the sidebar and click the button `Generate New Token`. 
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-    - type: digitalocean
-      project_name: my-digital-ocean-project
-      creds:
-        type: api_key
-        api_key: ...
-```
-
-</div>
-
-??? info "Project"
-    If `project_name` is not set, the default project will be used.
-
-??? info "Required permissions"
-    The API key must have the following scopes assigned:
-
-    * `account` - read
-    * `droplet` - create, read, update, delete, admin
-    * `project` - create, read, update, delete
-    * `regions` - read
-    * `sizes` - read
-    * `ssh_key` - create, read, update,delete
-
-### Crusoe Cloud
-
-Log into your [Crusoe Cloud](https://console.crusoecloud.com/) console and create an API key
-under your account settings. Note your project ID from the project settings page.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-    - type: crusoe
-      project_id: your-project-id
-      creds:
-        type: access_key
-        access_key: your-access-key
-        secret_key: your-secret-key
-      regions:
-        - us-east1-a
-        - us-southcentral1-a
-```
-
-</div>
-
-`regions` is optional. If not specified, all available Crusoe regions are used.
-
-### Hot Aisle
-
-Log in to the SSH TUI as described in the [Hot Aisle Quick Start](https://hotaisle.xyz/quick-start/).
-Create a new team and generate an API key for the member in the team.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-    - type: hotaisle
-      team_handle: hotaisle-team-handle
-      creds:
-        type: api_key
-        api_key: 9c27a4bb7a8e472fae12ab34.3f2e3c1db75b9a0187fd2196c6b3e56d2b912e1c439ba08d89e7b6fcd4ef1d3f
-```
-
-</div>
-
-??? info "Required permissions"
-    The API key must have the following roles assigned:
-
-    * **Owner role for the user** - Required for creating and managing SSH keys
-    * **Operator role for the team** - Required for managing virtual machines within the team
-
-
-### CloudRift
-
-Log into your [CloudRift](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
-
-Ensure you've created a project with CloudRift.
-
-Then proceed to configuring the backend.
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: cloudrift
-        creds:
-          type: api_key
-          api_key: rift_2prgY1d0laOrf2BblTwx2B2d1zcf1zIp4tZYpj5j88qmNgz38pxNlpX3vAo
-```
-
-</div>
+!!! info "What's next"
+    1. See the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) reference
+    2. Check [Projects](../concepts/projects.md)
 
 ## Container-based
 
@@ -1206,9 +1212,3 @@ projects:
 </div>
 
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
-
-SSH fleets support the same features as [VM-based](#vm-based) backends.
-
-!!! info "What's next"
-    1. See the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) reference
-    2. Check [Projects](../concepts/projects.md)

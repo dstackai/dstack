@@ -1,15 +1,76 @@
 ---
 title: Crusoe
-description: Using Crusoe clusters with InfiniBand support via Kubernetes or VMs
+description: Using Crusoe clusters with InfiniBand support via VMs or Kubernetes
 ---
 
 # Crusoe
 
 `dstack` allows using Crusoe clusters with fast interconnect via two ways:
 
+* [VMs](#vms) – If you configure a `crusoe` backend in `dstack` by providing your Crusoe credentials, `dstack` lets you fully provision and use clusters through `dstack`.
 * [Kubernetes](#kubernetes) – If you create a Kubernetes cluster on Crusoe and configure a `kubernetes` backend and create a backend fleet in `dstack`, `dstack` lets you fully use this cluster through `dstack`.
-* [VMs](#vms) – If you create a VM cluster on Crusoe and create an SSH fleet in `dstack`, `dstack` lets you fully use this cluster through `dstack`.
-  
+
+## VMs
+
+Since `dstack` offers a VM-based backend that natively integrates with Crusoe, you only need to provide your Crusoe credentials to `dstack`, and it will allow you to fully provision and use clusters on Crusoe through `dstack`.
+
+### Configure a backend
+
+Log into your [Crusoe](https://console.crusoecloud.com/) console, create an API key under your account settings, and note your project ID.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: crusoe
+      project_id: your-project-id
+      creds:
+        type: access_key
+        access_key: your-access-key
+        secret_key: your-secret-key
+```
+
+</div>
+
+### Create a fleet
+
+Once the backend is configured, you can create a fleet:
+
+<div editor-title="crusoe-fleet.dstack.yml">
+    
+```yaml
+type: fleet
+name: crusoe-fleet
+
+nodes: 2
+placement: cluster
+
+backends: [crusoe]
+
+resources:
+  gpu: A100:80GB:8
+```
+    
+</div>
+
+Pass the fleet configuration to `dstack apply`:
+
+<div class="termy">
+
+```shell
+$ dstack apply -f crusoe-fleet.dstack.yml
+```
+
+</div>
+
+This will automatically create an IB partition and provision instances with InfiniBand networking.
+
+Once the fleet is created, you can run [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), and [services](https://dstack.ai/docs/concepts/services).
+
+> If you want instances to be provisioned on demand, you can set `nodes` to `0..2`. In this case, `dstack` will create instances only when you run workloads.
+
 ## Kubernetes
 
 ### Create a cluster
@@ -74,56 +135,68 @@ $ dstack apply -f crusoe-fleet.dstack.yml
 
 Once the fleet is created, you can run [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), and [services](https://dstack.ai/docs/concepts/services).
 
-## VMs
-
-Another way to work with Crusoe clusters is through VMs. While `dstack` typically supports VM-based compute providers via [dedicated backends](https://dstack.ai/docs/concepts/backends#vm-based) that automate provisioning, Crusoe does not yet have [such a backend](https://github.com/dstackai/dstack/issues/3378). As a result, to use a VM-based Crusoe cluster with `dstack`, you should use [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets).
-
-### Create instances
-
-1. Go to `Compute`, then `Instances`, and click `Create Instance`. Make sure to select the right instance type and VM image (that [support interconnect](https://docs.crusoecloud.com/networking/infiniband/managing-infiniband-networks/index.html)). Make sure to create as many instances as needed.
-
-### Create a `dstack` fleet
-
-Follow the standard instructions for setting up an [SSH fleet](https://dstack.ai/docs/concepts/fleets/#ssh-fleets):
-
-<div editor-title="crusoe-fleet.dstack.yml"> 
-    
-```yaml
-type: fleet
-name: crusoe-fleet
-
-placement: cluster
-
-# SSH credentials for the on-prem servers
-ssh_config:
-  user: ubuntu
-  identity_file: ~/.ssh/id_rsa
-  hosts:
-    - 3.255.177.51
-    - 3.255.177.52
-```
-    
-</div>
-
-Pass the fleet configuration to `dstack apply`:
-
-<div class="termy">
-
-```shell
-$ dstack apply -f crusoe-fleet.dstack.yml
-```
-
-</div>
-
-Once the fleet is created, you can run [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), and [services](https://dstack.ai/docs/concepts/services).
-
 ## NCCL tests
 
 Use a [distributed task](https://dstack.ai/docs/concepts/tasks#distributed-tasks) that runs NCCL tests to validate cluster network bandwidth.
 
-=== "Crusoe Managed Kubernetes"
+=== "VMs"
 
-    If you’re running on Crusoe Managed Kubernetes, make sure to install HPC-X and provide an up-to-date topology file. 
+    With the Crusoe backend, HPC-X and NCCL topology files are pre-installed on the host VM image. Mount them into the container via [instance volumes](https://dstack.ai/docs/concepts/volumes#instance-volumes).
+
+    <div editor-title="crusoe-nccl-tests.dstack.yml">
+
+    ```yaml
+    type: task
+    name: nccl-tests
+
+    nodes: 2
+    startup_order: workers-first
+    stop_criteria: master-done
+
+    volumes:
+      - /opt/hpcx:/opt/hpcx
+      - /etc/crusoe/nccl_topo:/etc/crusoe/nccl_topo
+
+    commands:
+      - . /opt/hpcx/hpcx-init.sh
+      - hpcx_load
+      - |
+        if [ $DSTACK_NODE_RANK -eq 0 ]; then
+          mpirun \
+            --allow-run-as-root \
+            --hostfile $DSTACK_MPI_HOSTFILE \
+            -n $DSTACK_GPUS_NUM \
+            -N $DSTACK_GPUS_PER_NODE \
+            --bind-to none \
+            -mca btl tcp,self \
+            -mca coll_hcoll_enable 0 \
+            -x PATH \
+            -x LD_LIBRARY_PATH \
+            -x CUDA_DEVICE_ORDER=PCI_BUS_ID \
+            -x NCCL_SOCKET_NTHREADS=4 \
+            -x NCCL_NSOCKS_PERTHREAD=8 \
+            -x NCCL_TOPO_FILE=/etc/crusoe/nccl_topo/a100-80gb-sxm-ib-cloud-hypervisor.xml \
+            -x NCCL_IB_MERGE_VFS=0 \
+            -x NCCL_IB_HCA=^mlx5_0:1 \
+            /opt/nccl-tests/build/all_reduce_perf -b 8 -e 2G -f 2 -t 1 -g 1 -c 1 -n 100
+        else
+          sleep infinity
+        fi
+
+    backends: [crusoe]
+
+    resources:
+      gpu: A100:80GB:8
+      shm_size: 16GB
+    ```
+
+    </div>
+
+    > Update `NCCL_TOPO_FILE` to match your instance type. Topology files for all supported types are available at `/etc/crusoe/nccl_topo/` on the host.
+
+=== "Kubernetes"
+
+    If you're running on Crusoe Managed Kubernetes, make sure to install HPC-X and provide an up-to-date topology file. 
 
     <div editor-title="crusoe-nccl-tests.dstack.yml">
 
@@ -190,105 +263,12 @@ Use a [distributed task](https://dstack.ai/docs/concepts/tasks#distributed-tasks
     ??? info "Privileged"
         When running on Crusoe Managed Kubernetes, set `privileged` to `true` to ensure access to InfiniBand.
 
-=== "VMs"
-
-With Crusoe VMs, HPC-X and up-to-date topology files are already available on the hosts. When using SSH fleets, simply mount them via [instance volumes](https://dstack.ai/docs/concepts/volumes#instance-volumes).
-
-```yaml
-type: task
-name: nccl-tests
-
-nodes: 2
-startup_order: workers-first
-stop_criteria: master-done
-
-volumes:
-  - /opt/hpcx:/opt/hpcx
-  - /etc/crusoe/nccl_topo:/etc/crusoe/nccl_topo
-
-commands:
-  - . /opt/hpcx/hpcx-init.sh
-  - hpcx_load
-  # Run NCCL Tests
-  - |
-    if [ $DSTACK_NODE_RANK -eq 0 ]; then
-      mpirun \
-        --allow-run-as-root \
-        --hostfile $DSTACK_MPI_HOSTFILE \
-        -n $DSTACK_GPUS_NUM \
-        -N $DSTACK_GPUS_PER_NODE \
-        --bind-to none \
-        -mca btl tcp,self \
-        -mca coll_hcoll_enable 0 \
-        -x PATH \
-        -x LD_LIBRARY_PATH \
-        -x CUDA_DEVICE_ORDER=PCI_BUS_ID \
-        -x NCCL_SOCKET_NTHREADS=4 \
-        -x NCCL_NSOCKS_PERTHREAD=8 \
-        -x NCCL_TOPO_FILE=/etc/crusoe/nccl_topo/a100-80gb-sxm-ib-cloud-hypervisor.xml \
-        -x NCCL_IB_MERGE_VFS=0 \
-        -x NCCL_IB_AR_THRESHOLD=0 \
-        -x NCCL_IB_PCI_RELAXED_ORDERING=1 \
-        -x NCCL_IB_SPLIT_DATA_ON_QPS=0 \
-        -x NCCL_IB_QPS_PER_CONNECTION=2 \
-        -x NCCL_IB_HCA=mlx5_1:1,mlx5_2:1,mlx5_3:1,mlx5_4:1,mlx5_5:1,mlx5_6:1,mlx5_7:1,mlx5_8:1 \
-        -x UCX_NET_DEVICES=mlx5_1:1,mlx5_2:1,mlx5_3:1,mlx5_4:1,mlx5_5:1,mlx5_6:1,mlx5_7:1,mlx5_8:1 \
-        /opt/nccl-tests/build/all_reduce_perf -b 8 -e 2G -f 2 -t 1 -g 1 -c 1 -n 100
-    else
-      sleep infinity
-    fi
-
-resources:
-  gpu: A100:8
-  shm_size: 16GB
-```
-
 Pass the configuration to `dstack apply`:
 
 <div class="termy">
 
 ```shell
 $ dstack apply -f crusoe-nccl-tests.dstack.yml
-
-Provisioning...
----> 100%
-
-nccl-tests provisioning completed (running)
-
-out-of-place                       in-place
-        size         count      type   redop    root     time   algbw   busbw  #wrong     time   algbw   busbw  #wrong
-         (B)    (elements)                               (us)  (GB/s)  (GB/s)             (us)  (GB/s)  (GB/s)
-           8             2     float     sum      -1    27.70    0.00    0.00       0    29.82    0.00    0.00       0
-          16             4     float     sum      -1    28.78    0.00    0.00       0    28.99    0.00    0.00       0
-          32             8     float     sum      -1    28.49    0.00    0.00       0    28.16    0.00    0.00       0
-          64            16     float     sum      -1    28.41    0.00    0.00       0    28.69    0.00    0.00       0
-         128            32     float     sum      -1    28.94    0.00    0.01       0    28.58    0.00    0.01       0
-         256            64     float     sum      -1    29.46    0.01    0.02       0    29.45    0.01    0.02       0
-         512           128     float     sum      -1    30.23    0.02    0.03       0    29.85    0.02    0.03       0
-        1024           256     float     sum      -1    30.79    0.03    0.06       0    34.03    0.03    0.06       0
-        2048           512     float     sum      -1    37.90    0.05    0.10       0    33.22    0.06    0.12       0
-        4096          1024     float     sum      -1    35.91    0.11    0.21       0    35.30    0.12    0.22       0
-        8192          2048     float     sum      -1    36.84    0.22    0.42       0    38.30    0.21    0.40       0
-       16384          4096     float     sum      -1    47.08    0.35    0.65       0    37.26    0.44    0.82       0
-       32768          8192     float     sum      -1    45.20    0.72    1.36       0    48.70    0.67    1.26       0
-       65536         16384     float     sum      -1    49.43    1.33    2.49       0    50.97    1.29    2.41       0
-      131072         32768     float     sum      -1    51.08    2.57    4.81       0    50.17    2.61    4.90       0
-      262144         65536     float     sum      -1   192.78    1.36    2.55       0   100.00    2.62    4.92       0
-      524288        131072     float     sum      -1    68.02    7.71   14.45       0    69.40    7.55   14.16       0
-     1048576        262144     float     sum      -1    81.71   12.83   24.06       0    88.58   11.84   22.20       0
-     2097152        524288     float     sum      -1   113.03   18.55   34.79       0   102.21   20.52   38.47       0
-     4194304       1048576     float     sum      -1   123.50   33.96   63.68       0   131.71   31.84   59.71       0
-     8388608       2097152     float     sum      -1   189.42   44.29   83.04       0   183.01   45.84   85.95       0
-    16777216       4194304     float     sum      -1   274.05   61.22  114.79       0   265.91   63.09  118.30       0
-    33554432       8388608     float     sum      -1   490.77   68.37  128.20       0   490.53   68.40  128.26       0
-    67108864      16777216     float     sum      -1   854.62   78.52  147.23       0   853.49   78.63  147.43       0
-   134217728      33554432     float     sum      -1  1483.43   90.48  169.65       0  1479.22   90.74  170.13       0
-   268435456      67108864     float     sum      -1  2700.36   99.41  186.39       0  2700.49   99.40  186.38       0
-   536870912     134217728     float     sum      -1  5300.49  101.29  189.91       0  5314.91  101.01  189.40       0
-  1073741824     268435456     float     sum      -1  10472.2  102.53  192.25       0  10485.6  102.40  192.00       0
-  2147483648     536870912     float     sum      -1  20749.1  103.50  194.06       0  20745.7  103.51  194.09       0
-  Out of bounds values : 0 OK
-  Avg bus bandwidth    : 53.7387
 ```
 
 </div>
@@ -296,5 +276,5 @@ out-of-place                       in-place
 ## What's next
 
 1. Learn about [dev environments](https://dstack.ai/docs/concepts/dev-environments), [tasks](https://dstack.ai/docs/concepts/tasks), [services](https://dstack.ai/docs/concepts/services)
-2. Read the [Kuberentes](https://dstack.ai/docs/guides/kubernetes), and [Clusters](https://dstack.ai/docs/guides/clusters) guides
+2. Check out [backends](https://dstack.ai/docs/concepts/backends#crusoe-cloud) and [fleets](https://dstack.ai/docs/concepts/fleets#cloud-fleets)
 3. Check the docs on [Crusoe's networking](https://docs.crusoecloud.com/networking/infiniband/) and ["Crusoe Managed" Kubernetes](https://docs.crusoecloud.com/orchestration/cmk/index.html)

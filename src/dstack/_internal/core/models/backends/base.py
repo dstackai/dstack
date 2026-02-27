@@ -8,7 +8,7 @@ class BackendType(str, enum.Enum):
         AWS (BackendType): Amazon Web Services
         AZURE (BackendType): Microsoft Azure
         CLOUDRIFT (BackendType): CloudRift
-        CRUSOE (BackendType): Crusoe Cloud
+        CRUSOE (BackendType): Crusoe
         CUDO (BackendType): Cudo
         DATACRUNCH (BackendType): DataCrunch (for backward compatibility)
         DIGITALOCEAN (BackendType): DigitalOcean
