@@ -279,13 +279,8 @@ class FleetWorker(Worker[PipelineItem]):
         fleet_update_map.update(result.fleet_update_map)
         set_processed_update_map_fields(fleet_update_map)
         set_unlock_update_map_fields(fleet_update_map)
-        instance_update_rows = []
-        for instance_id, instance_update_map in result.instance_id_to_update_map.items():
-            update_row = _InstanceUpdateMap()
-            update_row.update(instance_update_map)
-            update_row["id"] = instance_id
-            set_processed_update_map_fields(update_row)
-            instance_update_rows.append(update_row)
+        instance_update_rows = _build_instance_update_rows(result.instance_id_to_update_map)
+
         async with get_session_ctx() as session:
             now = get_current_datetime()
             resolve_now_placeholders(fleet_update_map, now=now)
@@ -538,3 +533,16 @@ def _autodelete_fleet(fleet_model: FleetModel) -> bool:
 
     logger.info("Automatic cleanup of an empty fleet %s", fleet_model.name)
     return True
+
+
+def _build_instance_update_rows(
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap],
+) -> list[_InstanceUpdateMap]:
+    instance_update_rows = []
+    for instance_id, instance_update_map in instance_id_to_update_map.items():
+        update_row = _InstanceUpdateMap()
+        update_row.update(instance_update_map)
+        update_row["id"] = instance_id
+        set_processed_update_map_fields(update_row)
+        instance_update_rows.append(update_row)
+    return instance_update_rows
