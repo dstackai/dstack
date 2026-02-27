@@ -55,10 +55,8 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
 
     const configuration = run.run_spec.configuration as TDevEnvironmentConfiguration;
     const latestSubmission = run.jobs[0]?.job_submissions?.slice(-1)[0];
-    const workingDir = latestSubmission?.job_runtime_data?.working_dir;
-    const openInIDEUrl = workingDir
-        ? `${configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}${workingDir}`
-        : null;
+    const workingDir = latestSubmission?.job_runtime_data?.working_dir ?? '/';
+    const openInIDEUrl = `${configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}${workingDir}`;
     const ideDisplayName = getIDEDisplayName(configuration.ide);
 
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
@@ -67,7 +65,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
         <Container>
             <Header variant="h2">Connect</Header>
 
-            {run.status === 'running' && openInIDEUrl && (
+            {run.status === 'running' && (
                 <Wizard
                     i18nStrings={{
                         stepNumberLabel: (stepNumber) => `Step ${stepNumber}`,
@@ -271,10 +269,10 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                 />
             )}
 
-            {(run.status !== 'running' || !openInIDEUrl) && (
+            {run.status !== 'running' && (
                 <SpaceBetween size="s">
                     <Box />
-                    <Alert type="info">Waiting for the dev environment to be ready.</Alert>
+                    <Alert type="info">Waiting for the run to start.</Alert>
                 </SpaceBetween>
             )}
         </Container>
