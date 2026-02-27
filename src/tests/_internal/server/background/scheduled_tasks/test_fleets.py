@@ -154,8 +154,17 @@ class TestProcessFleets:
             status=InstanceStatus.IDLE,
             instance_num=1,
         )
+        instance3 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATED,
+            instance_num=2,
+        )
         await process_fleets()
         await session.refresh(instance1)
         await session.refresh(instance2)
+        await session.refresh(instance3)
         assert instance1.status == InstanceStatus.BUSY
         assert instance2.status == InstanceStatus.TERMINATING
+        assert instance3.deleted
