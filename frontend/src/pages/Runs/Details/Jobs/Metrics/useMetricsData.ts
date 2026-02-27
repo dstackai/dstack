@@ -15,7 +15,11 @@ import {
 import { bytesFormatter, getChartProps } from './helpers';
 
 export const useMetricsData = (params: TJobMetricsRequestParams) => {
-    const { data: metricsData, isLoading } = useGetMetricsQuery(params, {
+    const {
+        data: metricsData,
+        isLoading,
+        refetch,
+    } = useGetMetricsQuery(params, {
         skip: !params.run_name,
     });
 
@@ -76,5 +80,5 @@ export const useMetricsData = (params: TJobMetricsRequestParams) => {
         });
     }, [metricsData]);
 
-    return { cpuChartProps, eachGPUChartProps, memoryChartProps, eachGPUMemoryChartProps, isLoading };
+    return { cpuChartProps, eachGPUChartProps, memoryChartProps, eachGPUMemoryChartProps, isLoading, refetch };
 };

@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo } from 'react';
+import { useListener } from 'react-bus';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
 import { CodeEditor, Container, Header, Loader } from 'components';
 
 import { useGetRunQuery } from 'services/run';
+
+import { RUN_DETAILS_REFRESH_LIST_EVENT } from '../constants';
 
 interface AceEditorElement extends HTMLElement {
     env?: {
@@ -20,10 +23,16 @@ export const RunInspect = () => {
     const paramProjectName = params.projectName ?? '';
     const paramRunId = params.runId ?? '';
 
-    const { data: runData, isLoading } = useGetRunQuery({
+    const {
+        data: runData,
+        isLoading,
+        refetch,
+    } = useGetRunQuery({
         project_name: paramProjectName,
         id: paramRunId,
     });
+
+    useListener(RUN_DETAILS_REFRESH_LIST_EVENT, refetch);
 
     const jsonContent = useMemo(() => {
         if (!runData) return '';

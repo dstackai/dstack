@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
+import { useListener } from 'react-bus';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
@@ -7,6 +8,7 @@ import { Box, ColumnLayout, Container, Header, LineChart } from 'components';
 import { riseRouterException } from 'libs';
 import { useGetRunQuery } from 'services/run';
 
+import { RUN_DETAILS_REFRESH_LIST_EVENT } from '../../constants';
 import { bytesFormatter, formatPercent, formatTime } from './helpers';
 import { useMetricsData } from './useMetricsData';
 
@@ -32,13 +34,22 @@ export const JobMetrics: React.FC = () => {
         return runData.jobs.find((job) => job.job_spec.job_name === paramJobName) ?? null;
     }, [runData]);
 
-    const { cpuChartProps, memoryChartProps, eachGPUChartProps, eachGPUMemoryChartProps, isLoading } = useMetricsData({
+    const {
+        cpuChartProps,
+        memoryChartProps,
+        eachGPUChartProps,
+        eachGPUMemoryChartProps,
+        isLoading,
+        refetch: refetchMetrics,
+    } = useMetricsData({
         project_name: paramProjectName,
         run_name: runData?.run_spec.run_name ?? '',
         run_id: runData?.id ?? '',
         job_num: jobData?.job_spec.job_num ?? 0,
         limit: 1000,
     });
+
+    useListener(RUN_DETAILS_REFRESH_LIST_EVENT, refetchMetrics);
 
     const statusType = isLoading || isLoadingRun ? 'loading' : 'finished';
 
