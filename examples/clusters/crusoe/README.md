@@ -16,7 +16,7 @@ Since `dstack` offers a VM-based backend that natively integrates with Crusoe, y
 
 ### Configure a backend
 
-Log into your [Crusoe Cloud](https://console.crusoecloud.com/) console, create an API key under your account settings, and note your project ID.
+Log into your [Crusoe](https://console.crusoecloud.com/) console, create an API key under your account settings, and note your project ID.
 
 <div editor-title="~/.dstack/server/config.yml">
 

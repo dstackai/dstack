@@ -745,9 +745,9 @@ projects:
     Nebius is only supported if `dstack server` is running on Python 3.10 or higher.
 
 
-### Crusoe Cloud
+### Crusoe
 
-Log into your [Crusoe Cloud](https://console.crusoecloud.com/) console and create an API key
+Log into your [Crusoe](https://console.crusoecloud.com/) console and create an API key
 under your account settings. Note your project ID from the project settings page.
 
 Then, go ahead and configure the backend:
@@ -913,6 +913,106 @@ projects:
 ```
 
 </div>
+
+### Vultr
+
+Log into your [Vultr](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: vultr
+        creds:
+          type: api_key
+          api_key: B57487240a466624b48de22865589
+```
+
+</div>
+
+### OCI
+
+There are two ways to configure OCI: using client credentials or using the default credentials.
+
+=== "Default credentials"
+    If you have default credentials set up in `~/.oci/config`, configure the backend like this:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: default
+    ```
+
+    </div>
+
+=== "Client credentials"
+
+    Log into the [OCI Console](https://cloud.oracle.com), go to `My profile`, 
+    select `API keys`, and click `Add API key`.
+
+    Once you add a key, you'll see the configuration file. Copy its values to configure the backend as follows:
+
+    <div editor-title="~/.dstack/server/config.yml">
+    
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: client
+          user: ocid1.user.oc1..g5vlaeqfu47akmaafq665xsgmyaqjktyfxtacfxc4ftjxuca7aohnd2ev66m
+          tenancy: ocid1.tenancy.oc1..ajqsftvk4qarcfaak3ha4ycdsaahxmaita5frdwg3tqo2bcokpd3n7oizwai
+          region: eu-frankfurt-1
+          fingerprint: 77:32:77:00:49:7c:cb:56:84:75:8e:77:96:7d:53:17
+          key_file: ~/.oci/private_key.pem
+    ```
+    
+    </div>
+
+    Make sure to include either the path to your private key via `key_file` or the contents of the key via `key_content`.
+
+??? info "Required permissions"
+
+    This is an example of a restrictive policy for a group of `dstack` users:
+
+    ```
+    Allow group <dstack-users> to read compartments in tenancy where target.compartment.name = '<dstack-compartment>'
+    Allow group <dstack-users> to read marketplace-community-listings in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage app-catalog-listing in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage instances in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage compute-capacity-reports in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage volumes in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage volume-attachments in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage virtual-network-family in compartment <dstack-compartment>
+    ```
+
+    To use this policy, create a compartment for `dstack` and specify it in `~/.dstack/server/config.yml`.
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: default
+        compartment_id: ocid1.compartment.oc1..aaaaaaaa
+    ```
+
+SSH fleets support the same features as [VM-based](#vm-based) backends.
+
+!!! info "What's next"
+    1. See the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) reference
+    2. Check [Projects](../concepts/projects.md)
 
 ## Container-based
 
@@ -1112,103 +1212,3 @@ projects:
 </div>
 
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
-
-### Vultr
-
-Log into your [Vultr](https://www.vultr.com/) account, click `Account` in the sidebar, select `API`, find the `Personal Access Token` panel and click the `Enable API` button. In the `Access Control` panel, allow API requests from all addresses or from the subnet where your `dstack` server is deployed.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: vultr
-        creds:
-          type: api_key
-          api_key: B57487240a466624b48de22865589
-```
-
-</div>
-
-### OCI
-
-There are two ways to configure OCI: using client credentials or using the default credentials.
-
-=== "Default credentials"
-    If you have default credentials set up in `~/.oci/config`, configure the backend like this:
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-      backends:
-      - type: oci
-        creds:
-          type: default
-    ```
-
-    </div>
-
-=== "Client credentials"
-
-    Log into the [OCI Console](https://cloud.oracle.com), go to `My profile`, 
-    select `API keys`, and click `Add API key`.
-
-    Once you add a key, you'll see the configuration file. Copy its values to configure the backend as follows:
-
-    <div editor-title="~/.dstack/server/config.yml">
-    
-    ```yaml
-    projects:
-    - name: main
-      backends:
-      - type: oci
-        creds:
-          type: client
-          user: ocid1.user.oc1..g5vlaeqfu47akmaafq665xsgmyaqjktyfxtacfxc4ftjxuca7aohnd2ev66m
-          tenancy: ocid1.tenancy.oc1..ajqsftvk4qarcfaak3ha4ycdsaahxmaita5frdwg3tqo2bcokpd3n7oizwai
-          region: eu-frankfurt-1
-          fingerprint: 77:32:77:00:49:7c:cb:56:84:75:8e:77:96:7d:53:17
-          key_file: ~/.oci/private_key.pem
-    ```
-    
-    </div>
-
-    Make sure to include either the path to your private key via `key_file` or the contents of the key via `key_content`.
-
-??? info "Required permissions"
-
-    This is an example of a restrictive policy for a group of `dstack` users:
-
-    ```
-    Allow group <dstack-users> to read compartments in tenancy where target.compartment.name = '<dstack-compartment>'
-    Allow group <dstack-users> to read marketplace-community-listings in compartment <dstack-compartment>
-    Allow group <dstack-users> to manage app-catalog-listing in compartment <dstack-compartment>
-    Allow group <dstack-users> to manage instances in compartment <dstack-compartment>
-    Allow group <dstack-users> to manage compute-capacity-reports in compartment <dstack-compartment>
-    Allow group <dstack-users> to manage volumes in compartment <dstack-compartment>
-    Allow group <dstack-users> to manage volume-attachments in compartment <dstack-compartment>
-    Allow group <dstack-users> to manage virtual-network-family in compartment <dstack-compartment>
-    ```
-
-    To use this policy, create a compartment for `dstack` and specify it in `~/.dstack/server/config.yml`.
-
-    ```yaml
-    projects:
-    - name: main
-      backends:
-      - type: oci
-        creds:
-          type: default
-        compartment_id: ocid1.compartment.oc1..aaaaaaaa
-    ```
-
-SSH fleets support the same features as [VM-based](#vm-based) backends.
-
-!!! info "What's next"
-    1. See the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) reference
-    2. Check [Projects](../concepts/projects.md)
