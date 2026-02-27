@@ -56,8 +56,8 @@ class FleetPipeline(Pipeline[PipelineItem]):
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
         min_processing_interval: timedelta = timedelta(seconds=30),
-        lock_timeout: timedelta = timedelta(seconds=30),
-        heartbeat_trigger: timedelta = timedelta(seconds=15),
+        lock_timeout: timedelta = timedelta(seconds=20),
+        heartbeat_trigger: timedelta = timedelta(seconds=10),
     ) -> None:
         super().__init__(
             workers_num=workers_num,
