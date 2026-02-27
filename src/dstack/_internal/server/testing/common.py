@@ -456,6 +456,8 @@ def get_job_runtime_data(
     ports: Optional[dict[int, int]] = None,
     offer: Optional[InstanceOfferWithAvailability] = None,
     volume_names: Optional[list[str]] = None,
+    working_dir: Optional[str] = None,
+    username: Optional[str] = None,
 ) -> JobRuntimeData:
     return JobRuntimeData(
         network_mode=NetworkMode(network_mode),
@@ -465,6 +467,8 @@ def get_job_runtime_data(
         ports=ports,
         offer=offer,
         volume_names=volume_names,
+        working_dir=working_dir,
+        username=username,
     )
 
 

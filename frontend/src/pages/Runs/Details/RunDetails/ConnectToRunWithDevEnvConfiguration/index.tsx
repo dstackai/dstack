@@ -54,7 +54,9 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
     const [sshCommand, copySSHCommand] = getSSHCommand(run);
 
     const configuration = run.run_spec.configuration as TDevEnvironmentConfiguration;
-    const openInIDEUrl = `${configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}/${run.run_spec.working_dir || 'workflow'}`;
+    const latestSubmission = run.jobs[0]?.job_submissions?.slice(-1)[0];
+    const workingDir = latestSubmission?.job_runtime_data?.working_dir ?? '/';
+    const openInIDEUrl = `${configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}${workingDir}`;
     const ideDisplayName = getIDEDisplayName(configuration.ide);
 
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });

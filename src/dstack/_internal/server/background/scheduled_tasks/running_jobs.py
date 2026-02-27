@@ -1116,7 +1116,13 @@ def _submit_job_to_runner(
     logger.debug("%s: uploading code", fmt(job_model))
     runner_client.upload_code(code)
     logger.debug("%s: starting job", fmt(job_model))
-    runner_client.run_job()
+    job_info = runner_client.run_job()
+    if job_info is not None:
+        jrd = get_job_runtime_data(job_model)
+        if jrd is not None:
+            jrd.working_dir = job_info.working_dir
+            jrd.username = job_info.username
+            job_model.job_runtime_data = jrd.json()
 
     switch_job_status(session, job_model, JobStatus.RUNNING)
     # do not log here, because the runner will send a new status

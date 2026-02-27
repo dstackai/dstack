@@ -44,6 +44,7 @@ from dstack._internal.server.background.scheduled_tasks.running_jobs import (
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
+    JobInfoResponse,
     JobStateEvent,
     PortMapping,
     PullResponse,
@@ -188,6 +189,7 @@ class TestProcessRunningJobs:
             run=run,
             status=JobStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data,
+            job_runtime_data=get_job_runtime_data(),
             instance=instance,
             instance_assigned=True,
         )
@@ -201,6 +203,9 @@ class TestProcessRunningJobs:
             runner_client_mock.healthcheck.return_value = HealthcheckResponse(
                 service="dstack-runner", version="0.0.1.dev2"
             )
+            runner_client_mock.run_job.return_value = JobInfoResponse(
+                working_dir="/dstack/run", username="dstack"
+            )
             await process_running_jobs()
             SSHTunnelMock.assert_called_once()
             runner_client_mock.healthcheck.assert_called_once()
@@ -210,6 +215,9 @@ class TestProcessRunningJobs:
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.RUNNING
+        jrd = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        assert jrd.working_dir == "/dstack/run"
+        assert jrd.username == "dstack"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -416,6 +424,9 @@ class TestProcessRunningJobs:
             PortMapping(container=10022, host=32771),
             PortMapping(container=10999, host=32772),
         ]
+        runner_client_mock.run_job.return_value = JobInfoResponse(
+            working_dir="/dstack/run", username="dstack"
+        )
 
         await process_running_jobs()
 
@@ -428,10 +439,13 @@ class TestProcessRunningJobs:
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.RUNNING
-        assert JobRuntimeData.__response__.parse_raw(job.job_runtime_data).ports == {
+        jrd = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        assert jrd.ports == {
             10022: 32771,
             10999: 32772,
         }
+        assert jrd.working_dir == "/dstack/run"
+        assert jrd.username == "dstack"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

@@ -46,6 +46,11 @@ class PullResponse(CoreModel):
     no_connections_secs: Optional[int] = None  # Optional for compatibility with old runners
 
 
+class JobInfoResponse(CoreModel):
+    working_dir: str
+    username: str
+
+
 class SubmitBody(CoreModel):
     run: Annotated[
         Run,
