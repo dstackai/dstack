@@ -229,7 +229,7 @@ class FleetWorker(Worker[FleetPipelineItem]):
                     select(InstanceModel)
                     .where(
                         InstanceModel.fleet_id == item.id,
-                        InstanceModel.deleted != False,
+                        InstanceModel.deleted == False,
                         # TODO: Lock instance models in the DB
                         # or_(
                         #     InstanceModel.lock_expires_at.is_(None),
@@ -314,6 +314,7 @@ class FleetWorker(Worker[FleetPipelineItem]):
             for instance_id, instance_update_map in result.instance_id_to_update_map.items():
                 update_row = dict(instance_update_map)
                 update_row["id"] = instance_id
+                update_row |= get_processed_update_map()  # | get_unlock_update_map()
                 instance_update_rows.append(update_row)
             if instance_update_rows:
                 await session.execute(
@@ -391,6 +392,7 @@ async def _process_fleet(fleet_model: FleetModel) -> _ProcessResult:
     # TODO: Drop fleets auto-deletion after dropping fleets auto-creation.
     deleted = _autodelete_fleet(fleet_model)
     if deleted:
+        result.fleet_update_map["status"] = FleetStatus.TERMINATED
         result.fleet_update_map["deleted"] = True
         result.fleet_update_map["deleted_at"] = get_current_datetime()
     return result
@@ -489,8 +491,7 @@ def _maintain_fleet_nodes_in_min_max_range(
             result.instance_id_to_update_map[instance.id] = {
                 "termination_reason": InstanceTerminationReason.MAX_INSTANCES_LIMIT,
                 "termination_reason_message": "Fleet has too many instances",
-                "deleted": True,
-                "deleted_at": get_current_datetime(),
+                "status": InstanceStatus.TERMINATING,
             }
             nodes_redundant -= 1
     return result
