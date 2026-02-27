@@ -3,6 +3,7 @@ import math
 import random
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import (
@@ -12,7 +13,6 @@ from typing import (
     Generic,
     Optional,
     Protocol,
-    Sequence,
     TypedDict,
     TypeVar,
     Union,
@@ -353,46 +353,66 @@ class _NowPlaceholder:
 
 
 NOW_PLACEHOLDER: Final = _NowPlaceholder()
+"""
+Use `NOW_PLACEHOLDER` together with `resolve_now_placeholders()` in pipeline update maps
+instead of `get_current_time()` to have the same current time for all updates in the transaction.
+"""
 
 # Timestamp value stored in update maps before being resolved to current time.
 UpdateMapDateTime = Union[datetime, _NowPlaceholder]
 
 
-class UnlockUpdateMap(TypedDict, total=False):
+class _UnlockUpdateMap(TypedDict, total=False):
     lock_expires_at: Optional[datetime]
     lock_token: Optional[uuid.UUID]
     lock_owner: Optional[str]
 
 
-class ProcessedUpdateMap(TypedDict, total=False):
+class _ProcessedUpdateMap(TypedDict, total=False):
     last_processed_at: UpdateMapDateTime
 
 
-class ItemUpdateMap(UnlockUpdateMap, ProcessedUpdateMap, total=False):
+class ItemUpdateMap(_UnlockUpdateMap, _ProcessedUpdateMap, total=False):
     lock_expires_at: Optional[datetime]
     lock_token: Optional[uuid.UUID]
     lock_owner: Optional[str]
     last_processed_at: UpdateMapDateTime
 
 
-def set_unlock_update_map_fields(update_map: UnlockUpdateMap):
+def set_unlock_update_map_fields(update_map: _UnlockUpdateMap):
     update_map["lock_expires_at"] = None
     update_map["lock_token"] = None
     update_map["lock_owner"] = None
 
 
 def set_processed_update_map_fields(
-    update_map: ProcessedUpdateMap,
+    update_map: _ProcessedUpdateMap,
     now: UpdateMapDateTime = NOW_PLACEHOLDER,
 ):
     update_map["last_processed_at"] = now
 
 
-def resolve_now_placeholders(update_values: Any, now: datetime):
-    if isinstance(update_values, list):
+class _ResolveNowUpdateMap(Protocol):
+    def items(self) -> Iterable[tuple[str, object]]: ...
+
+
+_ResolveNowInput = Union[_ResolveNowUpdateMap, Sequence[_ResolveNowUpdateMap]]
+
+
+def resolve_now_placeholders(update_values: _ResolveNowInput, now: datetime):
+    """
+    Replaces `NOW_PLACEHOLDER` with `now` in an update map or a sequence of update rows.
+    """
+    if isinstance(update_values, Sequence):
         for update_row in update_values:
             resolve_now_placeholders(update_row, now)
         return
+    # Runtime dict narrowing is required here: pyright doesn't model TypedDicts as
+    # supporting generic dynamic-key mutation via protocol methods.
+    if not isinstance(update_values, dict):
+        raise TypeError(
+            "resolve_now_placeholders() expects update maps or sequences of update maps"
+        )
     for key, value in update_values.items():
         if value is NOW_PLACEHOLDER:
             update_values[key] = now

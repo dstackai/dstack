@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import Sequence, TypedDict
 
 from sqlalchemy import or_, select, update
+from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.models.fleets import FleetSpec, FleetStatus
@@ -316,43 +317,12 @@ class FleetWorker(Worker[PipelineItem]):
                     update(InstanceModel).execution_options(synchronize_session=False),
                     instance_update_rows,
                 )
-
             if result.new_instances_count > 0:
-                fleet_spec = get_fleet_spec(fleet_model)
-                res = await session.execute(
-                    select(InstanceModel.instance_num).where(
-                        InstanceModel.fleet_id == fleet_model.id,
-                        InstanceModel.deleted == False,
-                    )
+                await _create_missing_fleet_instances(
+                    session=session,
+                    fleet_model=fleet_model,
+                    new_instances_count=result.new_instances_count,
                 )
-                taken_instance_nums = set(res.scalars().all())
-                for _ in range(result.new_instances_count):
-                    instance_num = get_next_instance_num(taken_instance_nums)
-                    instance_model = create_fleet_instance_model(
-                        session=session,
-                        project=fleet_model.project,
-                        # TODO: Store fleet.user and pass it instead of the project owner.
-                        username=fleet_model.project.owner.name,
-                        spec=fleet_spec,
-                        instance_num=instance_num,
-                    )
-                    instance_model.fleet_id = fleet_model.id
-                    taken_instance_nums.add(instance_num)
-                    events.emit(
-                        session=session,
-                        message=(
-                            "Instance created to meet target fleet node count."
-                            f" Status: {instance_model.status.upper()}"
-                        ),
-                        actor=events.SystemActor(),
-                        targets=[events.Target.from_model(instance_model)],
-                    )
-                logger.info(
-                    "Added %d instances to fleet %s",
-                    result.new_instances_count,
-                    fleet_model.name,
-                )
-
             emit_fleet_status_change_event(
                 session=session,
                 fleet_model=fleet_model,
@@ -546,3 +516,44 @@ def _build_instance_update_rows(
         set_processed_update_map_fields(update_row)
         instance_update_rows.append(update_row)
     return instance_update_rows
+
+
+async def _create_missing_fleet_instances(
+    session: AsyncSession,
+    fleet_model: FleetModel,
+    new_instances_count: int,
+):
+    fleet_spec = get_fleet_spec(fleet_model)
+    res = await session.execute(
+        select(InstanceModel.instance_num).where(
+            InstanceModel.fleet_id == fleet_model.id,
+            InstanceModel.deleted == False,
+        )
+    )
+    taken_instance_nums = set(res.scalars().all())
+    for _ in range(new_instances_count):
+        instance_num = get_next_instance_num(taken_instance_nums)
+        instance_model = create_fleet_instance_model(
+            session=session,
+            project=fleet_model.project,
+            # TODO: Store fleet.user and pass it instead of the project owner.
+            username=fleet_model.project.owner.name,
+            spec=fleet_spec,
+            instance_num=instance_num,
+        )
+        instance_model.fleet_id = fleet_model.id
+        taken_instance_nums.add(instance_num)
+        events.emit(
+            session=session,
+            message=(
+                "Instance created to meet target fleet node count."
+                f" Status: {instance_model.status.upper()}"
+            ),
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(instance_model)],
+        )
+    logger.info(
+        "Added %d instances to fleet %s",
+        new_instances_count,
+        fleet_model.name,
+    )
