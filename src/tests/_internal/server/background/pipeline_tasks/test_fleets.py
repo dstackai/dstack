@@ -42,7 +42,6 @@ def _fleet_to_pipeline_item(fleet: FleetModel) -> FleetPipelineItem:
         lock_token=fleet.lock_token,
         lock_expires_at=fleet.lock_expires_at,
         prev_lock_expired=False,
-        status=fleet.status,
     )
 
 
@@ -232,6 +231,46 @@ class TestFleetWorker:
         assert instance2.status == InstanceStatus.TERMINATING
         assert instance3.deleted
         assert fleet.consolidation_attempt == 1
+
+    async def test_consolidation_attempt_increments_when_over_max_and_no_idle_instances(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=1)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            instance_num=0,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            instance_num=1,
+        )
+
+        fleet.consolidation_attempt = 2
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        await session.refresh(instance1)
+        await session.refresh(instance2)
+        assert instance1.status == InstanceStatus.BUSY
+        assert instance2.status == InstanceStatus.BUSY
+        assert fleet.consolidation_attempt == 3
 
     async def test_marks_placement_groups_fleet_deleted_on_fleet_delete(
         self, test_db, session: AsyncSession, worker: FleetWorker

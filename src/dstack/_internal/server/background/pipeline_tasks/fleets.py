@@ -47,7 +47,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class FleetPipelineItem(PipelineItem):
-    status: FleetStatus
+    pass
 
 
 class FleetPipeline(Pipeline[FleetPipelineItem]):
@@ -152,7 +152,6 @@ class FleetFetcher(Fetcher[FleetPipelineItem]):
                             FleetModel.id,
                             FleetModel.lock_token,
                             FleetModel.lock_expires_at,
-                            FleetModel.status,
                         )
                     )
                 )
@@ -172,7 +171,6 @@ class FleetFetcher(Fetcher[FleetPipelineItem]):
                             lock_expires_at=lock_expires_at,
                             lock_token=lock_token,
                             prev_lock_expired=prev_lock_expired,
-                            status=fleet_model.status,
                         )
                     )
                 await session.commit()
@@ -375,9 +373,10 @@ class _ProcessResult:
 
 
 @dataclass
-class _MaintainNodexResult:
+class _MaintainNodesResult:
     instance_id_to_update_map: dict[uuid.UUID, UpdateMap] = field(default_factory=dict)
     new_instances_count: int = 0
+    changes_required: bool = False
 
     @property
     def has_changes(self) -> bool:
@@ -412,13 +411,10 @@ def _consolidate_fleet_state_with_spec(fleet_model: FleetModel) -> _ProcessResul
     if maintain_nodes_result.has_changes:
         result.instance_id_to_update_map = maintain_nodes_result.instance_id_to_update_map
         result.new_instances_count = maintain_nodes_result.new_instances_count
+    if maintain_nodes_result.changes_required:
         result.fleet_update_map["consolidation_attempt"] = fleet_model.consolidation_attempt + 1
     else:
-        # The fleet is already consolidated or consolidation is in progress.
-        # We reset consolidation_attempt in both cases for simplicity.
-        # The second case does not need reset but is ok to do since
-        # it means consolidation is longer than delay, so it won't happen too often.
-        # TODO: Reset consolidation_attempt on fleet in-place update.
+        # The fleet is consolidated with respect to nodes min/max.
         result.fleet_update_map["consolidation_attempt"] = 0
     result.fleet_update_map["last_consolidated_at"] = get_current_datetime()
     return result
@@ -453,16 +449,17 @@ def _get_consolidation_retry_delay(consolidation_attempt: int) -> timedelta:
 def _maintain_fleet_nodes_in_min_max_range(
     fleet_model: FleetModel,
     fleet_spec: FleetSpec,
-) -> _MaintainNodexResult:
+) -> _MaintainNodesResult:
     """
     Ensures the fleet has at least `nodes.min` and at most `nodes.max` instances.
     """
     assert fleet_spec.configuration.nodes is not None
-    result = _MaintainNodexResult()
+    result = _MaintainNodesResult()
     for instance in fleet_model.instances:
         # Delete terminated but not deleted instances since
         # they are going to be replaced with new pending instances.
         if instance.status == InstanceStatus.TERMINATED and not instance.deleted:
+            result.changes_required = True
             result.instance_id_to_update_map[instance.id] = {
                 "deleted": True,
                 "deleted_at": get_current_datetime(),
@@ -472,6 +469,7 @@ def _maintain_fleet_nodes_in_min_max_range(
     ]
     active_instances_num = len(active_instances)
     if active_instances_num < fleet_spec.configuration.nodes.min:
+        result.changes_required = True
         nodes_missing = fleet_spec.configuration.nodes.min - active_instances_num
         result.new_instances_count = nodes_missing
         return result
@@ -483,11 +481,12 @@ def _maintain_fleet_nodes_in_min_max_range(
     # Fleet has more instances than allowed by nodes.max.
     # This is possible due to race conditions (e.g. provisioning jobs in a fleet concurrently)
     # or if nodes.max is updated.
+    result.changes_required = True
     nodes_redundant = active_instances_num - fleet_spec.configuration.nodes.max
     for instance in fleet_model.instances:
         if nodes_redundant == 0:
             break
-        if instance.status in [InstanceStatus.IDLE]:
+        if instance.status == InstanceStatus.IDLE:
             result.instance_id_to_update_map[instance.id] = {
                 "termination_reason": InstanceTerminationReason.MAX_INSTANCES_LIMIT,
                 "termination_reason_message": "Fleet has too many instances",

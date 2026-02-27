@@ -604,6 +604,8 @@ class FleetModel(PipelineModelMixin, BaseModel):
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="fleet")
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
 
+    # `consolidation_attempt` counts how many times in a row fleet needed consolidation.
+    # Allows increasing delays between attempts.
     consolidation_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
     last_consolidated_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
