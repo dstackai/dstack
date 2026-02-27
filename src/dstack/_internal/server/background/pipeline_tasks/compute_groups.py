@@ -203,7 +203,12 @@ class ComputeGroupWorker(Worker[PipelineItem]):
         # TODO: Fetch only compute groups with all instances terminating.
         if all(i.status == InstanceStatus.TERMINATING for i in compute_group_model.instances):
             terminate_result = await _terminate_compute_group(compute_group_model)
-        if terminate_result.compute_group_update_map:
+        terminated = terminate_result.compute_group_update_map.get(
+            "status"
+        ) == ComputeGroupStatus.TERMINATED or terminate_result.compute_group_update_map.get(
+            "deleted", False
+        )
+        if terminated:
             logger.info("Terminated compute group %s", compute_group_model.id)
         else:
             set_processed_update_map_fields(terminate_result.compute_group_update_map)

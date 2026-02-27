@@ -17,7 +17,6 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     ItemUpdateMap,
     Pipeline,
     PipelineItem,
-    ProcessedUpdateMap,
     Worker,
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
@@ -495,15 +494,16 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
                 targets=[events.Target.from_model(gateway_model)],
             )
         else:
-            processed_update_map: ProcessedUpdateMap = {}
-            set_processed_update_map_fields(processed_update_map)
+            update_map = _GatewayUpdateMap()
+            set_processed_update_map_fields(update_map)
+            set_unlock_update_map_fields(update_map)
             res = await session.execute(
                 update(GatewayModel)
                 .where(
                     GatewayModel.id == gateway_model.id,
                     GatewayModel.lock_token == gateway_model.lock_token,
                 )
-                .values(**processed_update_map)
+                .values(**update_map)
                 .returning(GatewayModel.id)
             )
             updated_ids = list(res.scalars().all())

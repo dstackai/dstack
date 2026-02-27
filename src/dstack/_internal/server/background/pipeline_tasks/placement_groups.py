@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Sequence
 
@@ -193,8 +194,10 @@ class PlacementGroupWorker(Worker[PipelineItem]):
                 )
                 return
 
-        update_map = await _delete_placement_group(placement_group_model)
-        if update_map:
+        result = await _delete_placement_group(placement_group_model)
+        update_map = _PlacementGroupUpdateMap()
+        update_map.update(result.update_map)
+        if update_map.get("deleted", False):
             logger.info("Deleted placement group %s", placement_group_model.name)
         else:
             set_processed_update_map_fields(update_map)
@@ -226,15 +229,20 @@ class _PlacementGroupUpdateMap(ItemUpdateMap, total=False):
     deleted_at: datetime
 
 
+@dataclass
+class _DeletePlacementGroupResult:
+    update_map: _PlacementGroupUpdateMap = field(default_factory=_PlacementGroupUpdateMap)
+
+
 async def _delete_placement_group(
     placement_group_model: PlacementGroupModel,
-) -> _PlacementGroupUpdateMap:
+) -> _DeletePlacementGroupResult:
     placement_group = placement_group_model_to_placement_group(placement_group_model)
     if placement_group.provisioning_data is None:
         logger.error(
             "Failed to delete placement group %s. provisioning_data is None.", placement_group.name
         )
-        return _get_deleted_update_map()
+        return _DeletePlacementGroupResult(update_map=_get_deleted_update_map())
     backend = await backends_services.get_project_backend_by_type(
         project=placement_group_model.project,
         backend_type=placement_group.provisioning_data.backend,
@@ -245,7 +253,7 @@ async def _delete_placement_group(
             "Failed to delete placement group %s. Backend not available. Please delete it manually.",
             placement_group.name,
         )
-        return _get_deleted_update_map()
+        return _DeletePlacementGroupResult(update_map=_get_deleted_update_map())
     compute = backend.compute()
     assert isinstance(compute, ComputeWithPlacementGroupSupport)
     try:
@@ -254,16 +262,16 @@ async def _delete_placement_group(
         logger.info(
             "Placement group %s is still in use. Skipping deletion for now.", placement_group.name
         )
-        return _PlacementGroupUpdateMap()
+        return _DeletePlacementGroupResult()
     except Exception:
         # TODO: Retry deletion
         logger.exception(
             "Got exception when deleting placement group %s. Please delete it manually.",
             placement_group.name,
         )
-        return _get_deleted_update_map()
+        return _DeletePlacementGroupResult(update_map=_get_deleted_update_map())
 
-    return _get_deleted_update_map()
+    return _DeletePlacementGroupResult(update_map=_get_deleted_update_map())
 
 
 def _get_deleted_update_map() -> _PlacementGroupUpdateMap:

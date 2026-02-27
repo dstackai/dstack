@@ -257,6 +257,7 @@ class TestGatewayWorkerDeleted:
         )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        gateway.lock_owner = "GatewayPipeline"
         gateway.to_be_deleted = True
         original_last_processed_at = gateway.last_processed_at
         await session.commit()
@@ -286,6 +287,9 @@ class TestGatewayWorkerDeleted:
         await session.refresh(gateway_compute)
         assert gateway.to_be_deleted is True
         assert gateway.last_processed_at > original_last_processed_at
+        assert gateway.lock_token is None
+        assert gateway.lock_expires_at is None
+        assert gateway.lock_owner is None
         assert gateway_compute.active is True
         assert gateway_compute.deleted is False
         events = await list_events(session)
