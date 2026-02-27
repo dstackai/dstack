@@ -55,7 +55,7 @@ class FleetPipeline(Pipeline[PipelineItem]):
         workers_num: int = 10,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=30),
+        min_processing_interval: timedelta = timedelta(seconds=60),
         lock_timeout: timedelta = timedelta(seconds=20),
         heartbeat_trigger: timedelta = timedelta(seconds=10),
     ) -> None:
@@ -416,13 +416,12 @@ def _is_fleet_ready_for_consolidation(fleet_model: FleetModel) -> bool:
 # We use exponentially increasing consolidation retry delays so that
 # consolidation does not happen too often. In particular, this prevents
 # retrying instance provisioning constantly in case of no offers.
-# TODO: Adjust delays.
 _CONSOLIDATION_RETRY_DELAYS = [
-    timedelta(seconds=30),
     timedelta(minutes=1),
     timedelta(minutes=2),
     timedelta(minutes=5),
     timedelta(minutes=10),
+    timedelta(minutes=30),
 ]
 
 

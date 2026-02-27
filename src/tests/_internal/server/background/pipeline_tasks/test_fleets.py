@@ -392,5 +392,7 @@ class TestFleetWorker:
         )
         assert len(instances) == 1
         assert fleet.consolidation_attempt == 0
-        assert fleet.last_consolidated_at is not None
-        assert fleet.last_consolidated_at > previous_last_consolidated_at
+        assert (
+            fleet.last_consolidated_at is not None
+            and fleet.last_consolidated_at > previous_last_consolidated_at
+        )
