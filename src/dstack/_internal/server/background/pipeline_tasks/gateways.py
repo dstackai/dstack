@@ -541,14 +541,14 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
 
 
 @dataclass
-class _DeletedResult:
+class _ProcessToBeDeletedResult:
     delete_gateway: bool
     gateway_compute_update_map: _GatewayComputeUpdateMap = field(
         default_factory=_GatewayComputeUpdateMap
     )
 
 
-async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _DeletedResult:
+async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _ProcessToBeDeletedResult:
     assert gateway_model.backend.type != BackendType.DSTACK
     backend = await backends_services.get_project_backend_by_type_or_error(
         project=gateway_model.project, backend_type=gateway_model.backend.type
@@ -572,9 +572,9 @@ async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _Delete
                 "Error when deleting gateway compute for %s",
                 gateway_model.name,
             )
-            return _DeletedResult(delete_gateway=False)
+            return _ProcessToBeDeletedResult(delete_gateway=False)
         logger.info("Deleted gateway compute for %s", gateway_model.name)
-    result = _DeletedResult(delete_gateway=True)
+    result = _ProcessToBeDeletedResult(delete_gateway=True)
     if gateway_model.gateway_compute is not None:
         await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
         result.gateway_compute_update_map = {"active": False, "deleted": True}

@@ -412,11 +412,11 @@ async def _process_to_be_deleted_item(item: VolumePipelineItem):
 
 
 @dataclass
-class _DeletedResult:
+class _ProcessToBeDeletedResult:
     update_map: _VolumeUpdateMap = field(default_factory=_VolumeUpdateMap)
 
 
-async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _DeletedResult:
+async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessToBeDeletedResult:
     volume = volume_model_to_volume(volume_model)
     if volume.external:
         return _get_deleted_result()
@@ -457,8 +457,8 @@ async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _DeletedRe
     return _get_deleted_result()
 
 
-def _get_deleted_result() -> _DeletedResult:
-    return _DeletedResult(
+def _get_deleted_result() -> _ProcessToBeDeletedResult:
+    return _ProcessToBeDeletedResult(
         update_map={
             "deleted": True,
             "deleted_at": NOW_PLACEHOLDER,

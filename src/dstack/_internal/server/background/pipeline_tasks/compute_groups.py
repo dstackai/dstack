@@ -333,16 +333,9 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _T
             exc_info=not isinstance(e, BackendError),
         )
     terminated_result = _get_terminated_result()
-    compute_group_update_map = _ComputeGroupUpdateMap()
-    compute_group_update_map.update(result.compute_group_update_map)
-    compute_group_update_map.update(terminated_result.compute_group_update_map)
-    instances_update_map = _InstanceBulkUpdateMap()
-    instances_update_map.update(result.instances_update_map)
-    instances_update_map.update(terminated_result.instances_update_map)
-    return _TerminateResult(
-        compute_group_update_map=compute_group_update_map,
-        instances_update_map=instances_update_map,
-    )
+    terminated_result.compute_group_update_map.update(result.compute_group_update_map)
+    terminated_result.instances_update_map.update(result.instances_update_map)
+    return terminated_result
 
 
 def _next_termination_retry_at(last_termination_retry_at: datetime) -> datetime:

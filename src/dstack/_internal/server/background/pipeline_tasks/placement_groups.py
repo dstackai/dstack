@@ -231,19 +231,19 @@ class _PlacementGroupUpdateMap(ItemUpdateMap, total=False):
 
 
 @dataclass
-class _DeletePlacementGroupResult:
+class _DeleteResult:
     update_map: _PlacementGroupUpdateMap = field(default_factory=_PlacementGroupUpdateMap)
 
 
 async def _delete_placement_group(
     placement_group_model: PlacementGroupModel,
-) -> _DeletePlacementGroupResult:
+) -> _DeleteResult:
     placement_group = placement_group_model_to_placement_group(placement_group_model)
     if placement_group.provisioning_data is None:
         logger.error(
             "Failed to delete placement group %s. provisioning_data is None.", placement_group.name
         )
-        return _DeletePlacementGroupResult(update_map=_get_deleted_update_map())
+        return _get_deleted_result()
     backend = await backends_services.get_project_backend_by_type(
         project=placement_group_model.project,
         backend_type=placement_group.provisioning_data.backend,
@@ -254,7 +254,7 @@ async def _delete_placement_group(
             "Failed to delete placement group %s. Backend not available. Please delete it manually.",
             placement_group.name,
         )
-        return _DeletePlacementGroupResult(update_map=_get_deleted_update_map())
+        return _get_deleted_result()
     compute = backend.compute()
     assert isinstance(compute, ComputeWithPlacementGroupSupport)
     try:
@@ -263,20 +263,18 @@ async def _delete_placement_group(
         logger.info(
             "Placement group %s is still in use. Skipping deletion for now.", placement_group.name
         )
-        return _DeletePlacementGroupResult()
+        return _DeleteResult()
     except Exception:
         # TODO: Retry deletion
         logger.exception(
             "Got exception when deleting placement group %s. Please delete it manually.",
             placement_group.name,
         )
-        return _DeletePlacementGroupResult(update_map=_get_deleted_update_map())
-
-    return _DeletePlacementGroupResult(update_map=_get_deleted_update_map())
+    return _get_deleted_result()
 
 
-def _get_deleted_update_map() -> _PlacementGroupUpdateMap:
+def _get_deleted_result() -> _DeleteResult:
     update_map = _PlacementGroupUpdateMap()
     update_map["deleted"] = True
     update_map["deleted_at"] = NOW_PLACEHOLDER
-    return update_map
+    return _DeleteResult(update_map=update_map)
