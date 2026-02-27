@@ -358,7 +358,7 @@ Use `NOW_PLACEHOLDER` together with `resolve_now_placeholders()` in pipeline upd
 instead of `get_current_time()` to have the same current time for all updates in the transaction.
 """
 
-# Timestamp value stored in update maps before being resolved to current time.
+
 UpdateMapDateTime = Union[datetime, _NowPlaceholder]
 
 
