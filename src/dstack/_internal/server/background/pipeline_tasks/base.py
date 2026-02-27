@@ -5,7 +5,18 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, ClassVar, Generic, Optional, Protocol, Sequence, TypedDict, TypeVar
+from typing import (
+    Any,
+    ClassVar,
+    Final,
+    Generic,
+    Optional,
+    Protocol,
+    Sequence,
+    TypedDict,
+    TypeVar,
+    Union,
+)
 
 from sqlalchemy import and_, or_, update
 from sqlalchemy.orm import Mapped
@@ -337,6 +348,16 @@ class Worker(Generic[ItemT], ABC):
         pass
 
 
+class _NowPlaceholder:
+    pass
+
+
+NOW_PLACEHOLDER: Final = _NowPlaceholder()
+
+# Timestamp value stored in update maps before being resolved to current time.
+UpdateMapDateTime = Union[datetime, _NowPlaceholder]
+
+
 class UnlockUpdateMap(TypedDict, total=False):
     lock_expires_at: Optional[datetime]
     lock_token: Optional[uuid.UUID]
@@ -344,17 +365,17 @@ class UnlockUpdateMap(TypedDict, total=False):
 
 
 class ProcessedUpdateMap(TypedDict, total=False):
-    last_processed_at: datetime
+    last_processed_at: UpdateMapDateTime
 
 
 class ItemUpdateMap(UnlockUpdateMap, ProcessedUpdateMap, total=False):
     lock_expires_at: Optional[datetime]
     lock_token: Optional[uuid.UUID]
     lock_owner: Optional[str]
-    last_processed_at: datetime
+    last_processed_at: UpdateMapDateTime
 
 
-def set_unlock_update_map_fields(update_map: UnlockUpdateMap) -> None:
+def set_unlock_update_map_fields(update_map: UnlockUpdateMap):
     update_map["lock_expires_at"] = None
     update_map["lock_token"] = None
     update_map["lock_owner"] = None
@@ -362,8 +383,16 @@ def set_unlock_update_map_fields(update_map: UnlockUpdateMap) -> None:
 
 def set_processed_update_map_fields(
     update_map: ProcessedUpdateMap,
-    processed_at: Optional[datetime] = None,
-) -> None:
-    if processed_at is None:
-        processed_at = get_current_datetime()
-    update_map["last_processed_at"] = processed_at
+    now: UpdateMapDateTime = NOW_PLACEHOLDER,
+):
+    update_map["last_processed_at"] = now
+
+
+def resolve_now_placeholders(update_values: Any, now: datetime):
+    if isinstance(update_values, list):
+        for update_row in update_values:
+            resolve_now_placeholders(update_row, now)
+        return
+    for key, value in update_values.items():
+        if value is NOW_PLACEHOLDER:
+            update_values[key] = now

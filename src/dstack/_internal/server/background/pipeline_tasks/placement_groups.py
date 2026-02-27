@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Sequence
 
 from sqlalchemy import or_, select, update
@@ -10,12 +10,15 @@ from sqlalchemy.orm import joinedload, load_only
 from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
 from dstack._internal.core.errors import PlacementGroupInUseError
 from dstack._internal.server.background.pipeline_tasks.base import (
+    NOW_PLACEHOLDER,
     Fetcher,
     Heartbeater,
     ItemUpdateMap,
     Pipeline,
     PipelineItem,
+    UpdateMapDateTime,
     Worker,
+    resolve_now_placeholders,
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
 )
@@ -195,16 +198,14 @@ class PlacementGroupWorker(Worker[PipelineItem]):
                 return
 
         result = await _delete_placement_group(placement_group_model)
-        update_map = _PlacementGroupUpdateMap()
-        update_map.update(result.update_map)
+        update_map = result.update_map
+        set_processed_update_map_fields(update_map)
+        set_unlock_update_map_fields(update_map)
         if update_map.get("deleted", False):
             logger.info("Deleted placement group %s", placement_group_model.name)
-        else:
-            set_processed_update_map_fields(update_map)
-
-        set_unlock_update_map_fields(update_map)
 
         async with get_session_ctx() as session:
+            resolve_now_placeholders(update_map, now=get_current_datetime())
             res = await session.execute(
                 update(PlacementGroupModel)
                 .where(
@@ -226,7 +227,7 @@ class PlacementGroupWorker(Worker[PipelineItem]):
 
 class _PlacementGroupUpdateMap(ItemUpdateMap, total=False):
     deleted: bool
-    deleted_at: datetime
+    deleted_at: UpdateMapDateTime
 
 
 @dataclass
@@ -275,9 +276,7 @@ async def _delete_placement_group(
 
 
 def _get_deleted_update_map() -> _PlacementGroupUpdateMap:
-    now = get_current_datetime()
     update_map = _PlacementGroupUpdateMap()
-    update_map["last_processed_at"] = now
     update_map["deleted"] = True
-    update_map["deleted_at"] = now
+    update_map["deleted_at"] = NOW_PLACEHOLDER
     return update_map

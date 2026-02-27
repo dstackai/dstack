@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Sequence, TypedDict
 
 from sqlalchemy import or_, select, update
@@ -11,12 +11,15 @@ from dstack._internal.core.models.fleets import FleetSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
+    NOW_PLACEHOLDER,
     Fetcher,
     Heartbeater,
     ItemUpdateMap,
     Pipeline,
     PipelineItem,
+    UpdateMapDateTime,
     Worker,
+    resolve_now_placeholders,
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
 )
@@ -276,7 +279,17 @@ class FleetWorker(Worker[PipelineItem]):
         fleet_update_map.update(result.fleet_update_map)
         set_processed_update_map_fields(fleet_update_map)
         set_unlock_update_map_fields(fleet_update_map)
+        instance_update_rows = []
+        for instance_id, instance_update_map in result.instance_id_to_update_map.items():
+            update_row = _InstanceUpdateMap()
+            update_row.update(instance_update_map)
+            update_row["id"] = instance_id
+            set_processed_update_map_fields(update_row)
+            instance_update_rows.append(update_row)
         async with get_session_ctx() as session:
+            now = get_current_datetime()
+            resolve_now_placeholders(fleet_update_map, now=now)
+            resolve_now_placeholders(instance_update_rows, now=now)
             res = await session.execute(
                 update(FleetModel)
                 .where(
@@ -303,14 +316,6 @@ class FleetWorker(Worker[PipelineItem]):
                     .where(PlacementGroupModel.fleet_id == item.id)
                     .values(fleet_deleted=True)
                 )
-
-            instance_update_rows = []
-            for instance_id, instance_update_map in result.instance_id_to_update_map.items():
-                update_row = _InstanceUpdateMap()
-                update_row.update(instance_update_map)
-                update_row["id"] = instance_id
-                set_processed_update_map_fields(update_row)
-                instance_update_rows.append(update_row)
             if instance_update_rows:
                 await session.execute(
                     update(InstanceModel).execution_options(synchronize_session=False),
@@ -366,9 +371,9 @@ class _FleetUpdateMap(ItemUpdateMap, total=False):
     status: FleetStatus
     status_message: str
     deleted: bool
-    deleted_at: datetime
+    deleted_at: UpdateMapDateTime
     consolidation_attempt: int
-    last_consolidated_at: datetime
+    last_consolidated_at: UpdateMapDateTime
 
 
 class _InstanceUpdateMap(TypedDict, total=False):
@@ -376,8 +381,8 @@ class _InstanceUpdateMap(TypedDict, total=False):
     termination_reason: InstanceTerminationReason
     termination_reason_message: str
     deleted: bool
-    deleted_at: datetime
-    last_processed_at: datetime
+    deleted_at: UpdateMapDateTime
+    last_processed_at: UpdateMapDateTime
     id: uuid.UUID
 
 
@@ -409,7 +414,7 @@ async def _process_fleet(fleet_model: FleetModel) -> _ProcessResult:
     if deleted:
         result.fleet_update_map["status"] = FleetStatus.TERMINATED
         result.fleet_update_map["deleted"] = True
-        result.fleet_update_map["deleted_at"] = get_current_datetime()
+        result.fleet_update_map["deleted_at"] = NOW_PLACEHOLDER
     return result
 
 
@@ -432,7 +437,7 @@ def _consolidate_fleet_state_with_spec(fleet_model: FleetModel) -> _ProcessResul
     else:
         # The fleet is consolidated with respect to nodes min/max.
         result.fleet_update_map["consolidation_attempt"] = 0
-    result.fleet_update_map["last_consolidated_at"] = get_current_datetime()
+    result.fleet_update_map["last_consolidated_at"] = NOW_PLACEHOLDER
     return result
 
 
@@ -478,7 +483,7 @@ def _maintain_fleet_nodes_in_min_max_range(
             result.changes_required = True
             result.instance_id_to_update_map[instance.id] = {
                 "deleted": True,
-                "deleted_at": get_current_datetime(),
+                "deleted_at": NOW_PLACEHOLDER,
             }
     active_instances = [
         i for i in fleet_model.instances if i.status != InstanceStatus.TERMINATED and not i.deleted

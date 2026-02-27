@@ -18,6 +18,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     Pipeline,
     PipelineItem,
     Worker,
+    resolve_now_placeholders,
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
 )
@@ -237,6 +238,8 @@ async def _process_submitted_item(item: GatewayPipelineItem):
             session.add(gateway_compute_model)
             await session.flush()
             update_map["gateway_compute_id"] = gateway_compute_model.id
+        now = get_current_datetime()
+        resolve_now_placeholders(update_map, now=now)
         res = await session.execute(
             update(GatewayModel)
             .where(
@@ -351,18 +354,20 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
             return
 
     result = await _process_provisioning_gateway(gateway_model)
-    update_map = _GatewayUpdateMap()
-    update_map.update(result.gateway_update_map)
-    set_processed_update_map_fields(update_map)
-    set_unlock_update_map_fields(update_map)
+    gateway_update_map = result.gateway_update_map
+    set_processed_update_map_fields(gateway_update_map)
+    set_unlock_update_map_fields(gateway_update_map)
+
     async with get_session_ctx() as session:
+        now = get_current_datetime()
+        resolve_now_placeholders(gateway_update_map, now=now)
         res = await session.execute(
             update(GatewayModel)
             .where(
                 GatewayModel.id == gateway_model.id,
                 GatewayModel.lock_token == gateway_model.lock_token,
             )
-            .values(**update_map)
+            .values(**gateway_update_map)
             .returning(GatewayModel.id)
         )
         updated_ids = list(res.scalars().all())
@@ -378,8 +383,8 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
             session=session,
             gateway_model=gateway_model,
             old_status=gateway_model.status,
-            new_status=update_map.get("status", gateway_model.status),
-            status_message=update_map.get("status_message", gateway_model.status_message),
+            new_status=gateway_update_map.get("status", gateway_model.status),
+            status_message=gateway_update_map.get("status_message", gateway_model.status_message),
         )
         if result.gateway_compute_update_map:
             res = await session.execute(
@@ -497,6 +502,7 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
             update_map = _GatewayUpdateMap()
             set_processed_update_map_fields(update_map)
             set_unlock_update_map_fields(update_map)
+            resolve_now_placeholders(update_map, now=get_current_datetime())
             res = await session.execute(
                 update(GatewayModel)
                 .where(
