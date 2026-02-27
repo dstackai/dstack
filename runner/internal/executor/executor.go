@@ -21,6 +21,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/dstackai/ansistrip"
 	"github.com/prometheus/procfs"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
 	"github.com/dstackai/dstack/runner/consts"
@@ -60,6 +61,10 @@ type RunExecutor struct {
 
 	fileArchiveDir string
 	repoBlobDir    string
+
+	runnerLogFile     *os.File
+	runnerLogStripper *ansistrip.Writer
+	runnerLogger      *logrus.Entry
 
 	run             schemas.Run
 	jobSpec         schemas.JobSpec
@@ -136,14 +141,26 @@ func NewRunExecutor(tempDir string, dstackDir string, currentUser linuxuser.User
 	}, nil
 }
 
+// GetJobInfo must be called after SetJob
+func (ex *RunExecutor) GetJobInfo(ctx context.Context) (string, string, error) {
+	// preRun() sets ex.jobUser and ex.jobWorkingDir
+	if err := ex.preRun(ctx); err != nil {
+		return "", "", err
+	}
+	return ex.jobUser.Username, ex.jobWorkingDir, nil
+}
+
 // Run must be called after SetJob and WriteRepoBlob
 func (ex *RunExecutor) Run(ctx context.Context) (err error) {
-	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
-	if err != nil {
-		ex.SetJobState(ctx, types.JobStateFailed)
-		return fmt.Errorf("create runner log file: %w", err)
+	// If jobStateHistory is not empty, either Run() has already been called or
+	// preRun() has already been called via GetJobInfo() and failed
+	if len(ex.jobStateHistory) > 0 {
+		return errors.New("already running or finished")
 	}
-	defer func() { _ = runnerLogFile.Close() }()
+	if err := ex.preRun(ctx); err != nil {
+		return err
+	}
+	defer ex.postRun(ctx)
 
 	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerJobLogFileName))
 	if err != nil {
@@ -153,7 +170,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	defer func() { _ = jobLogFile.Close() }()
 
 	defer func() {
-		// recover goes after runnerLogFile.Close() to keep the log
+		// recover goes after postRun(), which closes runnerLogFile, to keep the log
 		if r := recover(); r != nil {
 			log.Error(ctx, "Executor PANIC", "err", r)
 			ex.SetJobState(ctx, types.JobStateFailed)
@@ -171,21 +188,8 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	stripper := ansistrip.NewWriter(ex.runnerLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
-	defer func() { _ = stripper.Close() }()
-	logger := io.MultiWriter(runnerLogFile, os.Stdout, stripper)
-	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
-	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
-
-	if err := ex.setJobUser(ctx); err != nil {
-		ex.SetJobStateWithTerminationReason(
-			ctx,
-			types.JobStateFailed,
-			types.TerminationReasonExecutorError,
-			fmt.Sprintf("Failed to set job user (%s)", err),
-		)
-		return fmt.Errorf("set job user: %w", err)
-	}
+	ctx = log.WithLogger(ctx, ex.runnerLogger)
+	log.Info(ctx, "Run job")
 
 	// setJobUser sets User.HomeDir to "/" if the original home dir is not set or not accessible,
 	// in that case we skip home dir provisioning
@@ -202,16 +206,6 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		if err := ex.setupClusterSsh(ctx); err != nil {
 			log.Error(ctx, "Failed to set up cluster SSH", "err", err)
 		}
-	}
-
-	if err := ex.setJobWorkingDir(ctx); err != nil {
-		ex.SetJobStateWithTerminationReason(
-			ctx,
-			types.JobStateFailed,
-			types.TerminationReasonExecutorError,
-			fmt.Sprintf("Failed to set job working dir (%s)", err),
-		)
-		return fmt.Errorf("set job working dir: %w", err)
 	}
 
 	if err := ex.setupRepo(ctx); err != nil {
@@ -334,6 +328,66 @@ func (ex *RunExecutor) SetJobStateWithExitStatus(
 
 func (ex *RunExecutor) SetRunnerState(state string) {
 	ex.state = state
+}
+
+// preRun performs actions that were once part of Run() but were moved to a separate function
+// to implement GetJobInfo()
+// preRun must not execute long-running operations, as GetJobInfo() is called synchronously
+// in the /api/run method
+func (ex *RunExecutor) preRun(ctx context.Context) error {
+	// Already called once
+	if ex.runnerLogFile != nil {
+		return nil
+	}
+
+	// logging is required for the subsequent setJob{User,WorkingDir} calls
+	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
+	if err != nil {
+		ex.SetJobState(ctx, types.JobStateFailed)
+		return fmt.Errorf("create runner log file: %w", err)
+	}
+	ex.runnerLogFile = runnerLogFile
+	ex.runnerLogStripper = ansistrip.NewWriter(ex.runnerLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
+	runnerLogWriter := io.MultiWriter(ex.runnerLogFile, os.Stdout, ex.runnerLogStripper)
+	runnerLogLevel := log.DefaultEntry.Logger.Level
+	ex.runnerLogger = log.NewEntry(runnerLogWriter, int(runnerLogLevel))
+	ctx = log.WithLogger(ctx, ex.runnerLogger)
+	log.Info(ctx, "Logging configured", "log_level", runnerLogLevel.String())
+
+	// jobUser and jobWorkingDir are required for GetJobInfo()
+	if err := ex.setJobUser(ctx); err != nil {
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonExecutorError,
+			fmt.Sprintf("Failed to set job user (%s)", err),
+		)
+		return fmt.Errorf("set job user: %w", err)
+	}
+	if err := ex.setJobWorkingDir(ctx); err != nil {
+		ex.SetJobStateWithTerminationReason(
+			ctx,
+			types.JobStateFailed,
+			types.TerminationReasonExecutorError,
+			fmt.Sprintf("Failed to set job working dir (%s)", err),
+		)
+		return fmt.Errorf("set job working dir: %w", err)
+	}
+
+	return nil
+}
+
+func (ex *RunExecutor) postRun(ctx context.Context) {
+	if ex.runnerLogFile != nil {
+		if err := ex.runnerLogFile.Close(); err != nil {
+			log.Error(ctx, "Failed to close runnerLogFile", "err", err)
+		}
+	}
+	if ex.runnerLogStripper != nil {
+		if err := ex.runnerLogStripper.Close(); err != nil {
+			log.Error(ctx, "Failed to close runnerLogStripper", "err", err)
+		}
+	}
 }
 
 // setJobWorkingDir must be called from Run after setJobUser

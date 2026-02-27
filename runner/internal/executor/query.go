@@ -9,19 +9,14 @@ func (ex *RunExecutor) GetJobWsLogsHistory() []schemas.LogEvent {
 }
 
 func (ex *RunExecutor) GetHistory(timestamp int64) *schemas.PullResponse {
-	resp := &schemas.PullResponse{
+	return &schemas.PullResponse{
 		JobStates:         eventsAfter(ex.jobStateHistory, timestamp),
 		JobLogs:           eventsAfter(ex.jobLogs.history, timestamp),
 		RunnerLogs:        eventsAfter(ex.runnerLogs.history, timestamp),
 		LastUpdated:       ex.timestamp.GetLatest(),
 		NoConnectionsSecs: ex.connectionTracker.GetNoConnectionsSecs(),
 		HasMore:           ex.state != WaitLogsFinished,
-		WorkingDir:        ex.jobWorkingDir,
 	}
-	if ex.jobUser != nil {
-		resp.Username = ex.jobUser.Username
-	}
-	return resp
 }
 
 func (ex *RunExecutor) GetRunnerState() string {

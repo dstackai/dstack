@@ -12,6 +12,7 @@ type Executor interface {
 	GetHistory(timestamp int64) *schemas.PullResponse
 	GetJobWsLogsHistory() []schemas.LogEvent
 	GetRunnerState() string
+	GetJobInfo(ctx context.Context) (username string, workingDir string, err error)
 	Run(ctx context.Context) error
 	SetJob(job schemas.SubmitBody)
 	SetJobState(ctx context.Context, state types.JobState)

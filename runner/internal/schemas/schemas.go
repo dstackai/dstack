@@ -35,8 +35,11 @@ type PullResponse struct {
 	LastUpdated       int64           `json:"last_updated"`
 	NoConnectionsSecs int64           `json:"no_connections_secs"`
 	HasMore           bool            `json:"has_more"`
-	WorkingDir        string          `json:"working_dir,omitempty"`
-	Username          string          `json:"username,omitempty"`
+}
+
+type JobInfoResponse struct {
+	WorkingDir string `json:"working_dir"`
+	Username   string `json:"username"`
 }
 
 type Run struct {

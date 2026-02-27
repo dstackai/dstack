@@ -24,6 +24,7 @@ from dstack._internal.server.schemas.runner import (
     GPUDevice,
     HealthcheckResponse,
     InstanceHealthResponse,
+    JobInfoResponse,
     LegacyPullResponse,
     LegacyStopBody,
     LegacySubmitBody,
@@ -124,9 +125,13 @@ class RunnerClient:
         )
         resp.raise_for_status()
 
-    def run_job(self):
+    def run_job(self) -> Optional[JobInfoResponse]:
         resp = requests.post(self._url("/api/run"), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
+        if not _is_json_response(resp):
+            # Old runner or runner failed to get job info
+            return None
+        return JobInfoResponse.__response__.parse_obj(resp.json())
 
     def pull(self, timestamp: int) -> PullResponse:
         resp = requests.get(
@@ -615,6 +620,13 @@ def _memory_to_bytes(memory: Optional[Memory]) -> int:
     if memory is None:
         return 0
     return int(memory * 1024**3)
+
+
+def _is_json_response(response: requests.Response) -> bool:
+    content_type = response.headers.get("content-type")
+    if not content_type:
+        return False
+    return content_type.split(";", maxsplit=1)[0].strip() == "application/json"
 
 
 _TaskID = Union[uuid.UUID, str]
