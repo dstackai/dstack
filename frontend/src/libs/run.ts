@@ -2,6 +2,7 @@ import { get as _get } from 'lodash';
 import { StatusIndicatorProps } from '@cloudscape-design/components';
 
 import { capitalize } from 'libs';
+import { formatResources } from 'libs/resources';
 
 import { finishedRunStatuses } from '../pages/Runs/constants';
 import { getJobProbesStatuses } from '../pages/Runs/Details/Jobs/List/helpers';
@@ -99,7 +100,9 @@ export const getExtendedModelFromRun = (run: IRun): IModelExtended | null => {
         project_name: run.project_name,
         run_name: run?.run_spec.run_name ?? 'No run name',
         user: run.user,
-        resources: run.latest_job_submission?.job_provisioning_data?.instance_type?.resources?.description ?? null,
+        resources: run.latest_job_submission?.job_provisioning_data?.instance_type?.resources
+            ? formatResources(run.latest_job_submission.job_provisioning_data.instance_type.resources)
+            : null,
         price: run.latest_job_submission?.job_provisioning_data?.price ?? null,
         submitted_at: run.submitted_at,
         repository: getRepoNameFromRun(run),

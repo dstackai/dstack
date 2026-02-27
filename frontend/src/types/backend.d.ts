@@ -1,6 +1,7 @@
 declare type TBackendType =
     | 'aws'
     | 'azure'
+    | 'crusoe'
     | 'cudo'
     | 'datacrunch'
     | 'dstack'

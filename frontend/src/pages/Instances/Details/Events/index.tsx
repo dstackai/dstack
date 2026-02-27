@@ -1,5 +1,4 @@
 import React from 'react';
-import { useListener } from 'react-bus';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '@cloudscape-design/components/button';
@@ -13,17 +12,15 @@ import { useLazyGetAllEventsQuery } from 'services/events';
 
 import { useColumnsDefinitions } from 'pages/Events/List/hooks/useColumnDefinitions';
 
-import { RUN_DETAILS_REFRESH_LIST_EVENT } from '../../constants';
-
 export const EventsList = () => {
     const { t } = useTranslation();
     const params = useParams();
-    const paramRunId = params.runId ?? '';
+    const paramInstanceId = params.instanceId ?? '';
     const navigate = useNavigate();
 
-    const { data, isLoading, isLoadingMore, refreshList } = useInfiniteScroll<IEvent, TEventListRequestParams>({
+    const { data, isLoading, isLoadingMore } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
-        args: { limit: DEFAULT_TABLE_PAGE_SIZE, within_runs: [paramRunId] },
+        args: { limit: DEFAULT_TABLE_PAGE_SIZE, target_instances: [paramInstanceId] },
 
         getPaginationParams: (lastEvent) => ({
             prev_recorded_at: lastEvent.recorded_at,
@@ -31,14 +28,12 @@ export const EventsList = () => {
         }),
     });
 
-    useListener(RUN_DETAILS_REFRESH_LIST_EVENT, refreshList);
-
     const { items, collectionProps } = useCollection<IEvent>(data, {
         selection: {},
     });
 
     const goToFullView = () => {
-        navigate(ROUTES.EVENTS.LIST + `?within_runs=${paramRunId}`);
+        navigate(ROUTES.EVENTS.LIST + `?target_instances=${paramInstanceId}`);
     };
 
     const { columns } = useColumnsDefinitions();

@@ -25,6 +25,18 @@ export const instanceApi = createApi({
                 result ? [...result.map(({ name }) => ({ type: 'Instance' as const, id: name })), 'Instances'] : ['Instances'],
         }),
 
+        getInstanceDetails: builder.query<IInstance, { projectName: string; instanceId: string }>({
+            query: ({ projectName, instanceId }) => {
+                return {
+                    url: API.INSTANCES.DETAILS(projectName),
+                    method: 'POST',
+                    body: { id: instanceId },
+                };
+            },
+
+            providesTags: (result) => (result ? [{ type: 'Instance' as const, id: result.name }] : []),
+        }),
+
         deleteInstances: builder.mutation<
             void,
             { projectName: IProject['project_name']; fleetName: string; instancesNums: number[] }
@@ -42,4 +54,4 @@ export const instanceApi = createApi({
     }),
 });
 
-export const { useLazyGetInstancesQuery, useDeleteInstancesMutation } = instanceApi;
+export const { useLazyGetInstancesQuery, useGetInstanceDetailsQuery, useDeleteInstancesMutation } = instanceApi;

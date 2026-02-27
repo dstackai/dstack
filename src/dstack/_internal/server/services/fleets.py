@@ -1151,10 +1151,18 @@ def _calculate_ssh_hosts_changes(
         if isinstance(current_host, str) or isinstance(new_host, str):
             if current_host != new_host:
                 changed_hosts.add(host)
-        elif diff_models(
-            current_host, new_host, reset={"identity_file": True, "proxy_jump": {"identity_file"}}
-        ):
-            changed_hosts.add(host)
+        else:
+            current_host = copy_model(current_host, reset={"identity_file"})
+            new_host = copy_model(new_host, reset={"identity_file"})
+            # XXX: cannot use copy_model() or diff_models() with
+            # `reset={..., "proxy_jump": {"identity_file"}}`
+            # as SSHProxyParams.identity_file has no default value
+            if current_host.proxy_jump is not None:
+                current_host.proxy_jump.identity_file = ""
+            if new_host.proxy_jump is not None:
+                new_host.proxy_jump.identity_file = ""
+            if diff_models(current_host, new_host):
+                changed_hosts.add(host)
     return added_hosts, removed_hosts, changed_hosts
 
 

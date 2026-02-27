@@ -1,13 +1,10 @@
 import React, { useEffect, useMemo } from 'react';
-import { useListener } from 'react-bus';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
 import { CodeEditor, Container, Header, Loader } from 'components';
 
-import { useGetRunQuery } from 'services/run';
-
-import { RUN_DETAILS_REFRESH_LIST_EVENT } from '../constants';
+import { useGetInstanceDetailsQuery } from 'services/instance';
 
 interface AceEditorElement extends HTMLElement {
     env?: {
@@ -17,32 +14,29 @@ interface AceEditorElement extends HTMLElement {
     };
 }
 
-export const RunInspect = () => {
+export const InstanceInspect = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
-    const paramRunId = params.runId ?? '';
+    const paramInstanceId = params.instanceId ?? '';
 
-    const {
-        data: runData,
-        isLoading,
-        refetch,
-    } = useGetRunQuery({
-        project_name: paramProjectName,
-        id: paramRunId,
-    });
-
-    useListener(RUN_DETAILS_REFRESH_LIST_EVENT, refetch);
+    const { data, isLoading } = useGetInstanceDetailsQuery(
+        {
+            projectName: paramProjectName,
+            instanceId: paramInstanceId,
+        },
+        {
+            refetchOnMountOrArgChange: true,
+        },
+    );
 
     const jsonContent = useMemo(() => {
-        if (!runData) return '';
-        return JSON.stringify(runData, null, 2);
-    }, [runData]);
+        if (!data) return '';
+        return JSON.stringify(data, null, 2);
+    }, [data]);
 
-    // Set editor to read-only after it loads
     useEffect(() => {
         const timer = setTimeout(() => {
-            // Find the ace editor instance in the DOM
             const editorElements = document.querySelectorAll('.ace_editor');
             editorElements.forEach((element: Element) => {
                 const aceEditor = (element as AceEditorElement).env?.editor;
@@ -63,14 +57,12 @@ export const RunInspect = () => {
         );
 
     return (
-        <Container header={<Header variant="h2">{t('projects.run.inspect')}</Header>}>
+        <Container header={<Header variant="h2">{t('fleets.instances.inspect')}</Header>}>
             <CodeEditor
                 value={jsonContent}
                 language="json"
                 editorContentHeight={600}
-                onChange={() => {
-                    // Prevent editing - onChange is required but we ignore changes
-                }}
+                onChange={() => {}}
             />
         </Container>
     );

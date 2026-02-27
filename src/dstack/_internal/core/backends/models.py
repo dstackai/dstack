@@ -12,6 +12,11 @@ from dstack._internal.core.backends.cloudrift.models import (
     CloudRiftBackendConfig,
     CloudRiftBackendConfigWithCreds,
 )
+from dstack._internal.core.backends.crusoe.models import (
+    CrusoeBackendConfig,
+    CrusoeBackendConfigWithCreds,
+    CrusoeBackendFileConfigWithCreds,
+)
 from dstack._internal.core.backends.cudo.models import (
     CudoBackendConfig,
     CudoBackendConfigWithCreds,
@@ -79,6 +84,7 @@ AnyBackendConfigWithoutCreds = Union[
     AWSBackendConfig,
     AzureBackendConfig,
     CloudRiftBackendConfig,
+    CrusoeBackendConfig,
     CudoBackendConfig,
     BaseDigitalOceanBackendConfig,
     GCPBackendConfig,
@@ -103,6 +109,7 @@ AnyBackendConfigWithCreds = Union[
     AWSBackendConfigWithCreds,
     AzureBackendConfigWithCreds,
     CloudRiftBackendConfigWithCreds,
+    CrusoeBackendConfigWithCreds,
     CudoBackendConfigWithCreds,
     VerdaBackendConfigWithCreds,
     BaseDigitalOceanBackendConfigWithCreds,
@@ -126,6 +133,7 @@ AnyBackendFileConfigWithCreds = Union[
     AWSBackendConfigWithCreds,
     AzureBackendConfigWithCreds,
     CloudRiftBackendConfigWithCreds,
+    CrusoeBackendFileConfigWithCreds,
     CudoBackendConfigWithCreds,
     VerdaBackendConfigWithCreds,
     BaseDigitalOceanBackendConfigWithCreds,

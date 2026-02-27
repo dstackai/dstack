@@ -119,6 +119,7 @@
     "rc-tooltip": "^5.2.2",
     "react": "^18.3.1",
     "react-avatar": "^5.0.3",
+    "react-bus": "^4.0.1",
     "react-dom": "^18.3.1",
     "react-helmet": "^6.1.0",
     "react-hook-form": "^7.53.0",

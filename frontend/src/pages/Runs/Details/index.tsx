@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useBus } from 'react-bus';
 import { useTranslation } from 'react-i18next';
 import { Outlet, /*useNavigate,*/ useParams } from 'react-router-dom';
 import Button from '@cloudscape-design/components/button';
@@ -15,7 +16,7 @@ import {
     isAvailableStoppingForRun,
     // isAvailableDeletingForRun,
 } from '../utils';
-import { CodeTab } from './constants';
+import { CodeTab, RUN_DETAILS_REFRESH_LIST_EVENT } from './constants';
 
 import styles from './styles.module.scss';
 
@@ -26,12 +27,12 @@ export const RunDetailsPage: React.FC = () => {
     const paramProjectName = params.projectName ?? '';
     const paramRunId = params.runId ?? '';
     const [pushNotification] = useNotifications();
+    const bus = useBus();
 
     const {
         data: runData,
         error: runError,
         isLoading,
-        refetch,
     } = useGetRunQuery(
         {
             project_name: paramProjectName,
@@ -108,6 +109,10 @@ export const RunDetailsPage: React.FC = () => {
             });
     };
 
+    const refreshHandle = () => {
+        bus.emit(RUN_DETAILS_REFRESH_LIST_EVENT);
+    };
+
     // const deleteClickHandle = () => {
     //     if (!runData) {
     //         return;
@@ -157,7 +162,7 @@ export const RunDetailsPage: React.FC = () => {
                                     iconName="refresh"
                                     disabled={isLoading}
                                     ariaLabel={t('common.refresh')}
-                                    onClick={refetch}
+                                    onClick={refreshHandle}
                                 />
                             </>
                         }

@@ -160,7 +160,7 @@ This property ensures that instances are interconnected. This is required for ru
 
     #### Backends
 
-    Fast interconnect is supported on the `aws`, `gcp`, `nebius`, `kubernetes`, and `runpod` backends. Some backends may require additional configuration.
+    Fast interconnect is supported on the `aws`, `gcp`, `nebius`, `crusoe`, and `kubernetes` backends. Some backends may require additional configuration.
 
     === "AWS"
         On AWS, `dstack` requires `public_ips` to be set to `false` in the backend configuration.
@@ -173,14 +173,17 @@ This property ensures that instances are interconnected. This is required for ru
     === "Nebius"
         On [Nebius](https://docs.nebius.com/compute/clusters/gpu), `dstack` automatically configures InfiniBand networking if it is supported by the selected instance type.
 
+    === "Crusoe"
+        On [Crusoe](https://docs.crusoecloud.com/networking/infiniband/managing-infiniband-networks), `dstack` automatically configures InfiniBand networking if it is supported by the selected instance type.
+        Refer to the [Crusoe](../../examples/clusters/crusoe/index.md#vms) example for more details.
+
     === "Kubernetes"
         If the Kubernetes cluster has interconnect configured, `dstack` can use it without additional setup.
         See the [Lambda](../../examples/clusters/lambda/index.md#kubernetes) or [Crusoe](../../examples/clusters/crusoe/index.md#kubernetes) examples.
     
-    === "Runpod"
-        On [Runpod](https://docs.runpod.io/instant-clusters), `dstack` automatically configures InfiniBand networking if it is supported by the selected instance type.
-    
     > See the [Clusters](../../examples.md#clusters) examples.
+
+    <!-- TODO: Add Runpod tab to cluster backends once cluster support is fully tested -->
 
 === "SSH fleets"
     If the hosts in the SSH fleet have interconnect configured, you only need to set `placement` to `cluster`.

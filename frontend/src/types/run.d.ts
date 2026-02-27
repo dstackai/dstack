@@ -269,7 +269,9 @@ declare interface IResources {
     spot: boolean;
 
     disk?: IDisk;
+    cpu_arch?: string | null;
 
+    /** @deprecated Use formatResources() from libs/resources instead. Remove in 0.21. */
     description?: string;
 }
 

@@ -5,3 +5,5 @@ export enum CodeTab {
     Events = 'events',
     Inspect = 'inspect',
 }
+
+export const RUN_DETAILS_REFRESH_LIST_EVENT = 'RUN_DETAILS_REFRESH_LIST_EVENT';
