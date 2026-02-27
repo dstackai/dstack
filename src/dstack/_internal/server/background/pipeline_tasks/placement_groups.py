@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Sequence
 
 from sqlalchemy import or_, select, update
@@ -11,12 +11,12 @@ from dstack._internal.core.errors import PlacementGroupInUseError
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
+    ItemUpdateMap,
     Pipeline,
     PipelineItem,
-    UpdateMap,
     Worker,
-    get_processed_update_map,
-    get_unlock_update_map,
+    set_processed_update_map_fields,
+    set_unlock_update_map_fields,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
@@ -197,9 +197,9 @@ class PlacementGroupWorker(Worker[PipelineItem]):
         if update_map:
             logger.info("Deleted placement group %s", placement_group_model.name)
         else:
-            update_map = get_processed_update_map()
+            set_processed_update_map_fields(update_map)
 
-        update_map |= get_unlock_update_map()
+        set_unlock_update_map_fields(update_map)
 
         async with get_session_ctx() as session:
             res = await session.execute(
@@ -221,7 +221,14 @@ class PlacementGroupWorker(Worker[PipelineItem]):
                 )
 
 
-async def _delete_placement_group(placement_group_model: PlacementGroupModel) -> UpdateMap:
+class _PlacementGroupUpdateMap(ItemUpdateMap, total=False):
+    deleted: bool
+    deleted_at: datetime
+
+
+async def _delete_placement_group(
+    placement_group_model: PlacementGroupModel,
+) -> _PlacementGroupUpdateMap:
     placement_group = placement_group_model_to_placement_group(placement_group_model)
     if placement_group.provisioning_data is None:
         logger.error(
@@ -247,7 +254,7 @@ async def _delete_placement_group(placement_group_model: PlacementGroupModel) ->
         logger.info(
             "Placement group %s is still in use. Skipping deletion for now.", placement_group.name
         )
-        return {}
+        return _PlacementGroupUpdateMap()
     except Exception:
         # TODO: Retry deletion
         logger.exception(
@@ -259,10 +266,10 @@ async def _delete_placement_group(placement_group_model: PlacementGroupModel) ->
     return _get_deleted_update_map()
 
 
-def _get_deleted_update_map() -> UpdateMap:
+def _get_deleted_update_map() -> _PlacementGroupUpdateMap:
     now = get_current_datetime()
-    return {
-        "last_processed_at": now,
-        "deleted": True,
-        "deleted_at": now,
-    }
+    update_map = _PlacementGroupUpdateMap()
+    update_map["last_processed_at"] = now
+    update_map["deleted"] = True
+    update_map["deleted_at"] = now
+    return update_map

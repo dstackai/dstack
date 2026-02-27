@@ -10,8 +10,8 @@ from dstack._internal.core.models.fleets import FleetNodesSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.server.background.pipeline_tasks.base import PipelineItem
 from dstack._internal.server.background.pipeline_tasks.fleets import (
-    FleetPipelineItem,
     FleetWorker,
 )
 from dstack._internal.server.models import FleetModel, InstanceModel
@@ -33,10 +33,10 @@ def worker() -> FleetWorker:
     return FleetWorker(queue=Mock(), heartbeater=Mock())
 
 
-def _fleet_to_pipeline_item(fleet: FleetModel) -> FleetPipelineItem:
+def _fleet_to_pipeline_item(fleet: FleetModel) -> PipelineItem:
     assert fleet.lock_token is not None
     assert fleet.lock_expires_at is not None
-    return FleetPipelineItem(
+    return PipelineItem(
         __tablename__=fleet.__tablename__,
         id=fleet.id,
         lock_token=fleet.lock_token,

@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Sequence
 
 from sqlalchemy import or_, select, update
@@ -13,12 +13,12 @@ from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
+    ItemUpdateMap,
     Pipeline,
     PipelineItem,
-    UpdateMap,
     Worker,
-    get_processed_update_map,
-    get_unlock_update_map,
+    set_processed_update_map_fields,
+    set_unlock_update_map_fields,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
@@ -233,7 +233,10 @@ async def _process_submitted_item(item: VolumePipelineItem):
             return
 
     result = await _process_submitted_volume(volume_model)
-    update_map = result.update_map | get_processed_update_map() | get_unlock_update_map()
+    update_map = _VolumeUpdateMap()
+    update_map.update(result.update_map)
+    set_processed_update_map_fields(update_map)
+    set_unlock_update_map_fields(update_map)
     async with get_session_ctx() as session:
         res = await session.execute(
             update(VolumeModel)
@@ -263,9 +266,17 @@ async def _process_submitted_item(item: VolumePipelineItem):
         )
 
 
+class _VolumeUpdateMap(ItemUpdateMap, total=False):
+    status: VolumeStatus
+    status_message: str
+    volume_provisioning_data: str
+    deleted: bool
+    deleted_at: datetime
+
+
 @dataclass
 class _SubmittedResult:
-    update_map: UpdateMap = field(default_factory=dict)
+    update_map: _VolumeUpdateMap = field(default_factory=_VolumeUpdateMap)
 
 
 async def _process_submitted_volume(volume_model: VolumeModel) -> _SubmittedResult:
@@ -363,7 +374,9 @@ async def _process_to_be_deleted_item(item: VolumePipelineItem):
             return
 
     result = await _process_to_be_deleted_volume(volume_model)
-    update_map = result.update_map | get_unlock_update_map()
+    update_map = _VolumeUpdateMap()
+    update_map.update(result.update_map)
+    set_unlock_update_map_fields(update_map)
     async with get_session_ctx() as session:
         res = await session.execute(
             update(VolumeModel)
@@ -393,7 +406,7 @@ async def _process_to_be_deleted_item(item: VolumePipelineItem):
 
 @dataclass
 class _DeletedResult:
-    update_map: UpdateMap = field(default_factory=dict)
+    update_map: _VolumeUpdateMap = field(default_factory=_VolumeUpdateMap)
 
 
 async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _DeletedResult:

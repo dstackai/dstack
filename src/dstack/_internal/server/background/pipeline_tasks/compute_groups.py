@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Sequence
+from typing import Sequence, TypedDict
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only
@@ -14,12 +14,12 @@ from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
+    ItemUpdateMap,
     Pipeline,
     PipelineItem,
-    UpdateMap,
     Worker,
-    get_processed_update_map,
-    get_unlock_update_map,
+    set_processed_update_map_fields,
+    set_unlock_update_map_fields,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import ComputeGroupModel, InstanceModel, ProjectModel
@@ -206,9 +206,9 @@ class ComputeGroupWorker(Worker[PipelineItem]):
         if terminate_result.compute_group_update_map:
             logger.info("Terminated compute group %s", compute_group_model.id)
         else:
-            terminate_result.compute_group_update_map = get_processed_update_map()
+            set_processed_update_map_fields(terminate_result.compute_group_update_map)
 
-        terminate_result.compute_group_update_map |= get_unlock_update_map()
+        set_unlock_update_map_fields(terminate_result.compute_group_update_map)
 
         async with get_session_ctx() as session:
             res = await session.execute(
@@ -246,10 +246,28 @@ class ComputeGroupWorker(Worker[PipelineItem]):
                 )
 
 
+class _ComputeGroupUpdateMap(ItemUpdateMap, total=False):
+    status: ComputeGroupStatus
+    deleted: bool
+    deleted_at: datetime
+    first_termination_retry_at: datetime
+    last_termination_retry_at: datetime
+
+
+class _InstanceBulkUpdateMap(TypedDict, total=False):
+    last_processed_at: datetime
+    deleted: bool
+    deleted_at: datetime
+    finished_at: datetime
+    status: InstanceStatus
+
+
 @dataclass
 class _TerminateResult:
-    compute_group_update_map: UpdateMap = field(default_factory=dict)
-    instances_update_map: UpdateMap = field(default_factory=dict)
+    compute_group_update_map: _ComputeGroupUpdateMap = field(
+        default_factory=_ComputeGroupUpdateMap
+    )
+    instances_update_map: _InstanceBulkUpdateMap = field(default_factory=_InstanceBulkUpdateMap)
 
 
 async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _TerminateResult:
@@ -286,13 +304,13 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _T
         if compute_group_model.first_termination_retry_at is None:
             result.compute_group_update_map["first_termination_retry_at"] = get_current_datetime()
         result.compute_group_update_map["last_termination_retry_at"] = get_current_datetime()
+        first_termination_retry_at = result.compute_group_update_map.get(
+            "first_termination_retry_at", compute_group_model.first_termination_retry_at
+        )
+        assert first_termination_retry_at is not None
         if _next_termination_retry_at(
             result.compute_group_update_map["last_termination_retry_at"]
-        ) < _get_termination_deadline(
-            result.compute_group_update_map.get(
-                "first_termination_retry_at", compute_group_model.first_termination_retry_at
-            )
-        ):
+        ) < _get_termination_deadline(first_termination_retry_at):
             logger.warning(
                 "Failed to terminate compute group %s. Will retry. Error: %r",
                 compute_group.name,
@@ -309,10 +327,15 @@ async def _terminate_compute_group(compute_group_model: ComputeGroupModel) -> _T
             exc_info=not isinstance(e, BackendError),
         )
     terminated_result = _get_terminated_result()
+    compute_group_update_map = _ComputeGroupUpdateMap()
+    compute_group_update_map.update(result.compute_group_update_map)
+    compute_group_update_map.update(terminated_result.compute_group_update_map)
+    instances_update_map = _InstanceBulkUpdateMap()
+    instances_update_map.update(result.instances_update_map)
+    instances_update_map.update(terminated_result.instances_update_map)
     return _TerminateResult(
-        compute_group_update_map=result.compute_group_update_map
-        | terminated_result.compute_group_update_map,
-        instances_update_map=result.instances_update_map | terminated_result.instances_update_map,
+        compute_group_update_map=compute_group_update_map,
+        instances_update_map=instances_update_map,
     )
 
 

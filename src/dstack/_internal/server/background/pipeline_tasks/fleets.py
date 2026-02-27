@@ -1,8 +1,8 @@
 import asyncio
 import uuid
 from dataclasses import dataclass, field
-from datetime import timedelta
-from typing import Sequence
+from datetime import datetime, timedelta
+from typing import Sequence, TypedDict
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only, selectinload
@@ -13,12 +13,12 @@ from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
+    ItemUpdateMap,
     Pipeline,
     PipelineItem,
-    UpdateMap,
     Worker,
-    get_processed_update_map,
-    get_unlock_update_map,
+    set_processed_update_map_fields,
+    set_unlock_update_map_fields,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
@@ -45,12 +45,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-@dataclass
-class FleetPipelineItem(PipelineItem):
-    pass
-
-
-class FleetPipeline(Pipeline[FleetPipelineItem]):
+class FleetPipeline(Pipeline[PipelineItem]):
     def __init__(
         self,
         workers_num: int = 10,
@@ -68,7 +63,7 @@ class FleetPipeline(Pipeline[FleetPipelineItem]):
             lock_timeout=lock_timeout,
             heartbeat_trigger=heartbeat_trigger,
         )
-        self.__heartbeater = Heartbeater[FleetPipelineItem](
+        self.__heartbeater = Heartbeater[PipelineItem](
             model_type=FleetModel,
             lock_timeout=self._lock_timeout,
             heartbeat_trigger=self._heartbeat_trigger,
@@ -90,11 +85,11 @@ class FleetPipeline(Pipeline[FleetPipelineItem]):
         return FleetModel.__name__
 
     @property
-    def _heartbeater(self) -> Heartbeater[FleetPipelineItem]:
+    def _heartbeater(self) -> Heartbeater[PipelineItem]:
         return self.__heartbeater
 
     @property
-    def _fetcher(self) -> Fetcher[FleetPipelineItem]:
+    def _fetcher(self) -> Fetcher[PipelineItem]:
         return self.__fetcher
 
     @property
@@ -102,14 +97,14 @@ class FleetPipeline(Pipeline[FleetPipelineItem]):
         return self.__workers
 
 
-class FleetFetcher(Fetcher[FleetPipelineItem]):
+class FleetFetcher(Fetcher[PipelineItem]):
     def __init__(
         self,
-        queue: asyncio.Queue[FleetPipelineItem],
+        queue: asyncio.Queue[PipelineItem],
         queue_desired_minsize: int,
         min_processing_interval: timedelta,
         lock_timeout: timedelta,
-        heartbeater: Heartbeater[FleetPipelineItem],
+        heartbeater: Heartbeater[PipelineItem],
         queue_check_delay: float = 1.0,
     ) -> None:
         super().__init__(
@@ -122,7 +117,7 @@ class FleetFetcher(Fetcher[FleetPipelineItem]):
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.FleetFetcher.fetch")
-    async def fetch(self, limit: int) -> list[FleetPipelineItem]:
+    async def fetch(self, limit: int) -> list[PipelineItem]:
         fleet_lock, _ = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
         async with fleet_lock:
             async with get_session_ctx() as session:
@@ -165,7 +160,7 @@ class FleetFetcher(Fetcher[FleetPipelineItem]):
                     fleet_model.lock_token = lock_token
                     fleet_model.lock_owner = FleetPipeline.__name__
                     items.append(
-                        FleetPipelineItem(
+                        PipelineItem(
                             __tablename__=FleetModel.__tablename__,
                             id=fleet_model.id,
                             lock_expires_at=lock_expires_at,
@@ -177,11 +172,11 @@ class FleetFetcher(Fetcher[FleetPipelineItem]):
         return items
 
 
-class FleetWorker(Worker[FleetPipelineItem]):
+class FleetWorker(Worker[PipelineItem]):
     def __init__(
         self,
-        queue: asyncio.Queue[FleetPipelineItem],
-        heartbeater: Heartbeater[FleetPipelineItem],
+        queue: asyncio.Queue[PipelineItem],
+        heartbeater: Heartbeater[PipelineItem],
     ) -> None:
         super().__init__(
             queue=queue,
@@ -189,7 +184,7 @@ class FleetWorker(Worker[FleetPipelineItem]):
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.FleetWorker.process")
-    async def process(self, item: FleetPipelineItem):
+    async def process(self, item: PipelineItem):
         async with get_session_ctx() as session:
             res = await session.execute(
                 select(FleetModel)
@@ -277,9 +272,10 @@ class FleetWorker(Worker[FleetPipelineItem]):
                 # await session.commit()
 
         result = await _process_fleet(fleet_model)
-        fleet_update_map = (
-            result.fleet_update_map | get_processed_update_map() | get_unlock_update_map()
-        )
+        fleet_update_map = _FleetUpdateMap()
+        fleet_update_map.update(result.fleet_update_map)
+        set_processed_update_map_fields(fleet_update_map)
+        set_unlock_update_map_fields(fleet_update_map)
         async with get_session_ctx() as session:
             res = await session.execute(
                 update(FleetModel)
@@ -310,9 +306,10 @@ class FleetWorker(Worker[FleetPipelineItem]):
 
             instance_update_rows = []
             for instance_id, instance_update_map in result.instance_id_to_update_map.items():
-                update_row = dict(instance_update_map)
+                update_row = _InstanceUpdateMap()
+                update_row.update(instance_update_map)
                 update_row["id"] = instance_id
-                update_row |= get_processed_update_map()  # | get_unlock_update_map()
+                set_processed_update_map_fields(update_row)
                 instance_update_rows.append(update_row)
             if instance_update_rows:
                 await session.execute(
@@ -365,16 +362,35 @@ class FleetWorker(Worker[FleetPipelineItem]):
             )
 
 
+class _FleetUpdateMap(ItemUpdateMap, total=False):
+    status: FleetStatus
+    status_message: str
+    deleted: bool
+    deleted_at: datetime
+    consolidation_attempt: int
+    last_consolidated_at: datetime
+
+
+class _InstanceUpdateMap(TypedDict, total=False):
+    status: InstanceStatus
+    termination_reason: InstanceTerminationReason
+    termination_reason_message: str
+    deleted: bool
+    deleted_at: datetime
+    last_processed_at: datetime
+    id: uuid.UUID
+
+
 @dataclass
 class _ProcessResult:
-    fleet_update_map: UpdateMap = field(default_factory=dict)
-    instance_id_to_update_map: dict[uuid.UUID, UpdateMap] = field(default_factory=dict)
+    fleet_update_map: _FleetUpdateMap = field(default_factory=_FleetUpdateMap)
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap] = field(default_factory=dict)
     new_instances_count: int = 0
 
 
 @dataclass
 class _MaintainNodesResult:
-    instance_id_to_update_map: dict[uuid.UUID, UpdateMap] = field(default_factory=dict)
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap] = field(default_factory=dict)
     new_instances_count: int = 0
     changes_required: bool = False
 

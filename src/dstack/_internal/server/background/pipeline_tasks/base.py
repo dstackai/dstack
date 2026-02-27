@@ -5,7 +5,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, ClassVar, Generic, Optional, Protocol, Sequence, TypeVar
+from typing import Any, ClassVar, Generic, Optional, Protocol, Sequence, TypedDict, TypeVar
 
 from sqlalchemy import and_, or_, update
 from sqlalchemy.orm import Mapped
@@ -337,16 +337,33 @@ class Worker(Generic[ItemT], ABC):
         pass
 
 
-UpdateMap = dict[str, Any]
+class UnlockUpdateMap(TypedDict, total=False):
+    lock_expires_at: Optional[datetime]
+    lock_token: Optional[uuid.UUID]
+    lock_owner: Optional[str]
 
 
-def get_unlock_update_map() -> UpdateMap:
-    return {
-        "lock_expires_at": None,
-        "lock_token": None,
-        "lock_owner": None,
-    }
+class ProcessedUpdateMap(TypedDict, total=False):
+    last_processed_at: datetime
 
 
-def get_processed_update_map() -> UpdateMap:
-    return {"last_processed_at": get_current_datetime()}
+class ItemUpdateMap(UnlockUpdateMap, ProcessedUpdateMap, total=False):
+    lock_expires_at: Optional[datetime]
+    lock_token: Optional[uuid.UUID]
+    lock_owner: Optional[str]
+    last_processed_at: datetime
+
+
+def set_unlock_update_map_fields(update_map: UnlockUpdateMap) -> None:
+    update_map["lock_expires_at"] = None
+    update_map["lock_token"] = None
+    update_map["lock_owner"] = None
+
+
+def set_processed_update_map_fields(
+    update_map: ProcessedUpdateMap,
+    processed_at: Optional[datetime] = None,
+) -> None:
+    if processed_at is None:
+        processed_at = get_current_datetime()
+    update_map["last_processed_at"] = processed_at
