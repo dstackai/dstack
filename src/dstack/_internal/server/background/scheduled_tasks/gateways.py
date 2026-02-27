@@ -35,6 +35,8 @@ async def process_gateways_connections():
     await _process_active_connections()
 
 
+# NOTE: This scheduled task is going to be deprecated in favor of `GatewayPipeline`.
+# If this logic changes before removal, keep `pipeline_tasks/gateways.py` in sync.
 @sentry_utils.instrument_scheduled_task
 async def process_gateways():
     lock, lockset = get_locker(get_db().dialect_name).get_lockset(GatewayModel.__tablename__)

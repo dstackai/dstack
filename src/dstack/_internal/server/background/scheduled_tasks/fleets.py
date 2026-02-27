@@ -40,6 +40,8 @@ BATCH_SIZE = 10
 MIN_PROCESSING_INTERVAL = timedelta(seconds=30)
 
 
+# NOTE: This scheduled task is going to be deprecated in favor of `FleetPipeline`.
+# If this logic changes before removal, keep `pipeline_tasks/fleets.py` in sync.
 @sentry_utils.instrument_scheduled_task
 async def process_fleets():
     fleet_lock, fleet_lockset = get_locker(get_db().dialect_name).get_lockset(
