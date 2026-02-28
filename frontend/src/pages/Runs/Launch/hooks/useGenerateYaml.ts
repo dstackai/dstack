@@ -32,7 +32,6 @@ export const useGenerateYaml = ({ formValues, configuration, envParam, backends 
 
                 ...(name ? { name } : {}),
                 ...(ide ? { ide } : {}),
-                ...(docker ? { docker } : {}),
                 ...(image ? { image } : {}),
                 ...(python ? { python } : {}),
                 ...(envEntries.length > 0 ? { env: envEntries } : {}),

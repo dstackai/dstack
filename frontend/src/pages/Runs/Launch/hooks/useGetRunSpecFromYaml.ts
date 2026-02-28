@@ -36,6 +36,7 @@ const supportedFields: (keyof TDevEnvironmentConfiguration | keyof TServiceConfi
     'repos',
     'auth',
     'commands',
+    'ports',
     'port',
     'gateway',
     'https',
