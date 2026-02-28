@@ -54,8 +54,6 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
         if (detail.activeTabId === DockerPythonTabs.PYTHON) {
             setValue(FORM_FIELD_NAMES.image, '');
         }
-
-        setValue(FORM_FIELD_NAMES.docker, detail.activeTabId === DockerPythonTabs.DOCKER);
     };
 
     const defaultPassword = generateSecurePassword(20);
