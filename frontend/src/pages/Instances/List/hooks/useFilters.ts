@@ -4,8 +4,9 @@ import { ToggleProps } from '@cloudscape-design/components';
 
 import type { PropertyFilterProps } from 'components';
 
-import { useProjectFilter } from 'hooks/useProjectFilter';
+import { useLocalStorageState } from 'hooks';
 import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
+import { useLazyGetProjectsQuery } from 'services/project';
 
 type RequestParamsKeys = keyof Pick<TInstanceListRequestParams, 'only_active' | 'project_names' | 'fleet_ids'>;
 
@@ -14,10 +15,14 @@ const filterKeys: Record<string, RequestParamsKeys> = {
     FLEET_IDS: 'fleet_ids',
 };
 
-export const useFilters = (localStorePrefix = 'instances-list-page') => {
+const limit = 100;
+
+export const useFilters = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const [onlyActive, setOnlyActive] = useState(() => searchParams.get('only_active') === 'true');
-    const { projectOptions } = useProjectFilter({ localStorePrefix });
+    const [onlyActive, setOnlyActive] = useLocalStorageState('instance-list-filter-only-active', true);
+    const [dynamicFilteringOptions, setDynamicFilteringOptions] = useState<PropertyFilterProps.FilteringOption[]>([]);
+    const [filteringStatusType, setFilteringStatusType] = useState<PropertyFilterProps.StatusType | undefined>();
+    const [getProjects] = useLazyGetProjectsQuery();
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
         return requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys });
@@ -25,23 +30,12 @@ export const useFilters = (localStorePrefix = 'instances-list-page') => {
 
     const clearFilter = () => {
         setSearchParams({});
-        setOnlyActive(false);
         setPropertyFilterQuery(EMPTY_QUERY);
     };
 
     const filteringOptions = useMemo(() => {
-        const options: PropertyFilterProps.FilteringOption[] = [];
-
-        projectOptions.forEach(({ value }) => {
-            if (value)
-                options.push({
-                    propertyKey: filterKeys.PROJECT_NAMES,
-                    value,
-                });
-        });
-
-        return options;
-    }, [projectOptions]);
+        return [...dynamicFilteringOptions];
+    }, [dynamicFilteringOptions]);
 
     const filteringProperties = [
         {
@@ -54,6 +48,7 @@ export const useFilters = (localStorePrefix = 'instances-list-page') => {
             key: filterKeys.FLEET_IDS,
             operators: ['='],
             propertyLabel: 'Fleet ID',
+            groupValuesLabel: 'Fleet ID values',
         },
     ];
 
@@ -70,8 +65,6 @@ export const useFilters = (localStorePrefix = 'instances-list-page') => {
 
     const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
         setOnlyActive(detail.checked);
-
-        setSearchParams(tokensToSearchParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
     };
 
     const filteringRequestParams = useMemo(() => {
@@ -88,6 +81,32 @@ export const useFilters = (localStorePrefix = 'instances-list-page') => {
 
     const isDisabledClearFilter = !propertyFilterQuery.tokens.length && !onlyActive;
 
+    const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
+        setDynamicFilteringOptions([]);
+
+        console.log({ filteringProperty, filteringText });
+
+        if (!filteringText.length) {
+            return Promise.resolve();
+        }
+
+        setFilteringStatusType('loading');
+
+        if (filteringProperty?.key === filterKeys.PROJECT_NAMES) {
+            await getProjects({ name_pattern: filteringText, limit })
+                .unwrap()
+                .then(({ data }) =>
+                    data.map(({ project_name }) => ({
+                        propertyKey: filterKeys.PROJECT_NAMES,
+                        value: project_name,
+                    })),
+                )
+                .then(setDynamicFilteringOptions);
+        }
+
+        setFilteringStatusType(undefined);
+    };
+
     return {
         filteringRequestParams,
         clearFilter,
@@ -98,5 +117,7 @@ export const useFilters = (localStorePrefix = 'instances-list-page') => {
         onlyActive,
         onChangeOnlyActive,
         isDisabledClearFilter,
+        filteringStatusType,
+        handleLoadItems,
     } as const;
 };

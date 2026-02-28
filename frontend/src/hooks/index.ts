@@ -6,6 +6,7 @@ export { useConfirmationDialog } from './useConfirmationDialog';
 export { useHelpPanel } from './useHelpPanel';
 export { usePermissionGuard } from './usePermissionGuard';
 export { useInfiniteScroll } from './useInfiniteScroll';
+export { useLocalStorageState } from './useLocalStorageState';
 
 // cloudscape
 export { useCollection } from '@cloudscape-design/collection-hooks';

@@ -36,6 +36,8 @@ export const FleetList: React.FC = () => {
         onlyActive,
         onChangeOnlyActive,
         isDisabledClearFilter,
+        filteringStatusType,
+        handleLoadItems,
     } = useFilters();
 
     const projectHavingFleetMap = useCheckingForFleetsInProjects({});
@@ -127,9 +129,12 @@ export const FleetList: React.FC = () => {
                                 filteringAriaLabel: t('fleets.filter_property_placeholder'),
                                 filteringPlaceholder: t('fleets.filter_property_placeholder'),
                                 operationAndText: 'and',
+                                enteredTextLabel: (value) => `Use: ${value}`,
                             }}
                             filteringOptions={filteringOptions}
                             filteringProperties={filteringProperties}
+                            filteringStatusType={filteringStatusType}
+                            onLoadItems={handleLoadItems}
                         />
                     </div>
 
