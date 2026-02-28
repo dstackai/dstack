@@ -5,8 +5,8 @@ import { omit } from 'lodash';
 import type { PropertyFilterProps } from 'components';
 
 import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
-import { useGetProjectsQuery } from 'services/project';
-import { useGetUserListQuery } from 'services/user';
+import { useLazyGetProjectsQuery } from 'services/project';
+import { useLazyGetUserListQuery } from 'services/user';
 
 import { filterLastElementByPrefix } from '../helpers';
 
@@ -71,42 +71,49 @@ const baseFilteringProperties = [
         key: filterKeys.TARGET_USERS,
         operators: ['='],
         propertyLabel: 'Target users',
-        groupValuesLabel: 'Project ids',
+        groupValuesLabel: 'User ids',
     },
     {
         key: filterKeys.TARGET_FLEETS,
         operators: ['='],
         propertyLabel: 'Target fleet IDs',
+        groupValuesLabel: 'Fleet ids',
     },
     {
         key: filterKeys.TARGET_INSTANCES,
         operators: ['='],
         propertyLabel: 'Target instance IDs',
+        groupValuesLabel: 'Instance ids',
     },
     {
         key: filterKeys.TARGET_RUNS,
         operators: ['='],
         propertyLabel: 'Target run IDs',
+        groupValuesLabel: 'Run ids',
     },
     {
         key: filterKeys.TARGET_JOBS,
         operators: ['='],
         propertyLabel: 'Target job IDs',
+        groupValuesLabel: 'Job ids',
     },
     {
         key: filterKeys.TARGET_VOLUMES,
         operators: ['='],
         propertyLabel: 'Target volume IDs',
+        groupValuesLabel: 'Volume ids',
     },
     {
         key: filterKeys.TARGET_GATEWAYS,
         operators: ['='],
         propertyLabel: 'Target gateway IDs',
+        groupValuesLabel: 'Gateway ids',
     },
     {
         key: filterKeys.TARGET_SECRETS,
         operators: ['='],
         propertyLabel: 'Target secret IDs',
+        groupValuesLabel: 'Secret ids',
     },
 
     {
@@ -120,12 +127,14 @@ const baseFilteringProperties = [
         key: filterKeys.WITHIN_FLEETS,
         operators: ['='],
         propertyLabel: 'Within fleet IDs',
+        groupValuesLabel: 'Fleet ids',
     },
 
     {
         key: filterKeys.WITHIN_RUNS,
         operators: ['='],
         propertyLabel: 'Within run IDs',
+        groupValuesLabel: 'Run ids',
     },
 
     {
@@ -139,8 +148,11 @@ const baseFilteringProperties = [
         key: filterKeys.ACTORS,
         operators: ['='],
         propertyLabel: 'Actors',
+        groupValuesLabel: 'User names',
     },
 ];
+
+const limit = 100;
 
 export const useFilters = ({
     permanentFilters,
@@ -150,8 +162,10 @@ export const useFilters = ({
     withSearchParams?: boolean;
 }) => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const { data: projectsData, isLoading: isLoadingProjects } = useGetProjectsQuery({});
-    const { data: usersData, isLoading: isLoadingUsers } = useGetUserListQuery({});
+    const [dynamicFilteringOptions, setDynamicFilteringOptions] = useState<PropertyFilterProps.FilteringOption[]>([]);
+    const [filteringStatusType, setFilteringStatusType] = useState<PropertyFilterProps.StatusType | undefined>();
+    const [getProjects] = useLazyGetProjectsQuery();
+    const [getUsers] = useLazyGetUserListQuery();
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
         requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
@@ -165,31 +179,7 @@ export const useFilters = ({
     };
 
     const filteringOptions = useMemo(() => {
-        const options: PropertyFilterProps.FilteringOption[] = [];
-
-        projectsData?.data?.forEach(({ project_name }) => {
-            options.push({
-                propertyKey: filterKeys.TARGET_PROJECTS,
-                value: project_name,
-            });
-
-            options.push({
-                propertyKey: filterKeys.WITHIN_PROJECTS,
-                value: project_name,
-            });
-        });
-
-        usersData?.data?.forEach(({ username }) => {
-            options.push({
-                propertyKey: filterKeys.TARGET_USERS,
-                value: username,
-            });
-
-            options.push({
-                propertyKey: filterKeys.ACTORS,
-                value: username,
-            });
-        });
+        const options: PropertyFilterProps.FilteringOption[] = [...dynamicFilteringOptions];
 
         targetTypes?.forEach((targetType) => {
             options.push({
@@ -199,7 +189,7 @@ export const useFilters = ({
         });
 
         return options;
-    }, [projectsData, usersData]);
+    }, [dynamicFilteringOptions]);
 
     const setSearchParamsHandle = ({ tokens }: { tokens: PropertyFilterProps.Query['tokens'] }) => {
         const searchParams = tokensToSearchParams<RequestParamsKeys>(tokens);
@@ -293,25 +283,15 @@ export const useFilters = ({
             return [paramsFilter, permanentFilter];
         };
 
-        const targetProjects = filterParamsWithPermanentFitters(filterKeys.TARGET_PROJECTS)
-            .map((name: string) => projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'])
-            .filter(Boolean);
+        const targetProjects = filterParamsWithPermanentFitters(filterKeys.TARGET_PROJECTS).filter(Boolean);
 
-        const withInProjects = filterParamsWithPermanentFitters(filterKeys.WITHIN_PROJECTS)
-            .map((name: string) => projectsData?.data?.find(({ project_name }) => project_name === name)?.['project_id'])
-            .filter(Boolean);
+        const withInProjects = filterParamsWithPermanentFitters(filterKeys.WITHIN_PROJECTS).filter(Boolean);
 
-        const targetUsers = filterParamsWithPermanentFitters(filterKeys.TARGET_USERS)
-            .map((name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'])
-            .filter(Boolean);
+        const targetUsers = filterParamsWithPermanentFitters(filterKeys.TARGET_USERS).filter(Boolean);
 
-        const actors = filterParamsWithPermanentFitters(filterKeys.ACTORS)
-            .map((name: string) => usersData?.data?.find(({ username }) => username === name)?.['id'])
-            .filter(Boolean);
+        const actors = filterParamsWithPermanentFitters(filterKeys.ACTORS).filter(Boolean);
 
-        const includeTargetTypes = filterParamsWithPermanentFitters(filterKeys.INCLUDE_TARGET_TYPES)
-            .map((selectedLabel: string) => targetTypes?.find(({ label }) => label === selectedLabel)?.['value'])
-            .filter(Boolean);
+        const includeTargetTypes = filterParamsWithPermanentFitters(filterKeys.INCLUDE_TARGET_TYPES).filter(Boolean);
 
         const mappedFields = {
             ...(targetProjects?.length
@@ -355,7 +335,47 @@ export const useFilters = ({
             ...permanentFilters,
             ...mappedFields,
         } as TEventListFilters;
-    }, [propertyFilterQuery, usersData, projectsData, permanentFilters]);
+    }, [propertyFilterQuery, permanentFilters]);
+
+    const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
+        setDynamicFilteringOptions([]);
+
+        if (!filteringText.length) {
+            return Promise.resolve();
+        }
+
+        setFilteringStatusType('loading');
+
+        if (filteringProperty?.key === filterKeys.TARGET_PROJECTS || filteringProperty?.key === filterKeys.WITHIN_PROJECTS) {
+            await getProjects({ name_pattern: filteringText, limit })
+                .unwrap()
+                .then(({ data }) =>
+                    data.map(({ project_name, project_id }) => ({
+                        propertyKey: filteringProperty?.key,
+                        label: project_name,
+                        value: project_id,
+                        hiddenValue: 'test',
+                    })),
+                )
+                .then(setDynamicFilteringOptions);
+        }
+
+        if (filteringProperty?.key === filterKeys.TARGET_USERS || filteringProperty?.key === filterKeys.ACTORS) {
+            await getUsers({ name_pattern: filteringText, limit })
+                .unwrap()
+                .then(({ data }) =>
+                    data.map(({ username, id }) => ({
+                        propertyKey: filteringProperty?.key,
+                        label: username,
+                        value: id,
+                        hiddenValue: 'test2',
+                    })),
+                )
+                .then(setDynamicFilteringOptions);
+        }
+
+        setFilteringStatusType(undefined);
+    };
 
     return {
         filteringRequestParams,
@@ -364,6 +384,7 @@ export const useFilters = ({
         onChangePropertyFilter,
         filteringOptions,
         filteringProperties,
-        isLoadingFilters: isLoadingProjects || isLoadingUsers,
+        filteringStatusType,
+        handleLoadItems,
     } as const;
 };

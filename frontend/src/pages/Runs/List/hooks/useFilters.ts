@@ -16,6 +16,8 @@ const filterKeys: Record<string, RequestParamsKeys> = {
     USER_NAME: 'username',
 };
 
+const limit = 100;
+
 export const useFilters = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [onlyActive, setOnlyActive] = useLocalStorageState('run-list-filter-only-active', true);
@@ -81,11 +83,7 @@ export const useFilters = () => {
         } as Partial<TRunsRequestParams>;
     }, [propertyFilterQuery, onlyActive]);
 
-    const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({
-        detail: { filteringProperty, filteringText, firstPage, ...other },
-    }) => {
-        console.log({ filteringProperty, filteringText, firstPage, other });
-
+    const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
         setFilteringOptions([]);
 
         if (!filteringText.length) {
@@ -95,7 +93,7 @@ export const useFilters = () => {
         setFilteringStatusType('loading');
 
         if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
-            await getProjects({ name_pattern: filteringText })
+            await getProjects({ name_pattern: filteringText, limit })
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ project_name }) => ({
@@ -107,7 +105,7 @@ export const useFilters = () => {
         }
 
         if (filteringProperty?.key === filterKeys.USER_NAME) {
-            await getUsers({ name_pattern: filteringText })
+            await getUsers({ name_pattern: filteringText, limit })
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ username }) => ({

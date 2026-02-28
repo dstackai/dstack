@@ -26,6 +26,8 @@ export const List: React.FC = () => {
         filteringOptions,
         filteringProperties,
         filteringRequestParams,
+        filteringStatusType,
+        handleLoadItems,
     } = useFilters();
 
     useBreadcrumbs([
@@ -98,9 +100,12 @@ export const List: React.FC = () => {
                                 filteringAriaLabel: t('projects.run.filter_property_placeholder'),
                                 filteringPlaceholder: t('projects.run.filter_property_placeholder'),
                                 operationAndText: 'and',
+                                enteredTextLabel: (value) => `Use: ${value}`,
                             }}
                             filteringOptions={filteringOptions}
                             filteringProperties={filteringProperties}
+                            filteringStatusType={filteringStatusType}
+                            onLoadItems={handleLoadItems}
                         />
                     </div>
                 </div>
