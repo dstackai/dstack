@@ -91,18 +91,17 @@ STORAGE_SETUP_COMMANDS = [
 IMAGE_SXM_DOCKER = "ubuntu22.04-nvidia-sxm-docker:latest"
 IMAGE_PCIE_DOCKER = "ubuntu22.04-nvidia-pcie-docker:latest"
 IMAGE_ROCM = "ubuntu-rocm:latest"
-IMAGE_BASE = "ubuntu22.04:latest"
 
 
 def _get_image(instance_name: str, gpu_type: str) -> str:
-    if not gpu_type:
-        return IMAGE_BASE
     # Check instance name for SXM -- gpu_type from gpuhunt is normalized (e.g. "A100")
     # and doesn't contain "SXM", but instance names like "a100-80gb-sxm-ib.8x" do.
     if "-sxm" in instance_name.lower():
         return IMAGE_SXM_DOCKER
     if "MI3" in gpu_type:
         return IMAGE_ROCM
+    # Use PCIe docker image for both PCIe GPUs and CPU-only types.
+    # Crusoe has no CPU-specific Docker image; the base ubuntu image lacks Docker.
     return IMAGE_PCIE_DOCKER
 
 
