@@ -19,6 +19,7 @@ from dstack._internal.core.errors import (
     NoCapacityError,
     NotYetTerminated,
     ProvisioningError,
+    SSHProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
@@ -1203,6 +1204,28 @@ class TestAddSSHInstance:
         assert instance.status == InstanceStatus.IDLE
         assert instance.total_blocks == expected_blocks
         assert instance.busy_blocks == 0
+
+    async def test_retries_ssh_instance_if_provisioning_fails(
+        self,
+        session: AsyncSession,
+        deploy_instance_mock: Mock,
+    ):
+        deploy_instance_mock.side_effect = SSHProvisioningError("Expected")
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
+        )
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.PENDING
+        assert instance.termination_reason is None
 
 
 @pytest.mark.asyncio

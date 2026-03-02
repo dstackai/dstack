@@ -33,12 +33,11 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
-
-# FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
 from dstack._internal.core.errors import (
     BackendError,
     NotYetTerminated,
     ProvisioningError,
+    SSHProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
@@ -340,10 +339,10 @@ async def _add_remote(session: AsyncSession, instance: InstanceModel) -> None:
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
             health, host_info, arch = result
         except (asyncio.TimeoutError, TimeoutError) as e:
-            raise ProvisioningError(f"Deploy timeout: {e}") from e
+            raise SSHProvisioningError(f"Deploy timeout: {e}") from e
         except Exception as e:
-            raise ProvisioningError(f"Deploy instance raised an error: {e}") from e
-    except ProvisioningError as e:
+            raise SSHProvisioningError(f"Deploy instance raised an error: {e}") from e
+    except SSHProvisioningError as e:
         logger.warning(
             "Provisioning instance %s could not be completed because of the error: %s",
             instance.name,
@@ -462,7 +461,7 @@ def _deploy_instance(
         try:
             fleet_configuration_envs = remote_details.env.as_dict()
         except ValueError as e:
-            raise ProvisioningError(f"Invalid Env: {e}") from e
+            raise SSHProvisioningError(f"Invalid Env: {e}") from e
         shim_envs.update(fleet_configuration_envs)
         dstack_working_dir = get_dstack_working_dir()
         dstack_shim_binary_path = get_dstack_shim_binary_path()
@@ -490,7 +489,7 @@ def _deploy_instance(
         try:
             healthcheck = HealthcheckResponse.__response__.parse_raw(healthcheck_out)
         except ValueError as e:
-            raise ProvisioningError(f"Cannot parse HealthcheckResponse: {e}") from e
+            raise SSHProvisioningError(f"Cannot parse HealthcheckResponse: {e}") from e
         instance_check = runner_client.healthcheck_response_to_instance_check(healthcheck)
 
         return instance_check, host_info, arch
