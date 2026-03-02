@@ -108,8 +108,7 @@ from dstack._internal.server.services.placement import (
 )
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.server.utils import sentry_utils
-from dstack._internal.server.utils.provisioning import (
+from dstack._internal.server.services.ssh_fleets.provisioning import (
     detect_cpu_arch,
     get_host_info,
     get_paramiko_connection,
@@ -121,6 +120,7 @@ from dstack._internal.server.utils.provisioning import (
     run_shim_as_systemd_service,
     upload_envs,
 )
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import (
     get_current_datetime,
     get_or_error,
