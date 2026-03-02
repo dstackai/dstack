@@ -422,6 +422,23 @@ class TestGetInstance:
         assert resp_data["project_name"] == project.name
         assert resp_data["fleet_name"] == fleet.name
 
+    async def test_returns_instance_to_global_admin(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        admin = await create_user(session, global_role=GlobalRole.ADMIN, name="global-admin")
+        project = await create_project(session)
+        fleet = await create_fleet(session, project)
+        instance = await create_instance(session=session, project=project, fleet=fleet)
+
+        resp = await client.post(
+            f"/api/project/{project.name}/instances/get",
+            headers=get_auth_headers(admin.token),
+            json={"id": str(instance.id)},
+        )
+        assert resp.status_code == 200
+        resp_data = resp.json()
+        assert resp_data["id"] == str(instance.id)
+
     async def test_returns_400_if_instance_not_found(
         self, session: AsyncSession, client: AsyncClient
     ) -> None:
@@ -477,5 +494,18 @@ class TestGetInstance:
             f"/api/project/{project.name}/instances/get",
             headers=get_auth_headers(user.token),
             json={"id": str(instance.id)},
+        )
+        assert resp.status_code == 403
+
+    async def test_returns_403_if_not_project_member_and_instance_not_exists(
+        self, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session, name="non_member", global_role=GlobalRole.USER)
+        project = await create_project(session)
+
+        resp = await client.post(
+            f"/api/project/{project.name}/instances/get",
+            headers=get_auth_headers(user.token),
+            json={"id": str(uuid.uuid4())},
         )
         assert resp.status_code == 403
