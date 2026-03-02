@@ -1276,6 +1276,71 @@ class TestAddSSHInstance:
         assert instance.termination_reason == InstanceTerminationReason.ERROR
         assert instance.termination_reason_message == "Unsupported private SSH key type"
 
+    async def test_terminates_ssh_instance_if_internal_ip_cannot_be_resolved_from_network(
+        self,
+        session: AsyncSession,
+        host_info: dict,
+    ):
+        host_info["addresses"] = ["192.168.100.100/24"]
+        project = await create_project(session=session)
+        job_provisioning_data = get_job_provisioning_data(
+            dockerized=True,
+            backend=BackendType.REMOTE,
+            internal_ip=None,
+        )
+        job_provisioning_data.instance_network = "10.0.0.0/24"
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
+            job_provisioning_data=job_provisioning_data,
+        )
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == InstanceTerminationReason.ERROR
+        assert (
+            instance.termination_reason_message
+            == "Failed to locate internal IP address on the given network"
+        )
+
+    async def test_terminates_ssh_instance_if_internal_ip_is_not_in_host_interfaces(
+        self,
+        session: AsyncSession,
+        host_info: dict,
+    ):
+        host_info["addresses"] = ["192.168.100.100/24"]
+        project = await create_project(session=session)
+        job_provisioning_data = get_job_provisioning_data(
+            dockerized=True,
+            backend=BackendType.REMOTE,
+            internal_ip="10.0.0.20",
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
+            job_provisioning_data=job_provisioning_data,
+        )
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == InstanceTerminationReason.ERROR
+        assert (
+            instance.termination_reason_message
+            == "Specified internal IP not found among instance interfaces"
+        )
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

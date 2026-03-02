@@ -18,6 +18,7 @@
 - Python targets 3.9+ with 4-space indentation and max line length of 99 (see `ruff.toml`; `E501` is ignored but keep lines readable).
 - Imports are sorted via Ruff’s isort settings (`dstack` treated as first-party).
 - Keep primary/public functions before local helper functions in a module section.
+- Keep private classes, exceptions, and similar implementation-specific types close to the private functions that use them unless they are shared more broadly in the module.
 - Prefer pydantic-style models in `core/models`.
 - Tests use `test_*.py` modules and `test_*` functions; fixtures live near usage.
 

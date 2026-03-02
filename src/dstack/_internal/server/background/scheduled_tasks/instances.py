@@ -360,36 +360,13 @@ async def _add_remote(session: AsyncSession, instance: InstanceModel) -> None:
         return
 
     instance_type = host_info_to_instance_type(host_info, arch)
-    instance_network = None
-    internal_ip = None
     try:
-        default_jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
-        instance_network = default_jpd.instance_network
-        internal_ip = default_jpd.internal_ip
-    except ValidationError:
-        pass
-
-    host_network_addresses = host_info.get("addresses", [])
-    if internal_ip is None:
-        internal_ip = get_ip_from_network(
-            network=instance_network,
-            addresses=host_network_addresses,
-        )
-    if instance_network is not None and internal_ip is None:
+        instance_network, internal_ip = _resolve_ssh_instance_network(instance, host_info)
+    except _SSHInstanceNetworkResolutionError as e:
         instance.termination_reason = InstanceTerminationReason.ERROR
-        instance.termination_reason_message = (
-            "Failed to locate internal IP address on the given network"
-        )
+        instance.termination_reason_message = str(e)
         switch_instance_status(session, instance, InstanceStatus.TERMINATED)
         return
-    if internal_ip is not None:
-        if not is_ip_among_addresses(ip_address=internal_ip, addresses=host_network_addresses):
-            instance.termination_reason = InstanceTerminationReason.ERROR
-            instance.termination_reason_message = (
-                "Specified internal IP not found among instance interfaces"
-            )
-            switch_instance_status(session, instance, InstanceStatus.TERMINATED)
-            return
 
     divisible, blocks = is_divisible_into_blocks(
         cpu_count=instance_type.resources.cpus,
@@ -438,6 +415,41 @@ async def _add_remote(session: AsyncSession, instance: InstanceModel) -> None:
     instance.offer = instance_offer.json()
     instance.job_provisioning_data = jpd.json()
     instance.started_at = get_current_datetime()
+
+
+class _SSHInstanceNetworkResolutionError(Exception):
+    pass
+
+
+def _resolve_ssh_instance_network(
+    instance: InstanceModel, host_info: dict[str, Any]
+) -> tuple[Optional[str], Optional[str]]:
+    instance_network = None
+    internal_ip = None
+    try:
+        default_jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
+        instance_network = default_jpd.instance_network
+        internal_ip = default_jpd.internal_ip
+    except ValidationError:
+        pass
+
+    host_network_addresses = host_info.get("addresses", [])
+    if internal_ip is None:
+        internal_ip = get_ip_from_network(
+            network=instance_network,
+            addresses=host_network_addresses,
+        )
+    if instance_network is not None and internal_ip is None:
+        raise _SSHInstanceNetworkResolutionError(
+            "Failed to locate internal IP address on the given network"
+        )
+    if internal_ip is not None and not is_ip_among_addresses(
+        ip_address=internal_ip, addresses=host_network_addresses
+    ):
+        raise _SSHInstanceNetworkResolutionError(
+            "Specified internal IP not found among instance interfaces"
+        )
+    return instance_network, internal_ip
 
 
 def _deploy_instance(
