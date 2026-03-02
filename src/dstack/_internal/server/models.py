@@ -609,6 +609,15 @@ class FleetModel(PipelineModelMixin, BaseModel):
     consolidation_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
     last_consolidated_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
+    __table_args__ = (
+        Index(
+            "ix_fleets_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=deleted == false(),
+            sqlite_where=deleted == false(),
+        ),
+    )
+
 
 class InstanceModel(BaseModel):
     __tablename__ = "instances"
