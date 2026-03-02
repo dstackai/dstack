@@ -51,7 +51,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import ModelDiff, copy_model, diff_models
-from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
+from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite, sqlite_commit
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -686,9 +686,7 @@ async def delete_fleets(
         .order_by(InstanceModel.id)
     )
     instances_ids = list(res.scalars().unique().all())
-    if is_db_sqlite():
-        # Start new transaction to see committed changes after lock
-        await session.commit()
+    await sqlite_commit()
     async with (
         get_locker(get_db().dialect_name).lock_ctx(FleetModel.__tablename__, fleets_ids),
         get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids),

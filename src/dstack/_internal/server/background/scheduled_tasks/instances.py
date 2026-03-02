@@ -9,7 +9,7 @@ import requests
 from paramiko.pkey import PKey
 from paramiko.ssh_exception import PasswordRequiredException
 from pydantic import ValidationError
-from sqlalchemy import and_, delete, func, not_, select
+from sqlalchemy import and_, func, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -150,17 +150,6 @@ async def process_instances(batch_size: int = 1):
     for _ in range(batch_size):
         tasks.append(_process_next_instance())
     await asyncio.gather(*tasks)
-
-
-@sentry_utils.instrument_scheduled_task
-async def delete_instance_health_checks():
-    now = get_current_datetime()
-    cutoff = now - timedelta(seconds=server_settings.SERVER_INSTANCE_HEALTH_TTL_SECONDS)
-    async with get_session_ctx() as session:
-        await session.execute(
-            delete(InstanceHealthCheckModel).where(InstanceHealthCheckModel.collected_at < cutoff)
-        )
-        await session.commit()
 
 
 @sentry_utils.instrument_scheduled_task
