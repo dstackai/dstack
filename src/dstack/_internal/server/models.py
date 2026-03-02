@@ -576,7 +576,7 @@ class PoolModel(BaseModel):
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="pool", lazy="selectin")
 
 
-class FleetModel(BaseModel):
+class FleetModel(PipelineModelMixin, BaseModel):
     __tablename__ = "fleets"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -604,8 +604,19 @@ class FleetModel(BaseModel):
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="fleet")
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
 
+    # `consolidation_attempt` counts how many times in a row fleet needed consolidation.
+    # Allows increasing delays between attempts.
     consolidation_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
     last_consolidated_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
+    __table_args__ = (
+        Index(
+            "ix_fleets_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=deleted == false(),
+            sqlite_where=deleted == false(),
+        ),
+    )
 
 
 class InstanceModel(BaseModel):

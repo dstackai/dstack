@@ -5,10 +5,11 @@ from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, selectinload, with_loader_criteria
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.models.fleets import FleetSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
+from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
@@ -39,6 +40,8 @@ BATCH_SIZE = 10
 MIN_PROCESSING_INTERVAL = timedelta(seconds=30)
 
 
+# NOTE: This scheduled task is going to be deprecated in favor of `FleetPipeline`.
+# If this logic changes before removal, keep `pipeline_tasks/fleets.py` in sync.
 @sentry_utils.instrument_scheduled_task
 async def process_fleets():
     fleet_lock, fleet_lockset = get_locker(get_db().dialect_name).get_lockset(
@@ -59,10 +62,9 @@ async def process_fleets():
                 )
                 .options(
                     load_only(FleetModel.id, FleetModel.name),
-                    selectinload(FleetModel.instances).load_only(InstanceModel.id),
-                    with_loader_criteria(
-                        InstanceModel, InstanceModel.deleted == False, include_aliases=True
-                    ),
+                    selectinload(
+                        FleetModel.instances.and_(InstanceModel.deleted == False)
+                    ).load_only(InstanceModel.id),
                 )
                 .order_by(FleetModel.last_processed_at.asc())
                 .limit(BATCH_SIZE)
@@ -115,14 +117,17 @@ async def _process_fleets(session: AsyncSession, fleet_models: List[FleetModel])
     res = await session.execute(
         select(FleetModel)
         .where(FleetModel.id.in_(fleet_ids))
-        .options(
-            joinedload(FleetModel.instances).joinedload(InstanceModel.jobs).load_only(JobModel.id),
-            with_loader_criteria(
-                InstanceModel, InstanceModel.deleted == False, include_aliases=True
-            ),
-        )
         .options(joinedload(FleetModel.project))
-        .options(joinedload(FleetModel.runs).load_only(RunModel.status))
+        .options(
+            selectinload(FleetModel.instances.and_(InstanceModel.deleted == False))
+            .joinedload(InstanceModel.jobs)
+            .load_only(JobModel.id),
+        )
+        .options(
+            selectinload(
+                FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
+            ).load_only(RunModel.status)
+        )
         .execution_options(populate_existing=True)
     )
     fleet_models = list(res.unique().scalars().all())

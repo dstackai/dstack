@@ -356,7 +356,7 @@ async def _delete_gateways_pipeline(
         )
         gateway_models = res.scalars().all()
         if len(gateway_models) != len(gateways_ids):
-            # TODO: Make the delete endpoint fully async so we don't need to lock and error:
+            # TODO: Make the endpoint fully async so we don't need to lock and error:
             # put the request in queue and process in the background.
             raise ServerClientError(
                 "Failed to delete gateways: gateways are being processed currently. Try again later."

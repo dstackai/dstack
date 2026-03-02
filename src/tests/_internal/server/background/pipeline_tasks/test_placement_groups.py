@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import PlacementGroupInUseError
 from dstack._internal.server.background.pipeline_tasks.base import PipelineItem
 from dstack._internal.server.background.pipeline_tasks.placement_groups import PlacementGroupWorker
 from dstack._internal.server.models import PlacementGroupModel
@@ -62,3 +63,41 @@ class TestPlacementGroupWorker:
             aws_mock.compute.return_value.delete_placement_group.assert_called_once()
         await session.refresh(placement_group)
         assert placement_group.deleted
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_retries_placement_group_deletion_if_still_in_use(
+        self, test_db, session: AsyncSession, worker: PlacementGroupWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+        )
+        placement_group = await create_placement_group(
+            session=session,
+            project=project,
+            fleet=fleet,
+            name="test2-pg",
+            fleet_deleted=True,
+        )
+        placement_group.lock_token = uuid.uuid4()
+        placement_group.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        placement_group.lock_owner = "PlacementGroupPipeline"
+        original_last_processed_at = placement_group.last_processed_at
+        await session.commit()
+        with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
+            aws_mock = Mock()
+            m.return_value = aws_mock
+            aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            aws_mock.compute.return_value.delete_placement_group.side_effect = (
+                PlacementGroupInUseError()
+            )
+            await worker.process(_placement_group_to_pipeline_item(placement_group))
+            aws_mock.compute.return_value.delete_placement_group.assert_called_once()
+        await session.refresh(placement_group)
+        assert not placement_group.deleted
+        assert placement_group.last_processed_at > original_last_processed_at
+        assert placement_group.lock_token is None
+        assert placement_group.lock_expires_at is None
+        assert placement_group.lock_owner is None

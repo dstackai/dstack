@@ -11,14 +11,17 @@ from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
+    NOW_PLACEHOLDER,
     Fetcher,
     Heartbeater,
+    ItemUpdateMap,
     Pipeline,
     PipelineItem,
-    UpdateMap,
+    UpdateMapDateTime,
     Worker,
-    get_processed_update_map,
-    get_unlock_update_map,
+    resolve_now_placeholders,
+    set_processed_update_map_fields,
+    set_unlock_update_map_fields,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
@@ -233,8 +236,12 @@ async def _process_submitted_item(item: VolumePipelineItem):
             return
 
     result = await _process_submitted_volume(volume_model)
-    update_map = result.update_map | get_processed_update_map() | get_unlock_update_map()
+    update_map = result.update_map
+    set_processed_update_map_fields(update_map)
+    set_unlock_update_map_fields(update_map)
+
     async with get_session_ctx() as session:
+        resolve_now_placeholders(update_map, now=get_current_datetime())
         res = await session.execute(
             update(VolumeModel)
             .where(
@@ -263,9 +270,17 @@ async def _process_submitted_item(item: VolumePipelineItem):
         )
 
 
+class _VolumeUpdateMap(ItemUpdateMap, total=False):
+    status: VolumeStatus
+    status_message: str
+    volume_provisioning_data: str
+    deleted: bool
+    deleted_at: UpdateMapDateTime
+
+
 @dataclass
 class _SubmittedResult:
-    update_map: UpdateMap = field(default_factory=dict)
+    update_map: _VolumeUpdateMap = field(default_factory=_VolumeUpdateMap)
 
 
 async def _process_submitted_volume(volume_model: VolumeModel) -> _SubmittedResult:
@@ -363,8 +378,13 @@ async def _process_to_be_deleted_item(item: VolumePipelineItem):
             return
 
     result = await _process_to_be_deleted_volume(volume_model)
-    update_map = result.update_map | get_unlock_update_map()
+    update_map = _VolumeUpdateMap()
+    update_map.update(result.update_map)
+    set_processed_update_map_fields(update_map)
+    set_unlock_update_map_fields(update_map)
     async with get_session_ctx() as session:
+        now = get_current_datetime()
+        resolve_now_placeholders(update_map, now=now)
         res = await session.execute(
             update(VolumeModel)
             .where(
@@ -392,11 +412,11 @@ async def _process_to_be_deleted_item(item: VolumePipelineItem):
 
 
 @dataclass
-class _DeletedResult:
-    update_map: UpdateMap = field(default_factory=dict)
+class _ProcessToBeDeletedResult:
+    update_map: _VolumeUpdateMap = field(default_factory=_VolumeUpdateMap)
 
 
-async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _DeletedResult:
+async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessToBeDeletedResult:
     volume = volume_model_to_volume(volume_model)
     if volume.external:
         return _get_deleted_result()
@@ -437,12 +457,10 @@ async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _DeletedRe
     return _get_deleted_result()
 
 
-def _get_deleted_result() -> _DeletedResult:
-    now = get_current_datetime()
-    return _DeletedResult(
+def _get_deleted_result() -> _ProcessToBeDeletedResult:
+    return _ProcessToBeDeletedResult(
         update_map={
-            "last_processed_at": now,
             "deleted": True,
-            "deleted_at": now,
+            "deleted_at": NOW_PLACEHOLDER,
         }
     )

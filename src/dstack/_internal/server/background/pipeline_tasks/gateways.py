@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Optional, Sequence
+from typing import Optional, Sequence, TypedDict
 
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import joinedload, load_only
@@ -14,12 +14,13 @@ from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
+    ItemUpdateMap,
     Pipeline,
     PipelineItem,
-    UpdateMap,
     Worker,
-    get_processed_update_map,
-    get_unlock_update_map,
+    resolve_now_placeholders,
+    set_processed_update_map_fields,
+    set_unlock_update_map_fields,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
@@ -227,13 +228,18 @@ async def _process_submitted_item(item: GatewayPipelineItem):
             return
 
     result = await _process_submitted_gateway(gateway_model)
-    update_map = result.update_map | get_processed_update_map() | get_unlock_update_map()
+    update_map = _GatewayUpdateMap()
+    update_map.update(result.update_map)
+    set_processed_update_map_fields(update_map)
+    set_unlock_update_map_fields(update_map)
     async with get_session_ctx() as session:
         gateway_compute_model = result.gateway_compute_model
         if gateway_compute_model is not None:
             session.add(gateway_compute_model)
             await session.flush()
             update_map["gateway_compute_id"] = gateway_compute_model.id
+        now = get_current_datetime()
+        resolve_now_placeholders(update_map, now=now)
         res = await session.execute(
             update(GatewayModel)
             .where(
@@ -262,9 +268,20 @@ async def _process_submitted_item(item: GatewayPipelineItem):
         )
 
 
+class _GatewayUpdateMap(ItemUpdateMap, total=False):
+    status: GatewayStatus
+    status_message: str
+    gateway_compute_id: uuid.UUID
+
+
+class _GatewayComputeUpdateMap(TypedDict, total=False):
+    active: bool
+    deleted: bool
+
+
 @dataclass
 class _SubmittedResult:
-    update_map: UpdateMap = field(default_factory=dict)
+    update_map: _GatewayUpdateMap = field(default_factory=_GatewayUpdateMap)
     gateway_compute_model: Optional[GatewayComputeModel] = None
 
 
@@ -337,15 +354,20 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
             return
 
     result = await _process_provisioning_gateway(gateway_model)
-    update_map = result.gateway_update_map | get_processed_update_map() | get_unlock_update_map()
+    gateway_update_map = result.gateway_update_map
+    set_processed_update_map_fields(gateway_update_map)
+    set_unlock_update_map_fields(gateway_update_map)
+
     async with get_session_ctx() as session:
+        now = get_current_datetime()
+        resolve_now_placeholders(gateway_update_map, now=now)
         res = await session.execute(
             update(GatewayModel)
             .where(
                 GatewayModel.id == gateway_model.id,
                 GatewayModel.lock_token == gateway_model.lock_token,
             )
-            .values(**update_map)
+            .values(**gateway_update_map)
             .returning(GatewayModel.id)
         )
         updated_ids = list(res.scalars().all())
@@ -361,8 +383,8 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
             session=session,
             gateway_model=gateway_model,
             old_status=gateway_model.status,
-            new_status=update_map.get("status", gateway_model.status),
-            status_message=update_map.get("status_message", gateway_model.status_message),
+            new_status=gateway_update_map.get("status", gateway_model.status),
+            status_message=gateway_update_map.get("status_message", gateway_model.status_message),
         )
         if result.gateway_compute_update_map:
             res = await session.execute(
@@ -383,8 +405,10 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
 
 @dataclass
 class _ProvisioningResult:
-    gateway_update_map: UpdateMap = field(default_factory=dict)
-    gateway_compute_update_map: UpdateMap = field(default_factory=dict)
+    gateway_update_map: _GatewayUpdateMap = field(default_factory=_GatewayUpdateMap)
+    gateway_compute_update_map: _GatewayComputeUpdateMap = field(
+        default_factory=_GatewayComputeUpdateMap
+    )
 
 
 async def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningResult:
@@ -475,13 +499,17 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
                 targets=[events.Target.from_model(gateway_model)],
             )
         else:
+            update_map = _GatewayUpdateMap()
+            set_processed_update_map_fields(update_map)
+            set_unlock_update_map_fields(update_map)
+            resolve_now_placeholders(update_map, now=get_current_datetime())
             res = await session.execute(
                 update(GatewayModel)
                 .where(
                     GatewayModel.id == gateway_model.id,
                     GatewayModel.lock_token == gateway_model.lock_token,
                 )
-                .values(**get_processed_update_map())
+                .values(**update_map)
                 .returning(GatewayModel.id)
             )
             updated_ids = list(res.scalars().all())
@@ -513,12 +541,14 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
 
 
 @dataclass
-class _DeletedResult:
+class _ProcessToBeDeletedResult:
     delete_gateway: bool
-    gateway_compute_update_map: UpdateMap = field(default_factory=dict)
+    gateway_compute_update_map: _GatewayComputeUpdateMap = field(
+        default_factory=_GatewayComputeUpdateMap
+    )
 
 
-async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _DeletedResult:
+async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _ProcessToBeDeletedResult:
     assert gateway_model.backend.type != BackendType.DSTACK
     backend = await backends_services.get_project_backend_by_type_or_error(
         project=gateway_model.project, backend_type=gateway_model.backend.type
@@ -542,9 +572,9 @@ async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _Delete
                 "Error when deleting gateway compute for %s",
                 gateway_model.name,
             )
-            return _DeletedResult(delete_gateway=False)
+            return _ProcessToBeDeletedResult(delete_gateway=False)
         logger.info("Deleted gateway compute for %s", gateway_model.name)
-    result = _DeletedResult(delete_gateway=True)
+    result = _ProcessToBeDeletedResult(delete_gateway=True)
     if gateway_model.gateway_compute is not None:
         await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
         result.gateway_compute_update_map = {"active": False, "deleted": True}

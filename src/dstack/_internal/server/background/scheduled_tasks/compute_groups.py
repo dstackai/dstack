@@ -32,6 +32,8 @@ TERMINATION_RETRY_TIMEOUT = timedelta(seconds=60)
 TERMINATION_RETRY_MAX_DURATION = timedelta(minutes=15)
 
 
+# NOTE: This scheduled task is going to be deprecated in favor of `ComputeGroupPipeline`.
+# If this logic changes before removal, keep `pipeline_tasks/compute_groups.py` in sync.
 async def process_compute_groups(batch_size: int = 1):
     tasks = []
     for _ in range(batch_size):

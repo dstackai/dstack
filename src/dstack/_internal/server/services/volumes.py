@@ -369,7 +369,7 @@ async def _delete_volumes_pipeline(
         )
         volume_models = res.scalars().unique().all()
         if len(volume_models) != len(volumes_ids):
-            # TODO: Make the delete endpoint fully async so we don't need to lock and error:
+            # TODO: Make the endpoint fully async so we don't need to lock and error:
             # put the request in queue and process in the background.
             raise ServerClientError(
                 "Failed to delete volumes: volumes are being processed currently. Try again later."

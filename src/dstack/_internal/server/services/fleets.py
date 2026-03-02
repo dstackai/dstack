@@ -102,9 +102,43 @@ def switch_fleet_status(
         return
 
     fleet_model.status = new_status
+    emit_fleet_status_change_event(
+        session=session,
+        fleet_model=fleet_model,
+        old_status=old_status,
+        new_status=new_status,
+        status_message=fleet_model.status_message,
+        actor=actor,
+    )
 
-    msg = f"Fleet status changed {old_status.upper()} -> {new_status.upper()}"
+
+def emit_fleet_status_change_event(
+    session: AsyncSession,
+    fleet_model: FleetModel,
+    old_status: FleetStatus,
+    new_status: FleetStatus,
+    status_message: Optional[str],
+    actor: events.AnyActor = events.SystemActor(),
+) -> None:
+    if old_status == new_status:
+        return
+    msg = get_fleet_status_change_message(
+        old_status=old_status,
+        new_status=new_status,
+        status_message=status_message,
+    )
     events.emit(session, msg, actor=actor, targets=[events.Target.from_model(fleet_model)])
+
+
+def get_fleet_status_change_message(
+    old_status: FleetStatus,
+    new_status: FleetStatus,
+    status_message: Optional[str],
+) -> str:
+    msg = f"Fleet status changed {old_status.upper()} -> {new_status.upper()}"
+    if status_message is not None:
+        msg += f" ({status_message})"
+    return msg
 
 
 async def list_projects_with_no_active_fleets(
@@ -225,7 +259,7 @@ async def list_projects_fleet_models(
         .where(*filters)
         .order_by(*order_by)
         .limit(limit)
-        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
     )
     fleet_models = list(res.unique().scalars().all())
     return fleet_models
@@ -256,7 +290,7 @@ async def list_project_fleet_models(
     res = await session.execute(
         select(FleetModel)
         .where(*filters)
-        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
     )
     return list(res.unique().scalars().all())
 
@@ -485,13 +519,24 @@ async def apply_plan(
                 .joinedload(InstanceModel.jobs)
                 .load_only(JobModel.id)
             )
-            .options(selectinload(FleetModel.runs))
+            # `is_fleet_in_use()` only needs active run presence/status.
+            .options(
+                selectinload(
+                    FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
+                ).load_only(RunModel.id, RunModel.status)
+            )
             .execution_options(populate_existing=True)
             .order_by(FleetModel.id)  # take locks in order
             .with_for_update(key_share=True)
         )
         fleet_model = res.scalars().unique().one_or_none()
         if fleet_model is not None:
+            if fleet_model.lock_expires_at is not None:
+                # TODO: Make the endpoint fully async so we don't need to lock and error:
+                # put the request in queue and process in the background.
+                raise ServerClientError(
+                    "Failed to update fleet: fleet is being processed currently. Try again later."
+                )
             return await _update_fleet(
                 session=session,
                 user=user,
@@ -629,8 +674,7 @@ async def delete_fleets(
             FleetModel.name.in_(names),
             FleetModel.deleted == False,
         )
-        .order_by(FleetModel.id)  # take locks in order
-        .with_for_update(key_share=True)
+        .order_by(FleetModel.id)
     )
     fleets_ids = list(res.scalars().unique().all())
     res = await session.execute(
@@ -639,8 +683,7 @@ async def delete_fleets(
             InstanceModel.fleet_id.in_(fleets_ids),
             InstanceModel.deleted == False,
         )
-        .order_by(InstanceModel.id)  # take locks in order
-        .with_for_update(key_share=True)
+        .order_by(InstanceModel.id)
     )
     instances_ids = list(res.scalars().unique().all())
     if is_db_sqlite():
@@ -654,22 +697,56 @@ async def delete_fleets(
         # TODO: Do not lock fleet when deleting only instances.
         res = await session.execute(
             select(FleetModel)
-            .where(FleetModel.id.in_(fleets_ids))
+            .where(
+                FleetModel.project_id == project.id,
+                FleetModel.id.in_(fleets_ids),
+                FleetModel.deleted == False,
+                FleetModel.lock_expires_at.is_(None),
+            )
             .options(
-                joinedload(FleetModel.instances.and_(InstanceModel.id.in_(instances_ids)))
-                .joinedload(InstanceModel.jobs)
+                selectinload(FleetModel.instances.and_(InstanceModel.id.in_(instances_ids)))
+                .selectinload(InstanceModel.jobs)
                 .load_only(JobModel.id)
             )
             .options(
-                joinedload(
+                selectinload(
                     FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
-                )
+                ).load_only(RunModel.status)
             )
             .execution_options(populate_existing=True)
+            .order_by(FleetModel.id)  # take locks in order
+            .with_for_update(key_share=True, of=FleetModel)
         )
         fleet_models = res.scalars().unique().all()
-        fleets = [fleet_model_to_fleet(m) for m in fleet_models]
-        for fleet in fleets:
+        if len(fleet_models) != len(fleets_ids):
+            # TODO: Make the endpoint fully async so we don't need to lock and error:
+            # put the request in queue and process in the background.
+            msg = (
+                "Failed to delete fleets: fleets are being processed currently. Try again later."
+                if instance_nums is None
+                else "Failed to delete fleet instances: fleets are being processed currently. Try again later."
+            )
+            raise ServerClientError(msg)
+        res = await session.execute(
+            select(InstanceModel.id)
+            .where(
+                InstanceModel.id.in_(instances_ids),
+                InstanceModel.deleted == False,
+            )
+            .order_by(InstanceModel.id)  # take locks in order
+            .with_for_update(key_share=True, of=InstanceModel)
+            .execution_options(populate_existing=True)
+        )
+        instance_models_ids = list(res.scalars().unique().all())
+        if len(instance_models_ids) != len(instances_ids):
+            msg = (
+                "Failed to delete fleets: fleet instances are being processed currently. Try again later."
+                if instance_nums is None
+                else "Failed to delete fleet instances: fleet instances are being processed currently. Try again later."
+            )
+            raise ServerClientError(msg)
+        for fleet_model in fleet_models:
+            fleet = fleet_model_to_fleet(fleet_model)
             if fleet.spec.configuration.ssh_config is not None:
                 _check_can_manage_ssh_fleets(user=user, project=project)
         if instance_nums is None:

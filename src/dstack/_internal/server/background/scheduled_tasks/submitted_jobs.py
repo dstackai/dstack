@@ -13,7 +13,6 @@ from sqlalchemy.orm import (
     load_only,
     noload,
     selectinload,
-    with_loader_criteria,
 )
 
 from dstack._internal.core.backends.base.backend import Backend
@@ -223,9 +222,8 @@ async def _process_submitted_job(
         .where(JobModel.id == job_model.id)
         .options(joinedload(JobModel.instance))
         .options(
-            joinedload(JobModel.fleet).joinedload(FleetModel.instances),
-            with_loader_criteria(
-                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            joinedload(JobModel.fleet).selectinload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
             ),
         )
     )
@@ -236,9 +234,8 @@ async def _process_submitted_job(
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(RunModel.user).load_only(UserModel.name))
         .options(
-            joinedload(RunModel.fleet).joinedload(FleetModel.instances),
-            with_loader_criteria(
-                InstanceModel, InstanceModel.deleted == False, include_aliases=True
+            joinedload(RunModel.fleet).selectinload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
             ),
         )
     )
@@ -584,6 +581,8 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
             # To avoid violating fleet placement cluster during master provisioning,
             # we must lock empty fleets and respect existing instances in non-empty fleets.
             # On SQLite always take the lock during master provisioning for simplicity.
+            # It's fine to lock fleets currently locked by pipelines (with lock_* fields set)
+            # since we won't update fleets – we only need to ensure there is no parallel provisioning.
             await exit_stack.enter_async_context(
                 get_locker(get_db().dialect_name).lock_ctx(
                     FleetModel.__tablename__, [fleet_model.id]

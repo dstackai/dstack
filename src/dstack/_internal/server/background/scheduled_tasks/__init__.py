@@ -102,13 +102,13 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(
         process_idle_volumes, IntervalTrigger(seconds=60, jitter=10), max_instances=1
     )
-    _scheduler.add_job(
-        process_fleets,
-        IntervalTrigger(seconds=10, jitter=2),
-        max_instances=1,
-    )
     _scheduler.add_job(delete_instance_health_checks, IntervalTrigger(minutes=5), max_instances=1)
     if not FeatureFlags.PIPELINE_PROCESSING_ENABLED:
+        _scheduler.add_job(
+            process_fleets,
+            IntervalTrigger(seconds=10, jitter=2),
+            max_instances=1,
+        )
         _scheduler.add_job(
             process_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5
         )
