@@ -3,6 +3,7 @@ declare type TSpotPolicy = 'spot' | 'on-demand' | 'auto';
 declare type TFleetListRequestParams = TBaseRequestListParams & {
     project_name?: string;
     only_active?: boolean;
+    include_imported?: boolean;
 };
 
 declare interface ISSHHostParamsRequest {

@@ -83,6 +83,7 @@ export const useFilters = (localStorePrefix = 'instances-list-page') => {
         return {
             ...params,
             only_active: onlyActive,
+            include_imported: true,
         } as Partial<TInstanceListRequestParams>;
     }, [propertyFilterQuery, onlyActive]);
 

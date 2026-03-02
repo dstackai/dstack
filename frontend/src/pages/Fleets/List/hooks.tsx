@@ -182,6 +182,7 @@ export const useFilters = (localStorePrefix = 'fleet-list-page') => {
         return {
             ...params,
             only_active: onlyActive,
+            include_imported: true,
         } as Partial<TFleetListRequestParams>;
     }, [propertyFilterQuery, onlyActive]);
 

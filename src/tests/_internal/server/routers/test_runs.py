@@ -64,12 +64,14 @@ from dstack._internal.server.testing.common import (
     create_job,
     create_project,
     create_repo,
+    create_resource_export,
     create_run,
     create_user,
     get_auth_headers,
     get_fleet_spec,
     get_job_provisioning_data,
     get_run_spec,
+    get_ssh_fleet_configuration,
     list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
@@ -1383,6 +1385,56 @@ class TestGetRunPlan:
             )
         assert response.status_code == 200, response.json()
         assert response.json() == run_plan_dict
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_run_plan_with_offer_from_imported_fleet(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        importer_user = await create_user(session, global_role=GlobalRole.USER)
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.USER,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            instance_num=1,
+            backend=BackendType.REMOTE,
+        )
+        await create_resource_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+
+        run_spec = {"configuration": {"type": "dev-environment", "ide": "vscode"}}
+        body = {"run_spec": run_spec}
+        response = await client.post(
+            "/api/project/importer-project/runs/get_plan",
+            headers=get_auth_headers(importer_user.token),
+            json=body,
+        )
+        assert response.status_code == 200, response.json()
+        response_json = response.json()
+        assert response_json["project_name"] == "importer-project"
+        assert response_json["job_plans"][0]["offers"][0]["backend"] == "remote"
 
     @pytest.mark.parametrize(
         ("client_version", "expected_availability"),

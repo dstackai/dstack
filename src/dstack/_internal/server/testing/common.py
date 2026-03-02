@@ -93,6 +93,7 @@ from dstack._internal.server.models import (
     ComputeGroupModel,
     DecryptedString,
     EventModel,
+    ExportedFleetModel,
     FileArchiveModel,
     FleetModel,
     GatewayComputeModel,
@@ -107,6 +108,8 @@ from dstack._internal.server.models import (
     ProjectModel,
     RepoCredsModel,
     RepoModel,
+    ResourceExportModel,
+    ResourceImportModel,
     RunModel,
     SecretModel,
     UserModel,
@@ -512,6 +515,24 @@ async def create_compute_group(
     session.add(compute_group)
     await session.commit()
     return compute_group
+
+
+async def create_resource_export(
+    session: AsyncSession,
+    exporter_project: ProjectModel,
+    importer_projects: list[ProjectModel],
+    exported_fleets: list[FleetModel],
+    name: str = "test_resource_export",
+) -> ResourceExportModel:
+    resource_export = ResourceExportModel(
+        name=name,
+        project=exporter_project,
+        resource_imports=[ResourceImportModel(project=project) for project in importer_projects],
+        exported_fleets=[ExportedFleetModel(fleet=fleet) for fleet in exported_fleets],
+    )
+    session.add(resource_export)
+    await session.commit()
+    return resource_export
 
 
 async def create_probe(
