@@ -15,9 +15,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
 
-	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/internal/common"
-	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/common/consts"
+	"github.com/dstackai/dstack/runner/internal/common/gpu"
+	"github.com/dstackai/dstack/runner/internal/common/log"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
 	"github.com/dstackai/dstack/runner/internal/shim/components"
@@ -236,7 +236,7 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 	var dcgmExporter *dcgm.DCGMExporter
 	var dcgmWrapper dcgm.DCGMWrapperInterface
 
-	if common.GetGpuVendor() == common.GpuVendorNvidia {
+	if gpu.GetGpuVendor() == gpu.GpuVendorNvidia {
 		dcgmExporterPath, err := dcgm.GetDCGMExporterExecPath(ctx)
 		if err == nil {
 			interval := time.Duration(args.DCGMExporter.Interval * int(time.Millisecond))

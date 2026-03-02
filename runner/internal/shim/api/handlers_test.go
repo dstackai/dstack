@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	common "github.com/dstackai/dstack/runner/internal/api"
+	commonapi "github.com/dstackai/dstack/runner/internal/common/api"
 )
 
 func TestHealthcheck(t *testing.T) {
@@ -15,7 +15,7 @@ func TestHealthcheck(t *testing.T) {
 
 	server := NewShimServer(context.Background(), ":12345", "0.0.1.dev2", NewDummyRunner(), nil, nil, nil, nil)
 
-	f := common.JSONResponseHandler(server.HealthcheckHandler)
+	f := commonapi.JSONResponseHandler(server.HealthcheckHandler)
 	f(responseRecorder, request)
 
 	if responseRecorder.Code != 200 {
@@ -39,7 +39,7 @@ func TestTaskSubmit(t *testing.T) {
 
 	request := httptest.NewRequest("POST", "/api/tasks", strings.NewReader(requestBody))
 	responseRecorder := httptest.NewRecorder()
-	firstSubmitPost := common.JSONResponseHandler(server.TaskSubmitHandler)
+	firstSubmitPost := commonapi.JSONResponseHandler(server.TaskSubmitHandler)
 	firstSubmitPost(responseRecorder, request)
 	if responseRecorder.Code != 200 {
 		t.Errorf("Want status '%d', got '%d'", 200, responseRecorder.Code)
@@ -47,7 +47,7 @@ func TestTaskSubmit(t *testing.T) {
 
 	request = httptest.NewRequest("POST", "/api/tasks", strings.NewReader(requestBody))
 	responseRecorder = httptest.NewRecorder()
-	secondSubmitPost := common.JSONResponseHandler(server.TaskSubmitHandler)
+	secondSubmitPost := commonapi.JSONResponseHandler(server.TaskSubmitHandler)
 	secondSubmitPost(responseRecorder, request)
 	if responseRecorder.Code != 409 {
 		t.Errorf("Want status '%d', got '%d'", 409, responseRecorder.Code)

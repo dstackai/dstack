@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/dstackai/dstack/runner/internal/api"
-	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/common/api"
+	"github.com/dstackai/dstack/runner/internal/common/log"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/components"
 	"github.com/dstackai/dstack/runner/internal/shim/dcgm"

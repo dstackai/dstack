@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/common/log"
 )
 
 type logsWsRequestParams struct {

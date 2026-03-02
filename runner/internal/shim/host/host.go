@@ -9,7 +9,7 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 	"golang.org/x/sys/unix"
 
-	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/common/log"
 )
 
 func GetCpuCount(ctx context.Context) int {
