@@ -733,50 +733,22 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
             switch_instance_status(session, instance, InstanceStatus.BUSY)
         return
 
-    ssh_private_keys = get_instance_ssh_private_keys(instance)
-
-    health_check_cutoff = get_current_datetime() - timedelta(
-        seconds=server_settings.SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS
-    )
-    res = await session.execute(
-        select(func.count(1)).where(
-            InstanceHealthCheckModel.instance_id == instance.id,
-            InstanceHealthCheckModel.collected_at > health_check_cutoff,
-        )
-    )
-    check_instance_health = res.scalar_one() == 0
-
-    # May return False if fails to establish ssh connection
-    instance_check = await run_async(
-        _check_instance_inner,
-        ssh_private_keys,
-        job_provisioning_data,
-        None,
+    check_instance_health = await _should_check_instance_health(session, instance)
+    instance_check = await _run_instance_check(
         instance=instance,
+        job_provisioning_data=job_provisioning_data,
         check_instance_health=check_instance_health,
     )
-    if instance_check is False:
-        instance_check = InstanceCheck(reachable=False, message="SSH or tunnel error")
-
-    if instance_check.reachable and check_instance_health:
-        health_status = instance_check.get_health_status()
-    else:
-        # Keep previous health status
-        health_status = instance.health
-
-    loglevel = logging.DEBUG
-    if not instance_check.reachable and instance.status.is_available():
-        loglevel = logging.WARNING
-    elif check_instance_health and not health_status.is_healthy():
-        loglevel = logging.WARNING
-    logger.log(
-        loglevel,
-        "Instance %s check: reachable=%s health_status=%s message=%r",
-        instance.name,
-        instance_check.reachable,
-        health_status.name,
-        instance_check.message,
-        extra={"instance_name": instance.name, "health_status": health_status},
+    health_status = _get_health_status_for_instance_check(
+        instance=instance,
+        instance_check=instance_check,
+        check_instance_health=check_instance_health,
+    )
+    _log_instance_check_result(
+        instance=instance,
+        instance_check=instance_check,
+        health_status=health_status,
+        check_instance_health=check_instance_health,
     )
 
     if instance_check.has_health_checks():
@@ -821,6 +793,73 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
         if deadline is not None and get_current_datetime() > deadline:
             instance.termination_reason = InstanceTerminationReason.UNREACHABLE
             switch_instance_status(session, instance, InstanceStatus.TERMINATING)
+
+
+async def _should_check_instance_health(session: AsyncSession, instance: InstanceModel) -> bool:
+    health_check_cutoff = get_current_datetime() - timedelta(
+        seconds=server_settings.SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS
+    )
+    result = await session.execute(
+        select(func.count(1)).where(
+            InstanceHealthCheckModel.instance_id == instance.id,
+            InstanceHealthCheckModel.collected_at > health_check_cutoff,
+        )
+    )
+    return result.scalar_one() == 0
+
+
+async def _run_instance_check(
+    instance: InstanceModel,
+    job_provisioning_data: JobProvisioningData,
+    check_instance_health: bool,
+) -> InstanceCheck:
+    ssh_private_keys = get_instance_ssh_private_keys(instance)
+
+    # May return False if fails to establish ssh connection
+    instance_check = await run_async(
+        _check_instance_inner,
+        ssh_private_keys,
+        job_provisioning_data,
+        None,
+        instance=instance,
+        check_instance_health=check_instance_health,
+    )
+    if instance_check is False:
+        return InstanceCheck(reachable=False, message="SSH or tunnel error")
+    return instance_check
+
+
+def _get_health_status_for_instance_check(
+    instance: InstanceModel,
+    instance_check: InstanceCheck,
+    check_instance_health: bool,
+) -> HealthStatus:
+    if instance_check.reachable and check_instance_health:
+        return instance_check.get_health_status()
+    # Keep previous health status
+    return instance.health
+
+
+def _log_instance_check_result(
+    instance: InstanceModel,
+    instance_check: InstanceCheck,
+    health_status: HealthStatus,
+    check_instance_health: bool,
+) -> None:
+    loglevel = logging.DEBUG
+    if not instance_check.reachable and instance.status.is_available():
+        loglevel = logging.WARNING
+    elif check_instance_health and not health_status.is_healthy():
+        loglevel = logging.WARNING
+    logger.log(
+        loglevel,
+        "Instance %s check: reachable=%s health_status=%s message=%r",
+        instance.name,
+        instance_check.reachable,
+        health_status.name,
+        instance_check.message,
+        extra={"instance_name": instance.name, "health_status": health_status},
+    )
 
 
 async def _wait_for_instance_provisioning_data(
