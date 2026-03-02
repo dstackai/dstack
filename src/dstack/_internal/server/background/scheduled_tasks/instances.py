@@ -199,63 +199,81 @@ async def _process_next_instance():
 
 async def _process_instance(session: AsyncSession, instance: InstanceModel):
     logger.debug("%s: processing instance, status: %s", fmt(instance), instance.status.upper())
-    # Refetch to load related attributes.
-    # Load related attributes only for statuses that always need them.
-    if instance.status in (
-        InstanceStatus.PENDING,
-        InstanceStatus.TERMINATING,
-    ):
-        res = await session.execute(
-            select(InstanceModel)
-            .where(InstanceModel.id == instance.id)
-            .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
-            .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
-            .options(
-                joinedload(InstanceModel.fleet).joinedload(
-                    FleetModel.instances.and_(InstanceModel.deleted == False)
-                ),
-            )
-            .execution_options(populate_existing=True)
-        )
-        instance = res.unique().scalar_one()
-    elif instance.status == InstanceStatus.IDLE:
-        res = await session.execute(
-            select(InstanceModel)
-            .where(InstanceModel.id == instance.id)
-            .options(joinedload(InstanceModel.project))
-            .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
-            .options(
-                joinedload(InstanceModel.fleet).joinedload(
-                    FleetModel.instances.and_(InstanceModel.deleted == False)
-                ),
-            )
-            .execution_options(populate_existing=True)
-        )
-        instance = res.unique().scalar_one()
-
     if instance.status == InstanceStatus.PENDING:
-        if is_ssh_instance(instance):
-            await _add_remote(session, instance)
-        else:
-            await _create_instance(
-                session=session,
-                instance=instance,
-            )
-    elif instance.status in (
-        InstanceStatus.PROVISIONING,
-        InstanceStatus.IDLE,
-        InstanceStatus.BUSY,
-    ):
-        idle_duration_expired = _check_and_mark_terminating_if_idle_duration_expired(
-            session, instance
-        )
-        if not idle_duration_expired:
-            await _check_instance(session, instance)
+        await _process_pending_instance(session, instance)
+    elif instance.status == InstanceStatus.PROVISIONING:
+        await _process_provisioning_instance(session, instance)
+    elif instance.status == InstanceStatus.IDLE:
+        await _process_idle_instance(session, instance)
+    elif instance.status == InstanceStatus.BUSY:
+        await _process_busy_instance(session, instance)
     elif instance.status == InstanceStatus.TERMINATING:
-        await _terminate(session, instance)
+        await _process_terminating_instance(session, instance)
 
     instance.last_processed_at = get_current_datetime()
     await session.commit()
+
+
+async def _process_pending_instance(session: AsyncSession, instance: InstanceModel):
+    instance = await _refetch_instance_for_pending_or_terminating(session, instance.id)
+    if is_ssh_instance(instance):
+        await _add_remote(session, instance)
+    else:
+        await _create_instance(session=session, instance=instance)
+
+
+async def _process_provisioning_instance(session: AsyncSession, instance: InstanceModel):
+    await _check_instance(session, instance)
+
+
+async def _process_idle_instance(session: AsyncSession, instance: InstanceModel):
+    instance = await _refetch_instance_for_idle(session, instance.id)
+    idle_duration_expired = _check_and_mark_terminating_if_idle_duration_expired(session, instance)
+    if not idle_duration_expired:
+        await _check_instance(session, instance)
+
+
+async def _process_busy_instance(session: AsyncSession, instance: InstanceModel):
+    await _check_instance(session, instance)
+
+
+async def _process_terminating_instance(session: AsyncSession, instance: InstanceModel):
+    instance = await _refetch_instance_for_pending_or_terminating(session, instance.id)
+    await _terminate(session, instance)
+
+
+async def _refetch_instance_for_pending_or_terminating(
+    session: AsyncSession, instance_id
+) -> InstanceModel:
+    res = await session.execute(
+        select(InstanceModel)
+        .where(InstanceModel.id == instance_id)
+        .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+        .options(
+            joinedload(InstanceModel.fleet).joinedload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
+            )
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
+
+
+async def _refetch_instance_for_idle(session: AsyncSession, instance_id) -> InstanceModel:
+    res = await session.execute(
+        select(InstanceModel)
+        .where(InstanceModel.id == instance_id)
+        .options(joinedload(InstanceModel.project))
+        .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+        .options(
+            joinedload(InstanceModel.fleet).joinedload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
+            )
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
 
 
 def _check_and_mark_terminating_if_idle_duration_expired(
@@ -1142,7 +1160,8 @@ def _get_termination_deadline(instance: InstanceModel) -> datetime.datetime:
 
 
 def _need_to_wait_fleet_provisioning(
-    instance: InstanceModel, master_instance: InstanceModel
+    instance: InstanceModel,
+    master_instance: InstanceModel,
 ) -> bool:
     # Cluster cloud instances should wait for the first fleet instance to be provisioned
     # so that they are provisioned in the same backend/region
