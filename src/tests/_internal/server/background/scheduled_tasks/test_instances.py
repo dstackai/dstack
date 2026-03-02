@@ -1227,6 +1227,55 @@ class TestAddSSHInstance:
         assert instance.status == InstanceStatus.PENDING
         assert instance.termination_reason is None
 
+    async def test_terminates_ssh_instance_if_deploy_fails_unexpectedly(
+        self,
+        session: AsyncSession,
+        deploy_instance_mock: Mock,
+    ):
+        deploy_instance_mock.side_effect = RuntimeError("Unexpected")
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
+        )
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == InstanceTerminationReason.ERROR
+        assert instance.termination_reason_message == "Unexpected error when adding SSH instance"
+
+    async def test_terminates_ssh_instance_if_key_is_invalid(
+        self,
+        session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(
+            "dstack._internal.server.background.scheduled_tasks.instances._ssh_keys_to_pkeys",
+            Mock(side_effect=ValueError("Bad key")),
+        )
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
+        )
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == InstanceTerminationReason.ERROR
+        assert instance.termination_reason_message == "Unsupported private SSH key type"
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

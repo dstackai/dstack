@@ -312,43 +312,51 @@ async def _add_remote(session: AsyncSession, instance: InstanceModel) -> None:
         switch_instance_status(session, instance, InstanceStatus.TERMINATED)
         return
 
+    remote_details = get_instance_remote_connection_info(instance)
+    assert remote_details is not None
+
     try:
-        remote_details = get_instance_remote_connection_info(instance)
-        assert remote_details is not None
-        # Prepare connection key
-        try:
-            pkeys = _ssh_keys_to_pkeys(remote_details.ssh_keys)
-            if remote_details.ssh_proxy_keys is not None:
-                ssh_proxy_pkeys = _ssh_keys_to_pkeys(remote_details.ssh_proxy_keys)
-            else:
-                ssh_proxy_pkeys = None
-        except (ValueError, PasswordRequiredException):
-            instance.termination_reason = InstanceTerminationReason.ERROR
-            instance.termination_reason_message = "Unsupported private SSH key type"
-            switch_instance_status(session, instance, InstanceStatus.TERMINATED)
-            return
+        pkeys = _ssh_keys_to_pkeys(remote_details.ssh_keys)
+        if remote_details.ssh_proxy_keys is not None:
+            ssh_proxy_pkeys = _ssh_keys_to_pkeys(remote_details.ssh_proxy_keys)
+        else:
+            ssh_proxy_pkeys = None
+    except (ValueError, PasswordRequiredException):
+        instance.termination_reason = InstanceTerminationReason.ERROR
+        instance.termination_reason_message = "Unsupported private SSH key type"
+        switch_instance_status(session, instance, InstanceStatus.TERMINATED)
+        return
 
-        authorized_keys = [pk.public.strip() for pk in remote_details.ssh_keys]
-        authorized_keys.append(instance.project.ssh_public_key.strip())
+    authorized_keys = [pk.public.strip() for pk in remote_details.ssh_keys]
+    authorized_keys.append(instance.project.ssh_public_key.strip())
 
-        try:
-            future = run_async(
-                _deploy_instance, remote_details, pkeys, ssh_proxy_pkeys, authorized_keys
-            )
-            deploy_timeout = 20 * 60  # 20 minutes
-            result = await asyncio.wait_for(future, timeout=deploy_timeout)
-            health, host_info, arch = result
-        except (asyncio.TimeoutError, TimeoutError) as e:
-            raise SSHProvisioningError(f"Deploy timeout: {e}") from e
-        except Exception as e:
-            raise SSHProvisioningError(f"Deploy instance raised an error: {e}") from e
-    except SSHProvisioningError as e:
+    try:
+        future = run_async(
+            _deploy_instance, remote_details, pkeys, ssh_proxy_pkeys, authorized_keys
+        )
+        deploy_timeout = 20 * 60  # 20 minutes
+        health, host_info, arch = await asyncio.wait_for(future, timeout=deploy_timeout)
+    except (asyncio.TimeoutError, TimeoutError) as e:
         logger.warning(
-            "Provisioning instance %s could not be completed because of the error: %s",
-            instance.name,
-            e,
+            "%s: deploy timeout when adding SSH instance: %s",
+            fmt(instance),
+            repr(e),
         )
         # Stays in PENDING, may retry later
+        return
+    except SSHProvisioningError as e:
+        logger.warning(
+            "%s: provisioning error when adding SSH instance: %s",
+            fmt(instance),
+            repr(e),
+        )
+        # Stays in PENDING, may retry later
+        return
+    except Exception:
+        logger.exception("%s: unexpected error when adding SSH instance", fmt(instance))
+        instance.termination_reason = InstanceTerminationReason.ERROR
+        instance.termination_reason_message = "Unexpected error when adding SSH instance"
+        switch_instance_status(session, instance, InstanceStatus.TERMINATED)
         return
 
     instance_type = host_info_to_instance_type(host_info, arch)
