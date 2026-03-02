@@ -194,6 +194,51 @@ class TestGetFleet:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "by_id", [pytest.param(False, id="by-name"), pytest.param(True, id="by-id")]
+    )
+    async def test_returns_403_on_nonexistent_fleet_in_foreign_project(
+        self, test_db, session: AsyncSession, client: AsyncClient, by_id: bool
+    ):
+        await create_project(session, name="test-project")
+        user = await create_user(session, global_role=GlobalRole.USER)  # not a project member
+        if by_id:
+            body = {"id": str(uuid4())}
+        else:
+            body = {"name": "nonexistent"}
+        response = await client.post(
+            "/api/project/test-project/fleets/get",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "by_id", [pytest.param(False, id="by-name"), pytest.param(True, id="by-id")]
+    )
+    async def test_returns_403_on_deleted_fleet_in_foreign_project(
+        self, test_db, session: AsyncSession, client: AsyncClient, by_id: bool
+    ):
+        project = await create_project(session, name="test-project")
+        user = await create_user(session, global_role=GlobalRole.USER)  # not a project member
+        fleet = await create_fleet(
+            session=session, project=project, deleted=True, name="deleted-fleet"
+        )
+        if by_id:
+            body = {"id": str(fleet.id)}
+        else:
+            body = {"name": "deleted-fleet"}
+        response = await client.post(
+            "/api/project/test-project/fleets/get",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize("deleted", [False, True])
     async def test_returns_fleet_by_id(
         self, test_db, session: AsyncSession, client: AsyncClient, deleted: bool
@@ -302,6 +347,29 @@ class TestGetFleet:
             json={"name": "some_fleet"},
         )
         assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "by_id", [pytest.param(False, id="by-name"), pytest.param(True, id="by-id")]
+    )
+    async def test_returns_foreign_fleet_to_global_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient, by_id: bool
+    ):
+        admin = await create_user(session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session, name="test-project")
+        fleet = await create_fleet(session=session, project=project, name="test-fleet")
+        if by_id:
+            body = {"id": str(fleet.id)}
+        else:
+            body = {"name": "test-fleet"}
+        response = await client.post(
+            "/api/project/test-project/fleets/get",
+            headers=get_auth_headers(admin.token),
+            json=body,
+        )
+        assert response.status_code == 200
+        assert response.json()["name"] == "test-fleet"
 
 
 class TestApplyFleetPlan:
