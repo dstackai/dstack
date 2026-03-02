@@ -1,24 +1,24 @@
 ---
-title: Using volumes to optimize cold starts on RunPod
+title: Using volumes to optimize cold starts on Runpod
 date: 2024-08-13
-description: "Learn how to use volumes with dstack to optimize model inference cold start times on RunPod."  
+description: "Learn how to use volumes with dstack to optimize model inference cold start times on Runpod."  
 slug: volumes-on-runpod
 categories:
   - Changelog 
 ---
 
-# Using volumes to optimize cold starts on RunPod
+# Using volumes to optimize cold starts on Runpod
 
 Deploying custom models in the cloud often faces the challenge of cold start times, including the time to provision a
 new instance and download the model. This is especially relevant for services with autoscaling when new model replicas
 need to be provisioned quickly. 
 
 Let's explore how `dstack` optimizes this process using volumes, with an example of
-deploying a model on RunPod.
+deploying a model on Runpod.
 
 <!-- more -->
 
-Suppose you want to deploy Llama 3.1 on RunPod as a [service](../../docs/concepts/services.md):
+Suppose you want to deploy Llama 3.1 on Runpod as a [service](../../docs/concepts/services.md):
 
 <div editor-title="examples/llms/llama31/tgi/service.dstack.yml">
 
@@ -59,9 +59,9 @@ When starting each replica, `text-generation-launcher` downloads the model to th
 usually takes under a minute, but larger models may take longer. Repeated downloads can significantly affect
 auto-scaling efficiency.
 
-Great news: RunPod supports network volumes, which we can use for caching models across multiple replicas.
+Great news: Runpod supports network volumes, which we can use for caching models across multiple replicas.
 
-With `dstack`, you can create a RunPod volume using the following configuration:
+With `dstack`, you can create a Runpod volume using the following configuration:
 
 <div editor-title="examples/mist/volumes/runpod.dstack.yml">
 
@@ -130,7 +130,7 @@ resources:
 In this case, `dstack` attaches the specified volume to each new replica. This ensures the model is downloaded only
 once, reducing cold start time in proportion to the model size.
 
-A notable feature of RunPod is that volumes can be attached to multiple containers simultaneously. This capability is
+A notable feature of Runpod is that volumes can be attached to multiple containers simultaneously. This capability is
 particularly useful for auto-scalable services or distributed tasks.
 
 Using [volumes](../../docs/concepts/volumes.md) not only optimizes inference cold start times but also enhances the

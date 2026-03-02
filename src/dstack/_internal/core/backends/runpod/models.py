@@ -20,7 +20,7 @@ class RunpodBackendConfig(CoreModel):
     type: Literal["runpod"] = "runpod"
     regions: Annotated[
         Optional[List[str]],
-        Field(description="The list of RunPod regions. Omit to use all regions"),
+        Field(description="The list of Runpod regions. Omit to use all regions"),
     ] = None
     community_cloud: Annotated[
         Optional[bool],

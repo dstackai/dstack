@@ -22,7 +22,7 @@ While `dstack` integrates with leading cloud GPU providers, we aim to expand par
 sharing our vision of simplifying AI infrastructure orchestration with a lightweight, efficient alternative to Kubernetes.
 
 This year, we’re excited to welcome our first partners: [Lambda](https://lambdalabs.com/), 
-[RunPod](https://www.runpod.io/), 
+[Runpod](https://www.runpod.io/), 
 [CUDO Compute](https://www.cudocompute.com/), 
 and [Hot Aisle](https://hotaisle.xyz/).
 
@@ -114,7 +114,7 @@ This year, we’re particularly proud of our newly added integration with AMD.
 `dstack` works seamlessly with any on-prem AMD clusters. For example, you can rent such servers through our partner 
 [Hot Aisle](https://hotaisle.xyz/).
 
-> Among cloud providers, [AMD](https://www.amd.com/en/products/accelerators/instinct.html) is supported only through RunPod. In Q1 2025, we plan to extend it to
+> Among cloud providers, [AMD](https://www.amd.com/en/products/accelerators/instinct.html) is supported only through Runpod. In Q1 2025, we plan to extend it to
 [Nscale](https://www.nscale.com/),
 > [Hot Aisle](https://hotaisle.xyz/), and potentially other providers open to collaboration.
 

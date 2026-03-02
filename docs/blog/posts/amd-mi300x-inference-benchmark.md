@@ -217,8 +217,8 @@ is the primary sponsor of this benchmark, and we are sincerely grateful for thei
 If you'd like to use top-tier bare metal compute with AMD GPUs, we recommend going
 with Hot Aisle. Once you gain access to a cluster, it can be easily accessed via `dstack`'s [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets) easily.
 
-### RunPod
+### Runpod
 If you’d like to use on-demand compute with AMD GPUs at affordable prices, you can configure `dstack` to
-use [RunPod](https://runpod.io/). In
+use [Runpod](https://runpod.io/). In
 this case, `dstack` will be able to provision fleets automatically when you run dev environments, tasks, and
 services.
