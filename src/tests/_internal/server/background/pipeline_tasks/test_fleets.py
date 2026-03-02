@@ -1,5 +1,6 @@
+import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
 import pytest
@@ -12,6 +13,8 @@ from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.background.pipeline_tasks.base import PipelineItem
 from dstack._internal.server.background.pipeline_tasks.fleets import (
+    FleetFetcher,
+    FleetPipeline,
     FleetWorker,
 )
 from dstack._internal.server.models import FleetModel, InstanceModel
@@ -26,11 +29,23 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_fleet_spec,
 )
+from dstack._internal.utils.common import get_current_datetime
 
 
 @pytest.fixture
 def worker() -> FleetWorker:
     return FleetWorker(queue=Mock(), heartbeater=Mock())
+
+
+@pytest.fixture
+def fetcher() -> FleetFetcher:
+    return FleetFetcher(
+        queue=asyncio.Queue(),
+        queue_desired_minsize=1,
+        min_processing_interval=timedelta(seconds=60),
+        lock_timeout=timedelta(seconds=20),
+        heartbeater=Mock(),
+    )
 
 
 def _fleet_to_pipeline_item(fleet: FleetModel) -> PipelineItem:
@@ -43,6 +58,109 @@ def _fleet_to_pipeline_item(fleet: FleetModel) -> PipelineItem:
         lock_expires_at=fleet.lock_expires_at,
         prev_lock_expired=False,
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestFleetFetcher:
+    async def test_fetch_selects_eligible_fleets_and_sets_lock_fields(
+        self, test_db, session: AsyncSession, fetcher: FleetFetcher
+    ):
+        project = await create_project(session)
+        now = get_current_datetime()
+
+        stale = await create_fleet(
+            session=session,
+            project=project,
+            last_processed_at=now - timedelta(minutes=3),
+        )
+        just_created = await create_fleet(
+            session=session,
+            project=project,
+            created_at=now,
+            last_processed_at=now,
+            name="just-created",
+        )
+        deleted = await create_fleet(
+            session=session,
+            project=project,
+            deleted=True,
+            name="deleted",
+            last_processed_at=now - timedelta(minutes=2),
+        )
+        recent = await create_fleet(
+            session=session,
+            project=project,
+            created_at=now - timedelta(minutes=2),
+            last_processed_at=now,
+            name="recent",
+        )
+        locked = await create_fleet(
+            session=session,
+            project=project,
+            name="locked",
+            last_processed_at=now - timedelta(minutes=1, seconds=1),
+        )
+        locked.lock_expires_at = now + timedelta(minutes=1)
+        locked.lock_token = uuid.uuid4()
+        locked.lock_owner = "OtherPipeline"
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert {item.id for item in items} == {stale.id, just_created.id}
+
+        for fleet in [stale, just_created, deleted, recent, locked]:
+            await session.refresh(fleet)
+
+        assert stale.lock_owner == FleetPipeline.__name__
+        assert just_created.lock_owner == FleetPipeline.__name__
+        assert stale.lock_expires_at is not None
+        assert just_created.lock_expires_at is not None
+        assert stale.lock_token is not None
+        assert just_created.lock_token is not None
+        assert len({stale.lock_token, just_created.lock_token}) == 1
+
+        assert deleted.lock_owner is None
+        assert recent.lock_owner is None
+        assert locked.lock_owner == "OtherPipeline"
+
+    async def test_fetch_returns_oldest_fleets_first_up_to_limit(
+        self, test_db, session: AsyncSession, fetcher: FleetFetcher
+    ):
+        project = await create_project(session)
+        now = get_current_datetime()
+
+        oldest = await create_fleet(
+            session=session,
+            project=project,
+            name="oldest",
+            last_processed_at=now - timedelta(minutes=4),
+        )
+        middle = await create_fleet(
+            session=session,
+            project=project,
+            name="middle",
+            last_processed_at=now - timedelta(minutes=3),
+        )
+        newest = await create_fleet(
+            session=session,
+            project=project,
+            name="newest",
+            last_processed_at=now - timedelta(minutes=2),
+        )
+
+        items = await fetcher.fetch(limit=2)
+
+        assert [item.id for item in items] == [oldest.id, middle.id]
+
+        await session.refresh(oldest)
+        await session.refresh(middle)
+        await session.refresh(newest)
+
+        assert oldest.lock_owner == FleetPipeline.__name__
+        assert middle.lock_owner == FleetPipeline.__name__
+        assert newest.lock_owner is None
 
 
 @pytest.mark.asyncio

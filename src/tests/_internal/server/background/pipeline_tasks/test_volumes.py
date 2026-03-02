@@ -1,5 +1,6 @@
+import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 import pytest
@@ -9,6 +10,8 @@ from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.volumes import VolumeProvisioningData, VolumeStatus
 from dstack._internal.server.background.pipeline_tasks.volumes import (
+    VolumeFetcher,
+    VolumePipeline,
     VolumePipelineItem,
     VolumeWorker,
 )
@@ -22,11 +25,23 @@ from dstack._internal.server.testing.common import (
     get_volume_provisioning_data,
     list_events,
 )
+from dstack._internal.utils.common import get_current_datetime
 
 
 @pytest.fixture
 def worker() -> VolumeWorker:
     return VolumeWorker(queue=Mock(), heartbeater=Mock())
+
+
+@pytest.fixture
+def fetcher() -> VolumeFetcher:
+    return VolumeFetcher(
+        queue=asyncio.Queue(),
+        queue_desired_minsize=1,
+        min_processing_interval=timedelta(seconds=15),
+        lock_timeout=timedelta(seconds=30),
+        heartbeater=Mock(),
+    )
 
 
 def _volume_to_pipeline_item(volume_model: VolumeModel) -> VolumePipelineItem:
@@ -41,6 +56,145 @@ def _volume_to_pipeline_item(volume_model: VolumeModel) -> VolumePipelineItem:
         status=volume_model.status,
         to_be_deleted=volume_model.to_be_deleted,
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestVolumeFetcher:
+    async def test_fetch_selects_eligible_volumes_and_sets_lock_fields(
+        self, test_db, session: AsyncSession, fetcher: VolumeFetcher
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        now = get_current_datetime()
+        stale = now - timedelta(minutes=1)
+
+        submitted = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+            created_at=stale - timedelta(minutes=1),
+            last_processed_at=stale - timedelta(seconds=2),
+        )
+        to_be_deleted = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            created_at=stale - timedelta(minutes=1),
+            last_processed_at=stale - timedelta(seconds=1),
+        )
+        to_be_deleted.to_be_deleted = True
+
+        just_created = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+            created_at=now,
+            last_processed_at=now,
+        )
+
+        deleted = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+            created_at=stale - timedelta(minutes=1),
+            last_processed_at=stale,
+            deleted_at=stale,
+        )
+        recent = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+            created_at=now - timedelta(minutes=2),
+            last_processed_at=now,
+        )
+        locked = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+            created_at=stale - timedelta(minutes=1),
+            last_processed_at=stale + timedelta(seconds=1),
+        )
+        locked.lock_expires_at = now + timedelta(minutes=1)
+        locked.lock_token = uuid.uuid4()
+        locked.lock_owner = "OtherPipeline"
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert {item.id for item in items} == {
+            submitted.id,
+            to_be_deleted.id,
+            just_created.id,
+        }
+        assert {(item.id, item.status, item.to_be_deleted) for item in items} == {
+            (submitted.id, VolumeStatus.SUBMITTED, False),
+            (to_be_deleted.id, VolumeStatus.ACTIVE, True),
+            (just_created.id, VolumeStatus.SUBMITTED, False),
+        }
+
+        for volume in [submitted, to_be_deleted, just_created, deleted, recent, locked]:
+            await session.refresh(volume)
+
+        fetched_volumes = [submitted, to_be_deleted, just_created]
+        assert all(volume.lock_owner == VolumePipeline.__name__ for volume in fetched_volumes)
+        assert all(volume.lock_expires_at is not None for volume in fetched_volumes)
+        assert all(volume.lock_token is not None for volume in fetched_volumes)
+        assert len({volume.lock_token for volume in fetched_volumes}) == 1
+
+        assert deleted.lock_owner is None
+        assert recent.lock_owner is None
+        assert locked.lock_owner == "OtherPipeline"
+
+    async def test_fetch_returns_oldest_volumes_first_up_to_limit(
+        self, test_db, session: AsyncSession, fetcher: VolumeFetcher
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        now = get_current_datetime()
+
+        oldest = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+            created_at=now - timedelta(minutes=4),
+            last_processed_at=now - timedelta(minutes=3),
+        )
+        middle = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+            created_at=now - timedelta(minutes=3),
+            last_processed_at=now - timedelta(minutes=2),
+        )
+        newest = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+            created_at=now - timedelta(minutes=2),
+            last_processed_at=now - timedelta(minutes=1),
+        )
+
+        items = await fetcher.fetch(limit=2)
+
+        assert [item.id for item in items] == [oldest.id, middle.id]
+
+        await session.refresh(oldest)
+        await session.refresh(middle)
+        await session.refresh(newest)
+
+        assert oldest.lock_owner == VolumePipeline.__name__
+        assert middle.lock_owner == VolumePipeline.__name__
+        assert newest.lock_owner is None
 
 
 @pytest.mark.asyncio
