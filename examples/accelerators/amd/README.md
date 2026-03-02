@@ -55,7 +55,7 @@ Llama 3.1 70B in FP16 using [TGI](https://huggingface.co/docs/text-generation-in
     type: service
     name: llama31-service-vllm-amd
 
-    # Using RunPod's ROCm Docker image
+    # Using Runpod's ROCm Docker image
     image: runpod/pytorch:2.4.0-py3.10-rocm6.1.0-ubuntu22.04
     # Required environment variables
     env:
@@ -125,7 +125,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     type: task
     name: trl-amd-llama31-train
 
-    # Using RunPod's ROCm Docker image
+    # Using Runpod's ROCm Docker image
     image: runpod/pytorch:2.1.2-py3.10-rocm6.1-ubuntu22.04
 
     # Required environment variables
@@ -172,7 +172,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     # The name is optional, if not specified, generated randomly
     name: axolotl-amd-llama31-train
 
-    # Using RunPod's ROCm Docker image
+    # Using Runpod's ROCm Docker image
     image: runpod/pytorch:2.1.2-py3.10-rocm6.0.2-ubuntu22.04
     # Required environment variables
     env:

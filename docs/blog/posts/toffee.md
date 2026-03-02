@@ -20,7 +20,7 @@ In a recent engineering [blog post](https://research.toffee.ai/blog/how-we-use-d
 
 [Toffee](https://toffee.ai) builds AI-powered experiences backed by LLMs and image-generation models. To serve these workloads efficiently, they combine:
 
-- **GPU neoclouds** such as [RunPod](https://www.runpod.io/) and [Vast.ai](https://vast.ai/) for flexible, cost-efficient GPU capacity  
+- **GPU neoclouds** such as [Runpod](https://www.runpod.io/) and [Vast.ai](https://vast.ai/) for flexible, cost-efficient GPU capacity  
 - **AWS** for core, non-AI services and backend infrastructure  
 - **dstack** as the orchestration layer that provisions GPU resources and exposes AI models via `dstack` [services](../../docs/concepts/services.md) and [gateways](../../docs/concepts/gateways.md)
 
@@ -68,7 +68,7 @@ Beyond oechestration, Toffee relies on `dstack`’s UI as a central observabilit
 
 <img src="https://dstack.ai/static-assets/static-assets/images/toffee-metrics-dark.png" width="750" />
 
-> *Thanks to dstack’s seamless integration with GPU neoclouds like RunPod and Vast.ai, we’ve been able to shift most workloads off hyperscalers — reducing our effective GPU spend by roughly 2–3× without changing a single line of model code.*
+> *Thanks to dstack’s seamless integration with GPU neoclouds like Runpod and Vast.ai, we’ve been able to shift most workloads off hyperscalers — reducing our effective GPU spend by roughly 2–3× without changing a single line of model code.*
 >
 > *— [Nikita Shupeyko](https://www.linkedin.com/in/nikita-shupeyko/), AI/ML & Cloud Infrastructure Architect at Toffee*
 

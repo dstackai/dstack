@@ -1,25 +1,25 @@
 ---
-title: Supporting AMD accelerators on RunPod
+title: Supporting AMD accelerators on Runpod
 date: 2024-08-21
-description: "dstack, the open-source AI container orchestration platform, adds support for AMD accelerators, with RunPod as the first supported cloud provider."  
+description: "dstack, the open-source AI container orchestration platform, adds support for AMD accelerators, with Runpod as the first supported cloud provider."  
 slug: amd-on-runpod
 categories:
   - Changelog
 ---
 
-# Supporting AMD accelerators on RunPod
+# Supporting AMD accelerators on Runpod
 
 While `dstack` helps streamline the orchestration of containers for AI, its primary goal is to offer vendor independence
 and portability, ensuring compatibility across different hardware and cloud providers.
 
-Inspired by the recent `MI300X` benchmarks, we are pleased to announce that RunPod is the first cloud provider to offer
+Inspired by the recent `MI300X` benchmarks, we are pleased to announce that Runpod is the first cloud provider to offer
 AMD GPUs through `dstack`, with support for other cloud providers and on-prem servers to follow.
 
 <!-- more -->
 
 ## Specification
 
-For the reference, below is a comparison of the `MI300X` and `H100 SXM` specs, incl. the prices offered by RunPod.
+For the reference, below is a comparison of the `MI300X` and `H100 SXM` specs, incl. the prices offered by Runpod.
 
 |                                 | MI300X                                    | H100X SXM    |
 |---------------------------------|-------------------------------------------|--------------|
@@ -113,8 +113,8 @@ cloud resources and run the configuration.
 1. The examples above demonstrate the use of
 [TGI](https://huggingface.co/docs/text-generation-inference/en/installation_amd). 
 AMD accelerators can also be used with other frameworks like vLLM, Ollama, etc., and we'll be adding more examples soon.
-2. RunPod is the first cloud provider where dstack supports AMD. More cloud providers will be supported soon as well.
-3. Want to give RunPod and `dstack` a try? Make sure you've signed up for [RunPod](https://www.runpod.io/), 
+2. Runpod is the first cloud provider where dstack supports AMD. More cloud providers will be supported soon as well.
+3. Want to give Runpod and `dstack` a try? Make sure you've signed up for [Runpod](https://www.runpod.io/), 
    then [set up](../../docs/reference/server/config.yml.md#runpod) the `dstack server`. 
 
 > Have questioned or feedback? Join our [Discord](https://discord.gg/u8SmfwPpMd) 
