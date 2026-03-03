@@ -354,6 +354,7 @@ class TestGetFleetsTable:
         fleet_row = cells[0]
         assert fleet_row["NAME"] == "my-ssh"
         assert fleet_row["NODES"] == "1 (cluster)"
+        assert fleet_row["RESOURCES"] == "-"
         assert fleet_row["BACKEND"] == "ssh"
         assert fleet_row["SPOT"] == "-"
         assert fleet_row["PRICE"] == "-"
