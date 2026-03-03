@@ -32,8 +32,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    # TODO: Pin to gpuhunt release once crusoe-add-new-gpu-types branch is merged.
-    "gpuhunt @ git+https://github.com/dstackai/gpuhunt.git@crusoe-add-new-gpu-types",
+    "gpuhunt==0.1.18",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "orjson",
@@ -54,9 +53,6 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 dstack = "dstack._internal.cli.main:main"
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.hatch.version]
 path = "src/dstack/version.py"
