@@ -425,8 +425,8 @@ async def _process_pending_item(item: InstancePipelineItem) -> Optional[_Process
             log_lock_token_mismatch(logger, item)
             return None
     if is_ssh_instance(instance_model):
-        return await _process_add_remote(instance_model)
-    return await _process_create_instance(instance_model)
+        return await _add_ssh_instance(instance_model)
+    return await _create_cloud_instance(instance_model)
 
 
 async def _process_provisioning_item(item: InstancePipelineItem) -> Optional[_ProcessResult]:
@@ -435,7 +435,7 @@ async def _process_provisioning_item(item: InstancePipelineItem) -> Optional[_Pr
         if instance_model is None:
             log_lock_token_mismatch(logger, item)
             return None
-    return await _process_instance_check(instance_model)
+    return await _check_instance(instance_model)
 
 
 async def _process_idle_item(item: InstancePipelineItem) -> Optional[_ProcessResult]:
@@ -447,7 +447,7 @@ async def _process_idle_item(item: InstancePipelineItem) -> Optional[_ProcessRes
     idle_result = _process_idle_timeout(instance_model)
     if idle_result is not None:
         return idle_result
-    return await _process_instance_check(instance_model)
+    return await _check_instance(instance_model)
 
 
 async def _process_busy_item(item: InstancePipelineItem) -> Optional[_ProcessResult]:
@@ -456,7 +456,7 @@ async def _process_busy_item(item: InstancePipelineItem) -> Optional[_ProcessRes
         if instance_model is None:
             log_lock_token_mismatch(logger, item)
             return None
-    return await _process_instance_check(instance_model)
+    return await _check_instance(instance_model)
 
 
 async def _process_terminating_item(item: InstancePipelineItem) -> Optional[_ProcessResult]:
@@ -468,7 +468,7 @@ async def _process_terminating_item(item: InstancePipelineItem) -> Optional[_Pro
         if instance_model is None:
             log_lock_token_mismatch(logger, item)
             return None
-    return await _process_terminate(instance_model)
+    return await _terminate_instance(instance_model)
 
 
 async def _refetch_locked_instance_status(
@@ -596,7 +596,7 @@ def _can_terminate_fleet_instances_on_idle_duration(fleet_model: FleetModel) -> 
     return len(active_instances) > fleet.spec.configuration.nodes.min
 
 
-async def _process_add_remote(instance_model: InstanceModel) -> _ProcessResult:
+async def _add_ssh_instance(instance_model: InstanceModel) -> _ProcessResult:
     result = _ProcessResult()
     logger.info("Adding ssh instance %s...", instance_model.name)
 
@@ -638,7 +638,7 @@ async def _process_add_remote(instance_model: InstanceModel) -> _ProcessResult:
 
     try:
         future = run_async(
-            _deploy_instance,
+            _deploy_ssh_instance,
             remote_details,
             pkeys,
             ssh_proxy_pkeys,
@@ -778,7 +778,7 @@ def _resolve_ssh_instance_network(
     return instance_network, internal_ip
 
 
-def _deploy_instance(
+def _deploy_ssh_instance(
     remote_details: RemoteConnectionInfo,
     pkeys: list[PKey],
     ssh_proxy_pkeys: Optional[list[PKey]],
@@ -835,7 +835,7 @@ def _deploy_instance(
         return instance_check, host_info, arch
 
 
-async def _process_create_instance(instance_model: InstanceModel) -> _ProcessResult:
+async def _create_cloud_instance(instance_model: InstanceModel) -> _ProcessResult:
     result = _ProcessResult()
     master_instance_model = _get_fleet_master_instance(instance_model)
     if _need_to_wait_fleet_provisioning(instance_model, master_instance_model):
@@ -1157,7 +1157,7 @@ async def _find_or_create_suitable_placement_group_state(
     )
 
 
-async def _process_instance_check(instance_model: InstanceModel) -> _ProcessResult:
+async def _check_instance(instance_model: InstanceModel) -> _ProcessResult:
     result = _ProcessResult()
     if (
         instance_model.status == InstanceStatus.BUSY
@@ -1591,7 +1591,7 @@ def _get_instance_cpu_arch(instance_model: InstanceModel) -> Optional[gpuhunt.CP
     return job_provisioning_data.instance_type.resources.cpu_arch
 
 
-async def _process_terminate(instance_model: InstanceModel) -> _ProcessResult:
+async def _terminate_instance(instance_model: InstanceModel) -> _ProcessResult:
     result = _ProcessResult()
     now = get_current_datetime()
     if (
@@ -1803,80 +1803,6 @@ def _append_sibling_status_event(
     )
 
 
-def _get_effective_instance_status(
-    instance_model: InstanceModel,
-    update_map: _InstanceUpdateMap,
-) -> InstanceStatus:
-    return cast(InstanceStatus, update_map.get("status", instance_model.status))
-
-
-def _get_effective_instance_termination_reason(
-    instance_model: InstanceModel,
-    update_map: _InstanceUpdateMap,
-) -> Optional[InstanceTerminationReason]:
-    return cast(
-        Optional[InstanceTerminationReason],
-        update_map.get("termination_reason", instance_model.termination_reason),
-    )
-
-
-def _get_effective_instance_termination_reason_message(
-    instance_model: InstanceModel,
-    update_map: _InstanceUpdateMap,
-) -> Optional[str]:
-    return cast(
-        Optional[str],
-        update_map.get("termination_reason_message", instance_model.termination_reason_message),
-    )
-
-
-def _get_effective_instance_health(
-    instance_model: InstanceModel,
-    update_map: _InstanceUpdateMap,
-) -> HealthStatus:
-    return cast(HealthStatus, update_map.get("health", instance_model.health))
-
-
-def _get_effective_instance_unreachable(
-    instance_model: InstanceModel,
-    update_map: _InstanceUpdateMap,
-) -> bool:
-    return cast(bool, update_map.get("unreachable", instance_model.unreachable))
-
-
-def _emit_instance_health_change_event(
-    session: AsyncSession,
-    instance_model: InstanceModel,
-    old_health: HealthStatus,
-    new_health: HealthStatus,
-) -> None:
-    if old_health == new_health:
-        return
-    events.emit(
-        session=session,
-        message=f"Instance health changed {old_health.upper()} -> {new_health.upper()}",
-        actor=events.SystemActor(),
-        targets=[events.Target.from_model(instance_model)],
-    )
-
-
-def _emit_instance_reachability_change_event(
-    session: AsyncSession,
-    instance_model: InstanceModel,
-    old_status: InstanceStatus,
-    old_unreachable: bool,
-    new_unreachable: bool,
-) -> None:
-    if not old_status.is_available() or old_unreachable == new_unreachable:
-        return
-    events.emit(
-        session=session,
-        message="Instance became unreachable" if new_unreachable else "Instance became reachable",
-        actor=events.SystemActor(),
-        targets=[events.Target.from_model(instance_model)],
-    )
-
-
 async def _apply_process_result(item: InstancePipelineItem, result: _ProcessResult) -> None:
     async with get_session_ctx() as session:
         res = await session.execute(
@@ -1983,3 +1909,77 @@ async def _apply_process_result(item: InstancePipelineItem, result: _ProcessResu
                 ],
             )
         await session.commit()
+
+
+def _get_effective_instance_status(
+    instance_model: InstanceModel,
+    update_map: _InstanceUpdateMap,
+) -> InstanceStatus:
+    return cast(InstanceStatus, update_map.get("status", instance_model.status))
+
+
+def _get_effective_instance_termination_reason(
+    instance_model: InstanceModel,
+    update_map: _InstanceUpdateMap,
+) -> Optional[InstanceTerminationReason]:
+    return cast(
+        Optional[InstanceTerminationReason],
+        update_map.get("termination_reason", instance_model.termination_reason),
+    )
+
+
+def _get_effective_instance_termination_reason_message(
+    instance_model: InstanceModel,
+    update_map: _InstanceUpdateMap,
+) -> Optional[str]:
+    return cast(
+        Optional[str],
+        update_map.get("termination_reason_message", instance_model.termination_reason_message),
+    )
+
+
+def _get_effective_instance_health(
+    instance_model: InstanceModel,
+    update_map: _InstanceUpdateMap,
+) -> HealthStatus:
+    return cast(HealthStatus, update_map.get("health", instance_model.health))
+
+
+def _get_effective_instance_unreachable(
+    instance_model: InstanceModel,
+    update_map: _InstanceUpdateMap,
+) -> bool:
+    return cast(bool, update_map.get("unreachable", instance_model.unreachable))
+
+
+def _emit_instance_health_change_event(
+    session: AsyncSession,
+    instance_model: InstanceModel,
+    old_health: HealthStatus,
+    new_health: HealthStatus,
+) -> None:
+    if old_health == new_health:
+        return
+    events.emit(
+        session=session,
+        message=f"Instance health changed {old_health.upper()} -> {new_health.upper()}",
+        actor=events.SystemActor(),
+        targets=[events.Target.from_model(instance_model)],
+    )
+
+
+def _emit_instance_reachability_change_event(
+    session: AsyncSession,
+    instance_model: InstanceModel,
+    old_status: InstanceStatus,
+    old_unreachable: bool,
+    new_unreachable: bool,
+) -> None:
+    if not old_status.is_available() or old_unreachable == new_unreachable:
+        return
+    events.emit(
+        session=session,
+        message="Instance became unreachable" if new_unreachable else "Instance became reachable",
+        actor=events.SystemActor(),
+        targets=[events.Target.from_model(instance_model)],
+    )
