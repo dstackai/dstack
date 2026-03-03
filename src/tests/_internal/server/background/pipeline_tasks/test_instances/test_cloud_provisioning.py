@@ -261,6 +261,7 @@ class TestCloudProvisioning:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             m.return_value = []
             for instance in sorted(instances, key=lambda i: (i.instance_num, i.created_at)):
+                await session.refresh(instance)
                 await process_instance(session, worker, instance)
 
         termination_reasons = defaultdict(int)

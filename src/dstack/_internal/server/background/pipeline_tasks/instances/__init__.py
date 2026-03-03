@@ -228,23 +228,16 @@ class InstanceWorker(Worker[InstancePipelineItem]):
 
     @sentry_utils.instrument_named_task("pipeline_tasks.InstanceWorker.process")
     async def process(self, item: InstancePipelineItem):
-        async with get_session_ctx() as session:
-            instance_model = await _refetch_locked_instance_status(session=session, item=item)
-            if instance_model is None:
-                log_lock_token_mismatch(logger, item)
-                return
-            status = instance_model.status
-
         result: Optional[ProcessResult] = None
-        if status == InstanceStatus.PENDING:
+        if item.status == InstanceStatus.PENDING:
             result = await _process_pending_item(item)
-        elif status == InstanceStatus.PROVISIONING:
+        elif item.status == InstanceStatus.PROVISIONING:
             result = await _process_provisioning_item(item)
-        elif status == InstanceStatus.IDLE:
+        elif item.status == InstanceStatus.IDLE:
             result = await _process_idle_item(item)
-        elif status == InstanceStatus.BUSY:
+        elif item.status == InstanceStatus.BUSY:
             result = await _process_busy_item(item)
-        elif status == InstanceStatus.TERMINATING:
+        elif item.status == InstanceStatus.TERMINATING:
             result = await _process_terminating_item(item)
         if result is None:
             return
@@ -307,20 +300,6 @@ async def _process_terminating_item(item: InstancePipelineItem) -> Optional[Proc
             log_lock_token_mismatch(logger, item)
             return None
     return await terminate_instance(instance_model)
-
-
-async def _refetch_locked_instance_status(
-    session: AsyncSession, item: InstancePipelineItem
-) -> Optional[InstanceModel]:
-    res = await session.execute(
-        select(InstanceModel)
-        .where(
-            InstanceModel.id == item.id,
-            InstanceModel.lock_token == item.lock_token,
-        )
-        .options(load_only(InstanceModel.status))
-    )
-    return res.scalar_one_or_none()
 
 
 async def _refetch_locked_instance_for_pending_or_terminating(
