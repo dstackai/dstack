@@ -31,7 +31,6 @@ from dstack._internal.server.background.pipeline_tasks.instances.cloud_provision
     create_cloud_instance,
 )
 from dstack._internal.server.background.pipeline_tasks.instances.common import (
-    InstanceUpdateMap,
     ProcessResult,
 )
 from dstack._internal.server.background.pipeline_tasks.instances.ssh_deploy import (
@@ -395,69 +394,6 @@ async def _refetch_locked_instance_for_check(
     return res.unique().scalar_one_or_none()
 
 
-def _get_effective_instance_status(
-    instance_model: InstanceModel, update_map: InstanceUpdateMap
-) -> InstanceStatus:
-    return update_map.get("status", instance_model.status)
-
-
-def _get_effective_instance_termination_reason(
-    instance_model: InstanceModel, update_map: InstanceUpdateMap
-):
-    return update_map.get("termination_reason", instance_model.termination_reason)
-
-
-def _get_effective_instance_termination_reason_message(
-    instance_model: InstanceModel, update_map: InstanceUpdateMap
-):
-    return update_map.get("termination_reason_message", instance_model.termination_reason_message)
-
-
-def _get_effective_instance_health(
-    instance_model: InstanceModel, update_map: InstanceUpdateMap
-) -> HealthStatus:
-    return update_map.get("health", instance_model.health)
-
-
-def _get_effective_instance_unreachable(
-    instance_model: InstanceModel, update_map: InstanceUpdateMap
-) -> bool:
-    return update_map.get("unreachable", instance_model.unreachable)
-
-
-def _emit_instance_health_change_event(
-    session: AsyncSession,
-    instance_model: InstanceModel,
-    old_health: HealthStatus,
-    new_health: HealthStatus,
-) -> None:
-    if old_health == new_health:
-        return
-    events.emit(
-        session,
-        f"Instance health changed {old_health.upper()} -> {new_health.upper()}",
-        actor=events.SystemActor(),
-        targets=[events.Target.from_model(instance_model)],
-    )
-
-
-def _emit_instance_reachability_change_event(
-    session: AsyncSession,
-    instance_model: InstanceModel,
-    old_status: InstanceStatus,
-    old_unreachable: bool,
-    new_unreachable: bool,
-) -> None:
-    if not old_status.is_available() or old_unreachable == new_unreachable:
-        return
-    events.emit(
-        session,
-        "Instance became unreachable" if new_unreachable else "Instance became reachable",
-        actor=events.SystemActor(),
-        targets=[events.Target.from_model(instance_model)],
-    )
-
-
 async def _apply_process_result(item: InstancePipelineItem, result: ProcessResult) -> None:
     async with get_session_ctx() as session:
         res = await session.execute(
@@ -540,27 +476,28 @@ async def _apply_process_result(item: InstancePipelineItem, result: ProcessResul
             session=session,
             instance_model=instance_model,
             old_status=instance_model.status,
-            new_status=_get_effective_instance_status(instance_model, result.instance_update_map),
-            termination_reason=_get_effective_instance_termination_reason(
-                instance_model, result.instance_update_map
+            new_status=result.instance_update_map.get("status", instance_model.status),
+            termination_reason=result.instance_update_map.get(
+                "termination_reason", instance_model.termination_reason
             ),
-            termination_reason_message=_get_effective_instance_termination_reason_message(
-                instance_model, result.instance_update_map
+            termination_reason_message=result.instance_update_map.get(
+                "termination_reason_message",
+                instance_model.termination_reason_message,
             ),
         )
         _emit_instance_health_change_event(
             session=session,
             instance_model=instance_model,
             old_health=instance_model.health,
-            new_health=_get_effective_instance_health(instance_model, result.instance_update_map),
+            new_health=result.instance_update_map.get("health", instance_model.health),
         )
         _emit_instance_reachability_change_event(
             session=session,
             instance_model=instance_model,
             old_status=instance_model.status,
             old_unreachable=instance_model.unreachable,
-            new_unreachable=_get_effective_instance_unreachable(
-                instance_model, result.instance_update_map
+            new_unreachable=result.instance_update_map.get(
+                "unreachable", instance_model.unreachable
             ),
         )
 
@@ -578,3 +515,36 @@ async def _apply_process_result(item: InstancePipelineItem, result: ProcessResul
                     )
                 ],
             )
+
+
+def _emit_instance_health_change_event(
+    session: AsyncSession,
+    instance_model: InstanceModel,
+    old_health: HealthStatus,
+    new_health: HealthStatus,
+) -> None:
+    if old_health == new_health:
+        return
+    events.emit(
+        session,
+        f"Instance health changed {old_health.upper()} -> {new_health.upper()}",
+        actor=events.SystemActor(),
+        targets=[events.Target.from_model(instance_model)],
+    )
+
+
+def _emit_instance_reachability_change_event(
+    session: AsyncSession,
+    instance_model: InstanceModel,
+    old_status: InstanceStatus,
+    old_unreachable: bool,
+    new_unreachable: bool,
+) -> None:
+    if not old_status.is_available() or old_unreachable == new_unreachable:
+        return
+    events.emit(
+        session,
+        "Instance became unreachable" if new_unreachable else "Instance became reachable",
+        actor=events.SystemActor(),
+        targets=[events.Target.from_model(instance_model)],
+    )
