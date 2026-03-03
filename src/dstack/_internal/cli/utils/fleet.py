@@ -51,12 +51,16 @@ def get_fleets_table(
         if config.ssh_config is not None:
             # SSH fleet: fixed number of hosts, no cloud billing
             nodes = str(len(config.ssh_config.hosts))
+            resources = "-"
+            gpu = "-"
             backend = "ssh"
             spot_policy = "-"
             max_price = "-"
         else:
             # Backend fleet: dynamic nodes, cloud billing
             nodes = _format_nodes(config.nodes)
+            resources = config.resources.pretty_format() if config.resources else "-"
+            gpu = _format_fleet_gpu(config.resources)
             backend = _format_backends(config.backends)
             spot_policy = "-"
             if merged_profile and merged_profile.spot_policy:
@@ -74,18 +78,14 @@ def get_fleets_table(
         fleet_row: Dict[Union[str, int], Any] = {
             "NAME": name,
             "NODES": nodes,
+            "RESOURCES": resources,
+            "GPU": gpu,
             "BACKEND": backend,
             "PRICE": max_price,
             "SPOT": spot_policy,
             "STATUS": _format_fleet_status(fleet),
             "CREATED": format_date(fleet.created_at),
         }
-
-        if verbose:
-            fleet_row["RESOURCES"] = config.resources.pretty_format() if config.resources else "-"
-            fleet_row["ERROR"] = ""
-        else:
-            fleet_row["GPU"] = _format_fleet_gpu(config.resources)
 
         add_row_from_dict(table, fleet_row)
 
@@ -119,6 +119,8 @@ def get_fleets_table(
             instance_row: Dict[Union[str, int], Any] = {
                 "NAME": f"   instance={instance.instance_num}",
                 "NODES": "",
+                "RESOURCES": _format_instance_resources(instance),
+                "GPU": _format_instance_gpu(instance),
                 "BACKEND": backend_with_region,
                 "PRICE": instance_price,
                 "SPOT": instance_spot,
@@ -126,14 +128,8 @@ def get_fleets_table(
                 "CREATED": format_date(instance.created),
             }
 
-            if verbose:
-                instance_row["RESOURCES"] = _format_instance_resources(instance)
-                error = ""
-                if instance.status == InstanceStatus.TERMINATED and instance.termination_reason:
-                    error = instance.termination_reason
-                instance_row["ERROR"] = error
-            else:
-                instance_row["GPU"] = _format_instance_gpu(instance)
+            if instance.status == InstanceStatus.TERMINATED and instance.termination_reason:
+                instance_row["ERROR"] = instance.termination_reason
 
             add_row_from_dict(table, instance_row, style="secondary")
 
