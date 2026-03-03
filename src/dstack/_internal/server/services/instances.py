@@ -88,6 +88,8 @@ def switch_instance_status(
         instance_model=instance_model,
         old_status=old_status,
         new_status=new_status,
+        termination_reason=instance_model.termination_reason,
+        termination_reason_message=instance_model.termination_reason_message,
         actor=actor,
     )
 
@@ -97,20 +99,26 @@ def emit_instance_status_change_event(
     instance_model: InstanceModel,
     old_status: InstanceStatus,
     new_status: InstanceStatus,
+    termination_reason: Optional[InstanceTerminationReason],
+    termination_reason_message: Optional[str],
     actor: events.AnyActor = events.SystemActor(),
 ) -> None:
     if old_status == new_status:
         return
     msg = get_instance_status_change_message(
-        instance_model=instance_model,
         old_status=old_status,
         new_status=new_status,
+        termination_reason=termination_reason,
+        termination_reason_message=termination_reason_message,
     )
     events.emit(session, msg, actor=actor, targets=[events.Target.from_model(instance_model)])
 
 
 def get_instance_status_change_message(
-    instance_model: InstanceModel, old_status: InstanceStatus, new_status: InstanceStatus
+    old_status: InstanceStatus,
+    new_status: InstanceStatus,
+    termination_reason: Optional[InstanceTerminationReason],
+    termination_reason_message: Optional[str],
 ) -> str:
     msg = f"Instance status changed {old_status.upper()} -> {new_status.upper()}"
     if (
@@ -118,20 +126,20 @@ def get_instance_status_change_message(
         or new_status == InstanceStatus.TERMINATED
         and old_status != InstanceStatus.TERMINATING
     ):
-        if instance_model.termination_reason is None:
+        if termination_reason is None:
             raise ValueError(
                 f"termination_reason must be set when switching to {new_status.upper()} status"
             )
         if (
-            instance_model.termination_reason == InstanceTerminationReason.ERROR
-            and not instance_model.termination_reason_message
+            termination_reason == InstanceTerminationReason.ERROR
+            and not termination_reason_message
         ):
             raise ValueError(
                 "termination_reason_message must be set when termination_reason is ERROR"
             )
-        msg += f". Termination reason: {instance_model.termination_reason.upper()}"
-        if instance_model.termination_reason_message:
-            msg += f" ({instance_model.termination_reason_message})"
+        msg += f". Termination reason: {termination_reason.upper()}"
+        if termination_reason_message:
+            msg += f" ({termination_reason_message})"
     return msg
 
 

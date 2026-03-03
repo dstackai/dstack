@@ -104,12 +104,14 @@ from dstack._internal.server.services.fleets import (
     is_cloud_cluster,
 )
 from dstack._internal.server.services.instances import (
+    emit_instance_status_change_event,
     get_instance_configuration,
     get_instance_profile,
     get_instance_provisioning_data,
     get_instance_remote_connection_info,
     get_instance_requirements,
     get_instance_ssh_private_keys,
+    get_instance_status_change_message,
     is_ssh_instance,
     remove_dangling_tasks_from_instance,
 )
@@ -388,7 +390,7 @@ class _PlacementGroupCreate(TypedDict):
 
 
 @dataclass
-class _DeferredEvent:
+class _SiblingDeferredEvent:
     message: str
     project_id: uuid.UUID
     instance_id: uuid.UUID
@@ -406,7 +408,7 @@ class _PlacementGroupState:
 class _ProcessResult:
     instance_update_map: _InstanceUpdateMap = field(default_factory=_InstanceUpdateMap)
     sibling_update_rows: list[_SiblingInstanceUpdateMap] = field(default_factory=list)
-    deferred_events: list[_DeferredEvent] = field(default_factory=list)
+    sibling_deferred_events: list[_SiblingDeferredEvent] = field(default_factory=list)
     health_check_create: Optional[_HealthCheckCreate] = None
     placement_group_creates: list[_PlacementGroupCreate] = field(default_factory=list)
     schedule_pg_deletion_fleet_id: Optional[uuid.UUID] = None
@@ -576,7 +578,6 @@ def _process_idle_timeout(instance_model: InstanceModel) -> Optional[_ProcessRes
     result = _ProcessResult()
     _set_status_update(
         update_map=result.instance_update_map,
-        deferred_events=result.deferred_events,
         instance_model=instance_model,
         new_status=InstanceStatus.TERMINATING,
         termination_reason=InstanceTerminationReason.IDLE_TIMEOUT,
@@ -605,7 +606,6 @@ async def _process_add_remote(instance_model: InstanceModel) -> _ProcessResult:
     if retry_duration_deadline < get_current_datetime():
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATED,
             termination_reason=InstanceTerminationReason.PROVISIONING_TIMEOUT,
@@ -626,7 +626,6 @@ async def _process_add_remote(instance_model: InstanceModel) -> _ProcessResult:
     except (ValueError, PasswordRequiredException):
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATED,
             termination_reason=InstanceTerminationReason.ERROR,
@@ -665,7 +664,6 @@ async def _process_add_remote(instance_model: InstanceModel) -> _ProcessResult:
         logger.exception("%s: unexpected error when adding SSH instance", fmt(instance_model))
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATED,
             termination_reason=InstanceTerminationReason.ERROR,
@@ -679,7 +677,6 @@ async def _process_add_remote(instance_model: InstanceModel) -> _ProcessResult:
     except _SSHInstanceNetworkResolutionError as exc:
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATED,
             termination_reason=InstanceTerminationReason.ERROR,
@@ -695,7 +692,6 @@ async def _process_add_remote(instance_model: InstanceModel) -> _ProcessResult:
     if not divisible:
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATED,
             termination_reason=InstanceTerminationReason.ERROR,
@@ -731,7 +727,6 @@ async def _process_add_remote(instance_model: InstanceModel) -> _ProcessResult:
 
     _set_status_update(
         update_map=result.instance_update_map,
-        deferred_events=result.deferred_events,
         instance_model=instance_model,
         new_status=InstanceStatus.IDLE if health else InstanceStatus.PROVISIONING,
     )
@@ -861,7 +856,6 @@ async def _process_create_instance(instance_model: InstanceModel) -> _ProcessRes
         )
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATED,
             termination_reason=InstanceTerminationReason.ERROR,
@@ -967,7 +961,6 @@ async def _process_create_instance(instance_model: InstanceModel) -> _ProcessRes
 
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.PROVISIONING,
         )
@@ -988,7 +981,6 @@ async def _process_create_instance(instance_model: InstanceModel) -> _ProcessRes
 
     _set_status_update(
         update_map=result.instance_update_map,
-        deferred_events=result.deferred_events,
         instance_model=instance_model,
         new_status=InstanceStatus.TERMINATED,
         termination_reason=InstanceTerminationReason.NO_OFFERS,
@@ -1005,13 +997,24 @@ async def _process_create_instance(instance_model: InstanceModel) -> _ProcessRes
             sibling_update_map = _SiblingInstanceUpdateMap(id=sibling_instance_model.id)
             _set_status_update(
                 update_map=sibling_update_map,
-                deferred_events=result.deferred_events,
                 instance_model=sibling_instance_model,
                 new_status=InstanceStatus.TERMINATED,
                 termination_reason=InstanceTerminationReason.MASTER_FAILED,
             )
             if len(sibling_update_map) > 1:
                 result.sibling_update_rows.append(sibling_update_map)
+                _append_sibling_status_event(
+                    deferred_events=result.sibling_deferred_events,
+                    instance_model=sibling_instance_model,
+                    new_status=InstanceStatus.TERMINATED,
+                    termination_reason=cast(
+                        Optional[InstanceTerminationReason],
+                        sibling_update_map.get("termination_reason"),
+                    ),
+                    termination_reason_message=cast(
+                        Optional[str], sibling_update_map.get("termination_reason_message")
+                    ),
+                )
     return result
 
 
@@ -1163,7 +1166,6 @@ async def _process_instance_check(instance_model: InstanceModel) -> _ProcessResu
     ):
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATING,
             termination_reason=InstanceTerminationReason.JOB_FINISHED,
@@ -1189,7 +1191,6 @@ async def _process_instance_check(instance_model: InstanceModel) -> _ProcessResu
         if instance_model.status == InstanceStatus.PROVISIONING:
             _set_status_update(
                 update_map=result.instance_update_map,
-                deferred_events=result.deferred_events,
                 instance_model=instance_model,
                 new_status=InstanceStatus.BUSY,
             )
@@ -1224,13 +1225,11 @@ async def _process_instance_check(instance_model: InstanceModel) -> _ProcessResu
 
     _set_health_update(
         update_map=result.instance_update_map,
-        deferred_events=result.deferred_events,
         instance_model=instance_model,
         health=health_status,
     )
     _set_unreachable_update(
         update_map=result.instance_update_map,
-        deferred_events=result.deferred_events,
         instance_model=instance_model,
         unreachable=not instance_check.reachable,
     )
@@ -1240,7 +1239,6 @@ async def _process_instance_check(instance_model: InstanceModel) -> _ProcessResu
         if instance_model.status == InstanceStatus.PROVISIONING:
             _set_status_update(
                 update_map=result.instance_update_map,
-                deferred_events=result.deferred_events,
                 instance_model=instance_model,
                 new_status=InstanceStatus.IDLE if not instance_model.jobs else InstanceStatus.BUSY,
             )
@@ -1261,7 +1259,6 @@ async def _process_instance_check(instance_model: InstanceModel) -> _ProcessResu
         if now > provisioning_deadline:
             _set_status_update(
                 update_map=result.instance_update_map,
-                deferred_events=result.deferred_events,
                 instance_model=instance_model,
                 new_status=InstanceStatus.TERMINATING,
                 termination_reason=InstanceTerminationReason.PROVISIONING_TIMEOUT,
@@ -1272,7 +1269,6 @@ async def _process_instance_check(instance_model: InstanceModel) -> _ProcessResu
         if deadline is not None and now > deadline:
             _set_status_update(
                 update_map=result.instance_update_map,
-                deferred_events=result.deferred_events,
                 instance_model=instance_model,
                 new_status=InstanceStatus.TERMINATING,
                 termination_reason=InstanceTerminationReason.UNREACHABLE,
@@ -1358,7 +1354,6 @@ async def _process_wait_for_instance_provisioning_data(
     if get_current_datetime() > provisioning_deadline:
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATING,
             termination_reason=InstanceTerminationReason.PROVISIONING_TIMEOUT,
@@ -1377,7 +1372,6 @@ async def _process_wait_for_instance_provisioning_data(
         )
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATING,
             termination_reason=InstanceTerminationReason.ERROR,
@@ -1401,7 +1395,6 @@ async def _process_wait_for_instance_provisioning_data(
         )
         _set_status_update(
             update_map=result.instance_update_map,
-            deferred_events=result.deferred_events,
             instance_model=instance_model,
             new_status=InstanceStatus.TERMINATING,
             termination_reason=InstanceTerminationReason.ERROR,
@@ -1663,7 +1656,6 @@ async def _process_terminate(instance_model: InstanceModel) -> _ProcessResult:
     result.instance_update_map["finished_at"] = NOW_PLACEHOLDER
     _set_status_update(
         update_map=result.instance_update_map,
-        deferred_events=result.deferred_events,
         instance_model=instance_model,
         new_status=InstanceStatus.TERMINATED,
     )
@@ -1735,7 +1727,6 @@ def _ssh_keys_to_pkeys(ssh_keys: list[SSHKey]) -> list[PKey]:
 
 def _set_status_update(
     update_map: Union[_InstanceUpdateMap, _SiblingInstanceUpdateMap],
-    deferred_events: list[_DeferredEvent],
     instance_model: InstanceModel,
     new_status: InstanceStatus,
     termination_reason: object = _UNSET,
@@ -1766,13 +1757,44 @@ def _set_status_update(
         update_map["termination_reason_message"] = effective_termination_reason_message
 
     update_map["status"] = new_status
+
+
+def _set_health_update(
+    update_map: _InstanceUpdateMap,
+    instance_model: InstanceModel,
+    health: HealthStatus,
+) -> None:
+    if instance_model.health == health:
+        return
+    update_map["health"] = health
+
+
+def _set_unreachable_update(
+    update_map: _InstanceUpdateMap,
+    instance_model: InstanceModel,
+    unreachable: bool,
+) -> None:
+    if not instance_model.status.is_available() or instance_model.unreachable == unreachable:
+        return
+    update_map["unreachable"] = unreachable
+
+
+def _append_sibling_status_event(
+    deferred_events: list[_SiblingDeferredEvent],
+    instance_model: InstanceModel,
+    new_status: InstanceStatus,
+    termination_reason: Optional[InstanceTerminationReason],
+    termination_reason_message: Optional[str],
+) -> None:
+    if instance_model.status == new_status:
+        return
     deferred_events.append(
-        _DeferredEvent(
-            message=_format_status_change_message(
-                old_status=old_status,
+        _SiblingDeferredEvent(
+            message=get_instance_status_change_message(
+                old_status=instance_model.status,
                 new_status=new_status,
-                termination_reason=effective_termination_reason,
-                termination_reason_message=effective_termination_reason_message,
+                termination_reason=termination_reason,
+                termination_reason_message=termination_reason_message,
             ),
             project_id=instance_model.project_id,
             instance_id=instance_model.id,
@@ -1781,73 +1803,105 @@ def _set_status_update(
     )
 
 
-def _set_health_update(
-    update_map: _InstanceUpdateMap,
-    deferred_events: list[_DeferredEvent],
+def _get_effective_instance_status(
     instance_model: InstanceModel,
-    health: HealthStatus,
-) -> None:
-    if instance_model.health == health:
-        return
-    update_map["health"] = health
-    deferred_events.append(
-        _DeferredEvent(
-            message=f"Instance health changed {instance_model.health.upper()} -> {health.upper()}",
-            project_id=instance_model.project_id,
-            instance_id=instance_model.id,
-            instance_name=instance_model.name,
-        )
+    update_map: _InstanceUpdateMap,
+) -> InstanceStatus:
+    return cast(InstanceStatus, update_map.get("status", instance_model.status))
+
+
+def _get_effective_instance_termination_reason(
+    instance_model: InstanceModel,
+    update_map: _InstanceUpdateMap,
+) -> Optional[InstanceTerminationReason]:
+    return cast(
+        Optional[InstanceTerminationReason],
+        update_map.get("termination_reason", instance_model.termination_reason),
     )
 
 
-def _set_unreachable_update(
-    update_map: _InstanceUpdateMap,
-    deferred_events: list[_DeferredEvent],
+def _get_effective_instance_termination_reason_message(
     instance_model: InstanceModel,
-    unreachable: bool,
-) -> None:
-    if not instance_model.status.is_available() or instance_model.unreachable == unreachable:
-        return
-    update_map["unreachable"] = unreachable
-    deferred_events.append(
-        _DeferredEvent(
-            message="Instance became unreachable" if unreachable else "Instance became reachable",
-            project_id=instance_model.project_id,
-            instance_id=instance_model.id,
-            instance_name=instance_model.name,
-        )
+    update_map: _InstanceUpdateMap,
+) -> Optional[str]:
+    return cast(
+        Optional[str],
+        update_map.get("termination_reason_message", instance_model.termination_reason_message),
     )
 
 
-def _format_status_change_message(
+def _get_effective_instance_health(
+    instance_model: InstanceModel,
+    update_map: _InstanceUpdateMap,
+) -> HealthStatus:
+    return cast(HealthStatus, update_map.get("health", instance_model.health))
+
+
+def _get_effective_instance_unreachable(
+    instance_model: InstanceModel,
+    update_map: _InstanceUpdateMap,
+) -> bool:
+    return cast(bool, update_map.get("unreachable", instance_model.unreachable))
+
+
+def _emit_instance_health_change_event(
+    session: AsyncSession,
+    instance_model: InstanceModel,
+    old_health: HealthStatus,
+    new_health: HealthStatus,
+) -> None:
+    if old_health == new_health:
+        return
+    events.emit(
+        session=session,
+        message=f"Instance health changed {old_health.upper()} -> {new_health.upper()}",
+        actor=events.SystemActor(),
+        targets=[events.Target.from_model(instance_model)],
+    )
+
+
+def _emit_instance_reachability_change_event(
+    session: AsyncSession,
+    instance_model: InstanceModel,
     old_status: InstanceStatus,
-    new_status: InstanceStatus,
-    termination_reason: Optional[InstanceTerminationReason],
-    termination_reason_message: Optional[str],
-) -> str:
-    message = f"Instance status changed {old_status.upper()} -> {new_status.upper()}"
-    if new_status == InstanceStatus.TERMINATING or (
-        new_status == InstanceStatus.TERMINATED and old_status != InstanceStatus.TERMINATING
-    ):
-        if termination_reason is None:
-            raise ValueError(
-                f"termination_reason must be set when switching to {new_status.upper()} status"
-            )
-        if (
-            termination_reason == InstanceTerminationReason.ERROR
-            and not termination_reason_message
-        ):
-            raise ValueError(
-                "termination_reason_message must be set when termination_reason is ERROR"
-            )
-        message += f". Termination reason: {termination_reason.upper()}"
-        if termination_reason_message:
-            message += f" ({termination_reason_message})"
-    return message
+    old_unreachable: bool,
+    new_unreachable: bool,
+) -> None:
+    if not old_status.is_available() or old_unreachable == new_unreachable:
+        return
+    events.emit(
+        session=session,
+        message="Instance became unreachable" if new_unreachable else "Instance became reachable",
+        actor=events.SystemActor(),
+        targets=[events.Target.from_model(instance_model)],
+    )
 
 
 async def _apply_process_result(item: InstancePipelineItem, result: _ProcessResult) -> None:
     async with get_session_ctx() as session:
+        res = await session.execute(
+            select(InstanceModel)
+            .where(
+                InstanceModel.id == item.id,
+                InstanceModel.lock_token == item.lock_token,
+            )
+            .options(
+                load_only(
+                    InstanceModel.id,
+                    InstanceModel.project_id,
+                    InstanceModel.name,
+                    InstanceModel.status,
+                    InstanceModel.termination_reason,
+                    InstanceModel.termination_reason_message,
+                    InstanceModel.health,
+                    InstanceModel.unreachable,
+                )
+            )
+        )
+        instance_model = res.scalar_one_or_none()
+        if instance_model is None:
+            log_lock_token_mismatch(logger, item)
+            return
         for placement_group_create in result.placement_group_creates:
             session.add(PlacementGroupModel(**placement_group_create))
         if result.health_check_create is not None:
@@ -1859,6 +1913,7 @@ async def _apply_process_result(item: InstancePipelineItem, result: _ProcessResu
         resolve_now_placeholders(result.sibling_update_rows, now=now)
         res = await session.execute(
             update(InstanceModel)
+            .execution_options(synchronize_session=False)
             .where(
                 InstanceModel.id == item.id,
                 InstanceModel.lock_token == item.lock_token,
@@ -1885,7 +1940,35 @@ async def _apply_process_result(item: InstancePipelineItem, result: _ProcessResu
                 except_placement_group_ids=result.schedule_pg_deletion_except_ids,
             )
 
-        for deferred_event in result.deferred_events:
+        emit_instance_status_change_event(
+            session=session,
+            instance_model=instance_model,
+            old_status=instance_model.status,
+            new_status=_get_effective_instance_status(instance_model, result.instance_update_map),
+            termination_reason=_get_effective_instance_termination_reason(
+                instance_model, result.instance_update_map
+            ),
+            termination_reason_message=_get_effective_instance_termination_reason_message(
+                instance_model, result.instance_update_map
+            ),
+        )
+        _emit_instance_health_change_event(
+            session=session,
+            instance_model=instance_model,
+            old_health=instance_model.health,
+            new_health=_get_effective_instance_health(instance_model, result.instance_update_map),
+        )
+        _emit_instance_reachability_change_event(
+            session=session,
+            instance_model=instance_model,
+            old_status=instance_model.status,
+            old_unreachable=instance_model.unreachable,
+            new_unreachable=_get_effective_instance_unreachable(
+                instance_model, result.instance_update_map
+            ),
+        )
+
+        for deferred_event in result.sibling_deferred_events:
             events.emit(
                 session=session,
                 message=deferred_event.message,

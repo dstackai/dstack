@@ -241,6 +241,8 @@ class ComputeGroupWorker(Worker[PipelineItem]):
                     instance_model=instance_model,
                     old_status=instance_model.status,
                     new_status=InstanceStatus.TERMINATED,
+                    termination_reason=instance_model.termination_reason,
+                    termination_reason_message=instance_model.termination_reason_message,
                 )
 
 
