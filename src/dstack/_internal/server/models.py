@@ -619,7 +619,7 @@ class FleetModel(PipelineModelMixin, BaseModel):
     )
 
 
-class InstanceModel(BaseModel):
+class InstanceModel(PipelineModelMixin, BaseModel):
     __tablename__ = "instances"
 
     id: Mapped[uuid.UUID] = mapped_column(
