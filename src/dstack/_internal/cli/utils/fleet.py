@@ -10,13 +10,16 @@ from dstack._internal.core.models.resources import GPUSpec, ResourcesSpec
 from dstack._internal.utils.common import DateFormatter, pretty_date
 
 
-def print_fleets_table(fleets: List[Fleet], verbose: bool = False) -> None:
-    console.print(get_fleets_table(fleets, verbose=verbose))
+def print_fleets_table(fleets: List[Fleet], current_project: str, verbose: bool = False) -> None:
+    console.print(get_fleets_table(fleets, current_project=current_project, verbose=verbose))
     console.print()
 
 
 def get_fleets_table(
-    fleets: List[Fleet], verbose: bool = False, format_date: DateFormatter = pretty_date
+    fleets: List[Fleet],
+    current_project: str,
+    verbose: bool = False,
+    format_date: DateFormatter = pretty_date,
 ) -> Table:
     table = Table(box=None)
 
@@ -39,6 +42,10 @@ def get_fleets_table(
         # Fleet row
         config = fleet.spec.configuration
         merged_profile = fleet.spec.merged_profile
+
+        name = fleet.name
+        if fleet.project_name != current_project:
+            name = f"{fleet.project_name}/{fleet.name}"
 
         # Detect SSH fleet vs backend fleet
         if config.ssh_config is not None:
@@ -65,7 +72,7 @@ def get_fleets_table(
             nodes = f"{nodes} (cluster)"
 
         fleet_row: Dict[Union[str, int], Any] = {
-            "NAME": fleet.name,
+            "NAME": name,
             "NODES": nodes,
             "BACKEND": backend,
             "PRICE": max_price,

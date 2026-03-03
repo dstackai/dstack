@@ -141,7 +141,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
                 f"Provisioning [code]{fleet.name}[/]...", console=console
             ) as live:
                 while not _finished_provisioning(fleet):
-                    table = get_fleets_table([fleet])
+                    table = get_fleets_table([fleet], current_project=self.api.project)
                     live.update(table)
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     fleet = self.api.client.fleets.get(self.api.project, fleet.name)
@@ -159,6 +159,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
                 [fleet],
                 verbose=_fleet_has_failed_instances(fleet),
                 format_date=local_time,
+                current_project=self.api.project,
             )
         )
         if _fleet_has_failed_instances(fleet):
@@ -242,7 +243,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
                 f"Provisioning [code]{fleet.name}[/]...", console=console
             ) as live:
                 while not _finished_provisioning(fleet):
-                    table = get_fleets_table([fleet])
+                    table = get_fleets_table([fleet], current_project=self.api.project)
                     live.update(table)
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     fleet = self.api.client.fleets.get(self.api.project, fleet.name)
@@ -260,6 +261,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator[Fle
                 [fleet],
                 verbose=_fleet_has_failed_instances(fleet),
                 format_date=local_time,
+                current_project=self.api.project,
             )
         )
         if _fleet_has_failed_instances(fleet):
