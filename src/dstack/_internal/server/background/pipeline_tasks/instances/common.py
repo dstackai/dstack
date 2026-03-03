@@ -2,7 +2,7 @@ import datetime
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Optional, TypedDict, Union, cast
+from typing import Optional, TypedDict, Union
 
 from paramiko.pkey import PKey
 
@@ -28,15 +28,13 @@ from dstack._internal.server.services.instances import (
     get_instance_status_change_message,
 )
 from dstack._internal.server.services.offers import get_instance_offer_with_restricted_az
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import UNSET, Unset, get_current_datetime
 from dstack._internal.utils.ssh import pkey_from_str
 
 TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
 TERMINATION_RETRY_TIMEOUT = timedelta(seconds=30)
 TERMINATION_RETRY_MAX_DURATION = timedelta(minutes=15)
 PROVISIONING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
-
-_UNSET = object()
 
 
 class InstanceUpdateMap(ItemUpdateMap, total=False):
@@ -187,35 +185,29 @@ def set_status_update(
     update_map: Union[InstanceUpdateMap, SiblingInstanceUpdateMap],
     instance_model: InstanceModel,
     new_status: InstanceStatus,
-    termination_reason: object = _UNSET,
-    termination_reason_message: object = _UNSET,
+    termination_reason: Union[Optional[InstanceTerminationReason], Unset] = UNSET,
+    termination_reason_message: Union[Optional[str], Unset] = UNSET,
 ) -> bool:
     old_status = instance_model.status
     changed = False
     if old_status == new_status:
-        if termination_reason is not _UNSET:
-            update_map["termination_reason"] = cast(
-                Optional[InstanceTerminationReason], termination_reason
-            )
+        if not isinstance(termination_reason, Unset):
+            update_map["termination_reason"] = termination_reason
             changed = True
-        if termination_reason_message is not _UNSET:
-            update_map["termination_reason_message"] = cast(
-                Optional[str], termination_reason_message
-            )
+        if not isinstance(termination_reason_message, Unset):
+            update_map["termination_reason_message"] = termination_reason_message
             changed = True
         return changed
 
     effective_termination_reason = instance_model.termination_reason
-    if termination_reason is not _UNSET:
-        effective_termination_reason = cast(
-            Optional[InstanceTerminationReason], termination_reason
-        )
+    if not isinstance(termination_reason, Unset):
+        effective_termination_reason = termination_reason
         update_map["termination_reason"] = effective_termination_reason
         changed = True
 
     effective_termination_reason_message = instance_model.termination_reason_message
-    if termination_reason_message is not _UNSET:
-        effective_termination_reason_message = cast(Optional[str], termination_reason_message)
+    if not isinstance(termination_reason_message, Unset):
+        effective_termination_reason_message = termination_reason_message
         update_map["termination_reason_message"] = effective_termination_reason_message
         changed = True
 

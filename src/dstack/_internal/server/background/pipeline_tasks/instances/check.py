@@ -1,6 +1,6 @@
 import logging
 from datetime import timedelta
-from typing import Dict, Optional
+from typing import Optional
 
 import gpuhunt
 import requests
@@ -348,7 +348,7 @@ async def _process_wait_for_instance_provisioning_data(
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _check_instance_inner(
-    ports: Dict[int, int],
+    ports: dict[int, int],
     *,
     instance: InstanceModel,
     check_instance_health: bool = False,

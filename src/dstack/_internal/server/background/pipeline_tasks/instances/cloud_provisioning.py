@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, cast
+from typing import Optional
 
 from pydantic import ValidationError
 
@@ -226,12 +226,9 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
                     deferred_events=result.sibling_deferred_events,
                     instance_model=sibling_instance_model,
                     new_status=InstanceStatus.TERMINATED,
-                    termination_reason=cast(
-                        Optional[InstanceTerminationReason],
-                        sibling_update_map.get("termination_reason"),
-                    ),
-                    termination_reason_message=cast(
-                        Optional[str], sibling_update_map.get("termination_reason_message")
+                    termination_reason=sibling_update_map.get("termination_reason"),
+                    termination_reason_message=sibling_update_map.get(
+                        "termination_reason_message"
                     ),
                 )
     return result

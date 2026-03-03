@@ -7,12 +7,24 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, TypeVar
+from typing import Any, Final, Iterable, List, Optional, TypeVar
 from urllib.parse import urlparse
 
 from typing_extensions import ParamSpec
 
 from dstack._internal.core.models.common import Duration
+
+
+class Unset:
+    pass
+
+
+UNSET: Final = Unset()
+"""
+Use `UNSET` as kwargs default value to distinguish between
+specified and non-specified `Optional` values.
+"""
+
 
 P = ParamSpec("P")
 R = TypeVar("R")
