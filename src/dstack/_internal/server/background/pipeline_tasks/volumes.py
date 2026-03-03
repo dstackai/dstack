@@ -204,8 +204,6 @@ class VolumeWorker(Worker[VolumePipelineItem]):
             await _process_to_be_deleted_item(item)
         elif item.status == VolumeStatus.SUBMITTED:
             await _process_submitted_item(item)
-        elif item.status == VolumeStatus.ACTIVE:
-            pass
 
 
 async def _process_submitted_item(item: VolumePipelineItem):
