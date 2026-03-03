@@ -304,7 +304,7 @@ class FleetWorker(Worker[PipelineItem]):
                 )
             if instance_update_rows:
                 await session.execute(
-                    update(InstanceModel).execution_options(synchronize_session=False),
+                    update(InstanceModel),
                     instance_update_rows,
                 )
             if result.new_instances_count > 0:

@@ -435,7 +435,7 @@ async def _apply_process_result(item: InstancePipelineItem, result: ProcessResul
 
         if result.sibling_update_rows:
             await session.execute(
-                update(InstanceModel).execution_options(synchronize_session=False),
+                update(InstanceModel),
                 result.sibling_update_rows,
             )
 
