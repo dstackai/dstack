@@ -167,7 +167,10 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                             )
                         ),
                         InstanceModel.deleted == False,
-                        InstanceModel.last_processed_at <= now - self._min_processing_interval,
+                        or_(
+                            InstanceModel.last_processed_at <= now - self._min_processing_interval,
+                            InstanceModel.last_processed_at == InstanceModel.created_at,
+                        ),
                         or_(
                             InstanceModel.lock_expires_at.is_(None),
                             InstanceModel.lock_expires_at < now,
