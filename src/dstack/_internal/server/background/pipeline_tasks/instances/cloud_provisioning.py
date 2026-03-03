@@ -215,13 +215,12 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
             if sibling_instance_model.id == instance_model.id:
                 continue
             sibling_update_map = SiblingInstanceUpdateMap(id=sibling_instance_model.id)
-            set_status_update(
+            if set_status_update(
                 update_map=sibling_update_map,
                 instance_model=sibling_instance_model,
                 new_status=InstanceStatus.TERMINATED,
                 termination_reason=InstanceTerminationReason.MASTER_FAILED,
-            )
-            if len(sibling_update_map) > 1:
+            ):
                 result.sibling_update_rows.append(sibling_update_map)
                 append_sibling_status_event(
                     deferred_events=result.sibling_deferred_events,

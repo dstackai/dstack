@@ -189,18 +189,21 @@ def set_status_update(
     new_status: InstanceStatus,
     termination_reason: object = _UNSET,
     termination_reason_message: object = _UNSET,
-) -> None:
+) -> bool:
     old_status = instance_model.status
+    changed = False
     if old_status == new_status:
         if termination_reason is not _UNSET:
             update_map["termination_reason"] = cast(
                 Optional[InstanceTerminationReason], termination_reason
             )
+            changed = True
         if termination_reason_message is not _UNSET:
             update_map["termination_reason_message"] = cast(
                 Optional[str], termination_reason_message
             )
-        return
+            changed = True
+        return changed
 
     effective_termination_reason = instance_model.termination_reason
     if termination_reason is not _UNSET:
@@ -208,33 +211,39 @@ def set_status_update(
             Optional[InstanceTerminationReason], termination_reason
         )
         update_map["termination_reason"] = effective_termination_reason
+        changed = True
 
     effective_termination_reason_message = instance_model.termination_reason_message
     if termination_reason_message is not _UNSET:
         effective_termination_reason_message = cast(Optional[str], termination_reason_message)
         update_map["termination_reason_message"] = effective_termination_reason_message
+        changed = True
 
     update_map["status"] = new_status
+    changed = True
+    return changed
 
 
 def set_health_update(
     update_map: InstanceUpdateMap,
     instance_model: InstanceModel,
     health: HealthStatus,
-) -> None:
+) -> bool:
     if instance_model.health == health:
-        return
+        return False
     update_map["health"] = health
+    return True
 
 
 def set_unreachable_update(
     update_map: InstanceUpdateMap,
     instance_model: InstanceModel,
     unreachable: bool,
-) -> None:
+) -> bool:
     if not instance_model.status.is_available() or instance_model.unreachable == unreachable:
-        return
+        return False
     update_map["unreachable"] = unreachable
+    return True
 
 
 def append_sibling_status_event(
