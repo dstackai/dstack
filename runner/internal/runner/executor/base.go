@@ -1,0 +1,32 @@
+package executor
+
+import (
+	"context"
+	"io"
+
+	"github.com/dstackai/dstack/runner/internal/common/types"
+	"github.com/dstackai/dstack/runner/internal/runner/schemas"
+)
+
+type Executor interface {
+	GetHistory(timestamp int64) *schemas.PullResponse
+	GetJobWsLogsHistory() []schemas.LogEvent
+	GetRunnerState() string
+	GetJobInfo(ctx context.Context) (username string, workingDir string, err error)
+	Run(ctx context.Context) error
+	SetJob(job schemas.SubmitBody)
+	SetJobState(ctx context.Context, state schemas.JobState)
+	SetJobStateWithTerminationReason(
+		ctx context.Context,
+		state schemas.JobState,
+		terminationReason types.TerminationReason,
+		terminationMessage string,
+	)
+	SetRunnerState(state string)
+	WriteFileArchive(id string, src io.Reader) error
+	WriteRepoBlob(src io.Reader) error
+	Lock()
+	RLock()
+	RUnlock()
+	Unlock()
+}

@@ -11,10 +11,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/dstackai/dstack/runner/internal/api"
-	"github.com/dstackai/dstack/runner/internal/executor"
-	"github.com/dstackai/dstack/runner/internal/log"
-	"github.com/dstackai/dstack/runner/internal/schemas"
+	"github.com/dstackai/dstack/runner/internal/common/api"
+	"github.com/dstackai/dstack/runner/internal/common/log"
+	"github.com/dstackai/dstack/runner/internal/runner/executor"
+	"github.com/dstackai/dstack/runner/internal/runner/schemas"
 )
 
 // TODO: set some reasonable value; (optional) make configurable

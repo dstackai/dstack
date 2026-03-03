@@ -7,10 +7,10 @@ import (
 	_ "net/http/pprof"
 	"time"
 
-	"github.com/dstackai/dstack/runner/internal/api"
-	"github.com/dstackai/dstack/runner/internal/executor"
-	"github.com/dstackai/dstack/runner/internal/log"
-	"github.com/dstackai/dstack/runner/internal/metrics"
+	"github.com/dstackai/dstack/runner/internal/common/api"
+	"github.com/dstackai/dstack/runner/internal/common/log"
+	"github.com/dstackai/dstack/runner/internal/runner/executor"
+	"github.com/dstackai/dstack/runner/internal/runner/metrics"
 )
 
 type Server struct {
