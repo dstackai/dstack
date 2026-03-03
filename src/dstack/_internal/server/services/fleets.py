@@ -686,7 +686,7 @@ async def delete_fleets(
         .order_by(InstanceModel.id)
     )
     instances_ids = list(res.scalars().unique().all())
-    await sqlite_commit()
+    await sqlite_commit(session)
     async with (
         get_locker(get_db().dialect_name).lock_ctx(FleetModel.__tablename__, fleets_ids),
         get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids),

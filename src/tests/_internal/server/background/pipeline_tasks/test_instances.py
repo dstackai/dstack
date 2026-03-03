@@ -23,7 +23,7 @@ from dstack._internal.core.errors import (
     SSHProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.fleets import InstanceGroupPlacement
+from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Gpu,
@@ -1183,7 +1183,11 @@ class TestInstanceWorker:
         fleet = await create_fleet(
             session,
             project,
-            spec=get_fleet_spec(conf=get_fleet_configuration(placement=placement, nodes=4)),
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=placement, nodes=FleetNodesSpec(min=4, target=4, max=4)
+                )
+            ),
         )
         instances = [
             await create_instance(
@@ -1230,7 +1234,11 @@ class TestInstanceWorker:
         fleet = await create_fleet(
             session,
             project,
-            spec=get_fleet_spec(conf=get_fleet_configuration(placement=placement, nodes=1)),
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=placement, nodes=FleetNodesSpec(min=1, target=1, max=1)
+                )
+            ),
         )
         instance = await create_instance(
             session=session,
@@ -1280,7 +1288,10 @@ class TestInstanceWorker:
             session,
             project,
             spec=get_fleet_spec(
-                conf=get_fleet_configuration(placement=InstanceGroupPlacement.CLUSTER, nodes=1)
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=1, target=1, max=1),
+                )
             ),
         )
         instance = await create_instance(
@@ -1342,7 +1353,10 @@ class TestInstanceWorker:
             session,
             project,
             spec=get_fleet_spec(
-                conf=get_fleet_configuration(placement=InstanceGroupPlacement.CLUSTER, nodes=1)
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=1, target=1, max=1),
+                )
             ),
         )
         instance = await create_instance(
