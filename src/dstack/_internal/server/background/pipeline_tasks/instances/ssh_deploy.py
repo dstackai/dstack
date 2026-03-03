@@ -259,10 +259,12 @@ def _deploy_instance(
         arch = detect_cpu_arch(client)
         logger.debug("%s: CPU arch is %s", remote_details.host, arch)
 
+        # Execute pre start commands
         shim_pre_start_commands = get_shim_pre_start_commands(arch=arch)
         run_pre_start_commands(client, shim_pre_start_commands, authorized_keys)
         logger.debug("The script for installing dstack has been executed")
 
+        # Upload envs
         shim_envs = get_shim_env(arch=arch)
         try:
             fleet_configuration_envs = remote_details.env.as_dict()
@@ -275,9 +277,11 @@ def _deploy_instance(
         upload_envs(client, dstack_working_dir, shim_envs)
         logger.debug("The dstack-shim environment variables have been installed")
 
+        # Ensure we have fresh versions of host info.json and dstack-runner
         remove_host_info_if_exists(client, dstack_working_dir)
         remove_dstack_runner_if_exists(client, dstack_runner_binary_path)
 
+        # Run dstack-shim as a systemd service
         run_shim_as_systemd_service(
             client=client,
             binary_path=dstack_shim_binary_path,
@@ -285,6 +289,7 @@ def _deploy_instance(
             dev=settings.DSTACK_VERSION is None,
         )
 
+        # Get host info
         host_info = get_host_info(client, dstack_working_dir)
         logger.debug("Received a host_info %s", host_info)
 

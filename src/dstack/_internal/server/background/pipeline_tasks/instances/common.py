@@ -122,6 +122,8 @@ def need_to_wait_fleet_provisioning(
     instance_model: InstanceModel,
     master_instance_model: InstanceModel,
 ) -> bool:
+    # Cluster cloud instances should wait for the first fleet instance to be provisioned
+    # so that they are provisioned in the same backend/region.
     if instance_model.fleet is None:
         return False
     if (

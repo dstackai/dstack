@@ -61,6 +61,11 @@ def process_idle_timeout(instance_model: InstanceModel) -> Optional[ProcessResul
         and not instance_model.jobs
     ):
         return None
+    # Do not terminate instances on idle duration if fleet is already at `nodes.min`.
+    # This is an optimization to avoid terminate-create loop.
+    # There may be race conditions since we don't take the fleet lock.
+    # That's ok: in the worst case we go below `nodes.min`, but
+    # the fleet consolidation logic will provision new nodes.
     if instance_model.fleet is not None and not can_terminate_fleet_instances_on_idle_duration(
         instance_model.fleet
     ):
@@ -92,6 +97,8 @@ async def check_instance(instance_model: InstanceModel) -> ProcessResult:
         and instance_model.jobs
         and all(job.status.is_finished() for job in instance_model.jobs)
     ):
+        # A busy instance could have no active jobs due to this bug:
+        # https://github.com/dstackai/dstack/issues/2068
         set_status_update(
             update_map=result.instance_update_map,
             instance_model=instance_model,
@@ -143,6 +150,7 @@ async def check_instance(instance_model: InstanceModel) -> ProcessResult:
     )
 
     if instance_check.has_health_checks():
+        # ensured by has_health_checks()
         assert instance_check.health_response is not None
         result.health_check_create = HealthCheckCreate(
             instance_id=instance_model.id,
@@ -232,6 +240,7 @@ async def _run_instance_check(
         instance=instance_model,
         check_instance_health=check_instance_health,
     )
+    # May return False if fails to establish ssh connection.
     if instance_check is False:
         return InstanceCheck(reachable=False, message="SSH or tunnel error")
     return instance_check
@@ -244,6 +253,7 @@ def _get_health_status_for_instance_check(
 ) -> HealthStatus:
     if instance_check.reachable and check_instance_health:
         return instance_check.get_health_status()
+    # Keep previous health status.
     return instance_model.health
 
 
@@ -367,6 +377,7 @@ def _check_instance_inner(
     except Exception as exc:
         logger.exception("%s: error removing dangling tasks: %s", fmt(instance), exc)
 
+    # There should be no shim API calls after this function call since it can request shim restart.
     _maybe_install_components(instance, shim_client)
     return runner_client.healthcheck_response_to_instance_check(
         healthcheck_response,
@@ -404,6 +415,11 @@ def _maybe_install_components(
     else:
         logger.debug("Instance %s: no shim info", instance_model.name)
 
+    # old shim without `dstack-shim` component and `/api/shutdown` support
+    # or the same version is already running
+    # or we just requested installation of at least one component
+    # or at least one component is already being installed
+    # or at least one shim task won't survive restart
     running_shim_version = shim_client.get_version_string()
     if (
         installed_shim_version is None
@@ -430,6 +446,10 @@ def _maybe_install_runner(
     shim_client: runner_client.ShimClient,
     runner_info: ComponentInfo,
 ) -> bool:
+    # For developers:
+    # * To install the latest dev build for the current branch from the CI,
+    #   set DSTACK_USE_LATEST_FROM_BRANCH=1.
+    # * To provide your own build, set DSTACK_RUNNER_VERSION_URL and DSTACK_RUNNER_DOWNLOAD_URL.
     expected_version = get_dstack_runner_version()
     if expected_version is None:
         logger.debug("Cannot determine the expected runner version")
@@ -473,6 +493,10 @@ def _maybe_install_shim(
     shim_client: runner_client.ShimClient,
     shim_info: ComponentInfo,
 ) -> bool:
+    # For developers:
+    # * To install the latest dev build for the current branch from the CI,
+    #   set DSTACK_USE_LATEST_FROM_BRANCH=1.
+    # * To provide your own build, set DSTACK_SHIM_VERSION_URL and DSTACK_SHIM_DOWNLOAD_URL.
     expected_version = get_dstack_shim_version()
     if expected_version is None:
         logger.debug("Cannot determine the expected shim version")

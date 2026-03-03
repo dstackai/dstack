@@ -106,6 +106,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         exclude_not_available=True,
     )
 
+    # Limit number of offers tried to prevent long-running processing in case all offers fail.
     for backend, instance_offer in offers[: server_settings.MAX_OFFERS_TRIED]:
         if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
             continue
@@ -190,6 +191,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         result.instance_update_map["started_at"] = NOW_PLACEHOLDER
 
         if instance_model.fleet_id is not None and instance_model.id == master_instance_model.id:
+            # Clean up placement groups that did not end up being used.
             result.schedule_pg_deletion_fleet_id = instance_model.fleet_id
             if placement_group_model is not None:
                 result.schedule_pg_deletion_except_id = placement_group_model.id
@@ -207,6 +209,8 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         and instance_model.id == master_instance_model.id
         and is_cloud_cluster(instance_model.fleet)
     ):
+        # Do not attempt to deploy other instances, as they won't determine the correct cluster
+        # backend, region, and placement group without a successfully deployed master instance.
         for sibling_instance_model in instance_model.fleet.instances:
             if sibling_instance_model.id == instance_model.id:
                 continue
