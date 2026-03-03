@@ -21,7 +21,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     UpdateMapDateTime,
 )
 from dstack._internal.server.background.scheduled_tasks.common import get_provisioning_timeout
-from dstack._internal.server.models import FleetModel, InstanceModel
+from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
 from dstack._internal.server.services.fleets import fleet_model_to_fleet, is_cloud_cluster
 from dstack._internal.server.services.instances import (
     get_instance_provisioning_data,
@@ -77,15 +77,6 @@ class HealthCheckCreate(TypedDict):
     response: str
 
 
-class PlacementGroupCreate(TypedDict):
-    id: uuid.UUID
-    name: str
-    project_id: uuid.UUID
-    fleet_id: uuid.UUID
-    configuration: str
-    provisioning_data: str
-
-
 @dataclass
 class SiblingDeferredEvent:
     message: str
@@ -100,9 +91,9 @@ class ProcessResult:
     sibling_update_rows: list[SiblingInstanceUpdateMap] = field(default_factory=list)
     sibling_deferred_events: list[SiblingDeferredEvent] = field(default_factory=list)
     health_check_create: Optional[HealthCheckCreate] = None
-    placement_group_creates: list[PlacementGroupCreate] = field(default_factory=list)
+    new_placement_group_models: list[PlacementGroupModel] = field(default_factory=list)
     schedule_pg_deletion_fleet_id: Optional[uuid.UUID] = None
-    schedule_pg_deletion_except_ids: tuple[uuid.UUID, ...] = ()
+    schedule_pg_deletion_except_id: Optional[uuid.UUID] = None
 
 
 def can_terminate_fleet_instances_on_idle_duration(fleet_model: FleetModel) -> bool:

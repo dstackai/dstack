@@ -45,7 +45,6 @@ from dstack._internal.server.models import (
     InstanceHealthCheckModel,
     InstanceModel,
     JobModel,
-    PlacementGroupModel,
     ProjectModel,
 )
 from dstack._internal.server.services import events
@@ -400,12 +399,9 @@ async def _apply_process_result(
     async with get_session_ctx() as session:
         if result.health_check_create is not None:
             session.add(InstanceHealthCheckModel(**result.health_check_create))
-        if result.placement_group_creates:
-            session.add_all(
-                PlacementGroupModel(**placement_group_create)
-                for placement_group_create in result.placement_group_creates
-            )
-        if result.health_check_create is not None or result.placement_group_creates:
+        if result.new_placement_group_models:
+            session.add_all(result.new_placement_group_models)
+        if result.health_check_create is not None or result.new_placement_group_models:
             await session.flush()
 
         now = get_current_datetime()
@@ -437,7 +433,11 @@ async def _apply_process_result(
             await schedule_fleet_placement_groups_deletion(
                 session=session,
                 fleet_id=result.schedule_pg_deletion_fleet_id,
-                except_placement_group_ids=result.schedule_pg_deletion_except_ids,
+                except_placement_group_ids=(
+                    ()
+                    if result.schedule_pg_deletion_except_id is None
+                    else (result.schedule_pg_deletion_except_id,)
+                ),
             )
 
         emit_instance_status_change_event(

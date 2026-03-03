@@ -32,7 +32,6 @@ from dstack._internal.core.models.placement import (
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.base import NOW_PLACEHOLDER
 from dstack._internal.server.background.pipeline_tasks.instances.common import (
-    PlacementGroupCreate,
     ProcessResult,
     SiblingInstanceUpdateMap,
     append_sibling_status_event,
@@ -61,7 +60,7 @@ logger = get_logger(__name__)
 class _PlacementGroupState:
     id: uuid.UUID
     placement_group: PlacementGroup
-    create_payload: Optional[PlacementGroupCreate] = None
+    new_model: Optional[PlacementGroupModel] = None
 
 
 async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
@@ -144,14 +143,12 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
             if selected_placement_group_state is None:
                 continue
             if (
-                selected_placement_group_state.create_payload is not None
+                selected_placement_group_state.new_model is not None
                 and selected_placement_group_state.id not in seen_placement_group_ids
             ):
                 seen_placement_group_ids.add(selected_placement_group_state.id)
                 placement_group_states.append(selected_placement_group_state)
-                result.placement_group_creates.append(
-                    selected_placement_group_state.create_payload
-                )
+                result.new_placement_group_models.append(selected_placement_group_state.new_model)
 
         logger.debug(
             "Trying %s in %s/%s for $%0.4f per hour",
@@ -205,7 +202,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         if instance_model.fleet_id is not None and instance_model.id == master_instance_model.id:
             result.schedule_pg_deletion_fleet_id = instance_model.fleet_id
             if selected_placement_group_state is not None:
-                result.schedule_pg_deletion_except_ids = (selected_placement_group_state.id,)
+                result.schedule_pg_deletion_except_id = selected_placement_group_state.id
         return result
 
     set_status_update(
@@ -363,7 +360,7 @@ async def _find_or_create_suitable_placement_group_state(
     return _PlacementGroupState(
         id=placement_group_id,
         placement_group=placement_group,
-        create_payload=PlacementGroupCreate(
+        new_model=PlacementGroupModel(
             id=placement_group_id,
             name=placement_group.name,
             project_id=instance_model.project_id,
