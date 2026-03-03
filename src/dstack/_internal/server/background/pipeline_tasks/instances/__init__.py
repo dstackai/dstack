@@ -228,25 +228,35 @@ class InstanceWorker(Worker[InstancePipelineItem]):
 
     @sentry_utils.instrument_named_task("pipeline_tasks.InstanceWorker.process")
     async def process(self, item: InstancePipelineItem):
-        result: Optional[ProcessResult] = None
+        process_context: Optional[_ProcessContext] = None
         if item.status == InstanceStatus.PENDING:
-            result = await _process_pending_item(item)
+            process_context = await _process_pending_item(item)
         elif item.status == InstanceStatus.PROVISIONING:
-            result = await _process_provisioning_item(item)
+            process_context = await _process_provisioning_item(item)
         elif item.status == InstanceStatus.IDLE:
-            result = await _process_idle_item(item)
+            process_context = await _process_idle_item(item)
         elif item.status == InstanceStatus.BUSY:
-            result = await _process_busy_item(item)
+            process_context = await _process_busy_item(item)
         elif item.status == InstanceStatus.TERMINATING:
-            result = await _process_terminating_item(item)
-        if result is None:
+            process_context = await _process_terminating_item(item)
+        if process_context is None:
             return
-        set_processed_update_map_fields(result.instance_update_map)
-        set_unlock_update_map_fields(result.instance_update_map)
-        await _apply_process_result(item=item, result=result)
+        set_processed_update_map_fields(process_context.result.instance_update_map)
+        set_unlock_update_map_fields(process_context.result.instance_update_map)
+        await _apply_process_result(
+            item=item,
+            instance_model=process_context.instance_model,
+            result=process_context.result,
+        )
 
 
-async def _process_pending_item(item: InstancePipelineItem) -> Optional[ProcessResult]:
+@dataclass
+class _ProcessContext:
+    instance_model: InstanceModel
+    result: ProcessResult
+
+
+async def _process_pending_item(item: InstancePipelineItem) -> Optional[_ProcessContext]:
     async with get_session_ctx() as session:
         instance_model = await _refetch_locked_instance_for_pending_or_terminating(
             session=session,
@@ -256,20 +266,23 @@ async def _process_pending_item(item: InstancePipelineItem) -> Optional[ProcessR
             log_lock_token_mismatch(logger, item)
             return None
     if is_ssh_instance(instance_model):
-        return await add_ssh_instance(instance_model)
-    return await create_cloud_instance(instance_model)
+        result = await add_ssh_instance(instance_model)
+    else:
+        result = await create_cloud_instance(instance_model)
+    return _ProcessContext(instance_model=instance_model, result=result)
 
 
-async def _process_provisioning_item(item: InstancePipelineItem) -> Optional[ProcessResult]:
+async def _process_provisioning_item(item: InstancePipelineItem) -> Optional[_ProcessContext]:
     async with get_session_ctx() as session:
         instance_model = await _refetch_locked_instance_for_check(session=session, item=item)
         if instance_model is None:
             log_lock_token_mismatch(logger, item)
             return None
-    return await check_instance(instance_model)
+    result = await check_instance(instance_model)
+    return _ProcessContext(instance_model=instance_model, result=result)
 
 
-async def _process_idle_item(item: InstancePipelineItem) -> Optional[ProcessResult]:
+async def _process_idle_item(item: InstancePipelineItem) -> Optional[_ProcessContext]:
     async with get_session_ctx() as session:
         instance_model = await _refetch_locked_instance_for_idle(session=session, item=item)
         if instance_model is None:
@@ -277,20 +290,22 @@ async def _process_idle_item(item: InstancePipelineItem) -> Optional[ProcessResu
             return None
     idle_result = process_idle_timeout(instance_model)
     if idle_result is not None:
-        return idle_result
-    return await check_instance(instance_model)
+        return _ProcessContext(instance_model=instance_model, result=idle_result)
+    result = await check_instance(instance_model)
+    return _ProcessContext(instance_model=instance_model, result=result)
 
 
-async def _process_busy_item(item: InstancePipelineItem) -> Optional[ProcessResult]:
+async def _process_busy_item(item: InstancePipelineItem) -> Optional[_ProcessContext]:
     async with get_session_ctx() as session:
         instance_model = await _refetch_locked_instance_for_check(session=session, item=item)
         if instance_model is None:
             log_lock_token_mismatch(logger, item)
             return None
-    return await check_instance(instance_model)
+    result = await check_instance(instance_model)
+    return _ProcessContext(instance_model=instance_model, result=result)
 
 
-async def _process_terminating_item(item: InstancePipelineItem) -> Optional[ProcessResult]:
+async def _process_terminating_item(item: InstancePipelineItem) -> Optional[_ProcessContext]:
     async with get_session_ctx() as session:
         instance_model = await _refetch_locked_instance_for_pending_or_terminating(
             session=session,
@@ -299,7 +314,8 @@ async def _process_terminating_item(item: InstancePipelineItem) -> Optional[Proc
         if instance_model is None:
             log_lock_token_mismatch(logger, item)
             return None
-    return await terminate_instance(instance_model)
+    result = await terminate_instance(instance_model)
+    return _ProcessContext(instance_model=instance_model, result=result)
 
 
 async def _refetch_locked_instance_for_pending_or_terminating(
@@ -376,33 +392,12 @@ async def _refetch_locked_instance_for_check(
     return res.unique().scalar_one_or_none()
 
 
-async def _apply_process_result(item: InstancePipelineItem, result: ProcessResult) -> None:
+async def _apply_process_result(
+    item: InstancePipelineItem,
+    instance_model: InstanceModel,
+    result: ProcessResult,
+) -> None:
     async with get_session_ctx() as session:
-        res = await session.execute(
-            select(InstanceModel)
-            .where(
-                InstanceModel.id == item.id,
-                InstanceModel.lock_token == item.lock_token,
-            )
-            .options(
-                load_only(
-                    InstanceModel.id,
-                    InstanceModel.project_id,
-                    InstanceModel.name,
-                    InstanceModel.status,
-                    InstanceModel.health,
-                    InstanceModel.unreachable,
-                    InstanceModel.termination_reason,
-                    InstanceModel.termination_reason_message,
-                    InstanceModel.lock_token,
-                )
-            )
-        )
-        instance_model = res.scalar_one_or_none()
-        if instance_model is None:
-            log_lock_token_changed_after_processing(logger, item)
-            return
-
         if result.health_check_create is not None:
             session.add(InstanceHealthCheckModel(**result.health_check_create))
         if result.placement_group_creates:
@@ -424,13 +419,12 @@ async def _apply_process_result(item: InstancePipelineItem, result: ProcessResul
                 InstanceModel.lock_token == item.lock_token,
             )
             .values(**result.instance_update_map)
-            .execution_options(synchronize_session=False)
             .returning(InstanceModel.id)
         )
         updated_ids = list(res.scalars().all())
         if len(updated_ids) == 0:
-            await session.rollback()
             log_lock_token_changed_after_processing(logger, item)
+            await session.rollback()
             return
 
         if result.sibling_update_rows:
