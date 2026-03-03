@@ -19,6 +19,8 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     PipelineItem,
     UpdateMapDateTime,
     Worker,
+    log_lock_token_changed_after_processing,
+    log_lock_token_mismatch,
     resolve_now_placeholders,
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
@@ -225,12 +227,7 @@ async def _process_submitted_item(item: VolumePipelineItem):
         )
         volume_model = res.unique().scalar_one_or_none()
         if volume_model is None:
-            logger.warning(
-                "Failed to process %s item %s: lock_token mismatch."
-                " The item is expected to be processed and updated on another fetch iteration.",
-                item.__tablename__,
-                item.id,
-            )
+            log_lock_token_mismatch(logger, item)
             return
 
     result = await _process_submitted_volume(volume_model)
@@ -251,12 +248,7 @@ async def _process_submitted_item(item: VolumePipelineItem):
         )
         updated_ids = list(res.scalars().all())
         if len(updated_ids) == 0:
-            logger.warning(
-                "Failed to update %s item %s after processing: lock_token changed."
-                " The item is expected to be processed and updated on another fetch iteration.",
-                item.__tablename__,
-                item.id,
-            )
+            log_lock_token_changed_after_processing(logger, item)
             # TODO: Clean up volume.
             return
         emit_volume_status_change_event(
@@ -367,12 +359,7 @@ async def _process_to_be_deleted_item(item: VolumePipelineItem):
         )
         volume_model = res.unique().scalar_one_or_none()
         if volume_model is None:
-            logger.warning(
-                "Failed to process %s item %s: lock_token mismatch."
-                " The item is expected to be processed and updated on another fetch iteration.",
-                item.__tablename__,
-                item.id,
-            )
+            log_lock_token_mismatch(logger, item)
             return
 
     result = await _process_to_be_deleted_volume(volume_model)
@@ -394,12 +381,7 @@ async def _process_to_be_deleted_item(item: VolumePipelineItem):
         )
         updated_ids = list(res.scalars().all())
         if len(updated_ids) == 0:
-            logger.warning(
-                "Failed to update %s item %s after processing: lock_token changed."
-                " The item is expected to be processed and updated on another fetch iteration.",
-                item.__tablename__,
-                item.id,
-            )
+            log_lock_token_changed_after_processing(logger, item)
             return
         events.emit(
             session,

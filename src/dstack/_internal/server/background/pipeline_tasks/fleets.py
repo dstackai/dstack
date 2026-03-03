@@ -20,6 +20,9 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     PipelineItem,
     UpdateMapDateTime,
     Worker,
+    log_lock_token_changed_after_processing,
+    log_lock_token_changed_on_reset,
+    log_lock_token_mismatch,
     resolve_now_placeholders,
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
@@ -210,12 +213,7 @@ class FleetWorker(Worker[PipelineItem]):
             )
             fleet_model = res.unique().scalar_one_or_none()
             if fleet_model is None:
-                logger.warning(
-                    "Failed to process %s item %s: lock_token mismatch."
-                    " The item is expected to be processed and updated on another fetch iteration.",
-                    item.__tablename__,
-                    item.id,
-                )
+                log_lock_token_mismatch(logger, item)
                 return
 
             instance_lock, _ = get_locker(get_db().dialect_name).get_lockset(
@@ -262,10 +260,7 @@ class FleetWorker(Worker[PipelineItem]):
                         )
                     )
                     if res.rowcount == 0:  # pyright: ignore[reportAttributeAccessIssue]
-                        logger.warning(
-                            "Failed to reset lock: lock_token changed."
-                            " The item is expected to be processed and updated on another fetch iteration."
-                        )
+                        log_lock_token_changed_on_reset(logger)
                     return
 
                 # TODO: Lock instance models in the DB
@@ -297,12 +292,7 @@ class FleetWorker(Worker[PipelineItem]):
             )
             updated_ids = list(res.scalars().all())
             if len(updated_ids) == 0:
-                logger.warning(
-                    "Failed to update %s item %s after processing: lock_token changed."
-                    " The item is expected to be processed and updated on another fetch iteration.",
-                    item.__tablename__,
-                    item.id,
-                )
+                log_lock_token_changed_after_processing(logger, item)
                 # TODO: Clean up fleet.
                 return
 

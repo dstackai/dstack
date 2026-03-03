@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import math
 import random
 import uuid
@@ -416,3 +417,40 @@ def resolve_now_placeholders(update_values: _ResolveNowInput, now: datetime):
     for key, value in update_values.items():
         if value is NOW_PLACEHOLDER:
             update_values[key] = now
+
+
+def log_lock_token_mismatch(
+    logger: logging.Logger,
+    item: PipelineItem,
+    action: str = "process",
+) -> None:
+    logger.warning(
+        "Failed to %s %s item %s: lock_token mismatch."
+        " The item is expected to be processed and updated on another fetch iteration.",
+        action,
+        item.__tablename__,
+        item.id,
+    )
+
+
+def log_lock_token_changed_after_processing(
+    logger: logging.Logger,
+    item: PipelineItem,
+    action: str = "update",
+    expected_outcome: str = "updated",
+) -> None:
+    logger.warning(
+        "Failed to %s %s item %s after processing: lock_token changed."
+        " The item is expected to be processed and %s on another fetch iteration.",
+        action,
+        item.__tablename__,
+        item.id,
+        expected_outcome,
+    )
+
+
+def log_lock_token_changed_on_reset(logger: logging.Logger) -> None:
+    logger.warning(
+        "Failed to reset lock: lock_token changed."
+        " The item is expected to be processed and updated on another fetch iteration."
+    )

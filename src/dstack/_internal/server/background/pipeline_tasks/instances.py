@@ -73,6 +73,8 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     PipelineItem,
     UpdateMapDateTime,
     Worker,
+    log_lock_token_changed_after_processing,
+    log_lock_token_mismatch,
     resolve_now_placeholders,
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
@@ -315,7 +317,7 @@ class InstanceWorker(Worker[InstancePipelineItem]):
         async with get_session_ctx() as session:
             instance_model = await _refetch_locked_instance_status(session=session, item=item)
             if instance_model is None:
-                _log_lock_token_mismatch(item, action="process")
+                log_lock_token_mismatch(logger, item)
                 return
             status = instance_model.status
 
@@ -330,10 +332,9 @@ class InstanceWorker(Worker[InstancePipelineItem]):
             result = await _process_busy_item(item)
         elif status == InstanceStatus.TERMINATING:
             result = await _process_terminating_item(item)
-
         if result is None:
+            # FIXME: Item won't be unlocked!!!
             return
-
         set_processed_update_map_fields(result.instance_update_map)
         set_unlock_update_map_fields(result.instance_update_map)
         await _apply_process_result(item=item, result=result)
@@ -419,7 +420,7 @@ async def _process_pending_item(item: InstancePipelineItem) -> Optional[_Process
             item=item,
         )
         if instance_model is None:
-            _log_lock_token_mismatch(item, action="process")
+            log_lock_token_mismatch(logger, item)
             return None
     if is_ssh_instance(instance_model):
         return await _process_add_remote(instance_model)
@@ -430,7 +431,7 @@ async def _process_provisioning_item(item: InstancePipelineItem) -> Optional[_Pr
     async with get_session_ctx() as session:
         instance_model = await _refetch_locked_instance_for_check(session=session, item=item)
         if instance_model is None:
-            _log_lock_token_mismatch(item, action="process")
+            log_lock_token_mismatch(logger, item)
             return None
     return await _process_instance_check(instance_model)
 
@@ -439,7 +440,7 @@ async def _process_idle_item(item: InstancePipelineItem) -> Optional[_ProcessRes
     async with get_session_ctx() as session:
         instance_model = await _refetch_locked_instance_for_idle(session=session, item=item)
         if instance_model is None:
-            _log_lock_token_mismatch(item, action="process")
+            log_lock_token_mismatch(logger, item)
             return None
     idle_result = _process_idle_timeout(instance_model)
     if idle_result is not None:
@@ -451,7 +452,7 @@ async def _process_busy_item(item: InstancePipelineItem) -> Optional[_ProcessRes
     async with get_session_ctx() as session:
         instance_model = await _refetch_locked_instance_for_check(session=session, item=item)
         if instance_model is None:
-            _log_lock_token_mismatch(item, action="process")
+            log_lock_token_mismatch(logger, item)
             return None
     return await _process_instance_check(instance_model)
 
@@ -463,7 +464,7 @@ async def _process_terminating_item(item: InstancePipelineItem) -> Optional[_Pro
             item=item,
         )
         if instance_model is None:
-            _log_lock_token_mismatch(item, action="process")
+            log_lock_token_mismatch(logger, item)
             return None
     return await _process_terminate(instance_model)
 
@@ -796,10 +797,10 @@ def _deploy_instance(
         remote_details.ssh_proxy,
         ssh_proxy_pkeys,
     ) as client:
-        logger.info("Connected to %s %s", remote_details.ssh_user, remote_details.host)
+        logger.debug("Connected to %s %s", remote_details.ssh_user, remote_details.host)
 
         arch = detect_cpu_arch(client)
-        logger.info("%s: CPU arch is %s", remote_details.host, arch)
+        logger.debug("%s: CPU arch is %s", remote_details.host, arch)
 
         shim_pre_start_commands = get_shim_pre_start_commands(arch=arch)
         run_pre_start_commands(client, shim_pre_start_commands, authorized_keys)
@@ -1138,12 +1139,6 @@ async def _find_or_create_suitable_placement_group_state(
         )
         return None
 
-    logger.info(
-        "Created placement group %s in %s/%s",
-        placement_group.name,
-        placement_group.configuration.backend.value,
-        placement_group.configuration.region,
-    )
     placement_group.provisioning_data = provisioning_data
     return _PlacementGroupState(
         id=placement_group_id,
@@ -1873,7 +1868,7 @@ async def _apply_process_result(item: InstancePipelineItem, result: _ProcessResu
         )
         updated_ids = list(res.scalars().all())
         if len(updated_ids) == 0:
-            _log_lock_token_mismatch(item, action="update after processing")
+            log_lock_token_changed_after_processing(logger, item)
             await session.rollback()
             return
 
@@ -1905,13 +1900,3 @@ async def _apply_process_result(item: InstancePipelineItem, result: _ProcessResu
                 ],
             )
         await session.commit()
-
-
-def _log_lock_token_mismatch(item: InstancePipelineItem, action: str) -> None:
-    logger.warning(
-        "Failed to %s %s item %s: lock_token mismatch."
-        " The item is expected to be processed and updated on another fetch iteration.",
-        action,
-        item.__tablename__,
-        item.id,
-    )
