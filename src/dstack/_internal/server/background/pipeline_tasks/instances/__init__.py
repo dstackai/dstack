@@ -433,19 +433,11 @@ async def _apply_process_result(item: InstancePipelineItem, result: ProcessResul
             log_lock_token_changed_after_processing(logger, item)
             return
 
-        for sibling_update_row in result.sibling_update_rows:
-            sibling_id = sibling_update_row.get("id")
-            if sibling_id is None:
-                continue
-            sibling_values = {
-                key: value for key, value in sibling_update_row.items() if key != "id"
-            }
-            if sibling_values:
-                await session.execute(
-                    update(InstanceModel)
-                    .where(InstanceModel.id == sibling_id)
-                    .values(**sibling_values)
-                )
+        if result.sibling_update_rows:
+            await session.execute(
+                update(InstanceModel).execution_options(synchronize_session=False),
+                result.sibling_update_rows,
+            )
 
         if result.schedule_pg_deletion_fleet_id is not None:
             await schedule_fleet_placement_groups_deletion(
