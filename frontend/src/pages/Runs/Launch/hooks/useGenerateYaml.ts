@@ -14,8 +14,7 @@ export type UseGenerateYamlArgs = {
 
 export const useGenerateYaml = ({ formValues, configuration, envParam, backends }: UseGenerateYamlArgs) => {
     return useMemo(() => {
-        const { name, ide, image, python, offer, docker, repo_url, repo_path, working_dir, password, gpu_enabled } =
-            formValues;
+        const { name, ide, image, python, offer, repo_url, repo_path, working_dir, password, gpu_enabled } = formValues;
         const gpuEnabled = gpu_enabled === true;
 
         const envEntries: string[] = [];

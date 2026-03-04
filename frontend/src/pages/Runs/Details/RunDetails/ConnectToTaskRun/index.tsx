@@ -5,11 +5,9 @@ import {
     Alert,
     Box,
     Button,
-    ButtonDropdown,
     Code,
-    Container,
     ExpandableSection,
-    Header,
+    Link,
     Popover,
     SpaceBetween,
     StatusIndicator,
@@ -26,24 +24,33 @@ import styles from '../ConnectToRunWithDevEnvConfiguration/styles.module.scss';
 const UvInstallCommand = 'uv tool install dstack -U';
 const PipInstallCommand = 'pip install dstack -U';
 
-const getPort = (spec: IAppSpec): number => spec.map_to_port ?? spec.port;
+const getMappedPort = (spec: IAppSpec): number | undefined => spec.map_to_port;
 
 export const ConnectToTaskRun: FC<{ run: IRun }> = ({ run }) => {
     const { t } = useTranslation();
+    const [isExpandedConnectSection, setIsExpandedConnectSection] = React.useState(true);
 
     const attachCommand = `dstack attach ${run.run_spec.run_name} --logs`;
     const appSpecs = run.jobs[0]?.job_spec?.app_specs ?? [];
+    const mappedAppSpecs = appSpecs.filter((spec) => getMappedPort(spec) != null);
 
     const [activeStepIndex, setActiveStepIndex] = React.useState(0);
-    const [selectedPort, setSelectedPort] = React.useState(() => getPort(appSpecs[0]));
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
 
-    const openPort = (port: number) => window.open(`http://127.0.0.1:${port}`, '_blank');
-
     return (
-        <Container>
-            <Header variant="h2">Connect</Header>
-
+        <ExpandableSection
+            variant="container"
+            headerText="Connect"
+            expanded={isExpandedConnectSection}
+            onChange={({ detail }) => setIsExpandedConnectSection(detail.expanded)}
+            headerActions={
+                <Button
+                    iconName="script"
+                    variant={isExpandedConnectSection ? 'normal' : 'primary'}
+                    onClick={() => setIsExpandedConnectSection((prev) => !prev)}
+                />
+            }
+        >
             {run.status === 'running' && (
                 <Wizard
                     i18nStrings={{
@@ -57,15 +64,15 @@ export const ConnectToTaskRun: FC<{ run: IRun }> = ({ run }) => {
                     }}
                     onNavigate={({ detail }) => setActiveStepIndex(detail.requestedStepIndex)}
                     activeStepIndex={activeStepIndex}
-                    onSubmit={() => openPort(selectedPort)}
-                    submitButtonText={appSpecs.length === 1 ? 'Open port' : `Open port ${selectedPort}`}
+                    onSubmit={() => setIsExpandedConnectSection(false)}
+                    submitButtonText="Done"
                     allowSkipTo
                     steps={[
                         {
                             title: 'Attach',
+                            description: 'To access this run, first you need to attach to it.',
                             content: (
                                 <SpaceBetween size="s">
-                                    <Box>To access this run, first you need to attach to it.</Box>
                                     <div className={styles.codeWrapper}>
                                         <Code className={styles.code}>{attachCommand}</Code>
 
@@ -198,47 +205,55 @@ export const ConnectToTaskRun: FC<{ run: IRun }> = ({ run }) => {
                             ),
                             isOptional: true,
                         },
-                        {
-                            title: 'Open',
-                            description: 'After the CLI is attached, you can open the forwarded ports.',
-                            content: (
-                                <SpaceBetween size="s">
-                                    {appSpecs.length === 1 ? (
-                                        <Button
-                                            variant="primary"
-                                            external={true}
-                                            onClick={() => openPort(getPort(appSpecs[0]))}
-                                        >
-                                            Open port
-                                        </Button>
-                                    ) : (
-                                        <ButtonDropdown
-                                            variant="primary"
-                                            mainAction={{
-                                                text: `Open port ${selectedPort}`,
-                                                external: true,
-                                                onClick: () => openPort(selectedPort),
-                                            }}
-                                            items={appSpecs.map((spec) => {
-                                                const port = getPort(spec);
+                        ...(mappedAppSpecs.length > 0
+                            ? [
+                                  {
+                                      title: 'Open',
+                                      description: 'After the CLI is attached, use the forwarded localhost URLs.',
+                                      content: (
+                                          <SpaceBetween size="s">
+                                              {mappedAppSpecs.map((spec) => {
+                                                  const mappedPort = getMappedPort(spec)!;
+                                                  const localUrl = `http://127.0.0.1:${mappedPort}`;
 
-                                                return {
-                                                    id: String(port),
-                                                    text: `Port ${port}`,
-                                                    external: true,
-                                                };
-                                            })}
-                                            onItemClick={({ detail }) => {
-                                                const port = Number(detail.id);
-                                                setSelectedPort(port);
-                                                openPort(port);
-                                            }}
-                                        />
-                                    )}
-                                </SpaceBetween>
-                            ),
-                            isOptional: true,
-                        },
+                                                  return (
+                                                      <Alert
+                                                          key={`${spec.port}-${mappedPort}`}
+                                                          type="info"
+                                                          action={
+                                                              <Popover
+                                                                  dismissButton={false}
+                                                                  position="top"
+                                                                  size="small"
+                                                                  triggerType="custom"
+                                                                  content={
+                                                                      <StatusIndicator type="success">
+                                                                          {t('common.copied')}
+                                                                      </StatusIndicator>
+                                                                  }
+                                                              >
+                                                                  <Button
+                                                                      formAction="none"
+                                                                      iconName="copy"
+                                                                      variant="normal"
+                                                                      onClick={() => copyToClipboard(localUrl)}
+                                                                  />
+                                                              </Popover>
+                                                          }
+                                                      >
+                                                          Port {spec.port} is forwarded to{' '}
+                                                          <Link href={localUrl} external>
+                                                              {localUrl}
+                                                          </Link>
+                                                      </Alert>
+                                                  );
+                                              })}
+                                          </SpaceBetween>
+                                      ),
+                                      isOptional: true,
+                                  },
+                              ]
+                            : []),
                     ]}
                 />
             )}
@@ -249,6 +264,6 @@ export const ConnectToTaskRun: FC<{ run: IRun }> = ({ run }) => {
                     <Alert type="info">Waiting for the run to start.</Alert>
                 </SpaceBetween>
             )}
-        </Container>
+        </ExpandableSection>
     );
 };

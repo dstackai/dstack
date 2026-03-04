@@ -7,8 +7,8 @@ export const CONFIGURATION_INFO = {
     body: (
         <>
             <p>
-                This is the <code>dstack</code> run configuration generated from the template and your settings. You
-                can review and adjust it before launching.
+                This is the <code>dstack</code> run configuration generated from the template and your settings. You can review
+                and adjust it before launching.
             </p>
 
             <p>To learn more, see:</p>
@@ -38,10 +38,7 @@ export const PASSWORD_INFO = {
     header: <h2>Password</h2>,
     body: (
         <>
-            <p>
-                A random password has been generated for this run. You will need it to access the run once it is
-                launched.
-            </p>
+            <p>A random password has been generated for this run. You will need it to access the run once it is launched.</p>
 
             <p>Make sure to copy the password before proceeding. Only share it with those you want to give access to.</p>
         </>
@@ -56,7 +53,6 @@ export const FORM_FIELD_NAMES = {
     name: 'name',
     ide: 'ide',
     config_yaml: 'config_yaml',
-    docker: 'docker',
     image: 'image',
     python: 'python',
     repo_enabled: 'repo_enabled',

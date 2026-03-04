@@ -230,7 +230,7 @@ export const ProjectSettings: React.FC = () => {
                                 onNavigate={({ detail }) => setActiveStepIndex(detail.requestedStepIndex)}
                                 activeStepIndex={activeStepIndex}
                                 onSubmit={() => setIsExpandedCliSection(false)}
-                                submitButtonText="Dismiss"
+                                submitButtonText="Done"
                                 allowSkipTo={true}
                                 steps={[
                                     {

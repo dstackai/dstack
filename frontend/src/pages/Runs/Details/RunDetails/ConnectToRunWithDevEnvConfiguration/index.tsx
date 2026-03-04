@@ -1,20 +1,7 @@
 import React, { FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import {
-    Alert,
-    Box,
-    Button,
-    Code,
-    Container,
-    ExpandableSection,
-    Header,
-    Popover,
-    SpaceBetween,
-    StatusIndicator,
-    Tabs,
-    Wizard,
-} from 'components';
+import { Alert, Box, Button, Code, ExpandableSection, Popover, SpaceBetween, StatusIndicator, Tabs, Wizard } from 'components';
 
 import { copyToClipboard } from 'libs';
 
@@ -28,6 +15,7 @@ const PipInstallCommand = 'pip install dstack -U';
 
 export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) => {
     const { t } = useTranslation();
+    const [isExpandedConnectSection, setIsExpandedConnectSection] = React.useState(true);
 
     const getAttachCommand = (runData: IRun) => {
         const attachCommand = `dstack attach ${runData.run_spec.run_name} --logs`;
@@ -62,9 +50,19 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
 
     return (
-        <Container>
-            <Header variant="h2">Connect</Header>
-
+        <ExpandableSection
+            variant="container"
+            headerText="Connect"
+            expanded={isExpandedConnectSection}
+            onChange={({ detail }) => setIsExpandedConnectSection(detail.expanded)}
+            headerActions={
+                <Button
+                    iconName="script"
+                    variant={isExpandedConnectSection ? 'normal' : 'primary'}
+                    onClick={() => setIsExpandedConnectSection((prev) => !prev)}
+                />
+            }
+        >
             {run.status === 'running' && (
                 <Wizard
                     i18nStrings={{
@@ -78,15 +76,15 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                     }}
                     onNavigate={({ detail }) => setActiveStepIndex(detail.requestedStepIndex)}
                     activeStepIndex={activeStepIndex}
-                    onSubmit={() => window.open(openInIDEUrl, '_blank')}
-                    submitButtonText={`Open in ${ideDisplayName}`}
+                    onSubmit={() => setIsExpandedConnectSection(false)}
+                    submitButtonText="Done"
                     allowSkipTo
                     steps={[
                         {
                             title: 'Attach',
+                            description: 'To access this run, first you need to attach to it.',
                             content: (
                                 <SpaceBetween size="s">
-                                    <Box>To access this run, first you need to attach to it.</Box>
                                     <div className={styles.codeWrapper}>
                                         <Code className={styles.code}>{attachCommand}</Code>
 
@@ -275,6 +273,6 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                     <Alert type="info">Waiting for the run to start.</Alert>
                 </SpaceBetween>
             )}
-        </Container>
+        </ExpandableSection>
     );
 };
