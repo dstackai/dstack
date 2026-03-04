@@ -12,12 +12,12 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.services import events
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_export,
     create_fleet,
     create_instance,
     create_job,
     create_project,
     create_repo,
-    create_resource_export,
     create_run,
     create_user,
     get_auth_headers,
@@ -1399,8 +1399,8 @@ class TestListEventsWithExportedFleet:
             targets=[events.Target.from_model(instance)],
         )
 
-        # Create resource export
-        await create_resource_export(
+        # Create export
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project_1, importer_project_2],

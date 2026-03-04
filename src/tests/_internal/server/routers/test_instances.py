@@ -14,11 +14,11 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_export,
     create_fleet,
     create_instance,
     create_instance_health_check,
     create_project,
-    create_resource_export,
     create_user,
     get_auth_headers,
     get_fleet_configuration,
@@ -295,7 +295,7 @@ class TestListInstances:
         await create_instance(
             session=session, project=exporter_project, fleet=fleet, name="exported-fleet-0"
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -355,7 +355,7 @@ class TestListInstances:
             fleet=fleet,
             name="exported-fleet-0",
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -410,7 +410,7 @@ class TestListInstances:
             fleet=fleet,
             name="shared-fleet-0",
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -485,7 +485,7 @@ class TestListInstances:
             name="exported-fleet-0",
         )
         for name in ["export-1", "export-2"]:
-            await create_resource_export(
+            await create_export(
                 session=session,
                 exporter_project=exporter_project,
                 importer_projects=[importer_project],
@@ -772,7 +772,7 @@ class TestGetInstance:
             project=exporter_project,
             fleet=fleet,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -823,7 +823,7 @@ class TestGetInstance:
             project=exporter_project,
             fleet=fleet,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],

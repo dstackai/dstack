@@ -24,9 +24,9 @@ from dstack._internal.core.models.volumes import Volume
 from dstack._internal.server.models import (
     ExportedFleetModel,
     FleetModel,
+    ImportModel,
     InstanceModel,
     ProjectModel,
-    ResourceImportModel,
     RunModel,
 )
 from dstack._internal.server.services.fleets import (
@@ -214,8 +214,8 @@ async def get_run_candidate_fleet_models_filters(
     # do not provision on it to prevent attaching volumes that are currently detaching.
     detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
     is_fleet_imported_subquery = exists().where(
-        ResourceImportModel.project_id == project.id,
-        ResourceImportModel.resource_export_id == ExportedFleetModel.resource_export_id,
+        ImportModel.project_id == project.id,
+        ImportModel.export_id == ExportedFleetModel.export_id,
         ExportedFleetModel.fleet_id == FleetModel.id,
     )
     fleet_filters = [

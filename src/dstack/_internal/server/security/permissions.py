@@ -12,10 +12,10 @@ from dstack._internal.server.db import get_session
 from dstack._internal.server.models import (
     ExportedFleetModel,
     FleetModel,
+    ImportModel,
     InstanceModel,
     MemberModel,
     ProjectModel,
-    ResourceImportModel,
     UserModel,
 )
 from dstack._internal.server.services.projects import (
@@ -277,8 +277,8 @@ async def check_can_access_fleet(
         FleetModel.project_id == fleet_project.id,
         exists().where(
             MemberModel.user_id == user.id,
-            MemberModel.project_id == ResourceImportModel.project_id,
-            ResourceImportModel.resource_export_id == ExportedFleetModel.resource_export_id,
+            MemberModel.project_id == ImportModel.project_id,
+            ImportModel.export_id == ExportedFleetModel.export_id,
             ExportedFleetModel.fleet_id == FleetModel.id,
         ),
     ]
@@ -307,8 +307,8 @@ async def check_can_access_instance(
         InstanceModel.id == instance_id,
         exists().where(
             MemberModel.user_id == user.id,
-            MemberModel.project_id == ResourceImportModel.project_id,
-            ResourceImportModel.resource_export_id == ExportedFleetModel.resource_export_id,
+            MemberModel.project_id == ImportModel.project_id,
+            ImportModel.export_id == ExportedFleetModel.export_id,
             ExportedFleetModel.fleet_id == InstanceModel.fleet_id,
         ),
     ]

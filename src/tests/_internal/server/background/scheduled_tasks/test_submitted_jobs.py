@@ -42,12 +42,12 @@ from dstack._internal.server.models import (
 from dstack._internal.server.settings import JobNetworkMode
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
+    create_export,
     create_fleet,
     create_instance,
     create_job,
     create_project,
     create_repo,
-    create_resource_export,
     create_run,
     create_user,
     create_volume,
@@ -406,7 +406,7 @@ class TestProcessSubmittedJobs:
             run=run,
             instance_assigned=False,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],

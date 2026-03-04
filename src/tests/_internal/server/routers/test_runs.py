@@ -57,6 +57,7 @@ from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.services.runs.spec import validate_run_spec_and_set_defaults
 from dstack._internal.server.testing.common import (
     create_backend,
+    create_export,
     create_fleet,
     create_gateway,
     create_gateway_compute,
@@ -64,7 +65,6 @@ from dstack._internal.server.testing.common import (
     create_job,
     create_project,
     create_repo,
-    create_resource_export,
     create_run,
     create_user,
     get_auth_headers,
@@ -1417,7 +1417,7 @@ class TestGetRunPlan:
             instance_num=1,
             backend=BackendType.REMOTE,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],

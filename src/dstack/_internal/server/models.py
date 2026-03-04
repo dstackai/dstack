@@ -980,11 +980,9 @@ class EventTargetModel(BaseModel):
     entity_name: Mapped[str] = mapped_column(String(200))
 
 
-class ResourceExportModel(BaseModel):
-    __tablename__ = "resource_exports"
-    __table_args__ = (
-        UniqueConstraint("project_id", "name", name="uq_resource_exports_project_id_name"),
-    )
+class ExportModel(BaseModel):
+    __tablename__ = "exports"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_exports_project_id_name"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
@@ -995,21 +993,17 @@ class ResourceExportModel(BaseModel):
     )
     project: Mapped["ProjectModel"] = relationship()
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
-    resource_imports: Mapped[List["ResourceImportModel"]] = relationship(
-        back_populates="resource_export"
-    )
-    exported_fleets: Mapped[List["ExportedFleetModel"]] = relationship(
-        back_populates="resource_export"
-    )
+    imports: Mapped[List["ImportModel"]] = relationship(back_populates="export")
+    exported_fleets: Mapped[List["ExportedFleetModel"]] = relationship(back_populates="export")
 
 
-class ResourceImportModel(BaseModel):
-    __tablename__ = "resource_imports"
+class ImportModel(BaseModel):
+    __tablename__ = "imports"
     __table_args__ = (
         UniqueConstraint(
             "project_id",
-            "resource_export_id",
-            name="uq_resource_imports_project_id_resource_export_id",
+            "export_id",
+            name="uq_imports_project_id_export_id",
         ),
     )
 
@@ -1020,28 +1014,26 @@ class ResourceImportModel(BaseModel):
         ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     project: Mapped["ProjectModel"] = relationship()
-    resource_export_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("resource_exports.id", ondelete="CASCADE"), index=True
+    export_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("exports.id", ondelete="CASCADE"), index=True
     )
-    resource_export: Mapped["ResourceExportModel"] = relationship()
+    export: Mapped["ExportModel"] = relationship()
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
 
 
 class ExportedFleetModel(BaseModel):
     __tablename__ = "exported_fleets"
     __table_args__ = (
-        UniqueConstraint(
-            "resource_export_id", "fleet_id", name="uq_exported_fleets_resource_export_id_fleet_id"
-        ),
+        UniqueConstraint("export_id", "fleet_id", name="uq_exported_fleets_export_id_fleet_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    resource_export_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("resource_exports.id", ondelete="CASCADE"), index=True
+    export_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("exports.id", ondelete="CASCADE"), index=True
     )
-    resource_export: Mapped["ResourceExportModel"] = relationship()
+    export: Mapped["ExportModel"] = relationship()
     fleet_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("fleets.id", ondelete="CASCADE"), index=True
     )

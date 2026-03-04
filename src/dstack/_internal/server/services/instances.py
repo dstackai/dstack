@@ -44,10 +44,10 @@ from dstack._internal.server import settings as server_settings
 from dstack._internal.server.models import (
     ExportedFleetModel,
     FleetModel,
+    ImportModel,
     InstanceHealthCheckModel,
     InstanceModel,
     ProjectModel,
-    ResourceImportModel,
     UserModel,
 )
 from dstack._internal.server.schemas.health.dcgm import DCGMHealthResponse
@@ -526,8 +526,8 @@ async def list_projects_instance_models(
 ) -> List[InstanceModel]:
     project_ids = [p.id for p in projects]
     is_instance_imported_subquery = exists().where(
-        ResourceImportModel.project_id.in_(project_ids),
-        ResourceImportModel.resource_export_id == ExportedFleetModel.resource_export_id,
+        ImportModel.project_id.in_(project_ids),
+        ImportModel.export_id == ExportedFleetModel.export_id,
         ExportedFleetModel.fleet_id == InstanceModel.fleet_id,
     )
     filters: List = [

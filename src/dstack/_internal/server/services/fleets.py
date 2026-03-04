@@ -55,11 +55,11 @@ from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     ExportedFleetModel,
     FleetModel,
+    ImportModel,
     InstanceModel,
     JobModel,
     MemberModel,
     ProjectModel,
-    ResourceImportModel,
     RunModel,
     UserModel,
 )
@@ -235,8 +235,8 @@ async def list_projects_fleet_models(
     filters = []
     project_ids = {p.id for p in projects}
     is_fleet_imported_subquery = exists().where(
-        ResourceImportModel.project_id.in_(project_ids),
-        ResourceImportModel.resource_export_id == ExportedFleetModel.resource_export_id,
+        ImportModel.project_id.in_(project_ids),
+        ImportModel.export_id == ExportedFleetModel.export_id,
         ExportedFleetModel.fleet_id == FleetModel.id,
     )
     filters.append(
@@ -306,8 +306,8 @@ async def list_project_fleet_models(
 ) -> List[FleetModel]:
     filters = []
     is_fleet_imported_subquery = exists().where(
-        ResourceImportModel.project_id == project.id,
-        ResourceImportModel.resource_export_id == ExportedFleetModel.resource_export_id,
+        ImportModel.project_id == project.id,
+        ImportModel.export_id == ExportedFleetModel.export_id,
         ExportedFleetModel.fleet_id == FleetModel.id,
     )
     filters.append(

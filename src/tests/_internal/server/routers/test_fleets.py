@@ -31,12 +31,12 @@ from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_export,
     create_fleet,
     create_instance,
     create_job,
     create_project,
     create_repo,
-    create_resource_export,
     create_run,
     create_user,
     default_permissions_context,
@@ -171,7 +171,7 @@ class TestListFleets:
             project=exporter_project,
             fleet=fleet,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -224,7 +224,7 @@ class TestListFleets:
             project=exporter_project,
             spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -276,7 +276,7 @@ class TestListFleets:
             project=exporter_project,
             fleet=fleet,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -339,7 +339,7 @@ class TestListFleets:
             fleet=fleet,
         )
         for name in ["export-1", "export-2"]:
-            await create_resource_export(
+            await create_export(
                 session=session,
                 exporter_project=exporter_project,
                 importer_projects=[importer_project],
@@ -428,7 +428,7 @@ class TestListProjectFleets:
             project=exporter_project,
             fleet=fleet,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -478,7 +478,7 @@ class TestListProjectFleets:
             project=exporter_project,
             spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -529,7 +529,7 @@ class TestListProjectFleets:
             fleet=fleet,
         )
         for name in ["export-1", "export-2"]:
-            await create_resource_export(
+            await create_export(
                 session=session,
                 exporter_project=exporter_project,
                 importer_projects=[importer_project],
@@ -769,7 +769,7 @@ class TestGetFleet:
             project=exporter_project,
             fleet=fleet,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -830,7 +830,7 @@ class TestGetFleet:
             project=exporter_project,
             fleet=fleet,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -1418,7 +1418,7 @@ class TestApplyFleetPlan:
             project=exporter_project,
             spec=spec,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -1598,7 +1598,7 @@ class TestDeleteFleets:
             project=exporter_project,
             spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -1766,7 +1766,7 @@ class TestDeleteFleetInstances:
             fleet=fleet,
             instance_num=1,
         )
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
@@ -1995,7 +1995,7 @@ class TestGetPlan:
         )
         spec = get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet"))
         fleet = await create_fleet(session=session, project=exporter_project, spec=spec)
-        await create_resource_export(
+        await create_export(
             session=session,
             exporter_project=exporter_project,
             importer_projects=[importer_project],
