@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Button, Header, SegmentedControl, SpaceBetween } from 'components';
+import { Button, Container, Header, Loader, SegmentedControl, SpaceBetween } from 'components';
 
 import { useBreadcrumbs } from 'hooks';
 import { ROUTES } from 'routes';
+import { useGetUserQuery } from 'services/user';
 
 import { EventList } from 'pages/Events/List';
 
@@ -15,6 +16,7 @@ export const Events: React.FC = () => {
     const paramUserName = params.userName ?? '';
     const navigate = useNavigate();
     const [filterParamName, setFilterParamName] = useState<keyof TEventListFilters>('actors');
+    const { data, isLoading } = useGetUserQuery({ name: paramUserName });
 
     useBreadcrumbs([
         {
@@ -32,8 +34,15 @@ export const Events: React.FC = () => {
     ]);
 
     const goToEventsPage = () => {
-        navigate(ROUTES.EVENTS.LIST + `?${filterParamName}=${paramUserName}`);
+        navigate(ROUTES.EVENTS.LIST + `?${filterParamName}=${data?.id}`);
     };
+
+    if (isLoading || !data)
+        return (
+            <Container>
+                <Loader />
+            </Container>
+        );
 
     return (
         <EventList
@@ -57,7 +66,7 @@ export const Events: React.FC = () => {
                     />
                 );
             }}
-            permanentFilters={{ [filterParamName]: [paramUserName] }}
+            permanentFilters={{ [filterParamName]: [data.id] }}
             showFilters={false}
         />
     );
