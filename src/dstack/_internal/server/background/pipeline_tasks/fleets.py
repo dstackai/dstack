@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Sequence, TypedDict
+from typing import Optional, Sequence, TypedDict
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio.session import AsyncSession
@@ -216,60 +216,22 @@ class FleetWorker(Worker[PipelineItem]):
                 log_lock_token_mismatch(logger, item)
                 return
 
-            instance_lock, _ = get_locker(get_db().dialect_name).get_lockset(
-                InstanceModel.__tablename__
-            )
-            async with instance_lock:
-                res = await session.execute(
-                    select(InstanceModel)
-                    .where(
-                        InstanceModel.fleet_id == item.id,
-                        InstanceModel.deleted == False,
-                        or_(
-                            InstanceModel.lock_expires_at.is_(None),
-                            InstanceModel.lock_expires_at < get_current_datetime(),
-                        ),
-                        or_(
-                            InstanceModel.lock_owner.is_(None),
-                            InstanceModel.lock_owner == FleetPipeline.__name__,
-                        ),
-                    )
-                    .with_for_update(skip_locked=True, key_share=True)
+            # Lock instance only if consolidation is needed.
+            consolidation_fleet_spec = _get_fleet_spec_if_ready_for_consolidation(fleet_model)
+            consolidation_instances = None
+            if consolidation_fleet_spec is not None:
+                consolidation_instances = await _lock_fleet_instances_for_consolidation(
+                    session=session,
+                    item=item,
                 )
-                locked_instance_models = res.scalars().all()
-                if len(fleet_model.instances) != len(locked_instance_models):
-                    logger.debug(
-                        "Failed to lock fleet %s instances. The fleet will be processed later.",
-                        item.id,
-                    )
-                    # Keep `lock_owner` so that `InstancePipeline` sees that the fleet is being locked
-                    # but unset `lock_expires_at` to process the item again ASAP (after `min_processing_interval`).
-                    # Unset `lock_token` so that heartbeater can no longer update the item.
-                    res = await session.execute(
-                        update(FleetModel)
-                        .where(
-                            FleetModel.id == item.id,
-                            FleetModel.lock_token == item.lock_token,
-                        )
-                        .values(
-                            lock_expires_at=None,
-                            lock_token=None,
-                            last_processed_at=get_current_datetime(),
-                        )
-                        .returning(FleetModel.id)
-                    )
-                    updated_ids = list(res.scalars().all())
-                    if len(updated_ids) == 0:
-                        log_lock_token_changed_on_reset(logger)
+                if consolidation_instances is None:
                     return
 
-                for instance_model in locked_instance_models:
-                    instance_model.lock_expires_at = item.lock_expires_at
-                    instance_model.lock_token = item.lock_token
-                    instance_model.lock_owner = FleetPipeline.__name__
-                await session.commit()
-
-        result = await _process_fleet(fleet_model)
+        result = await _process_fleet(
+            fleet_model,
+            consolidation_fleet_spec=consolidation_fleet_spec,
+            consolidation_instances=consolidation_instances,
+        )
         fleet_update_map = _FleetUpdateMap()
         fleet_update_map.update(result.fleet_update_map)
         set_processed_update_map_fields(fleet_update_map)
@@ -340,6 +302,86 @@ class _InstanceUpdateMap(TypedDict, total=False):
     id: uuid.UUID
 
 
+def _get_fleet_spec_if_ready_for_consolidation(fleet_model: FleetModel) -> Optional[FleetSpec]:
+    if fleet_model.status == FleetStatus.TERMINATING:
+        return None
+    consolidation_fleet_spec = get_fleet_spec(fleet_model)
+    if (
+        consolidation_fleet_spec.configuration.nodes is None
+        or consolidation_fleet_spec.autocreated
+    ):
+        return None
+    if not _is_fleet_ready_for_consolidation(fleet_model):
+        return None
+    return consolidation_fleet_spec
+
+
+async def _lock_fleet_instances_for_consolidation(
+    session: AsyncSession,
+    item: PipelineItem,
+) -> Optional[list[InstanceModel]]:
+    instance_lock, _ = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
+    async with instance_lock:
+        res = await session.execute(
+            select(InstanceModel)
+            .where(
+                InstanceModel.fleet_id == item.id,
+                InstanceModel.deleted == False,
+                or_(
+                    InstanceModel.lock_expires_at.is_(None),
+                    InstanceModel.lock_expires_at < get_current_datetime(),
+                ),
+                or_(
+                    InstanceModel.lock_owner.is_(None),
+                    InstanceModel.lock_owner == FleetPipeline.__name__,
+                ),
+            )
+            .with_for_update(skip_locked=True, key_share=True)
+        )
+        locked_instance_models = list(res.scalars().all())
+        locked_instance_ids = {instance_model.id for instance_model in locked_instance_models}
+
+        res = await session.execute(
+            select(InstanceModel.id).where(
+                InstanceModel.fleet_id == item.id,
+                InstanceModel.deleted == False,
+            )
+        )
+        current_instance_ids = set(res.scalars().all())
+        if current_instance_ids != locked_instance_ids:
+            logger.debug(
+                "Failed to lock fleet %s instances. The fleet will be processed later.",
+                item.id,
+            )
+            # Keep `lock_owner` so that `InstancePipeline` sees that the fleet is being locked
+            # but unset `lock_expires_at` to process the item again ASAP (after `min_processing_interval`).
+            # Unset `lock_token` so that heartbeater can no longer update the item.
+            res = await session.execute(
+                update(FleetModel)
+                .where(
+                    FleetModel.id == item.id,
+                    FleetModel.lock_token == item.lock_token,
+                )
+                .values(
+                    lock_expires_at=None,
+                    lock_token=None,
+                    last_processed_at=get_current_datetime(),
+                )
+                .returning(FleetModel.id)
+            )
+            updated_ids = list(res.scalars().all())
+            if len(updated_ids) == 0:
+                log_lock_token_changed_on_reset(logger)
+            return None
+
+        for instance_model in locked_instance_models:
+            instance_model.lock_expires_at = item.lock_expires_at
+            instance_model.lock_token = item.lock_token
+            instance_model.lock_owner = FleetPipeline.__name__
+        await session.commit()
+        return locked_instance_models
+
+
 @dataclass
 class _ProcessResult:
     fleet_update_map: _FleetUpdateMap = field(default_factory=_FleetUpdateMap)
@@ -358,8 +400,18 @@ class _MaintainNodesResult:
         return len(self.instance_id_to_update_map) > 0 or self.new_instances_count > 0
 
 
-async def _process_fleet(fleet_model: FleetModel) -> _ProcessResult:
-    result = _consolidate_fleet_state_with_spec(fleet_model)
+async def _process_fleet(
+    fleet_model: FleetModel,
+    consolidation_fleet_spec: Optional[FleetSpec] = None,
+    consolidation_instances: Optional[Sequence[InstanceModel]] = None,
+) -> _ProcessResult:
+    result = _ProcessResult()
+    if consolidation_fleet_spec is not None:
+        result = _consolidate_fleet_state_with_spec(
+            fleet_model,
+            consolidation_fleet_spec=consolidation_fleet_spec,
+            consolidation_instances=consolidation_instances,
+        )
     if result.new_instances_count > 0:
         # Avoid deleting fleets that are about to provision new instances.
         return result
@@ -371,17 +423,16 @@ async def _process_fleet(fleet_model: FleetModel) -> _ProcessResult:
     return result
 
 
-def _consolidate_fleet_state_with_spec(fleet_model: FleetModel) -> _ProcessResult:
+def _consolidate_fleet_state_with_spec(
+    fleet_model: FleetModel,
+    consolidation_fleet_spec: FleetSpec,
+    consolidation_instances: Optional[Sequence[InstanceModel]] = None,
+) -> _ProcessResult:
     result = _ProcessResult()
-    if fleet_model.status == FleetStatus.TERMINATING:
-        return result
-    fleet_spec = get_fleet_spec(fleet_model)
-    if fleet_spec.configuration.nodes is None or fleet_spec.autocreated:
-        # Only explicitly created cloud fleets are consolidated.
-        return result
-    if not _is_fleet_ready_for_consolidation(fleet_model):
-        return result
-    maintain_nodes_result = _maintain_fleet_nodes_in_min_max_range(fleet_model, fleet_spec)
+    maintain_nodes_result = _maintain_fleet_nodes_in_min_max_range(
+        instances=consolidation_instances or fleet_model.instances,
+        fleet_spec=consolidation_fleet_spec,
+    )
     if maintain_nodes_result.has_changes:
         result.instance_id_to_update_map = maintain_nodes_result.instance_id_to_update_map
         result.new_instances_count = maintain_nodes_result.new_instances_count
@@ -420,7 +471,7 @@ def _get_consolidation_retry_delay(consolidation_attempt: int) -> timedelta:
 
 
 def _maintain_fleet_nodes_in_min_max_range(
-    fleet_model: FleetModel,
+    instances: Sequence[InstanceModel],
     fleet_spec: FleetSpec,
 ) -> _MaintainNodesResult:
     """
@@ -428,7 +479,7 @@ def _maintain_fleet_nodes_in_min_max_range(
     """
     assert fleet_spec.configuration.nodes is not None
     result = _MaintainNodesResult()
-    for instance in fleet_model.instances:
+    for instance in instances:
         # Delete terminated but not deleted instances since
         # they are going to be replaced with new pending instances.
         if instance.status == InstanceStatus.TERMINATED and not instance.deleted:
@@ -438,7 +489,7 @@ def _maintain_fleet_nodes_in_min_max_range(
                 "deleted_at": NOW_PLACEHOLDER,
             }
     active_instances = [
-        i for i in fleet_model.instances if i.status != InstanceStatus.TERMINATED and not i.deleted
+        i for i in instances if i.status != InstanceStatus.TERMINATED and not i.deleted
     ]
     active_instances_num = len(active_instances)
     if active_instances_num < fleet_spec.configuration.nodes.min:
@@ -456,7 +507,7 @@ def _maintain_fleet_nodes_in_min_max_range(
     # or if nodes.max is updated.
     result.changes_required = True
     nodes_redundant = active_instances_num - fleet_spec.configuration.nodes.max
-    for instance in fleet_model.instances:
+    for instance in instances:
         if nodes_redundant == 0:
             break
         if instance.status == InstanceStatus.IDLE:

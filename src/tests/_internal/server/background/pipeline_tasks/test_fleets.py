@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from dstack._internal.core.models.fleets import FleetNodesSpec, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus
@@ -16,7 +17,10 @@ from dstack._internal.server.background.pipeline_tasks.fleets import (
     FleetFetcher,
     FleetPipeline,
     FleetWorker,
+    _get_fleet_spec_if_ready_for_consolidation,
+    _lock_fleet_instances_for_consolidation,
 )
+from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import FleetModel, InstanceModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
@@ -28,6 +32,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     get_fleet_spec,
+    get_ssh_fleet_configuration,
 )
 from dstack._internal.utils.common import get_current_datetime
 
@@ -166,6 +171,220 @@ class TestFleetFetcher:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestFleetWorker:
+    async def test_ready_for_consolidation_helper_returns_none_for_ssh_fleet(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(conf=get_ssh_fleet_configuration()),
+        )
+
+        assert _get_fleet_spec_if_ready_for_consolidation(fleet) is None
+
+    async def test_ready_for_consolidation_helper_returns_none_when_retry_delay_is_active(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(),
+        )
+        fleet.consolidation_attempt = 1
+        fleet.last_consolidated_at = datetime.now(timezone.utc)
+        await session.commit()
+
+        assert _get_fleet_spec_if_ready_for_consolidation(fleet) is None
+
+    async def test_ready_for_consolidation_helper_returns_consolidation_fleet_spec_for_eligible_cloud_fleet(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(),
+            last_processed_at=datetime(2023, 1, 2, 3, 0, tzinfo=timezone.utc),
+        )
+
+        consolidation_fleet_spec = _get_fleet_spec_if_ready_for_consolidation(fleet)
+
+        assert consolidation_fleet_spec is not None
+        assert consolidation_fleet_spec.configuration.nodes is not None
+
+    async def test_skips_instance_locking_for_ssh_fleet(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(conf=get_ssh_fleet_configuration()),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        original_last_processed_at = fleet.last_processed_at
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        instance.lock_token = uuid.uuid4()
+        instance.lock_expires_at = datetime(2025, 1, 2, 3, 5, tzinfo=timezone.utc)
+        instance.lock_owner = "OtherPipeline"
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        await session.refresh(instance)
+        assert not fleet.deleted
+        assert fleet.lock_owner is None
+        assert fleet.lock_token is None
+        assert fleet.lock_expires_at is None
+        assert fleet.last_processed_at > original_last_processed_at
+        assert instance.lock_owner == "OtherPipeline"
+
+    async def test_skips_instance_locking_when_fleet_is_not_ready_for_consolidation(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        original_last_processed_at = fleet.last_processed_at
+        original_last_consolidated_at = datetime.now(timezone.utc)
+        fleet.consolidation_attempt = 1
+        fleet.last_consolidated_at = original_last_consolidated_at
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        instance.lock_token = uuid.uuid4()
+        instance.lock_expires_at = datetime(2025, 1, 2, 3, 5, tzinfo=timezone.utc)
+        instance.lock_owner = "OtherPipeline"
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        await session.refresh(instance)
+        assert not fleet.deleted
+        assert fleet.consolidation_attempt == 1
+        assert fleet.last_consolidated_at == original_last_consolidated_at
+        assert fleet.lock_owner is None
+        assert fleet.lock_token is None
+        assert fleet.lock_expires_at is None
+        assert fleet.last_processed_at > original_last_processed_at
+        assert instance.lock_owner == "OtherPipeline"
+
+    async def test_resets_fleet_lock_when_not_all_instances_can_be_locked(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+        )
+        locked_elsewhere = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=1,
+        )
+        original_last_processed_at = fleet.last_processed_at
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        fleet.lock_owner = FleetPipeline.__name__
+        locked_elsewhere.lock_token = uuid.uuid4()
+        locked_elsewhere.lock_expires_at = datetime(2025, 1, 2, 3, 5, tzinfo=timezone.utc)
+        locked_elsewhere.lock_owner = "OtherPipeline"
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        await session.refresh(locked_elsewhere)
+        assert fleet.lock_owner == FleetPipeline.__name__
+        assert fleet.lock_token is None
+        assert fleet.lock_expires_at is None
+        assert fleet.last_processed_at > original_last_processed_at
+        assert locked_elsewhere.lock_owner == "OtherPipeline"
+
+    async def test_lock_helper_uses_fresh_current_instances_instead_of_stale_relationship(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+        )
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        fleet.lock_owner = FleetPipeline.__name__
+        await session.commit()
+
+        res = await session.execute(
+            select(FleetModel)
+            .where(FleetModel.id == fleet.id)
+            .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        )
+        stale_fleet_model = res.unique().scalar_one()
+        assert len(stale_fleet_model.instances) == 1
+
+        async with get_session_ctx() as other_session:
+            project_model = await other_session.get(type(project), project.id)
+            fleet_model = await other_session.get(FleetModel, fleet.id)
+            assert project_model is not None
+            assert fleet_model is not None
+            await create_instance(
+                session=other_session,
+                project=project_model,
+                fleet=fleet_model,
+                status=InstanceStatus.IDLE,
+                instance_num=1,
+            )
+
+        assert len(stale_fleet_model.instances) == 1
+
+        locked_instances = await _lock_fleet_instances_for_consolidation(
+            session=session,
+            item=_fleet_to_pipeline_item(fleet),
+        )
+
+        assert locked_instances is not None
+        assert len(locked_instances) == 2
+        assert {instance.instance_num for instance in locked_instances} == {0, 1}
+
     async def test_deletes_empty_autocreated_fleet(
         self, test_db, session: AsyncSession, worker: FleetWorker
     ):
