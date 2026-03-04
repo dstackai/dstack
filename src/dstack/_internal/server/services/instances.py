@@ -532,7 +532,7 @@ async def list_projects_instance_models(
     )
     filters: List = [
         or_(
-            InstanceModel.project_id.in_(p.id for p in projects),
+            InstanceModel.project_id.in_(project_ids),
             is_instance_imported_subquery if include_imported else false(),
         )
     ]
