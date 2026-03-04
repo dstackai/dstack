@@ -727,6 +727,15 @@ class InstanceModel(PipelineModelMixin, BaseModel):
         cascade="save-update, merge, delete-orphan, delete",
     )
 
+    __table_args__ = (
+        Index(
+            "ix_instances_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=deleted == false(),
+            sqlite_where=deleted == false(),
+        ),
+    )
+
 
 class InstanceHealthCheckModel(BaseModel):
     __tablename__ = "instance_health_checks"
