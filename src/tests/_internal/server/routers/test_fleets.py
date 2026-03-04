@@ -310,6 +310,55 @@ class TestListFleets:
         assert len(response_json[2]["instances"]) == 1
         assert response_json[2]["instances"][0]["id"] == str(instance.id)
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_fleet_once_if_imported_twice(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.USER,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+        )
+        for name in ["export-1", "export-2"]:
+            await create_resource_export(
+                session=session,
+                exporter_project=exporter_project,
+                importer_projects=[importer_project],
+                exported_fleets=[fleet],
+                name=name,
+            )
+        response = await client.post(
+            "/api/fleets/list",
+            headers=get_auth_headers(importer_user.token),
+            json={"include_imported": True},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 1
+        assert response_json[0]["name"] == "exported-fleet"
+        assert response_json[0]["project_name"] == "exporter-project"
+        assert len(response_json[0]["instances"]) == 1
+        assert response_json[0]["instances"][0]["id"] == str(instance.id)
+
 
 class TestListProjectFleets:
     @pytest.mark.asyncio
@@ -450,6 +499,55 @@ class TestListProjectFleets:
         assert len(response_json) == 1
         assert response_json[0]["name"] == "local-fleet"
         assert response_json[0]["project_name"] == "importer-project"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_fleet_once_if_imported_twice(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.USER,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+        )
+        for name in ["export-1", "export-2"]:
+            await create_resource_export(
+                session=session,
+                exporter_project=exporter_project,
+                importer_projects=[importer_project],
+                exported_fleets=[fleet],
+                name=name,
+            )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/fleets/list",
+            headers=get_auth_headers(importer_user.token),
+            json={"include_imported": True},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 1
+        assert response_json[0]["name"] == "exported-fleet"
+        assert response_json[0]["project_name"] == "exporter-project"
+        assert len(response_json[0]["instances"]) == 1
+        assert response_json[0]["instances"][0]["id"] == str(instance.id)
 
 
 class TestGetFleet:
