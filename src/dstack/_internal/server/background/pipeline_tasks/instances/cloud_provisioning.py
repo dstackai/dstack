@@ -2,6 +2,10 @@ import uuid
 from typing import Optional
 
 from pydantic import ValidationError
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
+from sqlalchemy.orm.attributes import set_committed_value
 
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
@@ -26,25 +30,21 @@ from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.base import NOW_PLACEHOLDER
 from dstack._internal.server.background.pipeline_tasks.instances.common import (
     ProcessResult,
-    SiblingInstanceUpdateMap,
-    append_sibling_status_event,
-    get_fleet_master_instance,
-    get_instance_offer_for_instance,
-    need_to_wait_fleet_provisioning,
     set_status_update,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, PlacementGroupModel
+from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
 from dstack._internal.server.services.fleets import get_create_instance_offers, is_cloud_cluster
 from dstack._internal.server.services.instances import (
     get_instance_configuration,
     get_instance_profile,
+    get_instance_provisioning_data,
     get_instance_requirements,
 )
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.offers import get_instance_offer_with_restricted_az
 from dstack._internal.server.services.placement import (
     get_fleet_placement_group_models,
-    get_placement_group_model_for_instance,
     placement_group_model_to_placement_group,
     placement_group_model_to_placement_group_optional,
 )
@@ -56,13 +56,6 @@ logger = get_logger(__name__)
 
 async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
     result = ProcessResult()
-    master_instance_model = get_fleet_master_instance(instance_model)
-    if need_to_wait_fleet_provisioning(instance_model, master_instance_model):
-        logger.debug(
-            "%s: waiting for the first instance in the fleet to be provisioned",
-            fmt(instance_model),
-        )
-        return result
 
     try:
         instance_configuration = get_instance_configuration(instance_model)
@@ -84,18 +77,63 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         )
         return result
 
-    # The placement group is determined when provisioning the master instance
-    # and used for all other instances in the fleet.
-    async with get_session_ctx() as session:
-        placement_group_models = await get_fleet_placement_group_models(
-            session=session,
-            fleet_id=instance_model.fleet_id,
-        )
-    placement_group_model = get_placement_group_model_for_instance(
-        placement_group_models=placement_group_models,
-        instance_model=instance_model,
-        master_instance_model=master_instance_model,
-    )
+    current_master_instance_model = None
+    master_job_provisioning_data = None
+    placement_group_models: list[PlacementGroupModel] = []
+    placement_group_model = None
+    if instance_model.fleet is not None and is_cloud_cluster(instance_model.fleet):
+        assert instance_model.fleet_id is not None
+        async with get_session_ctx() as session:
+            current_master_instance_model = await _load_current_master_instance(
+                session=session,
+                fleet_id=instance_model.fleet_id,
+            )
+            placement_group_models = await get_fleet_placement_group_models(
+                session=session,
+                fleet_id=instance_model.fleet_id,
+            )
+        if current_master_instance_model is None:
+            # FleetPipeline elects the current master. Until it does, instance
+            # workers must wait instead of trying to coordinate bootstrap.
+            logger.debug(
+                "%s: waiting for fleet pipeline to elect current cluster master",
+                fmt(instance_model),
+            )
+            return result
+        if current_master_instance_model.id != instance_model.id:
+            if (
+                current_master_instance_model.deleted
+                or current_master_instance_model.status == InstanceStatus.TERMINATED
+            ):
+                # Master failover is also owned by FleetPipeline. InstancePipeline
+                # only terminates the current instance and waits for the next fleet tick.
+                logger.debug(
+                    "%s: waiting for fleet pipeline to replace current master %s",
+                    fmt(instance_model),
+                    current_master_instance_model.id,
+                )
+                return result
+            master_job_provisioning_data = get_instance_provisioning_data(
+                current_master_instance_model
+            )
+            if master_job_provisioning_data is None:
+                logger.debug(
+                    "%s: waiting for current master %s to determine cluster placement",
+                    fmt(instance_model),
+                    current_master_instance_model.id,
+                )
+                return result
+            # Non-master instances only reuse the placement group chosen by the
+            # current master. They never create a new placement group themselves.
+            placement_group_model = _get_current_master_placement_group_model(
+                placement_group_models=placement_group_models,
+                fleet_id=instance_model.fleet_id,
+            )
+            if placement_group_model is not None:
+                _populate_current_master_placement_group_relations(
+                    placement_group_model=placement_group_model,
+                    instance_model=instance_model,
+                )
     offers = await get_create_instance_offers(
         project=instance_model.project,
         profile=profile,
@@ -104,6 +142,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
         blocks="auto" if instance_model.total_blocks is None else instance_model.total_blocks,
         exclude_not_available=True,
+        master_job_provisioning_data=master_job_provisioning_data,
     )
 
     # Limit number of offers tried to prevent long-running processing in case all offers fail.
@@ -112,15 +151,18 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
             continue
         compute = backend.compute()
         assert isinstance(compute, ComputeWithCreateInstanceSupport)
-        instance_offer = get_instance_offer_for_instance(
-            instance_offer=instance_offer,
-            instance_model=instance_model,
-            master_instance_model=master_instance_model,
-        )
+        if master_job_provisioning_data is not None:
+            # Shared offer lookup already restricts backend and region from the master.
+            # Availability zone still has to be narrowed per offer.
+            instance_offer = get_instance_offer_with_restricted_az(
+                instance_offer=instance_offer,
+                master_job_provisioning_data=master_job_provisioning_data,
+            )
         if (
             instance_model.fleet is not None
             and is_cloud_cluster(instance_model.fleet)
-            and instance_model.id == master_instance_model.id
+            and current_master_instance_model is not None
+            and current_master_instance_model.id == instance_model.id
             and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
             and (
@@ -190,7 +232,11 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         result.instance_update_map["total_blocks"] = instance_offer.total_blocks
         result.instance_update_map["started_at"] = NOW_PLACEHOLDER
 
-        if instance_model.fleet_id is not None and instance_model.id == master_instance_model.id:
+        if (
+            instance_model.fleet_id is not None
+            and current_master_instance_model is not None
+            and current_master_instance_model.id == instance_model.id
+        ):
             # Clean up placement groups that did not end up being used.
             result.schedule_pg_deletion_fleet_id = instance_model.fleet_id
             if placement_group_model is not None:
@@ -204,34 +250,62 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         termination_reason=InstanceTerminationReason.NO_OFFERS,
         termination_reason_message="All offers failed" if offers else "No offers found",
     )
-    if (
-        instance_model.fleet is not None
-        and instance_model.id == master_instance_model.id
-        and is_cloud_cluster(instance_model.fleet)
-    ):
-        # Do not attempt to deploy other instances, as they won't determine the correct cluster
-        # backend, region, and placement group without a successfully deployed master instance.
-        for sibling_instance_model in instance_model.fleet.instances:
-            if sibling_instance_model.id == instance_model.id:
-                continue
-            sibling_update_map = SiblingInstanceUpdateMap(id=sibling_instance_model.id)
-            if set_status_update(
-                update_map=sibling_update_map,
-                instance_model=sibling_instance_model,
-                new_status=InstanceStatus.TERMINATED,
-                termination_reason=InstanceTerminationReason.MASTER_FAILED,
-            ):
-                result.sibling_update_rows.append(sibling_update_map)
-                append_sibling_status_event(
-                    deferred_events=result.sibling_deferred_events,
-                    instance_model=sibling_instance_model,
-                    new_status=InstanceStatus.TERMINATED,
-                    termination_reason=sibling_update_map.get("termination_reason"),
-                    termination_reason_message=sibling_update_map.get(
-                        "termination_reason_message"
-                    ),
-                )
     return result
+
+
+async def _load_current_master_instance(
+    session: AsyncSession,
+    fleet_id: uuid.UUID,
+) -> Optional[InstanceModel]:
+    res = await session.execute(
+        select(FleetModel.current_master_instance_id).where(FleetModel.id == fleet_id)
+    )
+    current_master_instance_id = res.scalar_one_or_none()
+    if current_master_instance_id is None:
+        return None
+    res = await session.execute(
+        select(InstanceModel)
+        .where(
+            InstanceModel.id == current_master_instance_id,
+        )
+        .options(
+            load_only(
+                InstanceModel.id,
+                InstanceModel.deleted,
+                InstanceModel.status,
+                InstanceModel.job_provisioning_data,
+            )
+        )
+    )
+    return res.scalar_one_or_none()
+
+
+def _get_current_master_placement_group_model(
+    placement_group_models: list[PlacementGroupModel],
+    fleet_id: uuid.UUID,
+) -> Optional[PlacementGroupModel]:
+    if not placement_group_models:
+        return None
+    if len(placement_group_models) > 1:
+        logger.error(
+            "Expected 0 or 1 placement groups associated with fleet master %s, found %s."
+            " Using the first placement group for this provisioning attempt.",
+            fleet_id,
+            len(placement_group_models),
+        )
+    return placement_group_models[0]
+
+
+def _populate_current_master_placement_group_relations(
+    placement_group_model: PlacementGroupModel,
+    instance_model: InstanceModel,
+) -> None:
+    # Placement groups are loaded in a separate session from the instance worker.
+    # Reattach the already-known project/fleet objects so later detached access
+    # can still build a PlacementGroup value object without lazy loading.
+    set_committed_value(placement_group_model, "project", instance_model.project)
+    if instance_model.fleet is not None:
+        set_committed_value(placement_group_model, "fleet", instance_model.fleet)
 
 
 async def _find_or_create_suitable_placement_group_model(

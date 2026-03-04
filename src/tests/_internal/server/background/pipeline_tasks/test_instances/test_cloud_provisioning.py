@@ -1,5 +1,3 @@
-import datetime as dt
-from collections import defaultdict
 from typing import Optional
 from unittest.mock import Mock, patch
 
@@ -29,6 +27,7 @@ from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_fleet,
     create_instance,
+    create_placement_group,
     create_project,
     get_fleet_configuration,
     get_fleet_spec,
@@ -37,8 +36,15 @@ from dstack._internal.server.testing.common import (
     get_placement_group_provisioning_data,
 )
 from tests._internal.server.background.pipeline_tasks.test_instances.helpers import (
+    instance_to_pipeline_item,
+    lock_instance,
     process_instance,
 )
+
+
+async def _set_current_master_instance(session: AsyncSession, fleet, instance) -> None:
+    fleet.current_master_instance_id = None if instance is None else instance.id
+    await session.commit()
 
 
 @pytest.mark.asyncio
@@ -209,31 +215,11 @@ class TestCloudProvisioning:
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == InstanceTerminationReason.NO_OFFERS
 
-    @pytest.mark.parametrize(
-        ("placement", "expected_termination_reasons"),
-        [
-            pytest.param(
-                InstanceGroupPlacement.CLUSTER,
-                {
-                    InstanceTerminationReason.NO_OFFERS: 1,
-                    InstanceTerminationReason.MASTER_FAILED: 3,
-                },
-                id="cluster",
-            ),
-            pytest.param(
-                None,
-                {InstanceTerminationReason.NO_OFFERS: 4},
-                id="non-cluster",
-            ),
-        ],
-    )
-    async def test_terminates_cluster_instances_if_master_not_created(
+    async def test_waits_when_fleet_has_no_current_master(
         self,
         test_db,
         session: AsyncSession,
         worker: InstanceWorker,
-        placement: Optional[InstanceGroupPlacement],
-        expected_termination_reasons: dict[str, int],
     ):
         project = await create_project(session=session)
         fleet = await create_fleet(
@@ -241,35 +227,464 @@ class TestCloudProvisioning:
             project,
             spec=get_fleet_spec(
                 conf=get_fleet_configuration(
-                    placement=placement, nodes=FleetNodesSpec(min=4, target=4, max=4)
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=2, target=2, max=2),
                 )
             ),
         )
-        instances = [
-            await create_instance(
-                session=session,
-                project=project,
-                fleet=fleet,
-                status=InstanceStatus.PENDING,
-                offer=None,
-                job_provisioning_data=None,
-                instance_num=index,
-                created_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=index),
-            )
-            for index in range(4)
-        ]
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=0,
+        )
+
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock]
+            await process_instance(session, worker, instance)
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.PENDING
+        assert backend_mock.compute.return_value.create_instance.call_count == 0
+
+    async def test_waits_for_current_master_to_determine_cluster_placement(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=2, target=2, max=2),
+                )
+            ),
+        )
+        master_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=0,
+        )
+        sibling_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=1,
+        )
+        await _set_current_master_instance(session, fleet, master_instance)
+
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock]
+            await process_instance(session, worker, sibling_instance)
+
+        await session.refresh(master_instance)
+        await session.refresh(sibling_instance)
+        assert master_instance.status == InstanceStatus.PENDING
+        assert sibling_instance.status == InstanceStatus.PENDING
+        assert backend_mock.compute.return_value.create_instance.call_count == 0
+
+    async def test_failed_master_does_not_provision_stale_sibling_until_fleet_reassigns_it(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=2, target=2, max=2),
+                )
+            ),
+        )
+        master_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=0,
+        )
+        sibling_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=1,
+        )
+        await _set_current_master_instance(session, fleet, master_instance)
+
+        lock_instance(master_instance)
+        lock_instance(sibling_instance)
+        await session.commit()
+        master_item = instance_to_pipeline_item(master_instance)
+        sibling_item = instance_to_pipeline_item(sibling_instance)
+
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             m.return_value = []
-            for instance in sorted(instances, key=lambda i: (i.instance_num, i.created_at)):
-                await session.refresh(instance)
-                await process_instance(session, worker, instance)
+            await worker.process(master_item)
 
-        termination_reasons = defaultdict(int)
-        for instance in instances:
-            await session.refresh(instance)
-            assert instance.status == InstanceStatus.TERMINATED
-            termination_reasons[instance.termination_reason] += 1
-        assert termination_reasons == expected_termination_reasons
+        await session.refresh(master_instance)
+        await session.refresh(sibling_instance)
+        assert master_instance.status == InstanceStatus.TERMINATED
+        assert master_instance.termination_reason == InstanceTerminationReason.NO_OFFERS
+        assert sibling_instance.status == InstanceStatus.PENDING
+
+        gcp_mock = Mock()
+        gcp_mock.TYPE = BackendType.GCP
+        gcp_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        gcp_mock.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.GCP, region="us-central1")
+        ]
+        gcp_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
+            backend=BackendType.GCP,
+            region="us-central1",
+        )
+        aws_mock = Mock()
+        aws_mock.TYPE = BackendType.AWS
+        aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        aws_mock.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, region="us-east-1")
+        ]
+        aws_mock.compute.return_value.create_placement_group.return_value = (
+            get_placement_group_provisioning_data()
+        )
+        aws_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [gcp_mock, aws_mock]
+            await worker.process(sibling_item)
+
+        await session.refresh(sibling_instance)
+        assert sibling_instance.status == InstanceStatus.PENDING
+        assert gcp_mock.compute.return_value.get_offers.call_count == 0
+        assert gcp_mock.compute.return_value.create_instance.call_count == 0
+        assert aws_mock.compute.return_value.create_instance.call_count == 0
+
+        await _set_current_master_instance(session, fleet, sibling_instance)
+        promoted_backend_mock = Mock()
+        promoted_backend_mock.TYPE = BackendType.AWS
+        promoted_backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        promoted_backend_mock.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, region="us-east-1")
+        ]
+        promoted_backend_mock.compute.return_value.create_placement_group.return_value = (
+            get_placement_group_provisioning_data()
+        )
+        promoted_backend_mock.compute.return_value.create_instance.return_value = (
+            get_job_provisioning_data(
+                backend=BackendType.AWS,
+                region="us-east-1",
+            )
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [promoted_backend_mock]
+            await process_instance(session, worker, sibling_instance)
+
+        await session.refresh(sibling_instance)
+        assert sibling_instance.status == InstanceStatus.PROVISIONING
+        assert sibling_instance.backend == BackendType.AWS
+        assert sibling_instance.region == "us-east-1"
+        assert promoted_backend_mock.compute.return_value.create_instance.call_count == 1
+
+    async def test_follows_current_master_backend_and_region_constraints(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=2, target=2, max=2),
+                )
+            ),
+        )
+        master_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            job_provisioning_data=get_job_provisioning_data(
+                backend=BackendType.AWS,
+                region="us-east-1",
+            ),
+            instance_num=0,
+        )
+        sibling_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=1,
+        )
+        await _set_current_master_instance(session, fleet, master_instance)
+
+        gcp_mock = Mock()
+        gcp_mock.TYPE = BackendType.GCP
+        gcp_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        gcp_mock.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.GCP, region="us-central1")
+        ]
+        gcp_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
+            backend=BackendType.GCP,
+            region="us-central1",
+        )
+        aws_mock = Mock()
+        aws_mock.TYPE = BackendType.AWS
+        aws_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        aws_mock.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, region="us-east-1")
+        ]
+        aws_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [gcp_mock, aws_mock]
+            await process_instance(session, worker, sibling_instance)
+
+        await session.refresh(sibling_instance)
+        assert sibling_instance.status == InstanceStatus.PROVISIONING
+        assert sibling_instance.backend == BackendType.AWS
+        assert sibling_instance.region == "us-east-1"
+        assert gcp_mock.compute.return_value.get_offers.call_count == 0
+        assert gcp_mock.compute.return_value.create_instance.call_count == 0
+        assert aws_mock.compute.return_value.create_instance.call_count == 1
+
+    async def test_non_master_does_not_create_new_placement_group_without_master_pg(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=2, target=2, max=2),
+                )
+            ),
+        )
+        master_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            job_provisioning_data=get_job_provisioning_data(
+                backend=BackendType.AWS,
+                region="us-east-1",
+            ),
+            instance_num=0,
+        )
+        sibling_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=1,
+        )
+        await _set_current_master_instance(session, fleet, master_instance)
+
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        backend_mock.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, region="us-east-1")
+        ]
+        backend_mock.compute.return_value.is_suitable_placement_group.return_value = True
+        backend_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock]
+            await process_instance(session, worker, sibling_instance)
+
+        await session.refresh(sibling_instance)
+        assert sibling_instance.status == InstanceStatus.PROVISIONING
+        assert backend_mock.compute.return_value.create_placement_group.call_count == 0
+        placement_groups = (await session.execute(select(PlacementGroupModel))).scalars().all()
+        assert len(placement_groups) == 0
+
+    async def test_non_master_reuses_existing_current_master_placement_group(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=3, target=3, max=3),
+                )
+            ),
+        )
+        master_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            job_provisioning_data=get_job_provisioning_data(
+                backend=BackendType.AWS,
+                region="us-east-1",
+            ),
+            instance_num=0,
+        )
+        current_master_pg = await create_placement_group(
+            session=session,
+            project=project,
+            fleet=fleet,
+        )
+        sibling_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=1,
+        )
+        await _set_current_master_instance(session, fleet, master_instance)
+
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        backend_mock.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, region="us-east-1")
+        ]
+        backend_mock.compute.return_value.is_suitable_placement_group.return_value = True
+        backend_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock]
+            await process_instance(session, worker, sibling_instance)
+
+        await session.refresh(sibling_instance)
+        assert sibling_instance.status == InstanceStatus.PROVISIONING
+        assert backend_mock.compute.return_value.create_placement_group.call_count == 0
+        create_call = backend_mock.compute.return_value.create_instance.call_args
+        assert create_call is not None
+        assert create_call.args[2] is not None
+        assert create_call.args[2].name == current_master_pg.name
+        placement_groups = (await session.execute(select(PlacementGroupModel))).scalars().all()
+        assert len(placement_groups) == 1
+
+    async def test_allows_parallel_processing_after_master_is_provisioned(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session,
+            project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=3, target=3, max=3),
+                )
+            ),
+        )
+        master_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            job_provisioning_data=get_job_provisioning_data(
+                backend=BackendType.AWS,
+                region="us-east-1",
+            ),
+            instance_num=0,
+        )
+        later_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=2,
+        )
+        earlier_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            instance_num=1,
+        )
+        await _set_current_master_instance(session, fleet, master_instance)
+
+        backend_mock = Mock()
+        backend_mock.TYPE = BackendType.AWS
+        backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+        backend_mock.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, region="us-east-1")
+        ]
+        backend_mock.compute.return_value.create_instance.return_value = get_job_provisioning_data(
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock]
+            await process_instance(session, worker, later_instance)
+            assert backend_mock.compute.return_value.create_instance.call_count == 1
+            await process_instance(session, worker, earlier_instance)
+
+        await session.refresh(later_instance)
+        await session.refresh(earlier_instance)
+        assert later_instance.status == InstanceStatus.PROVISIONING
+        assert earlier_instance.status == InstanceStatus.PROVISIONING
+        assert backend_mock.compute.return_value.create_instance.call_count == 2
 
     @pytest.mark.parametrize(
         ("placement", "should_create"),
@@ -304,6 +719,8 @@ class TestCloudProvisioning:
             offer=None,
             job_provisioning_data=None,
         )
+        if placement == InstanceGroupPlacement.CLUSTER:
+            await _set_current_master_instance(session, fleet, instance)
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -357,6 +774,7 @@ class TestCloudProvisioning:
             offer=None,
             job_provisioning_data=None,
         )
+        await _set_current_master_instance(session, fleet, instance)
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
@@ -421,6 +839,7 @@ class TestCloudProvisioning:
             offer=None,
             job_provisioning_data=None,
         )
+        await _set_current_master_instance(session, fleet, instance)
         backend_mock = Mock()
         backend_mock.TYPE = BackendType.AWS
         backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)

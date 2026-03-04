@@ -8,7 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from dstack._internal.core.models.fleets import FleetNodesSpec, FleetStatus
+from dstack._internal.core.models.fleets import (
+    FleetNodesSpec,
+    FleetStatus,
+    InstanceGroupPlacement,
+)
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -31,7 +35,9 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_fleet_configuration,
     get_fleet_spec,
+    get_job_provisioning_data,
     get_ssh_fleet_configuration,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -63,6 +69,12 @@ def _fleet_to_pipeline_item(fleet: FleetModel) -> PipelineItem:
         lock_expires_at=fleet.lock_expires_at,
         prev_lock_expired=False,
     )
+
+
+async def _lock_fleet_for_processing(session: AsyncSession, fleet: FleetModel) -> None:
+    fleet.lock_token = uuid.uuid4()
+    fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+    await session.commit()
 
 
 @pytest.mark.asyncio
@@ -384,6 +396,221 @@ class TestFleetWorker:
         assert locked_instances is not None
         assert len(locked_instances) == 2
         assert {instance.instance_num for instance in locked_instances} == {0, 1}
+
+    async def test_syncs_initial_current_master_for_cluster_fleet(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=2, target=2, max=2),
+                )
+            ),
+        )
+        first_instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=0,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=1,
+        )
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        assert fleet.current_master_instance_id == first_instance.id
+
+    async def test_keeps_current_master_when_it_is_still_active(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=2, target=2, max=2),
+                )
+            ),
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=0,
+        )
+        current_master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PROVISIONING,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance_num=1,
+        )
+        fleet.current_master_instance_id = current_master.id
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        assert fleet.current_master_instance_id == current_master.id
+
+    async def test_promotes_provisioned_survivor_when_current_master_terminated(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=1, target=1, max=2),
+                )
+            ),
+        )
+        terminated_master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATED,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=0,
+        )
+        provisioned_survivor = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance_num=1,
+        )
+        fleet.current_master_instance_id = terminated_master.id
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        await session.refresh(terminated_master)
+        assert terminated_master.deleted
+        assert fleet.current_master_instance_id == provisioned_survivor.id
+
+    async def test_promotes_next_bootstrap_candidate_when_current_master_terminated(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=1, target=1, max=2),
+                )
+            ),
+        )
+        terminated_master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATED,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=0,
+        )
+        next_candidate = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=1,
+        )
+        fleet.current_master_instance_id = terminated_master.id
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        assert fleet.current_master_instance_id == next_candidate.id
+
+    async def test_clears_current_master_for_non_cluster_fleet(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        fleet.current_master_instance_id = instance.id
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        assert fleet.current_master_instance_id is None
+
+    async def test_syncs_current_master_after_creating_missing_instances(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=2, target=2, max=2),
+                )
+            ),
+        )
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        instances = (
+            (
+                await session.execute(
+                    select(InstanceModel)
+                    .where(InstanceModel.fleet_id == fleet.id, InstanceModel.deleted == False)
+                    .order_by(InstanceModel.instance_num, InstanceModel.created_at)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(instances) == 2
+        assert fleet.current_master_instance_id == instances[0].id
 
     async def test_deletes_empty_autocreated_fleet(
         self, test_db, session: AsyncSession, worker: FleetWorker

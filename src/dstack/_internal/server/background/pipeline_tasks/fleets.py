@@ -8,7 +8,11 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
-from dstack._internal.core.models.fleets import FleetSpec, FleetStatus
+from dstack._internal.core.models.fleets import (
+    FleetSpec,
+    FleetStatus,
+    InstanceGroupPlacement,
+)
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
@@ -274,6 +278,14 @@ class FleetWorker(Worker[PipelineItem]):
                     fleet_model=fleet_model,
                     new_instances_count=result.new_instances_count,
                 )
+                await session.flush()
+            # FleetPipeline is the sole owner of cluster master election.
+            # Sync it after instance updates and creation so the pointer reflects
+            # the final post-consolidation fleet state that will be committed.
+            await _sync_current_master_instance(
+                session=session,
+                fleet_model_id=fleet_model.id,
+            )
             emit_fleet_status_change_event(
                 session=session,
                 fleet_model=fleet_model,
@@ -596,3 +608,79 @@ async def _create_missing_fleet_instances(
         new_instances_count,
         fleet_model.name,
     )
+
+
+async def _sync_current_master_instance(
+    session: AsyncSession,
+    fleet_model_id: uuid.UUID,
+) -> None:
+    fleet_model = await session.get(FleetModel, fleet_model_id)
+    if fleet_model is None:
+        return
+
+    new_current_master_instance_id = None
+    fleet_spec = get_fleet_spec(fleet_model)
+    is_cluster = (
+        fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        and fleet_spec.configuration.ssh_config is None
+    )
+    if not fleet_model.deleted and is_cluster:
+        res = await session.execute(
+            select(InstanceModel)
+            .where(
+                InstanceModel.fleet_id == fleet_model_id,
+                InstanceModel.deleted == False,
+            )
+            .order_by(InstanceModel.instance_num, InstanceModel.created_at)
+            .options(
+                load_only(
+                    InstanceModel.id,
+                    InstanceModel.status,
+                    InstanceModel.job_provisioning_data,
+                )
+            )
+        )
+        current_instance_models = list(res.scalars().all())
+        new_current_master_instance_id = _select_current_master_instance_id(
+            current_master_instance_id=fleet_model.current_master_instance_id,
+            instance_models=current_instance_models,
+        )
+
+    if fleet_model.current_master_instance_id == new_current_master_instance_id:
+        return
+
+    await session.execute(
+        update(FleetModel)
+        .where(FleetModel.id == fleet_model_id)
+        .values(current_master_instance_id=new_current_master_instance_id)
+    )
+
+
+def _select_current_master_instance_id(
+    current_master_instance_id: Optional[uuid.UUID],
+    instance_models: Sequence[InstanceModel],
+) -> Optional[uuid.UUID]:
+    # Keep the current master stable while it is still alive so InstancePipeline
+    # does not see fleet-wide election churn between provisioning attempts.
+    if current_master_instance_id is not None:
+        for instance_model in instance_models:
+            if (
+                instance_model.id == current_master_instance_id
+                and instance_model.status != InstanceStatus.TERMINATED
+            ):
+                return instance_model.id
+
+    # If the old master is gone, prefer a surviving provisioned instance since it
+    # already defines backend/region/AZ for the current cluster generation.
+    for instance_model in instance_models:
+        if (
+            instance_model.status != InstanceStatus.TERMINATED
+            and instance_model.job_provisioning_data is not None
+        ):
+            return instance_model.id
+
+    for instance_model in instance_models:
+        if instance_model.status != InstanceStatus.TERMINATED:
+            return instance_model.id
+
+    return None

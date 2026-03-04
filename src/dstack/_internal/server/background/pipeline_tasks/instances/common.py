@@ -7,10 +7,8 @@ from typing import Optional, TypedDict, Union
 from paramiko.pkey import PKey
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
-    InstanceOfferWithAvailability,
     InstanceStatus,
     InstanceTerminationReason,
     SSHKey,
@@ -22,12 +20,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 )
 from dstack._internal.server.background.scheduled_tasks.common import get_provisioning_timeout
 from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
-from dstack._internal.server.services.fleets import fleet_model_to_fleet, is_cloud_cluster
-from dstack._internal.server.services.instances import (
-    get_instance_provisioning_data,
-    get_instance_status_change_message,
-)
-from dstack._internal.server.services.offers import get_instance_offer_with_restricted_az
+from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.utils.common import UNSET, Unset, get_current_datetime
 from dstack._internal.utils.ssh import pkey_from_str
 
@@ -61,13 +54,6 @@ class InstanceUpdateMap(ItemUpdateMap, total=False):
     deleted_at: UpdateMapDateTime
 
 
-class SiblingInstanceUpdateMap(TypedDict, total=False):
-    id: uuid.UUID
-    status: InstanceStatus
-    termination_reason: Optional[InstanceTerminationReason]
-    termination_reason_message: Optional[str]
-
-
 class HealthCheckCreate(TypedDict):
     instance_id: uuid.UUID
     collected_at: datetime.datetime
@@ -76,18 +62,8 @@ class HealthCheckCreate(TypedDict):
 
 
 @dataclass
-class SiblingDeferredEvent:
-    message: str
-    project_id: uuid.UUID
-    instance_id: uuid.UUID
-    instance_name: str
-
-
-@dataclass
 class ProcessResult:
     instance_update_map: InstanceUpdateMap = field(default_factory=InstanceUpdateMap)
-    sibling_update_rows: list[SiblingInstanceUpdateMap] = field(default_factory=list)
-    sibling_deferred_events: list[SiblingDeferredEvent] = field(default_factory=list)
     health_check_create: Optional[HealthCheckCreate] = None
     new_placement_group_models: list[PlacementGroupModel] = field(default_factory=list)
     schedule_pg_deletion_fleet_id: Optional[uuid.UUID] = None
@@ -102,52 +78,6 @@ def can_terminate_fleet_instances_on_idle_duration(fleet_model: FleetModel) -> b
         instance for instance in fleet_model.instances if instance.status.is_active()
     ]
     return len(active_instances) > fleet.spec.configuration.nodes.min
-
-
-def get_fleet_master_instance(instance_model: InstanceModel) -> InstanceModel:
-    if instance_model.fleet is None:
-        return instance_model
-    fleet_instances = list(instance_model.fleet.instances)
-    if all(fleet_instance.id != instance_model.id for fleet_instance in fleet_instances):
-        fleet_instances.append(instance_model)
-    return min(
-        fleet_instances,
-        key=lambda fleet_instance: (fleet_instance.instance_num, fleet_instance.created_at),
-    )
-
-
-def need_to_wait_fleet_provisioning(
-    instance_model: InstanceModel,
-    master_instance_model: InstanceModel,
-) -> bool:
-    # Cluster cloud instances should wait for the first fleet instance to be provisioned
-    # so that they are provisioned in the same backend/region.
-    if instance_model.fleet is None:
-        return False
-    if (
-        instance_model.id == master_instance_model.id
-        or master_instance_model.job_provisioning_data is not None
-        or master_instance_model.status == InstanceStatus.TERMINATED
-    ):
-        return False
-    return is_cloud_cluster(instance_model.fleet)
-
-
-def get_instance_offer_for_instance(
-    instance_offer: InstanceOfferWithAvailability,
-    instance_model: InstanceModel,
-    master_instance_model: InstanceModel,
-) -> InstanceOfferWithAvailability:
-    if instance_model.fleet is None:
-        return instance_offer
-    fleet = fleet_model_to_fleet(instance_model.fleet)
-    if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
-        master_job_provisioning_data = get_instance_provisioning_data(master_instance_model)
-        return get_instance_offer_with_restricted_az(
-            instance_offer=instance_offer,
-            master_job_provisioning_data=master_job_provisioning_data,
-        )
-    return instance_offer
 
 
 def get_instance_idle_duration(instance_model: InstanceModel) -> datetime.timedelta:
@@ -182,7 +112,7 @@ def ssh_keys_to_pkeys(ssh_keys: list[SSHKey]) -> list[PKey]:
 
 
 def set_status_update(
-    update_map: Union[InstanceUpdateMap, SiblingInstanceUpdateMap],
+    update_map: InstanceUpdateMap,
     instance_model: InstanceModel,
     new_status: InstanceStatus,
     termination_reason: Union[Optional[InstanceTerminationReason], Unset] = UNSET,
@@ -236,27 +166,3 @@ def set_unreachable_update(
         return False
     update_map["unreachable"] = unreachable
     return True
-
-
-def append_sibling_status_event(
-    deferred_events: list[SiblingDeferredEvent],
-    instance_model: InstanceModel,
-    new_status: InstanceStatus,
-    termination_reason: Optional[InstanceTerminationReason],
-    termination_reason_message: Optional[str],
-) -> None:
-    if instance_model.status == new_status:
-        return
-    deferred_events.append(
-        SiblingDeferredEvent(
-            message=get_instance_status_change_message(
-                old_status=instance_model.status,
-                new_status=new_status,
-                termination_reason=termination_reason,
-                termination_reason_message=termination_reason_message,
-            ),
-            project_id=instance_model.project_id,
-            instance_id=instance_model.id,
-            instance_name=instance_model.name,
-        )
-    )

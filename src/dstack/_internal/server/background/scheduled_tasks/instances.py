@@ -672,6 +672,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
     if instance.fleet and instance.id == master_instance.id and is_cloud_cluster(instance.fleet):
         # Do not attempt to deploy other instances, as they won't determine the correct cluster
         # backend, region, and placement group without a successfully deployed master instance
+        # FIXME: Race condition with siblings processed concurrently.
         for sibling_instance in instance.fleet.instances:
             if sibling_instance.id == instance.id:
                 continue

@@ -406,7 +406,6 @@ async def _apply_process_result(
 
         now = get_current_datetime()
         resolve_now_placeholders(result.instance_update_map, now=now)
-        resolve_now_placeholders(result.sibling_update_rows, now=now)
 
         res = await session.execute(
             update(InstanceModel)
@@ -422,12 +421,6 @@ async def _apply_process_result(
             log_lock_token_changed_after_processing(logger, item)
             await session.rollback()
             return
-
-        if result.sibling_update_rows:
-            await session.execute(
-                update(InstanceModel),
-                result.sibling_update_rows,
-            )
 
         if result.schedule_pg_deletion_fleet_id is not None:
             await schedule_fleet_placement_groups_deletion(
@@ -468,21 +461,6 @@ async def _apply_process_result(
                 "unreachable", instance_model.unreachable
             ),
         )
-
-        for sibling_deferred_event in result.sibling_deferred_events:
-            events.emit(
-                session,
-                sibling_deferred_event.message,
-                actor=events.SystemActor(),
-                targets=[
-                    events.Target(
-                        type=events.EventTargetType.INSTANCE,
-                        project_id=sibling_deferred_event.project_id,
-                        id=sibling_deferred_event.instance_id,
-                        name=sibling_deferred_event.instance_name,
-                    )
-                ],
-            )
 
 
 def _emit_instance_health_change_event(
