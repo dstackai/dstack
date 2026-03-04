@@ -507,6 +507,8 @@ async def apply_plan(
     ):
         # Refetch after lock
         # TODO: Lock instances with FOR UPDATE?
+        # We do not respect InstanceModel.lock_* fields here because FleetPipeline does not update SSH instances.
+        # TODO: Respect InstanceModel.lock_* fields if FleetPipeline and apply update the same instances.
         res = await session.execute(
             select(FleetModel)
             .where(
@@ -730,6 +732,7 @@ async def delete_fleets(
             .where(
                 InstanceModel.id.in_(instances_ids),
                 InstanceModel.deleted == False,
+                InstanceModel.lock_expires_at.is_(None),
             )
             .order_by(InstanceModel.id)  # take locks in order
             .with_for_update(key_share=True, of=InstanceModel)
