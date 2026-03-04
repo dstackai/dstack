@@ -4,6 +4,7 @@ from dstack._internal.server.background.pipeline_tasks.base import Pipeline
 from dstack._internal.server.background.pipeline_tasks.compute_groups import ComputeGroupPipeline
 from dstack._internal.server.background.pipeline_tasks.fleets import FleetPipeline
 from dstack._internal.server.background.pipeline_tasks.gateways import GatewayPipeline
+from dstack._internal.server.background.pipeline_tasks.instances import InstancePipeline
 from dstack._internal.server.background.pipeline_tasks.placement_groups import (
     PlacementGroupPipeline,
 )
@@ -19,6 +20,7 @@ class PipelineManager:
             ComputeGroupPipeline(),
             FleetPipeline(),
             GatewayPipeline(),
+            InstancePipeline(),
             PlacementGroupPipeline(),
             VolumePipeline(),
         ]

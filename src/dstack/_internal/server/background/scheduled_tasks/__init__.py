@@ -146,13 +146,13 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
             kwargs={"batch_size": 5},
             max_instances=2 if replica == 0 else 1,
         )
-        _scheduler.add_job(
-            process_instances,
-            IntervalTrigger(seconds=4, jitter=2),
-            kwargs={"batch_size": 5},
-            max_instances=2 if replica == 0 else 1,
-        )
         if not FeatureFlags.PIPELINE_PROCESSING_ENABLED:
+            _scheduler.add_job(
+                process_instances,
+                IntervalTrigger(seconds=4, jitter=2),
+                kwargs={"batch_size": 5},
+                max_instances=2 if replica == 0 else 1,
+            )
             _scheduler.add_job(
                 process_compute_groups,
                 IntervalTrigger(seconds=15, jitter=2),
