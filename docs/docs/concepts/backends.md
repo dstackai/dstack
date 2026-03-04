@@ -891,6 +891,18 @@ projects:
     * **Owner role for the user** - Required for creating and managing SSH keys
     * **Operator role for the team** - Required for managing virtual machines within the team
 
+??? info "Pricing"
+    `dstack` shows the hourly price for Hot Aisle instances. Some instances also require an upfront payment for a minimum reservation period, which is usually a few hours. You will be charged for the full minimum period even if you stop the instance early.
+
+    See the Hot Aisle API for the minimum reservation period for each instance type:
+
+    <div class="termy">
+
+    ```shell
+    $ curl -H "Authorization: Token $API_KEY" https://admin.hotaisle.app/api/teams/$TEAM_HANDLE/virtual_machines/available/ | jq ".[] | {gpus: .Specs.gpus, MinimumReservationMinutes}"
+    ```
+
+    </div>
 
 ### CloudRift
 

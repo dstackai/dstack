@@ -76,14 +76,25 @@ class HotAisleAPIClient:
 
     def terminate_virtual_machine(self, vm_name: str) -> None:
         url = f"{API_URL}/teams/{self.team_handle}/virtual_machines/{vm_name}/"
-        response = self._make_request("DELETE", url)
+        response = self._make_request(
+            "DELETE",
+            url,
+            params={
+                "force": "true",  # delete even if min reservation time not met
+            },
+        )
         if response.status_code == 404:
             logger.debug("Hot Aisle virtual machine %s not found", vm_name)
             return
         response.raise_for_status()
 
     def _make_request(
-        self, method: str, url: str, json: Optional[Dict[str, Any]] = None, timeout: int = 30
+        self,
+        method: str,
+        url: str,
+        json: Optional[dict[str, Any]] = None,
+        params: Optional[dict[str, str]] = None,
+        timeout: int = 30,
     ) -> requests.Response:
         headers = {
             "accept": "application/json",
@@ -97,5 +108,6 @@ class HotAisleAPIClient:
             url=url,
             headers=headers,
             json=json,
+            params=params,
             timeout=timeout,
         )
