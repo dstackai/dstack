@@ -66,6 +66,7 @@ async def _process_next_terminating_job():
                     .where(
                         InstanceModel.id == job_model.used_instance_id,
                         InstanceModel.id.not_in(instance_lockset),
+                        InstanceModel.lock_expires_at.is_(None),
                     )
                     .with_for_update(skip_locked=True, key_share=True)
                 )
