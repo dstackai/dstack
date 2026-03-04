@@ -225,15 +225,14 @@ class FleetWorker(Worker[PipelineItem]):
                     .where(
                         InstanceModel.fleet_id == item.id,
                         InstanceModel.deleted == False,
-                        # TODO: Lock instance models in the DB
-                        # or_(
-                        #     InstanceModel.lock_expires_at.is_(None),
-                        #     InstanceModel.lock_expires_at < get_current_datetime(),
-                        # ),
-                        # or_(
-                        #     InstanceModel.lock_owner.is_(None),
-                        #     InstanceModel.lock_owner == FleetPipeline.__name__,
-                        # ),
+                        or_(
+                            InstanceModel.lock_expires_at.is_(None),
+                            InstanceModel.lock_expires_at < get_current_datetime(),
+                        ),
+                        or_(
+                            InstanceModel.lock_owner.is_(None),
+                            InstanceModel.lock_owner == FleetPipeline.__name__,
+                        ),
                     )
                     .with_for_update(skip_locked=True, key_share=True)
                 )
@@ -243,7 +242,6 @@ class FleetWorker(Worker[PipelineItem]):
                         "Failed to lock fleet %s instances. The fleet will be processed later.",
                         item.id,
                     )
-                    now = get_current_datetime()
                     # Keep `lock_owner` so that `InstancePipeline` sees that the fleet is being locked
                     # but unset `lock_expires_at` to process the item again ASAP (after `min_processing_interval`).
                     # Unset `lock_token` so that heartbeater can no longer update the item.
@@ -256,19 +254,20 @@ class FleetWorker(Worker[PipelineItem]):
                         .values(
                             lock_expires_at=None,
                             lock_token=None,
-                            last_processed_at=now,
+                            last_processed_at=get_current_datetime(),
                         )
+                        .returning(FleetModel.id)
                     )
-                    if res.rowcount == 0:  # pyright: ignore[reportAttributeAccessIssue]
+                    updated_ids = list(res.scalars().all())
+                    if len(updated_ids) == 0:
                         log_lock_token_changed_on_reset(logger)
                     return
 
-                # TODO: Lock instance models in the DB
-                # for instance_model in locked_instance_models:
-                #     instance_model.lock_expires_at = item.lock_expires_at
-                #     instance_model.lock_token = item.lock_token
-                #     instance_model.lock_owner = FleetPipeline.__name__
-                # await session.commit()
+                for instance_model in locked_instance_models:
+                    instance_model.lock_expires_at = item.lock_expires_at
+                    instance_model.lock_token = item.lock_token
+                    instance_model.lock_owner = FleetPipeline.__name__
+                await session.commit()
 
         result = await _process_fleet(fleet_model)
         fleet_update_map = _FleetUpdateMap()
