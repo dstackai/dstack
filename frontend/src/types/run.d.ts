@@ -241,7 +241,7 @@ declare interface IJobProbe {
 }
 
 declare interface IJobSpec {
-    app_specs?: IAppSpec;
+    app_specs?: IAppSpec[];
     commands: string[];
     env?: { [key: string]: string };
     home_dir?: string;

@@ -6,7 +6,6 @@ export interface IRunEnvironmentFormValues {
     name: string;
     ide: 'cursor' | 'vscode' | 'windsurf' | 'coder';
     config_yaml: string;
-    docker: boolean;
     image?: string;
     python?: string;
     repo_enabled?: boolean;

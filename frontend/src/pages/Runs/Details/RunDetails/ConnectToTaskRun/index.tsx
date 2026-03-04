@@ -1,52 +1,40 @@
 import React, { FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Alert, Box, Button, Code, ExpandableSection, Popover, SpaceBetween, StatusIndicator, Tabs, Wizard } from 'components';
+import {
+    Alert,
+    Box,
+    Button,
+    Code,
+    ExpandableSection,
+    Link,
+    Popover,
+    SpaceBetween,
+    StatusIndicator,
+    Tabs,
+    Wizard,
+} from 'components';
 
 import { copyToClipboard } from 'libs';
 
 import { useConfigProjectCliCommand } from 'pages/Project/hooks/useConfigProjectCliComand';
-import { getIDEDisplayName } from 'pages/Runs/Launch/constants';
 
-import styles from './styles.module.scss';
+import styles from '../ConnectToRunWithDevEnvConfiguration/styles.module.scss';
 
 const UvInstallCommand = 'uv tool install dstack -U';
 const PipInstallCommand = 'pip install dstack -U';
 
-export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) => {
+const getMappedPort = (spec: IAppSpec): number | undefined => spec.map_to_port;
+
+export const ConnectToTaskRun: FC<{ run: IRun }> = ({ run }) => {
     const { t } = useTranslation();
     const [isExpandedConnectSection, setIsExpandedConnectSection] = React.useState(true);
 
-    const getAttachCommand = (runData: IRun) => {
-        const attachCommand = `dstack attach ${runData.run_spec.run_name} --logs`;
-
-        const copyAttachCommand = () => {
-            copyToClipboard(attachCommand);
-        };
-
-        return [attachCommand, copyAttachCommand] as const;
-    };
-
-    const getSSHCommand = (runData: IRun) => {
-        const sshCommand = `ssh ${runData.run_spec.run_name}`;
-
-        const copySSHCommand = () => {
-            copyToClipboard(sshCommand);
-        };
-
-        return [sshCommand, copySSHCommand] as const;
-    };
+    const attachCommand = `dstack attach ${run.run_spec.run_name} --logs`;
+    const appSpecs = run.jobs[0]?.job_spec?.app_specs ?? [];
+    const mappedAppSpecs = appSpecs.filter((spec) => getMappedPort(spec) != null);
 
     const [activeStepIndex, setActiveStepIndex] = React.useState(0);
-    const [attachCommand, copyAttachCommand] = getAttachCommand(run);
-    const [sshCommand, copySSHCommand] = getSSHCommand(run);
-
-    const configuration = run.run_spec.configuration as TDevEnvironmentConfiguration;
-    const latestSubmission = run.jobs[0]?.job_submissions?.slice(-1)[0];
-    const workingDir = latestSubmission?.job_runtime_data?.working_dir ?? '/';
-    const openInIDEUrl = `${configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}${workingDir}`;
-    const ideDisplayName = getIDEDisplayName(configuration.ide);
-
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
 
     return (
@@ -100,7 +88,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                                                     formAction="none"
                                                     iconName="copy"
                                                     variant="normal"
-                                                    onClick={copyAttachCommand}
+                                                    onClick={() => copyToClipboard(attachCommand)}
                                                 />
                                             </Popover>
                                         </div>
@@ -217,52 +205,55 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                             ),
                             isOptional: true,
                         },
-                        {
-                            title: 'Open',
-                            description: `After the CLI is attached, you can open the dev environment in ${ideDisplayName}.`,
-                            content: (
-                                <SpaceBetween size="s">
-                                    <Button
-                                        variant="primary"
-                                        external={true}
-                                        onClick={() => window.open(openInIDEUrl, '_blank')}
-                                    >
-                                        Open in {ideDisplayName}
-                                    </Button>
+                        ...(mappedAppSpecs.length > 0
+                            ? [
+                                  {
+                                      title: 'Open',
+                                      description: 'After the CLI is attached, use the forwarded localhost URLs.',
+                                      content: (
+                                          <SpaceBetween size="s">
+                                              {mappedAppSpecs.map((spec) => {
+                                                  const mappedPort = getMappedPort(spec)!;
+                                                  const localUrl = `http://127.0.0.1:${mappedPort}`;
 
-                                    <ExpandableSection headerText="Need plain SSH?">
-                                        <SpaceBetween size="s">
-                                            <Box />
-                                            <div className={styles.codeWrapper}>
-                                                <Code className={styles.code}>{sshCommand}</Code>
-
-                                                <div className={styles.copy}>
-                                                    <Popover
-                                                        dismissButton={false}
-                                                        position="top"
-                                                        size="small"
-                                                        triggerType="custom"
-                                                        content={
-                                                            <StatusIndicator type="success">
-                                                                {t('common.copied')}
-                                                            </StatusIndicator>
-                                                        }
-                                                    >
-                                                        <Button
-                                                            formAction="none"
-                                                            iconName="copy"
-                                                            variant="normal"
-                                                            onClick={() => copySSHCommand()}
-                                                        />
-                                                    </Popover>
-                                                </div>
-                                            </div>
-                                        </SpaceBetween>
-                                    </ExpandableSection>
-                                </SpaceBetween>
-                            ),
-                            isOptional: true,
-                        },
+                                                  return (
+                                                      <Alert
+                                                          key={`${spec.port}-${mappedPort}`}
+                                                          type="info"
+                                                          action={
+                                                              <Popover
+                                                                  dismissButton={false}
+                                                                  position="top"
+                                                                  size="small"
+                                                                  triggerType="custom"
+                                                                  content={
+                                                                      <StatusIndicator type="success">
+                                                                          {t('common.copied')}
+                                                                      </StatusIndicator>
+                                                                  }
+                                                              >
+                                                                  <Button
+                                                                      formAction="none"
+                                                                      iconName="copy"
+                                                                      variant="normal"
+                                                                      onClick={() => copyToClipboard(localUrl)}
+                                                                  />
+                                                              </Popover>
+                                                          }
+                                                      >
+                                                          Port {spec.port} is forwarded to{' '}
+                                                          <Link href={localUrl} external>
+                                                              {localUrl}
+                                                          </Link>
+                                                      </Alert>
+                                                  );
+                                              })}
+                                          </SpaceBetween>
+                                      ),
+                                      isOptional: true,
+                                  },
+                              ]
+                            : []),
                     ]}
                 />
             )}
