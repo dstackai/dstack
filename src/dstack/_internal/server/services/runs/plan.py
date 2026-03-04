@@ -239,9 +239,12 @@ async def select_run_candidate_fleet_models_with_filters(
         .execution_options(populate_existing=True)
     )
     if lock_instances:
-        stmt = stmt.order_by(InstanceModel.id).with_for_update(  # take locks in order
-            key_share=True, of=InstanceModel
-        )
+        # Skip locked instances since waiting for all the instances to unlock may take indefinite time.
+        # TODO: Switch to optimistic locking – implement select-lock-reselect loop.
+        stmt = stmt.where(InstanceModel.lock_expires_at.is_(None))
+        stmt = stmt.order_by(
+            InstanceModel.id  # take locks in order
+        ).with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
     res = await session.execute(stmt)
     fleet_models_with_instances = list(res.unique().scalars().all())
     fleet_models_with_instances_ids = [f.id for f in fleet_models_with_instances]
