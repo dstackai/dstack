@@ -20,7 +20,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 )
 from dstack._internal.server.background.scheduled_tasks.common import get_provisioning_timeout
 from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
-from dstack._internal.server.services.fleets import fleet_model_to_fleet
+from dstack._internal.server.services.fleets import get_fleet_spec
 from dstack._internal.utils.common import UNSET, Unset, get_current_datetime
 from dstack._internal.utils.ssh import pkey_from_str
 
@@ -71,13 +71,13 @@ class ProcessResult:
 
 
 def can_terminate_fleet_instances_on_idle_duration(fleet_model: FleetModel) -> bool:
-    fleet = fleet_model_to_fleet(fleet_model)
-    if fleet.spec.configuration.nodes is None or fleet.spec.autocreated:
+    fleet_spec = get_fleet_spec(fleet_model)
+    if fleet_spec.configuration.nodes is None or fleet_spec.autocreated:
         return True
     active_instances = [
         instance for instance in fleet_model.instances if instance.status.is_active()
     ]
-    return len(active_instances) > fleet.spec.configuration.nodes.min
+    return len(active_instances) > fleet_spec.configuration.nodes.min
 
 
 def get_instance_idle_duration(instance_model: InstanceModel) -> datetime.timedelta:
