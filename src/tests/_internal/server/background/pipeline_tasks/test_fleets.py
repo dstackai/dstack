@@ -12,7 +12,7 @@ from dstack._internal.core.models.fleets import (
     FleetStatus,
     InstanceGroupPlacement,
 )
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.background.pipeline_tasks.base import PipelineItem
@@ -455,6 +455,55 @@ class TestFleetWorker:
         await session.refresh(fleet)
         assert fleet.current_master_instance_id == next_candidate.id
 
+    async def test_does_not_elect_terminating_bootstrap_candidate_as_master(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=1, target=1, max=3),
+                )
+            ),
+        )
+        terminated_master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATED,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=0,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=1,
+        )
+        pending_candidate = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=2,
+        )
+        fleet.current_master_instance_id = terminated_master.id
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        assert fleet.current_master_instance_id == pending_candidate.id
+
     async def test_clears_current_master_for_non_cluster_fleet(
         self, test_db, session: AsyncSession, worker: FleetWorker
     ):
@@ -570,6 +619,118 @@ class TestFleetWorker:
             instance.id != surviving_instance.id and instance.instance_num == 0
             for instance in non_deleted_instances
         )
+
+    async def test_min_zero_failed_master_terminates_unprovisioned_siblings(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=0, target=3, max=3),
+                )
+            ),
+        )
+        failed_master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATED,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=0,
+        )
+        failed_master.termination_reason = InstanceTerminationReason.NO_OFFERS
+        sibling1 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=1,
+        )
+        sibling2 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=2,
+        )
+        fleet.current_master_instance_id = failed_master.id
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        await session.refresh(failed_master)
+        await session.refresh(sibling1)
+        await session.refresh(sibling2)
+        assert failed_master.deleted
+        assert sibling1.status == InstanceStatus.TERMINATED
+        assert sibling2.status == InstanceStatus.TERMINATED
+        assert sibling1.termination_reason == InstanceTerminationReason.MASTER_FAILED
+        assert sibling2.termination_reason == InstanceTerminationReason.MASTER_FAILED
+        assert fleet.current_master_instance_id is None
+
+    async def test_min_zero_failed_master_preserves_provisioned_survivor(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=0, target=2, max=2),
+                )
+            ),
+        )
+        failed_master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATED,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=0,
+        )
+        failed_master.termination_reason = InstanceTerminationReason.NO_OFFERS
+        provisioned_survivor = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            job_provisioning_data=get_job_provisioning_data(),
+            instance_num=1,
+        )
+        pending_sibling = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=2,
+        )
+        fleet.current_master_instance_id = failed_master.id
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        await session.refresh(provisioned_survivor)
+        await session.refresh(pending_sibling)
+        assert provisioned_survivor.status == InstanceStatus.IDLE
+        assert pending_sibling.status == InstanceStatus.PENDING
+        assert pending_sibling.termination_reason is None
+        assert fleet.current_master_instance_id == provisioned_survivor.id
 
     async def test_deletes_empty_autocreated_fleet(
         self, test_db, session: AsyncSession, worker: FleetWorker

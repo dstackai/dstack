@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload, load_only, selectinload
 from dstack._internal.core.models.fleets import (
     FleetSpec,
     FleetStatus,
+    InstanceGroupPlacement,
 )
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import RunStatus
@@ -44,7 +45,6 @@ from dstack._internal.server.services.fleets import (
     emit_fleet_status_change_event,
     get_fleet_spec,
     get_next_instance_num,
-    is_cloud_cluster,
     is_fleet_empty,
     is_fleet_in_use,
 )
@@ -427,7 +427,12 @@ async def _process_fleet(
         result.fleet_update_map["status"] = FleetStatus.TERMINATED
         result.fleet_update_map["deleted"] = True
         result.fleet_update_map["deleted_at"] = NOW_PLACEHOLDER
-    _set_current_master_instance_id_update(
+    _set_fail_instances_on_master_bootstrap_failure(
+        fleet_model=fleet_model,
+        instance_models=effective_instances,
+        instance_id_to_update_map=result.instance_id_to_update_map,
+    )
+    _set_current_master_instance_id(
         fleet_model=fleet_model,
         fleet_update_map=result.fleet_update_map,
         instance_models=effective_instances,
@@ -610,14 +615,73 @@ async def _create_missing_fleet_instances(
     )
 
 
-def _set_current_master_instance_id_update(
+def _set_fail_instances_on_master_bootstrap_failure(
+    fleet_model: FleetModel,
+    instance_models: Sequence[InstanceModel],
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap],
+) -> None:
+    """
+    Terminates instances with MASTER_FAILED if the master dies with NO_OFFERS in a cluster with node.min == 0.
+    This is needed to avoid master re-election loop and fail fast.
+    """
+    fleet_spec = get_fleet_spec(fleet_model)
+    if (
+        not _is_cloud_cluster_fleet_spec(fleet_spec)
+        or fleet_spec.configuration.nodes is None
+        or fleet_spec.configuration.nodes.min != 0
+        or fleet_model.current_master_instance_id is None
+    ):
+        return
+
+    current_master_instance_model = None
+    for instance_model in instance_models:
+        if instance_model.id == fleet_model.current_master_instance_id:
+            current_master_instance_model = instance_model
+            break
+    if current_master_instance_model is None:
+        return
+
+    if (
+        current_master_instance_model.status != InstanceStatus.TERMINATED
+        or current_master_instance_model.termination_reason != InstanceTerminationReason.NO_OFFERS
+    ):
+        return
+
+    surviving_instance_models = _get_surviving_instance_models_after_updates(
+        instance_models=instance_models,
+        instance_id_to_update_map=instance_id_to_update_map,
+    )
+    if any(
+        instance_model.status not in InstanceStatus.finished_statuses()
+        for instance_model in surviving_instance_models
+    ):
+        return
+
+    for instance_model in surviving_instance_models:
+        if (
+            instance_model.id == current_master_instance_model.id
+            or instance_model.status in InstanceStatus.finished_statuses()
+        ):
+            continue
+        update_map = instance_id_to_update_map.setdefault(instance_model.id, _InstanceUpdateMap())
+        update_map["status"] = InstanceStatus.TERMINATED
+        update_map["termination_reason"] = InstanceTerminationReason.MASTER_FAILED
+
+
+def _set_current_master_instance_id(
     fleet_model: FleetModel,
     fleet_update_map: _FleetUpdateMap,
     instance_models: Sequence[InstanceModel],
     instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap],
     new_instance_creates: Sequence[_NewInstanceCreate],
 ) -> None:
-    if not is_cloud_cluster(fleet_model):
+    """
+    Sets `current_master_instance_id` for `fleet_model`.
+    Master instance can be changed if the previous master is gone.
+    If there are no active instances, newly selected master may change backend/region/az/placement.
+    """
+    fleet_spec = get_fleet_spec(fleet_model)
+    if not _is_cloud_cluster_fleet_spec(fleet_spec):
         fleet_update_map["current_master_instance_id"] = None
         return
     surviving_instance_models = _get_surviving_instance_models_after_updates(
@@ -627,6 +691,7 @@ def _set_current_master_instance_id_update(
     current_master_instance_id = _select_current_master_instance_id(
         current_master_instance_id=fleet_model.current_master_instance_id,
         surviving_instance_models=surviving_instance_models,
+        instance_id_to_update_map=instance_id_to_update_map,
         new_instance_creates=new_instance_creates,
     )
     fleet_update_map["current_master_instance_id"] = current_master_instance_id
@@ -648,6 +713,7 @@ def _get_surviving_instance_models_after_updates(
 def _select_current_master_instance_id(
     current_master_instance_id: Optional[uuid.UUID],
     surviving_instance_models: Sequence[InstanceModel],
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap],
     new_instance_creates: Sequence[_NewInstanceCreate],
 ) -> Optional[uuid.UUID]:
     # Keep the current master stable while it is still alive so InstancePipeline
@@ -656,7 +722,11 @@ def _select_current_master_instance_id(
         for instance_model in surviving_instance_models:
             if (
                 instance_model.id == current_master_instance_id
-                and instance_model.status != InstanceStatus.TERMINATED
+                and _get_effective_instance_status(
+                    instance_model,
+                    instance_id_to_update_map=instance_id_to_update_map,
+                )
+                not in InstanceStatus.finished_statuses()
             ):
                 return instance_model.id
 
@@ -664,7 +734,11 @@ def _select_current_master_instance_id(
     # keep following an already-established cluster placement decision.
     for instance_model in surviving_instance_models:
         if (
-            instance_model.status != InstanceStatus.TERMINATED
+            _get_effective_instance_status(
+                instance_model,
+                instance_id_to_update_map=instance_id_to_update_map,
+            )
+            not in InstanceStatus.finished_statuses()
             and instance_model.job_provisioning_data is not None
         ):
             return instance_model.id
@@ -672,10 +746,34 @@ def _select_current_master_instance_id(
     # Prefer existing surviving instances over freshly planned replacements to
     # avoid election churn during min-nodes backfill.
     for instance_model in surviving_instance_models:
-        if instance_model.status != InstanceStatus.TERMINATED:
+        if (
+            _get_effective_instance_status(
+                instance_model,
+                instance_id_to_update_map=instance_id_to_update_map,
+            )
+            not in InstanceStatus.finished_statuses()
+        ):
             return instance_model.id
 
     for new_instance_create in sorted(new_instance_creates, key=lambda i: i["instance_num"]):
         return new_instance_create["id"]
 
     return None
+
+
+def _get_effective_instance_status(
+    instance_model: InstanceModel,
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap],
+) -> InstanceStatus:
+    update_map = instance_id_to_update_map.get(instance_model.id)
+    if update_map is None:
+        return instance_model.status
+    return update_map.get("status", instance_model.status)
+
+
+def _is_cloud_cluster_fleet_spec(fleet_spec: FleetSpec) -> bool:
+    configuration = fleet_spec.configuration
+    return (
+        configuration.placement == InstanceGroupPlacement.CLUSTER
+        and configuration.ssh_config is None
+    )
