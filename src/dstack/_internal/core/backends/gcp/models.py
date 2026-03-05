@@ -5,6 +5,8 @@ from pydantic import Field, root_validator
 from dstack._internal.core.backends.base.models import fill_data
 from dstack._internal.core.models.common import CoreModel
 
+GCP_TPU_DEFAULT = False
+
 
 class GCPServiceAccountCreds(CoreModel):
     type: Annotated[Literal["service_account"], Field(description="The type of credentials")] = (
@@ -89,6 +91,15 @@ class GCPBackendConfig(CoreModel):
             description="The tags (labels) that will be assigned to resources created by `dstack`"
         ),
     ] = None
+    tpu: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether TPU offers can be used for provisioning."
+                f" Defaults to `{str(GCP_TPU_DEFAULT).lower()}`"
+            )
+        ),
+    ] = None
     preview_features: Annotated[
         Optional[List[Literal["g4"]]],
         Field(
@@ -142,6 +153,12 @@ class GCPStoredConfig(GCPBackendConfig):
 
 class GCPConfig(GCPStoredConfig):
     creds: AnyGCPCreds
+
+    @property
+    def allow_tpu(self) -> bool:
+        if self.tpu is not None:
+            return self.tpu
+        return GCP_TPU_DEFAULT
 
     @property
     def allocate_public_ips(self) -> bool:

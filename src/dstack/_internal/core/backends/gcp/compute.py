@@ -135,7 +135,7 @@ class GCPCompute(
         regions = get_or_error(self.config.regions)
         offers = get_catalog_offers(
             backend=BackendType.GCP,
-            extra_filter=_supported_instances_and_zones(regions),
+            extra_filter=_supported_instances_and_zones(regions, tpu=self.config.allow_tpu),
         )
         quotas: Dict[str, Dict[str, float]] = defaultdict(dict)
         for region in self.regions_client.list(project=self.config.project_id):
@@ -989,14 +989,17 @@ class GCPCompute(
 
 def _supported_instances_and_zones(
     regions: List[str],
+    tpu: bool = False,
 ) -> Optional[Callable[[InstanceOffer], bool]]:
     def _filter(offer: InstanceOffer) -> bool:
         # strip zone
         if offer.region[:-2] not in regions:
             return False
-        # remove multi-host TPUs for initial release
-        if _is_tpu(offer.instance.name) and not _is_single_host_tpu(offer.instance.name):
-            return False
+        if _is_tpu(offer.instance.name):
+            if not tpu:
+                return False
+            if not _is_single_host_tpu(offer.instance.name):
+                return False
         for family in [
             "m4-",
             "c4-",
