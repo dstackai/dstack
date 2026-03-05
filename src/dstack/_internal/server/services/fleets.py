@@ -799,6 +799,8 @@ async def delete_fleets(
         )
         instance_models_ids = list(res.scalars().unique().all())
         if len(instance_models_ids) != len(instances_ids):
+            # FIXME: In case of many instances, it can always fail.
+            # Try locking and waiting for all instances here until requests are queued for processing.
             msg = (
                 "Failed to delete fleets: fleet instances are being processed currently. Try again later."
                 if instance_nums is None

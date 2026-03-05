@@ -72,7 +72,7 @@ class InstancePipeline(Pipeline[InstancePipelineItem]):
         workers_num: int = 20,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=10),
+        min_processing_interval: timedelta = timedelta(seconds=15),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
     ) -> None:
