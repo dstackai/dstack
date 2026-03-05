@@ -1,8 +1,8 @@
 """Add InstanceModel pipeline columns
 
 Revision ID: 8e8647f20aa4
-Revises: 46150101edec
-Create Date: 2026-03-04 05:47:39.307013+00:00
+Revises: 5e8c7a9202bc
+Create Date: 2026-03-05 05:47:39.307013+00:00
 
 """
 
@@ -14,7 +14,7 @@ import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
 revision = "8e8647f20aa4"
-down_revision = "46150101edec"
+down_revision = "5e8c7a9202bc"
 branch_labels = None
 depends_on = None
 
