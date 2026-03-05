@@ -229,8 +229,6 @@ async def _get_cluster_master_context(
             fleet_id=instance_model.fleet_id,
         )
     if current_master_instance_model is None:
-        # FleetPipeline elects the current master. Until it does, instance
-        # workers must wait instead of trying to coordinate bootstrap.
         logger.debug(
             "%s: waiting for fleet pipeline to elect current cluster master",
             fmt(instance_model),
@@ -244,8 +242,6 @@ async def _get_cluster_master_context(
             current_master_instance_model.deleted
             or current_master_instance_model.status == InstanceStatus.TERMINATED
         ):
-            # Master failover is also owned by FleetPipeline. InstancePipeline
-            # only terminates the current instance and waits for the next fleet tick.
             logger.debug(
                 "%s: waiting for fleet pipeline to replace current master %s",
                 fmt(instance_model),
@@ -262,6 +258,7 @@ async def _get_cluster_master_context(
                 current_master_instance_model.id,
             )
             return None
+
     return _ClusterMasterContext(
         current_master_instance_model=current_master_instance_model,
         is_current_instance_master=is_current_instance_master,

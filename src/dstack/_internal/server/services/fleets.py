@@ -842,10 +842,10 @@ def is_fleet_empty(fleet_model: FleetModel) -> bool:
 
 
 def is_cloud_cluster(fleet_model: FleetModel) -> bool:
-    fleet = fleet_model_to_fleet(fleet_model)
+    fleet_spec = get_fleet_spec(fleet_model)
     return (
-        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-        and fleet.spec.configuration.ssh_config is None
+        fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        and fleet_spec.configuration.ssh_config is None
     )
 
 
