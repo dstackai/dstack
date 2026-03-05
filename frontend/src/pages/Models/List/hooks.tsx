@@ -7,10 +7,10 @@ import type { PropertyFilterProps } from 'components';
 import { Button, ListEmptyMessage, NavigateLink, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { useProjectFilter } from 'hooks/useProjectFilter';
 import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
 import { ROUTES } from 'routes';
-import { useGetUserListQuery } from 'services/user';
+import { useLazyGetProjectsQuery } from 'services/project';
+import { useLazyGetUserListQuery } from 'services/user';
 
 import { getModelGateway } from '../helpers';
 
@@ -126,10 +126,15 @@ const filterKeys: Record<string, RequestParamsKeys> = {
     USER_NAME: 'username',
 };
 
-export const useFilters = (localStorePrefix = 'models-list-page') => {
+const limit = 100;
+
+export const useFilters = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const { projectOptions } = useProjectFilter({ localStorePrefix });
-    const { data: usersData } = useGetUserListQuery({});
+
+    const [filteringOptions, setFilteringOptions] = useState<PropertyFilterProps.FilteringOption[]>([]);
+    const [filteringStatusType, setFilteringStatusType] = useState<PropertyFilterProps.StatusType | undefined>();
+    const [getProjects] = useLazyGetProjectsQuery();
+    const [getUsers] = useLazyGetUserListQuery();
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
         requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
@@ -139,27 +144,6 @@ export const useFilters = (localStorePrefix = 'models-list-page') => {
         setSearchParams({});
         setPropertyFilterQuery(EMPTY_QUERY);
     };
-
-    const filteringOptions = useMemo(() => {
-        const options: PropertyFilterProps.FilteringOption[] = [];
-
-        projectOptions.forEach(({ value }) => {
-            if (value)
-                options.push({
-                    propertyKey: filterKeys.PROJECT_NAME,
-                    value,
-                });
-        });
-
-        usersData?.data?.forEach(({ username }) => {
-            options.push({
-                propertyKey: filterKeys.USER_NAME,
-                value: username,
-            });
-        });
-
-        return options;
-    }, [projectOptions, usersData]);
 
     const filteringProperties = [
         {
@@ -172,6 +156,7 @@ export const useFilters = (localStorePrefix = 'models-list-page') => {
             key: filterKeys.USER_NAME,
             operators: ['='],
             propertyLabel: 'User',
+            groupValuesLabel: 'User values',
         },
     ];
 
@@ -196,6 +181,42 @@ export const useFilters = (localStorePrefix = 'models-list-page') => {
         }) as Partial<TRunsRequestParams>;
     }, [propertyFilterQuery]);
 
+    const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
+        setFilteringOptions([]);
+
+        if (!filteringText.length) {
+            return Promise.resolve();
+        }
+
+        setFilteringStatusType('loading');
+
+        if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
+            await getProjects({ name_pattern: filteringText, limit })
+                .unwrap()
+                .then(({ data }) =>
+                    data.map(({ project_name }) => ({
+                        propertyKey: filterKeys.PROJECT_NAME,
+                        value: project_name,
+                    })),
+                )
+                .then(setFilteringOptions);
+        }
+
+        if (filteringProperty?.key === filterKeys.USER_NAME) {
+            await getUsers({ name_pattern: filteringText, limit })
+                .unwrap()
+                .then(({ data }) =>
+                    data.map(({ username }) => ({
+                        propertyKey: filterKeys.USER_NAME,
+                        value: username,
+                    })),
+                )
+                .then(setFilteringOptions);
+        }
+
+        setFilteringStatusType(undefined);
+    };
+
     return {
         filteringRequestParams,
         clearFilter,
@@ -203,5 +224,7 @@ export const useFilters = (localStorePrefix = 'models-list-page') => {
         onChangePropertyFilter,
         filteringOptions,
         filteringProperties,
+        filteringStatusType,
+        handleLoadItems,
     } as const;
 };

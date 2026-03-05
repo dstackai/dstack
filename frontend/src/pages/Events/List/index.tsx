@@ -13,7 +13,7 @@ import { useLazyGetAllEventsQuery } from 'services/events';
 import { useColumnsDefinitions } from './hooks/useColumnDefinitions';
 import { useFilters } from './hooks/useFilters';
 
-import styles from '../../Runs/List/styles.module.scss';
+import styles from 'pages/Runs/List/styles.module.scss';
 
 type RenderHeaderArgs = {
     refreshAction?: () => void;
@@ -49,13 +49,13 @@ export const EventList: React.FC<EventListProps> = ({
         onChangePropertyFilter,
         filteringOptions,
         filteringProperties,
-        isLoadingFilters,
+        filteringStatusType,
+        handleLoadItems,
     } = useFilters({ permanentFilters, withSearchParams });
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IEvent, TEventListRequestParams>({
         useLazyQuery: useLazyGetAllEventsQuery,
         args: { ...filteringRequestParams, limit: DEFAULT_TABLE_PAGE_SIZE },
-        skip: isLoadingFilters,
 
         getPaginationParams: (lastEvent) => ({
             prev_recorded_at: lastEvent.recorded_at,
@@ -73,7 +73,7 @@ export const EventList: React.FC<EventListProps> = ({
 
     const { columns } = useColumnsDefinitions();
 
-    const loading = isLoadingFilters || isLoading;
+    const loading = isLoading;
 
     return (
         <Table
@@ -99,9 +99,12 @@ export const EventList: React.FC<EventListProps> = ({
                                     filteringAriaLabel: t('projects.run.filter_property_placeholder'),
                                     filteringPlaceholder: t('projects.run.filter_property_placeholder'),
                                     operationAndText: 'and',
+                                    enteredTextLabel: (value) => `Use: ${value}`,
                                 }}
                                 filteringOptions={filteringOptions}
                                 filteringProperties={filteringProperties}
+                                filteringStatusType={filteringStatusType}
+                                onLoadItems={handleLoadItems}
                             />
                         </div>
                     </div>

@@ -2,10 +2,11 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { Button, Header, SpaceBetween } from 'components';
+import { Button, Container, Header, Loader, SpaceBetween } from 'components';
 
 import { useBreadcrumbs } from 'hooks';
 import { ROUTES } from 'routes';
+import { useGetProjectQuery } from 'services/project';
 
 import { EventList } from 'pages/Events/List';
 
@@ -14,6 +15,7 @@ export const Events: React.FC = () => {
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
     const navigate = useNavigate();
+    const { data, isLoading } = useGetProjectQuery({ name: paramProjectName });
 
     useBreadcrumbs([
         {
@@ -31,8 +33,15 @@ export const Events: React.FC = () => {
     ]);
 
     const goToEventsPage = () => {
-        navigate(ROUTES.EVENTS.LIST + `?within_projects=${paramProjectName}`);
+        navigate(ROUTES.EVENTS.LIST + `?within_projects=${data?.project_id}`);
     };
+
+    if (isLoading || !data)
+        return (
+            <Container>
+                <Loader />
+            </Container>
+        );
 
     return (
         <EventList
@@ -48,7 +57,7 @@ export const Events: React.FC = () => {
                     />
                 );
             }}
-            permanentFilters={{ within_projects: [paramProjectName] }}
+            permanentFilters={{ within_projects: [data.project_id] }}
             showFilters={false}
         />
     );

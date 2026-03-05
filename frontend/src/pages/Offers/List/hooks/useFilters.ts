@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 
 import type { MultiselectProps, PropertyFilterProps } from 'components';
 
-import { useProjectFilter } from 'hooks/useProjectFilter';
 import {
     EMPTY_QUERY,
     requestParamsToArray,
@@ -11,6 +10,7 @@ import {
     tokensToRequestParams,
     tokensToSearchParams,
 } from 'libs/filters';
+import { useGetProjectsQuery, useLazyGetProjectsQuery } from 'services/project';
 
 import { getPropertyFilterOptions } from '../helpers';
 
@@ -54,43 +54,51 @@ const filteringProperties = [
         key: filterKeys.PROJECT_NAME,
         operators: ['='],
         propertyLabel: 'Project',
+        groupValuesLabel: 'Project values',
     },
     {
         key: filterKeys.GPU_NAME,
         operators: ['='],
         propertyLabel: 'GPU name',
+        groupValuesLabel: 'GPU name values',
     },
     {
         key: filterKeys.GPU_COUNT,
         operators: ['<=', '>='],
         propertyLabel: 'GPU count',
+        groupValuesLabel: 'GPU count values',
     },
     {
         key: filterKeys.GPU_MEMORY,
         operators: ['<=', '>='],
         propertyLabel: 'GPU memory',
+        groupValuesLabel: 'GPU memory values',
     },
     {
         key: filterKeys.BACKEND,
         operators: ['='],
         propertyLabel: 'Backend',
+        groupValuesLabel: 'Backend values',
     },
     {
         key: filterKeys.SPOT_POLICY,
         operators: ['='],
         propertyLabel: 'Spot policy',
+        groupValuesLabel: 'Spot policy values',
     },
 ];
 
 const gpuFilterOption = { label: 'GPU', value: 'gpu' };
-
 const defaultGroupByOptions = [{ ...gpuFilterOption }, { label: 'Backend', value: 'backend' }];
-
 const groupByRequestParamName: RequestParamsKeys = 'group_by';
+const limit = 100;
 
 export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {}, defaultFilters }: UseFiltersArgs) => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const { projectOptions } = useProjectFilter({ localStorePrefix: 'offers-list-projects' });
+    const [dynamicFilteringOptions, setDynamicFilteringOptions] = useState<PropertyFilterProps.FilteringOption[]>([]);
+    const [filteringStatusType, setFilteringStatusType] = useState<PropertyFilterProps.StatusType | undefined>();
+    const [getProjects] = useLazyGetProjectsQuery();
+    const { data: projectsData } = useGetProjectsQuery({ limit: 1 });
     const projectNameIsChecked = useRef(false);
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
@@ -119,17 +127,9 @@ export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {
     };
 
     const filteringOptions = useMemo(() => {
-        const options: PropertyFilterProps.FilteringOption[] = [...spotPolicyOptions];
+        const options: PropertyFilterProps.FilteringOption[] = [...spotPolicyOptions, ...dynamicFilteringOptions];
 
         const { names, backends } = getPropertyFilterOptions(gpus);
-
-        projectOptions.forEach(({ value }) => {
-            if (value)
-                options.push({
-                    propertyKey: filterKeys.PROJECT_NAME,
-                    value,
-                });
-        });
 
         Array.from(names).forEach((name) => {
             options.push({
@@ -146,7 +146,7 @@ export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {
         });
 
         return options;
-    }, [gpus]);
+    }, [gpus, dynamicFilteringOptions]);
 
     const groupByOptions: MultiselectProps.Options = useMemo(() => {
         return defaultGroupByOptions.map((option) => {
@@ -243,8 +243,32 @@ export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {
         };
     }, [propertyFilterQuery, permanentFilters]);
 
+    const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
+        setDynamicFilteringOptions([]);
+
+        if (!filteringText.length) {
+            return Promise.resolve();
+        }
+
+        setFilteringStatusType('loading');
+
+        if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
+            await getProjects({ name_pattern: filteringText, limit })
+                .unwrap()
+                .then(({ data }) =>
+                    data.map(({ project_name }) => ({
+                        propertyKey: filterKeys.PROJECT_NAME,
+                        value: project_name,
+                    })),
+                )
+                .then(setDynamicFilteringOptions);
+        }
+
+        setFilteringStatusType(undefined);
+    };
+
     useEffect(() => {
-        if (!projectNameIsChecked.current && projectOptions.length) {
+        if (!projectNameIsChecked.current && projectsData?.data?.length) {
             projectNameIsChecked.current = true;
 
             if (!filteringRequestParams['project_name']) {
@@ -254,14 +278,14 @@ export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {
                         {
                             operator: '=',
                             propertyKey: filterKeys.PROJECT_NAME,
-                            value: projectOptions[0].value,
+                            value: projectsData.data[0].project_name,
                         },
                     ],
                     operation: 'and',
                 });
             }
         }
-    }, [projectOptions]);
+    }, [projectsData]);
 
     return {
         filteringRequestParams,
@@ -273,5 +297,7 @@ export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {
         groupBy,
         groupByOptions,
         onChangeGroupBy,
+        filteringStatusType,
+        handleLoadItems,
     } as const;
 };
