@@ -574,6 +574,10 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
     fleet_model: Optional[FleetModel],
     job: Job,
 ) -> Optional[JobProvisioningData]:
+    # TODO: When submitted-jobs provisioning moves to pipelines, stop inferring the
+    # cluster master from loaded fleet instances here. Resolve the current master via
+    # FleetModel.current_master_instance_id so jobs follow the same master election
+    # as FleetPipeline/InstancePipeline.
     master_instance_provisioning_data = None
     if is_master_job(job) and fleet_model is not None:
         fleet = fleet_model_to_fleet(fleet_model)

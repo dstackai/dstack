@@ -11,7 +11,6 @@ from sqlalchemy.orm import joinedload, load_only, selectinload
 from dstack._internal.core.models.fleets import (
     FleetSpec,
     FleetStatus,
-    InstanceGroupPlacement,
 )
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import RunStatus
@@ -45,6 +44,7 @@ from dstack._internal.server.services.fleets import (
     emit_fleet_status_change_event,
     get_fleet_spec,
     get_next_instance_num,
+    is_cloud_cluster,
     is_fleet_empty,
     is_fleet_in_use,
 )
@@ -272,20 +272,12 @@ class FleetWorker(Worker[PipelineItem]):
                     update(InstanceModel),
                     instance_update_rows,
                 )
-            if result.new_instances_count > 0:
+            if len(result.new_instance_creates) > 0:
                 await _create_missing_fleet_instances(
                     session=session,
                     fleet_model=fleet_model,
-                    new_instances_count=result.new_instances_count,
+                    new_instance_creates=result.new_instance_creates,
                 )
-                await session.flush()
-            # FleetPipeline is the sole owner of cluster master election.
-            # Sync it after instance updates and creation so the pointer reflects
-            # the final post-consolidation fleet state that will be committed.
-            await _sync_current_master_instance(
-                session=session,
-                fleet_model_id=fleet_model.id,
-            )
             emit_fleet_status_change_event(
                 session=session,
                 fleet_model=fleet_model,
@@ -302,6 +294,7 @@ class _FleetUpdateMap(ItemUpdateMap, total=False):
     deleted_at: UpdateMapDateTime
     consolidation_attempt: int
     last_consolidated_at: UpdateMapDateTime
+    current_master_instance_id: Optional[uuid.UUID]
 
 
 class _InstanceUpdateMap(TypedDict, total=False):
@@ -398,18 +391,23 @@ async def _lock_fleet_instances_for_consolidation(
 class _ProcessResult:
     fleet_update_map: _FleetUpdateMap = field(default_factory=_FleetUpdateMap)
     instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap] = field(default_factory=dict)
-    new_instances_count: int = 0
+    new_instance_creates: list["_NewInstanceCreate"] = field(default_factory=list)
+
+
+class _NewInstanceCreate(TypedDict):
+    id: uuid.UUID
+    instance_num: int
 
 
 @dataclass
 class _MaintainNodesResult:
     instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap] = field(default_factory=dict)
-    new_instances_count: int = 0
+    new_instance_creates: list[_NewInstanceCreate] = field(default_factory=list)
     changes_required: bool = False
 
     @property
     def has_changes(self) -> bool:
-        return len(self.instance_id_to_update_map) > 0 or self.new_instances_count > 0
+        return len(self.instance_id_to_update_map) > 0 or len(self.new_instance_creates) > 0
 
 
 async def _process_fleet(
@@ -418,36 +416,40 @@ async def _process_fleet(
     consolidation_instances: Optional[Sequence[InstanceModel]] = None,
 ) -> _ProcessResult:
     result = _ProcessResult()
+    effective_instances = list(consolidation_instances or fleet_model.instances)
     if consolidation_fleet_spec is not None:
         result = _consolidate_fleet_state_with_spec(
             fleet_model,
             consolidation_fleet_spec=consolidation_fleet_spec,
-            consolidation_instances=consolidation_instances,
+            consolidation_instances=effective_instances,
         )
-    if result.new_instances_count > 0:
-        # Avoid deleting fleets that are about to provision new instances.
-        return result
-    delete = _should_delete_fleet(fleet_model)
-    if delete:
+    if len(result.new_instance_creates) == 0 and _should_delete_fleet(fleet_model):
         result.fleet_update_map["status"] = FleetStatus.TERMINATED
         result.fleet_update_map["deleted"] = True
         result.fleet_update_map["deleted_at"] = NOW_PLACEHOLDER
+    _set_current_master_instance_id_update(
+        fleet_model=fleet_model,
+        fleet_update_map=result.fleet_update_map,
+        instance_models=effective_instances,
+        instance_id_to_update_map=result.instance_id_to_update_map,
+        new_instance_creates=result.new_instance_creates,
+    )
     return result
 
 
 def _consolidate_fleet_state_with_spec(
     fleet_model: FleetModel,
     consolidation_fleet_spec: FleetSpec,
-    consolidation_instances: Optional[Sequence[InstanceModel]] = None,
+    consolidation_instances: Sequence[InstanceModel],
 ) -> _ProcessResult:
     result = _ProcessResult()
     maintain_nodes_result = _maintain_fleet_nodes_in_min_max_range(
-        instances=consolidation_instances or fleet_model.instances,
+        instances=consolidation_instances,
         fleet_spec=consolidation_fleet_spec,
     )
     if maintain_nodes_result.has_changes:
         result.instance_id_to_update_map = maintain_nodes_result.instance_id_to_update_map
-        result.new_instances_count = maintain_nodes_result.new_instances_count
+        result.new_instance_creates = maintain_nodes_result.new_instance_creates
     if maintain_nodes_result.changes_required:
         result.fleet_update_map["consolidation_attempt"] = fleet_model.consolidation_attempt + 1
     else:
@@ -507,7 +509,13 @@ def _maintain_fleet_nodes_in_min_max_range(
     if active_instances_num < fleet_spec.configuration.nodes.min:
         result.changes_required = True
         nodes_missing = fleet_spec.configuration.nodes.min - active_instances_num
-        result.new_instances_count = nodes_missing
+        taken_instance_nums = {instance.instance_num for instance in active_instances}
+        for _ in range(nodes_missing):
+            instance_num = get_next_instance_num(taken_instance_nums)
+            taken_instance_nums.add(instance_num)
+            result.new_instance_creates.append(
+                _NewInstanceCreate(id=uuid.uuid4(), instance_num=instance_num)
+            )
         return result
     if (
         fleet_spec.configuration.nodes.max is None
@@ -572,28 +580,20 @@ def _build_instance_update_rows(
 async def _create_missing_fleet_instances(
     session: AsyncSession,
     fleet_model: FleetModel,
-    new_instances_count: int,
+    new_instance_creates: Sequence[_NewInstanceCreate],
 ):
     fleet_spec = get_fleet_spec(fleet_model)
-    res = await session.execute(
-        select(InstanceModel.instance_num).where(
-            InstanceModel.fleet_id == fleet_model.id,
-            InstanceModel.deleted == False,
-        )
-    )
-    taken_instance_nums = set(res.scalars().all())
-    for _ in range(new_instances_count):
-        instance_num = get_next_instance_num(taken_instance_nums)
+    for new_instance_create in new_instance_creates:
         instance_model = create_fleet_instance_model(
             session=session,
             project=fleet_model.project,
             # TODO: Store fleet.user and pass it instead of the project owner.
             username=fleet_model.project.owner.name,
             spec=fleet_spec,
-            instance_num=instance_num,
+            instance_num=new_instance_create["instance_num"],
+            instance_id=new_instance_create["id"],
         )
         instance_model.fleet_id = fleet_model.id
-        taken_instance_nums.add(instance_num)
         events.emit(
             session=session,
             message=(
@@ -605,82 +605,77 @@ async def _create_missing_fleet_instances(
         )
     logger.info(
         "Added %d instances to fleet %s",
-        new_instances_count,
+        len(new_instance_creates),
         fleet_model.name,
     )
 
 
-async def _sync_current_master_instance(
-    session: AsyncSession,
-    fleet_model_id: uuid.UUID,
+def _set_current_master_instance_id_update(
+    fleet_model: FleetModel,
+    fleet_update_map: _FleetUpdateMap,
+    instance_models: Sequence[InstanceModel],
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap],
+    new_instance_creates: Sequence[_NewInstanceCreate],
 ) -> None:
-    fleet_model = await session.get(FleetModel, fleet_model_id)
-    if fleet_model is None:
+    if not is_cloud_cluster(fleet_model):
+        fleet_update_map["current_master_instance_id"] = None
         return
-
-    new_current_master_instance_id = None
-    fleet_spec = get_fleet_spec(fleet_model)
-    is_cluster = (
-        fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-        and fleet_spec.configuration.ssh_config is None
+    surviving_instance_models = _get_surviving_instance_models_after_updates(
+        instance_models=instance_models,
+        instance_id_to_update_map=instance_id_to_update_map,
     )
-    if not fleet_model.deleted and is_cluster:
-        res = await session.execute(
-            select(InstanceModel)
-            .where(
-                InstanceModel.fleet_id == fleet_model_id,
-                InstanceModel.deleted == False,
-            )
-            .order_by(InstanceModel.instance_num, InstanceModel.created_at)
-            .options(
-                load_only(
-                    InstanceModel.id,
-                    InstanceModel.status,
-                    InstanceModel.job_provisioning_data,
-                )
-            )
-        )
-        current_instance_models = list(res.scalars().all())
-        new_current_master_instance_id = _select_current_master_instance_id(
-            current_master_instance_id=fleet_model.current_master_instance_id,
-            instance_models=current_instance_models,
-        )
-
-    if fleet_model.current_master_instance_id == new_current_master_instance_id:
-        return
-
-    await session.execute(
-        update(FleetModel)
-        .where(FleetModel.id == fleet_model_id)
-        .values(current_master_instance_id=new_current_master_instance_id)
+    current_master_instance_id = _select_current_master_instance_id(
+        current_master_instance_id=fleet_model.current_master_instance_id,
+        surviving_instance_models=surviving_instance_models,
+        new_instance_creates=new_instance_creates,
     )
+    fleet_update_map["current_master_instance_id"] = current_master_instance_id
+
+
+def _get_surviving_instance_models_after_updates(
+    instance_models: Sequence[InstanceModel],
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap],
+) -> list[InstanceModel]:
+    surviving_instance_models = []
+    for instance_model in sorted(instance_models, key=lambda i: (i.instance_num, i.created_at)):
+        instance_update_map = instance_id_to_update_map.get(instance_model.id)
+        if instance_update_map is not None and instance_update_map.get("deleted"):
+            continue
+        surviving_instance_models.append(instance_model)
+    return surviving_instance_models
 
 
 def _select_current_master_instance_id(
     current_master_instance_id: Optional[uuid.UUID],
-    instance_models: Sequence[InstanceModel],
+    surviving_instance_models: Sequence[InstanceModel],
+    new_instance_creates: Sequence[_NewInstanceCreate],
 ) -> Optional[uuid.UUID]:
     # Keep the current master stable while it is still alive so InstancePipeline
     # does not see fleet-wide election churn between provisioning attempts.
     if current_master_instance_id is not None:
-        for instance_model in instance_models:
+        for instance_model in surviving_instance_models:
             if (
                 instance_model.id == current_master_instance_id
                 and instance_model.status != InstanceStatus.TERMINATED
             ):
                 return instance_model.id
 
-    # If the old master is gone, prefer a surviving provisioned instance since it
-    # already defines backend/region/AZ for the current cluster generation.
-    for instance_model in instance_models:
+    # If the old master is gone, prefer a surviving provisioned instance so we
+    # keep following an already-established cluster placement decision.
+    for instance_model in surviving_instance_models:
         if (
             instance_model.status != InstanceStatus.TERMINATED
             and instance_model.job_provisioning_data is not None
         ):
             return instance_model.id
 
-    for instance_model in instance_models:
+    # Prefer existing surviving instances over freshly planned replacements to
+    # avoid election churn during min-nodes backfill.
+    for instance_model in surviving_instance_models:
         if instance_model.status != InstanceStatus.TERMINATED:
             return instance_model.id
+
+    for new_instance_create in sorted(new_instance_creates, key=lambda i: i["instance_num"]):
+        return new_instance_create["id"]
 
     return None

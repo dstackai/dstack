@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from typing import Optional
 
 from pydantic import ValidationError
@@ -26,6 +27,7 @@ from dstack._internal.core.models.instances import (
     InstanceTerminationReason,
 )
 from dstack._internal.core.models.placement import PlacementGroupConfiguration, PlacementStrategy
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.base import NOW_PLACEHOLDER
 from dstack._internal.server.background.pipeline_tasks.instances.common import (
@@ -54,6 +56,13 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+@dataclass
+class _ClusterMasterContext:
+    current_master_instance_model: InstanceModel
+    is_current_instance_master: bool
+    master_job_provisioning_data: Optional[JobProvisioningData]
+
+
 async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
     result = ProcessResult()
 
@@ -77,63 +86,21 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         )
         return result
 
-    current_master_instance_model = None
-    master_job_provisioning_data = None
+    cluster_context = None
     placement_group_models: list[PlacementGroupModel] = []
     placement_group_model = None
+    master_job_provisioning_data = None
     if instance_model.fleet is not None and is_cloud_cluster(instance_model.fleet):
-        assert instance_model.fleet_id is not None
-        async with get_session_ctx() as session:
-            current_master_instance_model = await _load_current_master_instance(
-                session=session,
-                fleet_id=instance_model.fleet_id,
-            )
-            placement_group_models = await get_fleet_placement_group_models(
-                session=session,
-                fleet_id=instance_model.fleet_id,
-            )
-        if current_master_instance_model is None:
-            # FleetPipeline elects the current master. Until it does, instance
-            # workers must wait instead of trying to coordinate bootstrap.
-            logger.debug(
-                "%s: waiting for fleet pipeline to elect current cluster master",
-                fmt(instance_model),
-            )
+        cluster_context = await _get_cluster_master_context(instance_model)
+        if cluster_context is None:
+            # Waiting for the master
             return result
-        if current_master_instance_model.id != instance_model.id:
-            if (
-                current_master_instance_model.deleted
-                or current_master_instance_model.status == InstanceStatus.TERMINATED
-            ):
-                # Master failover is also owned by FleetPipeline. InstancePipeline
-                # only terminates the current instance and waits for the next fleet tick.
-                logger.debug(
-                    "%s: waiting for fleet pipeline to replace current master %s",
-                    fmt(instance_model),
-                    current_master_instance_model.id,
-                )
-                return result
-            master_job_provisioning_data = get_instance_provisioning_data(
-                current_master_instance_model
-            )
-            if master_job_provisioning_data is None:
-                logger.debug(
-                    "%s: waiting for current master %s to determine cluster placement",
-                    fmt(instance_model),
-                    current_master_instance_model.id,
-                )
-                return result
-            # Non-master instances only reuse the placement group chosen by the
-            # current master. They never create a new placement group themselves.
-            placement_group_model = _get_current_master_placement_group_model(
-                placement_group_models=placement_group_models,
-                fleet_id=instance_model.fleet_id,
-            )
-            if placement_group_model is not None:
-                _populate_current_master_placement_group_relations(
-                    placement_group_model=placement_group_model,
-                    instance_model=instance_model,
-                )
+        placement_group_models, placement_group_model = await _get_cluster_placement_context(
+            instance_model=instance_model,
+            cluster_context=cluster_context,
+        )
+        master_job_provisioning_data = cluster_context.master_job_provisioning_data
+
     offers = await get_create_instance_offers(
         project=instance_model.project,
         profile=profile,
@@ -152,17 +119,15 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         compute = backend.compute()
         assert isinstance(compute, ComputeWithCreateInstanceSupport)
         if master_job_provisioning_data is not None:
-            # Shared offer lookup already restricts backend and region from the master.
+            # `get_create_instance_offers()` already restricts backend and region from the master.
             # Availability zone still has to be narrowed per offer.
             instance_offer = get_instance_offer_with_restricted_az(
                 instance_offer=instance_offer,
                 master_job_provisioning_data=master_job_provisioning_data,
             )
         if (
-            instance_model.fleet is not None
-            and is_cloud_cluster(instance_model.fleet)
-            and current_master_instance_model is not None
-            and current_master_instance_model.id == instance_model.id
+            cluster_context is not None
+            and cluster_context.is_current_instance_master
             and instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
             and (
@@ -234,8 +199,8 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
 
         if (
             instance_model.fleet_id is not None
-            and current_master_instance_model is not None
-            and current_master_instance_model.id == instance_model.id
+            and cluster_context is not None
+            and cluster_context.is_current_instance_master
         ):
             # Clean up placement groups that did not end up being used.
             result.schedule_pg_deletion_fleet_id = instance_model.fleet_id
@@ -251,6 +216,84 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         termination_reason_message="All offers failed" if offers else "No offers found",
     )
     return result
+
+
+async def _get_cluster_master_context(
+    instance_model: InstanceModel,
+) -> Optional[_ClusterMasterContext]:
+    assert instance_model.fleet is not None and is_cloud_cluster(instance_model.fleet)
+    assert instance_model.fleet_id is not None
+    async with get_session_ctx() as session:
+        current_master_instance_model = await _load_current_master_instance(
+            session=session,
+            fleet_id=instance_model.fleet_id,
+        )
+    if current_master_instance_model is None:
+        # FleetPipeline elects the current master. Until it does, instance
+        # workers must wait instead of trying to coordinate bootstrap.
+        logger.debug(
+            "%s: waiting for fleet pipeline to elect current cluster master",
+            fmt(instance_model),
+        )
+        return None
+
+    is_current_instance_master = current_master_instance_model.id == instance_model.id
+    master_job_provisioning_data = None
+    if not is_current_instance_master:
+        if (
+            current_master_instance_model.deleted
+            or current_master_instance_model.status == InstanceStatus.TERMINATED
+        ):
+            # Master failover is also owned by FleetPipeline. InstancePipeline
+            # only terminates the current instance and waits for the next fleet tick.
+            logger.debug(
+                "%s: waiting for fleet pipeline to replace current master %s",
+                fmt(instance_model),
+                current_master_instance_model.id,
+            )
+            return None
+        master_job_provisioning_data = get_instance_provisioning_data(
+            current_master_instance_model
+        )
+        if master_job_provisioning_data is None:
+            logger.debug(
+                "%s: waiting for current master %s to determine cluster placement",
+                fmt(instance_model),
+                current_master_instance_model.id,
+            )
+            return None
+    return _ClusterMasterContext(
+        current_master_instance_model=current_master_instance_model,
+        is_current_instance_master=is_current_instance_master,
+        master_job_provisioning_data=master_job_provisioning_data,
+    )
+
+
+async def _get_cluster_placement_context(
+    instance_model: InstanceModel,
+    cluster_context: _ClusterMasterContext,
+) -> tuple[list[PlacementGroupModel], Optional[PlacementGroupModel]]:
+    assert instance_model.fleet is not None and is_cloud_cluster(instance_model.fleet)
+    assert instance_model.fleet_id is not None
+    async with get_session_ctx() as session:
+        placement_group_models = await get_fleet_placement_group_models(
+            session=session,
+            fleet_id=instance_model.fleet_id,
+        )
+    placement_group_model = None
+    if not cluster_context.is_current_instance_master:
+        # Non-master instances only reuse the placement group chosen by the
+        # current master. They never create a new placement group themselves.
+        placement_group_model = _get_current_master_placement_group_model(
+            placement_group_models=placement_group_models,
+            fleet_id=instance_model.fleet_id,
+        )
+        if placement_group_model is not None:
+            _populate_current_master_placement_group_relations(
+                placement_group_model=placement_group_model,
+                instance_model=instance_model,
+            )
+    return placement_group_models, placement_group_model
 
 
 async def _load_current_master_instance(

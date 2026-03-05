@@ -587,6 +587,7 @@ def create_fleet_instance_model(
     username: str,
     spec: FleetSpec,
     instance_num: int,
+    instance_id: Optional[uuid.UUID] = None,
 ) -> InstanceModel:
     profile = spec.merged_profile
     requirements = get_fleet_requirements(spec)
@@ -598,6 +599,7 @@ def create_fleet_instance_model(
         requirements=requirements,
         instance_name=f"{spec.configuration.name}-{instance_num}",
         instance_num=instance_num,
+        instance_id=instance_id,
         reservation=spec.merged_profile.reservation,
         blocks=spec.configuration.blocks,
         tags=spec.configuration.tags,
@@ -870,6 +872,9 @@ def get_fleet_master_instance_provisioning_data(
 ) -> Optional[JobProvisioningData]:
     master_instance_provisioning_data = None
     if fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
+        # TODO: This legacy helper infers the cluster master from fleet instances.
+        # Pipeline-based provisioning should use FleetModel.current_master_instance_id
+        # instead of relying on instance ordering in the loaded relationship.
         # Offers for master jobs must be in the same cluster as existing instances.
         fleet_instance_models = [im for im in fleet_model.instances if not im.deleted]
         if len(fleet_instance_models) > 0:

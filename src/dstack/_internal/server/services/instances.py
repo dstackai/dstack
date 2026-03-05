@@ -642,11 +642,13 @@ def create_instance_model(
     reservation: Optional[str],
     blocks: Union[Literal["auto"], int],
     tags: Optional[Dict[str, str]],
+    instance_id: Optional[uuid.UUID] = None,
 ) -> InstanceModel:
     termination_policy, termination_idle_time = get_termination(
         profile, DEFAULT_FLEET_TERMINATION_IDLE_TIME
     )
-    instance_id = uuid.uuid4()
+    if instance_id is None:
+        instance_id = uuid.uuid4()
     project_ssh_key = SSHKey(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
