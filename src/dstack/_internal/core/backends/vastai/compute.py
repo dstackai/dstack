@@ -51,7 +51,7 @@ class VastAICompute(
                     "verified": {"eq": True},
                     "cuda_max_good": {"gte": 12.8},
                     "compute_cap": {"gte": 600},
-                }
+                },
             )
         )
 
