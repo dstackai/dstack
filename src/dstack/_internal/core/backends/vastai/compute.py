@@ -43,6 +43,7 @@ class VastAICompute(
         self.catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
         self.catalog.add_provider(
             VastAIProvider(
+                community_cloud=config.allow_community_cloud,
                 extra_filters={
                     "direct_port_count": {"gte": 1},
                     "reliability2": {"gte": 0.9},

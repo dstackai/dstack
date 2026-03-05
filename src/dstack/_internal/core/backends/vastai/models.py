@@ -4,6 +4,10 @@ from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
 
+# TODO: Re-evaluate this default once Vast Server Cloud inventory improves for
+# CUDA-sensitive GPU families (e.g. H100 with strict cuda_max_good filtering).
+VASTAI_COMMUNITY_CLOUD_DEFAULT = True
+
 
 class VastAIAPIKeyCreds(CoreModel):
     type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"
@@ -20,6 +24,15 @@ class VastAIBackendConfig(CoreModel):
         Optional[List[str]],
         Field(description="The list of VastAI regions. Omit to use all regions"),
     ] = None
+    community_cloud: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "Whether Community Cloud offers can be suggested in addition to Server Cloud."
+                f" Defaults to `{str(VASTAI_COMMUNITY_CLOUD_DEFAULT).lower()}`"
+            )
+        ),
+    ] = None
 
 
 class VastAIBackendConfigWithCreds(VastAIBackendConfig):
@@ -35,3 +48,9 @@ class VastAIStoredConfig(VastAIBackendConfig):
 
 class VastAIConfig(VastAIStoredConfig):
     creds: AnyVastAICreds
+
+    @property
+    def allow_community_cloud(self) -> bool:
+        if self.community_cloud is not None:
+            return self.community_cloud
+        return VASTAI_COMMUNITY_CLOUD_DEFAULT

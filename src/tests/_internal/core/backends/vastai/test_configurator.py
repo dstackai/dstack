@@ -8,6 +8,20 @@ from dstack._internal.core.errors import BackendInvalidCredentialsError
 
 
 class TestVastAIConfigurator:
+    def test_allow_community_cloud_default(self):
+        config = VastAIBackendConfigWithCreds(creds=VastAICreds(api_key="valid"))
+        backend = VastAIConfigurator().create_backend(project_name="main", config=config)
+        loaded_config = VastAIConfigurator()._get_config(backend)
+        assert loaded_config.allow_community_cloud is True
+
+    def test_allow_community_cloud_enabled(self):
+        config = VastAIBackendConfigWithCreds(
+            creds=VastAICreds(api_key="valid"), community_cloud=True
+        )
+        backend = VastAIConfigurator().create_backend(project_name="main", config=config)
+        loaded_config = VastAIConfigurator()._get_config(backend)
+        assert loaded_config.allow_community_cloud is True
+
     def test_validate_config_valid(self):
         config = VastAIBackendConfigWithCreds(
             creds=VastAICreds(api_key="valid"),
