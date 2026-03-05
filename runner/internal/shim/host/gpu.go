@@ -13,8 +13,8 @@ import (
 
 	execute "github.com/alexellis/go-execute/v2"
 
-	"github.com/dstackai/dstack/runner/internal/common"
-	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/common/gpu"
+	"github.com/dstackai/dstack/runner/internal/common/log"
 )
 
 const (
@@ -23,7 +23,7 @@ const (
 )
 
 type GpuInfo struct {
-	Vendor common.GpuVendor
+	Vendor gpu.GpuVendor
 	Name   string
 	Vram   int // MiB
 	// NVIDIA: uuid field from nvidia-smi, "globally unique immutable alphanumeric identifier of the GPU",
@@ -43,16 +43,16 @@ type GpuInfo struct {
 }
 
 func GetGpuInfo(ctx context.Context) []GpuInfo {
-	switch gpuVendor := common.GetGpuVendor(); gpuVendor {
-	case common.GpuVendorNvidia:
+	switch gpuVendor := gpu.GetGpuVendor(); gpuVendor {
+	case gpu.GpuVendorNvidia:
 		return getNvidiaGpuInfo(ctx)
-	case common.GpuVendorAmd:
+	case gpu.GpuVendorAmd:
 		return getAmdGpuInfo(ctx)
-	case common.GpuVendorIntel:
+	case gpu.GpuVendorIntel:
 		return getIntelGpuInfo(ctx)
-	case common.GpuVendorTenstorrent:
+	case gpu.GpuVendorTenstorrent:
 		return getTenstorrentGpuInfo(ctx)
-	case common.GpuVendorNone:
+	case gpu.GpuVendorNone:
 		return []GpuInfo{}
 	}
 	return []GpuInfo{}
@@ -99,7 +99,7 @@ func getNvidiaGpuInfo(ctx context.Context) []GpuInfo {
 			vram = 0
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor: common.GpuVendorNvidia,
+			Vendor: gpu.GpuVendorNvidia,
 			Name:   strings.TrimSpace(record[0]),
 			Vram:   vram,
 			ID:     strings.TrimSpace(record[2]),
@@ -170,7 +170,7 @@ func getAmdGpuInfo(ctx context.Context) []GpuInfo {
 			continue
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor:         common.GpuVendorAmd,
+			Vendor:         gpu.GpuVendorAmd,
 			Name:           amdGpu.Asic.Name,
 			Vram:           amdGpu.Vram.Size.Value,
 			RenderNodePath: renderNodePath,
@@ -233,7 +233,7 @@ func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
 
 			// Create new GPU entry for "L" device
 			lDeviceMap[uniqueID] = &GpuInfo{
-				Vendor: common.GpuVendorTenstorrent,
+				Vendor: gpu.GpuVendorTenstorrent,
 				Name:   name,
 				Vram:   baseVram,
 				ID:     boardID,
@@ -304,7 +304,7 @@ func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
 			if !existingGpu {
 				// Create new GPU entry
 				lDeviceMap[uniqueID] = &GpuInfo{
-					Vendor: common.GpuVendorTenstorrent,
+					Vendor: gpu.GpuVendorTenstorrent,
 					Name:   boardType,
 					Vram:   baseVram,
 					ID:     boardID,
@@ -423,7 +423,7 @@ func getIntelGpuInfo(ctx context.Context) []GpuInfo {
 			vram = 0
 		}
 		gpus = append(gpus, GpuInfo{
-			Vendor: common.GpuVendorIntel,
+			Vendor: gpu.GpuVendorIntel,
 			Name:   strings.TrimSpace(record[0]),
 			Vram:   vram,
 			Index:  strings.TrimSpace(record[2]),

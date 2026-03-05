@@ -50,7 +50,7 @@ MAX_RESOURCE_NAME_LEN = 60
 
 CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
-# RunPod does not seem to have any limits on the disk size.
+# Runpod does not seem to have any limits on the disk size.
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("1GB"), max=None)
 
 

@@ -16,13 +16,15 @@ from dstack._internal.server.schemas.fleets import (
     DeleteFleetsRequest,
     GetFleetPlanRequest,
     GetFleetRequest,
+    ListProjectFleetsRequest,
 )
 from dstack.api.server._group import APIClientGroup
 
 
 class FleetsAPIClient(APIClientGroup):
-    def list(self, project_name: str) -> List[Fleet]:
-        resp = self._request(f"/api/project/{project_name}/fleets/list")
+    def list(self, project_name: str, *, include_imported: bool = False) -> List[Fleet]:
+        body = ListProjectFleetsRequest(include_imported=include_imported)
+        resp = self._request(f"/api/project/{project_name}/fleets/list", body=body.json())
         return parse_obj_as(List[Fleet.__response__], resp.json())
 
     def get(

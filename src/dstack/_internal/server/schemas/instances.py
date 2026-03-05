@@ -15,6 +15,7 @@ class ListInstancesRequest(CoreModel):
     project_names: Optional[list[str]] = None
     fleet_ids: Optional[list[UUID]] = None
     only_active: bool = False
+    include_imported: bool = False
     prev_created_at: Optional[datetime] = None
     prev_id: Optional[UUID] = None
     limit: int = 1000

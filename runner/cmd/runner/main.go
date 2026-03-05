@@ -14,12 +14,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v3"
 
-	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/internal/executor"
-	linuxuser "github.com/dstackai/dstack/runner/internal/linux/user"
-	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/common/consts"
+	"github.com/dstackai/dstack/runner/internal/common/log"
 	"github.com/dstackai/dstack/runner/internal/runner/api"
-	"github.com/dstackai/dstack/runner/internal/ssh"
+	"github.com/dstackai/dstack/runner/internal/runner/executor"
+	linuxuser "github.com/dstackai/dstack/runner/internal/runner/linux/user"
+	"github.com/dstackai/dstack/runner/internal/runner/ssh"
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.

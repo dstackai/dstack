@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/dstackai/dstack/runner/internal/common"
+	"github.com/dstackai/dstack/runner/internal/common/gpu"
 )
 
 func loadTestData(filename string) ([]byte, error) {
@@ -172,7 +172,7 @@ func TestGetGpusFromTtSmiSnapshot(t *testing.T) {
 
 	expectedGpus := []GpuInfo{
 		{
-			Vendor: common.GpuVendorTenstorrent,
+			Vendor: gpu.GpuVendorTenstorrent,
 			Name:   "n150",
 			Vram:   12 * 1024,
 			ID:     "100018611902010",
@@ -222,19 +222,19 @@ func TestGetGpusFromTtSmiSnapshotMultipleDevices(t *testing.T) {
 	}
 
 	for boardID, expected := range expectedGpus {
-		gpu, exists := gpusByID[boardID]
+		gpu_, exists := gpusByID[boardID]
 		if !exists {
 			t.Errorf("Expected GPU with board_id %s not found", boardID)
 			continue
 		}
-		if gpu.Name != expected.name {
-			t.Errorf("GPU %s: name = %s, want %s", boardID, gpu.Name, expected.name)
+		if gpu_.Name != expected.name {
+			t.Errorf("GPU %s: name = %s, want %s", boardID, gpu_.Name, expected.name)
 		}
-		if gpu.Vram != expected.vram {
-			t.Errorf("GPU %s: VRAM = %d, want %d", boardID, gpu.Vram, expected.vram)
+		if gpu_.Vram != expected.vram {
+			t.Errorf("GPU %s: VRAM = %d, want %d", boardID, gpu_.Vram, expected.vram)
 		}
-		if gpu.Vendor != common.GpuVendorTenstorrent {
-			t.Errorf("GPU %s: vendor = %v, want %v", boardID, gpu.Vendor, common.GpuVendorTenstorrent)
+		if gpu_.Vendor != gpu.GpuVendorTenstorrent {
+			t.Errorf("GPU %s: vendor = %v, want %v", boardID, gpu_.Vendor, gpu.GpuVendorTenstorrent)
 		}
 	}
 }
@@ -263,25 +263,25 @@ func TestGetGpusFromTtSmiSnapshotGalaxy(t *testing.T) {
 	actualTotalVram := 0
 
 	// Verify all GPUs have the correct properties
-	for i, gpu := range gpus {
-		if gpu.Vendor != common.GpuVendorTenstorrent {
-			t.Errorf("GPU[%d] vendor = %v, want %v", i, gpu.Vendor, common.GpuVendorTenstorrent)
+	for i, gpu_ := range gpus {
+		if gpu_.Vendor != gpu.GpuVendorTenstorrent {
+			t.Errorf("GPU[%d] vendor = %v, want %v", i, gpu_.Vendor, gpu.GpuVendorTenstorrent)
 		}
-		if gpu.Name != "tt-galaxy-wh" {
-			t.Errorf("GPU[%d] name = %s, want tt-galaxy-wh", i, gpu.Name)
+		if gpu_.Name != "tt-galaxy-wh" {
+			t.Errorf("GPU[%d] name = %s, want tt-galaxy-wh", i, gpu_.Name)
 		}
-		if gpu.ID != "100035100000000" {
-			t.Errorf("GPU[%d] ID = %s, want 100035100000000", i, gpu.ID)
+		if gpu_.ID != "100035100000000" {
+			t.Errorf("GPU[%d] ID = %s, want 100035100000000", i, gpu_.ID)
 		}
-		if gpu.Vram != 12*1024 {
-			t.Errorf("GPU[%d] VRAM = %d, want %d", i, gpu.Vram, 12*1024)
+		if gpu_.Vram != 12*1024 {
+			t.Errorf("GPU[%d] VRAM = %d, want %d", i, gpu_.Vram, 12*1024)
 		}
 		// Verify indices are sequential (0, 1, 2, ..., 31)
 		expectedIndex := strconv.Itoa(i)
-		if gpu.Index != expectedIndex {
-			t.Errorf("GPU[%d] index = %s, want %s", i, gpu.Index, expectedIndex)
+		if gpu_.Index != expectedIndex {
+			t.Errorf("GPU[%d] index = %s, want %s", i, gpu_.Index, expectedIndex)
 		}
-		actualTotalVram += gpu.Vram
+		actualTotalVram += gpu_.Vram
 	}
 
 	// Verify total VRAM is 384GB

@@ -1,13 +1,23 @@
 from typing import Annotated, Optional, Tuple
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.db import get_session
-from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.server.models import (
+    ExportedFleetModel,
+    FleetModel,
+    ImportModel,
+    InstanceModel,
+    MemberModel,
+    ProjectModel,
+    UserModel,
+)
 from dstack._internal.server.services.projects import (
     get_project_model_by_name,
     get_user_project_role,
@@ -18,6 +28,7 @@ from dstack._internal.server.utils.routers import (
     error_invalid_token,
     error_not_found,
 )
+from dstack._internal.utils.common import EntityName, EntityNameOrID
 
 
 class Authenticated:
@@ -249,3 +260,58 @@ async def is_project_member(session: AsyncSession, project_name: str, token: str
         return True
     except HTTPException:
         return False
+
+
+async def check_can_access_fleet(
+    session: AsyncSession,
+    user: UserModel,
+    fleet_project: ProjectModel,
+    fleet_name_or_id: EntityNameOrID,
+) -> None:
+    if (
+        user.global_role == GlobalRole.ADMIN
+        or get_user_project_role(user=user, project=fleet_project) is not None
+    ):
+        return
+    filters = [
+        FleetModel.project_id == fleet_project.id,
+        exists().where(
+            MemberModel.user_id == user.id,
+            MemberModel.project_id == ImportModel.project_id,
+            ImportModel.export_id == ExportedFleetModel.export_id,
+            ExportedFleetModel.fleet_id == FleetModel.id,
+        ),
+    ]
+    if isinstance(fleet_name_or_id, EntityName):
+        filters.extend([FleetModel.name == fleet_name_or_id.name, FleetModel.deleted == False])
+    else:
+        filters.append(FleetModel.id == fleet_name_or_id.id)
+    res = await session.execute(select(func.count()).select_from(FleetModel).where(*filters))
+    if res.scalar_one() == 0:
+        raise error_forbidden()
+
+
+async def check_can_access_instance(
+    session: AsyncSession,
+    user: UserModel,
+    instance_project: ProjectModel,
+    instance_id: UUID,
+) -> None:
+    if (
+        user.global_role == GlobalRole.ADMIN
+        or get_user_project_role(user=user, project=instance_project) is not None
+    ):
+        return
+    filters = [
+        InstanceModel.project_id == instance_project.id,
+        InstanceModel.id == instance_id,
+        exists().where(
+            MemberModel.user_id == user.id,
+            MemberModel.project_id == ImportModel.project_id,
+            ImportModel.export_id == ExportedFleetModel.export_id,
+            ExportedFleetModel.fleet_id == InstanceModel.fleet_id,
+        ),
+    ]
+    res = await session.execute(select(func.count()).select_from(InstanceModel).where(*filters))
+    if res.scalar_one() == 0:
+        raise error_forbidden()

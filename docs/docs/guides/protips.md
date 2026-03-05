@@ -218,7 +218,7 @@ If the run reuses an existing fleet instance, only the fleet's
 
 If an instance remains `idle`, it is automatically terminated after `idle_duration`.
 
-> Not applied for container-based backends (Kubernetes, Vast.ai, RunPod).
+> Not applied for container-based backends (Kubernetes, Vast.ai, Runpod).
 
 ## Volumes
 

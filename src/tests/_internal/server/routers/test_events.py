@@ -3,6 +3,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 import pytest
+import pytest_asyncio
 from freezegun import freeze_time
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,7 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.services import events
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_export,
     create_fleet,
     create_instance,
     create_job,
@@ -19,6 +21,8 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     get_auth_headers,
+    get_fleet_spec,
+    get_ssh_fleet_configuration,
 )
 
 pytestmark = [
@@ -1326,3 +1330,227 @@ class TestListEventsPagination:
         )
         resp.raise_for_status()
         assert len(resp.json()) == 2
+
+
+class TestListEventsWithExportedFleet:
+    @pytest_asyncio.fixture
+    async def exported_fleet_setup(self, session: AsyncSession):
+        # Create exporter user and project
+        exporter_user = await create_user(
+            session, name="exporter-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(
+            session, name="exporter-project", owner=exporter_user
+        )
+        await add_project_member(
+            session=session,
+            project=exporter_project,
+            user=exporter_user,
+            project_role=ProjectRole.USER,
+        )
+
+        # Create first importer user and project
+        importer_user_1 = await create_user(
+            session, name="importer-user-1", global_role=GlobalRole.USER
+        )
+        importer_project_1 = await create_project(
+            session, name="importer-project-1", owner=importer_user_1
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project_1,
+            user=importer_user_1,
+            project_role=ProjectRole.USER,
+        )
+
+        # Create second importer user and project
+        importer_user_2 = await create_user(
+            session, name="importer-user-2", global_role=GlobalRole.USER
+        )
+        importer_project_2 = await create_project(
+            session, name="importer-project-2", owner=importer_user_2
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project_2,
+            user=importer_user_2,
+            project_role=ProjectRole.USER,
+        )
+
+        # Create fleet and instance
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        events.emit(
+            session=session,
+            message="Fleet created",
+            actor=events.UserActor.from_user(exporter_user),
+            targets=[events.Target.from_model(fleet)],
+        )
+        instance = await create_instance(
+            session=session, project=exporter_project, fleet=fleet, name="exported-fleet-0"
+        )
+        events.emit(
+            session=session,
+            message="Instance created",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(instance)],
+        )
+
+        # Create export
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project_1, importer_project_2],
+            exported_fleets=[fleet],
+        )
+
+        # Create first importer run and job
+        importer_run_1 = await create_run(
+            session=session,
+            project=importer_project_1,
+            user=importer_user_1,
+            repo=await create_repo(session=session, project_id=importer_project_1.id),
+            run_name="importer-run-1",
+        )
+        events.emit(
+            session=session,
+            message="Run created",
+            actor=events.UserActor.from_user(importer_user_1),
+            targets=[events.Target.from_model(importer_run_1)],
+        )
+        importer_job_1 = await create_job(
+            session=session,
+            run=importer_run_1,
+            fleet=fleet,
+            instance=instance,
+        )
+        events.emit(
+            session=session,
+            message="Job assigned to instance",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(importer_job_1), events.Target.from_model(instance)],
+        )
+
+        # Create second importer run and job
+        importer_run_2 = await create_run(
+            session=session,
+            project=importer_project_2,
+            user=importer_user_2,
+            repo=await create_repo(session=session, project_id=importer_project_2.id),
+            run_name="importer-run-2",
+        )
+        events.emit(
+            session=session,
+            message="Run created",
+            actor=events.UserActor.from_user(importer_user_2),
+            targets=[events.Target.from_model(importer_run_2)],
+        )
+        importer_job_2 = await create_job(
+            session=session,
+            run=importer_run_2,
+            fleet=fleet,
+            instance=instance,
+        )
+        events.emit(
+            session=session,
+            message="Job assigned to instance",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(importer_job_2), events.Target.from_model(instance)],
+        )
+
+        await session.commit()
+
+        return {
+            "exporter_user": exporter_user,
+            "importer_user_1": importer_user_1,
+            "importer_user_2": importer_user_2,
+            "exported_fleet": fleet,
+        }
+
+    @pytest.mark.parametrize("with_filter", [True, False])
+    async def test_exporter_user_sees_all_events_targeting_exported_fleet(
+        self,
+        session: AsyncSession,
+        client: AsyncClient,
+        exported_fleet_setup: dict,
+        with_filter: bool,
+    ) -> None:
+        filters = {}
+        if with_filter:
+            filters = {"within_fleets": [str(exported_fleet_setup["exported_fleet"].id)]}
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(exported_fleet_setup["exporter_user"].token),
+            json={"ascending": True, **filters},
+        )
+        resp.raise_for_status()
+        assert resp.json()[0]["message"] == "Fleet created"
+        assert resp.json()[1]["message"] == "Instance created"
+        assert resp.json()[2]["message"] == "Job assigned to instance"
+        assert {t["name"] for t in resp.json()[2]["targets"]} == {
+            "exported-fleet-0",
+            "importer-run-1-0-0",
+        }
+        assert resp.json()[3]["message"] == "Job assigned to instance"
+        assert {t["name"] for t in resp.json()[3]["targets"]} == {
+            "exported-fleet-0",
+            "importer-run-2-0-0",
+        }
+        assert len(resp.json()) == 4
+
+    @pytest.mark.parametrize(
+        ("user_key", "job_name"),
+        [
+            ("importer_user_1", "importer-run-1-0-0"),
+            ("importer_user_2", "importer-run-2-0-0"),
+        ],
+    )
+    async def test_importer_user_sees_only_events_about_their_own_run(
+        self,
+        session: AsyncSession,
+        client: AsyncClient,
+        exported_fleet_setup: dict,
+        user_key: str,
+        job_name: str,
+    ) -> None:
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(exported_fleet_setup[user_key].token),
+            json={"ascending": True},
+        )
+        resp.raise_for_status()
+        assert resp.json()[0]["message"] == "Run created"
+        assert resp.json()[1]["message"] == "Job assigned to instance"
+        assert {t["name"] for t in resp.json()[1]["targets"]} == {"exported-fleet-0", job_name}
+        assert len(resp.json()) == 2
+
+    @pytest.mark.parametrize(
+        ("user_key", "job_name"),
+        [
+            ("importer_user_1", "importer-run-1-0-0"),
+            ("importer_user_2", "importer-run-2-0-0"),
+        ],
+    )
+    async def test_importer_user_can_filter_by_imported_fleet(
+        self,
+        session: AsyncSession,
+        client: AsyncClient,
+        exported_fleet_setup: dict,
+        user_key: str,
+        job_name: str,
+    ) -> None:
+        resp = await client.post(
+            "/api/events/list",
+            headers=get_auth_headers(exported_fleet_setup[user_key].token),
+            json={
+                "ascending": True,
+                "within_fleets": [str(exported_fleet_setup["exported_fleet"].id)],
+            },
+        )
+        resp.raise_for_status()
+        assert resp.json()[0]["message"] == "Job assigned to instance"
+        assert {t["name"] for t in resp.json()[0]["targets"]} == {"exported-fleet-0", job_name}
+        assert len(resp.json()) == 1

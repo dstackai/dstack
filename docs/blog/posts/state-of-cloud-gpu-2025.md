@@ -28,7 +28,7 @@ These axes split providers into distinct archetypes—each with different econom
 | :---- | :---- | :---- |
 | **Classical hyperscalers** | General-purpose clouds with GPU SKUs bolted on | AWS, Google Cloud, Azure, OCI |
 | **Massive neoclouds** | GPU-first operators built around dense HGX or MI-series clusters | CoreWeave, Lambda, Nebius, Crusoe |
-| **Rapidly-catching neoclouds** | Smaller GPU-first players building out aggressively | RunPod, DataCrunch, Voltage Park, TensorWave, Hot Aisle |
+| **Rapidly-catching neoclouds** | Smaller GPU-first players building out aggressively | Runpod, DataCrunch, Voltage Park, TensorWave, Hot Aisle |
 | **Cloud marketplaces** | Don’t own capacity; sell orchestration + unified API over multiple backends | NVIDIA DGX Cloud (Lepton), Modal, Lightning AI, dstack Sky |
 | **DC aggregators** | Aggregate idle capacity from third-party datacenters, pricing via market dynamics | Vast.ai |
 
@@ -89,7 +89,7 @@ For comparison, below is the price range for H100×GPU clusters across providers
 
 <img src="https://dstack.ai/static-assets/static-assets/images/cloud-providers-cluster-h100.png" width="750"/>
 
-> Most hyperscalers and neoclouds need short- or long-term contracts, though providers like RunPod, DataCrunch, and Nebius offer on-demand clusters. Larger capacity and longer commitments bring bigger discounts — Nebius offers up to 35% off for longer terms.
+> Most hyperscalers and neoclouds need short- or long-term contracts, though providers like Runpod, DataCrunch, and Nebius offer on-demand clusters. Larger capacity and longer commitments bring bigger discounts — Nebius offers up to 35% off for longer terms.
 
 ## New GPU generations – why they matter
 

@@ -36,6 +36,7 @@ import { EventsList } from '../Events/List';
 import { JobList } from '../Jobs/List';
 import { ConnectToRunWithDevEnvConfiguration } from './ConnectToRunWithDevEnvConfiguration';
 import { ConnectToServiceRun } from './ConnectToServiceRun';
+import { ConnectToTaskRun } from './ConnectToTaskRun';
 
 export const RunDetails = () => {
     const { t } = useTranslation();
@@ -102,7 +103,7 @@ export const RunDetails = () => {
 
                     <div>
                         <Box variant="awsui-key-label">{t('projects.run.configuration')}</Box>
-                        <div>{runData.run_spec.configuration_path}</div>
+                        <div>{runData.run_spec.configuration_path || '-'}</div>
                     </div>
 
                     <div>
@@ -209,6 +210,11 @@ export const RunDetails = () => {
 
             {runData.run_spec.configuration.type === 'service' && !runIsStopped(runData.status) && (
                 <ConnectToServiceRun run={runData} />
+            )}
+
+            {runData.run_spec.configuration.type === 'task' && !runIsStopped(runData.status) &&
+                (runData.jobs[0]?.job_spec?.app_specs?.length ?? 0) > 0 && (
+                <ConnectToTaskRun run={runData} />
             )}
 
             {runData.jobs.length > 1 && (

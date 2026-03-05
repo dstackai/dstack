@@ -273,10 +273,7 @@ _configuration_type_to_configurator_class_map = {c.TYPE: c for c in _job_configu
 async def stop_runner(session: AsyncSession, job_model: JobModel):
     res = await session.execute(
         select(InstanceModel)
-        .where(
-            InstanceModel.project_id == job_model.project_id,
-            InstanceModel.id == job_model.instance_id,
-        )
+        .where(InstanceModel.id == job_model.instance_id)
         .options(joinedload(InstanceModel.project))
     )
     instance: Optional[InstanceModel] = res.scalar()

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dstackai/dstack/runner/internal/common"
-	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/common/log"
+	"github.com/dstackai/dstack/runner/internal/common/utils"
 )
 
 const downloadTimeout = 10 * time.Minute
@@ -90,7 +90,7 @@ func downloadFile(ctx context.Context, url string, path string, mode os.FileMode
 }
 
 func checkDstackComponent(ctx context.Context, name ComponentName, pth string) (status ComponentStatus, version string, err error) {
-	exists, err := common.PathExists(pth)
+	exists, err := utils.PathExists(pth)
 	if err != nil {
 		return ComponentStatusError, "", fmt.Errorf("check %s: %w", name, err)
 	}

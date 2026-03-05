@@ -908,7 +908,7 @@ resources:
 
 #### Network volumes
 
-Network volumes are persistent cloud storage (AWS EBS, GCP persistent disks, RunPod volumes).
+Network volumes are persistent cloud storage (AWS EBS, GCP persistent disks, Runpod volumes).
 
 Single-node task:
 
@@ -936,7 +936,7 @@ resources:
 
 </div>
 
-Network volumes cannot be used with distributed tasks (no multi-attach support), except where multi-attach is supported (RunPod) or via volume interpolation. 
+Network volumes cannot be used with distributed tasks (no multi-attach support), except where multi-attach is supported (Runpod) or via volume interpolation. 
 
 For distributed tasks, use interpolation to attach different volumes to each node.
 

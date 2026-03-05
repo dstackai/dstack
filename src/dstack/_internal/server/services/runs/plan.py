@@ -1,9 +1,9 @@
 import math
 from typing import Optional, Union
 
-from sqlalchemy import and_, not_, or_, select
+from sqlalchemy import and_, exists, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, noload
+from sqlalchemy.orm import contains_eager, joinedload, noload
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.models.fleets import Fleet, InstanceGroupPlacement
@@ -21,7 +21,14 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume
-from dstack._internal.server.models import FleetModel, InstanceModel, ProjectModel, RunModel
+from dstack._internal.server.models import (
+    ExportedFleetModel,
+    FleetModel,
+    ImportModel,
+    InstanceModel,
+    ProjectModel,
+    RunModel,
+)
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
     fleet_model_to_fleet,
@@ -206,8 +213,16 @@ async def get_run_candidate_fleet_models_filters(
     # If another job freed the instance but is still trying to detach volumes,
     # do not provision on it to prevent attaching volumes that are currently detaching.
     detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
+    is_fleet_imported_subquery = exists().where(
+        ImportModel.project_id == project.id,
+        ImportModel.export_id == ExportedFleetModel.export_id,
+        ExportedFleetModel.fleet_id == FleetModel.id,
+    )
     fleet_filters = [
-        FleetModel.project_id == project.id,
+        or_(
+            FleetModel.project_id == project.id,
+            is_fleet_imported_subquery,
+        ),
         FleetModel.deleted == False,
     ]
     if run_model is not None and run_model.fleet is not None:
@@ -235,7 +250,12 @@ async def select_run_candidate_fleet_models_with_filters(
         .join(FleetModel.instances)
         .where(*fleet_filters)
         .where(*instance_filters)
-        .options(contains_eager(FleetModel.instances))
+        .options(
+            contains_eager(FleetModel.instances),
+            joinedload(FleetModel.project)
+            .load_only(ProjectModel.name)
+            .joinedload(ProjectModel.backends),
+        )
         .execution_options(populate_existing=True)
     )
     if lock_instances:

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dstackai/dstack/runner/internal/common"
-	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/common/gpu"
+	"github.com/dstackai/dstack/runner/internal/common/log"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
 )
 
@@ -33,21 +33,21 @@ func NewGpuLock(gpus []host.GpuInfo) (*GpuLock, error) {
 	lock := make(map[string]bool, len(gpus))
 	if len(gpus) > 0 {
 		vendor := gpus[0].Vendor
-		for _, gpu := range gpus {
-			if gpu.Vendor != vendor {
+		for _, gpu_ := range gpus {
+			if gpu_.Vendor != vendor {
 				return nil, errors.New("multiple GPU vendors detected")
 			}
 			var resourceID string
 			switch vendor {
-			case common.GpuVendorNvidia:
-				resourceID = gpu.ID
-			case common.GpuVendorAmd:
-				resourceID = gpu.RenderNodePath
-			case common.GpuVendorTenstorrent:
-				resourceID = gpu.Index
-			case common.GpuVendorIntel:
-				resourceID = gpu.Index
-			case common.GpuVendorNone:
+			case gpu.GpuVendorNvidia:
+				resourceID = gpu_.ID
+			case gpu.GpuVendorAmd:
+				resourceID = gpu_.RenderNodePath
+			case gpu.GpuVendorTenstorrent:
+				resourceID = gpu_.Index
+			case gpu.GpuVendorIntel:
+				resourceID = gpu_.Index
+			case gpu.GpuVendorNone:
 				return nil, fmt.Errorf("unexpected GPU vendor %s", vendor)
 			default:
 				return nil, fmt.Errorf("unexpected GPU vendor %s", vendor)

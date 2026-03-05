@@ -126,6 +126,7 @@ def create_backend_fleet(
     gpu_count_max: int = 0,
     instances: Optional[List[Instance]] = None,
     status: FleetStatus = FleetStatus.ACTIVE,
+    project_name: str = "test-project",
 ) -> Fleet:
     nodes = FleetNodesSpec(min=nodes_min, target=nodes_min, max=nodes_max)
 
@@ -154,7 +155,7 @@ def create_backend_fleet(
     return Fleet(
         id=uuid4(),
         name=name,
-        project_name="test-project",
+        project_name=project_name,
         spec=spec,
         created_at=datetime(2023, 1, 2, 3, 4, 5, tzinfo=timezone.utc),
         status=status,
@@ -222,7 +223,7 @@ class TestGetFleetsTable:
             instances=[instance],
         )
 
-        table = get_fleets_table([fleet], verbose=False)
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
         cells = get_table_cells(table)
 
         assert len(cells) == 2  # 1 fleet row + 1 instance row
@@ -262,7 +263,7 @@ class TestGetFleetsTable:
             instances=[instance],
         )
 
-        table = get_fleets_table([fleet], verbose=True)
+        table = get_fleets_table([fleet], current_project="test-project", verbose=True)
         cells = get_table_cells(table)
 
         assert len(cells) == 2
@@ -310,7 +311,7 @@ class TestGetFleetsTable:
             instances=[instance1, instance2],
         )
 
-        table = get_fleets_table([fleet], verbose=False)
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
         cells = get_table_cells(table)
 
         assert len(cells) == 3  # 1 fleet row + 2 instance rows
@@ -345,7 +346,7 @@ class TestGetFleetsTable:
             instances=[instance],
         )
 
-        table = get_fleets_table([fleet], verbose=True)
+        table = get_fleets_table([fleet], current_project="test-project", verbose=True)
         cells = get_table_cells(table)
 
         assert len(cells) == 2
@@ -353,6 +354,7 @@ class TestGetFleetsTable:
         fleet_row = cells[0]
         assert fleet_row["NAME"] == "my-ssh"
         assert fleet_row["NODES"] == "1 (cluster)"
+        assert fleet_row["RESOURCES"] == "-"
         assert fleet_row["BACKEND"] == "ssh"
         assert fleet_row["SPOT"] == "-"
         assert fleet_row["PRICE"] == "-"
@@ -395,7 +397,9 @@ class TestGetFleetsTable:
             instances=[ssh_instance],
         )
 
-        table = get_fleets_table([backend_fleet, ssh_fleet], verbose=False)
+        table = get_fleets_table(
+            [backend_fleet, ssh_fleet], current_project="test-project", verbose=False
+        )
         cells = get_table_cells(table)
 
         assert len(cells) == 4  # 2 fleet rows + 2 instance rows
@@ -433,7 +437,9 @@ class TestGetFleetsTable:
             name="terminating", status=FleetStatus.TERMINATING, instances=[terminating_instance]
         )
 
-        table = get_fleets_table([active_fleet, terminating_fleet], verbose=False)
+        table = get_fleets_table(
+            [active_fleet, terminating_fleet], current_project="test-project", verbose=False
+        )
 
         active_style = get_table_cell_style(table, "STATUS", 0)
         assert active_style == "bold white"
@@ -451,7 +457,7 @@ class TestGetFleetsTable:
             instances=[idle_instance, busy_instance],
         )
 
-        table = get_fleets_table([fleet], verbose=False)
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
 
         idle_style = get_table_cell_style(table, "STATUS", 1)
         assert idle_style == "bold sea_green3"
@@ -462,7 +468,7 @@ class TestGetFleetsTable:
     def test_empty_fleet(self):
         fleet = create_backend_fleet(name="empty-fleet", instances=[])
 
-        table = get_fleets_table([fleet], verbose=False)
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
         cells = get_table_cells(table)
 
         assert len(cells) == 1
@@ -474,7 +480,7 @@ class TestGetFleetsTable:
             max_price=5.0,
         )
 
-        table = get_fleets_table([fleet], verbose=False)
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
         cells = get_table_cells(table)
 
         assert cells[0]["PRICE"] == "$0..$5"
@@ -485,7 +491,7 @@ class TestGetFleetsTable:
             backends=[BackendType.AWS, BackendType.GCP, BackendType.AZURE],
         )
 
-        table = get_fleets_table([fleet], verbose=False)
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
         cells = get_table_cells(table)
 
         assert cells[0]["BACKEND"] == "aws, gcp, azure"
@@ -496,7 +502,24 @@ class TestGetFleetsTable:
             backends=None,
         )
 
-        table = get_fleets_table([fleet], verbose=False)
+        table = get_fleets_table([fleet], current_project="test-project", verbose=False)
         cells = get_table_cells(table)
 
         assert cells[0]["BACKEND"] == "*"
+
+    def test_with_imported_fleet(self):
+        current_project_fleet = create_backend_fleet(
+            name="current-fleet", project_name="current-project"
+        )
+        other_project_fleet = create_backend_fleet(
+            name="other-fleet", project_name="other-project"
+        )
+        table = get_fleets_table(
+            [current_project_fleet, other_project_fleet],
+            verbose=False,
+            current_project="current-project",
+        )
+        cells = get_table_cells(table)
+        assert len(cells) == 2
+        assert cells[0]["NAME"] == "current-fleet"
+        assert cells[1]["NAME"] == "other-project/other-fleet"

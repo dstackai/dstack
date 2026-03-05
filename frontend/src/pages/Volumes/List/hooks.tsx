@@ -8,12 +8,12 @@ import type { PropertyFilterProps } from 'components';
 import { Button, ListEmptyMessage, NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { useNotifications } from 'hooks';
-import { useProjectFilter } from 'hooks/useProjectFilter';
+import { useLocalStorageState, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
 import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
 import { getStatusIconType } from 'libs/volumes';
 import { ROUTES } from 'routes';
+import { useLazyGetProjectsQuery } from 'services/project';
 import { useDeleteVolumesMutation } from 'services/volume';
 
 export const useVolumesTableEmptyMessages = ({
@@ -122,10 +122,14 @@ const filterKeys: Record<string, RequestParamsKeys> = {
     PROJECT_NAME: 'project_name',
 };
 
-export const useFilters = (localStorePrefix = 'volume-list-page') => {
+const limit = 100;
+
+export const useFilters = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const [onlyActive, setOnlyActive] = useState(() => searchParams.get('only_active') === 'true');
-    const { projectOptions } = useProjectFilter({ localStorePrefix });
+    const [onlyActive, setOnlyActive] = useLocalStorageState('volume-list-filter-only-active', true);
+    const [dynamicFilteringOptions, setDynamicFilteringOptions] = useState<PropertyFilterProps.FilteringOption[]>([]);
+    const [filteringStatusType, setFilteringStatusType] = useState<PropertyFilterProps.StatusType | undefined>();
+    const [getProjects] = useLazyGetProjectsQuery();
 
     const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
         requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys }),
@@ -133,25 +137,14 @@ export const useFilters = (localStorePrefix = 'volume-list-page') => {
 
     const clearFilter = () => {
         setSearchParams({});
-        setOnlyActive(false);
         setPropertyFilterQuery(EMPTY_QUERY);
     };
 
     const isDisabledClearFilter = !propertyFilterQuery.tokens.length && !onlyActive;
 
-    const filteringOptions = useMemo(() => {
-        const options: PropertyFilterProps.FilteringOption[] = [];
-
-        projectOptions.forEach(({ value }) => {
-            if (value)
-                options.push({
-                    propertyKey: filterKeys.PROJECT_NAME,
-                    value,
-                });
-        });
-
-        return options;
-    }, [projectOptions]);
+    const filteringOptions = useMemo<PropertyFilterProps.FilteringOption[]>(() => {
+        return [...dynamicFilteringOptions];
+    }, [dynamicFilteringOptions]);
 
     const filteringProperties = [
         {
@@ -179,8 +172,6 @@ export const useFilters = (localStorePrefix = 'volume-list-page') => {
 
     const onChangeOnlyActive: ToggleProps['onChange'] = ({ detail }) => {
         setOnlyActive(detail.checked);
-
-        setSearchParams(tokensToSearchParams<RequestParamsKeys>(propertyFilterQuery.tokens, detail.checked));
     };
 
     const filteringRequestParams = useMemo(() => {
@@ -194,6 +185,30 @@ export const useFilters = (localStorePrefix = 'volume-list-page') => {
         } as Partial<TVolumesListRequestParams>;
     }, [propertyFilterQuery, onlyActive]);
 
+    const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
+        setDynamicFilteringOptions([]);
+
+        if (!filteringText.length) {
+            return Promise.resolve();
+        }
+
+        setFilteringStatusType('loading');
+
+        if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
+            await getProjects({ name_pattern: filteringText, limit })
+                .unwrap()
+                .then(({ data }) =>
+                    data.map(({ project_name }) => ({
+                        propertyKey: filterKeys.PROJECT_NAME,
+                        value: project_name,
+                    })),
+                )
+                .then(setDynamicFilteringOptions);
+        }
+
+        setFilteringStatusType(undefined);
+    };
+
     return {
         filteringRequestParams,
         clearFilter,
@@ -204,6 +219,8 @@ export const useFilters = (localStorePrefix = 'volume-list-page') => {
         onlyActive,
         onChangeOnlyActive,
         isDisabledClearFilter,
+        filteringStatusType,
+        handleLoadItems,
     } as const;
 };
 

@@ -252,14 +252,14 @@ async def list_events(
     limit: int,
     ascending: bool,
 ) -> list[Event]:
-    target_filters = []
+    target_visibility_filters = []
     if user.global_role != GlobalRole.ADMIN:
         query = select(MemberModel.project_id).where(MemberModel.user_id == user.id)
         res = await session.execute(query)
         # In Postgres, fetching project IDs separately is orders of magnitude faster
         # than using a subquery.
         project_ids = list(res.unique().scalars().all())
-        target_filters.append(
+        target_visibility_filters.append(
             or_(
                 EventTargetModel.entity_project_id.in_(project_ids),
                 and_(
@@ -269,6 +269,7 @@ async def list_events(
                 ),
             )
         )
+    target_filters = []
     if target_projects is not None:
         target_filters.append(
             and_(
@@ -426,11 +427,24 @@ async def list_events(
     if event_filters:
         query = query.where(*event_filters)
     if target_filters:
+        # Each returned event should reference at least one target the user **wants** to see
+        # (as defined by user-provided filters).
         query = query.where(
             exists().where(
                 and_(
                     EventTargetModel.event_id == EventModel.id,
                     *target_filters,
+                )
+            )
+        )
+    if target_visibility_filters:
+        # Each returned event should reference at least one target the user **can** see
+        # (as defined by project membership).
+        query = query.where(
+            exists().where(
+                and_(
+                    EventTargetModel.event_id == EventModel.id,
+                    *target_visibility_filters,
                 )
             )
         )

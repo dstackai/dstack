@@ -105,6 +105,8 @@ export const OfferList: React.FC<OfferListProps> = ({
         groupBy,
         groupByOptions,
         onChangeGroupBy,
+        filteringStatusType,
+        handleLoadItems,
     } = useFilters({ gpus: data?.gpus ?? [], withSearchParams, permanentFilters, defaultFilters });
 
     useEffect(() => {
@@ -239,38 +241,43 @@ export const OfferList: React.FC<OfferListProps> = ({
             loading={!disabled && (isLoading || isFetching)}
             loadingText={t('common.loading')}
             stickyHeader={true}
-            filter={disabled ? undefined : (
-                <div className={styles.selectFilters}>
-                    <div className={styles.propertyFilter}>
-                        <PropertyFilter
-                            disabled={isLoading || isFetching}
-                            query={propertyFilterQuery}
-                            onChange={onChangePropertyFilter}
-                            expandToViewport
-                            hideOperations
-                            i18nStrings={{
-                                clearFiltersText: t('common.clearFilter'),
-                                filteringAriaLabel: t('offer.filter_property_placeholder'),
-                                filteringPlaceholder: t('offer.filter_property_placeholder'),
-                                operationAndText: 'and',
-                            }}
-                            filteringOptions={filteringOptions}
-                            filteringProperties={filteringProperties}
-                        />
-                    </div>
+            filter={
+                disabled ? undefined : (
+                    <div className={styles.selectFilters}>
+                        <div className={styles.propertyFilter}>
+                            <PropertyFilter
+                                disabled={isLoading || isFetching}
+                                query={propertyFilterQuery}
+                                onChange={onChangePropertyFilter}
+                                expandToViewport
+                                hideOperations
+                                i18nStrings={{
+                                    clearFiltersText: t('common.clearFilter'),
+                                    filteringAriaLabel: t('offer.filter_property_placeholder'),
+                                    filteringPlaceholder: t('offer.filter_property_placeholder'),
+                                    operationAndText: 'and',
+                                    enteredTextLabel: (value) => `Use: ${value}`,
+                                }}
+                                filteringOptions={filteringOptions}
+                                filteringProperties={filteringProperties}
+                                filteringStatusType={filteringStatusType}
+                                onLoadItems={handleLoadItems}
+                            />
+                        </div>
 
-                    <div className={styles.filterField}>
-                        <MultiselectCSD
-                            placeholder={t('offer.groupBy')}
-                            onChange={onChangeGroupBy}
-                            options={groupByOptions}
-                            selectedOptions={groupBy}
-                            expandToViewport={true}
-                            disabled={isLoading || isFetching}
-                        />
+                        <div className={styles.filterField}>
+                            <MultiselectCSD
+                                placeholder={t('offer.groupBy')}
+                                onChange={onChangeGroupBy}
+                                options={groupByOptions}
+                                selectedOptions={groupBy}
+                                expandToViewport={true}
+                                disabled={isLoading || isFetching}
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
         />
     );
 };

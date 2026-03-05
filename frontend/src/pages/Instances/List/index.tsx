@@ -38,6 +38,8 @@ export const List: React.FC = () => {
         onlyActive,
         onChangeOnlyActive,
         isDisabledClearFilter,
+        filteringStatusType,
+        handleLoadItems,
     } = useFilters();
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IInstance, TInstanceListRequestParams>({
@@ -116,9 +118,12 @@ export const List: React.FC = () => {
                                 filteringAriaLabel: t('projects.run.filter_property_placeholder'),
                                 filteringPlaceholder: t('projects.run.filter_property_placeholder'),
                                 operationAndText: 'and',
+                                enteredTextLabel: (value) => `Use: ${value}`,
                             }}
                             filteringOptions={filteringOptions}
                             filteringProperties={filteringProperties}
+                            filteringStatusType={filteringStatusType}
+                            onLoadItems={handleLoadItems}
                         />
                     </div>
 

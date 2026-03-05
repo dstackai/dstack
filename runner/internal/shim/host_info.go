@@ -7,18 +7,18 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dstackai/dstack/runner/internal/common"
+	"github.com/dstackai/dstack/runner/internal/common/gpu"
 )
 
 type hostInfo struct {
-	GpuVendor common.GpuVendor `json:"gpu_vendor"`
-	GpuName   string           `json:"gpu_name"`
-	GpuMemory int              `json:"gpu_memory"` // MiB
-	GpuCount  int              `json:"gpu_count"`
-	Addresses []string         `json:"addresses"`
-	DiskSize  uint64           `json:"disk_size"` // bytes
-	NumCPUs   int              `json:"cpus"`
-	Memory    uint64           `json:"memory"` // bytes
+	GpuVendor gpu.GpuVendor `json:"gpu_vendor"`
+	GpuName   string        `json:"gpu_name"`
+	GpuMemory int           `json:"gpu_memory"` // MiB
+	GpuCount  int           `json:"gpu_count"`
+	Addresses []string      `json:"addresses"`
+	DiskSize  uint64        `json:"disk_size"` // bytes
+	NumCPUs   int           `json:"cpus"`
+	Memory    uint64        `json:"memory"` // bytes
 }
 
 func WriteHostInfo(dir string, resources Resources) error {
@@ -28,7 +28,7 @@ func WriteHostInfo(dir string, resources Resources) error {
 		return err
 	}
 
-	gpuVendor := common.GpuVendorNone
+	gpuVendor := gpu.GpuVendorNone
 	gpuCount := 0
 	gpuMemory := 0
 	gpuName := ""

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, List, Literal, Optional, Union
 
 import gpuhunt
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, exists, false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
@@ -42,7 +42,9 @@ from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.models import (
+    ExportedFleetModel,
     FleetModel,
+    ImportModel,
     InstanceHealthCheckModel,
     InstanceModel,
     ProjectModel,
@@ -524,13 +526,23 @@ async def list_projects_instance_models(
     projects: List[ProjectModel],
     fleet_ids: Optional[Iterable[uuid.UUID]],
     only_active: bool,
+    include_imported: bool,
     prev_created_at: Optional[datetime],
     prev_id: Optional[uuid.UUID],
     limit: int,
     ascending: bool,
 ) -> List[InstanceModel]:
+    project_ids = [p.id for p in projects]
+    is_instance_imported_subquery = exists().where(
+        ImportModel.project_id.in_(project_ids),
+        ImportModel.export_id == ExportedFleetModel.export_id,
+        ExportedFleetModel.fleet_id == InstanceModel.fleet_id,
+    )
     filters: List = [
-        InstanceModel.project_id.in_(p.id for p in projects),
+        or_(
+            InstanceModel.project_id.in_(project_ids),
+            is_instance_imported_subquery if include_imported else false(),
+        )
     ]
     if fleet_ids is not None:
         filters.append(InstanceModel.fleet_id.in_(fleet_ids))
@@ -577,7 +589,10 @@ async def list_projects_instance_models(
         .where(*filters)
         .order_by(*order_by)
         .limit(limit)
-        .options(joinedload(InstanceModel.fleet))
+        .options(
+            joinedload(InstanceModel.fleet),
+            joinedload(InstanceModel.project).load_only(ProjectModel.name),
+        )
     )
     instance_models = list(res.unique().scalars().all())
     return instance_models
@@ -589,6 +604,7 @@ async def list_user_instances(
     project_names: Optional[Container[str]],
     fleet_ids: Optional[Iterable[uuid.UUID]],
     only_active: bool,
+    include_imported: bool,
     prev_created_at: Optional[datetime],
     prev_id: Optional[uuid.UUID],
     limit: int,
@@ -608,6 +624,7 @@ async def list_user_instances(
         projects=projects,
         fleet_ids=fleet_ids,
         only_active=only_active,
+        include_imported=include_imported,
         prev_created_at=prev_created_at,
         prev_id=prev_id,
         limit=limit,

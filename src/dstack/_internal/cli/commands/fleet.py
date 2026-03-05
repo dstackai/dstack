@@ -93,17 +93,21 @@ class FleetCommand(APIBaseCommand):
         args.subfunc(args)
 
     def _list(self, args: argparse.Namespace):
-        fleets = self.api.client.fleets.list(self.api.project)
+        fleets = self.api.client.fleets.list(self.api.project, include_imported=True)
         if not args.watch:
-            print_fleets_table(fleets, verbose=args.verbose)
+            print_fleets_table(fleets, current_project=self.api.project, verbose=args.verbose)
             return
 
         try:
             with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
                 while True:
-                    live.update(get_fleets_table(fleets, verbose=args.verbose))
+                    live.update(
+                        get_fleets_table(
+                            fleets, current_project=self.api.project, verbose=args.verbose
+                        )
+                    )
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
-                    fleets = self.api.client.fleets.list(self.api.project)
+                    fleets = self.api.client.fleets.list(self.api.project, include_imported=True)
         except KeyboardInterrupt:
             pass
 

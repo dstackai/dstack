@@ -2,6 +2,7 @@ declare type TInstanceListRequestParams = TBaseRequestListParams & {
     project_names?: string[];
     fleet_ids?: string[];
     only_active?: boolean;
+    include_imported?: boolean;
 };
 
 declare type TInstanceStatus =

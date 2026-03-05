@@ -31,6 +31,7 @@ from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_export,
     create_fleet,
     create_instance,
     create_job,
@@ -141,6 +142,223 @@ class TestListFleets:
         assert len(response_json) == 1
         assert response_json[0]["project_name"] == "project1"
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("with_project_name_filter", [True, False])
+    async def test_returns_imported_fleet_with_include_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient, with_project_name_filter: bool
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        await create_fleet(
+            session=session,
+            project=importer_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="local-fleet")),
+        )
+        response = await client.post(
+            "/api/fleets/list",
+            headers=get_auth_headers(importer_user.token),
+            json={
+                "include_imported": True,
+                "project_name": "importer-project" if with_project_name_filter else None,
+            },
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        response_json.sort(key=lambda f: f["name"])
+        assert len(response_json) == 2
+        assert response_json[0]["name"] == "exported-fleet"
+        assert response_json[0]["project_name"] == "exporter-project"
+        assert len(response_json[0]["instances"]) == 1
+        assert response_json[0]["instances"][0]["id"] == str(instance.id)
+        assert response_json[1]["name"] == "local-fleet"
+        assert response_json[1]["project_name"] == "importer-project"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_not_returns_imported_fleet_without_include_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        await create_fleet(
+            session=session,
+            project=importer_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="local-fleet")),
+        )
+        response = await client.post(
+            "/api/fleets/list",
+            headers=get_auth_headers(importer_user.token),
+            json={},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 1
+        assert response_json[0]["name"] == "local-fleet"
+        assert response_json[0]["project_name"] == "importer-project"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_imported_fleet_once_when_user_member_of_both_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, name="user", global_role=GlobalRole.USER)
+        exporter_project = await create_project(session, name="exporter-project", owner=user)
+        importer_project = await create_project(session, name="importer-project", owner=user)
+        await add_project_member(
+            session=session,
+            project=exporter_project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="shared-fleet")),
+        )
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="local-exporter-fleet")),
+        )
+        await create_fleet(
+            session=session,
+            project=importer_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="local-importer-fleet")),
+        )
+        response = await client.post(
+            "/api/fleets/list",
+            headers=get_auth_headers(user.token),
+            json={"include_imported": True},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        response_json.sort(key=lambda f: f["name"])
+        assert len(response_json) == 3
+        assert response_json[0]["name"] == "local-exporter-fleet"
+        assert response_json[0]["project_name"] == "exporter-project"
+        assert response_json[1]["name"] == "local-importer-fleet"
+        assert response_json[1]["project_name"] == "importer-project"
+        assert response_json[2]["name"] == "shared-fleet"
+        assert response_json[2]["project_name"] == "exporter-project"
+        assert len(response_json[2]["instances"]) == 1
+        assert response_json[2]["instances"][0]["id"] == str(instance.id)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_fleet_once_if_imported_twice(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.USER,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+        )
+        for name in ["export-1", "export-2"]:
+            await create_export(
+                session=session,
+                exporter_project=exporter_project,
+                importer_projects=[importer_project],
+                exported_fleets=[fleet],
+                name=name,
+            )
+        response = await client.post(
+            "/api/fleets/list",
+            headers=get_auth_headers(importer_user.token),
+            json={"include_imported": True},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 1
+        assert response_json[0]["name"] == "exported-fleet"
+        assert response_json[0]["project_name"] == "exporter-project"
+        assert len(response_json[0]["instances"]) == 1
+        assert response_json[0]["instances"][0]["id"] == str(instance.id)
+
 
 class TestListProjectFleets:
     @pytest.mark.asyncio
@@ -182,6 +400,155 @@ class TestListProjectFleets:
             }
         ]
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_imported_fleet_with_include_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        await create_fleet(
+            session=session,
+            project=importer_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="local-fleet")),
+        )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/fleets/list",
+            headers=get_auth_headers(importer_user.token),
+            json={"include_imported": True},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        response_json.sort(key=lambda f: f["name"])
+        assert len(response_json) == 2
+        assert response_json[0]["name"] == "exported-fleet"
+        assert response_json[0]["project_name"] == "exporter-project"
+        assert len(response_json[0]["instances"]) == 1
+        assert response_json[0]["instances"][0]["id"] == str(instance.id)
+        assert response_json[1]["name"] == "local-fleet"
+        assert response_json[1]["project_name"] == "importer-project"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_not_returns_imported_fleet_without_include_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        await create_fleet(
+            session=session,
+            project=importer_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="local-fleet")),
+        )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/fleets/list",
+            headers=get_auth_headers(importer_user.token),
+            json={},  # No include_imported parameter
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 1
+        assert response_json[0]["name"] == "local-fleet"
+        assert response_json[0]["project_name"] == "importer-project"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_fleet_once_if_imported_twice(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.USER,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+        )
+        for name in ["export-1", "export-2"]:
+            await create_export(
+                session=session,
+                exporter_project=exporter_project,
+                importer_projects=[importer_project],
+                exported_fleets=[fleet],
+                name=name,
+            )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/fleets/list",
+            headers=get_auth_headers(importer_user.token),
+            json={"include_imported": True},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 1
+        assert response_json[0]["name"] == "exported-fleet"
+        assert response_json[0]["project_name"] == "exporter-project"
+        assert len(response_json[0]["instances"]) == 1
+        assert response_json[0]["instances"][0]["id"] == str(instance.id)
+
 
 class TestGetFleet:
     @pytest.mark.asyncio
@@ -191,6 +558,51 @@ class TestGetFleet:
     ):
         response = await client.post("/api/project/main/fleets/get")
         assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "by_id", [pytest.param(False, id="by-name"), pytest.param(True, id="by-id")]
+    )
+    async def test_returns_403_on_nonexistent_fleet_in_foreign_project(
+        self, test_db, session: AsyncSession, client: AsyncClient, by_id: bool
+    ):
+        await create_project(session, name="test-project")
+        user = await create_user(session, global_role=GlobalRole.USER)  # not a project member
+        if by_id:
+            body = {"id": str(uuid4())}
+        else:
+            body = {"name": "nonexistent"}
+        response = await client.post(
+            "/api/project/test-project/fleets/get",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "by_id", [pytest.param(False, id="by-name"), pytest.param(True, id="by-id")]
+    )
+    async def test_returns_403_on_deleted_fleet_in_foreign_project(
+        self, test_db, session: AsyncSession, client: AsyncClient, by_id: bool
+    ):
+        project = await create_project(session, name="test-project")
+        user = await create_user(session, global_role=GlobalRole.USER)  # not a project member
+        fleet = await create_fleet(
+            session=session, project=project, deleted=True, name="deleted-fleet"
+        )
+        if by_id:
+            body = {"id": str(fleet.id)}
+        else:
+            body = {"name": "deleted-fleet"}
+        response = await client.post(
+            "/api/project/test-project/fleets/get",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 403
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -302,6 +714,138 @@ class TestGetFleet:
             json={"name": "some_fleet"},
         )
         assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "by_id", [pytest.param(False, id="by-name"), pytest.param(True, id="by-id")]
+    )
+    async def test_returns_foreign_fleet_to_global_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient, by_id: bool
+    ):
+        admin = await create_user(session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session, name="test-project")
+        fleet = await create_fleet(session=session, project=project, name="test-fleet")
+        if by_id:
+            body = {"id": str(fleet.id)}
+        else:
+            body = {"name": "test-fleet"}
+        response = await client.post(
+            "/api/project/test-project/fleets/get",
+            headers=get_auth_headers(admin.token),
+            json=body,
+        )
+        assert response.status_code == 200
+        assert response.json()["name"] == "test-fleet"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "by_id", [pytest.param(False, id="by-name"), pytest.param(False, id="by-id")]
+    )
+    async def test_returns_imported_fleet(
+        self, test_db, session: AsyncSession, client: AsyncClient, by_id: bool
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        if by_id:
+            body = {"id": str(fleet.id)}
+        else:
+            body = {"name": "exported-fleet"}
+        response = await client.post(
+            "/api/project/exporter-project/fleets/get",
+            headers=get_auth_headers(importer_user.token),
+            json=body,
+        )
+        assert response.status_code == 200
+        assert response.json()["id"] == str(fleet.id)
+        assert response.json()["name"] == "exported-fleet"
+        assert response.json()["project_name"] == "exporter-project"
+        assert len(response.json()["instances"]) == 1
+        assert response.json()["instances"][0]["id"] == str(instance.id)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "by_id", [pytest.param(False, id="by-name"), pytest.param(False, id="by-id")]
+    )
+    async def test_returns_403_on_foreign_fleet_if_not_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient, by_id: bool
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        not_importer_user = await create_user(
+            session, name="not-importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(
+            session, name="exporter-project", owner=importer_user
+        )
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        not_importer_project = await create_project(
+            session, name="not-importer-project", owner=not_importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=not_importer_project,
+            user=not_importer_user,
+            project_role=ProjectRole.USER,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        if by_id:
+            body = {"id": str(fleet.id)}
+        else:
+            body = {"name": "exported-fleet"}
+        response = await client.post(
+            "/api/project/exporter-project/fleets/get",
+            headers=get_auth_headers(not_importer_user.token),
+            json=body,
+        )
+        assert response.status_code == 403
 
 
 class TestApplyFleetPlan:
@@ -850,6 +1394,43 @@ class TestApplyFleetPlan:
             )
         assert response.status_code in [401, 403]
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_importer_member_cannot_apply_plan_on_imported_fleet(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        spec = get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet"))
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=spec,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/fleets/apply",
+            headers=get_auth_headers(importer_user.token),
+            json={"plan": {"spec": spec.dict()}, "force": False},
+        )
+        assert response.status_code == 403
+
 
 class TestDeleteFleets:
     @pytest.mark.asyncio
@@ -994,6 +1575,42 @@ class TestDeleteFleets:
             )
         assert response.status_code in [401, 403]
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_importer_member_cannot_delete_imported_fleet(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/fleets/delete",
+            headers=get_auth_headers(importer_user.token),
+            json={"names": [fleet.name]},
+        )
+        assert response.status_code == 403
+
 
 class TestDeleteFleetInstances:
     @pytest.mark.asyncio
@@ -1119,6 +1736,48 @@ class TestDeleteFleetInstances:
         await session.refresh(instance)
         assert fleet.status != FleetStatus.TERMINATING
         assert instance.status != InstanceStatus.TERMINATING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_importer_member_cannot_delete_imported_fleet_instances(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet")),
+        )
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            instance_num=1,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/fleets/delete_instances",
+            headers=get_auth_headers(importer_user.token),
+            json={"name": fleet.name, "instance_nums": [1]},
+        )
+        assert response.status_code == 403
 
 
 class TestGetPlan:
@@ -1315,6 +1974,39 @@ class TestGetPlan:
         assert len(offers) == 2
         assert offers[0]["availability"] == InstanceAvailability.AVAILABLE.value
         assert offers[1]["availability"] == expected_availability.value
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_importer_member_cannot_get_plan_for_imported_fleet(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        spec = get_fleet_spec(get_ssh_fleet_configuration(name="exported-fleet"))
+        fleet = await create_fleet(session=session, project=exporter_project, spec=spec)
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/fleets/get_plan",
+            headers=get_auth_headers(importer_user.token),
+            json={"spec": spec.dict()},
+        )
+        assert response.status_code == 403
 
 
 def _fleet_model_to_json_dict(fleet: FleetModel) -> dict:

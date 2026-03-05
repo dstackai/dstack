@@ -25,7 +25,7 @@ To use your own cloud account, open the project settings and edit the correspond
 ![dstack-sky-banner.png](https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-sky-edit-backend-config.png){ width=650 }
 
 You can configure your cloud accounts for any of the supported providers, including AWS, GCP, Azure, TensorDock, Lambda,
-CUDO, RunPod, and Vast.ai.
+CUDO, Runpod, and Vast.ai.
 
 Additionally, you can disable certain backends if you do not plan to use them.
 

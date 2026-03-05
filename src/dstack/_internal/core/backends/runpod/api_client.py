@@ -108,7 +108,7 @@ class RunpodApiClient:
         container_disk_in_gb: int,
         container_registry_auth_id: str,
         # Default pod volume is 20GB.
-        # RunPod errors if it's not specified for podEditJob.
+        # Runpod errors if it's not specified for podEditJob.
         volume_in_gb: int = 20,
     ) -> str:
         resp = self._make_request(
@@ -320,7 +320,7 @@ class RunpodApiClient:
             )
             response.raise_for_status()
             response_json = response.json()
-            # RunPod returns 200 on client errors
+            # Runpod returns 200 on client errors
             if "errors" in response_json:
                 raise RunpodApiClientError(errors=response_json["errors"])
             return response

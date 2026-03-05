@@ -17,7 +17,7 @@ import (
 
 	"github.com/alexellis/go-execute/v2"
 
-	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/common/log"
 )
 
 // Counter represents a single line in counters.csv, see
