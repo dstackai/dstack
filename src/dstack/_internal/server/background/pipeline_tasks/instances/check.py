@@ -69,10 +69,6 @@ def process_idle_timeout(instance_model: InstanceModel) -> Optional[ProcessResul
     if instance_model.fleet is not None and not can_terminate_fleet_instances_on_idle_duration(
         instance_model.fleet
     ):
-        logger.debug(
-            "Skipping instance %s termination on idle duration. Fleet is already at `nodes.min`.",
-            instance_model.name,
-        )
         return None
 
     idle_duration = get_instance_idle_duration(instance_model)

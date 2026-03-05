@@ -73,6 +73,7 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import (
     get_member,
@@ -467,6 +468,7 @@ async def apply_plan(
     project: ProjectModel,
     plan: ApplyFleetPlanInput,
     force: bool,
+    pipeline_hinter: PipelineHinterProtocol,
 ) -> Fleet:
     spec = await apply_plugin_policies(
         user=user.name,
@@ -487,6 +489,7 @@ async def apply_plan(
             project=project,
             user=user,
             spec=spec,
+            pipeline_hinter=pipeline_hinter,
         )
 
     fleet_model = await get_project_fleet_model_by_name(
@@ -500,6 +503,7 @@ async def apply_plan(
             project=project,
             user=user,
             spec=spec,
+            pipeline_hinter=pipeline_hinter,
         )
 
     instances_ids = sorted(i.id for i in fleet_model.instances if not i.deleted)
@@ -557,6 +561,7 @@ async def apply_plan(
         project=project,
         user=user,
         spec=spec,
+        pipeline_hinter=pipeline_hinter,
     )
 
 
@@ -565,6 +570,7 @@ async def create_fleet(
     project: ProjectModel,
     user: UserModel,
     spec: FleetSpec,
+    pipeline_hinter: PipelineHinterProtocol,
 ) -> Fleet:
     spec = await apply_plugin_policies(
         user=user.name,
@@ -578,7 +584,9 @@ async def create_fleet(
     if spec.configuration.ssh_config is not None:
         _check_can_manage_ssh_fleets(user=user, project=project)
 
-    return await _create_fleet(session=session, project=project, user=user, spec=spec)
+    return await _create_fleet(
+        session=session, project=project, user=user, spec=spec, pipeline_hinter=pipeline_hinter
+    )
 
 
 def create_fleet_instance_model(
@@ -910,6 +918,7 @@ async def _create_fleet(
     project: ProjectModel,
     user: UserModel,
     spec: FleetSpec,
+    pipeline_hinter: PipelineHinterProtocol,
 ) -> Fleet:
     lock_namespace = f"fleet_names_{project.name}"
     if is_db_sqlite():
@@ -990,6 +999,8 @@ async def _create_fleet(
                     targets=[events.Target.from_model(instance_model)],
                 )
                 fleet_model.instances.append(instance_model)
+            pipeline_hinter.hint_fetch(FleetModel.__name__)
+            pipeline_hinter.hint_fetch(InstanceModel.__name__)
         await session.commit()
         return fleet_model_to_fleet(fleet_model)
 
