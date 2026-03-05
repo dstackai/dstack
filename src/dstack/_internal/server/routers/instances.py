@@ -7,6 +7,7 @@ import dstack._internal.server.services.instances as instances_services
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.instances import Instance
 from dstack._internal.server.db import get_session
+from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.instances import (
     GetInstanceHealthChecksRequest,
@@ -14,7 +15,11 @@ from dstack._internal.server.schemas.instances import (
     GetInstanceRequest,
     ListInstancesRequest,
 )
-from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.security.permissions import (
+    Authenticated,
+    ProjectMember,
+    check_can_access_instance,
+)
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -52,6 +57,7 @@ async def list_instances(
             project_names=body.project_names,
             fleet_ids=body.fleet_ids,
             only_active=body.only_active,
+            include_imported=body.include_imported,
             prev_created_at=body.prev_created_at,
             prev_id=body.prev_id,
             limit=body.limit,
@@ -83,12 +89,15 @@ async def get_instance_health_checks(
 async def get_instance(
     body: GetInstanceRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
-    user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
+    user: Annotated[UserModel, Depends(Authenticated())],
+    project: Annotated[ProjectModel, Depends(Project())],
 ):
     """
     Returns an instance given its ID.
     """
-    _, project = user_project
+    await check_can_access_instance(
+        session=session, user=user, instance_project=project, instance_id=body.id
+    )
     instance = await instances_services.get_instance(
         session=session, project=project, instance_id=body.id
     )

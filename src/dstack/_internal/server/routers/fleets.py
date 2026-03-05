@@ -9,6 +9,7 @@ from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.fleets import Fleet, FleetPlan
 from dstack._internal.server.compatibility.common import patch_offers_list
 from dstack._internal.server.db import get_session
+from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.fleets import (
     ApplyFleetPlanRequest,
@@ -18,8 +19,13 @@ from dstack._internal.server.schemas.fleets import (
     GetFleetPlanRequest,
     GetFleetRequest,
     ListFleetsRequest,
+    ListProjectFleetsRequest,
 )
-from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.security.permissions import (
+    Authenticated,
+    ProjectMember,
+    check_can_access_fleet,
+)
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -58,6 +64,7 @@ async def list_fleets(
             user=user,
             project_name=body.project_name,
             only_active=body.only_active,
+            include_imported=body.include_imported,
             prev_created_at=body.prev_created_at,
             prev_id=body.prev_id,
             limit=body.limit,
@@ -68,6 +75,7 @@ async def list_fleets(
 
 @project_router.post("/list", response_model=List[Fleet])
 async def list_project_fleets(
+    body: Optional[ListProjectFleetsRequest] = None,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
@@ -76,8 +84,14 @@ async def list_project_fleets(
     Includes only active fleet instances. To list all fleet instances, use `/api/instances/list`.
     """
     _, project = user_project
+    if body is None:
+        body = ListProjectFleetsRequest()
     return CustomORJSONResponse(
-        await fleets_services.list_project_fleets(session=session, project=project)
+        await fleets_services.list_project_fleets(
+            session=session,
+            project=project,
+            include_imported=body.include_imported,
+        )
     )
 
 
@@ -85,16 +99,19 @@ async def list_project_fleets(
 async def get_fleet(
     body: GetFleetRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    user: UserModel = Depends(Authenticated()),
+    project: ProjectModel = Depends(Project()),
 ):
     """
     Returns a fleet given `name` or `id`.
     If given `name`, does not return deleted fleets.
     If given `id`, returns deleted fleets.
     """
-    _, project = user_project
+    await check_can_access_fleet(
+        session=session, user=user, fleet_project=project, fleet_name_or_id=body.get_name_or_id()
+    )
     fleet = await fleets_services.get_fleet(
-        session=session, project=project, name=body.name, fleet_id=body.id
+        session=session, project=project, name_or_id=body.get_name_or_id()
     )
     if fleet is None:
         raise ResourceNotExistsError()

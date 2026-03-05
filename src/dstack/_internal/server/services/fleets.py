@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import wraps
 from typing import List, Literal, Optional, Tuple, TypeVar, Union
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, exists, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, joinedload, selectinload
 
@@ -53,7 +53,9 @@ from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.core.services.diff import ModelDiff, copy_model, diff_models
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
+    ExportedFleetModel,
     FleetModel,
+    ImportModel,
     InstanceModel,
     JobModel,
     MemberModel,
@@ -82,6 +84,7 @@ from dstack._internal.server.services.projects import (
 )
 from dstack._internal.server.services.resources import set_resources_defaults
 from dstack._internal.utils import random_names
+from dstack._internal.utils.common import EntityID, EntityName, EntityNameOrID
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import pkey_from_str
 
@@ -193,6 +196,7 @@ async def list_fleets(
     user: UserModel,
     project_name: Optional[str],
     only_active: bool,
+    include_imported: bool,
     prev_created_at: Optional[datetime],
     prev_id: Optional[uuid.UUID],
     limit: int,
@@ -209,6 +213,7 @@ async def list_fleets(
         session=session,
         projects=projects,
         only_active=only_active,
+        include_imported=include_imported,
         prev_created_at=prev_created_at,
         prev_id=prev_id,
         limit=limit,
@@ -221,13 +226,25 @@ async def list_projects_fleet_models(
     session: AsyncSession,
     projects: List[ProjectModel],
     only_active: bool,
+    include_imported: bool,
     prev_created_at: Optional[datetime],
     prev_id: Optional[uuid.UUID],
     limit: int,
     ascending: bool,
 ) -> List[FleetModel]:
     filters = []
-    filters.append(FleetModel.project_id.in_(p.id for p in projects))
+    project_ids = {p.id for p in projects}
+    is_fleet_imported_subquery = exists().where(
+        ImportModel.project_id.in_(project_ids),
+        ImportModel.export_id == ExportedFleetModel.export_id,
+        ExportedFleetModel.fleet_id == FleetModel.id,
+    )
+    filters.append(
+        or_(
+            FleetModel.project_id.in_(project_ids),
+            is_fleet_imported_subquery if include_imported else false(),
+        )
+    )
     if only_active:
         filters.append(FleetModel.deleted == False)
     if prev_created_at is not None:
@@ -259,7 +276,10 @@ async def list_projects_fleet_models(
         .where(*filters)
         .order_by(*order_by)
         .limit(limit)
-        .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .options(
+            joinedload(FleetModel.project).load_only(ProjectModel.name),
+            selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)),
+        )
     )
     fleet_models = list(res.unique().scalars().all())
     return fleet_models
@@ -269,8 +289,11 @@ async def list_project_fleets(
     session: AsyncSession,
     project: ProjectModel,
     names: Optional[List[str]] = None,
+    include_imported: bool = False,
 ) -> List[Fleet]:
-    fleet_models = await list_project_fleet_models(session=session, project=project, names=names)
+    fleet_models = await list_project_fleet_models(
+        session=session, project=project, names=names, include_imported=include_imported
+    )
     return [fleet_model_to_fleet(v) for v in fleet_models]
 
 
@@ -278,11 +301,21 @@ async def list_project_fleet_models(
     session: AsyncSession,
     project: ProjectModel,
     names: Optional[List[str]] = None,
+    include_imported: bool = False,
     include_deleted: bool = False,
 ) -> List[FleetModel]:
-    filters = [
-        FleetModel.project_id == project.id,
-    ]
+    filters = []
+    is_fleet_imported_subquery = exists().where(
+        ImportModel.project_id == project.id,
+        ImportModel.export_id == ExportedFleetModel.export_id,
+        ExportedFleetModel.fleet_id == FleetModel.id,
+    )
+    filters.append(
+        or_(
+            FleetModel.project_id == project.id,
+            is_fleet_imported_subquery if include_imported else false(),
+        )
+    )
     if names is not None:
         filters.append(FleetModel.name.in_(names))
     if not include_deleted:
@@ -290,7 +323,10 @@ async def list_project_fleet_models(
     res = await session.execute(
         select(FleetModel)
         .where(*filters)
-        .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .options(
+            joinedload(FleetModel.project).load_only(ProjectModel.name),
+            selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)),
+        )
     )
     return list(res.unique().scalars().all())
 
@@ -298,20 +334,17 @@ async def list_project_fleet_models(
 async def get_fleet(
     session: AsyncSession,
     project: ProjectModel,
-    name: Optional[str] = None,
-    fleet_id: Optional[uuid.UUID] = None,
+    name_or_id: EntityNameOrID,
     include_sensitive: bool = False,
 ) -> Optional[Fleet]:
-    if fleet_id is not None:
+    if isinstance(name_or_id, EntityID):
         fleet_model = await get_project_fleet_model_by_id(
-            session=session, project=project, fleet_id=fleet_id
-        )
-    elif name is not None:
-        fleet_model = await get_project_fleet_model_by_name(
-            session=session, project=project, name=name
+            session=session, project=project, fleet_id=name_or_id.id
         )
     else:
-        raise ServerClientError("name or id must be specified")
+        fleet_model = await get_project_fleet_model_by_name(
+            session=session, project=project, name=name_or_id.name
+        )
     if fleet_model is None:
         return None
     return fleet_model_to_fleet(fleet_model, include_sensitive=include_sensitive)
@@ -329,7 +362,10 @@ async def get_project_fleet_model_by_id(
     res = await session.execute(
         select(FleetModel)
         .where(*filters)
-        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .options(
+            joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)),
+            joinedload(FleetModel.project).load_only(ProjectModel.name),
+        )
     )
     return res.unique().scalar_one_or_none()
 
@@ -349,7 +385,10 @@ async def get_project_fleet_model_by_name(
     res = await session.execute(
         select(FleetModel)
         .where(*filters)
-        .options(joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .options(
+            joinedload(FleetModel.instances.and_(InstanceModel.deleted == False)),
+            joinedload(FleetModel.project).load_only(ProjectModel.name),
+        )
     )
     return res.unique().scalar_one_or_none()
 
@@ -379,7 +418,7 @@ async def get_plan(
         current_fleet = await get_fleet(
             session=session,
             project=project,
-            name=effective_spec.configuration.name,
+            name_or_id=EntityName(effective_spec.configuration.name),
             include_sensitive=True,
         )
         if current_fleet is not None:

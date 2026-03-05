@@ -978,3 +978,63 @@ class EventTargetModel(BaseModel):
     )
     entity_id: Mapped[uuid.UUID] = mapped_column(UUIDType(binary=False), index=True)
     entity_name: Mapped[str] = mapped_column(String(200))
+
+
+class ExportModel(BaseModel):
+    __tablename__ = "exports"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_exports_project_id_name"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    project: Mapped["ProjectModel"] = relationship()
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    imports: Mapped[List["ImportModel"]] = relationship(back_populates="export")
+    exported_fleets: Mapped[List["ExportedFleetModel"]] = relationship(back_populates="export")
+
+
+class ImportModel(BaseModel):
+    __tablename__ = "imports"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "export_id",
+            name="uq_imports_project_id_export_id",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    project: Mapped["ProjectModel"] = relationship()
+    export_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("exports.id", ondelete="CASCADE"), index=True
+    )
+    export: Mapped["ExportModel"] = relationship()
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+
+
+class ExportedFleetModel(BaseModel):
+    __tablename__ = "exported_fleets"
+    __table_args__ = (
+        UniqueConstraint("export_id", "fleet_id", name="uq_exported_fleets_export_id_fleet_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    export_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("exports.id", ondelete="CASCADE"), index=True
+    )
+    export: Mapped["ExportModel"] = relationship()
+    fleet_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("fleets.id", ondelete="CASCADE"), index=True
+    )
+    fleet: Mapped["FleetModel"] = relationship()

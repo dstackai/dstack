@@ -93,10 +93,13 @@ from dstack._internal.server.models import (
     ComputeGroupModel,
     DecryptedString,
     EventModel,
+    ExportedFleetModel,
+    ExportModel,
     FileArchiveModel,
     FleetModel,
     GatewayComputeModel,
     GatewayModel,
+    ImportModel,
     InstanceHealthCheckModel,
     InstanceModel,
     JobMetricsPoint,
@@ -512,6 +515,24 @@ async def create_compute_group(
     session.add(compute_group)
     await session.commit()
     return compute_group
+
+
+async def create_export(
+    session: AsyncSession,
+    exporter_project: ProjectModel,
+    importer_projects: list[ProjectModel],
+    exported_fleets: list[FleetModel],
+    name: str = "test_export",
+) -> ExportModel:
+    export = ExportModel(
+        name=name,
+        project=exporter_project,
+        imports=[ImportModel(project=project) for project in importer_projects],
+        exported_fleets=[ExportedFleetModel(fleet=fleet) for fleet in exported_fleets],
+    )
+    session.add(export)
+    await session.commit()
+    return export
 
 
 async def create_probe(

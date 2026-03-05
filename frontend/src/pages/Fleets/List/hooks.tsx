@@ -180,6 +180,7 @@ export const useFilters = () => {
         return {
             ...params,
             only_active: onlyActive,
+            include_imported: true,
         } as Partial<TFleetListRequestParams>;
     }, [propertyFilterQuery, onlyActive]);
 
