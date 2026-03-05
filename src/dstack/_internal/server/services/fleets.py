@@ -735,7 +735,7 @@ async def delete_fleets(
         .order_by(FleetModel.id)
     )
     fleets_ids = list(res.scalars().unique().all())
-    res = await session.execute(
+    stmt = (
         select(InstanceModel.id)
         .where(
             InstanceModel.fleet_id.in_(fleets_ids),
@@ -743,6 +743,9 @@ async def delete_fleets(
         )
         .order_by(InstanceModel.id)
     )
+    if instance_nums is not None:
+        stmt = stmt.where(InstanceModel.instance_num.in_(instance_nums))
+    res = await session.execute(stmt)
     instances_ids = list(res.scalars().unique().all())
     await sqlite_commit(session)
     async with (
@@ -803,8 +806,8 @@ async def delete_fleets(
             )
             raise ServerClientError(msg)
         for fleet_model in fleet_models:
-            fleet = fleet_model_to_fleet(fleet_model)
-            if fleet.spec.configuration.ssh_config is not None:
+            fleet_spec = get_fleet_spec(fleet_model)
+            if fleet_spec.configuration.ssh_config is not None:
                 _check_can_manage_ssh_fleets(user=user, project=project)
         if instance_nums is None:
             logger.info("Deleting fleets: %s", [f.name for f in fleet_models])

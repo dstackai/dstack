@@ -479,7 +479,6 @@ def _maybe_install_runner(
     # * To provide your own build, set DSTACK_RUNNER_VERSION_URL and DSTACK_RUNNER_DOWNLOAD_URL.
     expected_version = get_dstack_runner_version()
     if expected_version is None:
-        logger.debug("Cannot determine the expected runner version")
         return False
 
     installed_version = runner_info.version
@@ -526,7 +525,6 @@ def _maybe_install_shim(
     # * To provide your own build, set DSTACK_SHIM_VERSION_URL and DSTACK_SHIM_DOWNLOAD_URL.
     expected_version = get_dstack_shim_version()
     if expected_version is None:
-        logger.debug("Cannot determine the expected shim version")
         return False
 
     installed_version = shim_info.version
