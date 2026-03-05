@@ -5,6 +5,8 @@ from datetime import timedelta
 from typing import Optional, TypedDict, Union
 
 from paramiko.pkey import PKey
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.health import HealthStatus
@@ -70,14 +72,21 @@ class ProcessResult:
     schedule_pg_deletion_except_id: Optional[uuid.UUID] = None
 
 
-def can_terminate_fleet_instances_on_idle_duration(fleet_model: FleetModel) -> bool:
+async def can_terminate_fleet_instances_on_idle_duration(
+    session: AsyncSession,
+    fleet_model: FleetModel,
+) -> bool:
     fleet_spec = get_fleet_spec(fleet_model)
     if fleet_spec.configuration.nodes is None or fleet_spec.autocreated:
         return True
-    active_instances = [
-        instance for instance in fleet_model.instances if instance.status.is_active()
-    ]
-    return len(active_instances) > fleet_spec.configuration.nodes.min
+    res = await session.execute(
+        select(func.count(1)).where(
+            InstanceModel.fleet_id == fleet_model.id,
+            InstanceModel.deleted == False,
+            InstanceModel.status.not_in(InstanceStatus.finished_statuses()),
+        )
+    )
+    return res.scalar_one() > fleet_spec.configuration.nodes.min
 
 
 def get_instance_idle_duration(instance_model: InstanceModel) -> datetime.timedelta:

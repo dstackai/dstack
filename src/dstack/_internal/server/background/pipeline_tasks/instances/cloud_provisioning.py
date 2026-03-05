@@ -110,6 +110,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         blocks="auto" if instance_model.total_blocks is None else instance_model.total_blocks,
         exclude_not_available=True,
         master_job_provisioning_data=master_job_provisioning_data,
+        infer_master_job_provisioning_data_from_fleet_instances=False,
     )
 
     # Limit number of offers tried to prevent long-running processing in case all offers fail.

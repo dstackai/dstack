@@ -7,6 +7,7 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.fleets import FleetNodesSpec
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.profiles import TerminationPolicy
@@ -26,12 +27,15 @@ from dstack._internal.server.schemas.runner import (
 )
 from dstack._internal.server.services.runner.client import ComponentList, ShimClient
 from dstack._internal.server.testing.common import (
+    create_fleet,
     create_instance,
     create_job,
     create_project,
     create_repo,
     create_run,
     create_user,
+    get_fleet_configuration,
+    get_fleet_spec,
     get_remote_connection_info,
     list_events,
 )
@@ -401,6 +405,81 @@ class TestCheckInstance:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestProcessIdleTimeout:
+    async def test_does_not_terminate_by_idle_timeout_when_fleet_at_min_nodes(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                get_fleet_configuration(nodes=FleetNodesSpec(min=1, target=1, max=1))
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        instance.termination_idle_time = 300
+        instance.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+        instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
+        await session.commit()
+
+        monkeypatch.setattr(
+            instances_check,
+            "_check_instance_inner",
+            Mock(return_value=InstanceCheck(reachable=True)),
+        )
+
+        await process_instance(session, worker, instance)
+        await session.refresh(instance)
+
+        assert instance.status == InstanceStatus.IDLE
+        assert instance.termination_reason is None
+
+    async def test_terminates_by_idle_timeout_when_fleet_above_min_nodes(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: InstanceWorker,
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                get_fleet_configuration(nodes=FleetNodesSpec(min=1, target=2, max=2))
+            ),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        instance.termination_idle_time = 300
+        instance.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+        instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
+        await session.commit()
+
+        await process_instance(session, worker, instance)
+        await session.refresh(instance)
+
+        assert instance.status == InstanceStatus.TERMINATING
+        assert instance.termination_reason == InstanceTerminationReason.IDLE_TIMEOUT
+
     async def test_terminate_by_idle_timeout(
         self,
         test_db,

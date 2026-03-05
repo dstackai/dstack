@@ -467,16 +467,20 @@ async def get_create_instance_offers(
     blocks: Union[int, Literal["auto"]] = 1,
     exclude_not_available: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
+    infer_master_job_provisioning_data_from_fleet_instances: bool = True,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     multinode = False
     if fleet_spec is not None:
         multinode = fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER
     if fleet_model is not None:
-        fleet = fleet_model_to_fleet(fleet_model)
-        multinode = fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        fleet_spec_from_model = get_fleet_spec(fleet_model)
+        multinode = fleet_spec_from_model.configuration.placement == InstanceGroupPlacement.CLUSTER
         # The caller may override the current cluster master explicitly instead
         # of inferring placement restrictions from the loaded fleet instances.
-        if master_job_provisioning_data is None:
+        if (
+            master_job_provisioning_data is None
+            and infer_master_job_provisioning_data_from_fleet_instances
+        ):
             for instance in fleet_model.instances:
                 jpd = instances_services.get_instance_provisioning_data(instance)
                 if jpd is not None:

@@ -7,7 +7,6 @@ from typing import Optional, Sequence
 from sqlalchemy import and_, not_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
-from sqlalchemy.orm.attributes import set_committed_value
 
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import InstanceStatus
@@ -41,7 +40,6 @@ from dstack._internal.server.background.pipeline_tasks.instances.termination imp
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
-    FleetModel,
     InstanceHealthCheckModel,
     InstanceModel,
     JobModel,
@@ -287,9 +285,12 @@ async def _process_idle_item(item: InstancePipelineItem) -> Optional[_ProcessCon
         if instance_model is None:
             log_lock_token_mismatch(logger, item)
             return None
-    idle_result = process_idle_timeout(instance_model)
-    if idle_result is not None:
-        return _ProcessContext(instance_model=instance_model, result=idle_result)
+        idle_result = await process_idle_timeout(
+            session=session,
+            instance_model=instance_model,
+        )
+        if idle_result is not None:
+            return _ProcessContext(instance_model=instance_model, result=idle_result)
     result = await check_instance(instance_model)
     return _ProcessContext(instance_model=instance_model, result=result)
 
@@ -328,32 +329,9 @@ async def _refetch_locked_instance_for_pending_or_terminating(
         )
         .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
-        .options(
-            joinedload(InstanceModel.fleet).joinedload(
-                FleetModel.instances.and_(InstanceModel.deleted == False)
-            )
-        )
+        .options(joinedload(InstanceModel.fleet))
     )
-    instance_model = res.unique().scalar_one_or_none()
-    if instance_model is not None:
-        # Pending/terminating processing runs on detached objects and later traverses
-        # `fleet.project`, sibling `project`, and sibling `fleet`. Populate those attrs from
-        # already known objects so detached access works without adding extra joins.
-        _populate_pending_or_terminating_detached_relations(instance_model)
-    return instance_model
-
-
-def _populate_pending_or_terminating_detached_relations(
-    instance_model: InstanceModel,
-) -> None:
-    project = instance_model.project
-    fleet = instance_model.fleet
-    if fleet is None:
-        return
-    set_committed_value(fleet, "project", project)
-    for sibling_instance_model in fleet.instances:
-        set_committed_value(sibling_instance_model, "project", project)
-        set_committed_value(sibling_instance_model, "fleet", fleet)
+    return res.unique().scalar_one_or_none()
 
 
 async def _refetch_locked_instance_for_idle(
@@ -367,11 +345,7 @@ async def _refetch_locked_instance_for_idle(
         )
         .options(joinedload(InstanceModel.project))
         .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
-        .options(
-            joinedload(InstanceModel.fleet).joinedload(
-                FleetModel.instances.and_(InstanceModel.deleted == False)
-            )
-        )
+        .options(joinedload(InstanceModel.fleet))
     )
     return res.unique().scalar_one_or_none()
 
@@ -385,7 +359,13 @@ async def _refetch_locked_instance_for_check(
             InstanceModel.id == item.id,
             InstanceModel.lock_token == item.lock_token,
         )
-        .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+        .options(
+            joinedload(InstanceModel.project).load_only(
+                ProjectModel.id,
+                ProjectModel.ssh_public_key,
+                ProjectModel.ssh_private_key,
+            )
+        )
         .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
     )
     return res.unique().scalar_one_or_none()

@@ -2,6 +2,7 @@ import asyncio
 import logging
 import math
 import random
+import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
@@ -332,6 +333,7 @@ class Worker(Generic[ItemT], ABC):
         self._running = True
         while self._running:
             item = await self._queue.get()
+            start_time = time.time()
             logger.debug("Processing %s item %s", item.__tablename__, item.id)
             try:
                 await self.process(item)
@@ -339,7 +341,12 @@ class Worker(Generic[ItemT], ABC):
                 logger.exception("Unexpected exception when processing item")
             finally:
                 await self._heartbeater.untrack(item)
-            logger.debug("Processed %s item %s", item.__tablename__, item.id)
+            logger.debug(
+                "Processed %s item %s in %.3f",
+                item.__tablename__,
+                item.id,
+                time.time() - start_time,
+            )
 
     def stop(self):
         self._running = False

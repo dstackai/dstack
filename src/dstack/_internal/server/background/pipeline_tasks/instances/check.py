@@ -1,11 +1,15 @@
 import logging
+import uuid
 from datetime import timedelta
 from typing import Optional
 
 import gpuhunt
 import requests
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import (
     get_dstack_runner_download_url,
     get_dstack_runner_version,
@@ -14,6 +18,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import ProvisioningError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.profiles import TerminationPolicy
@@ -31,7 +36,7 @@ from dstack._internal.server.background.pipeline_tasks.instances.common import (
     set_unreachable_update,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceHealthCheckModel, InstanceModel
+from dstack._internal.server.models import InstanceHealthCheckModel, InstanceModel, ProjectModel
 from dstack._internal.server.schemas.instances import InstanceCheck
 from dstack._internal.server.schemas.runner import (
     ComponentInfo,
@@ -54,7 +59,10 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def process_idle_timeout(instance_model: InstanceModel) -> Optional[ProcessResult]:
+async def process_idle_timeout(
+    session: AsyncSession,
+    instance_model: InstanceModel,
+) -> Optional[ProcessResult]:
     if not (
         instance_model.status == InstanceStatus.IDLE
         and instance_model.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
@@ -66,8 +74,12 @@ def process_idle_timeout(instance_model: InstanceModel) -> Optional[ProcessResul
     # There may be race conditions since we don't take the fleet lock.
     # That's ok: in the worst case we go below `nodes.min`, but
     # the fleet consolidation logic will provision new nodes.
-    if instance_model.fleet is not None and not can_terminate_fleet_instances_on_idle_duration(
-        instance_model.fleet
+    if (
+        instance_model.fleet is not None
+        and not await can_terminate_fleet_instances_on_idle_duration(
+            session=session,
+            fleet_model=instance_model.fleet,
+        )
     ):
         return None
 
@@ -295,8 +307,8 @@ async def _process_wait_for_instance_provisioning_data(
         )
         return result
 
-    backend = await backends_services.get_project_backend_by_type(
-        project=instance_model.project,
+    backend = await _get_backend_for_provisioning_wait(
+        project_id=instance_model.project_id,
         backend_type=job_provisioning_data.backend,
     )
     if backend is None:
@@ -340,6 +352,25 @@ async def _process_wait_for_instance_provisioning_data(
             instance_model.name,
         )
     return result
+
+
+async def _get_backend_for_provisioning_wait(
+    project_id: uuid.UUID,
+    backend_type: BackendType,
+) -> Optional[Backend]:
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            select(ProjectModel)
+            .where(ProjectModel.id == project_id)
+            .options(joinedload(ProjectModel.backends))
+        )
+        project_model = res.unique().scalar_one_or_none()
+    if project_model is None:
+        return None
+    return await backends_services.get_project_backend_by_type(
+        project=project_model,
+        backend_type=backend_type,
+    )
 
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
