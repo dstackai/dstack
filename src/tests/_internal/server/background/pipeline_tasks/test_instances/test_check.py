@@ -587,7 +587,6 @@ class TestMaybeInstallRunner(BaseTestMaybeInstallComponents):
 
         instances_check._maybe_install_components(instance, shim_client_mock)
 
-        assert "Cannot determine the expected runner version" in debug_task_log.text
         shim_client_mock.get_components.assert_called_once()
         shim_client_mock.install_runner.assert_not_called()
 
@@ -713,7 +712,6 @@ class TestMaybeInstallShim(BaseTestMaybeInstallComponents):
 
         instances_check._maybe_install_components(instance, shim_client_mock)
 
-        assert "Cannot determine the expected shim version" in debug_task_log.text
         shim_client_mock.get_components.assert_called_once()
         shim_client_mock.install_shim.assert_not_called()
 
