@@ -44,7 +44,7 @@ from tests._internal.server.background.pipeline_tasks.test_instances.helpers imp
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("image_config_mock")
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-class TestInstanceCheck:
+class TestCheckInstance:
     async def test_check_shim_transitions_provisioning_on_ready(
         self,
         test_db,
@@ -397,6 +397,10 @@ class TestInstanceCheck:
         assert health_check.status == HealthStatus.WARNING
         assert health_check.response == health_response.json()
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestProcessIdleTimeout:
     async def test_terminate_by_idle_timeout(
         self,
         test_db,

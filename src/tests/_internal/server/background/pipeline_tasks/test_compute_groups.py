@@ -148,9 +148,9 @@ class TestComputeGroupFetcher:
         assert newest.lock_owner is None
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestComputeGroupWorker:
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminates_compute_group(
         self, test_db, session: AsyncSession, worker: ComputeGroupWorker
     ):
@@ -176,8 +176,6 @@ class TestComputeGroupWorker:
         assert compute_group.status == ComputeGroupStatus.TERMINATED
         assert compute_group.deleted
 
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_retries_compute_group_termination(
         self, test_db, session: AsyncSession, worker: ComputeGroupWorker
     ):

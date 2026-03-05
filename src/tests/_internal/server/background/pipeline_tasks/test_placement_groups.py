@@ -175,9 +175,9 @@ class TestPlacementGroupFetcher:
         assert newest.lock_owner is None
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestPlacementGroupWorker:
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_placement_group(
         self, test_db, session: AsyncSession, worker: PlacementGroupWorker
     ):
@@ -205,8 +205,6 @@ class TestPlacementGroupWorker:
         await session.refresh(placement_group)
         assert placement_group.deleted
 
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_retries_placement_group_deletion_if_still_in_use(
         self, test_db, session: AsyncSession, worker: PlacementGroupWorker
     ):

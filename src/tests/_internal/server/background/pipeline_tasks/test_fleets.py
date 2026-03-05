@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from sqlalchemy import select
@@ -15,6 +15,7 @@ from dstack._internal.core.models.fleets import (
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.server.background.pipeline_tasks import fleets as fleets_pipeline
 from dstack._internal.server.background.pipeline_tasks.base import PipelineItem
 from dstack._internal.server.background.pipeline_tasks.fleets import (
     FleetFetcher,
@@ -295,6 +296,70 @@ class TestFleetWorker:
         assert fleet.lock_expires_at is None
         assert fleet.last_processed_at > original_last_processed_at
         assert locked_elsewhere.lock_owner == "OtherPipeline"
+
+    async def test_unlocks_instances_after_consolidation(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=1)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+        )
+        await _lock_fleet_for_processing(session, fleet)
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(instance)
+        assert instance.lock_owner is None
+        assert instance.lock_token is None
+        assert instance.lock_expires_at is None
+
+    async def test_unlocks_instances_when_fleet_lock_token_changes_after_processing(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=1, target=1, max=1)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+        )
+        await _lock_fleet_for_processing(session, fleet)
+
+        async def mock_process_fleet(*args, **kwargs):
+            fleet_model = args[0]
+            fleet_model.lock_token = uuid.uuid4()
+            return fleets_pipeline._ProcessResult()
+
+        with patch.object(
+            fleets_pipeline,
+            "_process_fleet",
+            AsyncMock(side_effect=mock_process_fleet),
+        ):
+            await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(instance)
+        assert instance.lock_owner is None
+        assert instance.lock_token is None
+        assert instance.lock_expires_at is None
 
     async def test_syncs_initial_current_master_for_cluster_fleet(
         self, test_db, session: AsyncSession, worker: FleetWorker

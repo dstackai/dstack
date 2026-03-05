@@ -221,6 +221,7 @@ class FleetWorker(Worker[PipelineItem]):
                 return
 
             # Lock instance only if consolidation is needed.
+            locked_instance_ids: set[uuid.UUID] = set()
             consolidation_fleet_spec = _get_fleet_spec_if_ready_for_consolidation(fleet_model)
             consolidation_instances = None
             if consolidation_fleet_spec is not None:
@@ -230,6 +231,7 @@ class FleetWorker(Worker[PipelineItem]):
                 )
                 if consolidation_instances is None:
                     return
+                locked_instance_ids = {instance.id for instance in consolidation_instances}
 
         result = await _process_fleet(
             fleet_model,
@@ -240,7 +242,10 @@ class FleetWorker(Worker[PipelineItem]):
         fleet_update_map.update(result.fleet_update_map)
         set_processed_update_map_fields(fleet_update_map)
         set_unlock_update_map_fields(fleet_update_map)
-        instance_update_rows = _build_instance_update_rows(result.instance_id_to_update_map)
+        instance_update_rows = _build_instance_update_rows(
+            result.instance_id_to_update_map,
+            unlock_instance_ids=locked_instance_ids,
+        )
 
         async with get_session_ctx() as session:
             now = get_current_datetime()
@@ -258,6 +263,12 @@ class FleetWorker(Worker[PipelineItem]):
             updated_ids = list(res.scalars().all())
             if len(updated_ids) == 0:
                 log_lock_token_changed_after_processing(logger, item)
+                if locked_instance_ids:
+                    await _unlock_fleet_locked_instances(
+                        session=session,
+                        item=item,
+                        locked_instance_ids=locked_instance_ids,
+                    )
                 # TODO: Clean up fleet.
                 return
 
@@ -297,7 +308,7 @@ class _FleetUpdateMap(ItemUpdateMap, total=False):
     current_master_instance_id: Optional[uuid.UUID]
 
 
-class _InstanceUpdateMap(TypedDict, total=False):
+class _InstanceUpdateMap(ItemUpdateMap, total=False):
     status: InstanceStatus
     termination_reason: InstanceTerminationReason
     termination_reason_message: str
@@ -571,15 +582,40 @@ def _should_delete_fleet(fleet_model: FleetModel) -> bool:
 
 def _build_instance_update_rows(
     instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap],
+    unlock_instance_ids: set[uuid.UUID],
 ) -> list[_InstanceUpdateMap]:
     instance_update_rows = []
-    for instance_id, instance_update_map in instance_id_to_update_map.items():
+    for instance_id in sorted(instance_id_to_update_map.keys() | unlock_instance_ids):
+        instance_update_map = instance_id_to_update_map.get(instance_id)
         update_row = _InstanceUpdateMap()
-        update_row.update(instance_update_map)
+        if instance_update_map is not None:
+            update_row.update(instance_update_map)
+        if instance_id in unlock_instance_ids:
+            set_unlock_update_map_fields(update_row)
         update_row["id"] = instance_id
         set_processed_update_map_fields(update_row)
         instance_update_rows.append(update_row)
     return instance_update_rows
+
+
+async def _unlock_fleet_locked_instances(
+    session: AsyncSession,
+    item: PipelineItem,
+    locked_instance_ids: set[uuid.UUID],
+) -> None:
+    await session.execute(
+        update(InstanceModel)
+        .where(
+            InstanceModel.id.in_(locked_instance_ids),
+            InstanceModel.lock_token == item.lock_token,
+            InstanceModel.lock_owner == FleetPipeline.__name__,
+        )
+        .values(
+            lock_expires_at=None,
+            lock_token=None,
+            lock_owner=None,
+        )
+    )
 
 
 async def _create_missing_fleet_instances(
@@ -653,8 +689,11 @@ def _set_fail_instances_on_master_bootstrap_failure(
     )
     if any(
         instance_model.status not in InstanceStatus.finished_statuses()
+        and instance_model.job_provisioning_data is not None
         for instance_model in surviving_instance_models
     ):
+        # It should not be possible to provision non-master instances ahead of master
+        # but we still safe-guard against the case when there can be other instances provisioned.
         return
 
     for instance_model in surviving_instance_models:
