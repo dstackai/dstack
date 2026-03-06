@@ -32,7 +32,8 @@ class BackendType(str, enum.Enum):
     CLOUDRIFT = "cloudrift"
     CRUSOE = "crusoe"
     CUDO = "cudo"
-    DATACRUNCH = "datacrunch"  # BackendType for backward compatibility
+    DATACRUNCH = "datacrunch"
+    """`DATACRUNCH` is kept as a `BackendType` for backward compatibility."""
     DIGITALOCEAN = "digitalocean"
     DSTACK = "dstack"
     GCP = "gcp"
@@ -40,7 +41,7 @@ class BackendType(str, enum.Enum):
     KUBERNETES = "kubernetes"
     LAMBDA = "lambda"
     LOCAL = "local"
-    REMOTE = "remote"  # TODO: replace for LOCAL
+    REMOTE = "remote"
     NEBIUS = "nebius"
     OCI = "oci"
     RUNPOD = "runpod"

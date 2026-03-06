@@ -101,10 +101,10 @@ class PortMapping(CoreModel):
 
 
 class RepoExistsAction(str, Enum):
-    # Don't try to check out, terminate the run with an error (the default action since 0.20.0)
     ERROR = "error"
-    # Don't try to check out, skip the repo (the logic hardcoded in the pre-0.20.0 runner)
+    """`ERROR` means do not try to check out and terminate the run with an error. This is the default action since 0.20.0."""
     SKIP = "skip"
+    """`SKIP` means do not try to check out and skip the repo. This is the logic hardcoded in the pre-0.20.0 runner."""
 
 
 class RepoSpec(CoreModel):
@@ -469,8 +469,8 @@ class BaseRunConfiguration(CoreModel):
             ),
         ),
     ] = None
-    # deprecated since 0.18.31; has no effect
     home_dir: str = "/root"
+    """`home_dir` is deprecated since 0.18.31 and has no effect."""
     registry_auth: Annotated[
         Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")
     ] = None
@@ -540,8 +540,11 @@ class BaseRunConfiguration(CoreModel):
         list[FilePathMapping],
         Field(description="The local to container file path mappings"),
     ] = []
-    # deprecated since 0.18.31; task, service -- no effect; dev-environment -- executed right before `init`
     setup: CommandsList = []
+    """
+    setup: Deprecated since 0.18.31. It has no effect for tasks and services; for
+    dev environments it runs right before `init`.
+    """
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:

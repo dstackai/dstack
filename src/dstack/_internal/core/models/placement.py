@@ -16,7 +16,8 @@ class PlacementGroupConfiguration(CoreModel):
 
 
 class PlacementGroupProvisioningData(CoreModel):
-    backend: BackendType  # can be different from configuration backend
+    backend: BackendType
+    """`backend` can be different from the backend in `configuration`."""
     backend_data: Optional[str] = None
 
 

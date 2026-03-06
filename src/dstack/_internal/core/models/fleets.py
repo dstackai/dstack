@@ -30,8 +30,8 @@ from dstack._internal.utils.tags import tags_validator
 
 
 class FleetStatus(str, Enum):
-    # Currently all fleets are ACTIVE/TERMINATING/TERMINATED
-    # SUBMITTED/FAILED may be used if fleets require async processing
+    # Currently all fleets are ACTIVE, TERMINATING, or TERMINATED.
+    # SUBMITTED and FAILED may be used if fleets require async processing.
     SUBMITTED = "submitted"
     ACTIVE = "active"
     TERMINATING = "terminating"
@@ -372,10 +372,11 @@ class FleetSpec(generate_dual_core_model(FleetSpecConfig)):
     configuration_path: Optional[str] = None
     profile: Profile
     autocreated: bool = False
-    # merged_profile stores profile parameters merged from profile and configuration.
-    # Read profile parameters from merged_profile instead of profile directly.
-    # TODO: make merged_profile a computed field after migrating to pydanticV2
+    # TODO: make `merged_profile` a computed field after migrating to Pydantic v2.
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
+    """`merged_profile` stores profile parameters merged from `profile` and `configuration`.
+    Read profile parameters from `merged_profile` instead of `profile` directly.
+    """
 
     @root_validator
     def _merged_profile(cls, values) -> Dict:
@@ -416,7 +417,8 @@ class FleetPlan(CoreModel):
     offers: List[InstanceOfferWithAvailability]
     total_offers: int
     max_offer_price: Optional[float] = None
-    action: Optional[ApplyAction] = None  # default value for backward compatibility
+    action: Optional[ApplyAction] = None
+    """`action` uses a default value for backward compatibility."""
 
     def get_effective_spec(self) -> FleetSpec:
         if self.effective_spec is not None:

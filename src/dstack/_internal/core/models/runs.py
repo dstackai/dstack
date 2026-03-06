@@ -126,27 +126,44 @@ class RunTerminationReason(str, Enum):
 
 
 class JobTerminationReason(str, Enum):
-    # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
+    """`FAILED_TO_START_DUE_TO_NO_CAPACITY` is set by the server."""
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
+    """`INTERRUPTED_BY_NO_CAPACITY` is set by the server."""
     INSTANCE_UNREACHABLE = "instance_unreachable"
+    """`INSTANCE_UNREACHABLE` is set by the server."""
     WAITING_INSTANCE_LIMIT_EXCEEDED = "waiting_instance_limit_exceeded"
+    """`WAITING_INSTANCE_LIMIT_EXCEEDED` is set by the server."""
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
+    """`WAITING_RUNNER_LIMIT_EXCEEDED` is set by the server."""
     TERMINATED_BY_USER = "terminated_by_user"
+    """`TERMINATED_BY_USER` is set by the server."""
     VOLUME_ERROR = "volume_error"
+    """`VOLUME_ERROR` is set by the server."""
     GATEWAY_ERROR = "gateway_error"
+    """`GATEWAY_ERROR` is set by the server."""
     SCALED_DOWN = "scaled_down"
+    """`SCALED_DOWN` is set by the server."""
     DONE_BY_RUNNER = "done_by_runner"
+    """`DONE_BY_RUNNER` is set by the server."""
     ABORTED_BY_USER = "aborted_by_user"
+    """`ABORTED_BY_USER` is set by the server."""
     TERMINATED_BY_SERVER = "terminated_by_server"
+    """`TERMINATED_BY_SERVER` is set by the server."""
     INACTIVITY_DURATION_EXCEEDED = "inactivity_duration_exceeded"
+    """`INACTIVITY_DURATION_EXCEEDED` is set by the server."""
     TERMINATED_DUE_TO_UTILIZATION_POLICY = "terminated_due_to_utilization_policy"
-    # Set by the runner
+    """`TERMINATED_DUE_TO_UTILIZATION_POLICY` is set by the server."""
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
+    """`CONTAINER_EXITED_WITH_ERROR` is set by the runner."""
     PORTS_BINDING_FAILED = "ports_binding_failed"
+    """`PORTS_BINDING_FAILED` is set by the runner."""
     CREATING_CONTAINER_ERROR = "creating_container_error"
+    """`CREATING_CONTAINER_ERROR` is set by the runner."""
     EXECUTOR_ERROR = "executor_error"
+    """`EXECUTOR_ERROR` is set by the runner."""
     MAX_DURATION_EXCEEDED = "max_duration_exceeded"
+    """`MAX_DURATION_EXCEEDED` is set by the runner."""
 
     def to_status(self) -> JobStatus:
         mapping = {
@@ -210,9 +227,11 @@ class Requirements(CoreModel):
     max_price: Optional[float] = None
     spot: Optional[bool] = None
     reservation: Optional[str] = None
-    # Backends can use `multinode` to filter out offers if
-    # some offers support multinode and some do not.
     multinode: Optional[bool] = None
+    """
+    multinode: Backends can use `multinode` to filter out offers when some offers support
+    multinode and some do not.
+    """
 
     def pretty_format(self, resources_only: bool = False):
         res = self.resources.pretty_format()
@@ -241,7 +260,8 @@ class JobSSHKey(CoreModel):
 
 
 class ProbeSpec(CoreModel):
-    type: Literal["http"]  # expect other probe types in the future, namely `exec`
+    type: Literal["http"]
+    """`type` currently expects `http`, but other probe types such as `exec` may be added later."""
     url: str
     method: HTTPMethod = DEFAULT_PROBE_METHOD
     headers: list[HTTPHeaderSpec] = []
@@ -253,13 +273,16 @@ class ProbeSpec(CoreModel):
 
 
 class JobSpec(CoreModel):
-    replica_num: int = 0  # default value for backward compatibility
+    replica_num: int = 0
+    """`replica_num` uses a default value for backward compatibility."""
     job_num: int
     job_name: str
-    jobs_per_replica: int = 1  # default value for backward compatibility
+    jobs_per_replica: int = 1
+    """`jobs_per_replica` uses a default value for backward compatibility."""
     replica_group: str = DEFAULT_REPLICA_GROUP_NAME
     app_specs: Optional[List[AppSpec]]
-    user: Optional[UnixUser] = None  # default value for backward compatibility
+    user: Optional[UnixUser] = None
+    """`user` uses a default value for backward compatibility."""
     commands: List[str]
     env: Dict[str, str]
     home_dir: Optional[str]
@@ -275,51 +298,62 @@ class JobSpec(CoreModel):
     volumes: Optional[List[MountPoint]] = None
     ssh_key: Optional[JobSSHKey] = None
     working_dir: Optional[str]
-    # `repo_data` is optional for client compatibility with pre-0.19.17 servers and for compatibility
-    # with jobs submitted before 0.19.17. All new jobs are expected to have non-None `repo_data`.
-    # For --no-repo runs, `repo_data` is `VirtualRunRepoData()`.
     repo_data: Annotated[Optional[AnyRunRepoData], Field(discriminator="repo_type")] = None
-    # `repo_code_hash` can be None because it is not used for the repo or because the job was
-    # submitted before 0.19.17. See `_get_repo_code_hash` on how to get the correct `repo_code_hash`
-    # TODO: drop this comment when supporting jobs submitted before 0.19.17 is no longer relevant.
+    """`repo_data` is optional for client compatibility with pre-0.19.17 servers and for jobs
+    submitted before 0.19.17. All new jobs are expected to have non-`None` `repo_data`.
+    For `--no-repo` runs, `repo_data` is `VirtualRunRepoData()`.
+    """
+    # TODO: drop this compatibility note when support for jobs submitted before 0.19.17 is no longer relevant.
     repo_code_hash: Optional[str] = None
-    # `repo_dir` was added in 0.19.27. Default value is set for backward compatibility
+    """`repo_code_hash` can be `None` because it is not used for the repo or because the job was
+    submitted before 0.19.17. See `_get_repo_code_hash` for how to get the correct value.
+    """
     repo_dir: str = LEGACY_REPO_DIR
-    # None for jobs without repo and any jobs submitted by pre-0.20.0 clients
+    """`repo_dir` was added in 0.19.27 and uses a default value for backward compatibility."""
     repo_exists_action: Optional[RepoExistsAction] = None
+    """`repo_exists_action` is `None` for jobs without a repo and for jobs submitted by pre-0.20.0 clients."""
     file_archives: list[FileArchiveMapping] = []
-    # None for non-services and pre-0.19.19 services. See `get_service_port`
     service_port: Optional[int] = None
+    """`service_port` is `None` for non-services and pre-0.19.19 services. See `get_service_port`."""
     probes: list[ProbeSpec] = []
 
 
 class JobProvisioningData(CoreModel):
     backend: BackendType
-    # In case backend provisions instance in another backend, it may set that backend as base_backend.
     base_backend: Optional[BackendType] = None
+    """`base_backend` may be set when a backend provisions an instance in another backend and wants
+    to record that
+    backend as `base_backend`.
+    """
     instance_type: InstanceType
     instance_id: str
-    # hostname may not be set immediately after instance provisioning.
-    # It is set to a public IP or, if public IPs are disabled, to a private IP.
     hostname: Optional[str] = None
+    """`hostname` may not be set immediately after instance provisioning.
+    It is set to a public IP or, if public IPs are disabled, to a private IP.
+    """
     internal_ip: Optional[str] = None
-    # public_ip_enabled can used to distinguished instances with and without public IPs.
-    # hostname being None is not enough since it can be filled after provisioning.
     public_ip_enabled: bool = True
-    # instance_network a network address for multimode installation. Specified as `<ip address>/<netmask>`
-    # internal_ip will be selected from the specified network
+    """`public_ip_enabled` is used to distinguish instances with and without public IPs.
+    `hostname` being `None` is not enough because it can be filled after provisioning.
+    """
     instance_network: Optional[str] = None
+    """`instance_network` stores the multimode installation network, specified as
+    `<ip address>/<netmask>`. `internal_ip` will be selected from the specified network.
+    """
     region: str
     availability_zone: Optional[str] = None
     reservation: Optional[str] = None
     price: float
     username: str
-    # ssh_port be different from 22 for some backends.
-    # ssh_port may not be set immediately after instance provisioning
     ssh_port: Optional[int] = None
-    dockerized: bool  # True if backend starts shim
+    """`ssh_port` may be different from 22 for some backends and may not be set immediately after
+    instance provisioning.
+    """
+    dockerized: bool
+    """`dockerized` is `True` when the backend starts the shim."""
     ssh_proxy: Optional[SSHConnectionParams] = None
-    backend_data: Optional[str] = None  # backend-specific data in json
+    backend_data: Optional[str] = None
+    """`backend_data` stores backend-specific data in JSON."""
 
     def get_base_backend(self) -> BackendType:
         if self.base_backend is not None:
@@ -340,22 +374,29 @@ class JobRuntimeData(CoreModel):
     """
 
     network_mode: NetworkMode
-    # GPU, CPU, memory resource shares. None means all available (no limit)
     gpu: Optional[int] = None
+    """`gpu` stores the GPU resource share. `None` means all available with no limit."""
     cpu: Optional[float] = None
+    """`cpu` stores the CPU resource share. `None` means all available with no limit."""
     memory: Optional[Memory] = None
-    # container:host port mapping reported by shim. Empty dict if network_mode == NetworkMode.HOST
-    # None if data is not yet available (on vm-based backends and ssh instances)
-    # or not applicable (container-based backends)
+    """`memory` stores the memory resource share. `None` means all available with no limit."""
     ports: Optional[dict[int, int]] = None
-    # List of volumes used by the job
-    volume_names: Optional[list[str]] = None  # None for backward compatibility
-    # Virtual shared offer
-    offer: Optional[InstanceOfferWithAvailability] = None  # None for backward compatibility
-    # Resolved working directory and OS username reported by the runner.
-    # None if the runner hasn't reported them yet or if it's an old runner.
+    """`ports` stores the container-to-host port mapping reported by shim. It is an empty dict if
+    `network_mode == NetworkMode.HOST`. `None` if data is not yet available
+    on VM-based backends and SSH instances, or not applicable on container-based backends.
+    """
+    volume_names: Optional[list[str]] = None
+    """`volume_names` stores the list of volumes used by the job. It is `None` for backward compatibility."""
+    offer: Optional[InstanceOfferWithAvailability] = None
+    """`offer` stores the virtual shared offer. It is `None` for backward compatibility."""
     working_dir: Optional[str] = None
+    """`working_dir` stores the resolved working directory reported by the runner.
+    `None` if the runner has not reported it yet or if it is an old runner.
+    """
     username: Optional[str] = None
+    """`username` stores the resolved OS username reported by the runner.
+    `None` if the runner has not reported it yet or if it is an old runner.
+    """
 
 
 class ClusterInfo(CoreModel):
@@ -371,16 +412,19 @@ class Probe(CoreModel):
 class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
-    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
+    deployment_num: int = 0
+    """`deployment_num` uses a default value for compatibility with pre-0.19.14 servers."""
     submitted_at: datetime
     last_processed_at: datetime
     finished_at: Optional[datetime] = None
     inactivity_secs: Optional[int] = None
     status: JobStatus
-    status_message: str = ""  # default for backward compatibility
-    # termination_reason stores JobTerminationReason.
-    # str allows adding new enum members without breaking compatibility with old clients.
+    status_message: str = ""
+    """`status_message` uses a default value for backward compatibility."""
     termination_reason: Optional[str] = None
+    """`termination_reason` stores `JobTerminationReason`.
+    `str` allows adding new enum members without breaking compatibility with old clients.
+    """
     termination_reason_message: Optional[str] = None
     exit_status: Optional[int] = None
     job_provisioning_data: Optional[JobProvisioningData] = None
@@ -413,7 +457,7 @@ class RunSpecConfig(CoreConfig):
 
 
 class RunSpec(generate_dual_core_model(RunSpecConfig)):
-    # TODO: run_name is redundant here since they already passed in configuration
+    # TODO: consider removing `run_name` here because it is already passed in `configuration`.
     run_name: Annotated[
         Optional[str],
         Field(description="The run name. If not set, the run name is generated automatically."),
@@ -452,9 +496,10 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
         list[FileArchiveMapping],
         Field(description="The list of file archive ID to container path mappings."),
     ] = []
-    # Server uses configuration.working_dir since 0.19.27 and ignores this field, but the field
-    # still exists for compatibility with old clients that send it.
     working_dir: Optional[str] = None
+    """`working_dir` is kept for compatibility with old clients that still send it, even though the
+    server uses `configuration.working_dir` since 0.19.27 and ignores this field.
+    """
     configuration_path: Annotated[
         Optional[str],
         Field(
@@ -473,10 +518,11 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
             " Can be empty only before the run is submitted."
         ),
     ] = None
-    # merged_profile stores profile parameters merged from profile and configuration.
-    # Read profile parameters from merged_profile instead of profile directly.
-    # TODO: make merged_profile a computed field after migrating to pydanticV2
+    # TODO: make `merged_profile` a computed field after migrating to Pydantic v2.
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
+    """`merged_profile` stores profile parameters merged from `profile` and `configuration`.
+    Read profile parameters from `merged_profile` instead of `profile` directly.
+    """
 
     @root_validator
     def _merged_profile(cls, values) -> Dict:
@@ -546,16 +592,19 @@ class Run(CoreModel):
     submitted_at: datetime
     last_processed_at: datetime
     status: RunStatus
-    status_message: str = ""  # default for backward compatibility
-    # termination_reason stores RunTerminationReason.
-    # str allows adding new enum members without breaking compatibility with old clients.
+    status_message: str = ""
+    """`status_message` uses a default value for backward compatibility."""
     termination_reason: Optional[str] = None
+    """`termination_reason` stores `RunTerminationReason`.
+    `str` allows adding new enum members without breaking compatibility with old clients.
+    """
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission] = None
     cost: float = 0
     service: Optional[ServiceSpec] = None
-    deployment_num: int = 0  # default for compatibility with pre-0.19.14 servers
+    deployment_num: int = 0
+    """`deployment_num` uses a default value for compatibility with pre-0.19.14 servers."""
     error: Optional[str] = None
     deleted: Optional[bool] = None
     next_triggered_at: Optional[datetime] = None

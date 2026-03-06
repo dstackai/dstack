@@ -84,9 +84,11 @@ class DecryptedString(generate_dual_core_model(DecryptedStringConfig)):
     This is useful so that application code can have custom handling of failed decrypts (e.g. ignoring).
     """
 
-    # Do not read plaintext directly to avoid ignoring errors accidentally.
-    # Unpack with get_plaintext_or_error().
     plaintext: Optional[str]
+    """
+    `plaintext` should not be read directly to avoid ignoring errors accidentally.
+    Unpack with `get_plaintext_or_error()`.
+    """
     decrypted: bool = True
     exc: Optional[Exception] = None
 
@@ -211,20 +213,26 @@ class UserModel(BaseModel):
     name: Mapped[str] = mapped_column(String(50), unique=True)
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     token: Mapped[DecryptedString] = mapped_column(EncryptedString(200), unique=True)
-    # token_hash is needed for fast search by token when stored token is encrypted
     token_hash: Mapped[str] = mapped_column(String(2000), unique=True)
+    """`token_hash` is used for fast token lookup when the stored token is encrypted."""
     global_role: Mapped[GlobalRole] = mapped_column(EnumAsString(GlobalRole, 100))
-    # deactivated users cannot access API
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    """`active` controls whether the user can access the API."""
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
-    # `original_name` stores the name of a deleted user, while `name` is changed to a unique generated value.
     original_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    """`original_name` stores the deleted user's original name while `name` is changed to a unique
+    generated value.
+    """
 
-    # SSH keys can be null for users created before 0.19.33.
-    # Keys for those users are being gradually generated on /get_my_user calls.
-    # TODO: make keys required in a future version.
+    # TODO: make these keys required in a future version.
     ssh_private_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    """`ssh_private_key` can be `null` for users created before 0.19.33.
+    Keys for those users are being gradually generated on `/get_my_user` calls.
+    """
     ssh_public_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    """`ssh_public_key` can be `null` for users created before 0.19.33.
+    Keys for those users are being gradually generated on `/get_my_user` calls.
+    """
 
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True, index=True)
 
@@ -243,8 +251,10 @@ class ProjectModel(BaseModel):
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    # `original_name` stores the name of a deleted project, while `name` is changed to a unique generated value.
     original_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    """`original_name` stores the deleted project's original name while `name` is changed to a unique
+    generated value.
+    """
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     owner: Mapped[UserModel] = relationship(lazy="joined")
@@ -264,14 +274,15 @@ class ProjectModel(BaseModel):
         foreign_keys=[default_gateway_id]
     )
 
-    # TODO: Drop after the release without pools
-    # Note that multi-replica deployments can break if
-    # upgrading from an old version that uses pools to the version that drops pools from the DB.
+    # TODO: drop `default_pool_id` after the release without pools.
     default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
         ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"),
         nullable=True,
         deferred=True,  # Not loaded so it can be deleted in the next releases
     )
+    """`default_pool_id` exists because multi-replica deployments can break when upgrading from an
+    old version that uses pools to the version that drops pools from the database.
+    """
     default_pool: Mapped[Optional["PoolModel"]] = relationship(foreign_keys=[default_pool_id])
 
 
@@ -286,8 +297,8 @@ class MemberModel(BaseModel):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped[UserModel] = relationship(lazy="joined")
     project_role: Mapped[ProjectRole] = mapped_column(EnumAsString(ProjectRole, 100))
-    # member_num defines members ordering
     member_num: Mapped[Optional[int]] = mapped_column(Integer)
+    """`member_num` defines member ordering."""
 
 
 class BackendModel(BaseModel):
@@ -315,16 +326,18 @@ class RepoModel(BaseModel):
     )
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
-    # RepoModel.name stores repo_id
     name: Mapped[str] = mapped_column(String(100))
+    """`name` stores `repo_id`."""
     type: Mapped[RepoType] = mapped_column(EnumAsString(RepoType, 100))
 
     info: Mapped[str] = mapped_column(Text)
 
-    # `creds` is deprecated, for newly initialized repos per-user `RepoCredsModel` should be used
-    # instead. As of 0.18.25, there is no plan to remove this field, it's used as a fallback when
-    # `RepoCredsModel` associated with the user is not found.
     creds: Mapped[Optional[str]] = mapped_column(String(5000))
+    """
+    `creds` is deprecated. Newly initialized repos should use per-user `RepoCredsModel` instead.
+    As of 0.18.25 there is no plan to remove this field; it is used as a fallback when
+    `RepoCredsModel` associated with the user is not found.
+    """
 
 
 class RepoCredsModel(BaseModel):
@@ -354,7 +367,8 @@ class CodeModel(BaseModel):
     repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     repo: Mapped["RepoModel"] = relationship()
     blob_hash: Mapped[str] = mapped_column(String(4000))
-    blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)  # None means blob is stored on s3
+    blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)
+    """`blob` is stored on S3 when it is `None`."""
 
 
 class FileArchiveModel(BaseModel):
@@ -369,7 +383,8 @@ class FileArchiveModel(BaseModel):
     user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped["UserModel"] = relationship()
     blob_hash: Mapped[str] = mapped_column(Text)
-    blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)  # None means blob is stored on s3
+    blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)
+    """`blob` is stored on S3 when it is `None`."""
 
 
 class RunModel(BaseModel):
@@ -389,23 +404,26 @@ class RunModel(BaseModel):
     repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     repo: Mapped["RepoModel"] = relationship()
 
-    # Runs reference fleets so that fleets cannot be deleted while they are used.
-    # A fleet can have no busy instances but still be used by a run (e.g. a service with 0 replicas).
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    """`fleet_id` keeps runs attached to fleets so the fleets cannot be deleted while they are used.
+    A fleet can have no busy instances but still be used by a run, for example a service with
+    zero replicas.
+    """
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="runs")
 
     run_name: Mapped[str] = mapped_column(String(100))
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    # NOTE: `status` must be changed only via `switch_run_status()`
     status: Mapped[RunStatus] = mapped_column(EnumAsString(RunStatus, 100), index=True)
+    """`status` must be changed only via `switch_run_status()`."""
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
         EnumAsString(RunTerminationReason, 100)
     )
-    # resubmission_attempt counts consecutive transitions to pending without provisioning.
-    # Can be used to choose retry delay depending on the attempt number.
     resubmission_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    """`resubmission_attempt` counts consecutive transitions to pending without provisioning.
+    It can be used to choose a retry delay based on the attempt number.
+    """
     run_spec: Mapped[str] = mapped_column(Text)
     service_spec: Mapped[Optional[str]] = mapped_column(Text)
     priority: Mapped[int] = mapped_column(Integer, default=0)
@@ -439,9 +457,10 @@ class JobModel(BaseModel):
     )
     run: Mapped["RunModel"] = relationship()
 
-    # Jobs need to reference fleets because we may choose an optimal fleet for a master job
-    # but not yet create an instance for it.
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    """`fleet_id` keeps jobs attached to fleets because we may choose an optimal fleet for a master
+    job but not yet create an instance for it.
+    """
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="jobs")
 
     run_name: Mapped[str] = mapped_column(String(100))
@@ -450,26 +469,29 @@ class JobModel(BaseModel):
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
-    # NOTE: `status` must be changed only via `switch_job_status()`
     status: Mapped[JobStatus] = mapped_column(EnumAsString(JobStatus, 100), index=True)
+    """`status` must be changed only via `switch_job_status()`."""
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
         EnumAsString(JobTerminationReason, 100)
     )
     termination_reason_message: Mapped[Optional[str]] = mapped_column(Text)
-    # `disconnected_at` stores the first time of connectivity issues with the instance.
-    # Resets every time connectivity is restored.
     disconnected_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    """`disconnected_at` stores the first time connectivity issues were seen with the instance.
+    It resets every time connectivity is restored.
+    """
     exit_status: Mapped[Optional[int]] = mapped_column(Integer)
     job_spec_data: Mapped[str] = mapped_column(Text)
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
-    inactivity_secs: Mapped[Optional[int]] = mapped_column(Integer)  # 0 - active, None - N/A
-    # `removed` is used to ensure that the instance is killed after the job is finished
+    inactivity_secs: Mapped[Optional[int]] = mapped_column(Integer)
+    """`inactivity_secs` uses `0` for active jobs and `None` when inactivity is not applicable."""
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    """`remove_at` is used to ensure the instance is killed after the job is finished."""
     volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    # `instance_assigned` means instance assignment was done.
-    # if `instance_assigned` is True and `instance` is None, no instance was assigned.
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
+    """`instance_assigned` shows whether instance assignment has already been attempted.
+    If `instance_assigned` is `True` and `instance` is `None`, no instance was assigned.
+    """
     instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("instances.id", ondelete="CASCADE")
     )
@@ -481,15 +503,16 @@ class JobModel(BaseModel):
     probes: Mapped[list["ProbeModel"]] = relationship(
         back_populates="job", order_by="ProbeModel.probe_num"
     )
-    # Whether the replica is registered to receive service requests.
-    # Always `False` for non-service runs.
     registered: Mapped[bool] = mapped_column(Boolean, server_default=false())
-    # `waiting_master_job` is `True` for non-master jobs that have to wait
-    # for master processing before they can be processed.
-    # This allows updating all replica jobs even when only master is locked,
-    # e.g. to provision instances for all jobs when processing master.
-    # If not set, all jobs should be processed only one-by-one.
+    """`registered` shows whether the replica is registered to receive service requests.
+    It is always `False` for non-service runs.
+    """
     waiting_master_job: Mapped[Optional[bool]] = mapped_column(Boolean)
+    """`waiting_master_job` is `True` for non-master jobs that have to wait for master processing before
+    they can be processed. This allows updating all replica jobs even when only master is locked,
+    for example to provision instances for all jobs when processing master. If not set, all jobs
+    should be processed only one-by-one.
+    """
 
 
 class GatewayModel(PipelineModelMixin, BaseModel):
@@ -501,9 +524,11 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     name: Mapped[str] = mapped_column(String(100))
     region: Mapped[str] = mapped_column(String(100))
     wildcard_domain: Mapped[Optional[str]] = mapped_column(String(100))
-    # `configuration` is optional for compatibility with pre-0.18.2 gateways.
-    # Use `get_gateway_configuration` to construct `configuration` for old gateways.
     configuration: Mapped[Optional[str]] = mapped_column(Text)
+    """
+    configuration: Optional for compatibility with pre-0.18.2 gateways.
+    Use `get_gateway_configuration` to construct `configuration` for old gateways.
+    """
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     status: Mapped[GatewayStatus] = mapped_column(EnumAsString(GatewayStatus, 100))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
@@ -537,9 +562,10 @@ class GatewayComputeModel(BaseModel):
     instance_id: Mapped[str] = mapped_column(String(100))
     ip_address: Mapped[str] = mapped_column(String(100))
     hostname: Mapped[Optional[str]] = mapped_column(String(100))
-    # `configuration` is optional for compatibility with pre-0.18.2 gateways.
-    # Use `get_gateway_compute_configuration` to construct `configuration` for old gateways.
     configuration: Mapped[Optional[str]] = mapped_column(Text)
+    """`configuration` is optional for compatibility with pre-0.18.2 gateways.
+    Use `get_gateway_compute_configuration` to construct `configuration` for old gateways.
+    """
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[str] = mapped_column(String(100))
 
@@ -548,12 +574,12 @@ class GatewayComputeModel(BaseModel):
     )
     backend: Mapped[Optional["BackendModel"]] = relationship()
 
-    # The key to authorize the server with the gateway
     ssh_private_key: Mapped[str] = mapped_column(Text)
+    """`ssh_private_key` is the key used to authorize the server with the gateway."""
     ssh_public_key: Mapped[str] = mapped_column(Text)
 
-    # active means the server should maintain connection to gateway.
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    """`active` means the server should maintain a connection to the gateway."""
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     app_updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
 
@@ -594,8 +620,8 @@ class FleetModel(PipelineModelMixin, BaseModel):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    # NOTE: `status` must be changed only via `switch_fleet_status()`
     status: Mapped[FleetStatus] = mapped_column(EnumAsString(FleetStatus, 100), index=True)
+    """`status` must be changed only via `switch_fleet_status()`."""
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     spec: Mapped[str] = mapped_column(Text)
@@ -611,9 +637,10 @@ class FleetModel(PipelineModelMixin, BaseModel):
         UUIDType(binary=False), index=True
     )
 
-    # `consolidation_attempt` counts how many times in a row fleet needed consolidation.
-    # Allows increasing delays between attempts.
     consolidation_attempt: Mapped[int] = mapped_column(Integer, server_default="0")
+    """`consolidation_attempt` counts how many times in a row the fleet needed consolidation.
+    It allows increasing delays between attempts.
+    """
     last_consolidated_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     __table_args__ = (
@@ -646,7 +673,7 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
 
-    # TODO: Drop after the release without pools
+    # TODO: drop `pool_id` after the release without pools.
     pool_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("pools.id"),
         deferred=True,  # Not loaded so it can be deleted in the next releases
@@ -662,38 +689,36 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
     compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")
 
-    # NOTE: `status` must be changed only via `switch_instance_status()`
     status: Mapped[InstanceStatus] = mapped_column(EnumAsString(InstanceStatus, 100), index=True)
+    """`status` must be changed only via `switch_instance_status()`."""
     unreachable: Mapped[bool] = mapped_column(Boolean)
 
-    # VM
     started_at: Mapped[Optional[datetime]] = mapped_column(
         NaiveDateTime, default=get_current_datetime
     )
+    """`started_at` is used only for VM instances."""
     finished_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
-    # create instance
-    # TODO: Introduce a field that would store all resolved instance profile parameters, etc, (similar to job_spec).
-    # Currently, profile parameters are parsed every time they are accessed (e.g. see profile.retry).
+    # TODO: introduce a field that stores all resolved instance profile parameters, similar to `job_spec`.
     profile: Mapped[Optional[str]] = mapped_column(Text)
+    """`profile` stores raw profile data. Profile parameters are currently parsed every time they are
+    accessed, for example through `profile.retry`.
+    """
     requirements: Mapped[Optional[str]] = mapped_column(Text)
     instance_configuration: Mapped[Optional[str]] = mapped_column(Text)
 
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(100))
-    # TODO: Suggestion: do not assign DEFAULT_FLEET_TERMINATION_IDLE_TIME as the default here
-    # (make Optional instead; also instead of -1)
+    # TODO: consider not assigning `DEFAULT_FLEET_TERMINATION_IDLE_TIME` here and making this optional.
     termination_idle_time: Mapped[int] = mapped_column(
         Integer, default=DEFAULT_FLEET_TERMINATION_IDLE_TIME
     )
+    """`termination_idle_time` stores the idle timeout used for termination decisions."""
 
-    # Deprecated
     last_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime, deferred=True)
+    """`last_retry_at` is deprecated."""
 
-    # instance termination handling
     termination_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    # dstack versions prior to 0.20.1 represented instance termination reasons as raw strings.
-    # Such strings may still be stored in the database, so we are using a wide column (4000 chars)
-    # and a fallback deserializer to convert them to relevant enum members.
+    """`termination_deadline` is used for instance termination handling."""
     termination_reason: Mapped[Optional[InstanceTerminationReason]] = mapped_column(
         EnumAsString(
             InstanceTerminationReason,
@@ -701,9 +726,13 @@ class InstanceModel(PipelineModelMixin, BaseModel):
             fallback_deserializer=InstanceTerminationReason.from_legacy_str,
         )
     )
+    """`termination_reason` may need legacy deserialization because dstack versions prior to 0.20.1 represented instance termination
+    reasons as raw strings. Such strings may still be stored in the database, so this uses a
+    wide column and a fallback deserializer to convert them to relevant enum members.
+    """
     termination_reason_message: Mapped[Optional[str]] = mapped_column(String(4000))
-    # Deprecated since 0.19.22, not used
     health_status: Mapped[Optional[str]] = mapped_column(String(4000), deferred=True)
+    """`health_status` is deprecated since 0.19.22 and is no longer used."""
     health: Mapped[HealthStatus] = mapped_column(
         EnumAsString(HealthStatus, 100), default=HealthStatus.HEALTHY
     )
@@ -713,8 +742,8 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     backend: Mapped[Optional[BackendType]] = mapped_column(EnumAsString(BackendType, 100))
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
 
-    # Not set for cloud fleets that haven't been provisioning
     offer: Mapped[Optional[str]] = mapped_column(Text)
+    """`offer` is not set for cloud fleets that have not started provisioning."""
     region: Mapped[Optional[str]] = mapped_column(String(2000))
     price: Mapped[Optional[float]] = mapped_column(Float)
 
@@ -722,8 +751,8 @@ class InstanceModel(PipelineModelMixin, BaseModel):
 
     remote_connection_info: Mapped[Optional[str]] = mapped_column(Text)
 
-    # NULL means `auto` (only during provisioning, when ready it's not NULL)
     total_blocks: Mapped[Optional[int]] = mapped_column(Integer)
+    """`total_blocks` uses `NULL` to mean `auto` during provisioning; once ready it is not `NULL`."""
     busy_blocks: Mapped[int] = mapped_column(Integer, default=0)
 
     jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance")
@@ -785,19 +814,19 @@ class VolumeModel(PipelineModelMixin, BaseModel):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
-    # NOTE: `status` must be changed only via `switch_volume_status()`
     status: Mapped[VolumeStatus] = mapped_column(EnumAsString(VolumeStatus, 100), index=True)
+    """`status` must be changed only via `switch_volume_status()`."""
     status_message: Mapped[Optional[str]] = mapped_column(Text)
 
     configuration: Mapped[str] = mapped_column(Text)
     volume_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
-    # auto_cleanup_enabled is set for all new models but old models may not have it.
     auto_cleanup_enabled: Mapped[Optional[bool]] = mapped_column(Boolean)
+    """`auto_cleanup_enabled` is set for all new models, but old models may not have it."""
 
     attachments: Mapped[List["VolumeAttachmentModel"]] = relationship(back_populates="volume")
 
-    # Deprecated in favor of VolumeAttachmentModel.attachment_data
     volume_attachment_data: Mapped[Optional[str]] = mapped_column(Text)
+    """`volume_attachment_data` is deprecated in favor of `VolumeAttachmentModel.attachment_data`."""
 
     __table_args__ = (
         Index(
@@ -832,7 +861,7 @@ class PlacementGroupModel(PipelineModelMixin, BaseModel):
 
     fleet_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped["FleetModel"] = relationship(foreign_keys=[fleet_id])
-    # TODO: rename `fleet_deleted` -> `to_be_deleted`
+    # TODO: rename `fleet_deleted` to `to_be_deleted`.
     fleet_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
@@ -908,9 +937,10 @@ class JobMetricsPoint(BaseModel):
     memory_usage_bytes: Mapped[int] = mapped_column(BigInteger)
     memory_working_set_bytes: Mapped[int] = mapped_column(BigInteger)
 
-    # json-encoded lists of metric values of len(gpus) length
     gpus_memory_usage_bytes: Mapped[str] = mapped_column(Text)
+    """`gpus_memory_usage_bytes` stores a JSON-encoded list of metric values with length `len(gpus)`."""
     gpus_util_percent: Mapped[str] = mapped_column(Text)
+    """`gpus_util_percent` stores a JSON-encoded list of metric values with length `len(gpus)`."""
 
 
 class JobPrometheusMetrics(BaseModel):
@@ -920,8 +950,8 @@ class JobPrometheusMetrics(BaseModel):
     job: Mapped["JobModel"] = relationship()
 
     collected_at: Mapped[datetime] = mapped_column(NaiveDateTime)
-    # Raw Prometheus text response
     text: Mapped[str] = mapped_column(Text)
+    """`text` stores the raw Prometheus text response."""
 
 
 class ProbeModel(BaseModel):
@@ -936,7 +966,8 @@ class ProbeModel(BaseModel):
     job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id"), primary_key=True)
     job: Mapped["JobModel"] = relationship(back_populates="probes")
 
-    probe_num: Mapped[int] = mapped_column(Integer)  # index in JobSpec.probes
+    probe_num: Mapped[int] = mapped_column(Integer)
+    """`probe_num` is the index in `JobSpec.probes`."""
     due: Mapped[datetime] = mapped_column(NaiveDateTime)
     success_streak: Mapped[int] = mapped_column(BigInteger)
     active: Mapped[bool] = mapped_column(Boolean)

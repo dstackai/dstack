@@ -375,7 +375,7 @@ class ResourcesSpecConfig(CoreConfig):
 
 
 class ResourcesSpec(generate_dual_core_model(ResourcesSpecConfig)):
-    # TODO: Remove Range[int] in 0.20. Range[int] for backward compatibility only.
+    # TODO: remove `Range[int]` in 0.20. It is kept only for backward compatibility.
     cpu: Annotated[Union[CPUSpec, Range[int]], Field(description="The CPU requirements")] = (
         CPUSpec()
     )
@@ -390,8 +390,8 @@ class ResourcesSpec(generate_dual_core_model(ResourcesSpecConfig)):
             "you may need to configure this"
         ),
     ] = None
-    # Optional for backward compatibility
     gpu: Annotated[Optional[GPUSpec], Field(description="The GPU requirements")] = DEFAULT_GPU_SPEC
+    """`gpu` is optional for backward compatibility."""
     disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
 
     def pretty_format(self) -> str:

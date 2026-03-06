@@ -24,12 +24,14 @@ class ComputeGroupProvisioningData(CoreModel):
     compute_group_id: str
     compute_group_name: str
     backend: BackendType
-    # In case backend provisions instance in another backend,
-    # it may set that backend as base_backend.
     base_backend: Optional[BackendType] = None
+    """`base_backend` may be set when a backend provisions an instance in another backend and needs
+    to record that backend as `base_backend`.
+    """
     region: str
     job_provisioning_datas: List[JobProvisioningData]
-    backend_data: Optional[str] = None  # backend-specific data in json
+    backend_data: Optional[str] = None
+    """`backend_data` stores backend-specific data in JSON."""
 
 
 class ComputeGroup(CoreModel):
