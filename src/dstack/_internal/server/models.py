@@ -525,8 +525,7 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     region: Mapped[str] = mapped_column(String(100))
     wildcard_domain: Mapped[Optional[str]] = mapped_column(String(100))
     configuration: Mapped[Optional[str]] = mapped_column(Text)
-    """
-    configuration: Optional for compatibility with pre-0.18.2 gateways.
+    """`configuration` is Optional for compatibility with pre-0.18.2 gateways.
     Use `get_gateway_configuration` to construct `configuration` for old gateways.
     """
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)

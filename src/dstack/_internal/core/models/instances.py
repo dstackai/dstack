@@ -24,8 +24,7 @@ class Gpu(CoreModel):
     name: str
     memory_mib: int
     vendor: Optional[gpuhunt.AcceleratorVendor] = None
-    """
-    `vendor` is declared as optional, but the root validator always sets a value.
+    """`vendor` is declared as optional, but the root validator always sets a value.
     `assert gpu.vendor is not None` should be a safe type narrowing.
     """
 
@@ -346,8 +345,7 @@ class Instance(CoreModel):
     unreachable: bool = False
     health_status: HealthStatus = HealthStatus.HEALTHY
     termination_reason: Optional[str] = None
-    """
-    `termination_reason` stores `InstanceTerminationReason`.
+    """`termination_reason` stores `InstanceTerminationReason`.
     `str` allows adding new enum members without breaking compatibility with old clients.
     """
     termination_reason_message: Optional[str] = None
