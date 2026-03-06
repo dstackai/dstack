@@ -210,19 +210,21 @@ async def update_project(
     project: ProjectModel,
     is_public: Optional[bool] = None,
     templates_repo: Optional[str] = None,
-    update_is_public: bool = True,
-    update_templates_repo: bool = False,
+    reset_templates_repo: bool = False,
 ):
     updated_fields = []
-    if update_is_public and is_public is not None and is_public != project.is_public:
+    if is_public is not None and is_public != project.is_public:
         project.is_public = is_public
         updated_fields.append(f"is_public={is_public}")
-    if update_templates_repo:
+    normalized_templates_repo = project.templates_repo
+    should_update_templates_repo = False
+    if reset_templates_repo:
+        normalized_templates_repo = None
+        should_update_templates_repo = project.templates_repo is not None
+    elif templates_repo is not None:
         normalized_templates_repo = _normalize_templates_repo_url(templates_repo)
-        should_update_templates_repo = normalized_templates_repo != project.templates_repo
-    else:
-        normalized_templates_repo = project.templates_repo
-        should_update_templates_repo = False
+        if normalized_templates_repo is not None:
+            should_update_templates_repo = normalized_templates_repo != project.templates_repo
     if should_update_templates_repo:
         previous_templates_repo = project.templates_repo
         project.templates_repo = normalized_templates_repo

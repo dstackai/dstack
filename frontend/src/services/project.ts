@@ -196,7 +196,12 @@ export const projectApi = createApi({
 
         updateProject: builder.mutation<
             IProject,
-            { project_name: string; is_public?: boolean; templates_repo?: string | null }
+            {
+                project_name: string;
+                is_public?: boolean;
+                templates_repo?: string | null;
+                reset_templates_repo?: boolean;
+            }
         >({
             query: ({ project_name, ...body }) => ({
                 url: API.PROJECTS.UPDATE(project_name),

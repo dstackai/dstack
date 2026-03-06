@@ -57,6 +57,7 @@ class CreateProjectRequest(CoreModel):
 class UpdateProjectRequest(CoreModel):
     is_public: Optional[bool] = None
     templates_repo: Optional[str] = None
+    reset_templates_repo: bool = False
 
 
 class DeleteProjectsRequest(CoreModel):

@@ -2097,7 +2097,31 @@ class TestUpdateProjectVisibility:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_can_clear_templates_repo_with_null(
+    async def test_can_reset_templates_repo_with_explicit_flag(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
+        project = await create_project(
+            session=session,
+            owner=admin_user,
+            is_public=False,
+            templates_repo="https://github.com/org/templates.git",
+        )
+        await add_project_member(
+            session=session, project=project, user=admin_user, project_role=ProjectRole.ADMIN
+        )
+
+        response = await client.post(
+            f"/api/projects/{project.name}/update",
+            headers=get_auth_headers(admin_user.token),
+            json={"reset_templates_repo": True},
+        )
+        assert response.status_code == 200
+        assert response.json().get("templates_repo") is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_null_templates_repo_without_reset_does_not_clear_existing_value(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         admin_user = await create_user(session=session, name="admin", global_role=GlobalRole.USER)
@@ -2117,7 +2141,7 @@ class TestUpdateProjectVisibility:
             json={"templates_repo": None},
         )
         assert response.status_code == 200
-        assert response.json().get("templates_repo") is None
+        assert response.json()["templates_repo"] == "https://github.com/org/templates.git"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

@@ -281,7 +281,7 @@ export const ProjectSettings: React.FC = () => {
         setTemplatesRepoValue('');
         updateProject({
             project_name: paramProjectName,
-            templates_repo: null,
+            reset_templates_repo: true,
         })
             .unwrap()
             .then(() => {
