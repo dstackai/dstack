@@ -36,6 +36,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import events, users
+from dstack._internal.server.services import templates as templates_service
 from dstack._internal.server.services.backends import (
     get_backend_config_without_creds_from_backend_model,
 )
@@ -164,6 +165,7 @@ async def create_project(
     user: UserModel,
     project_name: str,
     is_public: bool = False,
+    templates_repo: Optional[str] = None,
     config: Optional[ProjectHookConfig] = None,
 ) -> Project:
     user_permissions = users.get_user_permissions(user)
@@ -180,6 +182,7 @@ async def create_project(
         owner=user,
         project_name=project_name,
         is_public=is_public,
+        templates_repo=templates_repo,
     )
     await add_project_member(
         session=session,
@@ -205,12 +208,28 @@ async def update_project(
     session: AsyncSession,
     user: UserModel,
     project: ProjectModel,
-    is_public: bool,
+    is_public: Optional[bool] = None,
+    templates_repo: Optional[str] = None,
+    update_is_public: bool = True,
+    update_templates_repo: bool = False,
 ):
     updated_fields = []
-    if is_public != project.is_public:
+    if update_is_public and is_public is not None and is_public != project.is_public:
         project.is_public = is_public
         updated_fields.append(f"is_public={is_public}")
+    if update_templates_repo:
+        normalized_templates_repo = _normalize_templates_repo_url(templates_repo)
+        should_update_templates_repo = normalized_templates_repo != project.templates_repo
+    else:
+        normalized_templates_repo = project.templates_repo
+        should_update_templates_repo = False
+    if should_update_templates_repo:
+        previous_templates_repo = project.templates_repo
+        project.templates_repo = normalized_templates_repo
+        templates_service.invalidate_templates_cache(
+            project.id, previous_templates_repo, project.templates_repo
+        )
+        updated_fields.append(f"templates_repo={normalized_templates_repo}")
     events.emit(
         session,
         f"Project updated. Updated fields: {', '.join(updated_fields) or '<none>'}",
@@ -575,9 +594,14 @@ async def get_project_model_by_id_or_error(
 
 
 async def create_project_model(
-    session: AsyncSession, owner: UserModel, project_name: str, is_public: bool = False
+    session: AsyncSession,
+    owner: UserModel,
+    project_name: str,
+    is_public: bool = False,
+    templates_repo: Optional[str] = None,
 ) -> ProjectModel:
     validate_project_name(project_name)
+    templates_repo = _normalize_templates_repo_url(templates_repo)
     private_bytes, public_bytes = await run_async(
         generate_rsa_key_pair_bytes, f"{project_name}@dstack"
     )
@@ -588,6 +612,7 @@ async def create_project_model(
         ssh_private_key=private_bytes.decode(),
         ssh_public_key=public_bytes.decode(),
         is_public=is_public,
+        templates_repo=templates_repo,
     )
     session.add(project)
     events.emit(
@@ -666,6 +691,11 @@ def project_model_to_project(
         backends=backends,
         members=members,
         is_public=project_model.is_public,
+        **(
+            {"templates_repo": project_model.templates_repo}
+            if project_model.templates_repo is not None
+            else {}
+        ),
     )
 
 
@@ -691,6 +721,20 @@ def validate_project_name(project_name: str):
 
 def is_valid_project_name(project_name: str) -> bool:
     return re.match("^[a-zA-Z0-9-_]{1,50}$", project_name) is not None
+
+
+def _normalize_templates_repo_url(templates_repo: Optional[str]) -> Optional[str]:
+    if templates_repo is None:
+        return None
+    templates_repo = templates_repo.strip()
+    if templates_repo == "":
+        return None
+    if templates_repo is not None:
+        try:
+            templates_service.validate_templates_repo_access(templates_repo)
+        except ValueError as e:
+            raise ServerClientError(str(e))
+    return templates_repo
 
 
 _CREATE_PROJECT_HOOKS = []

@@ -194,11 +194,14 @@ export const projectApi = createApi({
             providesTags: () => ['ProjectRepos'],
         }),
 
-        updateProject: builder.mutation<IProject, { project_name: string; is_public: boolean }>({
-            query: ({ project_name, is_public }) => ({
+        updateProject: builder.mutation<
+            IProject,
+            { project_name: string; is_public?: boolean; templates_repo?: string | null }
+        >({
+            query: ({ project_name, ...body }) => ({
                 url: API.PROJECTS.UPDATE(project_name),
                 method: 'POST',
-                body: { is_public },
+                body,
             }),
             transformResponse: transformProjectResponse,
             invalidatesTags: (result, error, params) => [{ type: 'Projects' as const, id: params?.project_name }],

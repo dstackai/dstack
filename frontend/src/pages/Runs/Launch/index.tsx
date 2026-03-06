@@ -7,6 +7,7 @@ import { WizardProps } from '@cloudscape-design/components';
 import { CardsProps } from '@cloudscape-design/components/cards';
 
 import {
+    Button,
     Container,
     FormCards,
     FormCodeEditor,
@@ -234,6 +235,10 @@ export const Launch: React.FC = () => {
             onSubmitWizard().catch(console.log);
         }
     };
+    const openProjectSettings = () => {
+        if (!formValues.project) return;
+        navigate(`${ROUTES.PROJECT.DETAILS.SETTINGS.FORMAT(formValues.project)}#danger-zone`);
+    };
 
     const envParam = selectedTemplate?.parameters?.find((p) => p.type === 'env');
     const yaml = useGenerateYaml({
@@ -320,6 +325,20 @@ export const Launch: React.FC = () => {
                                                 },
                                             ],
                                         }}
+                                        empty={
+                                            formValues.project ? (
+                                                <SpaceBetween size="xs" direction="vertical">
+                                                    <div>{t('runs.no_templates_alert.description')}</div>
+                                                    <div>
+                                                        <Button formAction="none" onClick={openProjectSettings}>
+                                                            {t('runs.no_templates_alert.action')}
+                                                        </Button>
+                                                    </div>
+                                                </SpaceBetween>
+                                            ) : (
+                                                t('runs.launch.wizard.template_placeholder')
+                                            )
+                                        }
                                         cardsPerRow={[{ cards: 1 }, { minWidth: 400, cards: 2 }, { minWidth: 800, cards: 3 }]}
                                         onSelectionChange={onChangeTemplate}
                                     />
@@ -346,11 +365,7 @@ export const Launch: React.FC = () => {
                                         defaultValue={false}
                                         toggleLabel={t('runs.launch.wizard.gpu')}
                                         toggleDescription={t('runs.launch.wizard.gpu_description')}
-                                        errorText={
-                                            formValues.gpu_enabled
-                                                ? formState.errors.offer?.message
-                                                : undefined
-                                        }
+                                        errorText={formValues.gpu_enabled ? formState.errors.offer?.message : undefined}
                                         name={FORM_FIELD_NAMES.gpu_enabled}
                                     />
                                 }
@@ -371,9 +386,7 @@ export const Launch: React.FC = () => {
                                     control={control}
                                     label={t('runs.launch.wizard.configuration_label')}
                                     description={t('runs.launch.wizard.configuration_description')}
-                                    info={
-                                        <InfoLink onFollow={() => openHelpPanel(CONFIGURATION_INFO)} />
-                                    }
+                                    info={<InfoLink onFollow={() => openHelpPanel(CONFIGURATION_INFO)} />}
                                     name={FORM_FIELD_NAMES.config_yaml}
                                     language="yaml"
                                     loading={loading}
