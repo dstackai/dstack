@@ -24,8 +24,7 @@ _templates_lock = threading.Lock()
 
 
 async def list_templates(project: ProjectModel) -> List[UITemplate]:
-    """Return templates available for the UI.
-    """
+    """Return templates available for the UI."""
     repo_url = project.templates_repo or settings.SERVER_TEMPLATES_REPO
     if not repo_url:
         return []
