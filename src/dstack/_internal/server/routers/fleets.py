@@ -26,6 +26,7 @@ from dstack._internal.server.security.permissions import (
     ProjectMember,
     check_can_access_fleet,
 )
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -144,6 +145,7 @@ async def apply_plan(
     body: ApplyFleetPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
 ):
     """
     Creates a new fleet or updates an existing fleet.
@@ -158,6 +160,7 @@ async def apply_plan(
             project=project,
             plan=body.plan,
             force=body.force,
+            pipeline_hinter=pipeline_hinter,
         )
     )
 
@@ -167,6 +170,7 @@ async def create_fleet(
     body: CreateFleetRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
 ):
     """
     Creates a fleet given a fleet configuration.
@@ -178,6 +182,7 @@ async def create_fleet(
             project=project,
             user=user,
             spec=body.spec,
+            pipeline_hinter=pipeline_hinter,
         )
     )
 

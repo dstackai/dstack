@@ -602,7 +602,14 @@ class FleetModel(PipelineModelMixin, BaseModel):
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="fleet")
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="fleet")
-    instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
+    instances: Mapped[List["InstanceModel"]] = relationship(
+        back_populates="fleet",
+        foreign_keys="InstanceModel.fleet_id",
+    )
+
+    current_master_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUIDType(binary=False), index=True
+    )
 
     # `consolidation_attempt` counts how many times in a row fleet needed consolidation.
     # Allows increasing delays between attempts.
@@ -619,7 +626,7 @@ class FleetModel(PipelineModelMixin, BaseModel):
     )
 
 
-class InstanceModel(BaseModel):
+class InstanceModel(PipelineModelMixin, BaseModel):
     __tablename__ = "instances"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -647,7 +654,10 @@ class InstanceModel(BaseModel):
     pool: Mapped[Optional["PoolModel"]] = relationship(back_populates="instances")
 
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"), index=True)
-    fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
+    fleet: Mapped[Optional["FleetModel"]] = relationship(
+        back_populates="instances",
+        foreign_keys=[fleet_id],
+    )
 
     compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
     compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")
@@ -725,6 +735,15 @@ class InstanceModel(BaseModel):
         # automatically marks them for deletion.
         # SQLAlchemy requires delete when using delete-orphan.
         cascade="save-update, merge, delete-orphan, delete",
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_instances_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=deleted == false(),
+            sqlite_where=deleted == false(),
+        ),
     )
 
 

@@ -19,6 +19,7 @@ from dstack._internal.core.errors import (
     NoCapacityError,
     NotYetTerminated,
     ProvisioningError,
+    SSHProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
@@ -40,7 +41,6 @@ from dstack._internal.core.models.runs import (
     JobStatus,
 )
 from dstack._internal.server.background.scheduled_tasks.instances import (
-    delete_instance_health_checks,
     process_instances,
 )
 from dstack._internal.server.models import (
@@ -65,7 +65,6 @@ from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_fleet,
     create_instance,
-    create_instance_health_check,
     create_job,
     create_project,
     create_repo,
@@ -1206,38 +1205,141 @@ class TestAddSSHInstance:
         assert instance.total_blocks == expected_blocks
         assert instance.busy_blocks == 0
 
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-@pytest.mark.usefixtures("test_db", "image_config_mock")
-class TestDeleteInstanceHealthChecks:
-    async def test_deletes_instance_health_checks(
-        self, monkeypatch: pytest.MonkeyPatch, session: AsyncSession
+    async def test_retries_ssh_instance_if_provisioning_fails(
+        self,
+        session: AsyncSession,
+        deploy_instance_mock: Mock,
     ):
+        deploy_instance_mock.side_effect = SSHProvisioningError("Expected")
         project = await create_project(session=session)
         instance = await create_instance(
-            session=session, project=project, status=InstanceStatus.IDLE
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
         )
-        # 30 minutes
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.PENDING
+        assert instance.termination_reason is None
+
+    async def test_terminates_ssh_instance_if_deploy_fails_unexpectedly(
+        self,
+        session: AsyncSession,
+        deploy_instance_mock: Mock,
+    ):
+        deploy_instance_mock.side_effect = RuntimeError("Unexpected")
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
+        )
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == InstanceTerminationReason.ERROR
+        assert instance.termination_reason_message == "Unexpected error when adding SSH instance"
+
+    async def test_terminates_ssh_instance_if_key_is_invalid(
+        self,
+        session: AsyncSession,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
         monkeypatch.setattr(
-            "dstack._internal.server.settings.SERVER_INSTANCE_HEALTH_TTL_SECONDS", 1800
+            "dstack._internal.server.background.scheduled_tasks.instances._ssh_keys_to_pkeys",
+            Mock(side_effect=ValueError("Bad key")),
         )
-        now = get_current_datetime()
-        # old check
-        await create_instance_health_check(
-            session=session, instance=instance, collected_at=now - dt.timedelta(minutes=40)
+        project = await create_project(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
         )
-        # recent check
-        check = await create_instance_health_check(
-            session=session, instance=instance, collected_at=now - dt.timedelta(minutes=20)
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == InstanceTerminationReason.ERROR
+        assert instance.termination_reason_message == "Unsupported private SSH key type"
+
+    async def test_terminates_ssh_instance_if_internal_ip_cannot_be_resolved_from_network(
+        self,
+        session: AsyncSession,
+        host_info: dict,
+    ):
+        host_info["addresses"] = ["192.168.100.100/24"]
+        project = await create_project(session=session)
+        job_provisioning_data = get_job_provisioning_data(
+            dockerized=True,
+            backend=BackendType.REMOTE,
+            internal_ip=None,
+        )
+        job_provisioning_data.instance_network = "10.0.0.0/24"
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
+            job_provisioning_data=job_provisioning_data,
+        )
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == InstanceTerminationReason.ERROR
+        assert (
+            instance.termination_reason_message
+            == "Failed to locate internal IP address on the given network"
         )
 
-        await delete_instance_health_checks()
+    async def test_terminates_ssh_instance_if_internal_ip_is_not_in_host_interfaces(
+        self,
+        session: AsyncSession,
+        host_info: dict,
+    ):
+        host_info["addresses"] = ["192.168.100.100/24"]
+        project = await create_project(session=session)
+        job_provisioning_data = get_job_provisioning_data(
+            dockerized=True,
+            backend=BackendType.REMOTE,
+            internal_ip="10.0.0.20",
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime(),
+            remote_connection_info=get_remote_connection_info(),
+            job_provisioning_data=job_provisioning_data,
+        )
+        await session.commit()
 
-        res = await session.execute(select(InstanceHealthCheckModel))
-        all_checks = res.scalars().all()
-        assert len(all_checks) == 1
-        assert all_checks[0] == check
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == InstanceTerminationReason.ERROR
+        assert (
+            instance.termination_reason_message
+            == "Specified internal IP not found among instance interfaces"
+        )
 
 
 @pytest.mark.asyncio

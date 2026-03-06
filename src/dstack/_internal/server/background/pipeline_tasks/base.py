@@ -1,6 +1,8 @@
 import asyncio
+import logging
 import math
 import random
+import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
@@ -331,6 +333,7 @@ class Worker(Generic[ItemT], ABC):
         self._running = True
         while self._running:
             item = await self._queue.get()
+            start_time = time.time()
             logger.debug("Processing %s item %s", item.__tablename__, item.id)
             try:
                 await self.process(item)
@@ -338,7 +341,12 @@ class Worker(Generic[ItemT], ABC):
                 logger.exception("Unexpected exception when processing item")
             finally:
                 await self._heartbeater.untrack(item)
-            logger.debug("Processed %s item %s", item.__tablename__, item.id)
+            logger.debug(
+                "Processed %s item %s in %.3f",
+                item.__tablename__,
+                item.id,
+                time.time() - start_time,
+            )
 
     def stop(self):
         self._running = False
@@ -416,3 +424,40 @@ def resolve_now_placeholders(update_values: _ResolveNowInput, now: datetime):
     for key, value in update_values.items():
         if value is NOW_PLACEHOLDER:
             update_values[key] = now
+
+
+def log_lock_token_mismatch(
+    logger: logging.Logger,
+    item: PipelineItem,
+    action: str = "process",
+) -> None:
+    logger.warning(
+        "Failed to %s %s item %s: lock_token mismatch."
+        " The item is expected to be processed and updated on another fetch iteration.",
+        action,
+        item.__tablename__,
+        item.id,
+    )
+
+
+def log_lock_token_changed_after_processing(
+    logger: logging.Logger,
+    item: PipelineItem,
+    action: str = "update",
+    expected_outcome: str = "updated",
+) -> None:
+    logger.warning(
+        "Failed to %s %s item %s after processing: lock_token changed."
+        " The item is expected to be processed and %s on another fetch iteration.",
+        action,
+        item.__tablename__,
+        item.id,
+        expected_outcome,
+    )
+
+
+def log_lock_token_changed_on_reset(logger: logging.Logger) -> None:
+    logger.warning(
+        "Failed to reset lock: lock_token changed."
+        " The item is expected to be processed and updated on another fetch iteration."
+    )

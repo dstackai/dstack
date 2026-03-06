@@ -1661,6 +1661,84 @@ class TestDeleteFleetInstances:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_ignores_lock_on_non_selected_instances(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            instance_num=1,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            instance_num=2,
+        )
+        fleet.instances.append(instance1)
+        fleet.instances.append(instance2)
+        instance2.lock_expires_at = datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc)
+        await session.commit()
+
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/delete_instances",
+            headers=get_auth_headers(user.token),
+            json={"name": fleet.name, "instance_nums": [1]},
+        )
+        assert response.status_code == 200
+        await session.refresh(fleet)
+        await session.refresh(instance1)
+        await session.refresh(instance2)
+        assert instance1.status == InstanceStatus.TERMINATING
+        assert instance2.status != InstanceStatus.TERMINATING
+        assert fleet.status != FleetStatus.TERMINATING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_when_selected_instance_locked(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            instance_num=1,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            instance_num=2,
+        )
+        fleet.instances.append(instance1)
+        fleet.instances.append(instance2)
+        instance1.lock_expires_at = datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc)
+        await session.commit()
+
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/delete_instances",
+            headers=get_auth_headers(user.token),
+            json={"name": fleet.name, "instance_nums": [1]},
+        )
+        assert response.status_code == 400
+        await session.refresh(fleet)
+        await session.refresh(instance1)
+        await session.refresh(instance2)
+        assert instance1.status != InstanceStatus.TERMINATING
+        assert instance2.status != InstanceStatus.TERMINATING
+        assert fleet.status != FleetStatus.TERMINATING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_deleting_busy_instances(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

@@ -106,6 +106,7 @@ include = [
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/cli/services/configurators",
     "src/dstack/_internal/cli/commands",
+    "src/tests/_internal/server/background/pipeline_tasks",
 ]
 ignore = [
     "src/dstack/_internal/server/migrations/versions",

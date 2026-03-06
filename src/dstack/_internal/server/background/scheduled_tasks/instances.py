@@ -9,7 +9,7 @@ import requests
 from paramiko.pkey import PKey
 from paramiko.ssh_exception import PasswordRequiredException
 from pydantic import ValidationError
-from sqlalchemy import and_, delete, func, not_, select
+from sqlalchemy import and_, func, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -33,12 +33,11 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
 from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
-
-# FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
 from dstack._internal.core.errors import (
     BackendError,
     NotYetTerminated,
     ProvisioningError,
+    SSHProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
@@ -108,8 +107,7 @@ from dstack._internal.server.services.placement import (
 )
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.server.utils import sentry_utils
-from dstack._internal.server.utils.provisioning import (
+from dstack._internal.server.services.ssh_fleets.provisioning import (
     detect_cpu_arch,
     get_host_info,
     get_paramiko_connection,
@@ -121,6 +119,7 @@ from dstack._internal.server.utils.provisioning import (
     run_shim_as_systemd_service,
     upload_envs,
 )
+from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import (
     get_current_datetime,
     get_or_error,
@@ -150,17 +149,6 @@ async def process_instances(batch_size: int = 1):
     for _ in range(batch_size):
         tasks.append(_process_next_instance())
     await asyncio.gather(*tasks)
-
-
-@sentry_utils.instrument_scheduled_task
-async def delete_instance_health_checks():
-    now = get_current_datetime()
-    cutoff = now - timedelta(seconds=server_settings.SERVER_INSTANCE_HEALTH_TTL_SECONDS)
-    async with get_session_ctx() as session:
-        await session.execute(
-            delete(InstanceHealthCheckModel).where(InstanceHealthCheckModel.collected_at < cutoff)
-        )
-        await session.commit()
 
 
 @sentry_utils.instrument_scheduled_task
@@ -211,63 +199,81 @@ async def _process_next_instance():
 
 async def _process_instance(session: AsyncSession, instance: InstanceModel):
     logger.debug("%s: processing instance, status: %s", fmt(instance), instance.status.upper())
-    # Refetch to load related attributes.
-    # Load related attributes only for statuses that always need them.
-    if instance.status in (
-        InstanceStatus.PENDING,
-        InstanceStatus.TERMINATING,
-    ):
-        res = await session.execute(
-            select(InstanceModel)
-            .where(InstanceModel.id == instance.id)
-            .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
-            .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
-            .options(
-                joinedload(InstanceModel.fleet).joinedload(
-                    FleetModel.instances.and_(InstanceModel.deleted == False)
-                ),
-            )
-            .execution_options(populate_existing=True)
-        )
-        instance = res.unique().scalar_one()
-    elif instance.status == InstanceStatus.IDLE:
-        res = await session.execute(
-            select(InstanceModel)
-            .where(InstanceModel.id == instance.id)
-            .options(joinedload(InstanceModel.project))
-            .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
-            .options(
-                joinedload(InstanceModel.fleet).joinedload(
-                    FleetModel.instances.and_(InstanceModel.deleted == False)
-                ),
-            )
-            .execution_options(populate_existing=True)
-        )
-        instance = res.unique().scalar_one()
-
     if instance.status == InstanceStatus.PENDING:
-        if is_ssh_instance(instance):
-            await _add_remote(session, instance)
-        else:
-            await _create_instance(
-                session=session,
-                instance=instance,
-            )
-    elif instance.status in (
-        InstanceStatus.PROVISIONING,
-        InstanceStatus.IDLE,
-        InstanceStatus.BUSY,
-    ):
-        idle_duration_expired = _check_and_mark_terminating_if_idle_duration_expired(
-            session, instance
-        )
-        if not idle_duration_expired:
-            await _check_instance(session, instance)
+        await _process_pending_instance(session, instance)
+    elif instance.status == InstanceStatus.PROVISIONING:
+        await _process_provisioning_instance(session, instance)
+    elif instance.status == InstanceStatus.IDLE:
+        await _process_idle_instance(session, instance)
+    elif instance.status == InstanceStatus.BUSY:
+        await _process_busy_instance(session, instance)
     elif instance.status == InstanceStatus.TERMINATING:
-        await _terminate(session, instance)
+        await _process_terminating_instance(session, instance)
 
     instance.last_processed_at = get_current_datetime()
     await session.commit()
+
+
+async def _process_pending_instance(session: AsyncSession, instance: InstanceModel):
+    instance = await _refetch_instance_for_pending_or_terminating(session, instance.id)
+    if is_ssh_instance(instance):
+        await _add_remote(session, instance)
+    else:
+        await _create_instance(session=session, instance=instance)
+
+
+async def _process_provisioning_instance(session: AsyncSession, instance: InstanceModel):
+    await _check_instance(session, instance)
+
+
+async def _process_idle_instance(session: AsyncSession, instance: InstanceModel):
+    instance = await _refetch_instance_for_idle(session, instance.id)
+    idle_duration_expired = _check_and_mark_terminating_if_idle_duration_expired(session, instance)
+    if not idle_duration_expired:
+        await _check_instance(session, instance)
+
+
+async def _process_busy_instance(session: AsyncSession, instance: InstanceModel):
+    await _check_instance(session, instance)
+
+
+async def _process_terminating_instance(session: AsyncSession, instance: InstanceModel):
+    instance = await _refetch_instance_for_pending_or_terminating(session, instance.id)
+    await _terminate(session, instance)
+
+
+async def _refetch_instance_for_pending_or_terminating(
+    session: AsyncSession, instance_id
+) -> InstanceModel:
+    res = await session.execute(
+        select(InstanceModel)
+        .where(InstanceModel.id == instance_id)
+        .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+        .options(
+            joinedload(InstanceModel.fleet).joinedload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
+            )
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
+
+
+async def _refetch_instance_for_idle(session: AsyncSession, instance_id) -> InstanceModel:
+    res = await session.execute(
+        select(InstanceModel)
+        .where(InstanceModel.id == instance_id)
+        .options(joinedload(InstanceModel.project))
+        .options(joinedload(InstanceModel.jobs).load_only(JobModel.id, JobModel.status))
+        .options(
+            joinedload(InstanceModel.fleet).joinedload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
+            )
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
 
 
 def _check_and_mark_terminating_if_idle_duration_expired(
@@ -324,76 +330,61 @@ async def _add_remote(session: AsyncSession, instance: InstanceModel) -> None:
         switch_instance_status(session, instance, InstanceStatus.TERMINATED)
         return
 
+    remote_details = get_instance_remote_connection_info(instance)
+    assert remote_details is not None
+
     try:
-        remote_details = get_instance_remote_connection_info(instance)
-        assert remote_details is not None
-        # Prepare connection key
-        try:
-            pkeys = _ssh_keys_to_pkeys(remote_details.ssh_keys)
-            if remote_details.ssh_proxy_keys is not None:
-                ssh_proxy_pkeys = _ssh_keys_to_pkeys(remote_details.ssh_proxy_keys)
-            else:
-                ssh_proxy_pkeys = None
-        except (ValueError, PasswordRequiredException):
-            instance.termination_reason = InstanceTerminationReason.ERROR
-            instance.termination_reason_message = "Unsupported private SSH key type"
-            switch_instance_status(session, instance, InstanceStatus.TERMINATED)
-            return
+        pkeys = _ssh_keys_to_pkeys(remote_details.ssh_keys)
+        if remote_details.ssh_proxy_keys is not None:
+            ssh_proxy_pkeys = _ssh_keys_to_pkeys(remote_details.ssh_proxy_keys)
+        else:
+            ssh_proxy_pkeys = None
+    except (ValueError, PasswordRequiredException):
+        instance.termination_reason = InstanceTerminationReason.ERROR
+        instance.termination_reason_message = "Unsupported private SSH key type"
+        switch_instance_status(session, instance, InstanceStatus.TERMINATED)
+        return
 
-        authorized_keys = [pk.public.strip() for pk in remote_details.ssh_keys]
-        authorized_keys.append(instance.project.ssh_public_key.strip())
+    authorized_keys = [pk.public.strip() for pk in remote_details.ssh_keys]
+    authorized_keys.append(instance.project.ssh_public_key.strip())
 
-        try:
-            future = run_async(
-                _deploy_instance, remote_details, pkeys, ssh_proxy_pkeys, authorized_keys
-            )
-            deploy_timeout = 20 * 60  # 20 minutes
-            result = await asyncio.wait_for(future, timeout=deploy_timeout)
-            health, host_info, arch = result
-        except (asyncio.TimeoutError, TimeoutError) as e:
-            raise ProvisioningError(f"Deploy timeout: {e}") from e
-        except Exception as e:
-            raise ProvisioningError(f"Deploy instance raised an error: {e}") from e
-    except ProvisioningError as e:
+    try:
+        future = run_async(
+            _deploy_instance, remote_details, pkeys, ssh_proxy_pkeys, authorized_keys
+        )
+        deploy_timeout = 20 * 60  # 20 minutes
+        health, host_info, arch = await asyncio.wait_for(future, timeout=deploy_timeout)
+    except (asyncio.TimeoutError, TimeoutError) as e:
         logger.warning(
-            "Provisioning instance %s could not be completed because of the error: %s",
-            instance.name,
-            e,
+            "%s: deploy timeout when adding SSH instance: %s",
+            fmt(instance),
+            repr(e),
         )
         # Stays in PENDING, may retry later
         return
-
-    instance_type = host_info_to_instance_type(host_info, arch)
-    instance_network = None
-    internal_ip = None
-    try:
-        default_jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
-        instance_network = default_jpd.instance_network
-        internal_ip = default_jpd.internal_ip
-    except ValidationError:
-        pass
-
-    host_network_addresses = host_info.get("addresses", [])
-    if internal_ip is None:
-        internal_ip = get_ip_from_network(
-            network=instance_network,
-            addresses=host_network_addresses,
+    except SSHProvisioningError as e:
+        logger.warning(
+            "%s: provisioning error when adding SSH instance: %s",
+            fmt(instance),
+            repr(e),
         )
-    if instance_network is not None and internal_ip is None:
+        # Stays in PENDING, may retry later
+        return
+    except Exception:
+        logger.exception("%s: unexpected error when adding SSH instance", fmt(instance))
         instance.termination_reason = InstanceTerminationReason.ERROR
-        instance.termination_reason_message = (
-            "Failed to locate internal IP address on the given network"
-        )
+        instance.termination_reason_message = "Unexpected error when adding SSH instance"
         switch_instance_status(session, instance, InstanceStatus.TERMINATED)
         return
-    if internal_ip is not None:
-        if not is_ip_among_addresses(ip_address=internal_ip, addresses=host_network_addresses):
-            instance.termination_reason = InstanceTerminationReason.ERROR
-            instance.termination_reason_message = (
-                "Specified internal IP not found among instance interfaces"
-            )
-            switch_instance_status(session, instance, InstanceStatus.TERMINATED)
-            return
+
+    instance_type = host_info_to_instance_type(host_info, arch)
+    try:
+        instance_network, internal_ip = _resolve_ssh_instance_network(instance, host_info)
+    except _SSHInstanceNetworkResolutionError as e:
+        instance.termination_reason = InstanceTerminationReason.ERROR
+        instance.termination_reason_message = str(e)
+        switch_instance_status(session, instance, InstanceStatus.TERMINATED)
+        return
 
     divisible, blocks = is_divisible_into_blocks(
         cpu_count=instance_type.resources.cpus,
@@ -444,6 +435,41 @@ async def _add_remote(session: AsyncSession, instance: InstanceModel) -> None:
     instance.started_at = get_current_datetime()
 
 
+class _SSHInstanceNetworkResolutionError(Exception):
+    pass
+
+
+def _resolve_ssh_instance_network(
+    instance: InstanceModel, host_info: dict[str, Any]
+) -> tuple[Optional[str], Optional[str]]:
+    instance_network = None
+    internal_ip = None
+    try:
+        default_jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
+        instance_network = default_jpd.instance_network
+        internal_ip = default_jpd.internal_ip
+    except ValidationError:
+        pass
+
+    host_network_addresses = host_info.get("addresses", [])
+    if internal_ip is None:
+        internal_ip = get_ip_from_network(
+            network=instance_network,
+            addresses=host_network_addresses,
+        )
+    if instance_network is not None and internal_ip is None:
+        raise _SSHInstanceNetworkResolutionError(
+            "Failed to locate internal IP address on the given network"
+        )
+    if internal_ip is not None and not is_ip_among_addresses(
+        ip_address=internal_ip, addresses=host_network_addresses
+    ):
+        raise _SSHInstanceNetworkResolutionError(
+            "Specified internal IP not found among instance interfaces"
+        )
+    return instance_network, internal_ip
+
+
 def _deploy_instance(
     remote_details: RemoteConnectionInfo,
     pkeys: list[PKey],
@@ -473,7 +499,7 @@ def _deploy_instance(
         try:
             fleet_configuration_envs = remote_details.env.as_dict()
         except ValueError as e:
-            raise ProvisioningError(f"Invalid Env: {e}") from e
+            raise SSHProvisioningError(f"Invalid Env: {e}") from e
         shim_envs.update(fleet_configuration_envs)
         dstack_working_dir = get_dstack_working_dir()
         dstack_shim_binary_path = get_dstack_shim_binary_path()
@@ -501,7 +527,7 @@ def _deploy_instance(
         try:
             healthcheck = HealthcheckResponse.__response__.parse_raw(healthcheck_out)
         except ValueError as e:
-            raise ProvisioningError(f"Cannot parse HealthcheckResponse: {e}") from e
+            raise SSHProvisioningError(f"Cannot parse HealthcheckResponse: {e}") from e
         instance_check = runner_client.healthcheck_response_to_instance_check(healthcheck)
 
         return instance_check, host_info, arch
@@ -646,6 +672,7 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
     if instance.fleet and instance.id == master_instance.id and is_cloud_cluster(instance.fleet):
         # Do not attempt to deploy other instances, as they won't determine the correct cluster
         # backend, region, and placement group without a successfully deployed master instance
+        # FIXME: Race condition with siblings processed concurrently.
         for sibling_instance in instance.fleet.instances:
             if sibling_instance.id == instance.id:
                 continue
@@ -707,50 +734,22 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
             switch_instance_status(session, instance, InstanceStatus.BUSY)
         return
 
-    ssh_private_keys = get_instance_ssh_private_keys(instance)
-
-    health_check_cutoff = get_current_datetime() - timedelta(
-        seconds=server_settings.SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS
-    )
-    res = await session.execute(
-        select(func.count(1)).where(
-            InstanceHealthCheckModel.instance_id == instance.id,
-            InstanceHealthCheckModel.collected_at > health_check_cutoff,
-        )
-    )
-    check_instance_health = res.scalar_one() == 0
-
-    # May return False if fails to establish ssh connection
-    instance_check = await run_async(
-        _check_instance_inner,
-        ssh_private_keys,
-        job_provisioning_data,
-        None,
+    check_instance_health = await _should_check_instance_health(session, instance)
+    instance_check = await _run_instance_check(
         instance=instance,
+        job_provisioning_data=job_provisioning_data,
         check_instance_health=check_instance_health,
     )
-    if instance_check is False:
-        instance_check = InstanceCheck(reachable=False, message="SSH or tunnel error")
-
-    if instance_check.reachable and check_instance_health:
-        health_status = instance_check.get_health_status()
-    else:
-        # Keep previous health status
-        health_status = instance.health
-
-    loglevel = logging.DEBUG
-    if not instance_check.reachable and instance.status.is_available():
-        loglevel = logging.WARNING
-    elif check_instance_health and not health_status.is_healthy():
-        loglevel = logging.WARNING
-    logger.log(
-        loglevel,
-        "Instance %s check: reachable=%s health_status=%s message=%r",
-        instance.name,
-        instance_check.reachable,
-        health_status.name,
-        instance_check.message,
-        extra={"instance_name": instance.name, "health_status": health_status},
+    health_status = _get_health_status_for_instance_check(
+        instance=instance,
+        instance_check=instance_check,
+        check_instance_health=check_instance_health,
+    )
+    _log_instance_check_result(
+        instance=instance,
+        instance_check=instance_check,
+        health_status=health_status,
+        check_instance_health=check_instance_health,
     )
 
     if instance_check.has_health_checks():
@@ -795,6 +794,73 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
         if deadline is not None and get_current_datetime() > deadline:
             instance.termination_reason = InstanceTerminationReason.UNREACHABLE
             switch_instance_status(session, instance, InstanceStatus.TERMINATING)
+
+
+async def _should_check_instance_health(session: AsyncSession, instance: InstanceModel) -> bool:
+    health_check_cutoff = get_current_datetime() - timedelta(
+        seconds=server_settings.SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS
+    )
+    result = await session.execute(
+        select(func.count(1)).where(
+            InstanceHealthCheckModel.instance_id == instance.id,
+            InstanceHealthCheckModel.collected_at > health_check_cutoff,
+        )
+    )
+    return result.scalar_one() == 0
+
+
+async def _run_instance_check(
+    instance: InstanceModel,
+    job_provisioning_data: JobProvisioningData,
+    check_instance_health: bool,
+) -> InstanceCheck:
+    ssh_private_keys = get_instance_ssh_private_keys(instance)
+
+    # May return False if fails to establish ssh connection
+    instance_check = await run_async(
+        _check_instance_inner,
+        ssh_private_keys,
+        job_provisioning_data,
+        None,
+        instance=instance,
+        check_instance_health=check_instance_health,
+    )
+    if instance_check is False:
+        return InstanceCheck(reachable=False, message="SSH or tunnel error")
+    return instance_check
+
+
+def _get_health_status_for_instance_check(
+    instance: InstanceModel,
+    instance_check: InstanceCheck,
+    check_instance_health: bool,
+) -> HealthStatus:
+    if instance_check.reachable and check_instance_health:
+        return instance_check.get_health_status()
+    # Keep previous health status
+    return instance.health
+
+
+def _log_instance_check_result(
+    instance: InstanceModel,
+    instance_check: InstanceCheck,
+    health_status: HealthStatus,
+    check_instance_health: bool,
+) -> None:
+    loglevel = logging.DEBUG
+    if not instance_check.reachable and instance.status.is_available():
+        loglevel = logging.WARNING
+    elif check_instance_health and not health_status.is_healthy():
+        loglevel = logging.WARNING
+    logger.log(
+        loglevel,
+        "Instance %s check: reachable=%s health_status=%s message=%r",
+        instance.name,
+        instance_check.reachable,
+        health_status.name,
+        instance_check.message,
+        extra={"instance_name": instance.name, "health_status": health_status},
+    )
 
 
 async def _wait_for_instance_provisioning_data(
@@ -1134,7 +1200,8 @@ def _get_termination_deadline(instance: InstanceModel) -> datetime.datetime:
 
 
 def _need_to_wait_fleet_provisioning(
-    instance: InstanceModel, master_instance: InstanceModel
+    instance: InstanceModel,
+    master_instance: InstanceModel,
 ) -> bool:
     # Cluster cloud instances should wait for the first fleet instance to be provisioned
     # so that they are provisioned in the same backend/region

@@ -136,6 +136,10 @@ class ConfigurationError(DstackError):
     pass
 
 
+class SSHProvisioningError(DstackError):
+    pass
+
+
 class SSHError(DstackError):
     pass
 

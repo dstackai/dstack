@@ -1,5 +1,6 @@
+import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -10,6 +11,8 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.gateways import GatewayProvisioningData, GatewayStatus
 from dstack._internal.server.background.pipeline_tasks.gateways import (
+    GatewayFetcher,
+    GatewayPipeline,
     GatewayPipelineItem,
     GatewayWorker,
 )
@@ -23,11 +26,23 @@ from dstack._internal.server.testing.common import (
     create_project,
     list_events,
 )
+from dstack._internal.utils.common import get_current_datetime
 
 
 @pytest.fixture
 def worker() -> GatewayWorker:
     return GatewayWorker(queue=Mock(), heartbeater=Mock())
+
+
+@pytest.fixture
+def fetcher() -> GatewayFetcher:
+    return GatewayFetcher(
+        queue=asyncio.Queue(),
+        queue_desired_minsize=1,
+        min_processing_interval=timedelta(seconds=15),
+        lock_timeout=timedelta(seconds=30),
+        heartbeater=Mock(),
+    )
 
 
 def _gateway_to_pipeline_item(gateway_model: GatewayModel) -> GatewayPipelineItem:
@@ -42,6 +57,167 @@ def _gateway_to_pipeline_item(gateway_model: GatewayModel) -> GatewayPipelineIte
         status=gateway_model.status,
         to_be_deleted=gateway_model.to_be_deleted,
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestGatewayFetcher:
+    async def test_fetch_selects_eligible_gateways_and_sets_lock_fields(
+        self, test_db, session: AsyncSession, fetcher: GatewayFetcher
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        now = get_current_datetime()
+        stale = now - timedelta(minutes=1)
+
+        submitted = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="submitted",
+            status=GatewayStatus.SUBMITTED,
+            last_processed_at=stale - timedelta(seconds=3),
+        )
+        provisioning = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="provisioning",
+            status=GatewayStatus.PROVISIONING,
+            last_processed_at=stale - timedelta(seconds=2),
+        )
+        to_be_deleted = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="to-be-deleted",
+            status=GatewayStatus.RUNNING,
+            last_processed_at=stale - timedelta(seconds=1),
+        )
+        to_be_deleted.to_be_deleted = True
+
+        just_created = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="just-created",
+            status=GatewayStatus.SUBMITTED,
+            last_processed_at=now,
+        )
+        just_created.created_at = now
+        just_created.last_processed_at = now
+
+        ineligible_status = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="ineligible-status",
+            status=GatewayStatus.RUNNING,
+            last_processed_at=stale,
+        )
+        recent = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="recent",
+            status=GatewayStatus.SUBMITTED,
+            last_processed_at=now,
+        )
+        recent.created_at = now - timedelta(minutes=2)
+        recent.last_processed_at = now
+
+        locked = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="locked",
+            status=GatewayStatus.SUBMITTED,
+            last_processed_at=stale + timedelta(seconds=1),
+        )
+        locked.lock_expires_at = now + timedelta(minutes=1)
+        locked.lock_token = uuid.uuid4()
+        locked.lock_owner = "OtherPipeline"
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert {item.id for item in items} == {
+            submitted.id,
+            provisioning.id,
+            to_be_deleted.id,
+            just_created.id,
+        }
+        assert {(item.id, item.status, item.to_be_deleted) for item in items} == {
+            (submitted.id, GatewayStatus.SUBMITTED, False),
+            (provisioning.id, GatewayStatus.PROVISIONING, False),
+            (to_be_deleted.id, GatewayStatus.RUNNING, True),
+            (just_created.id, GatewayStatus.SUBMITTED, False),
+        }
+
+        for gateway in [
+            submitted,
+            provisioning,
+            to_be_deleted,
+            just_created,
+            ineligible_status,
+            recent,
+            locked,
+        ]:
+            await session.refresh(gateway)
+
+        fetched_gateways = [submitted, provisioning, to_be_deleted, just_created]
+        assert all(gateway.lock_owner == GatewayPipeline.__name__ for gateway in fetched_gateways)
+        assert all(gateway.lock_expires_at is not None for gateway in fetched_gateways)
+        assert all(gateway.lock_token is not None for gateway in fetched_gateways)
+        assert len({gateway.lock_token for gateway in fetched_gateways}) == 1
+
+        assert ineligible_status.lock_owner is None
+        assert recent.lock_owner is None
+        assert locked.lock_owner == "OtherPipeline"
+
+    async def test_fetch_returns_oldest_gateways_first_up_to_limit(
+        self, test_db, session: AsyncSession, fetcher: GatewayFetcher
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        now = get_current_datetime()
+
+        oldest = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="oldest",
+            status=GatewayStatus.SUBMITTED,
+            last_processed_at=now - timedelta(minutes=3),
+        )
+        middle = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="middle",
+            status=GatewayStatus.PROVISIONING,
+            last_processed_at=now - timedelta(minutes=2),
+        )
+        newest = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="newest",
+            status=GatewayStatus.SUBMITTED,
+            last_processed_at=now - timedelta(minutes=1),
+        )
+
+        items = await fetcher.fetch(limit=2)
+
+        assert [item.id for item in items] == [oldest.id, middle.id]
+
+        await session.refresh(oldest)
+        await session.refresh(middle)
+        await session.refresh(newest)
+
+        assert oldest.lock_owner == GatewayPipeline.__name__
+        assert middle.lock_owner == GatewayPipeline.__name__
+        assert newest.lock_owner is None
 
 
 @pytest.mark.asyncio

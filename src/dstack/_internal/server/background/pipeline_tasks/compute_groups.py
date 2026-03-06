@@ -20,6 +20,8 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     PipelineItem,
     UpdateMapDateTime,
     Worker,
+    log_lock_token_changed_after_processing,
+    log_lock_token_mismatch,
     resolve_now_placeholders,
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
@@ -194,12 +196,7 @@ class ComputeGroupWorker(Worker[PipelineItem]):
             )
             compute_group_model = res.unique().scalar_one_or_none()
             if compute_group_model is None:
-                logger.warning(
-                    "Failed to process %s item %s: lock_token mismatch."
-                    " The item is expected to be processed and updated on another fetch iteration.",
-                    item.__tablename__,
-                    item.id,
-                )
+                log_lock_token_mismatch(logger, item)
                 return
 
         result = _TerminateResult()
@@ -228,12 +225,7 @@ class ComputeGroupWorker(Worker[PipelineItem]):
             )
             updated_ids = list(res.scalars().all())
             if len(updated_ids) == 0:
-                logger.warning(
-                    "Failed to update %s item %s after processing: lock_token changed."
-                    " The item is expected to be processed and updated on another fetch iteration.",
-                    item.__tablename__,
-                    item.id,
-                )
+                log_lock_token_changed_after_processing(logger, item)
                 return
             if not result.instances_update_map:
                 return
@@ -249,6 +241,8 @@ class ComputeGroupWorker(Worker[PipelineItem]):
                     instance_model=instance_model,
                     old_status=instance_model.status,
                     new_status=InstanceStatus.TERMINATED,
+                    termination_reason=instance_model.termination_reason,
+                    termination_reason_message=instance_model.termination_reason_message,
                 )
 
 
