@@ -86,7 +86,12 @@ from dstack._internal.server.services.projects import (
 )
 from dstack._internal.server.services.resources import set_resources_defaults
 from dstack._internal.utils import random_names
-from dstack._internal.utils.common import EntityID, EntityName, EntityNameOrID
+from dstack._internal.utils.common import (
+    EntityID,
+    EntityName,
+    EntityNameOrID,
+    get_current_datetime,
+)
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import pkey_from_str
 
@@ -999,6 +1004,7 @@ async def _create_fleet(
         else:
             spec.configuration.name = await generate_fleet_name(session=session, project=project)
 
+        now = get_current_datetime()
         fleet_model = FleetModel(
             id=uuid.uuid4(),
             name=spec.configuration.name,
@@ -1006,6 +1012,8 @@ async def _create_fleet(
             status=FleetStatus.ACTIVE,
             spec=spec.json(),
             instances=[],
+            created_at=now,
+            last_processed_at=now,
         )
         session.add(fleet_model)
         events.emit(
@@ -1057,9 +1065,10 @@ async def _create_fleet(
                     targets=[events.Target.from_model(instance_model)],
                 )
                 fleet_model.instances.append(instance_model)
-            pipeline_hinter.hint_fetch(FleetModel.__name__)
-            pipeline_hinter.hint_fetch(InstanceModel.__name__)
         await session.commit()
+        if spec.configuration.ssh_config is None:
+            pipeline_hinter.hint_fetch(FleetModel.__name__)
+        pipeline_hinter.hint_fetch(InstanceModel.__name__)
         return fleet_model_to_fleet(fleet_model)
 
 

@@ -679,12 +679,14 @@ def create_instance_model(
         reservation=reservation,
         tags=tags,
     )
+    now = common_utils.get_current_datetime()
     instance = InstanceModel(
         id=instance_id,
         name=instance_name,
         instance_num=instance_num,
         project=project,
-        created_at=common_utils.get_current_datetime(),
+        created_at=now,
+        last_processed_at=now,
         status=InstanceStatus.PENDING,
         unreachable=False,
         profile=profile.json(),
