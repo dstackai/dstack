@@ -126,44 +126,27 @@ class RunTerminationReason(str, Enum):
 
 
 class JobTerminationReason(str, Enum):
+    # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
-    """`FAILED_TO_START_DUE_TO_NO_CAPACITY` is set by the server."""
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
-    """`INTERRUPTED_BY_NO_CAPACITY` is set by the server."""
     INSTANCE_UNREACHABLE = "instance_unreachable"
-    """`INSTANCE_UNREACHABLE` is set by the server."""
     WAITING_INSTANCE_LIMIT_EXCEEDED = "waiting_instance_limit_exceeded"
-    """`WAITING_INSTANCE_LIMIT_EXCEEDED` is set by the server."""
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
-    """`WAITING_RUNNER_LIMIT_EXCEEDED` is set by the server."""
     TERMINATED_BY_USER = "terminated_by_user"
-    """`TERMINATED_BY_USER` is set by the server."""
     VOLUME_ERROR = "volume_error"
-    """`VOLUME_ERROR` is set by the server."""
     GATEWAY_ERROR = "gateway_error"
-    """`GATEWAY_ERROR` is set by the server."""
     SCALED_DOWN = "scaled_down"
-    """`SCALED_DOWN` is set by the server."""
     DONE_BY_RUNNER = "done_by_runner"
-    """`DONE_BY_RUNNER` is set by the server."""
     ABORTED_BY_USER = "aborted_by_user"
-    """`ABORTED_BY_USER` is set by the server."""
     TERMINATED_BY_SERVER = "terminated_by_server"
-    """`TERMINATED_BY_SERVER` is set by the server."""
     INACTIVITY_DURATION_EXCEEDED = "inactivity_duration_exceeded"
-    """`INACTIVITY_DURATION_EXCEEDED` is set by the server."""
     TERMINATED_DUE_TO_UTILIZATION_POLICY = "terminated_due_to_utilization_policy"
-    """`TERMINATED_DUE_TO_UTILIZATION_POLICY` is set by the server."""
+    # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
-    """`CONTAINER_EXITED_WITH_ERROR` is set by the runner."""
     PORTS_BINDING_FAILED = "ports_binding_failed"
-    """`PORTS_BINDING_FAILED` is set by the runner."""
     CREATING_CONTAINER_ERROR = "creating_container_error"
-    """`CREATING_CONTAINER_ERROR` is set by the runner."""
     EXECUTOR_ERROR = "executor_error"
-    """`EXECUTOR_ERROR` is set by the runner."""
     MAX_DURATION_EXCEEDED = "max_duration_exceeded"
-    """`MAX_DURATION_EXCEEDED` is set by the runner."""
 
     def to_status(self) -> JobStatus:
         mapping = {
@@ -228,9 +211,7 @@ class Requirements(CoreModel):
     spot: Optional[bool] = None
     reservation: Optional[str] = None
     multinode: Optional[bool] = None
-    """
-    multinode: Backends can use `multinode` to filter out offers when some offers support
-    multinode and some do not.
+    """Backends can use `multinode` to filter out offers when some offers support multinode and some do not.
     """
 
     def pretty_format(self, resources_only: bool = False):
@@ -322,8 +303,7 @@ class JobProvisioningData(CoreModel):
     backend: BackendType
     base_backend: Optional[BackendType] = None
     """`base_backend` may be set when a backend provisions an instance in another backend and wants
-    to record that
-    backend as `base_backend`.
+    to record that backend as `base_backend`.
     """
     instance_type: InstanceType
     instance_id: str
