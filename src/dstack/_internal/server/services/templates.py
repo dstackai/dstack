@@ -1,5 +1,6 @@
 import shutil
 import threading
+import uuid
 from pathlib import Path
 from typing import List, Optional
 
@@ -9,6 +10,7 @@ from cachetools import TTLCache, cached
 
 from dstack._internal.core.models.templates import UITemplate
 from dstack._internal.server import settings
+from dstack._internal.server.models import ProjectModel
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -17,62 +19,61 @@ logger = get_logger(__name__)
 TEMPLATES_DIR_NAME = ".dstack/templates"
 CACHE_TTL_SECONDS = 180
 
-_repo_path: Optional[Path] = None
-_templates_cache: TTLCache = TTLCache(maxsize=1, ttl=CACHE_TTL_SECONDS)
+_templates_cache: TTLCache = TTLCache(maxsize=1024, ttl=CACHE_TTL_SECONDS)
 _templates_lock = threading.Lock()
 
 
-async def list_templates() -> List[UITemplate]:
-    """Return templates available for the UI.
-
-    Currently returns only server-wide templates configured via DSTACK_SERVER_TEMPLATES_REPO.
-    Project-specific templates will be included once implemented.
-    """
-    if not settings.SERVER_TEMPLATES_REPO:
+async def list_templates(project: ProjectModel) -> List[UITemplate]:
+    """Return templates available for the UI."""
+    repo_url = project.templates_repo or settings.SERVER_TEMPLATES_REPO
+    if not repo_url:
         return []
-    return await run_async(_list_templates_sync)
+    repo_key = _repo_key(project.id, repo_url)
+    return await run_async(_list_templates_sync, repo_key, repo_url)
 
 
 @cached(cache=_templates_cache, lock=_templates_lock)
-def _list_templates_sync() -> List[UITemplate]:
-    _fetch_templates_repo()
-    return _parse_templates()
+def _list_templates_sync(repo_key: str, repo_url: str) -> List[UITemplate]:
+    try:
+        repo_path = _fetch_templates_repo(repo_key, repo_url)
+    except git.GitCommandError as e:
+        status = getattr(e, "status", "unknown")
+        stderr = (getattr(e, "stderr", "") or "").strip().splitlines()
+        reason = stderr[-1] if stderr else "git command failed"
+        logger.warning(
+            "Failed to fetch templates repo %s (exit_code=%s): %s", repo_url, status, reason
+        )
+        return []
+    return _parse_templates(repo_path)
 
 
-def _fetch_templates_repo() -> None:
-    global _repo_path
-
-    repo_dir = settings.SERVER_DATA_DIR_PATH / "templates-repo"
-
-    if _repo_path is not None and _repo_path.exists():
-        repo = git.Repo(str(_repo_path))
-        repo.remotes.origin.pull()
-        return
-
+def _fetch_templates_repo(repo_key: str, repo_url: str) -> Path:
+    repo_dir = settings.SERVER_DATA_DIR_PATH / "templates-repos" / repo_key
     if repo_dir.exists():
         try:
             repo = git.Repo(str(repo_dir))
-            repo.remotes.origin.pull()
-            _repo_path = repo_dir
-            return
+            remote_url = next(repo.remote().urls, None)
+            if remote_url != repo_url:
+                logger.info("Templates repo URL changed for key %s, re-cloning", repo_key)
+                shutil.rmtree(repo_dir)
+            else:
+                repo.remotes.origin.pull()
+                return repo_dir
         except (git.InvalidGitRepositoryError, git.GitCommandError):
             logger.warning("Invalid templates repo at %s, re-cloning", repo_dir)
             shutil.rmtree(repo_dir)
 
-    assert settings.SERVER_TEMPLATES_REPO is not None
+    repo_dir.parent.mkdir(parents=True, exist_ok=True)
     git.Repo.clone_from(
-        settings.SERVER_TEMPLATES_REPO,
+        repo_url,
         str(repo_dir),
         depth=1,
     )
-    _repo_path = repo_dir
+    return repo_dir
 
 
-def _parse_templates() -> List[UITemplate]:
-    if _repo_path is None:
-        return []
-
-    templates_dir = _repo_path / TEMPLATES_DIR_NAME
+def _parse_templates(repo_path: Path) -> List[UITemplate]:
+    templates_dir = repo_path / TEMPLATES_DIR_NAME
     if not templates_dir.is_dir():
         logger.warning("Templates directory %s not found in repo", TEMPLATES_DIR_NAME)
         return []
@@ -97,3 +98,22 @@ def _parse_templates() -> List[UITemplate]:
             continue
 
     return templates
+
+
+def _repo_key(project_id: uuid.UUID, repo_url: str) -> str:
+    key_source = f"{project_id}:{repo_url}"
+    return uuid.uuid5(uuid.NAMESPACE_URL, key_source).hex
+
+
+def validate_templates_repo_access(repo_url: str) -> None:
+    try:
+        git.Git().ls_remote("--exit-code", repo_url, "HEAD")
+    except git.GitCommandError:
+        raise ValueError(f"Cannot access templates repo: {repo_url}")
+
+
+def invalidate_templates_cache(project_id: uuid.UUID, *repo_urls: Optional[str]) -> None:
+    unique_repo_urls = {repo_url for repo_url in repo_urls if repo_url}
+    with _templates_lock:
+        for repo_url in unique_repo_urls:
+            _templates_cache.pop((_repo_key(project_id, repo_url), repo_url), None)

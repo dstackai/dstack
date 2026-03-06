@@ -30,6 +30,7 @@ declare interface IProject {
     owner: IUser | { username: string };
     created_at: string;
     isPublic: boolean;
+    templates_repo?: string | null;
 }
 
 declare interface IProjectMember {
@@ -55,4 +56,5 @@ declare interface IProjectSecret {
 
 declare type IProjectCreateRequestParams = Pick<IProject, 'project_name'> & {
     is_public: boolean;
+    templates_repo?: string | null;
 };
