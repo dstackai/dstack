@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -786,21 +787,27 @@ async def delete_fleets(
                 else "Failed to delete fleet instances: fleets are being processed currently. Try again later."
             )
             raise ServerClientError(msg)
-        res = await session.execute(
-            select(InstanceModel.id)
-            .where(
-                InstanceModel.id.in_(instances_ids),
-                InstanceModel.deleted == False,
-                InstanceModel.lock_expires_at.is_(None),
+        # Try locking instances in a retry loop.
+        # This is a hack to be able to delete fleets with many instances.
+        # Won't be necessary after requests are queued.
+        instances_left_to_lock = set(instances_ids)
+        for i in range(10):
+            res = await session.execute(
+                select(InstanceModel.id)
+                .where(
+                    InstanceModel.id.in_(instances_left_to_lock),
+                    InstanceModel.deleted == False,
+                    InstanceModel.lock_expires_at.is_(None),
+                )
+                .order_by(InstanceModel.id)  # take locks in order
+                .with_for_update(key_share=True, of=InstanceModel)
+                .execution_options(populate_existing=True)
             )
-            .order_by(InstanceModel.id)  # take locks in order
-            .with_for_update(key_share=True, of=InstanceModel)
-            .execution_options(populate_existing=True)
-        )
-        instance_models_ids = list(res.scalars().unique().all())
-        if len(instance_models_ids) != len(instances_ids):
-            # FIXME: In case of many instances, it can always fail.
-            # Try locking and waiting for all instances here until requests are queued for processing.
+            instances_left_to_lock.difference_update(res.scalars().unique().all())
+            if len(instances_left_to_lock) == 0:
+                break
+            await asyncio.sleep(0.5)
+        if len(instances_left_to_lock) > 0:
             msg = (
                 "Failed to delete fleets: fleet instances are being processed currently. Try again later."
                 if instance_nums is None
