@@ -107,7 +107,7 @@ def _repo_key(project_id: uuid.UUID, repo_url: str) -> str:
 
 def validate_templates_repo_access(repo_url: str) -> None:
     try:
-        git.cmd.Git().ls_remote("--exit-code", repo_url, "HEAD")
+        git.Git().ls_remote("--exit-code", repo_url, "HEAD")
     except git.GitCommandError:
         raise ValueError(f"Cannot access templates repo: {repo_url}")
 
