@@ -23,6 +23,7 @@ class RepoConfig(CoreModel):
 
 class GlobalConfig(CoreModel):
     projects: Annotated[List[ProjectConfig], Field(description="The list of projects")] = []
-    # Not used since 0.20.0. Can be removed when most users update their `config.yml` (it's updated
-    # each time a project is added)
     repos: Annotated[list[RepoConfig], Field(exclude=True)] = []
+    """`repos` is not used since 0.20.0. It can be removed when most users update their `config.yml`
+    because it is updated each time a project is added.
+    """

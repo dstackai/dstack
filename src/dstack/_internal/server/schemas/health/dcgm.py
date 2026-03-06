@@ -32,17 +32,20 @@ class DCGMHealthIncident(CoreModel):
     See: https://github.com/NVIDIA/go-dcgm/blob/85ceb31/pkg/dcgm/health.go#L68-L73
     """
 
-    # dcgmIncidentInfo_t
     system: int
+    """`system` comes from `dcgmIncidentInfo_t`."""
     health: DCGMHealthResult
+    """`health` comes from `dcgmIncidentInfo_t`."""
 
-    # dcgmDiagErrorDetail_t
     error_message: str
+    """`error_message` comes from `dcgmDiagErrorDetail_t`."""
     error_code: int
+    """`error_code` comes from `dcgmDiagErrorDetail_t`."""
 
-    # dcgmGroupEntityPair_t
-    entity_group_id: int  # dcgmGroupEntityPair_t
+    entity_group_id: int
+    """`entity_group_id` comes from `dcgmGroupEntityPair_t`."""
     entity_id: int
+    """`entity_id` comes from `dcgmGroupEntityPair_t`."""
 
 
 class DCGMHealthResponse(CoreModel):

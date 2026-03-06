@@ -134,8 +134,10 @@ class RegistryAuth(FrozenCoreModel):
 
 
 class ApplyAction(str, Enum):
-    CREATE = "create"  # resource is to be created or overridden
-    UPDATE = "update"  # resource is to be updated in-place
+    CREATE = "create"
+    """`CREATE` means the resource is to be created or overridden."""
+    UPDATE = "update"
+    """`UPDATE` means the resource is to be updated in-place."""
 
 
 class NetworkMode(str, Enum):

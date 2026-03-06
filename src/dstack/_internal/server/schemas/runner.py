@@ -28,7 +28,8 @@ class JobStateEvent(CoreModel):
 
 
 class LogEvent(CoreModel):
-    timestamp: int  # milliseconds
+    timestamp: int
+    """`timestamp` is stored in milliseconds."""
     message: bytes
 
     @validator("message", pre=True)
@@ -43,7 +44,8 @@ class PullResponse(CoreModel):
     job_logs: List[LogEvent]
     runner_logs: List[LogEvent]
     last_updated: int
-    no_connections_secs: Optional[int] = None  # Optional for compatibility with old runners
+    no_connections_secs: Optional[int] = None
+    """`no_connections_secs` is optional for compatibility with old runners."""
 
 
 class JobInfoResponse(CoreModel):
@@ -101,8 +103,7 @@ class SubmitBody(CoreModel):
     cluster_info: Annotated[Optional[ClusterInfo], Field(include=True)]
     secrets: Annotated[Optional[Dict[str, str]], Field(include=True)]
     repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)]
-    # run_spec is deprecated in favor of run.run_spec
-    # TODO: Remove once we no longer support instances deployed with 0.19.8 or earlier.
+    # TODO: remove `run_spec` once instances deployed with 0.19.8 or earlier are no longer supported.
     run_spec: Annotated[
         RunSpec,
         Field(
@@ -115,6 +116,7 @@ class SubmitBody(CoreModel):
             },
         ),
     ]
+    """`run_spec` is deprecated in favor of `run.run_spec`."""
 
 
 class HealthcheckResponse(CoreModel):
@@ -143,7 +145,8 @@ class ComponentStatus(str, Enum):
 
 
 class ComponentInfo(CoreModel):
-    name: str  # Not using ComponentName enum for compatibility of newer shim with older server
+    name: str
+    """`name` does not use `ComponentName` so newer shim versions remain compatible with the older server."""
     version: str
     status: ComponentStatus
 
@@ -203,8 +206,10 @@ class TaskListItem(CoreModel):
 
 
 class TaskListResponse(CoreModel):
-    ids: Optional[list[str]] = None  # returned by pre-0.19.26 shim
-    tasks: Optional[list[TaskListItem]] = None  # returned by 0.19.26+ shim
+    ids: Optional[list[str]] = None
+    """`ids` is returned by pre-0.19.26 shim versions."""
+    tasks: Optional[list[TaskListItem]] = None
+    """`tasks` is returned by shim versions 0.19.26 and newer."""
 
 
 class TaskInfoResponse(CoreModel):
@@ -212,8 +217,10 @@ class TaskInfoResponse(CoreModel):
     status: TaskStatus
     termination_reason: str
     termination_message: str
-    # default value for backward compatibility with 0.18.34, could be removed after a few releases
     ports: Optional[list[PortMapping]] = []
+    """`ports` uses a default value for backward compatibility with 0.18.34.
+    It can be removed after a few releases.
+    """
 
 
 class TaskSubmitRequest(CoreModel):

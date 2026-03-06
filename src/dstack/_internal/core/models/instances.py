@@ -23,9 +23,10 @@ logger = get_logger(__name__)
 class Gpu(CoreModel):
     name: str
     memory_mib: int
-    # Although it's declared as Optional, in fact it always has a value set by the root validator,
-    # that is, `assert gpu.vendor is not None` should be a safe type narrowing.
     vendor: Optional[gpuhunt.AcceleratorVendor] = None
+    """`vendor` is declared as optional, but the root validator always sets a value.
+    `assert gpu.vendor is not None` should be a safe type narrowing.
+    """
 
     @root_validator(pre=True)
     def validate_name_and_vendor(cls, values):
@@ -54,13 +55,15 @@ class Resources(CoreModel):
     memory_mib: int
     gpus: List[Gpu]
     spot: bool
-    disk: Disk = Disk(size_mib=102400)  # the default value (100GB) for backward compatibility
+    disk: Disk = Disk(size_mib=102400)
+    """`disk` defaults to 100GB for backward compatibility."""
     cpu_arch: Optional[gpuhunt.CPUArchitecture] = None
-    # Deprecated: description is now generated client-side. TODO: remove in 0.21.
+    # TODO: remove `description` in 0.21.
     description: Annotated[
         str,
         Field(description="Deprecated: generated client-side. Will be removed in 0.21."),
     ] = ""
+    """`description` is deprecated because it is now generated client-side."""
 
     @root_validator
     def _description(cls, values) -> Dict:
@@ -187,7 +190,8 @@ class RemoteConnectionInfo(CoreModel):
 class InstanceConfiguration(CoreModel):
     project_name: str
     instance_name: str
-    user: str  # dstack user name
+    user: str
+    """`user` stores the dstack user name."""
     ssh_keys: List[SSHKey]
     instance_id: Optional[str] = None
     reservation: Optional[str] = None
@@ -208,7 +212,8 @@ class InstanceAvailability(Enum):
     AVAILABLE = "available"
     NOT_AVAILABLE = "not_available"
     NO_QUOTA = "no_quota"
-    NO_BALANCE = "no_balance"  # For dstack Sky
+    NO_BALANCE = "no_balance"
+    """`NO_BALANCE` is used for dstack Sky."""
     IDLE = "idle"
     BUSY = "busy"
 
@@ -268,7 +273,8 @@ class InstanceTerminationReason(str, Enum):
     NO_OFFERS = "no_offers"
     MASTER_FAILED = "master_failed"
     MAX_INSTANCES_LIMIT = "max_instances_limit"
-    NO_BALANCE = "no_balance"  # used in dstack Sky
+    NO_BALANCE = "no_balance"
+    """`NO_BALANCE` is used in dstack Sky."""
 
     @classmethod
     def from_legacy_str(cls, v: str) -> "InstanceTerminationReason":
@@ -332,14 +338,16 @@ class Instance(CoreModel):
     fleet_id: Optional[UUID] = None
     fleet_name: Optional[str] = None
     instance_num: int
-    job_name: Optional[str] = None  # deprecated, always None (instance can have more than one job)
+    job_name: Optional[str] = None
+    """`job_name` is deprecated and always `None` because an instance can have more than one job."""
     hostname: Optional[str] = None
     status: InstanceStatus
     unreachable: bool = False
     health_status: HealthStatus = HealthStatus.HEALTHY
-    # termination_reason stores InstanceTerminationReason.
-    # str allows adding new enum members without breaking compatibility with old clients.
     termination_reason: Optional[str] = None
+    """`termination_reason` stores `InstanceTerminationReason`.
+    `str` allows adding new enum members without breaking compatibility with old clients.
+    """
     termination_reason_message: Optional[str] = None
     created: datetime.datetime
     finished_at: Optional[datetime.datetime] = None

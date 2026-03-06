@@ -102,27 +102,33 @@ class GatewaySpec(CoreModel):
 
 
 class Gateway(CoreModel):
-    # ID is only optional on the client side for compatibility with pre-0.20.7 servers.
-    # TODO(0.21): Make required.
+    # TODO(0.21): Make `id` required.
     id: Optional[uuid.UUID] = None
+    """`id` is only optional on the client side for compatibility with pre-0.20.7 servers."""
     name: str
     configuration: GatewayConfiguration
     created_at: datetime.datetime
     status: GatewayStatus
     status_message: Optional[str]
-    # The ip address / hostname the user should set up the domain for.
-    # Could be the same as ip_address but also different, e.g. gateway behind ALB.
     hostname: Optional[str]
-    # The ip address of the gateway instance
+    """`hostname` is the IP address or hostname the user should set up the domain for.
+    Could be the same as `ip_address` but also different, for example a gateway behind ALB.
+    """
     ip_address: Optional[str]
+    """`ip_address` is the IP address of the gateway instance."""
     instance_id: Optional[str]
     wildcard_domain: Optional[str]
     default: bool
-    # TODO: Deprecated configuration fields duplicated on top-level
-    # for backward compatibility with 0.19.x clients that expect them required.
-    # Remove after 0.21
     backend: Optional[BackendType] = None
+    """`backend` duplicates a configuration field on the top level for backward compatibility
+    with 0.19.x clients that expect it to be required.
+    Remove after 0.21.
+    """
     region: Optional[str] = None
+    """`region` duplicates a configuration field on the top level for backward compatibility
+    with 0.19.x clients that expect it to be required.
+    Remove after 0.21.
+    """
 
 
 class GatewayPlan(CoreModel):
@@ -147,8 +153,10 @@ class GatewayComputeConfiguration(CoreModel):
 
 class GatewayProvisioningData(CoreModel):
     instance_id: str
-    ip_address: str  # TODO: rename, Kubernetes uses domain names
+    # TODO: rename `ip_address`; Kubernetes uses domain names here.
+    ip_address: str
     region: str
     availability_zone: Optional[str] = None
     hostname: Optional[str] = None
-    backend_data: Optional[str] = None  # backend-specific data in json
+    backend_data: Optional[str] = None
+    """`backend_data` stores backend-specific data in JSON."""

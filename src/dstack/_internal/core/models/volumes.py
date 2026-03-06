@@ -17,9 +17,10 @@ from dstack._internal.utils.tags import tags_validator
 
 class VolumeStatus(str, Enum):
     SUBMITTED = "submitted"
-    # PROVISIONING is currently not used since on all backends supporting volumes,
-    # volumes become ACTIVE (ready to be used) almost immediately after provisioning.
     PROVISIONING = "provisioning"
+    """`PROVISIONING` is currently not used because on all backends supporting volumes,
+    volumes become `ACTIVE` almost immediately after provisioning.
+    """
     ACTIVE = "active"
     FAILED = "failed"
 
@@ -88,12 +89,13 @@ class VolumeProvisioningData(CoreModel):
     volume_id: str
     size_gb: int
     availability_zone: Optional[str] = None
-    # price per month
     price: Optional[float] = None
-    # should be manually attached/detached
+    """`price` stores the monthly price."""
     attachable: bool = True
+    """`attachable` shows whether the volume should be attached and detached manually."""
     detachable: bool = True
-    backend_data: Optional[str] = None  # backend-specific data in json
+    backend_data: Optional[str] = None
+    """`backend_data` stores backend-specific data in JSON."""
 
 
 class VolumeAttachmentData(CoreModel):
@@ -125,13 +127,15 @@ class Volume(CoreModel):
     status_message: Optional[str] = None
     deleted: bool
     deleted_at: Optional[datetime] = None
-    volume_id: Optional[str] = None  # id of the volume in the cloud
+    volume_id: Optional[str] = None
+    """`volume_id` is the volume identifier in the cloud provider."""
     provisioning_data: Optional[VolumeProvisioningData] = None
     cost: float = 0
     attachments: Optional[List[VolumeAttachment]] = None
-    # attachment_data is deprecated in favor of attachments.
-    # It's only set for volumes that were attached before attachments.
     attachment_data: Optional[VolumeAttachmentData] = None
+    """`attachment_data` is deprecated in favor of `attachments`.
+    It is only set for volumes that were attached before attachments were introduced.
+    """
 
     def get_attachment_data_for_instance(self, instance_id: str) -> Optional[VolumeAttachmentData]:
         if self.attachments is not None:

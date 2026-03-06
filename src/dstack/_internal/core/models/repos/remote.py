@@ -236,7 +236,8 @@ class GitRepoURL:
     ssh_port: Optional[str]
     path: str
 
-    original_host: str  # before SSH config lookup
+    original_host: str
+    """`original_host` stores the host value before SSH config lookup."""
 
     @staticmethod
     def parse(
