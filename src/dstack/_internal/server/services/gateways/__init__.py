@@ -341,23 +341,28 @@ async def _delete_gateways_pipeline(
     async with get_locker(get_db().dialect_name).lock_ctx(
         GatewayModel.__tablename__, gateways_ids
     ):
-        # Refetch after lock
-        res = await session.execute(
-            select(GatewayModel)
-            .where(
-                GatewayModel.id.in_(gateways_ids),
-                GatewayModel.project_id == project.id,
-                GatewayModel.lock_expires_at.is_(None),
+        # Retry locking gateways to increase lock acquisition chances.
+        # This hack is needed until requests are queued.
+        gateway_models = []
+        for i in range(10):
+            res = await session.execute(
+                select(GatewayModel)
+                .where(
+                    GatewayModel.id.in_(gateways_ids),
+                    GatewayModel.project_id == project.id,
+                    GatewayModel.lock_expires_at.is_(None),
+                )
+                .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
+                .order_by(GatewayModel.id)  # take locks in order
+                .with_for_update(key_share=True, of=GatewayModel)
+                .execution_options(populate_existing=True)
             )
-            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
-            .order_by(GatewayModel.id)  # take locks in order
-            .with_for_update(key_share=True, nowait=True, of=GatewayModel)
-            .execution_options(populate_existing=True)
-        )
-        gateway_models = res.scalars().all()
+            gateway_models = res.scalars().all()
+            if len(gateway_models) == len(gateways_ids):
+                break
+            await asyncio.sleep(0.5)
         if len(gateway_models) != len(gateways_ids):
-            # TODO: Make the endpoint fully async so we don't need to lock and error:
-            # put the request in queue and process in the background.
+            # TODO: Make the endpoint fully async so we don't need to lock and error.
             raise ServerClientError(
                 "Failed to delete gateways: gateways are being processed currently. Try again later."
             )

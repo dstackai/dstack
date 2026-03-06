@@ -753,43 +753,46 @@ async def delete_fleets(
         get_locker(get_db().dialect_name).lock_ctx(FleetModel.__tablename__, fleets_ids),
         get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids),
     ):
-        # Refetch after lock.
-        # TODO: Do not lock fleet when deleting only instances.
-        res = await session.execute(
-            select(FleetModel)
-            .where(
-                FleetModel.project_id == project.id,
-                FleetModel.id.in_(fleets_ids),
-                FleetModel.deleted == False,
-                FleetModel.lock_expires_at.is_(None),
+        # Retry locking fleets to increase lock acquisition chances.
+        # This hack is needed until requests are queued.
+        fleet_models = []
+        for i in range(10):
+            res = await session.execute(
+                select(FleetModel)
+                .where(
+                    FleetModel.project_id == project.id,
+                    FleetModel.id.in_(fleets_ids),
+                    FleetModel.deleted == False,
+                    FleetModel.lock_expires_at.is_(None),
+                )
+                .options(
+                    selectinload(FleetModel.instances.and_(InstanceModel.id.in_(instances_ids)))
+                    .selectinload(InstanceModel.jobs)
+                    .load_only(JobModel.id)
+                )
+                .options(
+                    selectinload(
+                        FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
+                    ).load_only(RunModel.status)
+                )
+                .order_by(FleetModel.id)  # take locks in order
+                .with_for_update(key_share=True, of=FleetModel)
+                .execution_options(populate_existing=True)
             )
-            .options(
-                selectinload(FleetModel.instances.and_(InstanceModel.id.in_(instances_ids)))
-                .selectinload(InstanceModel.jobs)
-                .load_only(JobModel.id)
-            )
-            .options(
-                selectinload(
-                    FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
-                ).load_only(RunModel.status)
-            )
-            .execution_options(populate_existing=True)
-            .order_by(FleetModel.id)  # take locks in order
-            .with_for_update(key_share=True, of=FleetModel)
-        )
-        fleet_models = res.scalars().unique().all()
+            fleet_models = res.scalars().unique().all()
+            if len(fleet_models) == len(fleets_ids):
+                break
+            await asyncio.sleep(0.5)
         if len(fleet_models) != len(fleets_ids):
-            # TODO: Make the endpoint fully async so we don't need to lock and error:
-            # put the request in queue and process in the background.
+            # TODO: Make the endpoint fully async so we don't need to lock and error.
             msg = (
                 "Failed to delete fleets: fleets are being processed currently. Try again later."
                 if instance_nums is None
                 else "Failed to delete fleet instances: fleets are being processed currently. Try again later."
             )
             raise ServerClientError(msg)
-        # Try locking instances in a retry loop.
-        # This is a hack to be able to delete fleets with many instances.
-        # Won't be necessary after requests are queued.
+        # Retry locking instances to increase lock acquisition chances.
+        # This hack is needed until requests are queued.
         instances_left_to_lock = set(instances_ids)
         for i in range(10):
             res = await session.execute(
