@@ -4,7 +4,7 @@ export interface IRunEnvironmentFormValues {
     gpu_enabled?: boolean;
     offer?: IGpu;
     name: string;
-    ide: 'cursor' | 'vscode' | 'windsurf' | 'coder';
+    ide: 'cursor' | 'vscode' | 'windsurf';
     config_yaml: string;
     image?: string;
     python?: string;
