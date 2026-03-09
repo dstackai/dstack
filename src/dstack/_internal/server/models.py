@@ -442,7 +442,7 @@ class RunModel(BaseModel):
     __table_args__ = (Index("ix_submitted_at_id", submitted_at.desc(), id),)
 
 
-class JobModel(BaseModel):
+class JobModel(PipelineModelMixin, BaseModel):
     __tablename__ = "jobs"
 
     id: Mapped[uuid.UUID] = mapped_column(
