@@ -305,7 +305,7 @@ async def create_run(
     repo: RepoModel,
     user: UserModel,
     fleet: Optional[FleetModel] = None,
-    run_name: str = "test-run",
+    run_name: Optional[str] = None,
     status: RunStatus = RunStatus.SUBMITTED,
     termination_reason: Optional[RunTerminationReason] = None,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
@@ -317,6 +317,8 @@ async def create_run(
     resubmission_attempt: int = 0,
     next_triggered_at: Optional[datetime] = None,
 ) -> RunModel:
+    if run_name is None:
+        run_name = "test-run"
     if run_spec is None:
         run_spec = get_run_spec(
             run_name=run_name,

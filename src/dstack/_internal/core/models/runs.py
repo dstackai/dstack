@@ -95,6 +95,10 @@ class RunTerminationReason(str, Enum):
     SERVER_ERROR = "server_error"
 
     def to_job_termination_reason(self) -> "JobTerminationReason":
+        """
+        Converts run termination reason to job termination reason.
+        Used to set job termination reason for non-terminated jobs on run termination.
+        """
         mapping = {
             self.ALL_JOBS_DONE: JobTerminationReason.DONE_BY_RUNNER,
             self.JOB_FAILED: JobTerminationReason.TERMINATED_BY_SERVER,
