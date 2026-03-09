@@ -230,7 +230,7 @@
             "project_visibility": "Visibility",
             "project_visibility_settings": "Change project visibility",
             "templates_repo": "Templates",
-            "override_project_templates": "Configure project templates",
+            "override_project_templates": "Configure templates",
             "transfer_ownership": "Transfer ownership",
             "templates_repo_description": "Set a project-level templates repository URL",
             "templates_repo_placeholder": "https://github.com/org/templates.git",
