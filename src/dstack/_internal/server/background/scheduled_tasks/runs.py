@@ -66,6 +66,10 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 MIN_PROCESSING_INTERVAL = datetime.timedelta(seconds=5)
+
+# No need to lock finished or terminating jobs since run processing does not update such jobs.
+JOB_STATUSES_EXCLUDED_FOR_LOCKING = JobStatus.finished_statuses() + [JobStatus.TERMINATING]
+
 ROLLING_DEPLOYMENT_MAX_SURGE = 1  # at most one extra replica during rolling deployment
 
 
@@ -121,10 +125,9 @@ async def _process_next_run():
                 )
                 .options(
                     joinedload(RunModel.jobs).load_only(JobModel.id),
-                    # No need to lock finished jobs
                     with_loader_criteria(
                         JobModel,
-                        JobModel.status.not_in(JobStatus.finished_statuses()),
+                        JobModel.status.not_in(JOB_STATUSES_EXCLUDED_FOR_LOCKING),
                         include_aliases=True,
                     ),
                 )
@@ -146,7 +149,7 @@ async def _process_next_run():
                     load_only(JobModel.id),
                     with_loader_criteria(
                         JobModel,
-                        JobModel.status.not_in(JobStatus.finished_statuses()),
+                        JobModel.status.not_in(JOB_STATUSES_EXCLUDED_FOR_LOCKING),
                         include_aliases=True,
                     ),
                 )

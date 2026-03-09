@@ -31,6 +31,7 @@ from dstack._internal.core.models.runs import (
     JobSubmission,
     JobTerminationReason,
     RunSpec,
+    RunTerminationReason,
 )
 from dstack._internal.core.models.volumes import Volume, VolumeMountPoint, VolumeStatus
 from dstack._internal.server import settings
@@ -349,6 +350,7 @@ async def process_terminating_job(
         if len(volume_models) > 0:
             logger.info("Detaching volumes: %s", [v.name for v in volume_models])
             all_volumes_detached = await _detach_volumes_from_job_instance(
+                session=session,
                 project=instance_model.project,
                 job_model=job_model,
                 jpd=jpd,
@@ -432,6 +434,7 @@ async def process_volumes_detaching(
     )
     logger.info("Detaching volumes: %s", [v.name for v in volume_models])
     all_volumes_detached = await _detach_volumes_from_job_instance(
+        session=session,
         project=instance_model.project,
         job_model=job_model,
         jpd=jpd,
@@ -523,6 +526,7 @@ def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, Li
 
 
 async def _detach_volumes_from_job_instance(
+    session: AsyncSession,
     project: ProjectModel,
     job_model: JobModel,
     jpd: JobProvisioningData,
@@ -542,6 +546,7 @@ async def _detach_volumes_from_job_instance(
 
     all_detached = True
     detached_volumes = []
+    run_termination_reason = await _get_run_termination_reason(session, job_model)
     for volume_model in volume_models:
         detached = await _detach_volume_from_job_instance(
             backend=backend,
@@ -550,6 +555,7 @@ async def _detach_volumes_from_job_instance(
             job_spec=job_spec,
             instance_model=instance_model,
             volume_model=volume_model,
+            run_termination_reason=run_termination_reason,
         )
         if detached:
             detached_volumes.append(volume_model)
@@ -572,6 +578,7 @@ async def _detach_volume_from_job_instance(
     job_spec: JobSpec,
     instance_model: InstanceModel,
     volume_model: VolumeModel,
+    run_termination_reason: Optional[RunTerminationReason],
 ) -> bool:
     detached = True
     volume = volume_model_to_volume(volume_model)
@@ -601,7 +608,11 @@ async def _detach_volume_from_job_instance(
                 volume=volume,
                 provisioning_data=jpd,
             )
-            if not detached and _should_force_detach_volume(job_model, job_spec.stop_duration):
+            if not detached and _should_force_detach_volume(
+                job_model,
+                run_termination_reason=run_termination_reason,
+                stop_duration=job_spec.stop_duration,
+            ):
                 logger.info(
                     "Force detaching volume %s from %s",
                     volume_model.name,
@@ -633,13 +644,27 @@ async def _detach_volume_from_job_instance(
 MIN_FORCE_DETACH_WAIT_PERIOD = timedelta(seconds=60)
 
 
-def _should_force_detach_volume(job_model: JobModel, stop_duration: Optional[int]) -> bool:
+async def _get_run_termination_reason(
+    session: AsyncSession, job_model: JobModel
+) -> Optional[RunTerminationReason]:
+    res = await session.execute(
+        select(RunModel.termination_reason).where(RunModel.id == job_model.run_id)
+    )
+    return res.scalar_one_or_none()
+
+
+def _should_force_detach_volume(
+    job_model: JobModel,
+    run_termination_reason: Optional[RunTerminationReason],
+    stop_duration: Optional[int],
+) -> bool:
     return (
         job_model.volumes_detached_at is not None
         and common.get_current_datetime()
         > job_model.volumes_detached_at + MIN_FORCE_DETACH_WAIT_PERIOD
         and (
             job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER
+            or run_termination_reason == RunTerminationReason.ABORTED_BY_USER
             or stop_duration is not None
             and common.get_current_datetime()
             > job_model.volumes_detached_at + timedelta(seconds=stop_duration)
