@@ -11,9 +11,7 @@ const passwordNotCopiedError = 'Copy the password before proceeding';
 
 export const useYupValidationResolver = (template?: ITemplate) => {
     const validationSchema = useMemo(() => {
-        const schema: Partial<
-            Record<IRunEnvironmentFormKeys, yup.StringSchema | yup.ArraySchema<yup.StringSchema> | yup.BooleanSchema>
-        > = {
+        const schema: Partial<Record<IRunEnvironmentFormKeys, yup.AnySchema>> = {
             project: yup.string().required(requiredFieldError),
             template: yup.array().min(1, requiredFieldError).of(yup.string()).required(requiredFieldError),
             config_yaml: yup.string().required(requiredFieldError),
@@ -31,12 +29,9 @@ export const useYupValidationResolver = (template?: ITemplate) => {
                         break;
 
                     case 'resources':
-                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                        // @ts-expect-error
-                        schema['offer'] = yup.object().when('gpu_enabled', {
-                            is: true,
-                            then: yup.object().required(requiredFieldError),
-                        });
+                        // Offer selection is optional when GPU is enabled.
+                        // If no offer is selected, YAML generation applies template GPU or a default fallback.
+                        schema['offer'] = yup.object().nullable();
                         break;
 
                     case 'python_or_docker':
@@ -66,13 +61,9 @@ export const useYupValidationResolver = (template?: ITemplate) => {
                             schema['password'] = yup
                                 .string()
                                 .required(requiredFieldError)
-                                .test(
-                                    'password-copied',
-                                    passwordNotCopiedError,
-                                    function () {
-                                        return this.parent.password_copied === true;
-                                    },
-                                );
+                                .test('password-copied', passwordNotCopiedError, function () {
+                                    return this.parent.password_copied === true;
+                                });
                         } else {
                             schema['password'] = yup.string().required(requiredFieldError);
                         }

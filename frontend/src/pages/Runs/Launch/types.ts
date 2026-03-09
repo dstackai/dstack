@@ -2,7 +2,7 @@ export interface IRunEnvironmentFormValues {
     project: IProject['project_name'];
     template: string[];
     gpu_enabled?: boolean;
-    offer: IGpu;
+    offer?: IGpu;
     name: string;
     ide: 'cursor' | 'vscode' | 'windsurf' | 'coder';
     config_yaml: string;
