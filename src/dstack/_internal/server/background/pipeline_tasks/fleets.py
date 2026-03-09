@@ -369,7 +369,7 @@ async def _lock_fleet_instances_for_consolidation(
                 "Failed to lock fleet %s instances. The fleet will be processed later.",
                 item.id,
             )
-            # Keep `lock_owner` so that `InstancePipeline` sees that the fleet is being locked
+            # Keep `lock_owner` so that `InstancePipeline` can check that the fleet is being locked
             # but unset `lock_expires_at` to process the item again ASAP (after `min_processing_interval`).
             # Unset `lock_token` so that heartbeater can no longer update the item.
             res = await session.execute(

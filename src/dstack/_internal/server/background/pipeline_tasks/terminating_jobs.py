@@ -239,12 +239,6 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
                 if instance_model is None:
                     await _reset_job_lock_for_retry(session=session, item=item)
                     return
-            if job_model.volumes_detached_at is not None and instance_model is None:
-                logger.error(
-                    "%s: expected used_instance_id while detaching volumes", fmt(job_model)
-                )
-                await _reset_job_lock_for_retry(session=session, item=item)
-                return
 
         if job_model.volumes_detached_at is None:
             result = await _process_terminating_job(
@@ -262,8 +256,9 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
         if instance_model is not None:
             if result.instance_update_map is None:
                 result.instance_update_map = _InstanceUpdateMap()
-            set_processed_update_map_fields(result.instance_update_map)
-            set_unlock_update_map_fields(result.instance_update_map)
+            instance_update_map = result.instance_update_map
+            set_processed_update_map_fields(instance_update_map)
+            set_unlock_update_map_fields(instance_update_map)
         await _apply_process_result(
             item=item,
             job_model=job_model,
@@ -287,9 +282,6 @@ class _InstanceUpdateMap(ItemUpdateMap, total=False):
     termination_reason_message: Optional[str]
     busy_blocks: int
     last_job_processed_at: UpdateMapDateTime
-    lock_expires_at: Optional[datetime]
-    lock_token: Optional[uuid.UUID]
-    lock_owner: Optional[str]
 
 
 class _VolumeUpdateRow(TypedDict):
@@ -361,7 +353,6 @@ async def _lock_related_instance(
                     InstanceModel.lock_owner == JobTerminatingPipeline.__name__,
                 ),
             )
-            .with_for_update(skip_locked=True, key_share=True)
             .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
             .options(
                 joinedload(InstanceModel.volume_attachments).joinedload(
@@ -369,6 +360,7 @@ async def _lock_related_instance(
                 )
             )
             .options(joinedload(InstanceModel.jobs).load_only(JobModel.id))
+            .with_for_update(skip_locked=True, key_share=True)
         )
         instance_model = res.unique().scalar_one_or_none()
         if instance_model is None:
@@ -419,6 +411,9 @@ async def _reset_job_lock_for_retry(session: AsyncSession, item: JobTerminatingP
             JobModel.id == item.id,
             JobModel.lock_token == item.lock_token,
         )
+        # Keep `lock_owner` so that `InstancePipeline` can check that the job is being locked
+        # but unset `lock_expires_at` to process the item again ASAP (after `min_processing_interval`).
+        # Unset `lock_token` so that heartbeater can no longer update the item.
         .values(
             lock_expires_at=None,
             lock_token=None,
@@ -439,10 +434,9 @@ async def _apply_process_result(
 ) -> None:
     async with get_session_ctx() as session:
         now = get_current_datetime()
-        locked_instance_model: Optional[InstanceModel] = instance_model
-        instance_update_map: Optional[_InstanceUpdateMap] = None
-        if locked_instance_model is not None:
-            instance_update_map = get_or_error(result.instance_update_map)
+        instance_update_map = result.instance_update_map
+        if instance_model is None:
+            instance_update_map = None
         resolve_now_placeholders(result.job_update_map, now=now)
         if instance_update_map is not None:
             resolve_now_placeholders(instance_update_map, now=now)
@@ -461,20 +455,19 @@ async def _apply_process_result(
         updated_ids = list(res.scalars().all())
         if len(updated_ids) == 0:
             log_lock_token_changed_after_processing(logger, item)
-            if locked_instance_model is not None:
+            if instance_model is not None:
                 await _unlock_related_instance(
                     session=session,
                     item=item,
-                    instance_id=locked_instance_model.id,
+                    instance_id=instance_model.id,
                 )
             return
 
-        if instance_update_map is not None:
-            locked_instance_model = get_or_error(locked_instance_model)
+        if instance_model is not None and instance_update_map is not None:
             res = await session.execute(
                 update(InstanceModel)
                 .where(
-                    InstanceModel.id == locked_instance_model.id,
+                    InstanceModel.id == instance_model.id,
                     InstanceModel.lock_token == item.lock_token,
                     InstanceModel.lock_owner == JobTerminatingPipeline.__name__,
                 )
@@ -485,17 +478,17 @@ async def _apply_process_result(
             if len(updated_ids) == 0:
                 logger.error(
                     "Failed to update related instance %s for terminating job %s.",
-                    locked_instance_model.id,
+                    instance_model.id,
                     item.id,
                 )
 
         if result.volume_update_rows:
             await session.execute(update(VolumeModel), result.volume_update_rows)
 
-        if result.detached_volume_ids and locked_instance_model is not None:
+        if result.detached_volume_ids and instance_model is not None:
             await session.execute(
                 delete(VolumeAttachmentModel).where(
-                    VolumeAttachmentModel.instance_id == locked_instance_model.id,
+                    VolumeAttachmentModel.instance_id == instance_model.id,
                     VolumeAttachmentModel.volume_id.in_(result.detached_volume_ids),
                 )
             )
@@ -513,31 +506,34 @@ async def _apply_process_result(
                 job_model.termination_reason_message,
             ),
         )
-        if instance_update_map is not None:
-            locked_instance_model = get_or_error(locked_instance_model)
+
+        if instance_model is not None and instance_update_map is not None:
             emit_instance_status_change_event(
                 session=session,
-                instance_model=locked_instance_model,
-                old_status=locked_instance_model.status,
-                new_status=instance_update_map.get("status", locked_instance_model.status),
+                instance_model=instance_model,
+                old_status=instance_model.status,
+                new_status=instance_update_map.get("status", instance_model.status),
                 termination_reason=instance_update_map.get(
-                    "termination_reason", locked_instance_model.termination_reason
+                    "termination_reason",
+                    instance_model.termination_reason,
                 ),
                 termination_reason_message=instance_update_map.get(
                     "termination_reason_message",
-                    locked_instance_model.termination_reason_message,
+                    instance_model.termination_reason_message,
                 ),
             )
-        if result.unassign_event_message is not None and locked_instance_model is not None:
+
+        if result.unassign_event_message is not None and instance_model is not None:
             events.emit(
                 session,
                 result.unassign_event_message,
                 actor=events.SystemActor(),
                 targets=[
                     events.Target.from_model(job_model),
-                    events.Target.from_model(locked_instance_model),
+                    events.Target.from_model(instance_model),
                 ],
             )
+
         if result.emit_unregister_replica_event:
             targets = [events.Target.from_model(job_model)]
             if result.unregister_gateway_target is not None:
@@ -583,10 +579,7 @@ async def _process_terminating_job(
     result = _ProcessResult(instance_update_map=instance_update_map)
 
     if instance_model is None:
-        result.unregister_gateway_target = await _unregister_replica(job_model=job_model)
-        if job_model.registered:
-            result.job_update_map["registered"] = False
-            result.emit_unregister_replica_event = True
+        await _unregister_replica_and_update_result(result=result, job_model=job_model)
         result.job_update_map["status"] = _get_job_termination_status(job_model)
         return result
 
@@ -634,10 +627,7 @@ async def _process_terminating_job(
         f" Instance blocks: {busy_blocks}/{instance_model.total_blocks} busy"
     )
 
-    result.unregister_gateway_target = await _unregister_replica(job_model=job_model)
-    if job_model.registered:
-        result.job_update_map["registered"] = False
-        result.emit_unregister_replica_event = True
+    await _unregister_replica_and_update_result(result=result, job_model=job_model)
     if detach_result.all_detached:
         result.job_update_map["status"] = _get_job_termination_status(job_model)
     return result
@@ -652,7 +642,7 @@ async def _process_job_volumes_detaching(
     Terminates the job when all the volumes are detached.
     If the volumes fail to detach, force detaches them.
     """
-    result = _ProcessResult()
+    result = _ProcessResult(instance_update_map=_InstanceUpdateMap())
     jpd = get_or_error(get_job_provisioning_data(job_model))
     (
         result.volume_update_rows,
@@ -694,6 +684,15 @@ async def _detach_job_volumes(
     return volume_update_rows, detach_result
 
 
+async def _unregister_replica_and_update_result(
+    result: _ProcessResult, job_model: JobModel
+) -> None:
+    result.unregister_gateway_target = await _unregister_replica(job_model=job_model)
+    if job_model.registered:
+        result.job_update_map["registered"] = False
+        result.emit_unregister_replica_event = True
+
+
 async def _unregister_replica(
     job_model: JobModel,
 ) -> Optional[events.Target]:
@@ -719,6 +718,8 @@ async def _unregister_replica(
             logger.warning("%s: unregistering replica from service: %s", fmt(job_model), e)
         except (httpx.RequestError, SSHError) as e:
             logger.debug("Gateway request failed", exc_info=True)
+            # FIXME: Unhandled exception raised.
+            # Handle and retry unregister with timeout.
             raise GatewayError(repr(e))
     return gateway_target
 
@@ -895,19 +896,22 @@ async def _detach_volume_from_job_instance(
     return detached
 
 
+_MIN_FORCE_DETACH_WAIT_PERIOD = timedelta(seconds=60)
+
+
 def _should_force_detach_volume(
     job_model: JobModel,
     run_termination_reason: Optional[RunTerminationReason],
     stop_duration: Optional[int],
 ) -> bool:
+    now = get_current_datetime()
     return (
         job_model.volumes_detached_at is not None
-        and get_current_datetime() > job_model.volumes_detached_at + timedelta(seconds=60)
+        and now > job_model.volumes_detached_at + _MIN_FORCE_DETACH_WAIT_PERIOD
         and (
             job_model.termination_reason == JobTerminationReason.ABORTED_BY_USER
             or run_termination_reason == RunTerminationReason.ABORTED_BY_USER
             or stop_duration is not None
-            and get_current_datetime()
-            > job_model.volumes_detached_at + timedelta(seconds=stop_duration)
+            and now > job_model.volumes_detached_at + timedelta(seconds=stop_duration)
         )
     )
