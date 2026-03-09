@@ -221,6 +221,7 @@ async def _process_terminating_job(
         ],
     )
 
+    # Volumes are not locked because no other place can update attached active volumes.
     for volume_model in volume_models:
         volume_model.last_job_processed_at = common.get_current_datetime()
 

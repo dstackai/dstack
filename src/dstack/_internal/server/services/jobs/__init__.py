@@ -75,15 +75,55 @@ def switch_job_status(
         return
 
     job_model.status = new_status
+    emit_job_status_change_event(
+        session=session,
+        job_model=job_model,
+        old_status=old_status,
+        new_status=new_status,
+        termination_reason=job_model.termination_reason,
+        termination_reason_message=job_model.termination_reason_message,
+        actor=actor,
+    )
 
+
+def get_job_status_change_message(
+    old_status: JobStatus,
+    new_status: JobStatus,
+    termination_reason: Optional[JobTerminationReason],
+    termination_reason_message: Optional[str],
+) -> str:
     msg = f"Job status changed {old_status.upper()} -> {new_status.upper()}"
     if new_status == JobStatus.TERMINATING:
-        if job_model.termination_reason is None:
+        if termination_reason is None:
             raise ValueError("termination_reason must be set when switching to TERMINATING status")
-        msg += f". Termination reason: {job_model.termination_reason.upper()}"
-        if job_model.termination_reason_message:
-            msg += f" ({job_model.termination_reason_message})"
-    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(job_model)])
+        msg += f". Termination reason: {termination_reason.upper()}"
+        if termination_reason_message:
+            msg += f" ({termination_reason_message})"
+    return msg
+
+
+def emit_job_status_change_event(
+    session: AsyncSession,
+    job_model: JobModel,
+    old_status: JobStatus,
+    new_status: JobStatus,
+    termination_reason: Optional[JobTerminationReason],
+    termination_reason_message: Optional[str],
+    actor: events.AnyActor = events.SystemActor(),
+) -> None:
+    if old_status == new_status:
+        return
+    events.emit(
+        session,
+        get_job_status_change_message(
+            old_status=old_status,
+            new_status=new_status,
+            termination_reason=termination_reason,
+            termination_reason_message=termination_reason_message,
+        ),
+        actor=actor,
+        targets=[events.Target.from_model(job_model)],
+    )
 
 
 async def get_jobs_from_run_spec(
