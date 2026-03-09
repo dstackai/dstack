@@ -631,7 +631,7 @@ export const ProjectSettings: React.FC = () => {
                                                         disabled={!isProjectAdmin(data)}
                                                     >
                                                         {data.templates_repo
-                                                            ? t('common.change')
+                                                            ? t('projects.edit.change_visibility')
                                                             : t('projects.edit.configure_templates_repo')}
                                                     </Button>
                                                     <Button
