@@ -551,7 +551,7 @@ export const ProjectSettings: React.FC = () => {
                                             <div>
                                                 <ButtonWithConfirmation
                                                     variant="danger-normal"
-                                                    disabled={!isProjectManager(data)}
+                                                    disabled={!isProjectAdmin(data)}
                                                     formAction="none"
                                                     onClick={() =>
                                                         changeVisibilityHandler(selectedVisibility.value === 'public')
@@ -628,16 +628,16 @@ export const ProjectSettings: React.FC = () => {
                                                 >
                                                     <Button
                                                         onClick={openChangeTemplatesRepoDialog}
-                                                        disabled={!isProjectManager(data)}
+                                                        disabled={!isProjectAdmin(data)}
                                                     >
                                                         {data.templates_repo
-                                                            ? t('projects.edit.change_visibility')
+                                                            ? t('common.change')
                                                             : t('projects.edit.configure_templates_repo')}
                                                     </Button>
                                                     <Button
                                                         variant="danger-normal"
                                                         onClick={openResetTemplatesRepoDialog}
-                                                        disabled={!isProjectManager(data) || !data.templates_repo}
+                                                        disabled={!isProjectAdmin(data) || !data.templates_repo}
                                                     >
                                                         {t('projects.edit.reset_templates_repo')}
                                                     </Button>
