@@ -546,15 +546,16 @@ async def _detach_volumes_from_job_instance(
 
     all_detached = True
     detached_volumes = []
+    run_termination_reason = await _get_run_termination_reason(session, job_model)
     for volume_model in volume_models:
         detached = await _detach_volume_from_job_instance(
-            session=session,
             backend=backend,
             job_model=job_model,
             jpd=jpd,
             job_spec=job_spec,
             instance_model=instance_model,
             volume_model=volume_model,
+            run_termination_reason=run_termination_reason,
         )
         if detached:
             detached_volumes.append(volume_model)
@@ -571,13 +572,13 @@ async def _detach_volumes_from_job_instance(
 
 
 async def _detach_volume_from_job_instance(
-    session: AsyncSession,
     backend: Backend,
     job_model: JobModel,
     jpd: JobProvisioningData,
     job_spec: JobSpec,
     instance_model: InstanceModel,
     volume_model: VolumeModel,
+    run_termination_reason: Optional[RunTerminationReason],
 ) -> bool:
     detached = True
     volume = volume_model_to_volume(volume_model)
@@ -607,9 +608,10 @@ async def _detach_volume_from_job_instance(
                 volume=volume,
                 provisioning_data=jpd,
             )
-            run_termination_reason = await _get_run_termination_reason(session, job_model)
             if not detached and _should_force_detach_volume(
-                job_model, run_termination_reason, job_spec.stop_duration
+                job_model,
+                run_termination_reason=run_termination_reason,
+                stop_duration=job_spec.stop_duration,
             ):
                 logger.info(
                     "Force detaching volume %s from %s",
