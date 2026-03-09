@@ -13,6 +13,7 @@ from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
+    JobRuntimeData,
     JobSpec,
     JobStatus,
     JobTerminationReason,
@@ -151,10 +152,6 @@ async def _process_terminating_job(
     Graceful stop should already be done by `process_terminating_run`.
     Caller must acquire the locks on the job and the job's instance.
     """
-    if job_model.remove_at is not None and job_model.remove_at > common.get_current_datetime():
-        # it's too early to terminate the instance
-        return
-
     if instance_model is None:
         # Possible if the job hasn't been assigned an instance yet
         await services.unregister_replica(session, job_model)
@@ -164,6 +161,12 @@ async def _process_terminating_job(
     all_volumes_detached: bool = True
     jrd = get_job_runtime_data(job_model)
     jpd = get_job_provisioning_data(job_model)
+    volume_models = await _get_job_volume_models(
+        session=session,
+        job_model=job_model,
+        instance_model=instance_model,
+        jrd=jrd,
+    )
     if jpd is not None:
         logger.debug("%s: stopping container", fmt(job_model))
         ssh_private_keys = get_instance_ssh_private_keys(instance_model)
@@ -177,14 +180,6 @@ async def _process_terminating_job(
                 ),
                 fmt(job_model),
             )
-        if jrd is not None and jrd.volume_names is not None:
-            volume_names = jrd.volume_names
-        else:
-            # Legacy jobs before job_runtime_data/blocks were introduced
-            volume_names = [va.volume.name for va in instance_model.volume_attachments]
-        volume_models = await list_project_volume_models(
-            session=session, project=instance_model.project, names=volume_names
-        )
         if len(volume_models) > 0:
             logger.info("Detaching volumes: %s", [v.name for v in volume_models])
             all_volumes_detached = await _detach_volumes_from_job_instance(
@@ -196,13 +191,7 @@ async def _process_terminating_job(
                 volume_models=volume_models,
             )
 
-    if jrd is not None and jrd.offer is not None:
-        blocks = jrd.offer.blocks
-    else:
-        # Old job submitted before jrd or blocks were introduced
-        blocks = 1
-    instance_model.busy_blocks -= blocks
-
+    instance_model.busy_blocks -= _get_job_occupied_blocks(jrd)
     if instance_model.status != InstanceStatus.BUSY or jpd is None or not jpd.dockerized:
         # Terminate instances that:
         # - have not finished provisioning yet
@@ -232,22 +221,38 @@ async def _process_terminating_job(
         ],
     )
 
-    volume_names = (
-        jrd.volume_names
-        if jrd and jrd.volume_names
-        else [va.volume.name for va in instance_model.volume_attachments]
-    )
-    if volume_names:
-        volumes = await list_project_volume_models(
-            session=session, project=instance_model.project, names=volume_names
-        )
-        for volume in volumes:
-            volume.last_job_processed_at = common.get_current_datetime()
+    for volume_model in volume_models:
+        volume_model.last_job_processed_at = common.get_current_datetime()
 
     await services.unregister_replica(session, job_model)
     if all_volumes_detached:
         # Do not terminate while some volumes are not detached.
         _set_job_termination_status(session, job_model)
+
+
+async def _get_job_volume_models(
+    session: AsyncSession,
+    job_model: JobModel,
+    instance_model: InstanceModel,
+    jrd: Optional[JobRuntimeData],
+) -> list[VolumeModel]:
+    volume_names = (
+        jrd.volume_names
+        if jrd and jrd.volume_names
+        else [va.volume.name for va in instance_model.volume_attachments]
+    )
+    if len(volume_names) == 0:
+        return []
+    return await list_project_volume_models(
+        session=session, project=instance_model.project, names=volume_names
+    )
+
+
+def _get_job_occupied_blocks(jrd: Optional[JobRuntimeData]) -> int:
+    if jrd is not None and jrd.offer is not None:
+        return jrd.offer.blocks
+    # Old job submitted before jrd or blocks were introduced
+    return 1
 
 
 async def _process_volumes_detaching(
@@ -262,13 +267,11 @@ async def _process_volumes_detaching(
     """
     jpd = get_or_error(get_job_provisioning_data(job_model))
     jrd = get_job_runtime_data(job_model)
-    if jrd is not None and jrd.volume_names is not None:
-        volume_names = jrd.volume_names
-    else:
-        # Legacy jobs before job_runtime_data/blocks were introduced
-        volume_names = [va.volume.name for va in instance_model.volume_attachments]
-    volume_models = await list_project_volume_models(
-        session=session, project=instance_model.project, names=volume_names
+    volume_models = await _get_job_volume_models(
+        session=session,
+        job_model=job_model,
+        instance_model=instance_model,
+        jrd=jrd,
     )
     logger.info("Detaching volumes: %s", [v.name for v in volume_models])
     all_volumes_detached = await _detach_volumes_from_job_instance(

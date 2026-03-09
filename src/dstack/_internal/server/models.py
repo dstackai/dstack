@@ -809,6 +809,9 @@ class VolumeModel(PipelineModelMixin, BaseModel):
         NaiveDateTime, default=get_current_datetime
     )
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    """`last_job_processed_at` records the last time the volume was used by a job.
+    Updated when a job terminates and used to delete volumes on `auto_cleanup_duration`.
+    """
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
