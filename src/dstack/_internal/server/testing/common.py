@@ -170,6 +170,7 @@ async def create_project(
     ssh_private_key: str = "",
     ssh_public_key: str = "",
     is_public: bool = False,
+    templates_repo: Optional[str] = None,
 ) -> ProjectModel:
     if owner is None:
         owner = await create_user(session=session, name="test_owner")
@@ -180,6 +181,7 @@ async def create_project(
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
         is_public=is_public,
+        templates_repo=templates_repo,
     )
     session.add(project)
     await session.commit()

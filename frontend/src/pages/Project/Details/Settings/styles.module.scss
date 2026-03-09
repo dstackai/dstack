@@ -8,6 +8,27 @@
     width: 300px;
 }
 
+.templatesRepoRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.templatesRepoTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.templatesRepoInput {
+    width: 300px;
+    max-width: 100%;
+}
+
+.templatesRepoActions {
+    flex-shrink: 0;
+}
+
 .codeWrapper {
     position: relative;
 

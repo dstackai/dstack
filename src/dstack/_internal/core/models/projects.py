@@ -26,6 +26,7 @@ class Project(CoreModel):
     backends: List[BackendInfo]
     members: List[Member]
     is_public: bool = False
+    templates_repo: Optional[str] = None
 
 
 class ProjectsInfoList(CoreModel):

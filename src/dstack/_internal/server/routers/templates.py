@@ -18,4 +18,5 @@ router = APIRouter(
 async def list_templates(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
-    return CustomORJSONResponse(await templates_service.list_templates())
+    _, project = user_project
+    return CustomORJSONResponse(await templates_service.list_templates(project))

@@ -50,7 +50,6 @@ export const RunList: React.FC = () => {
         filteringStatusType,
         handleLoadItems,
     } = useFilters();
-
     const projectHavingFleetMap = useCheckingForFleetsInProjects({});
 
     const { data, isLoading, refreshList, isLoadingMore } = useInfiniteScroll<IRun, TRunsRequestParams>({
@@ -120,7 +119,6 @@ export const RunList: React.FC = () => {
             }`,
         );
     };
-
     const projectDontHasFleet = Object.keys(projectHavingFleetMap).find((project) => !projectHavingFleetMap[project]);
 
     return (
@@ -143,7 +141,6 @@ export const RunList: React.FC = () => {
                         show={!!projectDontHasFleet}
                         dismissible={true}
                     />
-
                     <Header
                         variant="awsui-h1-sticky"
                         actions={
