@@ -216,22 +216,18 @@ async def update_project(
     if is_public is not None and is_public != project.is_public:
         project.is_public = is_public
         updated_fields.append(f"is_public={is_public}")
-    normalized_templates_repo = project.templates_repo
-    should_update_templates_repo = False
-    if reset_templates_repo:
-        normalized_templates_repo = None
-        should_update_templates_repo = project.templates_repo is not None
-    elif templates_repo is not None:
-        normalized_templates_repo = await _normalize_templates_repo_url(templates_repo)
-        if normalized_templates_repo is not None:
-            should_update_templates_repo = normalized_templates_repo != project.templates_repo
-    if should_update_templates_repo:
-        previous_templates_repo = project.templates_repo
-        project.templates_repo = normalized_templates_repo
+
+    update_templates_repo, new_templates_repo = await _resolve_new_templates_repo(
+        project=project,
+        templates_repo=templates_repo,
+        reset_templates_repo=reset_templates_repo,
+    )
+    if update_templates_repo:
         templates_service.invalidate_templates_cache(
-            project.id, previous_templates_repo, project.templates_repo
+            project.id, project.templates_repo, new_templates_repo
         )
-        updated_fields.append(f"templates_repo={normalized_templates_repo}")
+        project.templates_repo = new_templates_repo
+        updated_fields.append(f"templates_repo={new_templates_repo}")
     events.emit(
         session,
         f"Project updated. Updated fields: {', '.join(updated_fields) or '<none>'}",
@@ -731,12 +727,28 @@ async def _normalize_templates_repo_url(templates_repo: Optional[str]) -> Option
     templates_repo = templates_repo.strip()
     if templates_repo == "":
         return None
-    if templates_repo is not None:
-        try:
-            await run_async(templates_service.validate_templates_repo_access, templates_repo)
-        except ValueError as e:
-            raise ServerClientError(str(e))
+    try:
+        await run_async(templates_service.validate_templates_repo_access, templates_repo)
+    except ValueError as e:
+        raise ServerClientError(str(e))
     return templates_repo
+
+
+async def _resolve_new_templates_repo(
+    project: ProjectModel,
+    templates_repo: Optional[str],
+    reset_templates_repo: bool,
+) -> Tuple[bool, Optional[str]]:
+    if reset_templates_repo:
+        return project.templates_repo is not None, None
+    if templates_repo is None:
+        return False, None
+    normalized_templates_repo = await _normalize_templates_repo_url(templates_repo)
+    if normalized_templates_repo is None:
+        return False, None
+    if normalized_templates_repo == project.templates_repo:
+        return False, None
+    return True, normalized_templates_repo
 
 
 _CREATE_PROJECT_HOOKS = []
