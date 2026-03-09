@@ -222,7 +222,7 @@ async def update_project(
         normalized_templates_repo = None
         should_update_templates_repo = project.templates_repo is not None
     elif templates_repo is not None:
-        normalized_templates_repo = _normalize_templates_repo_url(templates_repo)
+        normalized_templates_repo = await _normalize_templates_repo_url(templates_repo)
         if normalized_templates_repo is not None:
             should_update_templates_repo = normalized_templates_repo != project.templates_repo
     if should_update_templates_repo:
@@ -603,7 +603,7 @@ async def create_project_model(
     templates_repo: Optional[str] = None,
 ) -> ProjectModel:
     validate_project_name(project_name)
-    templates_repo = _normalize_templates_repo_url(templates_repo)
+    templates_repo = await _normalize_templates_repo_url(templates_repo)
     private_bytes, public_bytes = await run_async(
         generate_rsa_key_pair_bytes, f"{project_name}@dstack"
     )
@@ -725,7 +725,7 @@ def is_valid_project_name(project_name: str) -> bool:
     return re.match("^[a-zA-Z0-9-_]{1,50}$", project_name) is not None
 
 
-def _normalize_templates_repo_url(templates_repo: Optional[str]) -> Optional[str]:
+async def _normalize_templates_repo_url(templates_repo: Optional[str]) -> Optional[str]:
     if templates_repo is None:
         return None
     templates_repo = templates_repo.strip()
@@ -733,7 +733,7 @@ def _normalize_templates_repo_url(templates_repo: Optional[str]) -> Optional[str
         return None
     if templates_repo is not None:
         try:
-            templates_service.validate_templates_repo_access(templates_repo)
+            await run_async(templates_service.validate_templates_repo_access, templates_repo)
         except ValueError as e:
             raise ServerClientError(str(e))
     return templates_repo
