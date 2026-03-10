@@ -4,8 +4,6 @@ date: 2026-03-10
 description: "Agentic engineering pulls compute discovery, provisioning, scheduling, and observability into the execution loop. Infrastructure orchestration is becoming an agent skill."
 slug: agentic-orchestration
 image: https://dstack.ai/static-assets/static-assets/images/agentic-orchestration.png
-categories:
-  - Changelog
 ---
 
 # Infrastructure orchestration is an agent skill
@@ -52,23 +50,21 @@ Providers that fit that layer become much easier to integrate into agent-driven 
 
 ## What this looks like with dstack
 
-dstack is an open-source control plane for provisioning GPU compute and orchestrating GPU workloads across a range of environments, including clouds, Kubernetes, and on-prem clusters. It exposes that infrastructure surface to agents and human operators through the CLI and configuration files.
+`dstack` is an open-source control plane for provisioning GPU compute and orchestrating GPU workloads across a range of environments, including clouds, Kubernetes, and on-prem clusters. It exposes that infrastructure surface to agents and human operators through the CLI and configuration files.
 
 **Step 1: treat available compute as queryable state**
 
 `dstack offer` turns available compute into something the workflow can query directly. It returns offers from configured backends and managed capacity, including region, resources, spot availability, and price.
 
 ```shell
-dstack offer --gpu H100:1.. --max-offers 3
-```
+$ dstack offer --gpu H100:1.. --max-offers 3
 
-```shell
-#   BACKEND  REGION     INSTANCE TYPE          RESOURCES                                     SPOT  PRICE
-1   verda    FIN-01     1H100.80S.30V          30xCPU, 120GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19
-2   runpod   US-KS-2    NVIDIA H100 PCIe       16xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.39
-3   nebius   eu-north1  gpu-h100-sxm           16xCPU, 200GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.95
-    ...
-Shown 3 of 99 offers
+ #   BACKEND  REGION     INSTANCE TYPE          RESOURCES                                     SPOT  PRICE
+ 1   verda    FIN-01     1H100.80S.30V          30xCPU, 120GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.19
+ 2   runpod   US-KS-2    NVIDIA H100 PCIe       16xCPU, 251GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.39
+ 3   nebius   eu-north1  gpu-h100-sxm           16xCPU, 200GB, 1xH100 (80GB), 100.0GB (disk)  no    $2.95
+     ...
+ Shown 3 of 99 offers
 ```
 
 In an agentic workflow, compute selection becomes part of execution. The workflow can inspect available capacity before deciding what to run.
@@ -89,32 +85,40 @@ resources:
 blocks: 4
 ```
 
-A fleet is dstack's unit of provisioning control. It can represent an elastic template over cloud or Kubernetes backends, a pre-provisioned pool, or a set of SSH-managed on-prem hosts. This is how dstack keeps provisioning explicit and bounded: the agent operates within declared capacity instead of interacting with provider infrastructure directly.
+A fleet is `dstack`'s unit of provisioning control. It can represent an elastic template over cloud or Kubernetes backends, a pre-provisioned pool, or a set of SSH-managed on-prem hosts. This is how `dstack` keeps provisioning explicit and bounded: the agent operates within declared capacity instead of interacting with provider infrastructure directly.
+
+<div class="termy">
 
 ```shell
-dstack apply -f fleet.dstack.yml
+$ dstack apply -f fleet.dstack.yml
 ```
+
+</div>
 
 In this context, `dstack apply` creates or updates the fleet resource. If the fleet is only a template, later runs can draw instances from it on demand. If it is pre-provisioned, the capacity is already present.
 
+<div class="termy">
+
 ```shell
-dstack fleet
+$ dstack fleet
 
  NAME         NODES  GPU           SPOT       BACKEND       PRICE    STATUS  CREATED
  gpu-cluster  2..4   A100:80GB:8   auto       aws           $0..$32  active  2 hours ago
    instance=0        A100:80GB:8   spot       aws (us-ea…)  $28.50   busy    2 hours ago
    instance=1        A100:80GB:8   spot       gcp (us-ce…)  $26.80   busy    1 hour ago
- on-prem      4      -             -          ssh           -        active  3 days ago
+ on-prem      2      -             -          ssh           -        active  3 days ago
    instance=0        A100:40GB:4   -          ssh           -        busy    3 days ago
    instance=1        A100:40GB:4   -          ssh           -        idle    3 days ago
  test-fleet   0..1   gpu:16GB      on-demand  *             -        active  10 min ago
 ```
 
+</div>
+
 In an agentic workflow, this gives the agent a visible provisioning surface: it can see which fleets exist, what capacity they expose, and whether that capacity is active, busy, or idle before deciding what to run next.
 
 **Step 3: run evaluation or training loops as tasks**
 
-Tasks are dstack's workload type for evaluation, fine-tuning, training, and other job-oriented workflows. They can also be distributed, in which case dstack handles cluster selection and job coordination across nodes.
+Tasks are `dstack`'s workload type for evaluation, fine-tuning, training, and other job-oriented workflows. They can also be distributed, in which case `dstack` handles cluster selection and job coordination across nodes.
 
 ```yaml
 # train.dstack.yml
@@ -124,7 +128,7 @@ name: train-qwen
 image: huggingface/trl-latest-gpu
 working_dir: /workspace
 
-repos:
+files:
   - .:/workspace
 
 commands:
@@ -137,19 +141,27 @@ resources:
   shm_size: 16GB
 ```
 
-Once a task is running, the agent may need to re-attach to the session, open a shell inside the container, or inspect runtime state before deciding what to do next. dstack exposes each of those actions directly.
+Once a task is running, the agent may need to re-attach to the session, open a shell inside the container, or inspect runtime state before deciding what to do next. `dstack` exposes each of those actions directly.
+
+<div class="termy">
 
 ```shell
-dstack attach train-qwen --logs
+$ dstack attach train-qwen --logs
 ```
 
+</div>
+
+<div class="termy">
+
 ```shell
-ssh train-qwen
+$ ssh train-qwen
 ```
+
+</div>
 
 **Step 4: run model inference as services**
 
-Services are dstack's workload type for long-lived inference endpoints. The same control plane that runs training and evaluation jobs can also deploy model-serving endpoints with stable URLs, autoscaling rules, and health checks.
+Services are `dstack`'s workload type for long-lived inference endpoints. The same control plane that runs training and evaluation jobs can also deploy model-serving endpoints with stable URLs, autoscaling rules, and health checks.
 
 ```yaml
 # serve.dstack.yml
@@ -169,7 +181,6 @@ commands:
       --trust-remote-code
 
 port: 8000
-gateway: true
 model: Qwen/Qwen2.5-32B-Instruct
 replicas: 1..4
 scaling:
@@ -183,15 +194,19 @@ resources:
 
 The endpoint can then be accessed directly, including from another agent step:
 
+<div class="termy">
+
 ```shell
-curl https://qwen25-instruct.example.com/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <dstack token>' \
-  -d '{
-    "model": "Qwen/Qwen2.5-32B-Instruct",
-    "messages": [{"role": "user", "content": "Hello"}]
-  }'
+$ curl https://qwen25-instruct.example.com/v1/chat/completions \
+   -H 'Content-Type: application/json' \
+   -H 'Authorization: Bearer <dstack token>' \
+   -d '{
+     "model": "Qwen/Qwen2.5-32B-Instruct",
+     "messages": [{"role": "user", "content": "Hello"}]
+   }'
 ```
+
+</div>
 
 The agent can launch the service, call the endpoint, and scale it through the same orchestration layer.
 
@@ -199,42 +214,52 @@ The agent can launch the service, call the endpoint, and scale it through the sa
 
 `dstack` exposes structured lifecycle data through events and metrics, so the loop can inspect state transitions and resource usage directly instead of inferring everything from logs.
 
-```shell
-dstack event --within-run train-qwen
-```
+<div class="termy">
 
 ```shell
-[2026-01-21 13:09:37] [run train-qwen] Run submitted. Status: SUBMITTED
-[2026-01-21 13:09:57] [job train-qwen-0-0] Job status changed SUBMITTED -> PROVISIONING
-[2026-01-21 13:11:49] [job train-qwen-0-0] Job status changed PULLING -> RUNNING
+$ dstack event --within-run train-qwen
+
+ [2026-01-21 13:09:37] [run train-qwen] Run submitted. Status: SUBMITTED
+ [2026-01-21 13:09:57] [job train-qwen-0-0] Job status changed SUBMITTED -> PROVISIONING
+ [2026-01-21 13:11:49] [job train-qwen-0-0] Job status changed PULLING -> RUNNING
 ```
 
-```shell
-dstack metrics train-qwen
-```
+</div>
+
+<div class="termy">
 
 ```shell
+$ dstack metrics train-qwen
+
  NAME        STATUS   CPU  MEMORY       GPU
  train-qwen  running  92%  118GB/200GB  gpu=0 mem=71GB/80GB util=97%
 ```
+
+</div>
 
 Taken together, these are the fine-grained primitives a fully autonomous agent needs: discover capacity, provision it, run the right workload type, inspect state, and decide what to do next without handing orchestration back to a human operator.
 
 ## Skills
 
-Those primitives become much more useful when they are paired with operational knowledge. dstack already ships an installable [agent skill](https://github.com/dstackai/dstack/blob/master/.agents/skills/dstack/SKILL.md) and documents how to install it:
+Those primitives become much more useful when they are paired with operational knowledge. `dstack` already ships an installable [agent skill](https://github.com/dstackai/dstack/blob/master/.agents/skills/dstack/SKILL.md) and documents how to install it:
+
+<div class="termy">
 
 ```shell
-npx skills add dstackai/dstack
+$ npx skills add dstackai/dstack
 ```
 
-> Skills are where operational know-how can live: how to run training, fine-tuning, inference, evals, and other specialized workflows against the orchestration layer. This should not stop at one built-in skill. The ecosystem needs specialized skills that encode the operational patterns agents actually use for these workloads.
+</div>
+
+Skills are where operational know-how can live: how to run training, fine-tuning, inference, evals, and other specialized workflows against the orchestration layer.
+
+> One built-in skill is only a start. The ecosystem needs specialized skills that encode the operational patterns agents actually use for these workloads.
 
 ## Governance and permissions
 
 As infrastructure management is delegated to agents, governance and observability become part of the orchestration model itself, not something added later around it.
 
-dstack already exposes part of that model through projects and permissions. Projects isolate teams and resources, define access boundaries, and control which backends and infrastructure surfaces an agent or user can operate against.
+`dstack` already exposes part of that model through projects and permissions. Projects isolate teams and resources, define access boundaries, and control which backends and infrastructure surfaces an agent or user can operate against.
 
 ## Why open source and the ecosystem matter here
 
@@ -242,10 +267,10 @@ If agents are going to provision compute and orchestrate workloads directly, the
 
 Teams need to see which backends it supports, how scheduling decisions are made, how permissions are enforced, and how lifecycle state is exposed. They also need to extend it: add new providers, refine operational policies, and encode better training, fine-tuning, inference, and evaluation workflows as reusable skills and recipes.
 
-dstack is MPL-2.0 licensed and designed around backends, fleets, projects, events, and metrics that can span different capacity sources. That matters because agentic orchestration will not be built once inside a single vendor boundary; it will be assembled across clouds, Kubernetes, on-prem infrastructure, and a growing ecosystem of specialized operational patterns.
+`dstack` is MPL-2.0 licensed and designed around backends, fleets, projects, events, and metrics that can span different capacity sources. That matters because agentic orchestration will not be built once inside a single vendor boundary; it will be assembled across clouds, Kubernetes, on-prem infrastructure, and a growing ecosystem of specialized operational patterns.
 
 ## What's next
 
 If you are already running agent-driven loops, feedback on the hard parts is especially useful: what still forces a human back into the path, which signals are missing, where provider integration still feels manual, and which specialized skills or recipes would be most valuable.
 
-If you want to use dstack for these workflows or contribute to the surrounding ecosystem, issues and feedback are welcome in the [GitHub repo](https://github.com/dstackai/dstack).
+If you want to use `dstack` for these workflows or contribute to the surrounding ecosystem, issues and feedback are welcome in the [GitHub repo](https://github.com/dstackai/dstack).

@@ -603,6 +603,11 @@ code .md-code__nav:hover .md-code__button {
     font-size: 33px;
 }
 
+/* Hide permalink anchor on top-level headings only */
+.md-typeset h1 > .headerlink {
+    display: none;
+}
+
 .md-typeset h2 {
     margin: 1.4em 0 0.64em;
     padding-top: 0.2em;
