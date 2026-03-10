@@ -1,6 +1,6 @@
 ---
 title: "Infrastructure orchestration is an agent skill"
-date: 2026-03-10
+date: 2026-03-11
 description: "Agentic engineering pulls compute discovery, provisioning, scheduling, and observability into the execution loop. Infrastructure orchestration is becoming an agent skill."
 slug: agentic-orchestration
 image: https://dstack.ai/static-assets/static-assets/images/agentic-orchestration.png
@@ -241,7 +241,7 @@ Taken together, these are the fine-grained primitives a fully autonomous agent n
 
 ## Skills
 
-Those primitives become much more useful when they are paired with operational knowledge. `dstack` already ships an installable [agent skill](https://github.com/dstackai/dstack/blob/master/.agents/skills/dstack/SKILL.md) and documents how to install it:
+Those primitives become much more useful when they are paired with operational knowledge. `dstack` already ships an installable [SKILL.md](https://skills.sh/dstackai/dstack/dstack) and documents how to install it:
 
 <div class="termy">
 
