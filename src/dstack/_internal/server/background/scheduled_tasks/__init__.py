@@ -135,12 +135,6 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
             max_instances=2 if replica == 0 else 1,
         )
         _scheduler.add_job(
-            process_terminating_jobs,
-            IntervalTrigger(seconds=4, jitter=2),
-            kwargs={"batch_size": 5},
-            max_instances=2 if replica == 0 else 1,
-        )
-        _scheduler.add_job(
             process_runs,
             IntervalTrigger(seconds=2, jitter=1),
             kwargs={"batch_size": 5},
@@ -157,6 +151,12 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
                 process_compute_groups,
                 IntervalTrigger(seconds=15, jitter=2),
                 kwargs={"batch_size": 1},
+                max_instances=2 if replica == 0 else 1,
+            )
+            _scheduler.add_job(
+                process_terminating_jobs,
+                IntervalTrigger(seconds=4, jitter=2),
+                kwargs={"batch_size": 5},
                 max_instances=2 if replica == 0 else 1,
             )
     _scheduler.start()

@@ -443,7 +443,7 @@ class RunModel(BaseModel):
     __table_args__ = (Index("ix_submitted_at_id", submitted_at.desc(), id),)
 
 
-class JobModel(BaseModel):
+class JobModel(PipelineModelMixin, BaseModel):
     __tablename__ = "jobs"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -514,6 +514,15 @@ class JobModel(BaseModel):
     for example to provision instances for all jobs when processing master. If not set, all jobs
     should be processed only one-by-one.
     """
+
+    __table_args__ = (
+        Index(
+            "ix_jobs_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=status.not_in(JobStatus.finished_statuses()),
+            sqlite_where=status.not_in(JobStatus.finished_statuses()),
+        ),
+    )
 
 
 class GatewayModel(PipelineModelMixin, BaseModel):
@@ -810,6 +819,9 @@ class VolumeModel(PipelineModelMixin, BaseModel):
         NaiveDateTime, default=get_current_datetime
     )
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    """`last_job_processed_at` records the last time the volume was used by a job.
+    Updated when a job terminates and used to delete volumes on `auto_cleanup_duration`.
+    """
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())

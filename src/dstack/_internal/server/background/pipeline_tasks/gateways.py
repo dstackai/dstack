@@ -152,7 +152,7 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
                     )
                     .order_by(GatewayModel.last_processed_at.asc())
                     .limit(limit)
-                    .with_for_update(skip_locked=True, key_share=True)
+                    .with_for_update(skip_locked=True, key_share=True, of=GatewayModel)
                     .options(
                         load_only(
                             GatewayModel.id,
