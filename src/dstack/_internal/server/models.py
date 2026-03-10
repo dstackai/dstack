@@ -250,6 +250,7 @@ class ProjectModel(BaseModel):
     name: Mapped[str] = mapped_column(String(50), unique=True)
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    templates_repo: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     original_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     """`original_name` stores the deleted project's original name while `name` is changed to a unique

@@ -51,10 +51,13 @@ class ListProjectsRequest(CoreModel):
 class CreateProjectRequest(CoreModel):
     project_name: str
     is_public: bool = False
+    templates_repo: Optional[str] = None
 
 
 class UpdateProjectRequest(CoreModel):
-    is_public: bool
+    is_public: Optional[bool] = None
+    templates_repo: Optional[str] = None
+    reset_templates_repo: bool = False
 
 
 class DeleteProjectsRequest(CoreModel):

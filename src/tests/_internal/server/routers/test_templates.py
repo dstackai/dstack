@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 import yaml
+from git import GitCommandError
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,10 +21,8 @@ from dstack._internal.server.testing.common import (
 def _reset_cache():
     """Reset the templates cache before each test."""
     templates_service._templates_cache.clear()
-    templates_service._repo_path = None
     yield
     templates_service._templates_cache.clear()
-    templates_service._repo_path = None
 
 
 class TestListTemplates:
@@ -48,6 +47,42 @@ class TestListTemplates:
             )
         assert response.status_code == 200
         assert response.json() == []
+
+    @pytest.mark.asyncio
+    async def test_uses_project_templates_repo_when_set(
+        self, test_db, session: AsyncSession, client: AsyncClient, tmp_path: Path
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(
+            session=session, owner=user, name="project-with-templates", is_public=False
+        )
+        project.templates_repo = "https://project.example/repo.git"
+        await session.commit()
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        templates_dir = tmp_path / ".dstack" / "templates"
+        templates_dir.mkdir(parents=True)
+        with open(templates_dir / "desktop-ide.yml", "w") as f:
+            yaml.dump(
+                {
+                    "type": "template",
+                    "name": "desktop-ide",
+                    "title": "Desktop IDE",
+                    "parameters": [{"type": "name"}],
+                    "configuration": {"type": "dev-environment"},
+                },
+                f,
+            )
+
+        with patch.object(templates_service, "_fetch_templates_repo", return_value=tmp_path):
+            response = await client.post(
+                f"/api/project/{project.name}/templates/list",
+                headers=get_auth_headers(user.token),
+            )
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+        assert response.json()[0]["name"] == "desktop-ide"
 
     @pytest.mark.asyncio
     async def test_returns_templates(
@@ -98,9 +133,8 @@ class TestListTemplates:
             patch.object(
                 templates_service.settings, "SERVER_TEMPLATES_REPO", "https://example.com"
             ),
-            patch.object(templates_service, "_fetch_templates_repo"),
+            patch.object(templates_service, "_fetch_templates_repo", return_value=tmp_path),
         ):
-            templates_service._repo_path = tmp_path
             response = await client.post(
                 f"/api/project/{project.name}/templates/list",
                 headers=get_auth_headers(user.token),
@@ -116,3 +150,28 @@ class TestListTemplates:
         assert data[1]["parameters"][1]["type"] == "env"
         assert data[1]["parameters"][1]["name"] == "PASSWORD"
         assert data[1]["configuration"]["port"] == 8080
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_repo_fetch_fails(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        project.templates_repo = "https://github.com/dstackai/dstack-sky"
+        await session.commit()
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+
+        with patch.object(
+            templates_service,
+            "_fetch_templates_repo",
+            side_effect=GitCommandError(["git", "clone"], 128, stderr="not found"),
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/templates/list",
+                headers=get_auth_headers(user.token),
+            )
+
+        assert response.status_code == 200
+        assert response.json() == []
