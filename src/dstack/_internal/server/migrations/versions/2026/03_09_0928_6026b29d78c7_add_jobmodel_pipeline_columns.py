@@ -1,7 +1,7 @@
 """Add JobModel pipeline columns
 
 Revision ID: 6026b29d78c7
-Revises: c7b0a8e57294
+Revises: a13f5b55af01
 Create Date: 2026-03-09 09:28:17.993416+00:00
 
 """
@@ -14,7 +14,7 @@ import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
 revision = "6026b29d78c7"
-down_revision = "c7b0a8e57294"
+down_revision = "a13f5b55af01"
 branch_labels = None
 depends_on = None
 
