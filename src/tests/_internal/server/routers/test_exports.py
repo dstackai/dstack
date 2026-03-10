@@ -410,8 +410,13 @@ class TestUpdateExport:
             f"/api/project/{project.name}/exports/list", headers=get_auth_headers(user.token)
         )
         assert response.status_code == 200
-        assert len(response.json()) == 1
-        assert response.json()[0] == export_response
+        export_list = response.json()
+        assert len(export_list) == 1
+        export_response["imports"].sort(key=lambda i: i["project_name"])
+        export_list[0]["imports"].sort(key=lambda i: i["project_name"])
+        export_response["exported_fleets"].sort(key=lambda f: f["name"])
+        export_list[0]["exported_fleets"].sort(key=lambda f: f["name"])
+        assert export_list[0] == export_response
 
     async def test_can_add_same_entities_as_existing_deleted_ones(
         self, session: AsyncSession, client: AsyncClient
