@@ -177,7 +177,7 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                     )
                     .order_by(JobModel.last_processed_at.asc())
                     .limit(limit)
-                    .with_for_update(skip_locked=True, key_share=True)
+                    .with_for_update(skip_locked=True, key_share=True, of=JobModel)
                     .options(
                         load_only(
                             JobModel.id,
@@ -360,7 +360,7 @@ async def _lock_related_instance(
                 )
             )
             .options(joinedload(InstanceModel.jobs).load_only(JobModel.id))
-            .with_for_update(skip_locked=True, key_share=True)
+            .with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
         )
         instance_model = res.unique().scalar_one_or_none()
         if instance_model is None:

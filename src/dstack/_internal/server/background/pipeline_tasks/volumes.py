@@ -154,7 +154,7 @@ class VolumeFetcher(Fetcher[VolumePipelineItem]):
                     )
                     .order_by(VolumeModel.last_processed_at.asc())
                     .limit(limit)
-                    .with_for_update(skip_locked=True, key_share=True)
+                    .with_for_update(skip_locked=True, key_share=True, of=VolumeModel)
                     .options(
                         load_only(
                             VolumeModel.id,

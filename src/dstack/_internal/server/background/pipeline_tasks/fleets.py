@@ -152,7 +152,7 @@ class FleetFetcher(Fetcher[PipelineItem]):
                     )
                     .order_by(FleetModel.last_processed_at.asc())
                     .limit(limit)
-                    .with_for_update(skip_locked=True, key_share=True)
+                    .with_for_update(skip_locked=True, key_share=True, of=FleetModel)
                     .options(
                         load_only(
                             FleetModel.id,
@@ -352,7 +352,7 @@ async def _lock_fleet_instances_for_consolidation(
                     InstanceModel.lock_owner == FleetPipeline.__name__,
                 ),
             )
-            .with_for_update(skip_locked=True, key_share=True)
+            .with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
         )
         locked_instance_models = list(res.scalars().all())
         locked_instance_ids = {instance_model.id for instance_model in locked_instance_models}
