@@ -515,6 +515,15 @@ class JobModel(PipelineModelMixin, BaseModel):
     should be processed only one-by-one.
     """
 
+    __table_args__ = (
+        Index(
+            "ix_jobs_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=status.not_in(JobStatus.finished_statuses()),
+            sqlite_where=status.not_in(JobStatus.finished_statuses()),
+        ),
+    )
+
 
 class GatewayModel(PipelineModelMixin, BaseModel):
     __tablename__ = "gateways"
