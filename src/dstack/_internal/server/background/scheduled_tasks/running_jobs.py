@@ -150,13 +150,12 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     job_provisioning_data = job_submission.job_provisioning_data
     if job_provisioning_data is None:
         logger.error("%s: job_provisioning_data of an active job is None", fmt(job_model))
-        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-        job_model.termination_reason_message = (
-            "Unexpected server error: job_provisioning_data of an active job is None"
+        await _terminate_running_job(
+            session=session,
+            job_model=job_model,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message="Unexpected server error: job_provisioning_data of an active job is None",
         )
-        switch_job_status(session, job_model, JobStatus.TERMINATING)
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
         return
 
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
@@ -177,8 +176,7 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     "%s: waiting for all jobs in the replica to be provisioned",
                     fmt(job_model),
                 )
-                job_model.last_processed_at = common_utils.get_current_datetime()
-                await session.commit()
+                await _mark_job_processed(session=session, job_model=job_model)
                 return
 
         cluster_info = _get_cluster_info(
@@ -205,11 +203,12 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         try:
             _interpolate_secrets(secrets, job.job_spec)
         except InterpolatorError as e:
-            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-            job_model.termination_reason_message = f"Secrets interpolation error: {e.args[0]}"
-            switch_job_status(session, job_model, JobStatus.TERMINATING)
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
+            await _terminate_running_job(
+                session=session,
+                job_model=job_model,
+                termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+                termination_reason_message=f"Secrets interpolation error: {e.args[0]}",
+            )
             return
 
     server_ssh_private_keys = get_instance_ssh_private_keys(
@@ -219,12 +218,10 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     if initial_status == JobStatus.PROVISIONING:
         if job_provisioning_data.hostname is None:
             await _wait_for_instance_provisioning_data(session, job_model)
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
+            await _mark_job_processed(session=session, job_model=job_model)
             return
         if _should_wait_for_other_nodes(run, job, job_model):
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
+            await _mark_job_processed(session=session, job_model=job_model)
             return
 
         # fails are acceptable until timeout is exceeded
@@ -388,25 +385,14 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
                     )
 
     if initial_status != job_model.status and job_model.status == JobStatus.RUNNING:
-        job_model.probes = []
-        for probe_num in range(len(job.job_spec.probes)):
-            job_model.probes.append(
-                ProbeModel(
-                    name=f"{job_model.job_name}-{probe_num}",
-                    probe_num=probe_num,
-                    due=common_utils.get_current_datetime(),
-                    success_streak=0,
-                    active=True,
-                )
-            )
+        _initialize_running_job_probes(job_model=job_model, job=job)
 
     if job_model.status == JobStatus.RUNNING:
         await _maybe_register_replica(session, run_model, run, job_model, job.job_spec.probes)
     if job_model.status == JobStatus.RUNNING:
         await _check_gpu_utilization(session, job_model, job)
 
-    job_model.last_processed_at = common_utils.get_current_datetime()
-    await session.commit()
+    await _mark_job_processed(session=session, job_model=job_model)
 
 
 async def _refetch_job_model(session: AsyncSession, job_model: JobModel) -> JobModel:
@@ -454,6 +440,37 @@ async def _fetch_run_model(session: AsyncSession, run_id: uuid.UUID) -> RunModel
         .options(contains_eager(RunModel.jobs, alias=job_alias))
     )
     return res.unique().scalar_one()
+
+
+async def _mark_job_processed(session: AsyncSession, job_model: JobModel) -> None:
+    job_model.last_processed_at = common_utils.get_current_datetime()
+    await session.commit()
+
+
+async def _terminate_running_job(
+    session: AsyncSession,
+    job_model: JobModel,
+    termination_reason: JobTerminationReason,
+    termination_reason_message: str,
+) -> None:
+    job_model.termination_reason = termination_reason
+    job_model.termination_reason_message = termination_reason_message
+    switch_job_status(session, job_model, JobStatus.TERMINATING)
+    await _mark_job_processed(session=session, job_model=job_model)
+
+
+def _initialize_running_job_probes(job_model: JobModel, job: Job) -> None:
+    job_model.probes = []
+    for probe_num in range(len(job.job_spec.probes)):
+        job_model.probes.append(
+            ProbeModel(
+                name=f"{job_model.job_name}-{probe_num}",
+                probe_num=probe_num,
+                due=common_utils.get_current_datetime(),
+                success_streak=0,
+                active=True,
+            )
+        )
 
 
 async def _wait_for_instance_provisioning_data(session: AsyncSession, job_model: JobModel):
