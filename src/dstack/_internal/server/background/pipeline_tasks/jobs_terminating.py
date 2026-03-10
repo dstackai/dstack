@@ -338,6 +338,7 @@ async def _lock_related_instance(
     item: JobTerminatingPipelineItem,
     instance_id: uuid.UUID,
 ) -> Optional[InstanceModel]:
+    lock_owner = _get_related_instance_lock_owner(item.id)
     instance_lock, _ = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
     async with instance_lock:
         res = await session.execute(
@@ -350,7 +351,7 @@ async def _lock_related_instance(
                 ),
                 or_(
                     InstanceModel.lock_owner.is_(None),
-                    InstanceModel.lock_owner == JobTerminatingPipeline.__name__,
+                    InstanceModel.lock_owner == lock_owner,
                 ),
             )
             .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
@@ -367,7 +368,7 @@ async def _lock_related_instance(
             return None
         instance_model.lock_expires_at = item.lock_expires_at
         instance_model.lock_token = item.lock_token
-        instance_model.lock_owner = JobTerminatingPipeline.__name__
+        instance_model.lock_owner = lock_owner
         return instance_model
 
 
@@ -434,6 +435,7 @@ async def _apply_process_result(
 ) -> None:
     async with get_session_ctx() as session:
         now = get_current_datetime()
+        related_instance_lock_owner = _get_related_instance_lock_owner(item.id)
         instance_update_map = result.instance_update_map
         if instance_model is None:
             instance_update_map = None
@@ -469,7 +471,7 @@ async def _apply_process_result(
                 .where(
                     InstanceModel.id == instance_model.id,
                     InstanceModel.lock_token == item.lock_token,
-                    InstanceModel.lock_owner == JobTerminatingPipeline.__name__,
+                    InstanceModel.lock_owner == related_instance_lock_owner,
                 )
                 .values(**instance_update_map)
                 .returning(InstanceModel.id)
@@ -556,7 +558,7 @@ async def _unlock_related_instance(
         .where(
             InstanceModel.id == instance_id,
             InstanceModel.lock_token == item.lock_token,
-            InstanceModel.lock_owner == JobTerminatingPipeline.__name__,
+            InstanceModel.lock_owner == _get_related_instance_lock_owner(item.id),
         )
         .values(
             lock_expires_at=None,
@@ -915,3 +917,7 @@ def _should_force_detach_volume(
             and now > job_model.volumes_detached_at + timedelta(seconds=stop_duration)
         )
     )
+
+
+def _get_related_instance_lock_owner(job_id: uuid.UUID) -> str:
+    return f"{JobTerminatingPipeline.__name__}:{job_id}"

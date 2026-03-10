@@ -17,6 +17,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     JobTerminatingPipeline,
     JobTerminatingPipelineItem,
     JobTerminatingWorker,
+    _get_related_instance_lock_owner,
 )
 from dstack._internal.server.models import InstanceModel, JobModel, VolumeAttachmentModel
 from dstack._internal.server.testing.common import (
@@ -584,6 +585,49 @@ class TestJobTerminatingWorker:
         assert job.lock_owner == JobTerminatingPipeline.__name__
         assert job.last_processed_at > last_processed_before
 
+    async def test_resets_job_for_retry_if_related_instance_is_locked_by_another_job(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        other_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+            instance=instance,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+            instance=instance,
+        )
+        instance.lock_owner = _get_related_instance_lock_owner(other_job.id)
+        instance.lock_token = uuid.uuid4()
+        instance.lock_expires_at = get_current_datetime() - timedelta(minutes=1)
+        _lock_job(job)
+        last_processed_before = job.last_processed_at
+        await session.commit()
+
+        await worker.process(_job_to_pipeline_item(job))
+
+        await session.refresh(job)
+        await session.refresh(instance)
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+        assert job.lock_owner == JobTerminatingPipeline.__name__
+        assert job.last_processed_at > last_processed_before
+        assert instance.lock_owner == _get_related_instance_lock_owner(other_job.id)
+
     async def test_finishes_job_when_used_instance_is_not_set(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker
     ):
@@ -699,4 +743,4 @@ class TestJobTerminatingWorker:
         assert job.lock_token == job_lock_token
         assert job.lock_owner == JobTerminatingPipeline.__name__
         assert instance.lock_token == job_lock_token
-        assert instance.lock_owner == JobTerminatingPipeline.__name__
+        assert instance.lock_owner == _get_related_instance_lock_owner(job.id)
