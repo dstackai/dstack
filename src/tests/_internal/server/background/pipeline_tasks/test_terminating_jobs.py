@@ -12,7 +12,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
 from dstack._internal.core.models.volumes import VolumeStatus
-from dstack._internal.server.background.pipeline_tasks.terminating_jobs import (
+from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     JobTerminatingFetcher,
     JobTerminatingPipeline,
     JobTerminatingPipelineItem,
@@ -317,7 +317,7 @@ class TestJobTerminatingWorker:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.terminating_jobs.backends_services.get_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.get_project_backend_by_type"
         ) as m:
             backend_mock = Mock()
             m.return_value = backend_mock
@@ -368,7 +368,7 @@ class TestJobTerminatingWorker:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.terminating_jobs.backends_services.get_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.get_project_backend_by_type"
         ) as m:
             backend_mock = Mock()
             m.return_value = backend_mock
@@ -387,10 +387,10 @@ class TestJobTerminatingWorker:
         await session.commit()
         with (
             patch(
-                "dstack._internal.server.background.pipeline_tasks.terminating_jobs.backends_services.get_project_backend_by_type"
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.get_project_backend_by_type"
             ) as m,
             patch(
-                "dstack._internal.server.background.pipeline_tasks.terminating_jobs.get_current_datetime"
+                "dstack._internal.server.background.pipeline_tasks.jobs_terminating.get_current_datetime"
             ) as datetime_mock,
         ):
             datetime_mock.return_value = job.volumes_detached_at.replace(
@@ -416,7 +416,7 @@ class TestJobTerminatingWorker:
         _lock_job(job)
         await session.commit()
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.terminating_jobs.backends_services.get_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.get_project_backend_by_type"
         ) as m:
             backend_mock = Mock()
             m.return_value = backend_mock
@@ -524,7 +524,7 @@ class TestJobTerminatingWorker:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.terminating_jobs.backends_services.get_project_backend_by_type"
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating.backends_services.get_project_backend_by_type"
         ) as m:
             backend_mock = Mock()
             m.return_value = backend_mock
@@ -688,7 +688,7 @@ class TestJobTerminatingWorker:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.terminating_jobs._process_terminating_job",
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating._process_terminating_job",
             side_effect=RuntimeError("boom"),
         ):
             with pytest.raises(RuntimeError, match="boom"):
