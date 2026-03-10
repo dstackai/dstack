@@ -2,6 +2,7 @@ import asyncio
 import re
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Dict, List, Optional
 
@@ -141,133 +142,151 @@ async def _process_next_running_job():
             lockset.difference_update([job_model_id])
 
 
+@dataclass
+class _RunningJobContext:
+    job_model: JobModel
+    run_model: RunModel
+    repo_model: RepoModel
+    project: ProjectModel
+    run: Run
+    job: Job
+    job_submission: JobSubmission
+    job_provisioning_data: Optional[JobProvisioningData]
+    initial_status: JobStatus
+    server_ssh_private_keys: Optional[tuple[str, Optional[str]]] = None
+
+
 async def _process_running_job(session: AsyncSession, job_model: JobModel):
-    job_model = await _refetch_job_model(session, job_model)
-    run_model = await _fetch_run_model(session, job_model.run_id)
-    repo_model = run_model.repo
-    project = run_model.project
-    run = run_model_to_run(run_model, include_sensitive=True)
-    job_submission = job_model_to_job_submission(job_model)
-    job_provisioning_data = job_submission.job_provisioning_data
-    if job_provisioning_data is None:
-        logger.error("%s: job_provisioning_data of an active job is None", fmt(job_model))
+    context = await _load_running_job_context(session=session, job_model=job_model)
+    if context.job_provisioning_data is None:
+        logger.error("%s: job_provisioning_data of an active job is None", fmt(context.job_model))
         await _terminate_running_job(
             session=session,
-            job_model=job_model,
+            job_model=context.job_model,
             termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
             termination_reason_message="Unexpected server error: job_provisioning_data of an active job is None",
         )
         return
 
-    job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+    job_provisioning_data = common_utils.get_or_error(context.job_provisioning_data)
 
     volumes = []
     secrets = {}
     cluster_info = None
     repo_creds = None
 
-    initial_status = job_model.status
-    if initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
-        for other_job in run.jobs:
+    if context.initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
+        for other_job in context.run.jobs:
             if (
-                other_job.job_spec.replica_num == job.job_spec.replica_num
+                other_job.job_spec.replica_num == context.job.job_spec.replica_num
                 and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
             ):
                 logger.debug(
                     "%s: waiting for all jobs in the replica to be provisioned",
-                    fmt(job_model),
+                    fmt(context.job_model),
                 )
-                await _mark_job_processed(session=session, job_model=job_model)
+                await _mark_job_processed(session=session, job_model=context.job_model)
                 return
 
         cluster_info = _get_cluster_info(
-            jobs=run.jobs,
-            replica_num=job.job_spec.replica_num,
+            jobs=context.run.jobs,
+            replica_num=context.job.job_spec.replica_num,
             job_provisioning_data=job_provisioning_data,
-            job_runtime_data=job_submission.job_runtime_data,
+            job_runtime_data=context.job_submission.job_runtime_data,
         )
 
         volumes = await get_job_attached_volumes(
             session=session,
-            project=project,
-            run_spec=run.run_spec,
-            job_num=job.job_spec.job_num,
+            project=context.project,
+            run_spec=context.run.run_spec,
+            job_num=context.job.job_spec.job_num,
             job_provisioning_data=job_provisioning_data,
         )
 
         repo_creds_model = await get_repo_creds(
-            session=session, repo=repo_model, user=run_model.user
+            session=session, repo=context.repo_model, user=context.run_model.user
         )
-        repo_creds = repo_model_to_repo_head_with_creds(repo_model, repo_creds_model).repo_creds
+        repo_creds = repo_model_to_repo_head_with_creds(
+            context.repo_model, repo_creds_model
+        ).repo_creds
 
-        secrets = await get_project_secrets_mapping(session=session, project=project)
+        secrets = await get_project_secrets_mapping(session=session, project=context.project)
         try:
-            _interpolate_secrets(secrets, job.job_spec)
+            _interpolate_secrets(secrets, context.job.job_spec)
         except InterpolatorError as e:
             await _terminate_running_job(
                 session=session,
-                job_model=job_model,
+                job_model=context.job_model,
                 termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
                 termination_reason_message=f"Secrets interpolation error: {e.args[0]}",
             )
             return
 
-    server_ssh_private_keys = get_instance_ssh_private_keys(
-        common_utils.get_or_error(job_model.instance)
+    context.server_ssh_private_keys = get_instance_ssh_private_keys(
+        common_utils.get_or_error(context.job_model.instance)
     )
 
-    if initial_status == JobStatus.PROVISIONING:
+    if context.initial_status == JobStatus.PROVISIONING:
         await _process_running_job_provisioning_state(
             session=session,
-            run=run,
-            run_model=run_model,
-            repo_model=repo_model,
-            project=project,
-            job_model=job_model,
-            job=job,
-            job_submission=job_submission,
-            job_provisioning_data=job_provisioning_data,
+            context=context,
             volumes=volumes,
             cluster_info=cluster_info,
             secrets=secrets,
             repo_creds=repo_creds,
-            server_ssh_private_keys=server_ssh_private_keys,
         )
-    elif initial_status == JobStatus.PULLING:
+    elif context.initial_status == JobStatus.PULLING:
         await _process_running_job_pulling_state(
             session=session,
-            run=run,
-            run_model=run_model,
-            repo_model=repo_model,
-            project=project,
-            job_model=job_model,
-            job=job,
-            job_submission=job_submission,
-            job_provisioning_data=job_provisioning_data,
+            context=context,
             cluster_info=cluster_info,
             secrets=secrets,
             repo_creds=repo_creds,
-            server_ssh_private_keys=server_ssh_private_keys,
         )
     else:
         await _process_running_job_running_state(
             session=session,
-            run_model=run_model,
-            job_model=job_model,
-            job_submission=job_submission,
-            job_provisioning_data=job_provisioning_data,
-            server_ssh_private_keys=server_ssh_private_keys,
+            context=context,
         )
 
-    if initial_status != job_model.status and job_model.status == JobStatus.RUNNING:
-        _initialize_running_job_probes(job_model=job_model, job=job)
+    if (
+        context.initial_status != context.job_model.status
+        and context.job_model.status == JobStatus.RUNNING
+    ):
+        _initialize_running_job_probes(job_model=context.job_model, job=context.job)
 
-    if job_model.status == JobStatus.RUNNING:
-        await _maybe_register_replica(session, run_model, run, job_model, job.job_spec.probes)
-    if job_model.status == JobStatus.RUNNING:
-        await _check_gpu_utilization(session, job_model, job)
+    if context.job_model.status == JobStatus.RUNNING:
+        await _maybe_register_replica(
+            session,
+            context.run_model,
+            context.run,
+            context.job_model,
+            context.job.job_spec.probes,
+        )
+    if context.job_model.status == JobStatus.RUNNING:
+        await _check_gpu_utilization(session, context.job_model, context.job)
 
-    await _mark_job_processed(session=session, job_model=job_model)
+    await _mark_job_processed(session=session, job_model=context.job_model)
+
+
+async def _load_running_job_context(
+    session: AsyncSession, job_model: JobModel
+) -> _RunningJobContext:
+    job_model = await _refetch_job_model(session, job_model)
+    run_model = await _fetch_run_model(session, job_model.run_id)
+    run = run_model_to_run(run_model, include_sensitive=True)
+    job_submission = job_model_to_job_submission(job_model)
+    return _RunningJobContext(
+        job_model=job_model,
+        run_model=run_model,
+        repo_model=run_model.repo,
+        project=run_model.project,
+        run=run,
+        job=find_job(run.jobs, job_model.replica_num, job_model.job_num),
+        job_submission=job_submission,
+        job_provisioning_data=job_submission.job_provisioning_data,
+        initial_status=job_model.status,
+    )
 
 
 async def _refetch_job_model(session: AsyncSession, job_model: JobModel) -> JobModel:
@@ -319,37 +338,32 @@ async def _fetch_run_model(session: AsyncSession, run_id: uuid.UUID) -> RunModel
 
 async def _process_running_job_provisioning_state(
     session: AsyncSession,
-    run: Run,
-    run_model: RunModel,
-    repo_model: RepoModel,
-    project: ProjectModel,
-    job_model: JobModel,
-    job: Job,
-    job_submission: JobSubmission,
-    job_provisioning_data: JobProvisioningData,
+    context: _RunningJobContext,
     volumes: list[Volume],
     cluster_info: Optional[ClusterInfo],
     secrets: dict[str, str],
     repo_creds: Optional[RemoteRepoCreds],
-    server_ssh_private_keys: tuple[str, Optional[str]],
 ) -> None:
+    job_provisioning_data = common_utils.get_or_error(context.job_provisioning_data)
+    server_ssh_private_keys = common_utils.get_or_error(context.server_ssh_private_keys)
+
     if job_provisioning_data.hostname is None:
-        await _wait_for_instance_provisioning_data(session, job_model)
+        await _wait_for_instance_provisioning_data(session, context.job_model)
         return
-    if _should_wait_for_other_nodes(run, job, job_model):
+    if _should_wait_for_other_nodes(context.run, context.job, context.job_model):
         return
 
     # fails are acceptable until timeout is exceeded
     if job_provisioning_data.dockerized:
         logger.debug(
             "%s: process provisioning job with shim, age=%s",
-            fmt(job_model),
-            job_submission.age,
+            fmt(context.job_model),
+            context.job_submission.age,
         )
         ssh_user = job_provisioning_data.username
-        assert run.run_spec.ssh_key_pub is not None
-        user_ssh_key = run.run_spec.ssh_key_pub.strip()
-        public_keys = [project.ssh_public_key.strip(), user_ssh_key]
+        assert context.run.run_spec.ssh_key_pub is not None
+        user_ssh_key = context.run.run_spec.ssh_key_pub.strip()
+        public_keys = [context.project.ssh_public_key.strip(), user_ssh_key]
         if job_provisioning_data.backend == BackendType.LOCAL:
             # No need to update ~/.ssh/authorized_keys when running shim locally
             user_ssh_key = ""
@@ -359,11 +373,11 @@ async def _process_running_job_provisioning_state(
             job_provisioning_data,
             None,
             session,
-            run,
-            job_model,
+            context.run,
+            context.job_model,
             job_provisioning_data,
             volumes,
-            job.job_spec.registry_auth,
+            context.job.job_spec.registry_auth,
             public_keys,
             ssh_user,
             user_ssh_key,
@@ -372,21 +386,21 @@ async def _process_running_job_provisioning_state(
         assert cluster_info is not None
         logger.debug(
             "%s: process provisioning job without shim, age=%s",
-            fmt(job_model),
-            job_submission.age,
+            fmt(context.job_model),
+            context.job_submission.age,
         )
         # FIXME: downloading file archives and code here is a waste of time if
         # the runner is not ready yet
         file_archives = await _get_job_file_archives(
             session=session,
-            archive_mappings=job.job_spec.file_archives,
-            user=run_model.user,
+            archive_mappings=context.job.job_spec.file_archives,
+            user=context.run_model.user,
         )
         code = await _get_job_code(
             session=session,
-            project=project,
-            repo=repo_model,
-            code_hash=_get_repo_code_hash(run, job),
+            project=context.project,
+            repo=context.repo_model,
+            code_hash=_get_repo_code_hash(context.run, context.job),
         )
         success = await common_utils.run_async(
             _submit_job_to_runner,
@@ -394,9 +408,9 @@ async def _process_running_job_provisioning_state(
             job_provisioning_data,
             None,
             session,
-            run,
-            job_model,
-            job,
+            context.run,
+            context.job_model,
+            context.job,
             cluster_info,
             code,
             file_archives,
@@ -413,45 +427,44 @@ async def _process_running_job_provisioning_state(
         backend_type=job_provisioning_data.get_base_backend(),
         instance_type_name=job_provisioning_data.instance_type.name,
     )
-    if job_submission.age > provisioning_timeout:
-        job_model.termination_reason = JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
-        job_model.termination_reason_message = (
+    if context.job_submission.age > provisioning_timeout:
+        context.job_model.termination_reason = JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+        context.job_model.termination_reason_message = (
             f"Runner did not become available within {provisioning_timeout.total_seconds()}s."
-            f" Job submission age: {job_submission.age.total_seconds()}s)"
+            f" Job submission age: {context.job_submission.age.total_seconds()}s)"
         )
-        switch_job_status(session, job_model, JobStatus.TERMINATING)
+        switch_job_status(session, context.job_model, JobStatus.TERMINATING)
         # instance will be emptied by process_terminating_jobs
 
 
 async def _process_running_job_pulling_state(
     session: AsyncSession,
-    run: Run,
-    run_model: RunModel,
-    repo_model: RepoModel,
-    project: ProjectModel,
-    job_model: JobModel,
-    job: Job,
-    job_submission: JobSubmission,
-    job_provisioning_data: JobProvisioningData,
+    context: _RunningJobContext,
     cluster_info: Optional[ClusterInfo],
     secrets: dict[str, str],
     repo_creds: Optional[RemoteRepoCreds],
-    server_ssh_private_keys: tuple[str, Optional[str]],
 ) -> None:
+    job_provisioning_data = common_utils.get_or_error(context.job_provisioning_data)
+    server_ssh_private_keys = common_utils.get_or_error(context.server_ssh_private_keys)
+
     assert cluster_info is not None
-    logger.debug("%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age)
+    logger.debug(
+        "%s: process pulling job with shim, age=%s",
+        fmt(context.job_model),
+        context.job_submission.age,
+    )
     # FIXME: downloading file archives and code here is a waste of time if
     # the runner is not ready yet
     file_archives = await _get_job_file_archives(
         session=session,
-        archive_mappings=job.job_spec.file_archives,
-        user=run_model.user,
+        archive_mappings=context.job.job_spec.file_archives,
+        user=context.run_model.user,
     )
     code = await _get_job_code(
         session=session,
-        project=project,
-        repo=repo_model,
-        code_hash=_get_repo_code_hash(run, job),
+        project=context.project,
+        repo=context.repo_model,
+        code_hash=_get_repo_code_hash(context.run, context.job),
     )
     success = await common_utils.run_async(
         _process_pulling_with_shim,
@@ -459,9 +472,9 @@ async def _process_running_job_pulling_state(
         job_provisioning_data,
         None,
         session,
-        run,
-        job_model,
-        job,
+        context.run,
+        context.job_model,
+        context.job,
         cluster_info,
         code,
         file_archives,
@@ -472,86 +485,89 @@ async def _process_running_job_pulling_state(
     )
 
     if success:
-        _reset_disconnected_at(session, job_model)
+        _reset_disconnected_at(session, context.job_model)
         return
 
-    if job_model.termination_reason:
+    if context.job_model.termination_reason:
         logger.warning(
             "%s: failed due to %s, age=%s",
-            fmt(job_model),
-            job_model.termination_reason.value,
-            job_submission.age,
+            fmt(context.job_model),
+            context.job_model.termination_reason.value,
+            context.job_submission.age,
         )
-        switch_job_status(session, job_model, JobStatus.TERMINATING)
+        switch_job_status(session, context.job_model, JobStatus.TERMINATING)
         # job will be terminated and instance will be emptied by process_terminating_jobs
         return
 
     # No job_model.termination_reason set means ssh connection failed
-    _set_disconnected_at_now(session, job_model)
-    if not _should_terminate_job_due_to_disconnect(job_model):
+    _set_disconnected_at_now(session, context.job_model)
+    if not _should_terminate_job_due_to_disconnect(context.job_model):
         logger.warning(
             "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
-            fmt(job_model),
-            job_submission.age,
+            fmt(context.job_model),
+            context.job_submission.age,
         )
         return
 
     if job_provisioning_data.instance_type.resources.spot:
-        job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+        context.job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
     else:
-        job_model.termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
-    job_model.termination_reason_message = "Instance is unreachable"
-    switch_job_status(session, job_model, JobStatus.TERMINATING)
+        context.job_model.termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
+    context.job_model.termination_reason_message = "Instance is unreachable"
+    switch_job_status(session, context.job_model, JobStatus.TERMINATING)
 
 
 async def _process_running_job_running_state(
     session: AsyncSession,
-    run_model: RunModel,
-    job_model: JobModel,
-    job_submission: JobSubmission,
-    job_provisioning_data: JobProvisioningData,
-    server_ssh_private_keys: tuple[str, Optional[str]],
+    context: _RunningJobContext,
 ) -> None:
-    logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
+    job_provisioning_data = common_utils.get_or_error(context.job_provisioning_data)
+    server_ssh_private_keys = common_utils.get_or_error(context.server_ssh_private_keys)
+
+    logger.debug(
+        "%s: process running job, age=%s",
+        fmt(context.job_model),
+        context.job_submission.age,
+    )
     success = await common_utils.run_async(
         _process_running,
         server_ssh_private_keys,
         job_provisioning_data,
-        job_submission.job_runtime_data,
+        context.job_submission.job_runtime_data,
         session,
-        run_model,
-        job_model,
+        context.run_model,
+        context.job_model,
     )
 
     if success:
-        _reset_disconnected_at(session, job_model)
+        _reset_disconnected_at(session, context.job_model)
         return
 
-    if job_model.termination_reason:
+    if context.job_model.termination_reason:
         logger.warning(
             "%s: failed due to %s, age=%s",
-            fmt(job_model),
-            job_model.termination_reason.value,
-            job_submission.age,
+            fmt(context.job_model),
+            context.job_model.termination_reason.value,
+            context.job_submission.age,
         )
-        switch_job_status(session, job_model, JobStatus.TERMINATING)
+        switch_job_status(session, context.job_model, JobStatus.TERMINATING)
         # job will be terminated and instance will be emptied by process_terminating_jobs
         return
     # No job_model.termination_reason set means ssh connection failed
-    _set_disconnected_at_now(session, job_model)
-    if not _should_terminate_job_due_to_disconnect(job_model):
+    _set_disconnected_at_now(session, context.job_model)
+    if not _should_terminate_job_due_to_disconnect(context.job_model):
         logger.warning(
             "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
-            fmt(job_model),
-            job_submission.age,
+            fmt(context.job_model),
+            context.job_submission.age,
         )
         return
     if job_provisioning_data.instance_type.resources.spot:
-        job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+        context.job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
     else:
-        job_model.termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
-    job_model.termination_reason_message = "Instance is unreachable"
-    switch_job_status(session, job_model, JobStatus.TERMINATING)
+        context.job_model.termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
+    context.job_model.termination_reason_message = "Instance is unreachable"
+    switch_job_status(session, context.job_model, JobStatus.TERMINATING)
 
 
 async def _mark_job_processed(session: AsyncSession, job_model: JobModel) -> None:
