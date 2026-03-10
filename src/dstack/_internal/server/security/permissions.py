@@ -1,3 +1,4 @@
+from secrets import compare_digest
 from typing import Annotated, Optional, Tuple
 from uuid import UUID
 
@@ -219,9 +220,23 @@ class ProjectManagerOrSelfLeave:
         raise error_forbidden()
 
 
-class OptionalServiceAccount:
+class ServiceAccount:
+    def __init__(self, token: str) -> None:
+        self._token = token.encode()
+
+    async def __call__(
+        self, token: Annotated[HTTPAuthorizationCredentials, Security(HTTPBearer())]
+    ) -> None:
+        if not compare_digest(token.credentials.encode(), self._token):
+            raise error_invalid_token()
+
+
+class OptionalServiceAccount(ServiceAccount):
+    _token: Optional[bytes] = None
+
     def __init__(self, token: Optional[str]) -> None:
-        self._token = token
+        if token is not None:
+            super().__init__(token)
 
     async def __call__(
         self,
@@ -233,8 +248,12 @@ class OptionalServiceAccount:
             return
         if token is None:
             raise error_forbidden()
-        if token.credentials != self._token:
-            raise error_invalid_token()
+        await super().__call__(token)
+
+
+class AlwaysForbidden:
+    async def __call__(self) -> None:
+        raise error_forbidden()
 
 
 async def get_project_member(

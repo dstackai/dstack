@@ -126,6 +126,7 @@ markers = [
 ]
 env = [
     "DSTACK_CLI_RICH_FORCE_TERMINAL=0",
+    "DSTACK_SSHPROXY_API_TOKEN=test-token",
 ]
 filterwarnings = [
     # testcontainers modules use deprecated decorators – nothing we can do:
@@ -142,6 +143,7 @@ dev = [
     "pytest-httpbin>=2.1.0",
     "pytest-socket>=0.7.0",
     "pytest-env>=1.1.0",
+    "pytest-unordered>=0.7.0",
     "httpbin>=0.10.2", # indirect to make compatible with Werkzeug 3
     "requests-mock>=1.12.1",
     "openai>=1.68.2",

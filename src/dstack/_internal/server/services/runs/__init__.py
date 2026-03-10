@@ -112,6 +112,10 @@ def switch_run_status(
     events.emit(session, msg, actor=actor, targets=[events.Target.from_model(run_model)])
 
 
+def get_run_spec(run_model: RunModel) -> RunSpec:
+    return RunSpec.__response__.parse_raw(run_model.run_spec)
+
+
 async def list_user_runs(
     session: AsyncSession,
     user: UserModel,
@@ -743,7 +747,7 @@ def run_model_to_run(
             include_sensitive=include_sensitive,
         )
 
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    run_spec = get_run_spec(run_model)
 
     latest_job_submission = None
     if len(jobs) > 0 and len(jobs[0].job_submissions) > 0:

@@ -267,6 +267,10 @@ def get_job_runtime_data(job_model: JobModel) -> Optional[JobRuntimeData]:
     return JobRuntimeData.__response__.parse_raw(job_model.job_runtime_data)
 
 
+def get_job_spec(job_model: JobModel) -> JobSpec:
+    return JobSpec.__response__.parse_raw(job_model.job_spec_data)
+
+
 def delay_job_instance_termination(job_model: JobModel):
     job_model.remove_at = common.get_current_datetime() + timedelta(seconds=15)
 
