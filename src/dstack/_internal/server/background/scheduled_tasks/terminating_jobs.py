@@ -60,6 +60,8 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+# NOTE: This scheduled task is going to be deprecated in favor of `JobTerminatingPipeline`.
+# If this logic changes before removal, keep `pipeline_tasks/jobs_terminating.py` in sync.
 async def process_terminating_jobs(batch_size: int = 1):
     tasks = []
     for _ in range(batch_size):
