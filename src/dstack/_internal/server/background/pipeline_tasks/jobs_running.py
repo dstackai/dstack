@@ -1,7 +1,7 @@
 import asyncio
 import enum
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, Iterable, Literal, Optional, Sequence, Union
 
@@ -101,41 +101,6 @@ JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 @dataclass
 class JobRunningPipelineItem(PipelineItem):
     status: JobStatus
-
-
-@dataclass
-class _RunningJobContext:
-    job_model: JobModel
-    run_model: RunModel
-    repo_model: RepoModel
-    project: ProjectModel
-    run: Run
-    job: Job
-    job_submission: JobSubmission
-    job_provisioning_data: Optional[JobProvisioningData]
-    initial_status: JobStatus
-    initial_disconnected_at: Optional[datetime]
-    server_ssh_private_keys: Optional[tuple[str, Optional[str]]] = None
-
-
-@dataclass
-class _RunningJobStartupContext:
-    cluster_info: ClusterInfo
-    volumes: list[Volume]
-    secrets: dict[str, str]
-    repo_creds: Optional[RemoteRepoCreds]
-
-
-class _JobUpdateMap(ItemUpdateMap, total=False):
-    status: JobStatus
-    termination_reason: Optional[JobTerminationReason]
-    termination_reason_message: Optional[str]
-    job_provisioning_data: Optional[str]
-    job_runtime_data: Optional[str]
-    runner_timestamp: Optional[int]
-    disconnected_at: Optional[datetime]
-    inactivity_secs: Optional[int]
-    exit_status: Optional[int]
 
 
 class JobRunningPipeline(Pipeline[JobRunningPipelineItem]):
@@ -289,18 +254,27 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
             log_lock_token_mismatch(logger, item)
             return
 
-        await _process_running_job(context=context)
-
-        job_update_map = _build_job_update_map(context.job_model)
-        set_processed_update_map_fields(job_update_map)
-        set_unlock_update_map_fields(job_update_map)
+        result = await _process_running_job(context=context)
+        set_processed_update_map_fields(result.job_update_map)
+        set_unlock_update_map_fields(result.job_update_map)
         await _apply_process_result(
             item=item,
             job_model=context.job_model,
-            initial_status=context.initial_status,
-            initial_disconnected_at=context.initial_disconnected_at,
-            job_update_map=job_update_map,
+            result=result,
         )
+
+
+@dataclass
+class _RunningJobContext:
+    job_model: JobModel
+    run_model: RunModel
+    repo_model: RepoModel
+    project: ProjectModel
+    run: Run
+    job: Job
+    job_submission: JobSubmission
+    job_provisioning_data: Optional[JobProvisioningData]
+    server_ssh_private_keys: Optional[tuple[str, Optional[str]]] = None
 
 
 async def _load_running_job_context(item: JobRunningPipelineItem) -> Optional[_RunningJobContext]:
@@ -321,44 +295,76 @@ async def _load_running_job_context(item: JobRunningPipelineItem) -> Optional[_R
             job=find_job(run.jobs, job_model.replica_num, job_model.job_num),
             job_submission=job_submission,
             job_provisioning_data=job_submission.job_provisioning_data,
-            initial_status=job_model.status,
-            initial_disconnected_at=job_model.disconnected_at,
             server_ssh_private_keys=server_ssh_private_keys,
         )
 
 
-async def _process_running_job(context: _RunningJobContext) -> None:
+class _JobUpdateMap(ItemUpdateMap, total=False):
+    status: JobStatus
+    termination_reason: Optional[JobTerminationReason]
+    termination_reason_message: Optional[str]
+    job_provisioning_data: Optional[str]
+    job_runtime_data: Optional[str]
+    runner_timestamp: Optional[int]
+    disconnected_at: Optional[datetime]
+    inactivity_secs: Optional[int]
+    exit_status: Optional[int]
+
+
+@dataclass
+class _ProcessResult:
+    job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
+
+
+async def _process_running_job(context: _RunningJobContext) -> _ProcessResult:
+    result = _ProcessResult()
     if context.job_provisioning_data is None:
         logger.error("%s: job_provisioning_data of an active job is None", fmt(context.job_model))
         _terminate_running_job(
             job_model=context.job_model,
+            result=result,
             termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
             termination_reason_message=(
                 "Unexpected server error: job_provisioning_data of an active job is None"
             ),
         )
-        return
+        return result
 
     startup_context = None
-    if context.initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
-        startup_context = await _prepare_running_job_startup_context(context=context)
+    if context.job_model.status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
+        startup_context = await _prepare_running_job_startup_context(
+            context=context,
+            result=result,
+        )
         if startup_context is None:
-            return
+            return result
 
-    if context.initial_status == JobStatus.PROVISIONING:
+    if context.job_model.status == JobStatus.PROVISIONING:
         await _process_running_job_provisioning_state(
             context=context,
             startup_context=get_or_error(startup_context),
+            result=result,
         )
-    elif context.initial_status == JobStatus.PULLING:
+    elif context.job_model.status == JobStatus.PULLING:
         await _process_running_job_pulling_state(
             context=context,
             startup_context=get_or_error(startup_context),
+            result=result,
         )
+    return result
+
+
+@dataclass
+class _RunningJobStartupContext:
+    cluster_info: ClusterInfo
+    volumes: list[Volume]
+    secrets: dict[str, str]
+    repo_creds: Optional[RemoteRepoCreds]
 
 
 async def _prepare_running_job_startup_context(
     context: _RunningJobContext,
+    result: _ProcessResult,
 ) -> Optional[_RunningJobStartupContext]:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
 
@@ -404,6 +410,7 @@ async def _prepare_running_job_startup_context(
     except InterpolatorError as e:
         _terminate_running_job(
             job_model=context.job_model,
+            result=result,
             termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
             termination_reason_message=f"Secrets interpolation error: {e.args[0]}",
         )
@@ -471,17 +478,17 @@ async def _fetch_run_model(session: AsyncSession, run_id: uuid.UUID) -> RunModel
 async def _process_running_job_provisioning_state(
     context: _RunningJobContext,
     startup_context: _RunningJobStartupContext,
+    result: _ProcessResult,
 ) -> None:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
     server_ssh_private_keys = get_or_error(context.server_ssh_private_keys)
 
     if job_provisioning_data.hostname is None:
-        _wait_for_instance_provisioning_data(context.job_model)
+        _wait_for_instance_provisioning_data(context.job_model, result)
         return
     if _should_wait_for_other_nodes(context.run, context.job, context.job_model):
         return
 
-    success = False
     if job_provisioning_data.dockerized:
         logger.debug(
             "%s: process provisioning job with shim, age=%s",
@@ -501,6 +508,7 @@ async def _process_running_job_provisioning_state(
             None,
             run=context.run,
             job_model=context.job_model,
+            jrd=get_job_runtime_data(context.job_model),
             jpd=job_provisioning_data,
             volumes=startup_context.volumes,
             registry_auth=context.job.job_spec.registry_auth,
@@ -508,6 +516,9 @@ async def _process_running_job_provisioning_state(
             ssh_user=ssh_user,
             ssh_key=user_ssh_key,
         )
+        if success:
+            _set_job_status(context.job_model, result, JobStatus.PULLING)
+            return
     else:
         logger.debug(
             "%s: process provisioning job without shim, age=%s",
@@ -530,7 +541,7 @@ async def _process_running_job_provisioning_state(
                 repo=context.repo_model,
                 code_hash=_get_repo_code_hash(context.run, context.job),
             )
-            success = await run_async(
+            submit_result = await run_async(
                 _submit_job_to_runner,
                 server_ssh_private_keys,
                 job_provisioning_data,
@@ -538,6 +549,7 @@ async def _process_running_job_provisioning_state(
                 run=context.run,
                 job_model=context.job_model,
                 job=context.job,
+                jrd=get_job_runtime_data(context.job_model),
                 cluster_info=startup_context.cluster_info,
                 code=code,
                 file_archives=file_archives,
@@ -545,26 +557,35 @@ async def _process_running_job_provisioning_state(
                 repo_credentials=startup_context.repo_creds,
                 success_if_not_available=False,
             )
-
-    if success:
-        return
+            if submit_result is not False:
+                _apply_submit_job_to_runner_result(
+                    job_model=context.job_model,
+                    result=result,
+                    submit_result=submit_result,
+                )
+            if submit_result is not False and submit_result.success:
+                return
 
     provisioning_timeout = get_provisioning_timeout(
         backend_type=job_provisioning_data.get_base_backend(),
         instance_type_name=job_provisioning_data.instance_type.name,
     )
     if context.job_submission.age > provisioning_timeout:
-        context.job_model.termination_reason = JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
-        context.job_model.termination_reason_message = (
-            f"Runner did not become available within {provisioning_timeout.total_seconds()}s."
-            f" Job submission age: {context.job_submission.age.total_seconds()}s)"
+        _terminate_running_job(
+            job_model=context.job_model,
+            result=result,
+            termination_reason=JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED,
+            termination_reason_message=(
+                f"Runner did not become available within {provisioning_timeout.total_seconds()}s."
+                f" Job submission age: {context.job_submission.age.total_seconds()}s)"
+            ),
         )
-        _switch_job_status(context.job_model, JobStatus.TERMINATING)
 
 
 async def _process_running_job_pulling_state(
     context: _RunningJobContext,
     startup_context: _RunningJobStartupContext,
+    result: _ProcessResult,
 ) -> None:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
     server_ssh_private_keys = get_or_error(context.server_ssh_private_keys)
@@ -580,13 +601,34 @@ async def _process_running_job_pulling_state(
         job_provisioning_data,
         None,
         job_model=context.job_model,
+        jrd=_get_result_job_runtime_data(context.job_model, result),
     )
-    if shim_state == _ShimPullingState.WAITING:
-        _reset_disconnected_at(context.job_model)
+    if shim_state is False:
+        shim_state = None
+    elif shim_state.job_runtime_data is not None:
+        _set_job_runtime_data(result, shim_state.job_runtime_data)
+
+    if shim_state is not None and shim_state.state == _ShimPullingState.WAITING:
+        _reset_disconnected_at(context.job_model, result)
         return
 
-    if shim_state == _ShimPullingState.READY:
-        job_runtime_data = get_job_runtime_data(context.job_model)
+    if shim_state is not None and shim_state.state == _ShimPullingState.FAILED:
+        logger.warning(
+            "%s: failed due to %s, age=%s",
+            fmt(context.job_model),
+            get_or_error(shim_state.termination_reason).value,
+            context.job_submission.age,
+        )
+        _terminate_running_job(
+            job_model=context.job_model,
+            result=result,
+            termination_reason=get_or_error(shim_state.termination_reason),
+            termination_reason_message=get_or_error(shim_state.termination_reason_message),
+        )
+        return
+
+    if shim_state is not None and shim_state.state == _ShimPullingState.READY:
+        job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
         runner_availability = await run_async(
             _get_runner_availability,
             server_ssh_private_keys,
@@ -594,7 +636,7 @@ async def _process_running_job_pulling_state(
             job_runtime_data,
         )
         if runner_availability == _RunnerAvailability.UNAVAILABLE:
-            _reset_disconnected_at(context.job_model)
+            _reset_disconnected_at(context.job_model, result)
             return
 
         if runner_availability == _RunnerAvailability.AVAILABLE:
@@ -607,7 +649,7 @@ async def _process_running_job_pulling_state(
                 repo=context.repo_model,
                 code_hash=_get_repo_code_hash(context.run, context.job),
             )
-            success = await run_async(
+            submit_result = await run_async(
                 _submit_job_to_runner,
                 server_ssh_private_keys,
                 job_provisioning_data,
@@ -615,6 +657,7 @@ async def _process_running_job_pulling_state(
                 run=context.run,
                 job_model=context.job_model,
                 job=context.job,
+                jrd=job_runtime_data,
                 cluster_info=startup_context.cluster_info,
                 code=code,
                 file_archives=file_archives,
@@ -622,22 +665,20 @@ async def _process_running_job_pulling_state(
                 repo_credentials=startup_context.repo_creds,
                 success_if_not_available=True,
             )
-            if success:
-                _reset_disconnected_at(context.job_model)
+            if submit_result is not False:
+                _apply_submit_job_to_runner_result(
+                    job_model=context.job_model,
+                    result=result,
+                    submit_result=submit_result,
+                )
+            if submit_result is not False and submit_result.success:
+                _reset_disconnected_at(context.job_model, result)
                 return
 
-    if context.job_model.termination_reason:
-        logger.warning(
-            "%s: failed due to %s, age=%s",
-            fmt(context.job_model),
-            context.job_model.termination_reason.value,
-            context.job_submission.age,
-        )
-        _switch_job_status(context.job_model, JobStatus.TERMINATING)
-        return
-
-    _set_disconnected_at_now(context.job_model)
-    if not _should_terminate_job_due_to_disconnect(context.job_model):
+    _set_disconnected_at_now(context.job_model, result)
+    if not _should_terminate_job_due_to_disconnect(
+        _get_result_disconnected_at(context.job_model, result)
+    ):
         logger.warning(
             "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
             fmt(context.job_model),
@@ -646,44 +687,32 @@ async def _process_running_job_pulling_state(
         return
 
     if job_provisioning_data.instance_type.resources.spot:
-        context.job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+        termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
     else:
-        context.job_model.termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
-    context.job_model.termination_reason_message = "Instance is unreachable"
-    _switch_job_status(context.job_model, JobStatus.TERMINATING)
-
-
-def _build_job_update_map(job_model: JobModel) -> _JobUpdateMap:
-    return _JobUpdateMap(
-        status=job_model.status,
-        termination_reason=job_model.termination_reason,
-        termination_reason_message=job_model.termination_reason_message,
-        job_provisioning_data=job_model.job_provisioning_data,
-        job_runtime_data=job_model.job_runtime_data,
-        runner_timestamp=job_model.runner_timestamp,
-        disconnected_at=job_model.disconnected_at,
-        inactivity_secs=job_model.inactivity_secs,
-        exit_status=job_model.exit_status,
+        termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
+    _terminate_running_job(
+        job_model=context.job_model,
+        result=result,
+        termination_reason=termination_reason,
+        termination_reason_message="Instance is unreachable",
     )
 
 
 async def _apply_process_result(
     item: JobRunningPipelineItem,
     job_model: JobModel,
-    initial_status: JobStatus,
-    initial_disconnected_at: Optional[datetime],
-    job_update_map: _JobUpdateMap,
+    result: _ProcessResult,
 ) -> None:
     async with get_session_ctx() as session:
         now = get_current_datetime()
-        resolve_now_placeholders(job_update_map, now=now)
+        resolve_now_placeholders(result.job_update_map, now=now)
         res = await session.execute(
             update(JobModel)
             .where(
                 JobModel.id == item.id,
                 JobModel.lock_token == item.lock_token,
             )
-            .values(**job_update_map)
+            .values(**result.job_update_map)
             .returning(JobModel.id)
         )
         updated_ids = list(res.scalars().all())
@@ -694,12 +723,12 @@ async def _apply_process_result(
         emit_job_status_change_event(
             session=session,
             job_model=job_model,
-            old_status=initial_status,
-            new_status=job_update_map.get("status", initial_status),
-            termination_reason=job_update_map.get(
+            old_status=job_model.status,
+            new_status=result.job_update_map.get("status", job_model.status),
+            termination_reason=result.job_update_map.get(
                 "termination_reason", job_model.termination_reason
             ),
-            termination_reason_message=job_update_map.get(
+            termination_reason_message=result.job_update_map.get(
                 "termination_reason_message",
                 job_model.termination_reason_message,
             ),
@@ -707,25 +736,28 @@ async def _apply_process_result(
         _emit_reachability_change_event(
             session=session,
             job_model=job_model,
-            initial_disconnected_at=initial_disconnected_at,
-            new_disconnected_at=job_update_map.get("disconnected_at", initial_disconnected_at),
+            old_disconnected_at=job_model.disconnected_at,
+            new_disconnected_at=result.job_update_map.get(
+                "disconnected_at",
+                job_model.disconnected_at,
+            ),
         )
 
 
 def _emit_reachability_change_event(
     session: AsyncSession,
     job_model: JobModel,
-    initial_disconnected_at: Optional[datetime],
+    old_disconnected_at: Optional[datetime],
     new_disconnected_at: Optional[datetime],
 ) -> None:
-    if initial_disconnected_at is None and new_disconnected_at is not None:
+    if old_disconnected_at is None and new_disconnected_at is not None:
         events.emit(
             session,
             "Job became unreachable",
             actor=events.SystemActor(),
             targets=[events.Target.from_model(job_model)],
         )
-    elif initial_disconnected_at is not None and new_disconnected_at is None:
+    elif old_disconnected_at is not None and new_disconnected_at is None:
         events.emit(
             session,
             "Job became reachable",
@@ -736,15 +768,19 @@ def _emit_reachability_change_event(
 
 def _terminate_running_job(
     job_model: JobModel,
+    result: _ProcessResult,
     termination_reason: JobTerminationReason,
     termination_reason_message: str,
 ) -> None:
-    job_model.termination_reason = termination_reason
-    job_model.termination_reason_message = termination_reason_message
-    _switch_job_status(job_model, JobStatus.TERMINATING)
+    result.job_update_map["termination_reason"] = termination_reason
+    result.job_update_map["termination_reason_message"] = termination_reason_message
+    _set_job_status(job_model, result, JobStatus.TERMINATING)
 
 
-def _wait_for_instance_provisioning_data(job_model: JobModel) -> None:
+def _wait_for_instance_provisioning_data(
+    job_model: JobModel,
+    result: _ProcessResult,
+) -> None:
     if job_model.instance is None:
         logger.error(
             "%s: cannot update job_provisioning_data. job_model.instance is None.",
@@ -759,12 +795,15 @@ def _wait_for_instance_provisioning_data(job_model: JobModel) -> None:
         return
 
     if job_model.instance.status == InstanceStatus.TERMINATED:
-        job_model.termination_reason = JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED
-        job_model.termination_reason_message = "Instance is terminated"
-        _switch_job_status(job_model, JobStatus.TERMINATING)
+        _terminate_running_job(
+            job_model=job_model,
+            result=result,
+            termination_reason=JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED,
+            termination_reason_message="Instance is terminated",
+        )
         return
 
-    job_model.job_provisioning_data = job_model.instance.job_provisioning_data
+    result.job_update_map["job_provisioning_data"] = job_model.instance.job_provisioning_data
 
 
 def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> bool:
@@ -805,6 +844,7 @@ def _process_provisioning_with_shim(
     ports: Dict[int, int],
     run: Run,
     job_model: JobModel,
+    jrd: Optional[JobRuntimeData],
     jpd: JobProvisioningData,
     volumes: list[Volume],
     registry_auth: Optional[RegistryAuth],
@@ -843,12 +883,11 @@ def _process_provisioning_with_shim(
     gpu_devices = get_instance_specific_gpu_devices(jpd.backend, jpd.instance_type.name)
 
     container_user = "root"
-    job_runtime_data = get_job_runtime_data(job_model)
-    if job_runtime_data is not None:
-        gpu = job_runtime_data.gpu
-        cpu = job_runtime_data.cpu
-        memory = job_runtime_data.memory
-        network_mode = job_runtime_data.network_mode
+    if jrd is not None:
+        gpu = jrd.gpu
+        cpu = jrd.cpu
+        memory = jrd.memory
+        network_mode = jrd.network_mode
     else:
         gpu = None
         cpu = None
@@ -903,7 +942,6 @@ def _process_provisioning_with_shim(
             shim_client.stop(force=True)
             return False
 
-    _switch_job_status(job_model, JobStatus.PULLING)
     return True
 
 
@@ -915,6 +953,15 @@ class _RunnerAvailability(enum.Enum):
 class _ShimPullingState(enum.Enum):
     WAITING = "waiting"
     READY = "ready"
+    FAILED = "failed"
+
+
+@dataclass
+class _SyncShimPullingStateResult:
+    state: _ShimPullingState
+    termination_reason: Optional[JobTerminationReason] = None
+    termination_reason_message: Optional[str] = None
+    job_runtime_data: Optional[JobRuntimeData] = None
 
 
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
@@ -929,7 +976,8 @@ def _get_runner_availability(ports: Dict[int, int]) -> _RunnerAvailability:
 def _sync_shim_pulling_state(
     ports: Dict[int, int],
     job_model: JobModel,
-) -> Union[Literal[False], _ShimPullingState]:
+    jrd: Optional[JobRuntimeData] = None,
+) -> Union[_SyncShimPullingStateResult, Literal[False]]:
     shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
     if shim_client.is_api_v2_supported():
         task = shim_client.get_task(job_model.id)
@@ -941,19 +989,19 @@ def _sync_shim_pulling_state(
                 task.termination_message,
             )
             logger.debug("task status: %s", task.dict())
-            job_model.termination_reason = JobTerminationReason(task.termination_reason.lower())
-            job_model.termination_reason_message = task.termination_message
-            return False
+            return _SyncShimPullingStateResult(
+                state=_ShimPullingState.FAILED,
+                termination_reason=JobTerminationReason(task.termination_reason.lower()),
+                termination_reason_message=task.termination_message,
+            )
 
         if task.status != TaskStatus.RUNNING:
-            return _ShimPullingState.WAITING
+            return _SyncShimPullingStateResult(state=_ShimPullingState.WAITING)
 
-        job_runtime_data = get_job_runtime_data(job_model)
-        if job_runtime_data is not None:
+        if jrd is not None:
             if task.ports is None:
-                return _ShimPullingState.WAITING
-            job_runtime_data.ports = {pm.container: pm.host for pm in task.ports}
-            job_model.job_runtime_data = job_runtime_data.json()
+                return _SyncShimPullingStateResult(state=_ShimPullingState.WAITING)
+            jrd.ports = {pm.container: pm.host for pm in task.ports}
     else:
         shim_status = shim_client.pull()
         if (
@@ -968,30 +1016,35 @@ def _sync_shim_pulling_state(
                 shim_status.result.reason_message,
             )
             logger.debug("shim status: %s", shim_status.dict())
-            job_model.termination_reason = JobTerminationReason(shim_status.result.reason.lower())
-            job_model.termination_reason_message = shim_status.result.reason_message
-            return False
+            return _SyncShimPullingStateResult(
+                state=_ShimPullingState.FAILED,
+                termination_reason=JobTerminationReason(shim_status.result.reason.lower()),
+                termination_reason_message=shim_status.result.reason_message,
+            )
 
         if shim_status.state in ("pulling", "creating"):
-            return _ShimPullingState.WAITING
+            return _SyncShimPullingStateResult(state=_ShimPullingState.WAITING)
 
-    return _ShimPullingState.READY
+    return _SyncShimPullingStateResult(
+        state=_ShimPullingState.READY,
+        job_runtime_data=jrd,
+    )
 
 
-def _should_terminate_job_due_to_disconnect(job_model: JobModel) -> bool:
-    if job_model.disconnected_at is None:
+def _should_terminate_job_due_to_disconnect(disconnected_at: Optional[datetime]) -> bool:
+    if disconnected_at is None:
         return False
-    return get_current_datetime() > job_model.disconnected_at + JOB_DISCONNECTED_RETRY_TIMEOUT
+    return get_current_datetime() > disconnected_at + JOB_DISCONNECTED_RETRY_TIMEOUT
 
 
-def _set_disconnected_at_now(job_model: JobModel) -> None:
-    if job_model.disconnected_at is None:
-        job_model.disconnected_at = get_current_datetime()
+def _set_disconnected_at_now(job_model: JobModel, result: _ProcessResult) -> None:
+    if _get_result_disconnected_at(job_model, result) is None:
+        result.job_update_map["disconnected_at"] = get_current_datetime()
 
 
-def _reset_disconnected_at(job_model: JobModel) -> None:
-    if job_model.disconnected_at is not None:
-        job_model.disconnected_at = None
+def _reset_disconnected_at(job_model: JobModel, result: _ProcessResult) -> None:
+    if _get_result_disconnected_at(job_model, result) is not None:
+        result.job_update_map["disconnected_at"] = None
 
 
 def _get_cluster_info(
@@ -1084,19 +1137,27 @@ async def _get_job_file_archive(archive_id: uuid.UUID, user: UserModel) -> bytes
     return blob
 
 
+@dataclass
+class _SubmitJobToRunnerResult:
+    success: bool
+    set_running_status: bool = False
+    job_runtime_data: Optional[JobRuntimeData] = None
+
+
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
 def _submit_job_to_runner(
     ports: Dict[int, int],
     run: Run,
     job_model: JobModel,
     job: Job,
+    jrd: Optional[JobRuntimeData],
     cluster_info: ClusterInfo,
     code: bytes,
     file_archives: Iterable[tuple[uuid.UUID, bytes]],
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
     success_if_not_available: bool,
-) -> bool:
+) -> Union[_SubmitJobToRunnerResult, Literal[False]]:
     logger.debug("%s: submitting job spec", fmt(job_model))
     logger.debug(
         "%s: repo clone URL is %s",
@@ -1111,7 +1172,7 @@ def _submit_job_to_runner(
 
     runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
     if runner_client.healthcheck() is None:
-        return success_if_not_available
+        return _SubmitJobToRunnerResult(success=success_if_not_available)
 
     runner_client.submit_job(
         run=run,
@@ -1129,14 +1190,14 @@ def _submit_job_to_runner(
     logger.debug("%s: starting job", fmt(job_model))
     job_info = runner_client.run_job()
     if job_info is not None:
-        job_runtime_data = get_job_runtime_data(job_model)
-        if job_runtime_data is not None:
-            job_runtime_data.working_dir = job_info.working_dir
-            job_runtime_data.username = job_info.username
-            job_model.job_runtime_data = job_runtime_data.json()
-
-    _switch_job_status(job_model, JobStatus.RUNNING)
-    return True
+        if jrd is not None:
+            jrd.working_dir = job_info.working_dir
+            jrd.username = job_info.username
+    return _SubmitJobToRunnerResult(
+        success=True,
+        set_running_status=True,
+        job_runtime_data=jrd,
+    )
 
 
 def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec) -> None:
@@ -1149,6 +1210,44 @@ def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec) -> None:
         )
 
 
-def _switch_job_status(job_model: JobModel, new_status: JobStatus) -> None:
-    if job_model.status != new_status:
-        job_model.status = new_status
+def _set_job_status(job_model: JobModel, result: _ProcessResult, new_status: JobStatus) -> None:
+    if _get_result_status(job_model, result) != new_status:
+        result.job_update_map["status"] = new_status
+
+
+def _get_result_status(job_model: JobModel, result: _ProcessResult) -> JobStatus:
+    return result.job_update_map.get("status", job_model.status)
+
+
+def _get_result_disconnected_at(job_model: JobModel, result: _ProcessResult) -> Optional[datetime]:
+    return result.job_update_map.get("disconnected_at", job_model.disconnected_at)
+
+
+def _get_result_job_runtime_data(
+    job_model: JobModel, result: _ProcessResult
+) -> Optional[JobRuntimeData]:
+    raw_job_runtime_data = result.job_update_map.get(
+        "job_runtime_data", job_model.job_runtime_data
+    )
+    if raw_job_runtime_data is None:
+        return None
+    return JobRuntimeData.__response__.parse_raw(raw_job_runtime_data)
+
+
+def _set_job_runtime_data(
+    result: _ProcessResult, job_runtime_data: Optional[JobRuntimeData]
+) -> None:
+    result.job_update_map["job_runtime_data"] = (
+        None if job_runtime_data is None else job_runtime_data.json()
+    )
+
+
+def _apply_submit_job_to_runner_result(
+    job_model: JobModel,
+    result: _ProcessResult,
+    submit_result: _SubmitJobToRunnerResult,
+) -> None:
+    if submit_result.job_runtime_data is not None:
+        _set_job_runtime_data(result, submit_result.job_runtime_data)
+    if submit_result.set_running_status:
+        _set_job_status(job_model, result, JobStatus.RUNNING)

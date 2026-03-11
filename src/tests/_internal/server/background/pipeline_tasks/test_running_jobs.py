@@ -25,6 +25,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     JobRunningPipelineItem,
     JobRunningWorker,
     _RunnerAvailability,
+    _SubmitJobToRunnerResult,
 )
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
@@ -645,6 +646,48 @@ class TestJobRunningWorker:
         await session.refresh(job)
         assert job.status == JobStatus.PULLING
 
+    async def test_pulling_shim_waiting_resets_disconnect_and_emits_reachable_event(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            submitted_at=get_current_datetime(),
+            disconnected_at=get_current_datetime() - timedelta(minutes=1),
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+        shim_client_mock.get_task.return_value.ports = None
+
+        await _process_job(session, worker, job)
+
+        ssh_tunnel_mock.assert_called_once()
+        shim_client_mock.get_task.assert_called_once()
+        runner_client_mock.healthcheck.assert_not_called()
+        await session.refresh(job)
+        events = await list_events(session)
+        assert job.status == JobStatus.PULLING
+        assert job.disconnected_at is None
+        assert len(events) == 1
+        assert events[0].message == "Job became reachable"
+
     async def test_pulling_shim_runner_not_ready(
         self,
         test_db,
@@ -739,7 +782,7 @@ class TestJobRunningWorker:
         def assert_submit_job_to_runner(_, __, job_runtime_data, **kwargs):
             assert job_runtime_data is not None
             assert job_runtime_data.ports == expected_ports
-            return True
+            return _SubmitJobToRunnerResult(success=True)
 
         with (
             patch(
@@ -992,7 +1035,7 @@ class TestJobRunningWorker:
             ),
             patch(
                 "dstack._internal.server.background.pipeline_tasks.jobs_running._submit_job_to_runner",
-                return_value=True,
+                return_value=_SubmitJobToRunnerResult(success=True),
             ),
         ):
             await worker.process(_job_to_pipeline_item(job))
