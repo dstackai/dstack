@@ -39,6 +39,7 @@ from dstack._internal.core.models.volumes import (
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.scheduled_tasks.running_jobs import (
     _patch_base_image_for_aws_efa,
+    _RunnerAvailability,
     process_running_jobs,
 )
 from dstack._internal.server.models import JobModel
@@ -578,6 +579,91 @@ class TestProcessRunningJobs:
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PULLING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_pulling_shim_uses_runtime_port_mapping_for_runner_calls(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+        shim_client_mock.get_task.return_value.ports = [
+            PortMapping(container=10022, host=32771),
+            PortMapping(container=10999, host=32772),
+        ]
+
+        expected_ports = {
+            10022: 32771,
+            10999: 32772,
+        }
+
+        def assert_runner_availability(_, __, job_runtime_data):
+            assert job_runtime_data is not None
+            assert job_runtime_data.ports == expected_ports
+            return _RunnerAvailability.AVAILABLE
+
+        def assert_submit_job_to_runner(_, __, job_runtime_data, **kwargs):
+            assert job_runtime_data is not None
+            assert job_runtime_data.ports == expected_ports
+            return True
+
+        with (
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_runner_availability",
+                side_effect=assert_runner_availability,
+            ) as get_runner_availability_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._submit_job_to_runner",
+                side_effect=assert_submit_job_to_runner,
+            ) as submit_job_to_runner_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_file_archives",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_code",
+                new_callable=AsyncMock,
+                return_value=b"",
+            ),
+        ):
+            await process_running_jobs()
+
+            ssh_tunnel_mock.assert_called_once()
+            get_runner_availability_mock.assert_called_once()
+            submit_job_to_runner_mock.assert_called_once()
+
+        await session.refresh(job)
+        assert job is not None
+        assert job.status == JobStatus.PULLING
+        jrd = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        assert jrd.ports == expected_ports
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

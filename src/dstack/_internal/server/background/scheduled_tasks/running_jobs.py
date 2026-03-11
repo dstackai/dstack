@@ -470,7 +470,7 @@ async def _process_running_job_pulling_state(
         context.job_submission.age,
     )
     shim_state = await common_utils.run_async(
-        _get_shim_pulling_state,
+        _sync_shim_pulling_state,
         server_ssh_private_keys,
         job_provisioning_data,
         None,
@@ -481,11 +481,12 @@ async def _process_running_job_pulling_state(
         return
 
     if shim_state == _ShimPullingState.READY:
+        job_runtime_data = get_job_runtime_data(context.job_model)
         runner_availability = await common_utils.run_async(
             _get_runner_availability,
             server_ssh_private_keys,
             job_provisioning_data,
-            None,
+            job_runtime_data,
         )
         if runner_availability == _RunnerAvailability.UNAVAILABLE:
             _reset_disconnected_at(session, context.job_model)
@@ -507,7 +508,7 @@ async def _process_running_job_pulling_state(
                 _submit_job_to_runner,
                 server_ssh_private_keys,
                 job_provisioning_data,
-                None,
+                job_runtime_data,
                 session=session,
                 run=context.run,
                 job_model=context.job_model,
@@ -856,7 +857,7 @@ def _get_runner_availability(ports: Dict[int, int]) -> _RunnerAvailability:
 
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
-def _get_shim_pulling_state(
+def _sync_shim_pulling_state(
     ports: Dict[int, int],
     job_model: JobModel,
 ) -> Union[Literal[False], _ShimPullingState]:
