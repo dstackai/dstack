@@ -89,7 +89,8 @@ export const useColumnsDefinitions = () => {
         {
             id: 'resources',
             header: t('fleets.instances.resources'),
-            cell: (item) => formatFleetResources(item.spec.configuration.resources),
+            cell: (item) =>
+                item.spec.configuration.ssh_config ? '-' : formatFleetResources(item.spec.configuration.resources),
         },
         {
             id: 'instances',

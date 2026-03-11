@@ -310,6 +310,7 @@ async def list_project_fleet_models(
     names: Optional[List[str]] = None,
     include_imported: bool = False,
     include_deleted: bool = False,
+    include_instances: bool = True,
 ) -> List[FleetModel]:
     filters = []
     is_fleet_imported_subquery = exists().where(
@@ -327,14 +328,10 @@ async def list_project_fleet_models(
         filters.append(FleetModel.name.in_(names))
     if not include_deleted:
         filters.append(FleetModel.deleted == False)
-    res = await session.execute(
-        select(FleetModel)
-        .where(*filters)
-        .options(
-            joinedload(FleetModel.project).load_only(ProjectModel.name),
-            selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)),
-        )
-    )
+    options = [joinedload(FleetModel.project).load_only(ProjectModel.name)]
+    if include_instances:
+        options.append(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+    res = await session.execute(select(FleetModel).where(*filters).options(*options))
     return list(res.unique().scalars().all())
 
 

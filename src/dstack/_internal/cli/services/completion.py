@@ -80,6 +80,11 @@ class SecretNameCompleter(BaseAPINameCompleter):
         return [r.name for r in api.client.secrets.list(api.project)]
 
 
+class ExportNameCompleter(BaseAPINameCompleter):
+    def fetch_resource_names(self, api: Client) -> Iterable[str]:
+        return [r.name for r in api.client.exports.list(api.project)]
+
+
 class ProjectNameCompleter(BaseCompleter):
     """
     Completer for local project names.

@@ -172,6 +172,7 @@ async def create_project(
     ssh_public_key: str = "",
     is_public: bool = False,
     templates_repo: Optional[str] = None,
+    deleted: bool = False,
 ) -> ProjectModel:
     if owner is None:
         owner = await create_user(session=session, name="test_owner")
@@ -183,6 +184,7 @@ async def create_project(
         ssh_public_key=ssh_public_key,
         is_public=is_public,
         templates_repo=templates_repo,
+        deleted=deleted,
     )
     session.add(project)
     await session.commit()
@@ -530,7 +532,7 @@ async def create_export(
     exporter_project: ProjectModel,
     importer_projects: list[ProjectModel],
     exported_fleets: list[FleetModel],
-    name: str = "test_export",
+    name: str = "test-export",
 ) -> ExportModel:
     export = ExportModel(
         name=name,

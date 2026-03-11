@@ -64,26 +64,51 @@ export const renderRangeJSX = (range: { min?: number; max?: number }) => {
     return range.min?.toString() ?? range.max?.toString();
 };
 
-export const rangeToObject = (range: RequestParam): { min?: number; max?: number } | undefined => {
+export const rangeToObject = (
+    range: RequestParam,
+    {
+        requireUnit = false,
+    }: {
+        requireUnit?: boolean;
+    } = {},
+): { min?: number; max?: number } | undefined => {
+    const hasGbUnit = (value?: string) => /gb/i.test(value ?? '');
+
     if (!range) return;
 
     if (typeof range === 'string') {
         const [minString, maxString] = range.split(rangeSeparator);
+        const normalizeNumericPart = (value?: string) => (value ?? '').replace(/[^\d.]/g, '');
+        const parseBound = (value?: string): number | undefined => {
+            if (requireUnit && value && !hasGbUnit(value)) {
+                return undefined;
+            }
+            const normalized = normalizeNumericPart(value);
+            if (!normalized) {
+                return undefined;
+            }
+            const parsed = Number(normalized);
+            return isNaN(parsed) ? undefined : parsed;
+        };
 
-        const min = Number(minString);
-        const max = Number(maxString);
+        const min = parseBound(minString);
+        const max = parseBound(maxString);
 
-        if (!isNaN(min) && !isNaN(max)) {
+        if (typeof min === 'number' && typeof max === 'number') {
             return { min, max };
         }
 
-        if (!isNaN(min)) {
-            return { min, max: min };
+        if (typeof min === 'number') {
+            return { min };
         }
 
-        if (!isNaN(max)) {
-            return { min: max, max };
+        if (typeof max === 'number') {
+            return { max };
         }
+    }
+
+    if (typeof range === 'number') {
+        return requireUnit ? undefined : { min: range, max: range };
     }
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment

@@ -9,6 +9,7 @@ from dstack._internal.cli.commands.attach import AttachCommand
 from dstack._internal.cli.commands.completion import CompletionCommand
 from dstack._internal.cli.commands.delete import DeleteCommand
 from dstack._internal.cli.commands.event import EventCommand
+from dstack._internal.cli.commands.export import ExportCommand
 from dstack._internal.cli.commands.fleet import FleetCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
@@ -66,6 +67,7 @@ def main():
     AttachCommand.register(subparsers)
     DeleteCommand.register(subparsers)
     EventCommand.register(subparsers)
+    ExportCommand.register(subparsers)
     FleetCommand.register(subparsers)
     GatewayCommand.register(subparsers)
     InitCommand.register(subparsers)

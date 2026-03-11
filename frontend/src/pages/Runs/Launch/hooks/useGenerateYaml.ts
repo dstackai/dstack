@@ -9,13 +9,24 @@ export type UseGenerateYamlArgs = {
     formValues: IRunEnvironmentFormValues;
     configuration?: ITemplate['configuration'];
     envParam?: TTemplateParam;
+    hasResourcesParam?: boolean;
     backends?: string[];
 };
 
-export const useGenerateYaml = ({ formValues, configuration, envParam, backends }: UseGenerateYamlArgs) => {
+export const useGenerateYaml = ({ formValues, configuration, envParam, hasResourcesParam, backends }: UseGenerateYamlArgs) => {
     return useMemo(() => {
         const { name, ide, image, python, offer, repo_url, repo_path, working_dir, password, gpu_enabled } = formValues;
         const gpuEnabled = gpu_enabled === true;
+        const hasTemplateResources =
+            configuration &&
+            'resources' in configuration &&
+            configuration.resources &&
+            typeof configuration.resources === 'object'
+                ? true
+                : false;
+        const baseResources =
+            hasTemplateResources && configuration ? (configuration.resources as Record<string, unknown>) : undefined;
+        const hasTemplateGpu = !!baseResources && 'gpu' in baseResources;
 
         const envEntries: string[] = [];
         if (envParam?.name && password) {
@@ -38,6 +49,7 @@ export const useGenerateYaml = ({ formValues, configuration, envParam, backends 
                 ...(gpuEnabled && offer
                     ? {
                           resources: {
+                              ...baseResources,
                               gpu: `${offer.name}:${round(convertMiBToGB(offer.memory_mib))}GB:${renderRange(offer.count)}`,
                           },
 
@@ -46,7 +58,22 @@ export const useGenerateYaml = ({ formValues, configuration, envParam, backends 
                           ...(offer.spot.length > 1 ? { spot_policy: 'auto' } : {}),
                       }
                     : {}),
-                ...(!gpuEnabled ? { resources: { gpu: 0 } } : {}),
+                ...(gpuEnabled && !offer && hasResourcesParam && !hasTemplateGpu
+                    ? {
+                          resources: {
+                              ...baseResources,
+                              gpu: '1..',
+                          },
+                      }
+                    : {}),
+                ...(hasResourcesParam && !gpuEnabled
+                    ? {
+                          resources: {
+                              ...baseResources,
+                              gpu: 0,
+                          },
+                      }
+                    : {}),
 
                 ...(repo_url || repo_path
                     ? {
@@ -58,5 +85,5 @@ export const useGenerateYaml = ({ formValues, configuration, envParam, backends 
             },
             { lineWidth: -1 },
         );
-    }, [formValues, configuration, envParam, backends]);
+    }, [formValues, configuration, envParam, hasResourcesParam, backends]);
 };

@@ -33,6 +33,7 @@ import { OfferList } from 'pages/Offers/List';
 import { NoFleetProjectAlert } from 'pages/Project/components/NoFleetProjectAlert';
 
 import { ParamsWizardStep } from './components/ParamsWizardStep';
+import { getTemplateOfferDefaultFilters, hasConfiguredGpu } from './helpers/templateResources';
 import { useGenerateYaml } from './hooks/useGenerateYaml';
 import { useGetRunSpecFromYaml } from './hooks/useGetRunSpecFromYaml';
 import { useYupValidationResolver } from './hooks/useValidationResolver';
@@ -132,6 +133,12 @@ export const Launch: React.FC = () => {
         setSelectedTemplate(templatesData?.find((t) => t.name === formValues.template?.[0]));
     }, [templatesData, formValues.template]);
 
+    useEffect(() => {
+        setSelectedOffers([]);
+        setValue(FORM_FIELD_NAMES.offer, undefined);
+        setValue(FORM_FIELD_NAMES.gpu_enabled, hasConfiguredGpu(selectedTemplate));
+    }, [selectedTemplate, setValue]);
+
     const validateProjectAndTemplate = async () => await trigger(templateStepFieldNames);
     const validateOffer = async () => await trigger(offerStepFieldNames);
     const validateConfigParams = async () => await trigger(paramsStepFieldNames);
@@ -181,7 +188,7 @@ export const Launch: React.FC = () => {
     const onChangeOffer: CardsProps<IGpu>['onSelectionChange'] = ({ detail }) => {
         const newSelectedOffers = detail?.selectedItems ?? [];
         setSelectedOffers(newSelectedOffers);
-        setValue(FORM_FIELD_NAMES.offer, newSelectedOffers?.[0] ?? null);
+        setValue(FORM_FIELD_NAMES.offer, newSelectedOffers?.[0] ?? undefined);
     };
 
     const onSubmitWizard = async () => {
@@ -241,10 +248,20 @@ export const Launch: React.FC = () => {
     };
 
     const envParam = selectedTemplate?.parameters?.find((p) => p.type === 'env');
+    const hasResourcesParam = selectedTemplate?.parameters?.some((p) => p.type === 'resources') ?? false;
+    const configuredOfferFilters = getTemplateOfferDefaultFilters(selectedTemplate);
+    const defaultOfferFilters = useMemo(
+        () => ({
+            spot_policy: 'on-demand',
+            ...configuredOfferFilters,
+        }),
+        [configuredOfferFilters],
+    );
     const yaml = useGenerateYaml({
         formValues,
         configuration: selectedTemplate?.configuration,
         envParam,
+        hasResourcesParam,
         backends: selectedBackends,
     });
 
@@ -358,13 +375,17 @@ export const Launch: React.FC = () => {
                                 onSelectionChange={onChangeOffer}
                                 onChangeBackendFilter={setSelectedBackends}
                                 permanentFilters={{ project_name: formValues.project ?? '' }}
-                                defaultFilters={{ spot_policy: 'on-demand' }}
+                                defaultFilters={defaultOfferFilters}
                                 header={
                                     <FormToggle
                                         control={control}
                                         defaultValue={false}
                                         toggleLabel={t('runs.launch.wizard.gpu')}
-                                        toggleDescription={t('runs.launch.wizard.gpu_description')}
+                                        toggleDescription={t(
+                                            formValues.gpu_enabled
+                                                ? 'runs.launch.wizard.gpu_description_enabled'
+                                                : 'runs.launch.wizard.gpu_description_disabled',
+                                        )}
                                         errorText={formValues.gpu_enabled ? formState.errors.offer?.message : undefined}
                                         name={FORM_FIELD_NAMES.gpu_enabled}
                                     />

@@ -31,6 +31,7 @@ from dstack._internal.server.routers import (
     auth,
     backends,
     events,
+    exports,
     files,
     fleets,
     gateways,
@@ -254,6 +255,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(files.router)
     app.include_router(events.root_router)
     app.include_router(templates.router)
+    app.include_router(exports.project_router)
     app.include_router(sshproxy.router)
 
     @app.exception_handler(ForbiddenError)

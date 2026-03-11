@@ -457,14 +457,20 @@ async def list_user_project_models(
     session: AsyncSession,
     user: UserModel,
     only_names: bool = False,
+    include_members: bool = False,
 ) -> List[ProjectModel]:
     load_only_attrs = []
     if only_names:
         load_only_attrs += [ProjectModel.id, ProjectModel.name]
     if user.global_role == GlobalRole.ADMIN:
-        return await list_project_models(session=session, load_only_attrs=load_only_attrs)
+        return await list_project_models(
+            session=session, load_only_attrs=load_only_attrs, include_members=include_members
+        )
     return await list_member_project_models(
-        session=session, user=user, load_only_attrs=load_only_attrs
+        session=session,
+        user=user,
+        load_only_attrs=load_only_attrs,
+        include_members=include_members,
     )
 
 
@@ -529,14 +535,17 @@ async def list_user_owned_project_models(
 async def list_project_models(
     session: AsyncSession,
     load_only_attrs: Optional[List[QueryableAttribute]] = None,
+    include_members: bool = False,
 ) -> List[ProjectModel]:
     options = []
+    if include_members:
+        options.append(joinedload(ProjectModel.members))
     if load_only_attrs:
         options.append(load_only(*load_only_attrs))
     res = await session.execute(
         select(ProjectModel).where(ProjectModel.deleted == False).options(*options)
     )
-    return list(res.scalars().all())
+    return list(res.scalars().unique().all())
 
 
 # TODO: Do not load ProjectModel.backends and ProjectModel.members by default when getting project

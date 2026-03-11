@@ -20,7 +20,7 @@ export type UseFiltersArgs = {
     gpus: IGpu[];
     withSearchParams?: boolean;
     permanentFilters?: Partial<Record<RequestParamsKeys, string>>;
-    defaultFilters?: Partial<Record<RequestParamsKeys, string>>;
+    defaultFilters?: Partial<Record<RequestParamsKeys, string | string[]>>;
 };
 
 export const filterKeys: Record<string, RequestParamsKeys> = {
@@ -101,9 +101,18 @@ export const useFilters = ({ gpus, withSearchParams = true, permanentFilters = {
     const { data: projectsData } = useGetProjectsQuery({ limit: 1 });
     const projectNameIsChecked = useRef(false);
 
-    const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() =>
-        requestParamsToTokens<RequestParamsKeys>({ searchParams, filterKeys, defaultFilterValues: defaultFilters }),
-    );
+    const [propertyFilterQuery, setPropertyFilterQuery] = useState<PropertyFilterProps.Query>(() => {
+        const queryFromSearchParams = requestParamsToTokens<RequestParamsKeys>({
+            searchParams,
+            filterKeys,
+            defaultFilterValues: defaultFilters,
+        });
+        if (queryFromSearchParams.tokens.length > 0) {
+            return queryFromSearchParams;
+        }
+
+        return EMPTY_QUERY;
+    });
 
     const [groupBy, setGroupBy] = useState<MultiselectProps.Options>(() => {
         const selectedGroupBy = requestParamsToArray<RequestParamsKeys>({
