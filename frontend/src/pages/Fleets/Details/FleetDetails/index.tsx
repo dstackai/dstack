@@ -6,7 +6,13 @@ import { format } from 'date-fns';
 import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { formatFleetBackend, formatFleetResources, getFleetInstancesLinkText, getFleetPrice, getFleetStatusIconType } from 'libs/fleet';
+import {
+    formatFleetBackend,
+    formatFleetResources,
+    getFleetInstancesLinkText,
+    getFleetPrice,
+    getFleetStatusIconType,
+} from 'libs/fleet';
 import { ROUTES } from 'routes';
 import { useGetFleetDetailsQuery } from 'services/fleet';
 
@@ -69,7 +75,11 @@ export const FleetDetails = () => {
 
                         <div>
                             <Box variant="awsui-key-label">{t('fleets.instances.resources')}</Box>
-                            <div>{formatFleetResources(data.spec.configuration.resources)}</div>
+                            <div>
+                                {data.spec.configuration.ssh_config
+                                    ? '-'
+                                    : formatFleetResources(data.spec.configuration.resources)}
+                            </div>
                         </div>
 
                         <div>
@@ -89,7 +99,12 @@ export const FleetDetails = () => {
 
                         <div>
                             <Box variant="awsui-key-label">{t('fleets.instances.price')}</Box>
-                            <div>{(() => { const p = getFleetPrice(data); return typeof p === 'number' ? `$${p}` : '-'; })()}</div>
+                            <div>
+                                {(() => {
+                                    const p = getFleetPrice(data);
+                                    return typeof p === 'number' ? `$${p}` : '-';
+                                })()}
+                            </div>
                         </div>
                     </ColumnLayout>
                 </Container>
