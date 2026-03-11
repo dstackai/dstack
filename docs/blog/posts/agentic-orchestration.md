@@ -8,53 +8,72 @@ image: https://dstack.ai/static-assets/static-assets/images/agentic-orchestratio
 
 # Infrastructure orchestration is an agent skill
 
-Andrej Karpathy's [autoresearch demo](https://github.com/karpathy/autoresearch) shows the main change: the agent does not stop at suggesting code. It runs experiments, evaluates the results, commits improvements, and repeats the cycle. Execution itself is now inside the loop.
+Andrej Karpathy’s [autoresearch](https://github.com/karpathy/autoresearch) demo is a crisp example of “agentic engineering” in practice: a short Markdown spec (`program.md`) drives an automated research cycle that iterates many times on one GPU with minimal human involvement. This post extends that same idea one layer down.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/agentic-orchestration.png" width="630" />
 
 <!-- more -->
 
-Once execution is inside the loop, infrastructure is no longer just setup around it. The agent also needs to provision compute, run workloads, inspect what happened, and decide what to do next.
+Closing a research loop on one GPU is already useful. Closing the full engineering loop—training jobs, evaluations, deploying inference endpoints, running regressions, rolling forward/back—forces one additional requirement: infrastructure orchestration has to be something an agent can do reliably.
 
-This post is about that emerging shift: infrastructure orchestration becoming part of the agent loop.
+## Before: orchestration lived outside the workload
 
-## Before: orchestration assumed a human control loop
+Most orchestration approaches treat “what to run” and “where it runs” as separate.
 
-Until now, orchestration for AI workloads has usually been owned by platform teams.
+Teams decide the placement context outside the workload: which cluster or region, which GPU class, which runtime image, which quota pool, which scheduling lane. The workload is then expressed in a way that assumes that context is already fixed.
 
-Those teams automated provisioning, prepared runtime environments, scheduled workloads, and operated the infrastructure. Automation existed, but the orchestration loop itself still required human intervention.
-
-That model fits a world where infrastructure operations stay separate from the training, evaluation, and inference workflow itself. The emerging agentic workflow pulls orchestration into the loop.
+That separation is not “wrong.” It matches how humans operate: decisions about capacity and placement are made deliberately, reviewed, and changed on a human timescale. The orchestrator executes inside a box that humans chose.
 
 ## After: provisioning and scheduling move into the loop
 
-If an agent is driving a training, evaluation, or inference workflow, it cannot stop at generating code or launching a job. It also has to provision the right compute, place workloads efficiently, observe execution state, and adjust based on the result.
+Agentic engineering collapses the separation.
 
-That is the shift: compute provisioning and scheduling move into the agent loop. If platform teams are no longer in the hot path for each step, orchestration has to expose explicit primitives for capacity discovery, bounded provisioning, workload lifecycle management, and machine-readable state.
+When an agent is responsible for progress—not just for drafting code—compute choices affect how quickly it can iterate, what it can afford to try, and whether it can ship a result as a service. The orchestration decisions aren’t just “which cluster?”
 
-Without those primitives, the workflow still depends on manual intervention or a bespoke internal platform layer.
+Training often wants one shape of resources (long-running, stable, sometimes multi-GPU or multi-node). 
+
+Evaluation wants another (many small runs, often interruptible). Inference wants another (a long-lived service with predictable restarts, health checks, and a stable endpoint). If those shapes require switching tools and rewriting glue each time, the “agent does execution” idea breaks down at the infrastructure boundary.
+
+!!! info "Where orchestration becomes an agent skill"
+    Orchestration becomes an agent skill when agents can choose and operate compute as part of execution, instead of handing infrastructure decisions back to a human.
+
+## What “agent skill” means here
+
+This isn’t about giving an agent raw cloud credentials and hoping for the best. “Agent skill” here means there is an interface and set of abstractions that are stable enough to teach, predictable enough to automate, and specific enough for GPU work.
+
+An agent needs to reason about GPU constraints as first-class inputs: memory and count, placement for multi-node jobs, preemptible vs stable capacity, and the difference between “run 100 short evals” and “keep an inference endpoint alive.”
+
+A true orchestration skill is one where the agent can answer, mechanically: what ran, where it ran, what resources it used, what state transitions happened, and what to do next.
 
 ## What this does to platform teams
 
-Platform teams are not going to stay in the business of manually orchestrating AI infrastructure. The old model treats orchestration as an internal service layer that humans operate on behalf of everyone else. In the emerging model, that ownership shifts.
+The platform team shift is not “replace humans with agents.” It’s a change in what the platform optimizes for.
+
+Platforms are often designed around human workflows: manual approvals, bespoke runbooks, and implicit institutional knowledge. Agentic engineering needs a different center of gravity: an agent-native control plane that exposes explicit building blocks for GPU jobs and inference services, plus the constraints that keep cost and risk bounded.
+
+The old model treats orchestration as an internal service layer that humans operate on behalf of everyone else. In the emerging model, that ownership shifts.
 
 The platform team's job becomes enabling agent-driven orchestration and controlling it safely. That means defining the supported abstractions, access boundaries, budgets, quotas, and observability that let agents provision compute and operate workloads directly without turning the platform into an unbounded automation surface.
 
 ## What this does to cloud and datacenter providers
 
-For cloud and datacenter providers, orchestration stops being a detail above the hardware stack and becomes part of the product. Their capacity is no longer consumed only by humans or by platform teams operating custom glue. It is increasingly consumed through the orchestration layer that sits between the workload and the provider.
+For cloud and datacenter providers, GPUs don’t become less important; the interface around them becomes decisive for agent-operated workflows.
 
-That changes what makes capacity usable. A provider now has to fit the vendor-agnostic orchestration layer that agents use to discover capacity, provision it, schedule workloads, and observe state. 
+Agents need capacity to be discoverable, provisionable, and observable through repeatable semantics. A provider can have excellent hardware and still be painful to use if the operational contract is “humans click around and tribal-knowledge it into working.” In an agent-driven workflow, anything that can’t be expressed cleanly in an orchestration interface becomes friction.
 
-Providers that fit that layer become much easier to integrate into agent-driven systems. Providers that still require provider-specific operating patterns remain harder to operationalize, even when the underlying hardware is strong.
+That’s why multi-environment orchestration layers matter. They don’t only reduce vendor lock-in; they make capacity usable by automation, which is increasingly the consumer.
+
+Providers that still require provider-specific operating patterns remain harder to operationalize, even when the underlying hardware is strong.
 
 ## What this looks like with dstack
 
-`dstack` is an open-source control plane for provisioning GPU compute and orchestrating GPU workloads across a range of environments, including clouds, Kubernetes, and on-prem clusters. It exposes that infrastructure surface to agents and human operators through the CLI and configuration files.
+`dstack` is an open-source control plane for GPU provisioning and orchestration across GPU clouds and on-prem clusters, with a workflow model that explicitly targets development, training, and inference.
+
+The way to read `dstack` is as a CLI with a small set of abstractions that line up with the agent-skill requirements above.
 
 **Step 1: treat available compute as queryable state**
 
-`dstack offer` turns available compute into something the workflow can query directly. It returns offers from configured backends and managed capacity, including region, resources, spot availability, and price.
+`dstack` exposes “offers” as a way to query available hardware configurations from configured backends or on-prem clusters. That turns “where can I run this?” into something automation can ask and answer deterministically, instead of hard-coding instance types and regions.
 
 ```shell
 $ dstack offer --gpu H100:1.. --max-offers 3
@@ -67,9 +86,9 @@ $ dstack offer --gpu H100:1.. --max-offers 3
  Shown 3 of 99 offers
 ```
 
-In an agentic workflow, compute selection becomes part of execution. The workflow can inspect available capacity before deciding what to run.
-
 **Step 2: define capacity pools and provisioning bounds**
+
+Fleets are `dstack`’s way to make capacity explicit. A fleet can represent elastic capacity (scale from zero on demand) or a pre-provisioned pool (including SSH-managed on-prem hosts). It also supports operational patterns that matter for GPU efficiency, such as splitting a multi-GPU node into blocks so that many small jobs don’t waste a full 8-GPU box. The agent operates within declared capacity instead of interacting with provider infrastructure directly.
 
 ```yaml
 # fleet.dstack.yml
@@ -85,8 +104,6 @@ resources:
 blocks: 4
 ```
 
-A fleet is `dstack`'s unit of provisioning control. It can represent an elastic template over cloud or Kubernetes backends, a pre-provisioned pool, or a set of SSH-managed on-prem hosts. This is how `dstack` keeps provisioning explicit and bounded: the agent operates within declared capacity instead of interacting with provider infrastructure directly.
-
 <div class="termy">
 
 ```shell
@@ -95,7 +112,7 @@ $ dstack apply -f fleet.dstack.yml
 
 </div>
 
-In this context, `dstack apply` creates or updates the fleet resource. If the fleet is only a template, later runs can draw instances from it on demand. If it is pre-provisioned, the capacity is already present.
+If the fleet is elastic (`nodes` set to a range), later runs can provision instances on demand. If it is pre-provisioned, the capacity is already present.
 
 <div class="termy">
 
@@ -114,11 +131,9 @@ $ dstack fleet
 
 </div>
 
-In an agentic workflow, this gives the agent a visible provisioning surface: it can see which fleets exist, what capacity they expose, and whether that capacity is active, busy, or idle before deciding what to run next.
-
 **Step 3: run evaluation or training loops as tasks**
 
-Tasks are `dstack`'s workload type for evaluation, fine-tuning, training, and other job-oriented workflows. They can also be distributed, in which case `dstack` handles cluster selection and job coordination across nodes.
+Tasks are the batch form: training runs, eval runs, data processing. 
 
 ```yaml
 # train.dstack.yml
@@ -141,7 +156,9 @@ resources:
   shm_size: 16GB
 ```
 
-Once a task is running, the agent may need to re-attach to the session, open a shell inside the container, or inspect runtime state before deciding what to do next. `dstack` exposes each of those actions directly.
+Tasks can be distributed (`nodes` set to a number), in which case `dstack` handles cluster selection and job coordination across nodes.
+
+Once a task is running, the agent may attach to it and SSH inside the container to run commands interactively, or inspect runtime state before deciding what to do next.
 
 <div class="termy">
 
@@ -161,7 +178,7 @@ $ ssh train-qwen
 
 **Step 4: run model inference as services**
 
-Services are `dstack`'s workload type for long-lived inference endpoints. The same control plane that runs training and evaluation jobs can also deploy model-serving endpoints with stable URLs, autoscaling rules, and health checks.
+Services are the inference form: they turn a model into a endpoint that later steps in the loop can call, monitor, and scale as needed.
 
 ```yaml
 # serve.dstack.yml
@@ -192,7 +209,7 @@ resources:
   disk: 200GB
 ```
 
-The endpoint can then be accessed directly, including from another agent step:
+Once the service is running, the endpoint can be called directly, including from another agent step:
 
 <div class="termy">
 
@@ -208,7 +225,7 @@ $ curl https://qwen25-instruct.example.com/v1/chat/completions \
 
 </div>
 
-The agent can launch the service, call the endpoint, and scale it through the same orchestration layer.
+This matters because the agent does not just launch the service. It can treat the endpoint itself as part of the workflow: deploy it, call it, monitor it, and adjust it through the same orchestration layer.
 
 **Step 5: observe through events and metrics**
 
@@ -241,7 +258,9 @@ Taken together, these are the fine-grained primitives a fully autonomous agent n
 
 ## Skills
 
-Those primitives become much more useful when they are paired with operational knowledge. `dstack` already ships an installable [SKILL.md](https://skills.sh/dstackai/dstack/dstack) and documents how to install it:
+Those primitives make orchestration operable by agents, but they do not encode all of the workload-specific know-how. Training recipes, inference tuning, eval patterns, and runtime trade-offs still need to live somewhere.
+
+`dstack` already ships an installable [SKILL.md](https://skills.sh/dstackai/dstack/dstack) so tools like Claude Code, Codex, Cursor, and others can learn how to operate `dstack` configs and CLI without guessing:
 
 <div class="termy">
 
@@ -251,26 +270,20 @@ $ npx skills add dstackai/dstack
 
 </div>
 
-Skills are where operational know-how can live: how to run training, fine-tuning, inference, evals, and other specialized workflows against the orchestration layer.
+Skills are the layer where that operational know-how can be packaged and reused.
 
-> One built-in skill is only a start. The ecosystem needs specialized skills that encode the operational patterns agents actually use for these workloads.
-
-## Governance and permissions
-
-As infrastructure management is delegated to agents, governance and observability become part of the orchestration model itself, not something added later around it.
-
-`dstack` already exposes part of that model through projects and permissions. Projects isolate teams and resources, define access boundaries, and control which backends and infrastructure surfaces an agent or user can operate against.
+> The orchestrator provides the control surface. Skills provide the workload knowledge on top of it.
 
 ## Why open source and the ecosystem matter here
 
-If agents are going to provision compute and orchestrate workloads directly, the control plane cannot be a black box.
+Once orchestration becomes the interface that agents use, ecosystem depth matters for both sides.
 
-Teams need to see which backends it supports, how scheduling decisions are made, how permissions are enforced, and how lifecycle state is exposed. They also need to extend it: add new providers, refine operational policies, and encode better training, fine-tuning, inference, and evaluation workflows as reusable skills and recipes.
+Teams want a control plane they can inspect and extend because it sits in the path of cost, reliability, and security. Providers want their capacity to be usable through standard patterns instead of one-off glue. Open source accelerates both: more backends, more integrations, more operational recipes, and fewer bespoke adapters per provider or per team.
 
-`dstack` is MPL-2.0 licensed and designed around backends, fleets, projects, events, and metrics that can span different capacity sources. That matters because agentic orchestration will not be built once inside a single vendor boundary; it will be assembled across clouds, Kubernetes, on-prem infrastructure, and a growing ecosystem of specialized operational patterns.
+`dstack` is MPL-2.0 licensed. That matters because agentic orchestration will not be built once inside a single vendor boundary; it will be assembled across GPU clouds, Kubernetes, on-prem infrastructure, and a growing ecosystem of specialized operational patterns.
 
 ## What's next
 
-If you are already running agent-driven loops, feedback on the hard parts is especially useful: what still forces a human back into the path, which signals are missing, where provider integration still feels manual, and which specialized skills or recipes would be most valuable.
+Agentic engineering is moving toward agents that own execution, not agents that merely assist humans during execution. If training jobs, evaluations, and inference services are part of execution, then GPU orchestration has to be part of what agents can operate directly.
 
 If you want to use `dstack` for these workflows or contribute to the surrounding ecosystem, issues and feedback are welcome in the [GitHub repo](https://github.com/dstackai/dstack).
