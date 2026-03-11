@@ -1,6 +1,5 @@
 import asyncio
 import enum
-import re
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -11,7 +10,6 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
-from dstack._internal import settings
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
@@ -52,10 +50,15 @@ from dstack._internal.server.models import (
     RunModel,
     UserModel,
 )
-from dstack._internal.server.schemas.runner import GPUDevice, TaskStatus
+from dstack._internal.server.schemas.runner import TaskStatus
 from dstack._internal.server.services import events, services
 from dstack._internal.server.services import files as files_services
 from dstack._internal.server.services import logs as logs_services
+from dstack._internal.server.services.backends.provisioning import (
+    get_instance_specific_gpu_devices,
+    get_instance_specific_mounts,
+    resolve_provisioning_image_name,
+)
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
     get_instance_ssh_private_keys,
@@ -759,9 +762,9 @@ def _process_provisioning_with_shim(
     for volume, volume_mount in zip(volumes, volume_mounts):
         volume_mount.name = volume.name
 
-    instance_mounts += _get_instance_specific_mounts(jpd.backend, jpd.instance_type.name)
+    instance_mounts += get_instance_specific_mounts(jpd.backend, jpd.instance_type.name)
 
-    gpu_devices = _get_instance_specific_gpu_devices(jpd.backend, jpd.instance_type.name)
+    gpu_devices = get_instance_specific_gpu_devices(jpd.backend, jpd.instance_type.name)
 
     container_user = "root"
 
@@ -778,7 +781,7 @@ def _process_provisioning_with_shim(
         cpu = None
         memory = None
         network_mode = NetworkMode.HOST
-    image_name = _patch_base_image_for_aws_efa(job_spec, jpd)
+    image_name = resolve_provisioning_image_name(job_spec, jpd)
     if shim_client.is_api_v2_supported():
         shim_client.submit_task(
             task_id=job_model.id,
@@ -1301,105 +1304,3 @@ def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec):
             username=interpolate(job_spec.registry_auth.username),
             password=interpolate(job_spec.registry_auth.password),
         )
-
-
-def _get_instance_specific_mounts(
-    backend_type: BackendType, instance_type_name: str
-) -> List[InstanceMountPoint]:
-    if backend_type == BackendType.GCP:
-        if instance_type_name == "a3-megagpu-8g":
-            return [
-                InstanceMountPoint(
-                    instance_path="/dev/aperture_devices",
-                    path="/dev/aperture_devices",
-                ),
-                InstanceMountPoint(
-                    instance_path="/var/lib/tcpxo/lib64",
-                    path="/var/lib/tcpxo/lib64",
-                ),
-                InstanceMountPoint(
-                    instance_path="/var/lib/fastrak/lib64",
-                    path="/var/lib/fastrak/lib64",
-                ),
-            ]
-        if instance_type_name in ["a3-edgegpu-8g", "a3-highgpu-8g"]:
-            return [
-                InstanceMountPoint(
-                    instance_path="/var/lib/nvidia/lib64",
-                    path="/usr/local/nvidia/lib64",
-                ),
-                InstanceMountPoint(
-                    instance_path="/var/lib/nvidia/bin",
-                    path="/usr/local/nvidia/bin",
-                ),
-                InstanceMountPoint(
-                    instance_path="/var/lib/tcpx/lib64",
-                    path="/usr/local/tcpx/lib64",
-                ),
-                InstanceMountPoint(
-                    instance_path="/run/tcpx",
-                    path="/run/tcpx",
-                ),
-            ]
-    return []
-
-
-def _get_instance_specific_gpu_devices(
-    backend_type: BackendType, instance_type_name: str
-) -> List[GPUDevice]:
-    gpu_devices = []
-    if backend_type == BackendType.GCP and instance_type_name in [
-        "a3-edgegpu-8g",
-        "a3-highgpu-8g",
-    ]:
-        for i in range(8):
-            gpu_devices.append(
-                GPUDevice(path_on_host=f"/dev/nvidia{i}", path_in_container=f"/dev/nvidia{i}")
-            )
-        gpu_devices.append(
-            GPUDevice(path_on_host="/dev/nvidia-uvm", path_in_container="/dev/nvidia-uvm")
-        )
-        gpu_devices.append(
-            GPUDevice(path_on_host="/dev/nvidiactl", path_in_container="/dev/nvidiactl")
-        )
-    return gpu_devices
-
-
-def _patch_base_image_for_aws_efa(
-    job_spec: JobSpec, job_provisioning_data: JobProvisioningData
-) -> str:
-    image_name = job_spec.image_name
-
-    if job_provisioning_data.backend != BackendType.AWS:
-        return image_name
-
-    instance_type = job_provisioning_data.instance_type.name
-    efa_enabled_patterns = [
-        # TODO: p6-b200 isn't supported yet in gpuhunt
-        r"^p6-b200\.(48xlarge)$",
-        r"^p5\.(4xlarge|48xlarge)$",
-        r"^p5e\.(48xlarge)$",
-        r"^p5en\.(48xlarge)$",
-        r"^p4d\.(24xlarge)$",
-        r"^p4de\.(24xlarge)$",
-        r"^g6\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
-        r"^g6e\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
-        r"^gr6\.8xlarge$",
-        r"^g5\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
-        r"^g4dn\.(8xlarge|12xlarge|16xlarge|metal)$",
-        r"^p3dn\.(24xlarge)$",
-    ]
-
-    is_efa_enabled = any(re.match(pattern, instance_type) for pattern in efa_enabled_patterns)
-    if not is_efa_enabled:
-        return image_name
-
-    if not image_name.startswith(f"{settings.DSTACK_BASE_IMAGE}:"):
-        return image_name
-
-    if image_name.endswith(f"-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
-        return image_name[:-17] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-    elif image_name.endswith(f"-devel-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
-        return image_name[:-18] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-
-    return image_name

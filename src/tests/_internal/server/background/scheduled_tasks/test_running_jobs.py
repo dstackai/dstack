@@ -19,16 +19,12 @@ from dstack._internal.core.models.configurations import (
     ProbeConfig,
     ServiceConfiguration,
 )
-from dstack._internal.core.models.instances import InstanceStatus, InstanceType
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
-from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
-    JobProvisioningData,
     JobRuntimeData,
-    JobSpec,
     JobStatus,
     JobTerminationReason,
-    Requirements,
     RunStatus,
 )
 from dstack._internal.core.models.volumes import (
@@ -38,7 +34,6 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.scheduled_tasks.running_jobs import (
-    _patch_base_image_for_aws_efa,
     _RunnerAvailability,
     process_running_jobs,
 )
@@ -1302,129 +1297,3 @@ class TestProcessRunningJobs:
         else:
             assert not job.registered
             assert not events
-
-
-class TestPatchBaseImageForAwsEfa:
-    @staticmethod
-    def _create_job_spec(image_name: str) -> "JobSpec":
-        return JobSpec(
-            job_num=0,
-            job_name="test-job",
-            commands=["echo hello"],
-            env={},
-            image_name=image_name,
-            requirements=Requirements(resources=ResourcesSpec()),
-        )
-
-    @staticmethod
-    def _create_job_provisioning_data_with_instance_type(
-        backend: BackendType, instance_type: str
-    ) -> JobProvisioningData:
-        job_provisioning_data = get_job_provisioning_data(backend=backend)
-        job_provisioning_data.instance_type = InstanceType(
-            name=instance_type,
-            resources=job_provisioning_data.instance_type.resources,
-        )
-        return job_provisioning_data
-
-    @staticmethod
-    def _call_patch_base_image_for_aws_efa(
-        image_name: str, backend: BackendType, instance_type: str
-    ) -> str:
-        job_spec = TestPatchBaseImageForAwsEfa._create_job_spec(image_name)
-        job_provisioning_data = (
-            TestPatchBaseImageForAwsEfa._create_job_provisioning_data_with_instance_type(
-                backend, instance_type
-            )
-        )
-        return _patch_base_image_for_aws_efa(job_spec, job_provisioning_data)
-
-    @pytest.mark.parametrize(
-        "suffix,instance_type",
-        [
-            ("-base", "p6-b200.48xlarge"),
-            ("-devel", "p5.48xlarge"),
-        ],
-    )
-    def test_patch_aws_efa_instance_with_suffix(self, suffix: str, instance_type: str):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        result = self._call_patch_base_image_for_aws_efa(
-            image_name, BackendType.AWS, instance_type
-        )
-        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        assert result == expected
-
-    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
-    @pytest.mark.parametrize(
-        "instance_type",
-        [
-            "p5.48xlarge",
-            "p5e.48xlarge",
-            "p4d.24xlarge",
-            "p4de.24xlarge",
-            "g6.8xlarge",
-            "g6e.8xlarge",
-        ],
-    )
-    def test_patch_all_efa_instance_types(self, instance_type: str, suffix: str):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        result = self._call_patch_base_image_for_aws_efa(
-            image_name, BackendType.AWS, instance_type
-        )
-        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        assert result == expected
-
-    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
-    @pytest.mark.parametrize(
-        "backend",
-        [BackendType.GCP, BackendType.AZURE, BackendType.LAMBDA, BackendType.LOCAL],
-    )
-    @pytest.mark.parametrize(
-        "instance_type",
-        [
-            "standard-4",
-            "p5.xlarge",
-            "p6.2xlarge",
-            "g6.xlarge",
-        ],  # Mix of generic and EFA-named types
-    )
-    def test_no_patch_non_aws_backends(
-        self, backend: BackendType, suffix: str, instance_type: str
-    ):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        result = self._call_patch_base_image_for_aws_efa(image_name, backend, instance_type)
-        assert result == image_name
-
-    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
-    @pytest.mark.parametrize(
-        "instance_type",
-        ["t3.micro", "m5.large", "c5.xlarge", "r5.2xlarge", "m6i.large", "g6.xlarge"],
-    )
-    def test_no_patch_non_efa_aws_instances(self, instance_type: str, suffix: str):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
-        result = self._call_patch_base_image_for_aws_efa(
-            image_name, BackendType.AWS, instance_type
-        )
-        assert result == image_name
-
-    @pytest.mark.parametrize(
-        "instance_type",
-        ["p5.xlarge", "p6.2xlarge", "t3.micro", "m5.large"],  # Mix of EFA and non-EFA instances
-    )
-    @pytest.mark.parametrize(
-        "image_name",
-        [
-            "ubuntu:20.04",
-            "nvidia/cuda:11.8-runtime-ubuntu20.04",
-            "python:3.9-slim",
-            "custom/image:latest",
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-custom",
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa",
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}",
-        ],
-    )
-    def test_no_patch_other_images(self, instance_type: str, image_name: str):
-        result = self._call_patch_base_image_for_aws_efa(
-            image_name, BackendType.AWS, instance_type
-        )
-        assert result == image_name
