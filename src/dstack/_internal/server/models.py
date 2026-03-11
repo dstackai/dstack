@@ -49,6 +49,9 @@ from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+# Default options (save-update, merge) + delete-orphan + delete (required by delete-orphan)
+# delete-orphan allows to automatically delete entities removed from the relationship
+CASCADE_DEFAULT_WITH_DELETE_ORPHAN = "save-update, merge, delete-orphan, delete"
 
 
 class NaiveDateTime(TypeDecorator):
@@ -769,10 +772,7 @@ class InstanceModel(PipelineModelMixin, BaseModel):
 
     volume_attachments: Mapped[List["VolumeAttachmentModel"]] = relationship(
         back_populates="instance",
-        # Add delete-orphan option so that removing entries from volume_attachments
-        # automatically marks them for deletion.
-        # SQLAlchemy requires delete when using delete-orphan.
-        cascade="save-update, merge, delete-orphan, delete",
+        cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
     )
 
     __table_args__ = (
@@ -1055,8 +1055,14 @@ class ExportModel(BaseModel):
     )
     project: Mapped["ProjectModel"] = relationship()
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
-    imports: Mapped[List["ImportModel"]] = relationship(back_populates="export")
-    exported_fleets: Mapped[List["ExportedFleetModel"]] = relationship(back_populates="export")
+    imports: Mapped[List["ImportModel"]] = relationship(
+        back_populates="export",
+        cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
+    )
+    exported_fleets: Mapped[List["ExportedFleetModel"]] = relationship(
+        back_populates="export",
+        cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
+    )
 
 
 class ImportModel(BaseModel):

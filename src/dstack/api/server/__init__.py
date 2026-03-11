@@ -17,6 +17,7 @@ from dstack._internal.utils.logging import get_logger
 from dstack.api.server._auth import AuthAPIClient
 from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._events import EventsAPIClient
+from dstack.api.server._exports import ExportsAPIClient
 from dstack.api.server._files import FilesAPIClient
 from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
@@ -50,6 +51,7 @@ class APIClient:
         logs: operations with logs
         gateways: operations with gateways
         volumes: operations with volumes
+        exports: operations with exports
         files: operations with files
     """
 
@@ -125,6 +127,10 @@ class APIClient:
     @property
     def volumes(self) -> VolumesAPIClient:
         return VolumesAPIClient(self._request, self._logger)
+
+    @property
+    def exports(self) -> ExportsAPIClient:
+        return ExportsAPIClient(self._request, self._logger)
 
     @property
     def files(self) -> FilesAPIClient:
