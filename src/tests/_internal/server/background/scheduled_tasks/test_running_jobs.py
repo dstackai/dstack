@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from freezegun import freeze_time
@@ -150,6 +150,14 @@ class TestProcessRunningJobs:
             patch(
                 "dstack._internal.server.services.runner.client.RunnerClient"
             ) as RunnerClientMock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_file_archives",
+                new_callable=AsyncMock,
+            ) as get_job_file_archives_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_code",
+                new_callable=AsyncMock,
+            ) as get_job_code_mock,
             patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
         ):
             datetime_mock.return_value = datetime(2023, 1, 2, 5, 12, 30, 10, tzinfo=timezone.utc)
@@ -159,6 +167,8 @@ class TestProcessRunningJobs:
             await process_running_jobs()
             SSHTunnelMock.assert_called_once()
             runner_client_mock.healthcheck.assert_called_once()
+            get_job_file_archives_mock.assert_not_awaited()
+            get_job_code_mock.assert_not_awaited()
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PROVISIONING
@@ -207,8 +217,8 @@ class TestProcessRunningJobs:
                 working_dir="/dstack/run", username="dstack"
             )
             await process_running_jobs()
-            SSHTunnelMock.assert_called_once()
-            runner_client_mock.healthcheck.assert_called_once()
+            assert SSHTunnelMock.call_count == 2
+            assert runner_client_mock.healthcheck.call_count == 2
             runner_client_mock.submit_job.assert_called_once()
             runner_client_mock.upload_code.assert_called_once()
             runner_client_mock.run_job.assert_called_once()
@@ -430,9 +440,9 @@ class TestProcessRunningJobs:
 
         await process_running_jobs()
 
-        assert ssh_tunnel_mock.call_count == 2
+        assert ssh_tunnel_mock.call_count == 3
         shim_client_mock.get_task.assert_called_once()
-        runner_client_mock.healthcheck.assert_called_once()
+        assert runner_client_mock.healthcheck.call_count == 2
         runner_client_mock.submit_job.assert_called_once()
         runner_client_mock.upload_code.assert_called_once()
         runner_client_mock.run_job.assert_called_once()
@@ -484,12 +494,87 @@ class TestProcessRunningJobs:
         shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
         shim_client_mock.get_task.return_value.ports = None
 
-        await process_running_jobs()
+        with (
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_file_archives",
+                new_callable=AsyncMock,
+            ) as get_job_file_archives_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_code",
+                new_callable=AsyncMock,
+            ) as get_job_code_mock,
+        ):
+            await process_running_jobs()
 
-        ssh_tunnel_mock.assert_called_once()
-        shim_client_mock.get_task.assert_called_once()
-        runner_client_mock.healthcheck.assert_not_called()
-        runner_client_mock.submit_job.assert_not_called()
+            ssh_tunnel_mock.assert_called_once()
+            shim_client_mock.get_task.assert_called_once()
+            runner_client_mock.healthcheck.assert_not_called()
+            runner_client_mock.submit_job.assert_not_called()
+            get_job_file_archives_mock.assert_not_awaited()
+            get_job_code_mock.assert_not_awaited()
+        await session.refresh(job)
+        assert job is not None
+        assert job.status == JobStatus.PULLING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_pulling_shim_runner_not_ready(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+        shim_client_mock.get_task.return_value.ports = [
+            PortMapping(container=10022, host=32771),
+            PortMapping(container=10999, host=32772),
+        ]
+        runner_client_mock.healthcheck.return_value = None
+
+        with (
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_file_archives",
+                new_callable=AsyncMock,
+            ) as get_job_file_archives_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_code",
+                new_callable=AsyncMock,
+            ) as get_job_code_mock,
+        ):
+            await process_running_jobs()
+
+            assert ssh_tunnel_mock.call_count == 2
+            shim_client_mock.get_task.assert_called_once()
+            runner_client_mock.healthcheck.assert_called_once()
+            runner_client_mock.submit_job.assert_not_called()
+            get_job_file_archives_mock.assert_not_awaited()
+            get_job_code_mock.assert_not_awaited()
+
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PULLING

@@ -1,10 +1,11 @@
 import asyncio
+import enum
 import re
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional, Union
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -367,6 +368,7 @@ async def _process_running_job_provisioning_state(
         return
 
     # fails are acceptable until timeout is exceeded
+    success = False
     if job_provisioning_data.dockerized:
         logger.debug(
             "%s: process provisioning job with shim, age=%s",
@@ -401,35 +403,40 @@ async def _process_running_job_provisioning_state(
             fmt(context.job_model),
             context.job_submission.age,
         )
-        # FIXME: downloading file archives and code here is a waste of time if
-        # the runner is not ready yet
-        file_archives = await _get_job_file_archives(
-            session=session,
-            archive_mappings=context.job.job_spec.file_archives,
-            user=context.run_model.user,
-        )
-        code = await _get_job_code(
-            session=session,
-            project=context.project,
-            repo=context.repo_model,
-            code_hash=_get_repo_code_hash(context.run, context.job),
-        )
-        success = await common_utils.run_async(
-            _submit_job_to_runner,
+        runner_availability = await common_utils.run_async(
+            _get_runner_availability,
             server_ssh_private_keys,
             job_provisioning_data,
             None,
-            session=session,
-            run=context.run,
-            job_model=context.job_model,
-            job=context.job,
-            cluster_info=startup_context.cluster_info,
-            code=code,
-            file_archives=file_archives,
-            secrets=startup_context.secrets,
-            repo_credentials=startup_context.repo_creds,
-            success_if_not_available=False,
         )
+        if runner_availability == _RunnerAvailability.AVAILABLE:
+            file_archives = await _get_job_file_archives(
+                session=session,
+                archive_mappings=context.job.job_spec.file_archives,
+                user=context.run_model.user,
+            )
+            code = await _get_job_code(
+                session=session,
+                project=context.project,
+                repo=context.repo_model,
+                code_hash=_get_repo_code_hash(context.run, context.job),
+            )
+            success = await common_utils.run_async(
+                _submit_job_to_runner,
+                server_ssh_private_keys,
+                job_provisioning_data,
+                None,
+                session=session,
+                run=context.run,
+                job_model=context.job_model,
+                job=context.job,
+                cluster_info=startup_context.cluster_info,
+                code=code,
+                file_archives=file_archives,
+                secrets=startup_context.secrets,
+                repo_credentials=startup_context.repo_creds,
+                success_if_not_available=False,
+            )
 
     if success:
         return
@@ -462,40 +469,59 @@ async def _process_running_job_pulling_state(
         fmt(context.job_model),
         context.job_submission.age,
     )
-    # FIXME: downloading file archives and code here is a waste of time if
-    # the runner is not ready yet
-    file_archives = await _get_job_file_archives(
-        session=session,
-        archive_mappings=context.job.job_spec.file_archives,
-        user=context.run_model.user,
-    )
-    code = await _get_job_code(
-        session=session,
-        project=context.project,
-        repo=context.repo_model,
-        code_hash=_get_repo_code_hash(context.run, context.job),
-    )
-    success = await common_utils.run_async(
-        _process_pulling_with_shim,
+    shim_state = await common_utils.run_async(
+        _get_shim_pulling_state,
         server_ssh_private_keys,
         job_provisioning_data,
         None,
-        session=session,
-        run=context.run,
         job_model=context.job_model,
-        job=context.job,
-        cluster_info=startup_context.cluster_info,
-        code=code,
-        file_archives=file_archives,
-        secrets=startup_context.secrets,
-        repo_credentials=startup_context.repo_creds,
-        server_ssh_private_keys=server_ssh_private_keys,
-        jpd=job_provisioning_data,
     )
-
-    if success:
+    if shim_state == _ShimPullingState.WAITING:
         _reset_disconnected_at(session, context.job_model)
         return
+
+    if shim_state == _ShimPullingState.READY:
+        runner_availability = await common_utils.run_async(
+            _get_runner_availability,
+            server_ssh_private_keys,
+            job_provisioning_data,
+            None,
+        )
+        if runner_availability == _RunnerAvailability.UNAVAILABLE:
+            _reset_disconnected_at(session, context.job_model)
+            return
+
+        if runner_availability == _RunnerAvailability.AVAILABLE:
+            file_archives = await _get_job_file_archives(
+                session=session,
+                archive_mappings=context.job.job_spec.file_archives,
+                user=context.run_model.user,
+            )
+            code = await _get_job_code(
+                session=session,
+                project=context.project,
+                repo=context.repo_model,
+                code_hash=_get_repo_code_hash(context.run, context.job),
+            )
+            success = await common_utils.run_async(
+                _submit_job_to_runner,
+                server_ssh_private_keys,
+                job_provisioning_data,
+                None,
+                session=session,
+                run=context.run,
+                job_model=context.job_model,
+                job=context.job,
+                cluster_info=startup_context.cluster_info,
+                code=code,
+                file_archives=file_archives,
+                secrets=startup_context.secrets,
+                repo_credentials=startup_context.repo_creds,
+                success_if_not_available=True,
+            )
+            if success:
+                _reset_disconnected_at(session, context.job_model)
+                return
 
     if context.job_model.termination_reason:
         logger.warning(
@@ -562,6 +588,7 @@ async def _process_running_job_running_state(
         switch_job_status(session, context.job_model, JobStatus.TERMINATING)
         # job will be terminated and instance will be emptied by process_terminating_jobs
         return
+
     # No job_model.termination_reason set means ssh connection failed
     _set_disconnected_at_now(session, context.job_model)
     if not _should_terminate_job_due_to_disconnect(context.job_model):
@@ -571,6 +598,7 @@ async def _process_running_job_running_state(
             context.job_submission.age,
         )
         return
+
     if job_provisioning_data.instance_type.resources.spot:
         context.job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
     else:
@@ -809,31 +837,30 @@ def _process_provisioning_with_shim(
     return True
 
 
-@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
-def _process_pulling_with_shim(
-    ports: Dict[int, int],
-    session: AsyncSession,
-    run: Run,
-    job_model: JobModel,
-    job: Job,
-    cluster_info: ClusterInfo,
-    code: bytes,
-    file_archives: Iterable[tuple[uuid.UUID, bytes]],
-    secrets: Dict[str, str],
-    repo_credentials: Optional[RemoteRepoCreds],
-    server_ssh_private_keys: tuple[str, Optional[str]],
-    jpd: JobProvisioningData,
-) -> bool:
-    """
-    Possible next states:
-    - JobStatus.RUNNING if runner is available
-    - JobStatus.TERMINATING if shim is not available
+class _RunnerAvailability(enum.Enum):
+    AVAILABLE = "available"
+    UNAVAILABLE = "unavailable"
 
-    Returns:
-        is successful
-    """
+
+class _ShimPullingState(enum.Enum):
+    WAITING = "waiting"
+    READY = "ready"
+
+
+@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
+def _get_runner_availability(ports: Dict[int, int]) -> _RunnerAvailability:
+    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    if runner_client.healthcheck() is None:
+        return _RunnerAvailability.UNAVAILABLE
+    return _RunnerAvailability.AVAILABLE
+
+
+@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
+def _get_shim_pulling_state(
+    ports: Dict[int, int],
+    job_model: JobModel,
+) -> Union[Literal[False], _ShimPullingState]:
     shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
-    job_runtime_data = None
     if shim_client.is_api_v2_supported():  # raises error if shim is down, causes retry
         task = shim_client.get_task(job_model.id)
 
@@ -851,7 +878,7 @@ def _process_pulling_with_shim(
             return False
 
         if task.status != TaskStatus.RUNNING:
-            return True
+            return _ShimPullingState.WAITING
 
         job_runtime_data = get_job_runtime_data(job_model)
         # should check for None, as there may be older jobs submitted before
@@ -859,10 +886,9 @@ def _process_pulling_with_shim(
         if job_runtime_data is not None:
             # port mapping is not yet available, waiting
             if task.ports is None:
-                return True
+                return _ShimPullingState.WAITING
             job_runtime_data.ports = {pm.container: pm.host for pm in task.ports}
             job_model.job_runtime_data = job_runtime_data.json()
-
     else:
         shim_status = shim_client.pull()  # raises error if shim is down, causes retry
 
@@ -884,23 +910,9 @@ def _process_pulling_with_shim(
             return False
 
         if shim_status.state in ("pulling", "creating"):
-            return True
+            return _ShimPullingState.WAITING
 
-    return _submit_job_to_runner(
-        server_ssh_private_keys,
-        jpd,
-        job_runtime_data,
-        session=session,
-        run=run,
-        job_model=job_model,
-        job=job,
-        cluster_info=cluster_info,
-        code=code,
-        file_archives=file_archives,
-        secrets=secrets,
-        repo_credentials=repo_credentials,
-        success_if_not_available=True,
-    )
+    return _ShimPullingState.READY
 
 
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT])
