@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { Icon, NavigateLink, StatusIndicator, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { formatBackend, getStatusIconType } from 'libs/fleet';
+import { formatBackend, getStatusIconColor, getStatusIconType } from 'libs/fleet';
 import { formatInstanceStatusText, getHealthStatusIconType, prettyEnumValue } from 'libs/instance';
 import { formatResources } from 'libs/resources';
 import { ROUTES } from 'routes';
@@ -50,7 +50,9 @@ export const useColumnsDefinitions = () => {
             id: 'status',
             header: t('fleets.instances.status'),
             cell: (item) => (
-                <StatusIndicator type={getStatusIconType(item.status)}>{formatInstanceStatusText(item)}</StatusIndicator>
+                <StatusIndicator type={getStatusIconType(item.status)} colorOverride={getStatusIconColor(item.status)}>
+                    {formatInstanceStatusText(item)}
+                </StatusIndicator>
             ),
         },
         {

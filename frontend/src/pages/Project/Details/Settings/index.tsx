@@ -336,13 +336,6 @@ export const ProjectSettings: React.FC = () => {
                             headerText="CLI"
                             expanded={isExpandedCliSection}
                             onChange={({ detail }) => setIsExpandedCliSection(detail.expanded)}
-                            headerActions={
-                                <Button
-                                    iconName="script"
-                                    variant={isExpandedCliSection ? 'normal' : 'primary'}
-                                    onClick={() => setIsExpandedCliSection((prev) => !prev)}
-                                />
-                            }
                             // headerInfo={<InfoLink onFollow={() => openHelpPanel(CLI_INFO)} />}
                         >
                             <SpaceBetween size="s">

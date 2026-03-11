@@ -24,13 +24,6 @@ export const ConnectToServiceRun: FC<{ run: IRun }> = ({ run }) => {
             headerText="Connect"
             expanded={isExpandedEndpointSection}
             onChange={({ detail }) => setIsExpandedEndpointSection(detail.expanded)}
-            headerActions={
-                <Button
-                    iconName="script"
-                    variant={isExpandedEndpointSection ? 'normal' : 'primary'}
-                    onClick={() => setIsExpandedEndpointSection((prev) => !prev)}
-                />
-            }
         >
             {run.status !== 'running' && (
                 <SpaceBetween size="s">
