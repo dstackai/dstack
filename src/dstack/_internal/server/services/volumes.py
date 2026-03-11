@@ -209,6 +209,7 @@ async def list_project_volume_models(
         select(VolumeModel)
         .where(*filters)
         .options(joinedload(VolumeModel.user))
+        .options(joinedload(VolumeModel.project))
         .options(
             joinedload(VolumeModel.attachments)
             .joinedload(VolumeAttachmentModel.instance)
@@ -245,6 +246,7 @@ async def get_project_volume_model_by_name(
         select(VolumeModel)
         .where(*filters)
         .options(joinedload(VolumeModel.user))
+        .options(joinedload(VolumeModel.project))
         .options(
             joinedload(VolumeModel.attachments)
             .joinedload(VolumeAttachmentModel.instance)
