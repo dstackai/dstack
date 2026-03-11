@@ -385,15 +385,15 @@ async def _process_running_job_provisioning_state(
             server_ssh_private_keys,
             job_provisioning_data,
             None,
-            session,
-            context.run,
-            context.job_model,
-            job_provisioning_data,
-            startup_context.volumes,
-            context.job.job_spec.registry_auth,
-            public_keys,
-            ssh_user,
-            user_ssh_key,
+            session=session,
+            run=context.run,
+            job_model=context.job_model,
+            jpd=job_provisioning_data,
+            volumes=startup_context.volumes,
+            registry_auth=context.job.job_spec.registry_auth,
+            public_keys=public_keys,
+            ssh_user=ssh_user,
+            ssh_key=user_ssh_key,
         )
     else:
         logger.debug(
@@ -419,15 +419,15 @@ async def _process_running_job_provisioning_state(
             server_ssh_private_keys,
             job_provisioning_data,
             None,
-            session,
-            context.run,
-            context.job_model,
-            context.job,
-            startup_context.cluster_info,
-            code,
-            file_archives,
-            startup_context.secrets,
-            startup_context.repo_creds,
+            session=session,
+            run=context.run,
+            job_model=context.job_model,
+            job=context.job,
+            cluster_info=startup_context.cluster_info,
+            code=code,
+            file_archives=file_archives,
+            secrets=startup_context.secrets,
+            repo_credentials=startup_context.repo_creds,
             success_if_not_available=False,
         )
 
@@ -480,17 +480,17 @@ async def _process_running_job_pulling_state(
         server_ssh_private_keys,
         job_provisioning_data,
         None,
-        session,
-        context.run,
-        context.job_model,
-        context.job,
-        startup_context.cluster_info,
-        code,
-        file_archives,
-        startup_context.secrets,
-        startup_context.repo_creds,
-        server_ssh_private_keys,
-        job_provisioning_data,
+        session=session,
+        run=context.run,
+        job_model=context.job_model,
+        job=context.job,
+        cluster_info=startup_context.cluster_info,
+        code=code,
+        file_archives=file_archives,
+        secrets=startup_context.secrets,
+        repo_credentials=startup_context.repo_creds,
+        server_ssh_private_keys=server_ssh_private_keys,
+        jpd=job_provisioning_data,
     )
 
     if success:
@@ -543,9 +543,9 @@ async def _process_running_job_running_state(
         server_ssh_private_keys,
         job_provisioning_data,
         context.job_submission.job_runtime_data,
-        session,
-        context.run_model,
-        context.job_model,
+        session=session,
+        run_model=context.run_model,
+        job_model=context.job_model,
     )
 
     if success:
@@ -685,7 +685,7 @@ def _process_provisioning_with_shim(
     session: AsyncSession,
     run: Run,
     job_model: JobModel,
-    job_provisioning_data: JobProvisioningData,
+    jpd: JobProvisioningData,
     volumes: List[Volume],
     registry_auth: Optional[RegistryAuth],
     public_keys: List[str],
@@ -730,13 +730,9 @@ def _process_provisioning_with_shim(
     for volume, volume_mount in zip(volumes, volume_mounts):
         volume_mount.name = volume.name
 
-    instance_mounts += _get_instance_specific_mounts(
-        job_provisioning_data.backend, job_provisioning_data.instance_type.name
-    )
+    instance_mounts += _get_instance_specific_mounts(jpd.backend, jpd.instance_type.name)
 
-    gpu_devices = _get_instance_specific_gpu_devices(
-        job_provisioning_data.backend, job_provisioning_data.instance_type.name
-    )
+    gpu_devices = _get_instance_specific_gpu_devices(jpd.backend, jpd.instance_type.name)
 
     container_user = "root"
 
@@ -753,7 +749,7 @@ def _process_provisioning_with_shim(
         cpu = None
         memory = None
         network_mode = NetworkMode.HOST
-    image_name = _patch_base_image_for_aws_efa(job_spec, job_provisioning_data)
+    image_name = _patch_base_image_for_aws_efa(job_spec, jpd)
     if shim_client.is_api_v2_supported():
         shim_client.submit_task(
             task_id=job_model.id,
@@ -775,7 +771,7 @@ def _process_provisioning_with_shim(
             host_ssh_user=ssh_user,
             host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
-            instance_id=job_provisioning_data.instance_id,
+            instance_id=jpd.instance_id,
         )
     else:
         submitted = shim_client.submit(
@@ -792,7 +788,7 @@ def _process_provisioning_with_shim(
             mounts=volume_mounts,
             volumes=volumes,
             instance_mounts=instance_mounts,
-            instance_id=job_provisioning_data.instance_id,
+            instance_id=jpd.instance_id,
         )
         if not submitted:
             # This can happen when we lost connection to the runner (e.g., network issues), marked
@@ -826,7 +822,7 @@ def _process_pulling_with_shim(
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
     server_ssh_private_keys: tuple[str, Optional[str]],
-    job_provisioning_data: JobProvisioningData,
+    jpd: JobProvisioningData,
 ) -> bool:
     """
     Possible next states:
@@ -892,7 +888,7 @@ def _process_pulling_with_shim(
 
     return _submit_job_to_runner(
         server_ssh_private_keys,
-        job_provisioning_data,
+        jpd,
         job_runtime_data,
         session=session,
         run=run,
