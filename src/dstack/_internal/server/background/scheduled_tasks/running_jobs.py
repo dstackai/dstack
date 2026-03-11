@@ -156,6 +156,14 @@ class _RunningJobContext:
     server_ssh_private_keys: Optional[tuple[str, Optional[str]]] = None
 
 
+@dataclass
+class _RunningJobStartupContext:
+    cluster_info: ClusterInfo
+    volumes: list[Volume]
+    secrets: dict[str, str]
+    repo_creds: Optional[RemoteRepoCreds]
+
+
 async def _process_running_job(session: AsyncSession, job_model: JobModel):
     context = await _load_running_job_context(session=session, job_model=job_model)
     if context.job_provisioning_data is None:
@@ -168,80 +176,26 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         )
         return
 
-    job_provisioning_data = common_utils.get_or_error(context.job_provisioning_data)
-
-    volumes = []
-    secrets = {}
-    cluster_info = None
-    repo_creds = None
-
+    startup_context = None
     if context.initial_status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
-        for other_job in context.run.jobs:
-            if (
-                other_job.job_spec.replica_num == context.job.job_spec.replica_num
-                and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
-            ):
-                logger.debug(
-                    "%s: waiting for all jobs in the replica to be provisioned",
-                    fmt(context.job_model),
-                )
-                await _mark_job_processed(session=session, job_model=context.job_model)
-                return
-
-        cluster_info = _get_cluster_info(
-            jobs=context.run.jobs,
-            replica_num=context.job.job_spec.replica_num,
-            job_provisioning_data=job_provisioning_data,
-            job_runtime_data=context.job_submission.job_runtime_data,
-        )
-
-        volumes = await get_job_attached_volumes(
+        startup_context = await _prepare_running_job_startup_context(
             session=session,
-            project=context.project,
-            run_spec=context.run.run_spec,
-            job_num=context.job.job_spec.job_num,
-            job_provisioning_data=job_provisioning_data,
+            context=context,
         )
-
-        repo_creds_model = await get_repo_creds(
-            session=session, repo=context.repo_model, user=context.run_model.user
-        )
-        repo_creds = repo_model_to_repo_head_with_creds(
-            context.repo_model, repo_creds_model
-        ).repo_creds
-
-        secrets = await get_project_secrets_mapping(session=session, project=context.project)
-        try:
-            _interpolate_secrets(secrets, context.job.job_spec)
-        except InterpolatorError as e:
-            await _terminate_running_job(
-                session=session,
-                job_model=context.job_model,
-                termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
-                termination_reason_message=f"Secrets interpolation error: {e.args[0]}",
-            )
+        if startup_context is None:
             return
-
-    context.server_ssh_private_keys = get_instance_ssh_private_keys(
-        common_utils.get_or_error(context.job_model.instance)
-    )
 
     if context.initial_status == JobStatus.PROVISIONING:
         await _process_running_job_provisioning_state(
             session=session,
             context=context,
-            volumes=volumes,
-            cluster_info=cluster_info,
-            secrets=secrets,
-            repo_creds=repo_creds,
+            startup_context=common_utils.get_or_error(startup_context),
         )
     elif context.initial_status == JobStatus.PULLING:
         await _process_running_job_pulling_state(
             session=session,
             context=context,
-            cluster_info=cluster_info,
-            secrets=secrets,
-            repo_creds=repo_creds,
+            startup_context=common_utils.get_or_error(startup_context),
         )
     else:
         await _process_running_job_running_state(
@@ -249,22 +203,17 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             context=context,
         )
 
-    if (
-        context.initial_status != context.job_model.status
-        and context.job_model.status == JobStatus.RUNNING
-    ):
-        _initialize_running_job_probes(job_model=context.job_model, job=context.job)
-
     if context.job_model.status == JobStatus.RUNNING:
+        if context.initial_status != JobStatus.RUNNING:
+            _initialize_running_job_probes(job_model=context.job_model, job=context.job)
         await _maybe_register_replica(
             session,
-            context.run_model,
-            context.run,
-            context.job_model,
-            context.job.job_spec.probes,
+            run_model=context.run_model,
+            run=context.run,
+            job_model=context.job_model,
+            probe_specs=context.job.job_spec.probes,
         )
-    if context.job_model.status == JobStatus.RUNNING:
-        await _check_gpu_utilization(session, context.job_model, context.job)
+        await _check_gpu_utilization(session, job_model=context.job_model, job=context.job)
 
     await _mark_job_processed(session=session, job_model=context.job_model)
 
@@ -276,6 +225,9 @@ async def _load_running_job_context(
     run_model = await _fetch_run_model(session, job_model.run_id)
     run = run_model_to_run(run_model, include_sensitive=True)
     job_submission = job_model_to_job_submission(job_model)
+    server_ssh_private_keys = get_instance_ssh_private_keys(
+        common_utils.get_or_error(job_model.instance)
+    )
     return _RunningJobContext(
         job_model=job_model,
         run_model=run_model,
@@ -286,6 +238,70 @@ async def _load_running_job_context(
         job_submission=job_submission,
         job_provisioning_data=job_submission.job_provisioning_data,
         initial_status=job_model.status,
+        server_ssh_private_keys=server_ssh_private_keys,
+    )
+
+
+async def _prepare_running_job_startup_context(
+    session: AsyncSession,
+    context: _RunningJobContext,
+) -> Optional[_RunningJobStartupContext]:
+    job_provisioning_data = common_utils.get_or_error(context.job_provisioning_data)
+
+    for other_job in context.run.jobs:
+        if (
+            other_job.job_spec.replica_num == context.job.job_spec.replica_num
+            and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
+        ):
+            logger.debug(
+                "%s: waiting for all jobs in the replica to be provisioned",
+                fmt(context.job_model),
+            )
+            await _mark_job_processed(session=session, job_model=context.job_model)
+            return None
+
+    cluster_info = _get_cluster_info(
+        jobs=context.run.jobs,
+        replica_num=context.job.job_spec.replica_num,
+        job_provisioning_data=job_provisioning_data,
+        job_runtime_data=context.job_submission.job_runtime_data,
+    )
+
+    volumes = await get_job_attached_volumes(
+        session=session,
+        project=context.project,
+        run_spec=context.run.run_spec,
+        job_num=context.job.job_spec.job_num,
+        job_provisioning_data=job_provisioning_data,
+    )
+
+    repo_creds_model = await get_repo_creds(
+        session=session,
+        repo=context.repo_model,
+        user=context.run_model.user,
+    )
+    repo_creds = repo_model_to_repo_head_with_creds(
+        context.repo_model,
+        repo_creds_model,
+    ).repo_creds
+
+    secrets = await get_project_secrets_mapping(session=session, project=context.project)
+    try:
+        _interpolate_secrets(secrets, context.job.job_spec)
+    except InterpolatorError as e:
+        await _terminate_running_job(
+            session=session,
+            job_model=context.job_model,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message=f"Secrets interpolation error: {e.args[0]}",
+        )
+        return None
+
+    return _RunningJobStartupContext(
+        cluster_info=cluster_info,
+        volumes=volumes,
+        secrets=secrets,
+        repo_creds=repo_creds,
     )
 
 
@@ -339,10 +355,7 @@ async def _fetch_run_model(session: AsyncSession, run_id: uuid.UUID) -> RunModel
 async def _process_running_job_provisioning_state(
     session: AsyncSession,
     context: _RunningJobContext,
-    volumes: list[Volume],
-    cluster_info: Optional[ClusterInfo],
-    secrets: dict[str, str],
-    repo_creds: Optional[RemoteRepoCreds],
+    startup_context: _RunningJobStartupContext,
 ) -> None:
     job_provisioning_data = common_utils.get_or_error(context.job_provisioning_data)
     server_ssh_private_keys = common_utils.get_or_error(context.server_ssh_private_keys)
@@ -376,14 +389,13 @@ async def _process_running_job_provisioning_state(
             context.run,
             context.job_model,
             job_provisioning_data,
-            volumes,
+            startup_context.volumes,
             context.job.job_spec.registry_auth,
             public_keys,
             ssh_user,
             user_ssh_key,
         )
     else:
-        assert cluster_info is not None
         logger.debug(
             "%s: process provisioning job without shim, age=%s",
             fmt(context.job_model),
@@ -411,11 +423,11 @@ async def _process_running_job_provisioning_state(
             context.run,
             context.job_model,
             context.job,
-            cluster_info,
+            startup_context.cluster_info,
             code,
             file_archives,
-            secrets,
-            repo_creds,
+            startup_context.secrets,
+            startup_context.repo_creds,
             success_if_not_available=False,
         )
 
@@ -440,14 +452,11 @@ async def _process_running_job_provisioning_state(
 async def _process_running_job_pulling_state(
     session: AsyncSession,
     context: _RunningJobContext,
-    cluster_info: Optional[ClusterInfo],
-    secrets: dict[str, str],
-    repo_creds: Optional[RemoteRepoCreds],
+    startup_context: _RunningJobStartupContext,
 ) -> None:
     job_provisioning_data = common_utils.get_or_error(context.job_provisioning_data)
     server_ssh_private_keys = common_utils.get_or_error(context.server_ssh_private_keys)
 
-    assert cluster_info is not None
     logger.debug(
         "%s: process pulling job with shim, age=%s",
         fmt(context.job_model),
@@ -475,11 +484,11 @@ async def _process_running_job_pulling_state(
         context.run,
         context.job_model,
         context.job,
-        cluster_info,
+        startup_context.cluster_info,
         code,
         file_archives,
-        secrets,
-        repo_creds,
+        startup_context.secrets,
+        startup_context.repo_creds,
         server_ssh_private_keys,
         job_provisioning_data,
     )
