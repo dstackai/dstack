@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from freezegun import freeze_time
@@ -19,16 +19,12 @@ from dstack._internal.core.models.configurations import (
     ProbeConfig,
     ServiceConfiguration,
 )
-from dstack._internal.core.models.instances import InstanceStatus, InstanceType
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
-from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
-    JobProvisioningData,
     JobRuntimeData,
-    JobSpec,
     JobStatus,
     JobTerminationReason,
-    Requirements,
     RunStatus,
 )
 from dstack._internal.core.models.volumes import (
@@ -38,7 +34,7 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.scheduled_tasks.running_jobs import (
-    _patch_base_image_for_aws_efa,
+    _RunnerAvailability,
     process_running_jobs,
 )
 from dstack._internal.server.models import JobModel
@@ -150,6 +146,14 @@ class TestProcessRunningJobs:
             patch(
                 "dstack._internal.server.services.runner.client.RunnerClient"
             ) as RunnerClientMock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_file_archives",
+                new_callable=AsyncMock,
+            ) as get_job_file_archives_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_code",
+                new_callable=AsyncMock,
+            ) as get_job_code_mock,
             patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
         ):
             datetime_mock.return_value = datetime(2023, 1, 2, 5, 12, 30, 10, tzinfo=timezone.utc)
@@ -159,6 +163,8 @@ class TestProcessRunningJobs:
             await process_running_jobs()
             SSHTunnelMock.assert_called_once()
             runner_client_mock.healthcheck.assert_called_once()
+            get_job_file_archives_mock.assert_not_awaited()
+            get_job_code_mock.assert_not_awaited()
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PROVISIONING
@@ -207,8 +213,8 @@ class TestProcessRunningJobs:
                 working_dir="/dstack/run", username="dstack"
             )
             await process_running_jobs()
-            SSHTunnelMock.assert_called_once()
-            runner_client_mock.healthcheck.assert_called_once()
+            assert SSHTunnelMock.call_count == 2
+            assert runner_client_mock.healthcheck.call_count == 2
             runner_client_mock.submit_job.assert_called_once()
             runner_client_mock.upload_code.assert_called_once()
             runner_client_mock.run_job.assert_called_once()
@@ -430,9 +436,9 @@ class TestProcessRunningJobs:
 
         await process_running_jobs()
 
-        assert ssh_tunnel_mock.call_count == 2
+        assert ssh_tunnel_mock.call_count == 3
         shim_client_mock.get_task.assert_called_once()
-        runner_client_mock.healthcheck.assert_called_once()
+        assert runner_client_mock.healthcheck.call_count == 2
         runner_client_mock.submit_job.assert_called_once()
         runner_client_mock.upload_code.assert_called_once()
         runner_client_mock.run_job.assert_called_once()
@@ -484,15 +490,175 @@ class TestProcessRunningJobs:
         shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
         shim_client_mock.get_task.return_value.ports = None
 
-        await process_running_jobs()
+        with (
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_file_archives",
+                new_callable=AsyncMock,
+            ) as get_job_file_archives_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_code",
+                new_callable=AsyncMock,
+            ) as get_job_code_mock,
+        ):
+            await process_running_jobs()
 
-        ssh_tunnel_mock.assert_called_once()
-        shim_client_mock.get_task.assert_called_once()
-        runner_client_mock.healthcheck.assert_not_called()
-        runner_client_mock.submit_job.assert_not_called()
+            ssh_tunnel_mock.assert_called_once()
+            shim_client_mock.get_task.assert_called_once()
+            runner_client_mock.healthcheck.assert_not_called()
+            runner_client_mock.submit_job.assert_not_called()
+            get_job_file_archives_mock.assert_not_awaited()
+            get_job_code_mock.assert_not_awaited()
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PULLING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_pulling_shim_runner_not_ready(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+        shim_client_mock.get_task.return_value.ports = [
+            PortMapping(container=10022, host=32771),
+            PortMapping(container=10999, host=32772),
+        ]
+        runner_client_mock.healthcheck.return_value = None
+
+        with (
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_file_archives",
+                new_callable=AsyncMock,
+            ) as get_job_file_archives_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_code",
+                new_callable=AsyncMock,
+            ) as get_job_code_mock,
+        ):
+            await process_running_jobs()
+
+            assert ssh_tunnel_mock.call_count == 2
+            shim_client_mock.get_task.assert_called_once()
+            runner_client_mock.healthcheck.assert_called_once()
+            runner_client_mock.submit_job.assert_not_called()
+            get_job_file_archives_mock.assert_not_awaited()
+            get_job_code_mock.assert_not_awaited()
+
+        await session.refresh(job)
+        assert job is not None
+        assert job.status == JobStatus.PULLING
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_pulling_shim_uses_runtime_port_mapping_for_runner_calls(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            job_runtime_data=get_job_runtime_data(network_mode="bridge", ports=None),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+        shim_client_mock.get_task.return_value.ports = [
+            PortMapping(container=10022, host=32771),
+            PortMapping(container=10999, host=32772),
+        ]
+
+        expected_ports = {
+            10022: 32771,
+            10999: 32772,
+        }
+
+        def assert_runner_availability(_, __, job_runtime_data):
+            assert job_runtime_data is not None
+            assert job_runtime_data.ports == expected_ports
+            return _RunnerAvailability.AVAILABLE
+
+        def assert_submit_job_to_runner(_, __, job_runtime_data, **kwargs):
+            assert job_runtime_data is not None
+            assert job_runtime_data.ports == expected_ports
+            return True
+
+        with (
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_runner_availability",
+                side_effect=assert_runner_availability,
+            ) as get_runner_availability_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._submit_job_to_runner",
+                side_effect=assert_submit_job_to_runner,
+            ) as submit_job_to_runner_mock,
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_file_archives",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "dstack._internal.server.background.scheduled_tasks.running_jobs._get_job_code",
+                new_callable=AsyncMock,
+                return_value=b"",
+            ),
+        ):
+            await process_running_jobs()
+
+            ssh_tunnel_mock.assert_called_once()
+            get_runner_availability_mock.assert_called_once()
+            submit_job_to_runner_mock.assert_called_once()
+
+        await session.refresh(job)
+        assert job is not None
+        assert job.status == JobStatus.PULLING
+        jrd = JobRuntimeData.__response__.parse_raw(job.job_runtime_data)
+        assert jrd.ports == expected_ports
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -1131,129 +1297,3 @@ class TestProcessRunningJobs:
         else:
             assert not job.registered
             assert not events
-
-
-class TestPatchBaseImageForAwsEfa:
-    @staticmethod
-    def _create_job_spec(image_name: str) -> "JobSpec":
-        return JobSpec(
-            job_num=0,
-            job_name="test-job",
-            commands=["echo hello"],
-            env={},
-            image_name=image_name,
-            requirements=Requirements(resources=ResourcesSpec()),
-        )
-
-    @staticmethod
-    def _create_job_provisioning_data_with_instance_type(
-        backend: BackendType, instance_type: str
-    ) -> JobProvisioningData:
-        job_provisioning_data = get_job_provisioning_data(backend=backend)
-        job_provisioning_data.instance_type = InstanceType(
-            name=instance_type,
-            resources=job_provisioning_data.instance_type.resources,
-        )
-        return job_provisioning_data
-
-    @staticmethod
-    def _call_patch_base_image_for_aws_efa(
-        image_name: str, backend: BackendType, instance_type: str
-    ) -> str:
-        job_spec = TestPatchBaseImageForAwsEfa._create_job_spec(image_name)
-        job_provisioning_data = (
-            TestPatchBaseImageForAwsEfa._create_job_provisioning_data_with_instance_type(
-                backend, instance_type
-            )
-        )
-        return _patch_base_image_for_aws_efa(job_spec, job_provisioning_data)
-
-    @pytest.mark.parametrize(
-        "suffix,instance_type",
-        [
-            ("-base", "p6-b200.48xlarge"),
-            ("-devel", "p5.48xlarge"),
-        ],
-    )
-    def test_patch_aws_efa_instance_with_suffix(self, suffix: str, instance_type: str):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        result = self._call_patch_base_image_for_aws_efa(
-            image_name, BackendType.AWS, instance_type
-        )
-        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        assert result == expected
-
-    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
-    @pytest.mark.parametrize(
-        "instance_type",
-        [
-            "p5.48xlarge",
-            "p5e.48xlarge",
-            "p4d.24xlarge",
-            "p4de.24xlarge",
-            "g6.8xlarge",
-            "g6e.8xlarge",
-        ],
-    )
-    def test_patch_all_efa_instance_types(self, instance_type: str, suffix: str):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        result = self._call_patch_base_image_for_aws_efa(
-            image_name, BackendType.AWS, instance_type
-        )
-        expected = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        assert result == expected
-
-    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
-    @pytest.mark.parametrize(
-        "backend",
-        [BackendType.GCP, BackendType.AZURE, BackendType.LAMBDA, BackendType.LOCAL],
-    )
-    @pytest.mark.parametrize(
-        "instance_type",
-        [
-            "standard-4",
-            "p5.xlarge",
-            "p6.2xlarge",
-            "g6.xlarge",
-        ],  # Mix of generic and EFA-named types
-    )
-    def test_no_patch_non_aws_backends(
-        self, backend: BackendType, suffix: str, instance_type: str
-    ):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-        result = self._call_patch_base_image_for_aws_efa(image_name, backend, instance_type)
-        assert result == image_name
-
-    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
-    @pytest.mark.parametrize(
-        "instance_type",
-        ["t3.micro", "m5.large", "c5.xlarge", "r5.2xlarge", "m6i.large", "g6.xlarge"],
-    )
-    def test_no_patch_non_efa_aws_instances(self, instance_type: str, suffix: str):
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
-        result = self._call_patch_base_image_for_aws_efa(
-            image_name, BackendType.AWS, instance_type
-        )
-        assert result == image_name
-
-    @pytest.mark.parametrize(
-        "instance_type",
-        ["p5.xlarge", "p6.2xlarge", "t3.micro", "m5.large"],  # Mix of EFA and non-EFA instances
-    )
-    @pytest.mark.parametrize(
-        "image_name",
-        [
-            "ubuntu:20.04",
-            "nvidia/cuda:11.8-runtime-ubuntu20.04",
-            "python:3.9-slim",
-            "custom/image:latest",
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-custom",
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa",
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}",
-        ],
-    )
-    def test_no_patch_other_images(self, instance_type: str, image_name: str):
-        result = self._call_patch_base_image_for_aws_efa(
-            image_name, BackendType.AWS, instance_type
-        )
-        assert result == image_name
