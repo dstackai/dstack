@@ -1223,4 +1223,23 @@ projects:
 
 </div>
 
+??? info "Community Cloud"
+    By default, `dstack` includes both Server Cloud (datacenter) and Community Cloud offers.
+    To restrict offers to Server Cloud only, set `community_cloud: false` in the backend settings.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: vastai
+            creds:
+              type: api_key
+              api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
+            community_cloud: false
+    ```
+
+    </div>
+
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.

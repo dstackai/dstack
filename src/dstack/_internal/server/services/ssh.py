@@ -26,10 +26,12 @@ def container_ssh_tunnel(
     )
     assert jpd.hostname is not None
     assert jpd.ssh_port is not None
+    instance = get_or_error(job.instance)
     if not jpd.dockerized:
         ssh_destination = f"{jpd.username}@{jpd.hostname}"
         ssh_port = jpd.ssh_port
         ssh_proxy = jpd.ssh_proxy
+        ssh_proxy_private_key = None
     else:
         ssh_destination = "root@localhost"
         ssh_port = DSTACK_RUNNER_SSH_PORT
@@ -42,11 +44,14 @@ def container_ssh_tunnel(
             username=jpd.username,
             port=jpd.ssh_port,
         )
+        ssh_proxy_private_key = None
+        if job.project_id != instance.project_id:
+            ssh_proxy_private_key = FileContent(instance.project.ssh_private_key)
         if jpd.backend == BackendType.LOCAL:
             ssh_proxy = None
+            ssh_proxy_private_key = None
     ssh_head_proxy: Optional[SSHConnectionParams] = None
     ssh_head_proxy_private_key: Optional[str] = None
-    instance = get_or_error(job.instance)
     rci = get_instance_remote_connection_info(instance)
     if rci is not None and rci.ssh_proxy is not None:
         ssh_head_proxy = rci.ssh_proxy
@@ -56,12 +61,12 @@ def container_ssh_tunnel(
         ssh_head_proxy_private_key = get_or_error(ssh_head_proxy_private_key)
         ssh_proxies.append((ssh_head_proxy, FileContent(ssh_head_proxy_private_key)))
     if ssh_proxy is not None:
-        ssh_proxies.append((ssh_proxy, None))
+        ssh_proxies.append((ssh_proxy, ssh_proxy_private_key))
     return SSHTunnel(
         destination=ssh_destination,
         port=ssh_port,
         ssh_proxies=ssh_proxies,
-        identity=FileContent(instance.project.ssh_private_key),
+        identity=FileContent(job.project.ssh_private_key),
         forwarded_sockets=forwarded_sockets,
         options=options,
     )

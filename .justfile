@@ -15,3 +15,6 @@ set allow-duplicate-recipes
 import "runner/.justfile"
 
 import "frontend/.justfile"
+
+docs-serve:
+    uv run mkdocs serve --livereload -w examples -s

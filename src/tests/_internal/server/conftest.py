@@ -1,5 +1,6 @@
+from collections.abc import Generator
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 import pytest
@@ -39,3 +40,13 @@ def image_config_mock(monkeypatch: pytest.MonkeyPatch) -> ImageConfig:
         Mock(return_value=ImageConfigObject(config=image_config)),
     )
     return image_config
+
+
+@pytest.fixture()
+def mock_gateway_connection() -> Generator[AsyncMock, None, None]:
+    with patch(
+        "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
+    ) as get_conn_mock:
+        get_conn_mock.return_value.client = Mock()
+        get_conn_mock.return_value.client.return_value = AsyncMock()
+        yield get_conn_mock

@@ -313,6 +313,10 @@ async def register_replica(
     if gateway_id is not None:
         gateway, conn = await get_or_add_gateway_connection(session, gateway_id)
         job_submission = jobs_services.job_model_to_job_submission(job_model)
+        assert job_model.instance is not None
+        instance_project_ssh_private_key = None
+        if job_model.project_id != job_model.instance.project_id:
+            instance_project_ssh_private_key = job_model.instance.project.ssh_private_key
         try:
             logger.debug("%s: registering replica for service %s", fmt(job_model), run.id.hex)
             async with conn.client() as client:
@@ -320,6 +324,7 @@ async def register_replica(
                     run=run,
                     job_spec=JobSpec.__response__.parse_raw(job_model.job_spec_data),
                     job_submission=job_submission,
+                    instance_project_ssh_private_key=instance_project_ssh_private_key,
                     ssh_head_proxy=ssh_head_proxy,
                     ssh_head_proxy_private_key=ssh_head_proxy_private_key,
                 )

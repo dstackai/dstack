@@ -466,6 +466,137 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_second_replica_to_same_imported_fleet(
+        self, test_db, session: AsyncSession
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        exporter_project = await create_project(session, name="exporter-project", owner=user)
+        importer_project = await create_project(session, name="importer-project", owner=user)
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+            name="exported-fleet",
+        )
+        instance_0 = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            name="exported-fleet-0",
+            status=InstanceStatus.BUSY,
+        )
+        instance_1 = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            name="exported-fleet-1",
+            status=InstanceStatus.IDLE,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            fleet=fleet,
+            instance=instance_0,
+            instance_assigned=True,
+            status=JobStatus.RUNNING,
+            job_num=0,
+            replica_num=0,
+        )
+        job_1 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+            status=JobStatus.SUBMITTED,
+            job_num=0,
+            replica_num=1,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job_1)
+        assert job_1.status == JobStatus.SUBMITTED
+        assert job_1.instance_assigned
+        assert job_1.instance_id == instance_1.id
+        assert job_1.fleet_id == fleet.id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_second_job_fails_if_imported_fleet_has_no_capacity(
+        self, test_db, session: AsyncSession
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        exporter_project = await create_project(session, name="exporter-project", owner=user)
+        importer_project = await create_project(session, name="importer-project", owner=user)
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+            name="exported-fleet",
+        )
+        instance_0 = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            name="exported-fleet-0",
+            status=InstanceStatus.BUSY,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            fleet=fleet,
+            instance=instance_0,
+            instance_assigned=True,
+            status=JobStatus.RUNNING,
+            job_num=0,
+            replica_num=0,
+        )
+        job_1 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+            status=JobStatus.SUBMITTED,
+            job_num=0,
+            replica_num=1,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job_1)
+        assert job_1.status == JobStatus.SUBMITTED
+        assert job_1.instance_assigned
+        assert job_1.instance_id is None
+
+        await process_submitted_jobs()
+        await session.refresh(job_1)
+        assert job_1.status == JobStatus.TERMINATING
+        assert job_1.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_does_no_reuse_unavailable_instances(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)

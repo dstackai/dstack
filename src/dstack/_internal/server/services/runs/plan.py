@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, joinedload, noload
 
 from dstack._internal.core.backends.base.backend import Backend
-from dstack._internal.core.models.fleets import Fleet, InstanceGroupPlacement
+from dstack._internal.core.models.fleets import Fleet, FleetSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -34,6 +34,7 @@ from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     get_fleet_master_instance_provisioning_data,
     get_fleet_requirements,
+    get_fleet_spec,
 )
 from dstack._internal.server.services.instances import (
     filter_pool_instances,
@@ -375,7 +376,7 @@ async def find_optimal_fleet_with_offers(
         backend_offers = await _get_backend_offers_in_fleet(
             project=project,
             fleet_model=candidate_fleet_model,
-            fleet=candidate_fleet,
+            fleet_spec=candidate_fleet.spec,
             run_spec=run_spec,
             job=job,
             volumes=volumes,
@@ -436,12 +437,12 @@ async def find_optimal_fleet_with_offers(
 def get_run_profile_and_requirements_in_fleet(
     job: Job,
     run_spec: RunSpec,
-    fleet: Fleet,
+    fleet_spec: FleetSpec,
 ) -> tuple[Profile, Requirements]:
-    profile = combine_fleet_and_run_profiles(fleet.spec.merged_profile, run_spec.merged_profile)
+    profile = combine_fleet_and_run_profiles(fleet_spec.merged_profile, run_spec.merged_profile)
     if profile is None:
         raise ValueError("Cannot combine fleet profile")
-    fleet_requirements = get_fleet_requirements(fleet.spec)
+    fleet_requirements = get_fleet_requirements(fleet_spec)
     requirements = combine_fleet_and_run_requirements(
         fleet_requirements, job.job_spec.requirements
     )
@@ -547,17 +548,17 @@ async def _get_backend_offers_in_fleet(
     run_spec: RunSpec,
     job: Job,
     volumes: Optional[list[list[Volume]]],
-    fleet: Optional[Fleet] = None,
+    fleet_spec: Optional[FleetSpec] = None,
     max_offers: Optional[int] = None,
 ) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
-    if fleet is None:
-        fleet = fleet_model_to_fleet(fleet_model)
+    if fleet_spec is None:
+        fleet_spec = get_fleet_spec(fleet_model)
     try:
-        check_can_create_new_cloud_instance_in_fleet(fleet)
+        check_can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec)
         profile, requirements = get_run_profile_and_requirements_in_fleet(
             job=job,
             run_spec=run_spec,
-            fleet=fleet,
+            fleet_spec=fleet_spec,
         )
     except ValueError:
         backend_offers = []
@@ -565,7 +566,7 @@ async def _get_backend_offers_in_fleet(
         # Master job offers must be in the same cluster as existing instances.
         master_instance_provisioning_data = get_fleet_master_instance_provisioning_data(
             fleet_model=fleet_model,
-            fleet_spec=fleet.spec,
+            fleet_spec=fleet_spec,
         )
         # Handle multinode for old jobs that don't have requirements.multinode set.
         # TODO: Drop multinode param.

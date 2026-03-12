@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from freezegun import freeze_time
@@ -19,6 +19,7 @@ from dstack._internal.core.models.configurations import (
     ProbeConfig,
     ServiceConfiguration,
 )
+from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
 from dstack._internal.core.models.runs import (
@@ -52,6 +53,11 @@ from dstack._internal.server.services.volumes import (
     volume_model_to_volume,
 )
 from dstack._internal.server.testing.common import (
+    create_backend,
+    create_export,
+    create_fleet,
+    create_gateway,
+    create_gateway_compute,
     create_instance,
     create_job,
     create_job_metrics_point,
@@ -1272,3 +1278,168 @@ class TestProcessRunningJobs:
         else:
             assert not job.registered
             assert not events
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_registers_service_replica_in_gateway(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+        mock_gateway_connection: AsyncMock,
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway_compute = await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+        )
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            status=GatewayStatus.RUNNING,
+            name="test-gateway",
+            wildcard_domain="example.com",
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(
+                    port=80, image="ubuntu", gateway="test-gateway"
+                ),
+            ),
+            gateway=gateway,
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+            fleet=fleet,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+
+        await process_running_jobs()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.RUNNING
+        assert job.registered
+        events = await list_events(session)
+        assert {e.message for e in events} == {
+            "Job status changed PULLING -> RUNNING",
+            "Service replica registered to receive requests",
+        }
+        mock_gateway_connection.return_value.client.return_value.__aenter__.return_value.register_replica.assert_called_once_with(
+            run=ANY,
+            job_spec=ANY,
+            job_submission=ANY,
+            instance_project_ssh_private_key=None,
+            ssh_head_proxy=None,
+            ssh_head_proxy_private_key=None,
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_registers_service_replica_in_gateway_when_running_on_imported_instance(
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        runner_client_mock: Mock,
+        mock_gateway_connection: AsyncMock,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(
+            session=session, name="exporter", owner=user, ssh_private_key="exporter-private-key"
+        )
+        importer_project = await create_project(session=session, name="importer", owner=user)
+        fleet = await create_fleet(session=session, project=exporter_project)
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            status=InstanceStatus.BUSY,
+            fleet=fleet,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        backend = await create_backend(session=session, project_id=importer_project.id)
+        gateway_compute = await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+        )
+        gateway = await create_gateway(
+            session=session,
+            project_id=importer_project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            status=GatewayStatus.RUNNING,
+            name="test-gateway",
+            wildcard_domain="example.com",
+        )
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=user,
+            run_spec=get_run_spec(
+                run_name="test",
+                repo_id=repo.name,
+                configuration=ServiceConfiguration(
+                    port=80, image="ubuntu", gateway="test-gateway"
+                ),
+            ),
+            gateway=gateway,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.RUNNING
+
+        await process_running_jobs()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.RUNNING
+        assert job.registered
+        events = await list_events(session)
+        assert {e.message for e in events} == {
+            "Job status changed PULLING -> RUNNING",
+            "Service replica registered to receive requests",
+        }
+        mock_gateway_connection.return_value.client.return_value.__aenter__.return_value.register_replica.assert_called_once_with(
+            run=ANY,
+            job_spec=ANY,
+            job_submission=ANY,
+            instance_project_ssh_private_key="exporter-private-key",
+            ssh_head_proxy=None,
+            ssh_head_proxy_private_key=None,
+        )

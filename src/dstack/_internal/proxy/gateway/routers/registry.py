@@ -78,6 +78,7 @@ async def register_replica(
         ssh_destination=body.ssh_host,
         ssh_port=body.ssh_port,
         ssh_proxy=body.ssh_proxy,
+        ssh_proxy_private_key=body.ssh_proxy_private_key,
         ssh_head_proxy=body.ssh_head_proxy,
         ssh_head_proxy_private_key=body.ssh_head_proxy_private_key,
         internal_ip=body.internal_ip,
