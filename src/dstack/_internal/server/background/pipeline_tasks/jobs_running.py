@@ -273,13 +273,19 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
 class _ProcessContext:
     job_model: JobModel
     run_model: RunModel
-    repo_model: RepoModel
-    project: ProjectModel
     run: Run
     job: Job
     job_submission: JobSubmission
     job_provisioning_data: Optional[JobProvisioningData]
     server_ssh_private_keys: Optional[tuple[str, Optional[str]]] = None
+
+    @property
+    def repo_model(self) -> RepoModel:
+        return self.run_model.repo
+
+    @property
+    def project(self) -> ProjectModel:
+        return self.run_model.project
 
 
 class _JobUpdateMap(ItemUpdateMap, total=False):
@@ -296,11 +302,15 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
 
 
 @dataclass
+class _RegisterReplicaResult:
+    gateway_target: Optional[events.Target]  # None = no gateway
+
+
+@dataclass
 class _ProcessResult:
     job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
     new_probe_models: list[ProbeModel] = field(default_factory=list)
-    emit_register_replica_event: bool = False
-    register_gateway_target: Optional[events.Target] = None
+    replica_registration: Optional[_RegisterReplicaResult] = None  # None = not registered yet
 
 
 @dataclass
@@ -323,8 +333,6 @@ async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_Proce
         return _ProcessContext(
             job_model=job_model,
             run_model=run_model,
-            repo_model=run_model.repo,
-            project=run_model.project,
             run=run,
             job=find_job(run.jobs, job_model.replica_num, job_model.job_num),
             job_submission=job_submission,
@@ -347,32 +355,22 @@ async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
         )
         return result
 
-    startup_context = None
-    if context.job_model.status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
-        startup_context = await _prepare_startup_context(
-            context=context,
-            result=result,
-        )
+    if context.job_model.status == JobStatus.PROVISIONING:
+        startup_context = await _prepare_startup_context(context=context, result=result)
         if startup_context is None:
             return result
-
-    if context.job_model.status == JobStatus.PROVISIONING:
         await _process_provisioning_status(
-            context=context,
-            startup_context=get_or_error(startup_context),
-            result=result,
+            context=context, startup_context=startup_context, result=result
         )
     elif context.job_model.status == JobStatus.PULLING:
+        startup_context = await _prepare_startup_context(context=context, result=result)
+        if startup_context is None:
+            return result
         await _process_pulling_status(
-            context=context,
-            startup_context=get_or_error(startup_context),
-            result=result,
+            context=context, startup_context=startup_context, result=result
         )
-    else:
-        await _process_running_status(
-            context=context,
-            result=result,
-        )
+    elif context.job_model.status == JobStatus.RUNNING:
+        await _process_running_status(context=context, result=result)
 
     if _get_result_status(context.job_model, result) == JobStatus.RUNNING:
         if context.job_model.status != JobStatus.RUNNING:
@@ -700,27 +698,7 @@ async def _process_pulling_status(
                 return
 
     # SSH tunnel failed or READY but runner submit failed — treat as disconnect
-    _set_disconnected_at_now(context.job_model, result)
-    if not _should_terminate_job_due_to_disconnect(
-        _get_result_disconnected_at(context.job_model, result)
-    ):
-        logger.warning(
-            "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
-            fmt(context.job_model),
-            context.job_submission.age,
-        )
-        return
-
-    if job_provisioning_data.instance_type.resources.spot:
-        termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-    else:
-        termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
-    _terminate_job(
-        job_model=context.job_model,
-        job_update_map=result.job_update_map,
-        termination_reason=termination_reason,
-        termination_reason_message="Instance is unreachable",
-    )
+    _handle_instance_unreachable(context, result, job_provisioning_data)
 
 
 async def _process_running_status(
@@ -748,27 +726,7 @@ async def _process_running_status(
         _reset_disconnected_at(context.job_model, result)
         return
 
-    _set_disconnected_at_now(context.job_model, result)
-    if not _should_terminate_job_due_to_disconnect(
-        _get_result_disconnected_at(context.job_model, result)
-    ):
-        logger.warning(
-            "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
-            fmt(context.job_model),
-            context.job_submission.age,
-        )
-        return
-
-    if job_provisioning_data.instance_type.resources.spot:
-        termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-    else:
-        termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
-    _terminate_job(
-        job_model=context.job_model,
-        job_update_map=result.job_update_map,
-        termination_reason=termination_reason,
-        termination_reason_message="Instance is unreachable",
-    )
+    _handle_instance_unreachable(context, result, job_provisioning_data)
 
 
 async def _apply_process_result(
@@ -827,10 +785,10 @@ def _emit_result_events(
             job_model.disconnected_at,
         ),
     )
-    if result.emit_register_replica_event:
+    if result.replica_registration is not None:
         targets = [events.Target.from_model(job_model)]
-        if result.register_gateway_target is not None:
-            targets.append(result.register_gateway_target)
+        if result.replica_registration.gateway_target is not None:
+            targets.append(result.replica_registration.gateway_target)
         events.emit(
             session,
             "Service replica registered to receive requests",
@@ -866,6 +824,33 @@ def _wait_for_instance_provisioning_data(
         return
 
     result.job_update_map["job_provisioning_data"] = job_model.instance.job_provisioning_data
+
+
+def _handle_instance_unreachable(
+    context: _ProcessContext,
+    result: _ProcessResult,
+    job_provisioning_data: JobProvisioningData,
+) -> None:
+    _set_disconnected_at_now(context.job_model, result)
+    if not _should_terminate_job_due_to_disconnect(
+        _get_result_disconnected_at(context.job_model, result)
+    ):
+        logger.warning(
+            "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
+            fmt(context.job_model),
+            context.job_submission.age,
+        )
+        return
+    if job_provisioning_data.instance_type.resources.spot:
+        termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+    else:
+        termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
+    _terminate_job(
+        job_model=context.job_model,
+        job_update_map=result.job_update_map,
+        termination_reason=termination_reason,
+        termination_reason_message="Instance is unreachable",
+    )
 
 
 def _initialize_running_job_probes(
@@ -926,8 +911,7 @@ async def _maybe_register_replica(
         return
 
     result.job_update_map["registered"] = True
-    result.emit_register_replica_event = True
-    result.register_gateway_target = gateway_target
+    result.replica_registration = _RegisterReplicaResult(gateway_target=gateway_target)
 
 
 async def _register_service_replica(
@@ -1304,8 +1288,9 @@ def _submit_job_to_runner(
     job_info = runner_client.run_job()
     if job_info is not None:
         if jrd is not None:
-            jrd.working_dir = job_info.working_dir
-            jrd.username = job_info.username
+            jrd = jrd.copy(
+                update={"working_dir": job_info.working_dir, "username": job_info.username}
+            )
     return _SubmitJobToRunnerResult(
         success=True,
         set_running_status=True,
@@ -1520,6 +1505,16 @@ async def _get_job_file_archive(archive_id: uuid.UUID, user: UserModel) -> bytes
     return blob
 
 
+def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec) -> None:
+    interpolate = VariablesInterpolator({"secrets": secrets}).interpolate_or_error
+    job_spec.env = {k: interpolate(v) for k, v in job_spec.env.items()}
+    if job_spec.registry_auth is not None:
+        job_spec.registry_auth = RegistryAuth(
+            username=interpolate(job_spec.registry_auth.username),
+            password=interpolate(job_spec.registry_auth.password),
+        )
+
+
 def _emit_reachability_change_event(
     session: AsyncSession,
     job_model: JobModel,
@@ -1539,16 +1534,6 @@ def _emit_reachability_change_event(
             "Job became reachable",
             actor=events.SystemActor(),
             targets=[events.Target.from_model(job_model)],
-        )
-
-
-def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec) -> None:
-    interpolate = VariablesInterpolator({"secrets": secrets}).interpolate_or_error
-    job_spec.env = {k: interpolate(v) for k, v in job_spec.env.items()}
-    if job_spec.registry_auth is not None:
-        job_spec.registry_auth = RegistryAuth(
-            username=interpolate(job_spec.registry_auth.username),
-            password=interpolate(job_spec.registry_auth.password),
         )
 
 
@@ -1580,6 +1565,17 @@ def _set_job_runtime_data(result: _ProcessResult, jrd: Optional[JobRuntimeData])
     result.job_update_map["job_runtime_data"] = None if jrd is None else jrd.json()
 
 
+def _apply_submit_job_to_runner_result(
+    job_model: JobModel,
+    result: _ProcessResult,
+    submit_result: _SubmitJobToRunnerResult,
+) -> None:
+    if submit_result.job_runtime_data is not None:
+        _set_job_runtime_data(result, submit_result.job_runtime_data)
+    if submit_result.set_running_status:
+        _set_job_status(job_model, result, JobStatus.RUNNING)
+
+
 # Convention: _get_result_* helpers merge the loaded job_model state with any pending
 # updates recorded in result.job_update_map. Always use these (not job_model.attr directly)
 # when the field may have been updated earlier in the same processing cycle.
@@ -1604,14 +1600,3 @@ def _get_result_job_runtime_data(
 
 def _get_result_registered(job_model: JobModel, result: _ProcessResult) -> bool:
     return result.job_update_map.get("registered", job_model.registered)
-
-
-def _apply_submit_job_to_runner_result(
-    job_model: JobModel,
-    result: _ProcessResult,
-    submit_result: _SubmitJobToRunnerResult,
-) -> None:
-    if submit_result.job_runtime_data is not None:
-        _set_job_runtime_data(result, submit_result.job_runtime_data)
-    if submit_result.set_running_status:
-        _set_job_status(job_model, result, JobStatus.RUNNING)

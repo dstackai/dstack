@@ -1215,7 +1215,7 @@ class TestJobRunningWorker:
                 "1h",
                 60 * 60,
                 JobStatus.TERMINATING,
-                JobTerminationReason.TERMINATED_BY_SERVER,
+                JobTerminationReason.INACTIVITY_DURATION_EXCEEDED,
                 60 * 60,
                 id="duration-exceeded-exactly",
             ),
@@ -1223,7 +1223,7 @@ class TestJobRunningWorker:
                 "1h",
                 60 * 60 + 1,
                 JobStatus.TERMINATING,
-                JobTerminationReason.TERMINATED_BY_SERVER,
+                JobTerminationReason.INACTIVITY_DURATION_EXCEEDED,
                 60 * 60 + 1,
                 id="duration-exceeded",
             ),
@@ -1425,7 +1425,9 @@ class TestJobRunningWorker:
         await session.refresh(job)
         assert job.status == expected_status
         if expected_status == JobStatus.TERMINATING:
-            assert job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
+            assert (
+                job.termination_reason == JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY
+            )
             assert job.termination_reason_message == (
                 "The job GPU utilization below 80% for 600 seconds"
             )
