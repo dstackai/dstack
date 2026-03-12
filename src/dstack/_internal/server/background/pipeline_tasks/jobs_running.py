@@ -5,15 +5,19 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, Iterable, Literal, Optional, Sequence, Union
 
+import httpx
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
+from dstack._internal.core.errors import GatewayError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth
+from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.files import FileArchiveMapping
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import InstanceStatus, SSHConnectionParams
+from dstack._internal.core.models.metrics import Metric
 from dstack._internal.core.models.profiles import StartupOrder
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
@@ -26,6 +30,7 @@ from dstack._internal.core.models.runs import (
     JobSubmission,
     JobTerminationReason,
     Run,
+    RunSpec,
     RunStatus,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
@@ -57,11 +62,13 @@ from dstack._internal.server.models import (
 from dstack._internal.server.schemas.runner import TaskStatus
 from dstack._internal.server.services import events
 from dstack._internal.server.services import files as files_services
+from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.backends.provisioning import (
     get_instance_specific_gpu_devices,
     get_instance_specific_mounts,
     resolve_provisioning_image_name,
 )
+from dstack._internal.server.services.gateways import get_or_add_gateway_connection
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
     get_instance_ssh_private_keys,
@@ -76,6 +83,7 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.metrics import get_job_metrics
 from dstack._internal.server.services.repos import (
     get_code_model,
     get_repo_creds,
@@ -83,7 +91,7 @@ from dstack._internal.server.services.repos import (
 )
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.server.services.runs import run_model_to_run
+from dstack._internal.server.services.runs import is_job_ready, run_model_to_run
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.server.utils import sentry_utils
@@ -95,7 +103,7 @@ logger = get_logger(__name__)
 
 
 JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
-"""`JOB_DISCONNECTED_RETRY_TIMEOUT` is the minimum time before terminating active job in case of connectivity issues."""
+"""`The minimum time before terminating active job in case of connectivity issues."""
 
 
 @dataclass
@@ -246,10 +254,7 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
 
     @sentry_utils.instrument_named_task("pipeline_tasks.JobRunningWorker.process")
     async def process(self, item: JobRunningPipelineItem):
-        if item.status == JobStatus.RUNNING:
-            raise NotImplementedError("RUNNING-state migration is implemented in a later step")
-
-        context = await _load_running_job_context(item=item)
+        context = await _load_process_context(item=item)
         if context is None:
             log_lock_token_mismatch(logger, item)
             return
@@ -265,7 +270,7 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
 
 
 @dataclass
-class _RunningJobContext:
+class _ProcessContext:
     job_model: JobModel
     run_model: RunModel
     repo_model: RepoModel
@@ -275,28 +280,6 @@ class _RunningJobContext:
     job_submission: JobSubmission
     job_provisioning_data: Optional[JobProvisioningData]
     server_ssh_private_keys: Optional[tuple[str, Optional[str]]] = None
-
-
-async def _load_running_job_context(item: JobRunningPipelineItem) -> Optional[_RunningJobContext]:
-    async with get_session_ctx() as session:
-        job_model = await _refetch_locked_job_model(session=session, item=item)
-        if job_model is None:
-            return None
-        run_model = await _fetch_run_model(session=session, run_id=job_model.run_id)
-        run = run_model_to_run(run_model, include_sensitive=True)
-        job_submission = job_model_to_job_submission(job_model)
-        server_ssh_private_keys = get_instance_ssh_private_keys(get_or_error(job_model.instance))
-        return _RunningJobContext(
-            job_model=job_model,
-            run_model=run_model,
-            repo_model=run_model.repo,
-            project=run_model.project,
-            run=run,
-            job=find_job(run.jobs, job_model.replica_num, job_model.job_num),
-            job_submission=job_submission,
-            job_provisioning_data=job_submission.job_provisioning_data,
-            server_ssh_private_keys=server_ssh_private_keys,
-        )
 
 
 class _JobUpdateMap(ItemUpdateMap, total=False):
@@ -309,14 +292,48 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
     disconnected_at: Optional[datetime]
     inactivity_secs: Optional[int]
     exit_status: Optional[int]
+    registered: bool
 
 
 @dataclass
 class _ProcessResult:
     job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
+    new_probe_models: list[ProbeModel] = field(default_factory=list)
+    emit_register_replica_event: bool = False
+    register_gateway_target: Optional[events.Target] = None
 
 
-async def _process_running_job(context: _RunningJobContext) -> _ProcessResult:
+@dataclass
+class _StartupContext:
+    cluster_info: ClusterInfo
+    volumes: list[Volume]
+    secrets: dict[str, str]
+    repo_creds: Optional[RemoteRepoCreds]
+
+
+async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_ProcessContext]:
+    async with get_session_ctx() as session:
+        job_model = await _refetch_locked_job_model(session=session, item=item)
+        if job_model is None:
+            return None
+        run_model = await _fetch_run_model(session=session, run_id=job_model.run_id)
+        run = run_model_to_run(run_model, include_sensitive=True)
+        job_submission = job_model_to_job_submission(job_model)
+        server_ssh_private_keys = get_instance_ssh_private_keys(get_or_error(job_model.instance))
+        return _ProcessContext(
+            job_model=job_model,
+            run_model=run_model,
+            repo_model=run_model.repo,
+            project=run_model.project,
+            run=run,
+            job=find_job(run.jobs, job_model.replica_num, job_model.job_num),
+            job_submission=job_submission,
+            job_provisioning_data=job_submission.job_provisioning_data,
+            server_ssh_private_keys=server_ssh_private_keys,
+        )
+
+
+async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
     result = _ProcessResult()
     if context.job_provisioning_data is None:
         logger.error("%s: job_provisioning_data of an active job is None", fmt(context.job_model))
@@ -332,7 +349,7 @@ async def _process_running_job(context: _RunningJobContext) -> _ProcessResult:
 
     startup_context = None
     if context.job_model.status in [JobStatus.PROVISIONING, JobStatus.PULLING]:
-        startup_context = await _prepare_running_job_startup_context(
+        startup_context = await _prepare_startup_context(
             context=context,
             result=result,
         )
@@ -340,32 +357,39 @@ async def _process_running_job(context: _RunningJobContext) -> _ProcessResult:
             return result
 
     if context.job_model.status == JobStatus.PROVISIONING:
-        await _process_running_job_provisioning_state(
+        await _process_provisioning_status(
             context=context,
             startup_context=get_or_error(startup_context),
             result=result,
         )
     elif context.job_model.status == JobStatus.PULLING:
-        await _process_running_job_pulling_state(
+        await _process_pulling_status(
             context=context,
             startup_context=get_or_error(startup_context),
             result=result,
         )
+    else:
+        await _process_running_status(
+            context=context,
+            result=result,
+        )
+
+    if _get_result_status(context.job_model, result) == JobStatus.RUNNING:
+        if context.job_model.status != JobStatus.RUNNING:
+            _initialize_running_job_probes(
+                job_model=context.job_model,
+                job=context.job,
+                result=result,
+            )
+        await _maybe_register_replica(context=context, result=result)
+        await _check_gpu_utilization(context=context, result=result)
     return result
 
 
-@dataclass
-class _RunningJobStartupContext:
-    cluster_info: ClusterInfo
-    volumes: list[Volume]
-    secrets: dict[str, str]
-    repo_creds: Optional[RemoteRepoCreds]
-
-
-async def _prepare_running_job_startup_context(
-    context: _RunningJobContext,
+async def _prepare_startup_context(
+    context: _ProcessContext,
     result: _ProcessResult,
-) -> Optional[_RunningJobStartupContext]:
+) -> Optional[_StartupContext]:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
 
     for other_job in context.run.jobs:
@@ -405,6 +429,7 @@ async def _prepare_running_job_startup_context(
         context.repo_model,
         repo_creds_model,
     ).repo_creds
+
     try:
         _interpolate_secrets(secrets, context.job.job_spec)
     except InterpolatorError as e:
@@ -416,7 +441,7 @@ async def _prepare_running_job_startup_context(
         )
         return None
 
-    return _RunningJobStartupContext(
+    return _StartupContext(
         cluster_info=cluster_info,
         volumes=volumes,
         secrets=secrets,
@@ -475,9 +500,9 @@ async def _fetch_run_model(session: AsyncSession, run_id: uuid.UUID) -> RunModel
     return res.unique().scalar_one()
 
 
-async def _process_running_job_provisioning_state(
-    context: _RunningJobContext,
-    startup_context: _RunningJobStartupContext,
+async def _process_provisioning_status(
+    context: _ProcessContext,
+    startup_context: _StartupContext,
     result: _ProcessResult,
 ) -> None:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
@@ -582,9 +607,9 @@ async def _process_running_job_provisioning_state(
         )
 
 
-async def _process_running_job_pulling_state(
-    context: _RunningJobContext,
-    startup_context: _RunningJobStartupContext,
+async def _process_pulling_status(
+    context: _ProcessContext,
+    startup_context: _StartupContext,
     result: _ProcessResult,
 ) -> None:
     job_provisioning_data = get_or_error(context.job_provisioning_data)
@@ -698,6 +723,54 @@ async def _process_running_job_pulling_state(
     )
 
 
+async def _process_running_status(
+    context: _ProcessContext,
+    result: _ProcessResult,
+) -> None:
+    job_provisioning_data = get_or_error(context.job_provisioning_data)
+    server_ssh_private_keys = get_or_error(context.server_ssh_private_keys)
+
+    logger.debug(
+        "%s: process running job, age=%s",
+        fmt(context.job_model),
+        context.job_submission.age,
+    )
+    process_running_result = await run_async(
+        _process_running,
+        server_ssh_private_keys,
+        job_provisioning_data,
+        context.job_submission.job_runtime_data,
+        run_model=context.run_model,
+        job_model=context.job_model,
+    )
+    if process_running_result is not False:
+        result.job_update_map.update(process_running_result.job_update_map)
+        _reset_disconnected_at(context.job_model, result)
+        return
+
+    _set_disconnected_at_now(context.job_model, result)
+    if not _should_terminate_job_due_to_disconnect(
+        _get_result_disconnected_at(context.job_model, result)
+    ):
+        logger.warning(
+            "%s: is unreachable, waiting for the instance to become reachable again, age=%s",
+            fmt(context.job_model),
+            context.job_submission.age,
+        )
+        return
+
+    if job_provisioning_data.instance_type.resources.spot:
+        termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+    else:
+        termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
+    _terminate_running_job(
+        job_model=context.job_model,
+        result=result,
+        termination_reason=termination_reason,
+        termination_reason_message="Instance is unreachable",
+    )
+
+
 async def _apply_process_result(
     item: JobRunningPipelineItem,
     job_model: JobModel,
@@ -719,6 +792,9 @@ async def _apply_process_result(
         if len(updated_ids) == 0:
             log_lock_token_changed_after_processing(logger, item)
             return
+
+        if result.new_probe_models:
+            session.add_all(result.new_probe_models)
 
         emit_job_status_change_event(
             session=session,
@@ -742,28 +818,16 @@ async def _apply_process_result(
                 job_model.disconnected_at,
             ),
         )
-
-
-def _emit_reachability_change_event(
-    session: AsyncSession,
-    job_model: JobModel,
-    old_disconnected_at: Optional[datetime],
-    new_disconnected_at: Optional[datetime],
-) -> None:
-    if old_disconnected_at is None and new_disconnected_at is not None:
-        events.emit(
-            session,
-            "Job became unreachable",
-            actor=events.SystemActor(),
-            targets=[events.Target.from_model(job_model)],
-        )
-    elif old_disconnected_at is not None and new_disconnected_at is None:
-        events.emit(
-            session,
-            "Job became reachable",
-            actor=events.SystemActor(),
-            targets=[events.Target.from_model(job_model)],
-        )
+        if result.emit_register_replica_event:
+            targets = [events.Target.from_model(job_model)]
+            if result.register_gateway_target is not None:
+                targets.append(result.register_gateway_target)
+            events.emit(
+                session,
+                "Service replica registered to receive requests",
+                actor=events.SystemActor(),
+                targets=targets,
+            )
 
 
 def _terminate_running_job(
@@ -772,9 +836,12 @@ def _terminate_running_job(
     termination_reason: JobTerminationReason,
     termination_reason_message: str,
 ) -> None:
-    result.job_update_map["termination_reason"] = termination_reason
-    result.job_update_map["termination_reason_message"] = termination_reason_message
-    _set_job_status(job_model, result, JobStatus.TERMINATING)
+    _terminate_job(
+        job_model=job_model,
+        job_update_map=result.job_update_map,
+        termination_reason=termination_reason,
+        termination_reason_message=termination_reason_message,
+    )
 
 
 def _wait_for_instance_provisioning_data(
@@ -804,6 +871,161 @@ def _wait_for_instance_provisioning_data(
         return
 
     result.job_update_map["job_provisioning_data"] = job_model.instance.job_provisioning_data
+
+
+def _initialize_running_job_probes(
+    job_model: JobModel,
+    job: Job,
+    result: _ProcessResult,
+) -> None:
+    for probe_num in range(len(job.job_spec.probes)):
+        result.new_probe_models.append(
+            ProbeModel(
+                name=f"{job_model.job_name}-{probe_num}",
+                job_id=job_model.id,
+                probe_num=probe_num,
+                due=get_current_datetime(),
+                success_streak=0,
+                active=True,
+            )
+        )
+
+
+async def _maybe_register_replica(
+    context: _ProcessContext,
+    result: _ProcessResult,
+) -> None:
+    if (
+        context.run.run_spec.configuration.type != "service"
+        or _get_result_registered(context.job_model, result)
+        or context.job_model.job_num != 0
+        or result.new_probe_models
+        or not is_job_ready(context.job_model.probes, context.job.job_spec.probes)
+    ):
+        return
+
+    ssh_head_proxy: Optional[SSHConnectionParams] = None
+    ssh_head_proxy_private_key: Optional[str] = None
+    instance = get_or_error(context.job_model.instance)
+    rci = get_instance_remote_connection_info(instance)
+    if rci is not None and rci.ssh_proxy is not None:
+        ssh_head_proxy = rci.ssh_proxy
+        ssh_head_proxy_keys = get_or_error(rci.ssh_proxy_keys)
+        ssh_head_proxy_private_key = ssh_head_proxy_keys[0].private
+
+    try:
+        gateway_target = await _register_service_replica(
+            context=context,
+            result=result,
+            ssh_head_proxy=ssh_head_proxy,
+            ssh_head_proxy_private_key=ssh_head_proxy_private_key,
+        )
+    except GatewayError as e:
+        logger.warning("%s: failed to register service replica: %s", fmt(context.job_model), e)
+        _terminate_running_job(
+            job_model=context.job_model,
+            result=result,
+            termination_reason=JobTerminationReason.GATEWAY_ERROR,
+            termination_reason_message="Failed to register service replica",
+        )
+        return
+
+    result.job_update_map["registered"] = True
+    result.emit_register_replica_event = True
+    result.register_gateway_target = gateway_target
+
+
+async def _register_service_replica(
+    context: _ProcessContext,
+    result: _ProcessResult,
+    ssh_head_proxy: Optional[SSHConnectionParams],
+    ssh_head_proxy_private_key: Optional[str],
+) -> Optional[events.Target]:
+    if context.run_model.gateway_id is None:
+        return None
+
+    async with get_session_ctx() as session:
+        gateway_model, conn = await get_or_add_gateway_connection(
+            session, context.run_model.gateway_id
+        )
+    gateway_target = events.Target.from_model(gateway_model)
+    try:
+        logger.debug(
+            "%s: registering replica for service %s", fmt(context.job_model), context.run.id.hex
+        )
+        # JobRuntimeData might change on PULLING -> RUNNING path
+        # so we must update job_submission with the result value.
+        job_submission = context.job_submission.copy(deep=True)
+        job_submission.job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
+        async with conn.client() as gateway_client:
+            await gateway_client.register_replica(
+                run=context.run,
+                job_spec=JobSpec.__response__.parse_raw(context.job_model.job_spec_data),
+                job_submission=job_submission,
+                ssh_head_proxy=ssh_head_proxy,
+                ssh_head_proxy_private_key=ssh_head_proxy_private_key,
+            )
+    except (httpx.RequestError, SSHError) as e:
+        logger.debug("Gateway request failed", exc_info=True)
+        raise GatewayError(repr(e))
+    except GatewayError as e:
+        if "already exists in service" in e.msg:
+            logger.warning(
+                (
+                    "%s: could not register replica in gateway: %s."
+                    " NOTE: if you just updated dstack from pre-0.19.25 to 0.19.25+,"
+                    " expect to see this warning once for every running service replica"
+                ),
+                fmt(context.job_model),
+                e.msg,
+            )
+        else:
+            raise
+    return gateway_target
+
+
+async def _check_gpu_utilization(
+    context: _ProcessContext,
+    result: _ProcessResult,
+) -> None:
+    policy = context.job.job_spec.utilization_policy
+    if policy is None:
+        return
+
+    after = get_current_datetime() - timedelta(seconds=policy.time_window)
+    async with get_session_ctx() as session:
+        job_metrics = await get_job_metrics(session, context.job_model, after=after)
+    gpus_util_metrics: list[Metric] = []
+    for metric in job_metrics.metrics:
+        if metric.name.startswith("gpu_util_percent_gpu"):
+            gpus_util_metrics.append(metric)
+    if not gpus_util_metrics or gpus_util_metrics[0].timestamps[-1] > after + timedelta(minutes=1):
+        logger.debug("%s: GPU utilization check: not enough samples", fmt(context.job_model))
+        return
+    if _should_terminate_due_to_low_gpu_util(
+        policy.min_gpu_utilization, [metric.values for metric in gpus_util_metrics]
+    ):
+        logger.debug("%s: GPU utilization check: terminating", fmt(context.job_model))
+        _terminate_running_job(
+            job_model=context.job_model,
+            result=result,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message=(
+                f"The job GPU utilization below {policy.min_gpu_utilization}%"
+                f" for {policy.time_window} seconds"
+            ),
+        )
+    else:
+        logger.debug("%s: GPU utilization check: OK", fmt(context.job_model))
+
+
+def _should_terminate_due_to_low_gpu_util(
+    min_util: int, gpus_util: Iterable[Iterable[int]]
+) -> bool:
+    for gpu_util in gpus_util:
+        if all(util < min_util for util in gpu_util):
+            return True
+    return False
 
 
 def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> bool:
@@ -1031,6 +1253,168 @@ def _sync_shim_pulling_state(
     )
 
 
+@dataclass
+class _SubmitJobToRunnerResult:
+    success: bool
+    set_running_status: bool = False
+    job_runtime_data: Optional[JobRuntimeData] = None
+
+
+@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
+def _submit_job_to_runner(
+    ports: Dict[int, int],
+    run: Run,
+    job_model: JobModel,
+    job: Job,
+    jrd: Optional[JobRuntimeData],
+    cluster_info: ClusterInfo,
+    code: bytes,
+    file_archives: Iterable[tuple[uuid.UUID, bytes]],
+    secrets: Dict[str, str],
+    repo_credentials: Optional[RemoteRepoCreds],
+    success_if_not_available: bool,
+) -> Union[_SubmitJobToRunnerResult, Literal[False]]:
+    logger.debug("%s: submitting job spec", fmt(job_model))
+    logger.debug(
+        "%s: repo clone URL is %s",
+        fmt(job_model),
+        None if repo_credentials is None else repo_credentials.clone_url,
+    )
+    instance = job_model.instance
+    if instance is not None and (rci := get_instance_remote_connection_info(instance)) is not None:
+        instance_env = rci.env
+    else:
+        instance_env = None
+
+    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    if runner_client.healthcheck() is None:
+        return _SubmitJobToRunnerResult(success=success_if_not_available)
+
+    runner_client.submit_job(
+        run=run,
+        job=job,
+        cluster_info=cluster_info,
+        secrets={},
+        repo_credentials=repo_credentials,
+        instance_env=instance_env,
+    )
+    logger.debug("%s: uploading file archive(s)", fmt(job_model))
+    for archive_id, archive in file_archives:
+        runner_client.upload_archive(archive_id, archive)
+    logger.debug("%s: uploading code", fmt(job_model))
+    runner_client.upload_code(code)
+    logger.debug("%s: starting job", fmt(job_model))
+    job_info = runner_client.run_job()
+    if job_info is not None:
+        if jrd is not None:
+            jrd.working_dir = job_info.working_dir
+            jrd.username = job_info.username
+    return _SubmitJobToRunnerResult(
+        success=True,
+        set_running_status=True,
+        job_runtime_data=jrd,
+    )
+
+
+@dataclass
+class _ProcessRunningResult:
+    job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
+
+
+@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT])
+def _process_running(
+    ports: Dict[int, int],
+    run_model: RunModel,
+    job_model: JobModel,
+) -> Union[_ProcessRunningResult, Literal[False]]:
+    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    timestamp = job_model.runner_timestamp or 0
+    resp = runner_client.pull(timestamp)
+    logs_services.write_logs(
+        project=run_model.project,
+        run_name=run_model.run_name,
+        job_submission_id=job_model.id,
+        runner_logs=resp.runner_logs,
+        job_logs=resp.job_logs,
+    )
+    result = _ProcessRunningResult(
+        job_update_map=_JobUpdateMap(runner_timestamp=resp.last_updated)
+    )
+    if len(resp.job_states) > 0:
+        latest_state_event = resp.job_states[-1]
+        latest_status = latest_state_event.state
+        if latest_status == JobStatus.DONE:
+            _terminate_job(
+                job_model=job_model,
+                job_update_map=result.job_update_map,
+                termination_reason=JobTerminationReason.DONE_BY_RUNNER,
+                termination_reason_message=None,
+            )
+        elif latest_status in {JobStatus.FAILED, JobStatus.TERMINATED}:
+            termination_reason = JobTerminationReason.CONTAINER_EXITED_WITH_ERROR
+            if latest_state_event.termination_reason:
+                termination_reason = JobTerminationReason(
+                    latest_state_event.termination_reason.lower()
+                )
+            _terminate_job(
+                job_model=job_model,
+                job_update_map=result.job_update_map,
+                termination_reason=termination_reason,
+                termination_reason_message=latest_state_event.termination_message,
+            )
+        if latest_state_event.exit_status is not None:
+            result.job_update_map["exit_status"] = latest_state_event.exit_status
+            if latest_state_event.exit_status != 0:
+                logger.info(
+                    "%s: non-zero exit status %s", fmt(job_model), latest_state_event.exit_status
+                )
+    else:
+        _terminate_if_inactivity_duration_exceeded(
+            run_model=run_model,
+            job_model=job_model,
+            job_update_map=result.job_update_map,
+            no_connections_secs=resp.no_connections_secs,
+        )
+    return result
+
+
+def _terminate_if_inactivity_duration_exceeded(
+    run_model: RunModel,
+    job_model: JobModel,
+    job_update_map: _JobUpdateMap,
+    no_connections_secs: Optional[int],
+) -> None:
+    conf = RunSpec.__response__.parse_raw(run_model.run_spec).configuration
+    if not isinstance(conf, DevEnvironmentConfiguration) or not isinstance(
+        conf.inactivity_duration, int
+    ):
+        job_update_map["inactivity_secs"] = None
+        return
+
+    logger.debug("%s: no SSH connections for %s seconds", fmt(job_model), no_connections_secs)
+    job_update_map["inactivity_secs"] = no_connections_secs
+    if no_connections_secs is None:
+        _terminate_job(
+            job_model=job_model,
+            job_update_map=job_update_map,
+            termination_reason=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+            termination_reason_message=(
+                "The selected instance was created before dstack 0.18.41"
+                " and does not support inactivity_duration"
+            ),
+        )
+    elif no_connections_secs >= conf.inactivity_duration:
+        _terminate_job(
+            job_model=job_model,
+            job_update_map=job_update_map,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message=(
+                f"The job was inactive for {no_connections_secs} seconds,"
+                f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
+            ),
+        )
+
+
 def _should_terminate_job_due_to_disconnect(disconnected_at: Optional[datetime]) -> bool:
     if disconnected_at is None:
         return False
@@ -1137,67 +1521,26 @@ async def _get_job_file_archive(archive_id: uuid.UUID, user: UserModel) -> bytes
     return blob
 
 
-@dataclass
-class _SubmitJobToRunnerResult:
-    success: bool
-    set_running_status: bool = False
-    job_runtime_data: Optional[JobRuntimeData] = None
-
-
-@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
-def _submit_job_to_runner(
-    ports: Dict[int, int],
-    run: Run,
+def _emit_reachability_change_event(
+    session: AsyncSession,
     job_model: JobModel,
-    job: Job,
-    jrd: Optional[JobRuntimeData],
-    cluster_info: ClusterInfo,
-    code: bytes,
-    file_archives: Iterable[tuple[uuid.UUID, bytes]],
-    secrets: Dict[str, str],
-    repo_credentials: Optional[RemoteRepoCreds],
-    success_if_not_available: bool,
-) -> Union[_SubmitJobToRunnerResult, Literal[False]]:
-    logger.debug("%s: submitting job spec", fmt(job_model))
-    logger.debug(
-        "%s: repo clone URL is %s",
-        fmt(job_model),
-        None if repo_credentials is None else repo_credentials.clone_url,
-    )
-    instance = job_model.instance
-    if instance is not None and (rci := get_instance_remote_connection_info(instance)) is not None:
-        instance_env = rci.env
-    else:
-        instance_env = None
-
-    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
-    if runner_client.healthcheck() is None:
-        return _SubmitJobToRunnerResult(success=success_if_not_available)
-
-    runner_client.submit_job(
-        run=run,
-        job=job,
-        cluster_info=cluster_info,
-        secrets={},
-        repo_credentials=repo_credentials,
-        instance_env=instance_env,
-    )
-    logger.debug("%s: uploading file archive(s)", fmt(job_model))
-    for archive_id, archive in file_archives:
-        runner_client.upload_archive(archive_id, archive)
-    logger.debug("%s: uploading code", fmt(job_model))
-    runner_client.upload_code(code)
-    logger.debug("%s: starting job", fmt(job_model))
-    job_info = runner_client.run_job()
-    if job_info is not None:
-        if jrd is not None:
-            jrd.working_dir = job_info.working_dir
-            jrd.username = job_info.username
-    return _SubmitJobToRunnerResult(
-        success=True,
-        set_running_status=True,
-        job_runtime_data=jrd,
-    )
+    old_disconnected_at: Optional[datetime],
+    new_disconnected_at: Optional[datetime],
+) -> None:
+    if old_disconnected_at is None and new_disconnected_at is not None:
+        events.emit(
+            session,
+            "Job became unreachable",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(job_model)],
+        )
+    elif old_disconnected_at is not None and new_disconnected_at is None:
+        events.emit(
+            session,
+            "Job became reachable",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(job_model)],
+        )
 
 
 def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec) -> None:
@@ -1210,9 +1553,28 @@ def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec) -> None:
         )
 
 
+def _set_job_update_status(
+    job_model: JobModel,
+    job_update_map: _JobUpdateMap,
+    new_status: JobStatus,
+) -> None:
+    if job_update_map.get("status", job_model.status) != new_status:
+        job_update_map["status"] = new_status
+
+
+def _terminate_job(
+    job_model: JobModel,
+    job_update_map: _JobUpdateMap,
+    termination_reason: JobTerminationReason,
+    termination_reason_message: Optional[str],
+) -> None:
+    job_update_map["termination_reason"] = termination_reason
+    job_update_map["termination_reason_message"] = termination_reason_message
+    _set_job_update_status(job_model, job_update_map, JobStatus.TERMINATING)
+
+
 def _set_job_status(job_model: JobModel, result: _ProcessResult, new_status: JobStatus) -> None:
-    if _get_result_status(job_model, result) != new_status:
-        result.job_update_map["status"] = new_status
+    _set_job_update_status(job_model, result.job_update_map, new_status)
 
 
 def _get_result_status(job_model: JobModel, result: _ProcessResult) -> JobStatus:
@@ -1226,20 +1588,18 @@ def _get_result_disconnected_at(job_model: JobModel, result: _ProcessResult) -> 
 def _get_result_job_runtime_data(
     job_model: JobModel, result: _ProcessResult
 ) -> Optional[JobRuntimeData]:
-    raw_job_runtime_data = result.job_update_map.get(
-        "job_runtime_data", job_model.job_runtime_data
-    )
-    if raw_job_runtime_data is None:
+    jrd = result.job_update_map.get("job_runtime_data", job_model.job_runtime_data)
+    if jrd is None:
         return None
-    return JobRuntimeData.__response__.parse_raw(raw_job_runtime_data)
+    return JobRuntimeData.__response__.parse_raw(jrd)
 
 
-def _set_job_runtime_data(
-    result: _ProcessResult, job_runtime_data: Optional[JobRuntimeData]
-) -> None:
-    result.job_update_map["job_runtime_data"] = (
-        None if job_runtime_data is None else job_runtime_data.json()
-    )
+def _set_job_runtime_data(result: _ProcessResult, jrd: Optional[JobRuntimeData]) -> None:
+    result.job_update_map["job_runtime_data"] = None if jrd is None else jrd.json()
+
+
+def _get_result_registered(job_model: JobModel, result: _ProcessResult) -> bool:
+    return result.job_update_map.get("registered", job_model.registered)
 
 
 def _apply_submit_job_to_runner_result(
