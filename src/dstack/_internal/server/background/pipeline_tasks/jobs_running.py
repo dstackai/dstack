@@ -1402,11 +1402,10 @@ def _terminate_if_inactivity_duration_exceeded(
             ),
         )
     elif no_connections_secs >= conf.inactivity_duration:
-        # TODO(0.19 or earlier): set JobTerminationReason.INACTIVITY_DURATION_EXCEEDED
         _terminate_job(
             job_model=job_model,
             job_update_map=job_update_map,
-            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason=JobTerminationReason.INACTIVITY_DURATION_EXCEEDED,
             termination_reason_message=(
                 f"The job was inactive for {no_connections_secs} seconds,"
                 f" exceeding the inactivity_duration of {conf.inactivity_duration} seconds"
