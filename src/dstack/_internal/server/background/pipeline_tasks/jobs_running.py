@@ -260,8 +260,6 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
             return
 
         result = await _process_running_job(context=context)
-        set_processed_update_map_fields(result.job_update_map)
-        set_unlock_update_map_fields(result.job_update_map)
         await _apply_process_result(
             item=item,
             job_model=context.job_model,
@@ -734,6 +732,9 @@ async def _apply_process_result(
     job_model: JobModel,
     result: _ProcessResult,
 ) -> None:
+    set_processed_update_map_fields(result.job_update_map)
+    set_unlock_update_map_fields(result.job_update_map)
+
     async with get_session_ctx() as session:
         now = get_current_datetime()
         resolve_now_placeholders(result.job_update_map, now=now)

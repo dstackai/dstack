@@ -251,14 +251,6 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
                 instance_model=get_or_error(instance_model),
             )
 
-        set_processed_update_map_fields(result.job_update_map)
-        set_unlock_update_map_fields(result.job_update_map)
-        if instance_model is not None:
-            if result.instance_update_map is None:
-                result.instance_update_map = _InstanceUpdateMap()
-            instance_update_map = result.instance_update_map
-            set_processed_update_map_fields(instance_update_map)
-            set_unlock_update_map_fields(instance_update_map)
         await _apply_process_result(
             item=item,
             job_model=job_model,
@@ -439,6 +431,14 @@ async def _apply_process_result(
     instance_model: Optional[InstanceModel],
     result: _ProcessResult,
 ) -> None:
+    set_processed_update_map_fields(result.job_update_map)
+    set_unlock_update_map_fields(result.job_update_map)
+    if instance_model is not None and result.instance_update_map is None:
+        result.instance_update_map = _InstanceUpdateMap()
+    if result.instance_update_map is not None:
+        set_processed_update_map_fields(result.instance_update_map)
+        set_unlock_update_map_fields(result.instance_update_map)
+
     async with get_session_ctx() as session:
         now = get_current_datetime()
         related_instance_lock_owner = _get_related_instance_lock_owner(item.id)

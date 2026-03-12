@@ -238,8 +238,7 @@ class InstanceWorker(Worker[InstancePipelineItem]):
             process_context = await _process_terminating_item(item)
         if process_context is None:
             return
-        set_processed_update_map_fields(process_context.result.instance_update_map)
-        set_unlock_update_map_fields(process_context.result.instance_update_map)
+
         await _apply_process_result(
             item=item,
             instance_model=process_context.instance_model,
@@ -376,6 +375,9 @@ async def _apply_process_result(
     instance_model: InstanceModel,
     result: ProcessResult,
 ) -> None:
+    set_processed_update_map_fields(result.instance_update_map)
+    set_unlock_update_map_fields(result.instance_update_map)
+
     async with get_session_ctx() as session:
         if result.health_check_create is not None:
             session.add(InstanceHealthCheckModel(**result.health_check_create))

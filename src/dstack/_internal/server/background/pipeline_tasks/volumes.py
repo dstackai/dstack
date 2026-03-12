@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Sequence
+from typing import Optional, Sequence
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only
@@ -202,13 +202,22 @@ class VolumeWorker(Worker[VolumePipelineItem]):
 
     @sentry_utils.instrument_named_task("pipeline_tasks.VolumeWorker.process")
     async def process(self, item: VolumePipelineItem):
+        volume_model = await _refetch_locked_volume(item)
+        if volume_model is None:
+            log_lock_token_mismatch(logger, item)
+            return
+
         if item.to_be_deleted:
-            await _process_to_be_deleted_item(item)
+            result = await _process_to_be_deleted_volume(volume_model)
         elif item.status == VolumeStatus.SUBMITTED:
-            await _process_submitted_item(item)
+            result = await _process_submitted_volume(volume_model)
+        else:
+            return
+
+        await _apply_process_result(item=item, volume_model=volume_model, result=result)
 
 
-async def _process_submitted_item(item: VolumePipelineItem):
+async def _refetch_locked_volume(item: VolumePipelineItem) -> Optional[VolumeModel]:
     async with get_session_ctx() as session:
         res = await session.execute(
             select(VolumeModel)
@@ -217,7 +226,7 @@ async def _process_submitted_item(item: VolumePipelineItem):
                 VolumeModel.lock_token == item.lock_token,
             )
             .options(joinedload(VolumeModel.project).joinedload(ProjectModel.backends))
-            .options(joinedload(VolumeModel.user))
+            .options(joinedload(VolumeModel.user).load_only(UserModel.name))
             .options(
                 joinedload(VolumeModel.attachments)
                 .joinedload(VolumeAttachmentModel.instance)
@@ -225,13 +234,16 @@ async def _process_submitted_item(item: VolumePipelineItem):
                 .load_only(FleetModel.name)
             )
         )
-        volume_model = res.unique().scalar_one_or_none()
-        if volume_model is None:
-            log_lock_token_mismatch(logger, item)
-            return
+        return res.unique().scalar_one_or_none()
 
-    result = await _process_submitted_volume(volume_model)
-    update_map = result.update_map
+
+async def _apply_process_result(
+    item: VolumePipelineItem,
+    volume_model: VolumeModel,
+    result: "_ProcessResult",
+):
+    update_map = _VolumeUpdateMap()
+    update_map.update(result.update_map)
     set_processed_update_map_fields(update_map)
     set_unlock_update_map_fields(update_map)
 
@@ -249,15 +261,25 @@ async def _process_submitted_item(item: VolumePipelineItem):
         updated_ids = list(res.scalars().all())
         if len(updated_ids) == 0:
             log_lock_token_changed_after_processing(logger, item)
-            # TODO: Clean up volume.
+            if item.status == VolumeStatus.SUBMITTED:
+                # TODO: Clean up volume.
+                pass
             return
-        emit_volume_status_change_event(
-            session=session,
-            volume_model=volume_model,
-            old_status=volume_model.status,
-            new_status=update_map.get("status", volume_model.status),
-            status_message=update_map.get("status_message", volume_model.status_message),
-        )
+        if item.to_be_deleted:
+            events.emit(
+                session,
+                "Volume deleted",
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(volume_model)],
+            )
+        else:
+            emit_volume_status_change_event(
+                session=session,
+                volume_model=volume_model,
+                old_status=volume_model.status,
+                new_status=update_map.get("status", volume_model.status),
+                status_message=update_map.get("status_message", volume_model.status_message),
+            )
 
 
 class _VolumeUpdateMap(ItemUpdateMap, total=False):
@@ -269,11 +291,11 @@ class _VolumeUpdateMap(ItemUpdateMap, total=False):
 
 
 @dataclass
-class _SubmittedResult:
+class _ProcessResult:
     update_map: _VolumeUpdateMap = field(default_factory=_VolumeUpdateMap)
 
 
-async def _process_submitted_volume(volume_model: VolumeModel) -> _SubmittedResult:
+async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult:
     volume = volume_model_to_volume(volume_model)
     try:
         backend = await backends_services.get_project_backend_by_type_or_error(
@@ -287,7 +309,7 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _SubmittedResu
             volume.name,
             volume.configuration.backend.value,
         )
-        return _SubmittedResult(
+        return _ProcessResult(
             update_map={
                 "status": VolumeStatus.FAILED,
                 "status_message": "Backend not available",
@@ -314,7 +336,7 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _SubmittedResu
         status_message = f"Backend error: {repr(e)}"
         if len(e.args) > 0:
             status_message = str(e.args[0])
-        return _SubmittedResult(
+        return _ProcessResult(
             update_map={
                 "status": VolumeStatus.FAILED,
                 "status_message": status_message,
@@ -322,7 +344,7 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _SubmittedResu
         )
     except Exception as e:
         logger.exception("Got exception when creating volume %s", volume_model.name)
-        return _SubmittedResult(
+        return _ProcessResult(
             update_map={
                 "status": VolumeStatus.FAILED,
                 "status_message": f"Unexpected error: {repr(e)}",
@@ -332,7 +354,7 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _SubmittedResu
     logger.info("Added new volume %s", volume_model.name)
     # Provisioned volumes marked as active since they become available almost immediately in AWS
     # TODO: Consider checking volume state
-    return _SubmittedResult(
+    return _ProcessResult(
         update_map={
             "status": VolumeStatus.ACTIVE,
             "volume_provisioning_data": vpd.json(),
@@ -340,63 +362,7 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _SubmittedResu
     )
 
 
-async def _process_to_be_deleted_item(item: VolumePipelineItem):
-    async with get_session_ctx() as session:
-        res = await session.execute(
-            select(VolumeModel)
-            .where(
-                VolumeModel.id == item.id,
-                VolumeModel.lock_token == item.lock_token,
-            )
-            .options(joinedload(VolumeModel.project).joinedload(ProjectModel.backends))
-            .options(joinedload(VolumeModel.user).load_only(UserModel.name))
-            .options(
-                joinedload(VolumeModel.attachments)
-                .joinedload(VolumeAttachmentModel.instance)
-                .joinedload(InstanceModel.fleet)
-                .load_only(FleetModel.name)
-            )
-        )
-        volume_model = res.unique().scalar_one_or_none()
-        if volume_model is None:
-            log_lock_token_mismatch(logger, item)
-            return
-
-    result = await _process_to_be_deleted_volume(volume_model)
-    update_map = _VolumeUpdateMap()
-    update_map.update(result.update_map)
-    set_processed_update_map_fields(update_map)
-    set_unlock_update_map_fields(update_map)
-    async with get_session_ctx() as session:
-        now = get_current_datetime()
-        resolve_now_placeholders(update_map, now=now)
-        res = await session.execute(
-            update(VolumeModel)
-            .where(
-                VolumeModel.id == volume_model.id,
-                VolumeModel.lock_token == volume_model.lock_token,
-            )
-            .values(**update_map)
-            .returning(VolumeModel.id)
-        )
-        updated_ids = list(res.scalars().all())
-        if len(updated_ids) == 0:
-            log_lock_token_changed_after_processing(logger, item)
-            return
-        events.emit(
-            session,
-            "Volume deleted",
-            actor=events.SystemActor(),
-            targets=[events.Target.from_model(volume_model)],
-        )
-
-
-@dataclass
-class _ProcessToBeDeletedResult:
-    update_map: _VolumeUpdateMap = field(default_factory=_VolumeUpdateMap)
-
-
-async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessToBeDeletedResult:
+async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessResult:
     volume = volume_model_to_volume(volume_model)
     if volume.external:
         return _get_deleted_result()
@@ -437,8 +403,8 @@ async def _process_to_be_deleted_volume(volume_model: VolumeModel) -> _ProcessTo
     return _get_deleted_result()
 
 
-def _get_deleted_result() -> _ProcessToBeDeletedResult:
-    return _ProcessToBeDeletedResult(
+def _get_deleted_result() -> _ProcessResult:
+    return _ProcessResult(
         update_map={
             "deleted": True,
             "deleted_at": NOW_PLACEHOLDER,
