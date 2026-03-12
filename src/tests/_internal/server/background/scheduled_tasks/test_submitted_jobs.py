@@ -472,6 +472,42 @@ class TestProcessSubmittedJobs:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_job_fails_if_imported_ssh_fleet_is_empty(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        exporter_project = await create_project(session, name="exporter-project", owner=user)
+        importer_project = await create_project(session, name="importer-project", owner=user)
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+            name="exported-fleet",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+            status=JobStatus.SUBMITTED,
+        )
+        await process_submitted_jobs()
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_assigns_second_replica_to_same_imported_fleet(
         self, test_db, session: AsyncSession
     ):
