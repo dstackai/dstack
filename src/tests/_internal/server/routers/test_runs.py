@@ -1,7 +1,7 @@
 import copy
 import json
 from datetime import datetime, timezone
-from typing import Dict, Generator, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID
 
@@ -2351,14 +2351,7 @@ class TestDeleteRuns:
 
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestSubmitService:
-    @pytest.fixture(autouse=True)
-    def mock_gateway_connection(self) -> Generator[AsyncMock, None, None]:
-        with patch(
-            "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
-        ) as get_conn_mock:
-            get_conn_mock.return_value.client = Mock()
-            get_conn_mock.return_value.client.return_value = AsyncMock()
-            yield get_conn_mock
+    pytestmark = pytest.mark.usefixtures("mock_gateway_connection")
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
