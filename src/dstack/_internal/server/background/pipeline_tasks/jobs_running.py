@@ -337,9 +337,9 @@ async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
     result = _ProcessResult()
     if context.job_provisioning_data is None:
         logger.error("%s: job_provisioning_data of an active job is None", fmt(context.job_model))
-        _terminate_running_job(
+        _terminate_job(
             job_model=context.job_model,
-            result=result,
+            job_update_map=result.job_update_map,
             termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
             termination_reason_message=(
                 "Unexpected server error: job_provisioning_data of an active job is None"
@@ -433,9 +433,9 @@ async def _prepare_startup_context(
     try:
         _interpolate_secrets(secrets, context.job.job_spec)
     except InterpolatorError as e:
-        _terminate_running_job(
+        _terminate_job(
             job_model=context.job_model,
-            result=result,
+            job_update_map=result.job_update_map,
             termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
             termination_reason_message=f"Secrets interpolation error: {e.args[0]}",
         )
@@ -596,9 +596,9 @@ async def _process_provisioning_status(
         instance_type_name=job_provisioning_data.instance_type.name,
     )
     if context.job_submission.age > provisioning_timeout:
-        _terminate_running_job(
+        _terminate_job(
             job_model=context.job_model,
-            result=result,
+            job_update_map=result.job_update_map,
             termination_reason=JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED,
             termination_reason_message=(
                 f"Runner did not become available within {provisioning_timeout.total_seconds()}s."
@@ -628,31 +628,30 @@ async def _process_pulling_status(
         job_model=context.job_model,
         jrd=_get_result_job_runtime_data(context.job_model, result),
     )
-    if shim_state is False:
-        shim_state = None
-    elif shim_state.job_runtime_data is not None:
-        _set_job_runtime_data(result, shim_state.job_runtime_data)
+    if shim_state is not False:
+        if shim_state.job_runtime_data is not None:
+            _set_job_runtime_data(result, shim_state.job_runtime_data)
 
-    if shim_state is not None and shim_state.state == _ShimPullingState.WAITING:
-        _reset_disconnected_at(context.job_model, result)
-        return
+        if shim_state.state == _ShimPullingState.WAITING:
+            _reset_disconnected_at(context.job_model, result)
+            return
 
-    if shim_state is not None and shim_state.state == _ShimPullingState.FAILED:
-        logger.warning(
-            "%s: failed due to %s, age=%s",
-            fmt(context.job_model),
-            get_or_error(shim_state.termination_reason).value,
-            context.job_submission.age,
-        )
-        _terminate_running_job(
-            job_model=context.job_model,
-            result=result,
-            termination_reason=get_or_error(shim_state.termination_reason),
-            termination_reason_message=get_or_error(shim_state.termination_reason_message),
-        )
-        return
+        if shim_state.state == _ShimPullingState.FAILED:
+            logger.warning(
+                "%s: failed due to %s, age=%s",
+                fmt(context.job_model),
+                get_or_error(shim_state.termination_reason).value,
+                context.job_submission.age,
+            )
+            _terminate_job(
+                job_model=context.job_model,
+                job_update_map=result.job_update_map,
+                termination_reason=get_or_error(shim_state.termination_reason),
+                termination_reason_message=get_or_error(shim_state.termination_reason_message),
+            )
+            return
 
-    if shim_state is not None and shim_state.state == _ShimPullingState.READY:
+        # _ShimPullingState.READY
         job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
         runner_availability = await run_async(
             _get_runner_availability,
@@ -700,6 +699,7 @@ async def _process_pulling_status(
                 _reset_disconnected_at(context.job_model, result)
                 return
 
+    # SSH tunnel failed or READY but runner submit failed — treat as disconnect
     _set_disconnected_at_now(context.job_model, result)
     if not _should_terminate_job_due_to_disconnect(
         _get_result_disconnected_at(context.job_model, result)
@@ -715,9 +715,9 @@ async def _process_pulling_status(
         termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
     else:
         termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
-    _terminate_running_job(
+    _terminate_job(
         job_model=context.job_model,
-        result=result,
+        job_update_map=result.job_update_map,
         termination_reason=termination_reason,
         termination_reason_message="Instance is unreachable",
     )
@@ -763,9 +763,9 @@ async def _process_running_status(
         termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
     else:
         termination_reason = JobTerminationReason.INSTANCE_UNREACHABLE
-    _terminate_running_job(
+    _terminate_job(
         job_model=context.job_model,
-        result=result,
+        job_update_map=result.job_update_map,
         termination_reason=termination_reason,
         termination_reason_message="Instance is unreachable",
     )
@@ -796,52 +796,47 @@ async def _apply_process_result(
         if result.new_probe_models:
             session.add_all(result.new_probe_models)
 
-        emit_job_status_change_event(
-            session=session,
-            job_model=job_model,
-            old_status=job_model.status,
-            new_status=result.job_update_map.get("status", job_model.status),
-            termination_reason=result.job_update_map.get(
-                "termination_reason", job_model.termination_reason
-            ),
-            termination_reason_message=result.job_update_map.get(
-                "termination_reason_message",
-                job_model.termination_reason_message,
-            ),
-        )
-        _emit_reachability_change_event(
-            session=session,
-            job_model=job_model,
-            old_disconnected_at=job_model.disconnected_at,
-            new_disconnected_at=result.job_update_map.get(
-                "disconnected_at",
-                job_model.disconnected_at,
-            ),
-        )
-        if result.emit_register_replica_event:
-            targets = [events.Target.from_model(job_model)]
-            if result.register_gateway_target is not None:
-                targets.append(result.register_gateway_target)
-            events.emit(
-                session,
-                "Service replica registered to receive requests",
-                actor=events.SystemActor(),
-                targets=targets,
-            )
+        _emit_result_events(session=session, job_model=job_model, result=result)
 
 
-def _terminate_running_job(
+def _emit_result_events(
+    session: AsyncSession,
     job_model: JobModel,
     result: _ProcessResult,
-    termination_reason: JobTerminationReason,
-    termination_reason_message: str,
 ) -> None:
-    _terminate_job(
+    """Emit audit events for changes recorded in result.."""
+    emit_job_status_change_event(
+        session=session,
         job_model=job_model,
-        job_update_map=result.job_update_map,
-        termination_reason=termination_reason,
-        termination_reason_message=termination_reason_message,
+        old_status=job_model.status,
+        new_status=result.job_update_map.get("status", job_model.status),
+        termination_reason=result.job_update_map.get(
+            "termination_reason", job_model.termination_reason
+        ),
+        termination_reason_message=result.job_update_map.get(
+            "termination_reason_message",
+            job_model.termination_reason_message,
+        ),
     )
+    _emit_reachability_change_event(
+        session=session,
+        job_model=job_model,
+        old_disconnected_at=job_model.disconnected_at,
+        new_disconnected_at=result.job_update_map.get(
+            "disconnected_at",
+            job_model.disconnected_at,
+        ),
+    )
+    if result.emit_register_replica_event:
+        targets = [events.Target.from_model(job_model)]
+        if result.register_gateway_target is not None:
+            targets.append(result.register_gateway_target)
+        events.emit(
+            session,
+            "Service replica registered to receive requests",
+            actor=events.SystemActor(),
+            targets=targets,
+        )
 
 
 def _wait_for_instance_provisioning_data(
@@ -862,9 +857,9 @@ def _wait_for_instance_provisioning_data(
         return
 
     if job_model.instance.status == InstanceStatus.TERMINATED:
-        _terminate_running_job(
+        _terminate_job(
             job_model=job_model,
-            result=result,
+            job_update_map=result.job_update_map,
             termination_reason=JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED,
             termination_reason_message="Instance is terminated",
         )
@@ -922,9 +917,9 @@ async def _maybe_register_replica(
         )
     except GatewayError as e:
         logger.warning("%s: failed to register service replica: %s", fmt(context.job_model), e)
-        _terminate_running_job(
+        _terminate_job(
             job_model=context.job_model,
-            result=result,
+            job_update_map=result.job_update_map,
             termination_reason=JobTerminationReason.GATEWAY_ERROR,
             termination_reason_message="Failed to register service replica",
         )
@@ -1006,9 +1001,10 @@ async def _check_gpu_utilization(
         policy.min_gpu_utilization, [metric.values for metric in gpus_util_metrics]
     ):
         logger.debug("%s: GPU utilization check: terminating", fmt(context.job_model))
-        _terminate_running_job(
+        # TODO(0.19 or earlier): set JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY
+        _terminate_job(
             job_model=context.job_model,
-            result=result,
+            job_update_map=result.job_update_map,
             termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
             termination_reason_message=(
                 f"The job GPU utilization below {policy.min_gpu_utilization}%"
@@ -1223,7 +1219,7 @@ def _sync_shim_pulling_state(
         if jrd is not None:
             if task.ports is None:
                 return _SyncShimPullingStateResult(state=_ShimPullingState.WAITING)
-            jrd.ports = {pm.container: pm.host for pm in task.ports}
+            jrd = jrd.copy(update={"ports": {pm.container: pm.host for pm in task.ports}})
     else:
         shim_status = shim_client.pull()
         if (
@@ -1294,6 +1290,8 @@ def _submit_job_to_runner(
         run=run,
         job=job,
         cluster_info=cluster_info,
+        # Do not send all the secrets since interpolation is already done by the server.
+        # TODO: Passing secrets may be necessary for filtering out secret values from logs.
         secrets={},
         repo_credentials=repo_credentials,
         instance_env=instance_env,
@@ -1394,6 +1392,7 @@ def _terminate_if_inactivity_duration_exceeded(
     logger.debug("%s: no SSH connections for %s seconds", fmt(job_model), no_connections_secs)
     job_update_map["inactivity_secs"] = no_connections_secs
     if no_connections_secs is None:
+        # TODO(0.19 or earlier): make no_connections_secs required
         _terminate_job(
             job_model=job_model,
             job_update_map=job_update_map,
@@ -1404,6 +1403,7 @@ def _terminate_if_inactivity_duration_exceeded(
             ),
         )
     elif no_connections_secs >= conf.inactivity_duration:
+        # TODO(0.19 or earlier): set JobTerminationReason.INACTIVITY_DURATION_EXCEEDED
         _terminate_job(
             job_model=job_model,
             job_update_map=job_update_map,
@@ -1454,6 +1454,7 @@ def _get_cluster_info(
 
 
 def _get_repo_code_hash(run: Run, job: Job) -> Optional[str]:
+    # TODO: drop this function when supporting jobs submitted before 0.19.17 is no longer relevant.
     if (
         job.job_spec.repo_code_hash is None
         and run.run_spec.repo_code_hash is not None
@@ -1553,15 +1554,6 @@ def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec) -> None:
         )
 
 
-def _set_job_update_status(
-    job_model: JobModel,
-    job_update_map: _JobUpdateMap,
-    new_status: JobStatus,
-) -> None:
-    if job_update_map.get("status", job_model.status) != new_status:
-        job_update_map["status"] = new_status
-
-
 def _terminate_job(
     job_model: JobModel,
     job_update_map: _JobUpdateMap,
@@ -1573,8 +1565,26 @@ def _terminate_job(
     _set_job_update_status(job_model, job_update_map, JobStatus.TERMINATING)
 
 
+def _set_job_update_status(
+    job_model: JobModel,
+    job_update_map: _JobUpdateMap,
+    new_status: JobStatus,
+) -> None:
+    if job_update_map.get("status", job_model.status) != new_status:
+        job_update_map["status"] = new_status
+
+
 def _set_job_status(job_model: JobModel, result: _ProcessResult, new_status: JobStatus) -> None:
     _set_job_update_status(job_model, result.job_update_map, new_status)
+
+
+def _set_job_runtime_data(result: _ProcessResult, jrd: Optional[JobRuntimeData]) -> None:
+    result.job_update_map["job_runtime_data"] = None if jrd is None else jrd.json()
+
+
+# Convention: _get_result_* helpers merge the loaded job_model state with any pending
+# updates recorded in result.job_update_map. Always use these (not job_model.attr directly)
+# when the field may have been updated earlier in the same processing cycle.
 
 
 def _get_result_status(job_model: JobModel, result: _ProcessResult) -> JobStatus:
@@ -1592,10 +1602,6 @@ def _get_result_job_runtime_data(
     if jrd is None:
         return None
     return JobRuntimeData.__response__.parse_raw(jrd)
-
-
-def _set_job_runtime_data(result: _ProcessResult, jrd: Optional[JobRuntimeData]) -> None:
-    result.job_update_map["job_runtime_data"] = None if jrd is None else jrd.json()
 
 
 def _get_result_registered(job_model: JobModel, result: _ProcessResult) -> bool:
