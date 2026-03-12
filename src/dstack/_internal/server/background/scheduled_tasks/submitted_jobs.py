@@ -409,13 +409,14 @@ async def _process_submitted_job(
             await session.commit()
             return
 
-        master_instance_provisioning_data = (
-            await _fetch_fleet_with_master_instance_provisioning_data(
-                exit_stack=exit_stack,
-                session=session,
-                fleet_model=fleet_model,
-                job=job,
-            )
+        (
+            fleet_model,
+            master_instance_provisioning_data,
+        ) = await _fetch_fleet_with_master_instance_provisioning_data(
+            exit_stack=exit_stack,
+            session=session,
+            fleet_model=fleet_model,
+            job=job,
         )
         master_provisioning_data = (
             master_job_provisioning_data or master_instance_provisioning_data
@@ -573,7 +574,7 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
     session: AsyncSession,
     fleet_model: Optional[FleetModel],
     job: Job,
-) -> Optional[JobProvisioningData]:
+) -> tuple[Optional[FleetModel], Optional[JobProvisioningData]]:
     # TODO: When submitted-jobs provisioning moves to pipelines, stop inferring the
     # cluster master from loaded fleet instances here. Resolve the current master via
     # FleetModel.current_master_instance_id so jobs follow the same master election
@@ -626,7 +627,7 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
                 fleet_model=fleet_model,
                 fleet_spec=fleet.spec,
             )
-    return master_instance_provisioning_data
+    return fleet_model, master_instance_provisioning_data
 
 
 async def _assign_job_to_fleet_instance(
@@ -848,9 +849,6 @@ async def _run_jobs_on_new_instances(
             )
             continue
         finally:
-            # FIXME: Race condition when checking len(fleet_model.instances) == 0
-            # if provisioning independent jobs in a cluster fleet.
-            # Leads to placement groups being marked for deletion while still in use.
             if fleet_model is not None and len(fleet_model.instances) == 0:
                 # Clean up placement groups that did not end up being used.
                 for pg in placement_group_models:
