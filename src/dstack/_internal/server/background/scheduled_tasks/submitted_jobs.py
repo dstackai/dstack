@@ -105,7 +105,10 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.offers import (
+    get_instance_offer_with_restricted_az,
+    get_offers_by_requirements,
+)
 from dstack._internal.server.services.placement import (
     find_or_create_suitable_placement_group,
     get_fleet_placement_group_models,
@@ -782,6 +785,13 @@ async def _run_jobs_on_new_instances(
         offer_volumes = _get_offer_volumes(volumes, offer)
         job_configurations = [JobConfiguration(job=j, volumes=offer_volumes) for j in jobs]
         compute = backend.compute()
+        if master_job_provisioning_data is not None:
+            # `get_offers_by_requirements()` already restricts backend and region from the master.
+            # Availability zone still has to be narrowed per offer.
+            offer = get_instance_offer_with_restricted_az(
+                instance_offer=offer,
+                master_job_provisioning_data=master_job_provisioning_data,
+            )
         if (
             fleet_model is not None
             and len(fleet_model.instances) == 0
