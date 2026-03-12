@@ -13,15 +13,9 @@ if [[ -z "${LITESTREAM_REPLICA_URL}" ]]; then
   exec dstack server --host 0.0.0.0
 else
   if [[ ! -f "$DB_PATH" ]]; then
-    echo "Attempting Litestream restore..."
-    if ! output=$(litestream restore -o "$DB_PATH" "$LITESTREAM_REPLICA_URL" 2>&1); then
-      if echo "$output" | grep -qiE "cannot calc restore plan"; then
-        echo "No replica snapshots found; starting with empty database."
-      else
-        echo "$output" >&2
-        exit 1
-      fi
-    fi
+    echo "Starting db restore"
+    litestream restore -if-replica-exists -o "$DB_PATH" "$LITESTREAM_REPLICA_URL"
+    echo "Finished db restore"
   fi
   exec litestream replicate -exec "dstack server --host 0.0.0.0" "$DB_PATH" "$LITESTREAM_REPLICA_URL"
 fi
