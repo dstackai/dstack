@@ -23,7 +23,7 @@ for running tasks, dev environments, and services. Imported resources appear wit
 
 !!! info "Required project role"
     The user creating or updating an export must have the project admin role on both the exporter project and
-    each importer project. Alternatively, a global admin can add any project as an importer.
+    any importer project they add. Alternatively, a global admin can add any project as an importer.
 
 ## Manage exports
 
