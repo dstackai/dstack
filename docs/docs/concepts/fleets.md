@@ -468,6 +468,15 @@ ssh_config:
 !!! info "Reference"
     The fleet configuration file supports additional options, including [`instance_types`](../reference/dstack.yml/fleet.md#instance_types), [`max_price`](../reference/dstack.yml/fleet.md#max_price), [`regions`](../reference/dstack.yml/fleet.md#max_price), among others. For the complete list, see the [reference](../reference/dstack.yml/fleet.md).
 
+## Tenant isolation
+
+Workloads running on a fleet have access to the host, including mounted folders. For distributed workloads,
+containers use host network mode.
+
+Tighter isolation is on the roadmap, including [SSH reverse proxy](https://github.com/dstackai/dstack/issues/3644){:target="_blank"} and rootless access to the host.
+
+When [exporting fleets](exports.md) to other projects, the same access model applies to members of the importer projects.
+
 ## Export fleets
 
 Fleets can be exported to other projects, allowing those projects to use the exported fleets

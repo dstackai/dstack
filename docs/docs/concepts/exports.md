@@ -134,6 +134,9 @@ $ dstack fleet list
 
 Imported fleets can be used for runs just like the project's own fleets.
 
+!!! info "Tenant isolation"
+    Exported fleets share the same access model as regular fleets. See [Tenant isolation](fleets.md#tenant-isolation) for details.
+
 !!! info "What's next?"
     1. Check the [`dstack export` CLI reference](../reference/cli/dstack/export.md)
     2. Learn how to manage [fleets](fleets.md)
