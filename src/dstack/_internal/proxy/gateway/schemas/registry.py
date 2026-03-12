@@ -54,6 +54,7 @@ class RegisterReplicaRequest(BaseModel):
     ssh_host: str
     ssh_port: int
     ssh_proxy: Optional[SSHConnectionParams]
+    ssh_proxy_private_key: Optional[str]
     ssh_head_proxy: Optional[SSHConnectionParams]
     ssh_head_proxy_private_key: Optional[str]
     internal_ip: Optional[str] = None

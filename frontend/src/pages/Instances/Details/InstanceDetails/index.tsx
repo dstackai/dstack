@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { Box, ColumnLayout, Container, Header, Loader, NavigateLink, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-import { formatBackend, getStatusIconType } from 'libs/fleet';
+import { formatBackend, getStatusIconColor, getStatusIconType } from 'libs/fleet';
 import { getHealthStatusIconType, prettyEnumValue } from 'libs/instance';
 import { formatResources } from 'libs/resources';
 import { ROUTES } from 'routes';
@@ -52,9 +52,7 @@ export const InstanceDetails = () => {
                             <Box variant="awsui-key-label">{t('fleets.fleet')}</Box>
                             <div>
                                 {data.fleet_name && data.fleet_id ? (
-                                    <NavigateLink
-                                        href={ROUTES.FLEETS.DETAILS.FORMAT(data.project_name, data.fleet_id)}
-                                    >
+                                    <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(data.project_name, data.fleet_id)}>
                                         {data.fleet_name}
                                     </NavigateLink>
                                 ) : (
@@ -66,7 +64,10 @@ export const InstanceDetails = () => {
                         <div>
                             <Box variant="awsui-key-label">{t('fleets.instances.status')}</Box>
                             <div>
-                                <StatusIndicator type={getStatusIconType(data.status)}>
+                                <StatusIndicator
+                                    type={getStatusIconType(data.status)}
+                                    colorOverride={getStatusIconColor(data.status)}
+                                >
                                     {(data.status === 'idle' || data.status === 'busy') &&
                                     data.total_blocks !== null &&
                                     data.total_blocks > 1
@@ -98,17 +99,13 @@ export const InstanceDetails = () => {
 
                         <div>
                             <Box variant="awsui-key-label">{t('fleets.instances.finished_at')}</Box>
-                            <div>
-                                {data.finished_at ? format(new Date(data.finished_at), DATE_TIME_FORMAT) : '-'}
-                            </div>
+                            <div>{data.finished_at ? format(new Date(data.finished_at), DATE_TIME_FORMAT) : '-'}</div>
                         </div>
 
                         {data.termination_reason && (
                             <div>
                                 <Box variant="awsui-key-label">{t('fleets.instances.termination_reason')}</Box>
-                                <div>
-                                    {data.termination_reason_message ?? prettyEnumValue(data.termination_reason)}
-                                </div>
+                                <div>{data.termination_reason_message ?? prettyEnumValue(data.termination_reason)}</div>
                             </div>
                         )}
 

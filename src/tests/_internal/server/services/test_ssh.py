@@ -31,20 +31,32 @@ from dstack._internal.utils.path import FileContent
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 @pytest.mark.usefixtures("test_db", "image_config_mock")
 class TestGetContainerSSHCredentials:
-    project_key = "project-key"
+    instance_project_key = "instance-project-key"
+    run_project_key = "run-project-key"
 
     @pytest_asyncio.fixture
-    async def project(self, session: AsyncSession) -> ProjectModel:
-        return await create_project(session=session, ssh_private_key=self.project_key)
-
-    @pytest_asyncio.fixture
-    async def run(self, session: AsyncSession, project: ProjectModel) -> RunModel:
-        user = await create_user(session=session)
-        repo = await create_repo(
+    async def instance_project(self, session: AsyncSession) -> ProjectModel:
+        owner = await create_user(session=session, name="instance-project-owner")
+        return await create_project(
             session=session,
-            project_id=project.id,
+            name="instance-project",
+            owner=owner,
+            ssh_private_key=self.instance_project_key,
         )
-        return await create_run(session=session, project=project, user=user, repo=repo)
+
+    @pytest_asyncio.fixture
+    async def run(self, session: AsyncSession) -> RunModel:
+        run_project_owner = await create_user(session=session, name="run-project-owner")
+        run_project = await create_project(
+            session=session, name="run-project", ssh_private_key=self.run_project_key
+        )
+        repo = await create_repo(session=session, project_id=run_project.id)
+        run = await create_run(
+            session=session, project=run_project, user=run_project_owner, repo=repo
+        )
+        # Triggers session magic, attaches ProjectModel to JobModel somehow
+        assert run.project is not None
+        return run
 
     @pytest.mark.parametrize(
         ["jrd", "expected_port"],
@@ -67,12 +79,14 @@ class TestGetContainerSSHCredentials:
     async def test_vm_based_backend(
         self,
         session: AsyncSession,
-        project: ProjectModel,
+        instance_project: ProjectModel,
         run: RunModel,
         jrd: Optional[JobRuntimeData],
         expected_port: int,
     ):
-        instance = await create_instance(session=session, project=project, backend=BackendType.AWS)
+        instance = await create_instance(
+            session=session, project=instance_project, backend=BackendType.AWS
+        )
         jpd = get_job_provisioning_data(
             backend=BackendType.AWS,
             dockerized=True,
@@ -98,7 +112,7 @@ class TestGetContainerSSHCredentials:
                     username="ubuntu",
                     port=22,
                 ),
-                FileContent(self.project_key),
+                FileContent(self.instance_project_key),
             ),
             (
                 SSHConnectionParams(
@@ -106,18 +120,18 @@ class TestGetContainerSSHCredentials:
                     username="root",
                     port=expected_port,
                 ),
-                FileContent(self.project_key),
+                FileContent(self.run_project_key),
             ),
         ]
 
     async def test_container_based_backend(
         self,
         session: AsyncSession,
-        project: ProjectModel,
+        instance_project: ProjectModel,
         run: RunModel,
     ):
         instance = await create_instance(
-            session=session, project=project, backend=BackendType.RUNPOD
+            session=session, project=instance_project, backend=BackendType.RUNPOD
         )
         jpd = get_job_provisioning_data(
             backend=BackendType.RUNPOD,
@@ -143,18 +157,18 @@ class TestGetContainerSSHCredentials:
                     username="root",
                     port=32768,
                 ),
-                FileContent(self.project_key),
+                FileContent(self.run_project_key),
             ),
         ]
 
     async def test_container_based_backend_with_proxy(
         self,
         session: AsyncSession,
-        project: ProjectModel,
+        instance_project: ProjectModel,
         run: RunModel,
     ):
         instance = await create_instance(
-            session=session, project=project, backend=BackendType.KUBERNETES
+            session=session, project=instance_project, backend=BackendType.KUBERNETES
         )
         jpd = get_job_provisioning_data(
             backend=BackendType.KUBERNETES,
@@ -184,7 +198,7 @@ class TestGetContainerSSHCredentials:
                     username="root",
                     port=30022,
                 ),
-                FileContent(self.project_key),
+                FileContent(self.run_project_key),
             ),
             (
                 SSHConnectionParams(
@@ -192,14 +206,14 @@ class TestGetContainerSSHCredentials:
                     username="root",
                     port=DSTACK_RUNNER_SSH_PORT,
                 ),
-                FileContent(self.project_key),
+                FileContent(self.run_project_key),
             ),
         ]
 
     async def test_ssh_instance_with_head_proxy(
         self,
         session: AsyncSession,
-        project: ProjectModel,
+        instance_project: ProjectModel,
         run: RunModel,
     ):
         rci = get_remote_connection_info(
@@ -218,7 +232,7 @@ class TestGetContainerSSHCredentials:
         )
         instance = await create_instance(
             session=session,
-            project=project,
+            project=instance_project,
             backend=BackendType.REMOTE,
             remote_connection_info=rci,
         )
@@ -258,7 +272,7 @@ class TestGetContainerSSHCredentials:
                     username="ubuntu",
                     port=22222,
                 ),
-                FileContent(self.project_key),
+                FileContent(self.instance_project_key),
             ),
             (
                 SSHConnectionParams(
@@ -266,18 +280,18 @@ class TestGetContainerSSHCredentials:
                     username="root",
                     port=DSTACK_RUNNER_SSH_PORT,
                 ),
-                FileContent(self.project_key),
+                FileContent(self.run_project_key),
             ),
         ]
 
     async def test_local_backend(
         self,
         session: AsyncSession,
-        project: ProjectModel,
+        instance_project: ProjectModel,
         run: RunModel,
     ):
         instance = await create_instance(
-            session=session, project=project, backend=BackendType.LOCAL
+            session=session, project=instance_project, backend=BackendType.LOCAL
         )
         jpd = get_job_provisioning_data(
             backend=BackendType.LOCAL,
@@ -305,6 +319,6 @@ class TestGetContainerSSHCredentials:
                     username="root",
                     port=DSTACK_RUNNER_SSH_PORT,
                 ),
-                FileContent(self.project_key),
+                FileContent(self.run_project_key),
             ),
         ]

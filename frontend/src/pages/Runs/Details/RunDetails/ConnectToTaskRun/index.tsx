@@ -43,13 +43,6 @@ export const ConnectToTaskRun: FC<{ run: IRun }> = ({ run }) => {
             headerText="Connect"
             expanded={isExpandedConnectSection}
             onChange={({ detail }) => setIsExpandedConnectSection(detail.expanded)}
-            headerActions={
-                <Button
-                    iconName="script"
-                    variant={isExpandedConnectSection ? 'normal' : 'primary'}
-                    onClick={() => setIsExpandedConnectSection((prev) => !prev)}
-                />
-            }
         >
             {run.status === 'running' && (
                 <Wizard

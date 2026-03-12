@@ -81,9 +81,9 @@ from dstack._internal.server.services import events
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
-    fleet_model_to_fleet,
     generate_fleet_name,
     get_fleet_master_instance_provisioning_data,
+    get_fleet_spec,
     get_next_instance_num,
     is_cloud_cluster,
 )
@@ -580,8 +580,8 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
     # as FleetPipeline/InstancePipeline.
     master_instance_provisioning_data = None
     if is_master_job(job) and fleet_model is not None:
-        fleet = fleet_model_to_fleet(fleet_model)
-        if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
+        fleet_spec = get_fleet_spec(fleet_model)
+        if fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
             # To avoid violating fleet placement cluster during master provisioning,
             # we must lock empty fleets and respect existing instances in non-empty fleets.
             # On SQLite always take the lock during master provisioning for simplicity.
@@ -624,7 +624,7 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
                 fleet_model = res.unique().scalar_one()
             master_instance_provisioning_data = get_fleet_master_instance_provisioning_data(
                 fleet_model=fleet_model,
-                fleet_spec=fleet.spec,
+                fleet_spec=fleet_spec,
             )
     return master_instance_provisioning_data
 
@@ -730,15 +730,14 @@ async def _run_jobs_on_new_instances(
     job = jobs[0]
     profile = run.run_spec.merged_profile
     requirements = job.job_spec.requirements
-    fleet = None
     if fleet_model is not None:
-        fleet = fleet_model_to_fleet(fleet_model)
+        fleet_spec = get_fleet_spec(fleet_model)
         try:
-            check_can_create_new_cloud_instance_in_fleet(fleet)
+            check_can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec)
             profile, requirements = get_run_profile_and_requirements_in_fleet(
                 job=job,
                 run_spec=run.run_spec,
-                fleet=fleet,
+                fleet_spec=fleet_spec,
             )
         except ValueError as e:
             logger.debug("%s: %s", fmt(job_model), e.args[0])

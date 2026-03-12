@@ -26,6 +26,18 @@ export const getStatusIconType = (status: IInstance['status']): StatusIndicatorP
     }
 };
 
+export const getStatusIconColor = (status: IInstance['status']): StatusIndicatorProps.Color | undefined => {
+    switch (status) {
+        case 'busy':
+        case 'provisioning':
+        case 'starting':
+        case 'terminating':
+            return 'blue';
+        default:
+            return undefined;
+    }
+};
+
 export const getFleetStatusIconType = (status: IFleet['status']): StatusIndicatorProps['type'] => {
     switch (status) {
         case 'submitted':

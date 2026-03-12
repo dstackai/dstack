@@ -310,6 +310,7 @@ async def create_run(
     repo: RepoModel,
     user: UserModel,
     fleet: Optional[FleetModel] = None,
+    gateway: Optional[GatewayModel] = None,
     run_name: Optional[str] = None,
     status: RunStatus = RunStatus.SUBMITTED,
     termination_reason: Optional[RunTerminationReason] = None,
@@ -350,6 +351,7 @@ async def create_run(
         desired_replica_count=1,
         resubmission_attempt=resubmission_attempt,
         next_triggered_at=next_triggered_at,
+        gateway=gateway,
     )
     session.add(run)
     await session.commit()

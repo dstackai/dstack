@@ -953,23 +953,23 @@ def get_fleet_master_instance_provisioning_data(
     return master_instance_provisioning_data
 
 
-def can_create_new_cloud_instance_in_fleet(fleet: Fleet) -> bool:
-    if fleet.spec.configuration.ssh_config is not None:
+def can_create_new_cloud_instance_in_fleet(fleet_model: FleetModel, fleet_spec: FleetSpec) -> bool:
+    if fleet_spec.configuration.ssh_config is not None:
         return False
-    active_instances = [i for i in fleet.instances if i.status.is_active()]
+    active_instances = [i for i in fleet_model.instances if i.status.is_active()]
     # nodes.max is a soft limit that can be exceeded when provisioning concurrently.
     # The fleet consolidation logic will remove redundant nodes eventually.
     if (
-        fleet.spec.configuration.nodes is not None
-        and fleet.spec.configuration.nodes.max is not None
-        and len(active_instances) >= fleet.spec.configuration.nodes.max
+        fleet_spec.configuration.nodes is not None
+        and fleet_spec.configuration.nodes.max is not None
+        and len(active_instances) >= fleet_spec.configuration.nodes.max
     ):
         return False
     return True
 
 
-def check_can_create_new_cloud_instance_in_fleet(fleet: Fleet):
-    if not can_create_new_cloud_instance_in_fleet(fleet):
+def check_can_create_new_cloud_instance_in_fleet(fleet_model: FleetModel, fleet_spec: FleetSpec):
+    if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec):
         raise ValueError("Cannot fit new cloud instance into fleet")
 
 

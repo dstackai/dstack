@@ -37,6 +37,7 @@ async def get_upstream_response(
             JobModel.status == JobStatus.RUNNING,
         )
         .options(
+            (joinedload(JobModel.project, innerjoin=True).load_only(ProjectModel.ssh_private_key)),
             (
                 joinedload(JobModel.instance, innerjoin=True)
                 .load_only(InstanceModel.remote_connection_info)

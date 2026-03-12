@@ -52,9 +52,10 @@ export const getStatusIconColor = (
     switch (status) {
         case 'submitted':
         case 'pending':
-            return 'blue';
+        case 'provisioning':
         case 'pulling':
-            return 'green';
+        case 'terminating':
+            return 'blue';
         case 'aborted':
             return 'yellow';
         case 'done':

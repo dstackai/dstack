@@ -21,7 +21,7 @@ def get_container_ssh_credentials(job: JobModel) -> list[tuple[SSHConnectionPara
         is always "root" on all supported backends (Runpod, Vast.ai, Kubernetes)
 
     Args:
-        job: `JobModel` with `instance` and `instance.project` fields loaded.
+        job: `JobModel` with `project`, `instance` and `instance.project` fields loaded.
 
     Returns:
         A list of hosts credentials as (host's `SSHConnectionParams`, private key's `FileContent`)
@@ -30,7 +30,6 @@ def get_container_ssh_credentials(job: JobModel) -> list[tuple[SSHConnectionPara
     hosts: list[tuple[SSHConnectionParams, FileContent]] = []
 
     instance = get_or_error(job.instance)
-    project_key = FileContent(instance.project.ssh_private_key)
 
     rci = get_instance_remote_connection_info(instance)
     if rci is not None and (head_proxy := rci.ssh_proxy) is not None:
@@ -42,6 +41,8 @@ def get_container_ssh_credentials(job: JobModel) -> list[tuple[SSHConnectionPara
     assert jpd.hostname is not None
     assert jpd.ssh_port is not None
 
+    job_project_key = FileContent(job.project.ssh_private_key)
+
     if jpd.dockerized:
         if jpd.backend != BackendType.LOCAL:
             instance_proxy = SSHConnectionParams(
@@ -49,7 +50,8 @@ def get_container_ssh_credentials(job: JobModel) -> list[tuple[SSHConnectionPara
                 username=jpd.username,
                 port=jpd.ssh_port,
             )
-            hosts.append((instance_proxy, project_key))
+            instance_project_key = FileContent(instance.project.ssh_private_key)
+            hosts.append((instance_proxy, instance_project_key))
         ssh_port = DSTACK_RUNNER_SSH_PORT
         jrd = get_job_runtime_data(job)
         if jrd is not None and jrd.ports is not None:
@@ -59,16 +61,21 @@ def get_container_ssh_credentials(job: JobModel) -> list[tuple[SSHConnectionPara
             username="root",
             port=ssh_port,
         )
-        hosts.append((target_host, project_key))
+        hosts.append((target_host, job_project_key))
     else:
         if jpd.ssh_proxy is not None:
-            hosts.append((jpd.ssh_proxy, project_key))
+            # As of 2026-03-13, the only container-based backend with SSH proxy is Kubernetes,
+            # which is implemented as follows: the jump pod (JobProvisioningData.ssh_proxy)
+            # is created once per project via Compute.run_job() with a public key submitted as
+            # a method argument, that is, with the public key of the project of the first (within
+            # that project) job submitted to the cluster.
+            hosts.append((jpd.ssh_proxy, job_project_key))
         target_host = SSHConnectionParams(
             hostname=jpd.hostname,
             username=jpd.username,
             port=jpd.ssh_port,
         )
-        hosts.append((target_host, project_key))
+        hosts.append((target_host, job_project_key))
 
     return hosts
 
