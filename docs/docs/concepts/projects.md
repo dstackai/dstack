@@ -41,6 +41,11 @@ A user can be added to a project and assigned or unassigned as a project role on
   Unlike admins, managers cannot configure backends and gateways.
 * **User** – A user can manage project resources including runs, fleets, and volumes.
 
+## Project exports
+
+Projects can export resources such as fleets to other projects, allowing them to be used across team
+boundaries. See [Exports](exports.md) for more details.
+
 ## Authorization
 
 ### User token

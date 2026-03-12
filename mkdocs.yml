@@ -237,6 +237,7 @@ nav:
             - Projects: docs/concepts/projects.md
             - Metrics: docs/concepts/metrics.md
             - Events: docs/concepts/events.md
+            - Exports: docs/concepts/exports.md
       - Guides:
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
@@ -271,6 +272,7 @@ nav:
               - dstack volume: docs/reference/cli/dstack/volume.md
               - dstack gateway: docs/reference/cli/dstack/gateway.md
               - dstack secret: docs/reference/cli/dstack/secret.md
+              - dstack export: docs/reference/cli/dstack/export.md
           - API:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
