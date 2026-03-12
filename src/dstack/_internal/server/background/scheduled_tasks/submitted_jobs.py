@@ -5,7 +5,7 @@ from contextlib import AsyncExitStack
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     contains_eager,
@@ -596,12 +596,11 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
             await sqlite_commit(session)
             res = await session.execute(
                 select(FleetModel)
-                .outerjoin(FleetModel.instances)
                 .where(
                     FleetModel.id == fleet_model.id,
-                    or_(
-                        InstanceModel.id.is_(None),
-                        InstanceModel.deleted == True,
+                    ~exists().where(
+                        InstanceModel.fleet_id == fleet_model.id,
+                        InstanceModel.deleted == False,
                     ),
                 )
                 .with_for_update(key_share=True, of=FleetModel)
