@@ -87,7 +87,6 @@ class TestProcessSubmittedJobs:
         )
         await process_submitted_jobs()
         await session.refresh(job)
-        assert job is not None
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
@@ -145,7 +144,6 @@ class TestProcessSubmittedJobs:
             backend_mock.compute.return_value.run_job.assert_called_once()
 
         await session.refresh(job)
-        assert job is not None
         assert job.status == JobStatus.PROVISIONING
 
     @pytest.mark.asyncio
@@ -194,7 +192,6 @@ class TestProcessSubmittedJobs:
             backend_mock.compute.return_value.run_job.assert_not_called()
 
         await session.refresh(job)
-        assert job is not None
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
@@ -244,7 +241,6 @@ class TestProcessSubmittedJobs:
             backend_mock.compute.return_value.run_job.assert_not_called()
 
         await session.refresh(job)
-        assert job is not None
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
@@ -291,7 +287,6 @@ class TestProcessSubmittedJobs:
             await process_submitted_jobs()
 
         await session.refresh(job)
-        assert job is not None
         assert job.status == JobStatus.PROVISIONING
 
     @pytest.mark.asyncio
@@ -328,13 +323,12 @@ class TestProcessSubmittedJobs:
             await process_submitted_jobs()
 
         await session.refresh(job)
-        assert job is not None
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_assignes_job_to_instance(self, test_db, session: AsyncSession):
+    async def test_assigns_job_to_instance(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)
         repo = await create_repo(
