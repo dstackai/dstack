@@ -63,7 +63,7 @@ async def process_probes():
                     .joinedload(JobModel.instance)
                     .joinedload(InstanceModel.project)
                 )
-                .options(joinedload(ProbeModel.job))
+                .options(joinedload(ProbeModel.job).joinedload(JobModel.project))
                 .execution_options(populate_existing=True)
             )
             probes = res.unique().scalars().all()

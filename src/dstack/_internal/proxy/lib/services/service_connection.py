@@ -53,7 +53,10 @@ class ServiceConnection:
             ssh_head_proxy_private_key = get_or_error(replica.ssh_head_proxy_private_key)
             ssh_proxies.append((replica.ssh_head_proxy, FileContent(ssh_head_proxy_private_key)))
         if replica.ssh_proxy is not None:
-            ssh_proxies.append((replica.ssh_proxy, None))
+            if replica.ssh_proxy_private_key is not None:
+                ssh_proxies.append((replica.ssh_proxy, FileContent(replica.ssh_proxy_private_key)))
+            else:
+                ssh_proxies.append((replica.ssh_proxy, None))
         self._tunnel = SSHTunnel(
             destination=replica.ssh_destination,
             port=replica.ssh_port,

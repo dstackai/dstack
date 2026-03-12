@@ -85,6 +85,7 @@ class GatewayClient:
         run: Run,
         job_spec: JobSpec,
         job_submission: JobSubmission,
+        instance_project_ssh_private_key: Optional[str],
         ssh_head_proxy: Optional[SSHConnectionParams],
         ssh_head_proxy_private_key: Optional[str],
     ):
@@ -122,6 +123,7 @@ class GatewayClient:
                         username=jpd.username,
                         port=jpd.ssh_port,
                     ).dict(),
+                    "ssh_proxy_private_key": instance_project_ssh_private_key,
                 }
             )
         resp = await self._client.post(
