@@ -196,7 +196,7 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                             [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                         ),
                         RunModel.status.not_in([RunStatus.TERMINATING]),
-                        JobModel.last_processed_at < now - self._min_processing_interval,
+                        JobModel.last_processed_at <= now - self._min_processing_interval,
                         or_(
                             JobModel.lock_expires_at.is_(None),
                             JobModel.lock_expires_at < now,

@@ -290,14 +290,20 @@ class _VolumeUpdateRow(TypedDict):
 
 
 @dataclass
+class _UnregisterReplicaResult:
+    gateway_target: Optional[events.Target]  # None = no gateway
+
+
+@dataclass
 class _ProcessResult:
     job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
     instance_update_map: Optional[_InstanceUpdateMap] = None
     volume_update_rows: list[_VolumeUpdateRow] = field(default_factory=list)
     detached_volume_ids: set[uuid.UUID] = field(default_factory=set)
     unassign_event_message: Optional[str] = None
-    emit_unregister_replica_event: bool = False
-    unregister_gateway_target: Optional[events.Target] = None
+    replica_unregistration: Optional[_UnregisterReplicaResult] = (
+        None  # None = not unregistered yet
+    )
 
 
 @dataclass
@@ -536,10 +542,10 @@ async def _apply_process_result(
                 ],
             )
 
-        if result.emit_unregister_replica_event:
+        if result.replica_unregistration is not None:
             targets = [events.Target.from_model(job_model)]
-            if result.unregister_gateway_target is not None:
-                targets.append(result.unregister_gateway_target)
+            if result.replica_unregistration.gateway_target is not None:
+                targets.append(result.replica_unregistration.gateway_target)
             events.emit(
                 session,
                 "Service replica unregistered from receiving requests",
@@ -689,10 +695,10 @@ async def _detach_job_volumes(
 async def _unregister_replica_and_update_result(
     result: _ProcessResult, job_model: JobModel
 ) -> None:
-    result.unregister_gateway_target = await _unregister_replica(job_model=job_model)
+    gateway_target = await _unregister_replica(job_model=job_model)
     if job_model.registered:
         result.job_update_map["registered"] = False
-        result.emit_unregister_replica_event = True
+        result.replica_unregistration = _UnregisterReplicaResult(gateway_target=gateway_target)
 
 
 async def _unregister_replica(
