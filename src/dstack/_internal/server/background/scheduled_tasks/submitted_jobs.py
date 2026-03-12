@@ -848,6 +848,9 @@ async def _run_jobs_on_new_instances(
             )
             continue
         finally:
+            # FIXME: Race condition when checking len(fleet_model.instances) == 0
+            # if provisioning independent jobs in a cluster fleet.
+            # Leads to placement groups being marked for deletion while still in use.
             if fleet_model is not None and len(fleet_model.instances) == 0:
                 # Clean up placement groups that did not end up being used.
                 for pg in placement_group_models:
