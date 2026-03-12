@@ -65,6 +65,10 @@ export const FORM_FIELD_NAMES = {
 
 export const IDE_OPTIONS = [
     {
+        label: 'None',
+        value: '',
+    },
+    {
         label: 'Cursor',
         value: 'cursor',
     },
