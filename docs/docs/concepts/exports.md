@@ -11,8 +11,6 @@ the specified importer projects can see and use it as if it were their own.
 !!! warning "Experimental"
     Exports are an experimental feature.
     Currently, only [SSH fleets](fleets.md#ssh-fleets) can be exported.
-    Exports do not yet support configuration files and `dstack apply`.
-    Use the CLI commands below to manage exports.
 
 An export is created in the exporter project and specifies the resources to export and the
 importer projects that will gain access to them.
