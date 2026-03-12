@@ -929,19 +929,24 @@ async def _register_service_replica(
             session, context.run_model.gateway_id
         )
     gateway_target = events.Target.from_model(gateway_model)
+    assert context.job_model.instance is not None
+    instance_project_ssh_private_key = None
+    if context.job_model.project_id != context.job_model.instance.project_id:
+        instance_project_ssh_private_key = context.job_model.instance.project.ssh_private_key
+    # JobRuntimeData might change on PULLING -> RUNNING path
+    # so we must update job_submission with the result value.
+    job_submission = context.job_submission.copy(deep=True)
+    job_submission.job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
     try:
         logger.debug(
             "%s: registering replica for service %s", fmt(context.job_model), context.run.id.hex
         )
-        # JobRuntimeData might change on PULLING -> RUNNING path
-        # so we must update job_submission with the result value.
-        job_submission = context.job_submission.copy(deep=True)
-        job_submission.job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
         async with conn.client() as gateway_client:
             await gateway_client.register_replica(
                 run=context.run,
                 job_spec=JobSpec.__response__.parse_raw(context.job_model.job_spec_data),
                 job_submission=job_submission,
+                instance_project_ssh_private_key=instance_project_ssh_private_key,
                 ssh_head_proxy=ssh_head_proxy,
                 ssh_head_proxy_private_key=ssh_head_proxy_private_key,
             )
