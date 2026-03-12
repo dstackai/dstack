@@ -31,6 +31,7 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
+    AnyGatewayRouterConfig,
     Gateway,
     GatewayComputeConfiguration,
     GatewayConfiguration,
@@ -707,12 +708,10 @@ async def _update_gateway(gateway_compute_model: GatewayComputeModel, build: str
         gateway_compute_model.ssh_private_key,
     )
     logger.debug("Updating gateway %s", connection.ip_address)
-    compute_config = GatewayComputeConfiguration.__response__.parse_raw(
-        gateway_compute_model.configuration
-    )
+    router = _get_gateway_compute_router_config(gateway_compute_model)
 
     # Build package spec with extras and wheel URL
-    gateway_package = get_dstack_gateway_wheel(build, compute_config.router)
+    gateway_package = get_dstack_gateway_wheel(build, router)
     commands = [
         # prevent update.sh from overwriting itself during execution
         "cp dstack/update.sh dstack/_update.sh",
@@ -730,6 +729,17 @@ def _recently_updated(gateway_compute_model: GatewayComputeModel) -> bool:
     return gateway_compute_model.app_updated_at.replace(
         tzinfo=datetime.timezone.utc
     ) > get_current_datetime() - timedelta(seconds=60)
+
+
+def _get_gateway_compute_router_config(
+    compute: GatewayComputeModel,
+) -> Optional[AnyGatewayRouterConfig]:
+    if compute.configuration is None:  # pre-0.18.2 gateway
+        return None  # gateway routers introduced in 0.19.38
+    compute_config: GatewayComputeConfiguration = (
+        GatewayComputeConfiguration.__response__.parse_raw(compute.configuration)
+    )
+    return compute_config.router
 
 
 # NOTE: dstack Sky imports and uses this function
