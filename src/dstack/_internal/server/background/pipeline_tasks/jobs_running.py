@@ -1001,11 +1001,10 @@ async def _check_gpu_utilization(
         policy.min_gpu_utilization, [metric.values for metric in gpus_util_metrics]
     ):
         logger.debug("%s: GPU utilization check: terminating", fmt(context.job_model))
-        # TODO(0.19 or earlier): set JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY
         _terminate_job(
             job_model=context.job_model,
             job_update_map=result.job_update_map,
-            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason=JobTerminationReason.TERMINATED_DUE_TO_UTILIZATION_POLICY,
             termination_reason_message=(
                 f"The job GPU utilization below {policy.min_gpu_utilization}%"
                 f" for {policy.time_window} seconds"
