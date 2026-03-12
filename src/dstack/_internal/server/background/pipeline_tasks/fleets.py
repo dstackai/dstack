@@ -196,106 +196,23 @@ class FleetWorker(Worker[PipelineItem]):
 
     @sentry_utils.instrument_named_task("pipeline_tasks.FleetWorker.process")
     async def process(self, item: PipelineItem):
-        async with get_session_ctx() as session:
-            res = await session.execute(
-                select(FleetModel)
-                .where(
-                    FleetModel.id == item.id,
-                    FleetModel.lock_token == item.lock_token,
-                )
-                .options(joinedload(FleetModel.project))
-                .options(
-                    selectinload(FleetModel.instances.and_(InstanceModel.deleted == False))
-                    .joinedload(InstanceModel.jobs)
-                    .load_only(JobModel.id),
-                )
-                .options(
-                    selectinload(
-                        FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
-                    ).load_only(RunModel.status)
-                )
-            )
-            fleet_model = res.unique().scalar_one_or_none()
-            if fleet_model is None:
-                log_lock_token_mismatch(logger, item)
-                return
-
-            # Lock instance only if consolidation is needed.
-            locked_instance_ids: set[uuid.UUID] = set()
-            consolidation_fleet_spec = _get_fleet_spec_if_ready_for_consolidation(fleet_model)
-            consolidation_instances = None
-            if consolidation_fleet_spec is not None:
-                consolidation_instances = await _lock_fleet_instances_for_consolidation(
-                    session=session,
-                    item=item,
-                )
-                if consolidation_instances is None:
-                    return
-                locked_instance_ids = {instance.id for instance in consolidation_instances}
-
+        process_context = await _load_process_context(item)
+        if process_context is None:
+            return
         result = await _process_fleet(
-            fleet_model,
-            consolidation_fleet_spec=consolidation_fleet_spec,
-            consolidation_instances=consolidation_instances,
+            process_context.fleet_model,
+            consolidation_fleet_spec=process_context.consolidation_fleet_spec,
+            consolidation_instances=process_context.consolidation_instances,
         )
-        fleet_update_map = _FleetUpdateMap()
-        fleet_update_map.update(result.fleet_update_map)
-        set_processed_update_map_fields(fleet_update_map)
-        set_unlock_update_map_fields(fleet_update_map)
-        instance_update_rows = _build_instance_update_rows(
-            result.instance_id_to_update_map,
-            unlock_instance_ids=locked_instance_ids,
-        )
+        await _apply_process_result(item, process_context, result)
 
-        async with get_session_ctx() as session:
-            now = get_current_datetime()
-            resolve_now_placeholders(fleet_update_map, now=now)
-            resolve_now_placeholders(instance_update_rows, now=now)
-            res = await session.execute(
-                update(FleetModel)
-                .where(
-                    FleetModel.id == fleet_model.id,
-                    FleetModel.lock_token == fleet_model.lock_token,
-                )
-                .values(**fleet_update_map)
-                .returning(FleetModel.id)
-            )
-            updated_ids = list(res.scalars().all())
-            if len(updated_ids) == 0:
-                log_lock_token_changed_after_processing(logger, item)
-                if locked_instance_ids:
-                    await _unlock_fleet_locked_instances(
-                        session=session,
-                        item=item,
-                        locked_instance_ids=locked_instance_ids,
-                    )
-                # TODO: Clean up fleet.
-                return
 
-            if fleet_update_map.get("deleted"):
-                await session.execute(
-                    update(PlacementGroupModel)
-                    .where(PlacementGroupModel.fleet_id == item.id)
-                    .values(fleet_deleted=True)
-                )
-            if instance_update_rows:
-                await session.execute(
-                    update(InstanceModel),
-                    instance_update_rows,
-                )
-            if len(result.new_instance_creates) > 0:
-                await _create_missing_fleet_instances(
-                    session=session,
-                    fleet_model=fleet_model,
-                    new_instance_creates=result.new_instance_creates,
-                )
-            emit_fleet_status_change_event(
-                session=session,
-                fleet_model=fleet_model,
-                old_status=fleet_model.status,
-                new_status=fleet_update_map.get("status", fleet_model.status),
-                status_message=fleet_update_map.get("status_message", fleet_model.status_message),
-            )
+@dataclass
+class _ProcessContext:
+    fleet_model: FleetModel
+    consolidation_fleet_spec: Optional[FleetSpec]
+    consolidation_instances: Optional[list[InstanceModel]]
+    locked_instance_ids: set[uuid.UUID] = field(default_factory=set)
 
 
 class _FleetUpdateMap(ItemUpdateMap, total=False):
@@ -316,6 +233,83 @@ class _InstanceUpdateMap(ItemUpdateMap, total=False):
     deleted_at: UpdateMapDateTime
     last_processed_at: UpdateMapDateTime
     id: uuid.UUID
+
+
+@dataclass
+class _ProcessResult:
+    fleet_update_map: _FleetUpdateMap = field(default_factory=_FleetUpdateMap)
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap] = field(default_factory=dict)
+    new_instance_creates: list["_NewInstanceCreate"] = field(default_factory=list)
+
+
+class _NewInstanceCreate(TypedDict):
+    id: uuid.UUID
+    instance_num: int
+
+
+@dataclass
+class _MaintainNodesResult:
+    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap] = field(default_factory=dict)
+    new_instance_creates: list[_NewInstanceCreate] = field(default_factory=list)
+    changes_required: bool = False
+
+    @property
+    def has_changes(self) -> bool:
+        return len(self.instance_id_to_update_map) > 0 or len(self.new_instance_creates) > 0
+
+
+async def _load_process_context(item: PipelineItem) -> Optional[_ProcessContext]:
+    async with get_session_ctx() as session:
+        fleet_model = await _refetch_locked_fleet(session=session, item=item)
+        if fleet_model is None:
+            log_lock_token_mismatch(logger, item)
+            return None
+
+        consolidation_fleet_spec = _get_fleet_spec_if_ready_for_consolidation(fleet_model)
+        consolidation_instances = None
+        if consolidation_fleet_spec is not None:
+            consolidation_instances = await _lock_fleet_instances_for_consolidation(
+                session=session,
+                item=item,
+            )
+            if consolidation_instances is None:
+                return None
+
+        return _ProcessContext(
+            fleet_model=fleet_model,
+            consolidation_fleet_spec=consolidation_fleet_spec,
+            consolidation_instances=consolidation_instances,
+            locked_instance_ids=(
+                set()
+                if consolidation_instances is None
+                else {i.id for i in consolidation_instances}
+            ),
+        )
+
+
+async def _refetch_locked_fleet(
+    session: AsyncSession,
+    item: PipelineItem,
+) -> Optional[FleetModel]:
+    res = await session.execute(
+        select(FleetModel)
+        .where(
+            FleetModel.id == item.id,
+            FleetModel.lock_token == item.lock_token,
+        )
+        .options(joinedload(FleetModel.project))
+        .options(
+            selectinload(FleetModel.instances.and_(InstanceModel.deleted == False))
+            .joinedload(InstanceModel.jobs)
+            .load_only(JobModel.id),
+        )
+        .options(
+            selectinload(
+                FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
+            ).load_only(RunModel.status)
+        )
+    )
+    return res.unique().scalar_one_or_none()
 
 
 def _get_fleet_spec_if_ready_for_consolidation(fleet_model: FleetModel) -> Optional[FleetSpec]:
@@ -398,27 +392,71 @@ async def _lock_fleet_instances_for_consolidation(
         return locked_instance_models
 
 
-@dataclass
-class _ProcessResult:
-    fleet_update_map: _FleetUpdateMap = field(default_factory=_FleetUpdateMap)
-    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap] = field(default_factory=dict)
-    new_instance_creates: list["_NewInstanceCreate"] = field(default_factory=list)
+async def _apply_process_result(
+    item: PipelineItem,
+    context: _ProcessContext,
+    result: "_ProcessResult",
+) -> None:
+    fleet_update_map = _FleetUpdateMap()
+    fleet_update_map.update(result.fleet_update_map)
+    set_processed_update_map_fields(fleet_update_map)
+    set_unlock_update_map_fields(fleet_update_map)
+    instance_update_rows = _build_instance_update_rows(
+        result.instance_id_to_update_map,
+        unlock_instance_ids=context.locked_instance_ids,
+    )
 
+    async with get_session_ctx() as session:
+        now = get_current_datetime()
+        resolve_now_placeholders(fleet_update_map, now=now)
+        resolve_now_placeholders(instance_update_rows, now=now)
+        res = await session.execute(
+            update(FleetModel)
+            .where(
+                FleetModel.id == context.fleet_model.id,
+                FleetModel.lock_token == context.fleet_model.lock_token,
+            )
+            .values(**fleet_update_map)
+            .returning(FleetModel.id)
+        )
+        updated_ids = list(res.scalars().all())
+        if len(updated_ids) == 0:
+            log_lock_token_changed_after_processing(logger, item)
+            if context.locked_instance_ids:
+                await _unlock_fleet_locked_instances(
+                    session=session,
+                    item=item,
+                    locked_instance_ids=context.locked_instance_ids,
+                )
+            # TODO: Clean up fleet.
+            return
 
-class _NewInstanceCreate(TypedDict):
-    id: uuid.UUID
-    instance_num: int
-
-
-@dataclass
-class _MaintainNodesResult:
-    instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap] = field(default_factory=dict)
-    new_instance_creates: list[_NewInstanceCreate] = field(default_factory=list)
-    changes_required: bool = False
-
-    @property
-    def has_changes(self) -> bool:
-        return len(self.instance_id_to_update_map) > 0 or len(self.new_instance_creates) > 0
+        if fleet_update_map.get("deleted"):
+            await session.execute(
+                update(PlacementGroupModel)
+                .where(PlacementGroupModel.fleet_id == context.fleet_model.id)
+                .values(fleet_deleted=True)
+            )
+        if instance_update_rows:
+            await session.execute(
+                update(InstanceModel),
+                instance_update_rows,
+            )
+        if len(result.new_instance_creates) > 0:
+            await _create_missing_fleet_instances(
+                session=session,
+                fleet_model=context.fleet_model,
+                new_instance_creates=result.new_instance_creates,
+            )
+        emit_fleet_status_change_event(
+            session=session,
+            fleet_model=context.fleet_model,
+            old_status=context.fleet_model.status,
+            new_status=fleet_update_map.get("status", context.fleet_model.status),
+            status_message=fleet_update_map.get(
+                "status_message", context.fleet_model.status_message
+            ),
+        )
 
 
 async def _process_fleet(
