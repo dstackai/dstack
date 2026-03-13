@@ -4,7 +4,7 @@ import uuid
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List, Optional, Union
+from typing import List, Optional, Union, cast
 
 from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -249,18 +249,22 @@ async def _process_submitted_job(
     master_job_provisioning_data = None
     if job.job_spec.job_num != 0:
         if master_job.job_submissions[-1].job_provisioning_data is None:
-            logger.debug("%s: waiting for master job to be provisioned", fmt(job_model))
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
+            await _defer_submitted_job(
+                session=session,
+                job_model=job_model,
+                log_message="waiting for master job to be provisioned",
+            )
             return
         master_job_provisioning_data = JobProvisioningData.__response__.parse_obj(
             master_job.job_submissions[-1].job_provisioning_data
         )
     if job.job_spec.job_num != 0 or job.job_spec.replica_num != 0:
         if run_model.fleet_id is None:
-            logger.debug("%s: waiting for the run to be assigned to the fleet", fmt(job_model))
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
+            await _defer_submitted_job(
+                session=session,
+                job_model=job_model,
+                log_message="waiting for the run to be assigned to the fleet",
+            )
             return
     try:
         volume_models = await get_job_configured_volume_models(
@@ -280,11 +284,12 @@ async def _process_submitted_job(
         check_can_attach_job_volumes(volumes)
     except ServerClientError as e:
         logger.warning("%s: failed to prepare run volumes: %s", fmt(job_model), repr(e))
-        job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
-        job_model.termination_reason_message = e.msg
-        switch_job_status(session, job_model, JobStatus.TERMINATING)
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
+        await _terminate_submitted_job(
+            session=session,
+            job_model=job_model,
+            reason=JobTerminationReason.VOLUME_ERROR,
+            message=e.msg,
+        )
         return
 
     # Submitted jobs processing happens in two steps (transactions).
@@ -340,27 +345,25 @@ async def _process_submitted_job(
             if run_spec.merged_profile.fleets is not None:
                 # Run cannot create new fleets when fleets are specified
                 logger.debug("%s: failed to use specified fleets", fmt(job_model))
-                job_model.termination_reason = (
-                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+                await _terminate_submitted_job(
+                    session=session,
+                    job_model=job_model,
+                    reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                    message="Failed to use specified fleets",
                 )
-                job_model.termination_reason_message = "Failed to use specified fleets"
-                switch_job_status(session, job_model, JobStatus.TERMINATING)
-                job_model.last_processed_at = common_utils.get_current_datetime()
-                await session.commit()
                 return
             if not FeatureFlags.AUTOCREATED_FLEETS_ENABLED:
                 logger.debug("%s: no fleet found", fmt(job_model))
-                job_model.termination_reason = (
-                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-                )
                 # Note: `_get_job_status_message` relies on the "No fleet found" substring to return "no fleets"
-                job_model.termination_reason_message = (
-                    "No matching fleet found. Possible reasons: "
-                    "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
+                await _terminate_submitted_job(
+                    session=session,
+                    job_model=job_model,
+                    reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                    message=(
+                        "No matching fleet found. Possible reasons: "
+                        "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
+                    ),
                 )
-                switch_job_status(session, job_model, JobStatus.TERMINATING)
-                job_model.last_processed_at = common_utils.get_current_datetime()
-                await session.commit()
                 return
         instance = await _assign_job_to_fleet_instance(
             session=session,
@@ -369,8 +372,7 @@ async def _process_submitted_job(
             job_model=job_model,
             multinode=context.multinode,
         )
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
+        await _mark_job_processed(session=session, job_model=job_model)
         return
 
     jobs_to_provision = _get_jobs_to_provision(job, context.replica_jobs, job_model)
@@ -390,11 +392,12 @@ async def _process_submitted_job(
     else:
         if run_profile.creation_policy == CreationPolicy.REUSE:
             logger.debug("%s: reuse instance failed", fmt(job_model))
-            job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-            job_model.termination_reason_message = "Could not reuse any instances for this job"
-            switch_job_status(session, job_model, JobStatus.TERMINATING)
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
+            await _terminate_submitted_job(
+                session=session,
+                job_model=job_model,
+                reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                message="Could not reuse any instances for this job",
+            )
             return
 
         (
@@ -423,10 +426,11 @@ async def _process_submitted_job(
         )
         if run_job_result is None:
             logger.debug("%s: provisioning failed", fmt(job_model))
-            job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-            switch_job_status(session, job_model, JobStatus.TERMINATING)
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
+            await _terminate_submitted_job(
+                session=session,
+                job_model=job_model,
+                reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            )
             return
 
         if fleet_model is None:
@@ -581,6 +585,33 @@ async def _load_submitted_job_context(
         fleet_model=run_model.fleet or job_model.fleet,
         multinode=job.job_spec.jobs_per_replica > 1,
     )
+
+
+async def _defer_submitted_job(
+    session: AsyncSession,
+    job_model: JobModel,
+    log_message: str,
+):
+    logger.debug("%s: %s", fmt(job_model), log_message)
+    await _mark_job_processed(session=session, job_model=job_model)
+
+
+async def _terminate_submitted_job(
+    session: AsyncSession,
+    job_model: JobModel,
+    reason: JobTerminationReason,
+    message: object = common_utils.UNSET,
+):
+    job_model.termination_reason = reason
+    if message is not common_utils.UNSET:
+        job_model.termination_reason_message = cast(Optional[str], message)
+    switch_job_status(session, job_model, JobStatus.TERMINATING)
+    await _mark_job_processed(session=session, job_model=job_model)
+
+
+async def _mark_job_processed(session: AsyncSession, job_model: JobModel):
+    job_model.last_processed_at = common_utils.get_current_datetime()
+    await session.commit()
 
 
 async def _refetch_fleet_models_with_instances(
