@@ -260,17 +260,11 @@ async def _process_submitted_job(
     context = await _load_submitted_job_context(session=session, job_model=job_model)
     logger.debug("%s: provisioning has started", fmt(context.job_model))
 
-    job_model = context.job_model
-    run_model = context.run_model
-    run = context.run
-    job = context.job
-    run_spec = run.run_spec
-
     master_job_dependency = await _resolve_master_job_dependency(
         session=session,
-        job_model=job_model,
-        run=run,
-        job=job,
+        job_model=context.job_model,
+        run=context.run,
+        job=context.job,
     )
     if master_job_dependency is None:
         return
@@ -278,18 +272,18 @@ async def _process_submitted_job(
 
     if not await _resolve_fleet_dependency(
         session=session,
-        job_model=job_model,
-        run_model=run_model,
-        job=job,
+        job_model=context.job_model,
+        run_model=context.run_model,
+        job=context.job,
     ):
         return
 
     prepared_job_volumes = await _prepare_job_volumes(
         session=session,
-        job_model=job_model,
+        job_model=context.job_model,
         project=context.project,
-        run_spec=run_spec,
-        job=job,
+        run_spec=context.run.run_spec,
+        job=context.job,
     )
     if prepared_job_volumes is None:
         return
@@ -775,34 +769,53 @@ async def _finalize_submitted_job_processing(
         jobs_to_provision=provisioning_phase_result.jobs_to_provision,
     )
 
-    volume_models = prepared_job_volumes.volume_models
-    volumes_ids = sorted([v.id for vs in volume_models for v in vs])
+    await _attach_job_volumes_if_needed(
+        exit_stack=exit_stack,
+        session=session,
+        context=context,
+        prepared_job_volumes=prepared_job_volumes,
+        provisioning_phase_result=provisioning_phase_result,
+    )
+    await session.commit()
+
+
+async def _attach_job_volumes_if_needed(
+    exit_stack: AsyncExitStack,
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+    prepared_job_volumes: _PreparedJobVolumes,
+    provisioning_phase_result: _ProvisioningPhaseResult,
+) -> None:
     # TODO: Volume attachment for compute groups is not yet supported since
     # currently supported compute groups (e.g. Runpod) don't need explicit volume attachment.
-    if provisioning_phase_result.compute_group_model is None:
-        # Take lock to prevent attaching volumes that are to be deleted.
-        # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
-        # TODO: Lock instances for attaching volumes?
-        await session.execute(
-            select(VolumeModel)
-            .where(VolumeModel.id.in_(volumes_ids))
-            .options(joinedload(VolumeModel.user).load_only(UserModel.name))
-            .order_by(VolumeModel.id)  # take locks in order
-            .with_for_update(key_share=True, of=VolumeModel)
-        )
-        await exit_stack.enter_async_context(
-            get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids)
-        )
-        if len(volume_models) > 0:
-            assert len(provisioning_phase_result.instance_models) == 1
-            await _attach_volumes(
-                session=session,
-                project=context.project,
-                job_model=context.job_model,
-                instance=provisioning_phase_result.instance_models[0],
-                volume_models=volume_models,
-            )
-    await session.commit()
+    if provisioning_phase_result.compute_group_model is not None:
+        return
+
+    volume_models = prepared_job_volumes.volume_models
+    volumes_ids = sorted([v.id for vs in volume_models for v in vs])
+    # Take lock to prevent attaching volumes that are to be deleted.
+    # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
+    # TODO: Lock instances for attaching volumes?
+    await session.execute(
+        select(VolumeModel)
+        .where(VolumeModel.id.in_(volumes_ids))
+        .options(joinedload(VolumeModel.user).load_only(UserModel.name))
+        .order_by(VolumeModel.id)  # take locks in order
+        .with_for_update(key_share=True, of=VolumeModel)
+    )
+    await exit_stack.enter_async_context(
+        get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids)
+    )
+    if len(volume_models) == 0:
+        return
+    assert len(provisioning_phase_result.instance_models) == 1
+    await _attach_volumes(
+        session=session,
+        project=context.project,
+        job_model=context.job_model,
+        instance=provisioning_phase_result.instance_models[0],
+        volume_models=volume_models,
+    )
 
 
 async def _defer_submitted_job(
