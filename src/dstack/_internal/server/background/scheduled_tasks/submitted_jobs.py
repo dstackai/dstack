@@ -921,54 +921,68 @@ async def _lock_fleet_and_get_master_provisioning_data(
     # cluster master from loaded fleet instances here. Resolve the current master via
     # FleetModel.current_master_instance_id so jobs follow the same master election
     # as FleetPipeline/InstancePipeline.
-    master_instance_provisioning_data = None
-    if is_master_job(job) and fleet_model is not None:
-        fleet_spec = get_fleet_spec(fleet_model)
-        if fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
-            # To avoid violating fleet placement cluster during master provisioning,
-            # we must lock empty fleets and respect existing instances in non-empty fleets.
-            # On SQLite always take the lock during master provisioning for simplicity.
-            # It's fine to lock fleets currently locked by pipelines (with lock_* fields set)
-            # since we won't update fleets – we only need to ensure there is no parallel provisioning.
-            await exit_stack.enter_async_context(
-                get_locker(get_db().dialect_name).lock_ctx(
-                    FleetModel.__tablename__, [fleet_model.id]
-                )
-            )
-            await sqlite_commit(session)
-            res = await session.execute(
-                select(FleetModel)
-                .where(
-                    FleetModel.id == fleet_model.id,
-                    ~exists().where(
-                        InstanceModel.fleet_id == fleet_model.id,
-                        InstanceModel.deleted == False,
-                    ),
-                )
-                .with_for_update(key_share=True, of=FleetModel)
-                .execution_options(populate_existing=True)
-                .options(noload(FleetModel.instances))
-            )
-            empty_fleet_model = res.unique().scalar()
-            if empty_fleet_model is not None:
-                fleet_model = empty_fleet_model
-            else:
-                res = await session.execute(
-                    select(FleetModel)
-                    .join(FleetModel.instances)
-                    .where(
-                        FleetModel.id == fleet_model.id,
-                        InstanceModel.deleted == False,
-                    )
-                    .options(contains_eager(FleetModel.instances))
-                    .execution_options(populate_existing=True)
-                )
-                fleet_model = res.unique().scalar_one()
-            master_instance_provisioning_data = get_fleet_master_instance_provisioning_data(
-                fleet_model=fleet_model,
-                fleet_spec=fleet_spec,
-            )
+    if not is_master_job(job) or fleet_model is None:
+        return fleet_model, None
+
+    fleet_spec = _get_cluster_fleet_spec(fleet_model)
+    if fleet_spec is None:
+        return fleet_model, None
+
+    # To avoid violating fleet placement cluster during master provisioning,
+    # we must lock empty fleets and respect existing instances in non-empty fleets.
+    # On SQLite always take the lock during master provisioning for simplicity.
+    # It's fine to lock fleets currently locked by pipelines (with lock_* fields set)
+    # since we won't update fleets – we only need to ensure there is no parallel provisioning.
+    await exit_stack.enter_async_context(
+        get_locker(get_db().dialect_name).lock_ctx(FleetModel.__tablename__, [fleet_model.id])
+    )
+    await sqlite_commit(session)
+    fleet_model = await _refetch_cluster_master_fleet(session=session, fleet_model=fleet_model)
+    master_instance_provisioning_data = get_fleet_master_instance_provisioning_data(
+        fleet_model=fleet_model,
+        fleet_spec=fleet_spec,
+    )
     return fleet_model, master_instance_provisioning_data
+
+
+def _get_cluster_fleet_spec(fleet_model: FleetModel) -> Optional[FleetSpec]:
+    fleet_spec = get_fleet_spec(fleet_model)
+    if fleet_spec.configuration.placement != InstanceGroupPlacement.CLUSTER:
+        return None
+    return fleet_spec
+
+
+async def _refetch_cluster_master_fleet(
+    session: AsyncSession, fleet_model: FleetModel
+) -> FleetModel:
+    res = await session.execute(
+        select(FleetModel)
+        .where(
+            FleetModel.id == fleet_model.id,
+            ~exists().where(
+                InstanceModel.fleet_id == fleet_model.id,
+                InstanceModel.deleted == False,
+            ),
+        )
+        .with_for_update(key_share=True, of=FleetModel)
+        .execution_options(populate_existing=True)
+        .options(noload(FleetModel.instances))
+    )
+    empty_fleet_model = res.unique().scalar()
+    if empty_fleet_model is not None:
+        return empty_fleet_model
+
+    res = await session.execute(
+        select(FleetModel)
+        .join(FleetModel.instances)
+        .where(
+            FleetModel.id == fleet_model.id,
+            InstanceModel.deleted == False,
+        )
+        .options(contains_eager(FleetModel.instances))
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
 
 
 async def _assign_existing_instance_to_job(
