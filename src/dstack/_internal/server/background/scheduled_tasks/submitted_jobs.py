@@ -230,6 +230,17 @@ class _SubmittedJobContext:
     multinode: bool
 
 
+@dataclass
+class _MasterJobDependency:
+    provisioning_data: Optional[JobProvisioningData]
+
+
+@dataclass
+class _PreparedJobVolumes:
+    volume_models: list[list[VolumeModel]]
+    volumes: list[list[Volume]]
+
+
 async def _process_submitted_job(
     exit_stack: AsyncExitStack, session: AsyncSession, job_model: JobModel
 ):
@@ -245,52 +256,35 @@ async def _process_submitted_job(
     run_spec = run.run_spec
     run_profile = run_spec.merged_profile
 
-    master_job = find_job(run.jobs, job_model.replica_num, 0)
-    master_job_provisioning_data = None
-    if job.job_spec.job_num != 0:
-        if master_job.job_submissions[-1].job_provisioning_data is None:
-            await _defer_submitted_job(
-                session=session,
-                job_model=job_model,
-                log_message="waiting for master job to be provisioned",
-            )
-            return
-        master_job_provisioning_data = JobProvisioningData.__response__.parse_obj(
-            master_job.job_submissions[-1].job_provisioning_data
-        )
-    if job.job_spec.job_num != 0 or job.job_spec.replica_num != 0:
-        if run_model.fleet_id is None:
-            await _defer_submitted_job(
-                session=session,
-                job_model=job_model,
-                log_message="waiting for the run to be assigned to the fleet",
-            )
-            return
-    try:
-        volume_models = await get_job_configured_volume_models(
-            session=session,
-            project=project,
-            run_spec=run_spec,
-            job_num=job.job_spec.job_num,
-            job_spec=job.job_spec,
-        )
-        volumes = await get_job_configured_volumes(
-            session=session,
-            project=project,
-            run_spec=run_spec,
-            job_num=job.job_spec.job_num,
-            job_spec=job.job_spec,
-        )
-        check_can_attach_job_volumes(volumes)
-    except ServerClientError as e:
-        logger.warning("%s: failed to prepare run volumes: %s", fmt(job_model), repr(e))
-        await _terminate_submitted_job(
-            session=session,
-            job_model=job_model,
-            reason=JobTerminationReason.VOLUME_ERROR,
-            message=e.msg,
-        )
+    master_job_dependency = await _resolve_master_job_dependency(
+        session=session,
+        job_model=job_model,
+        run=run,
+        job=job,
+    )
+    if master_job_dependency is None:
         return
+    master_job_provisioning_data = master_job_dependency.provisioning_data
+
+    if not await _resolve_fleet_dependency(
+        session=session,
+        job_model=job_model,
+        run_model=run_model,
+        job=job,
+    ):
+        return
+
+    prepared_job_volumes = await _prepare_job_volumes(
+        session=session,
+        job_model=job_model,
+        project=project,
+        run_spec=run_spec,
+        job=job,
+    )
+    if prepared_job_volumes is None:
+        return
+    volume_models = prepared_job_volumes.volume_models
+    volumes = prepared_job_volumes.volumes
 
     # Submitted jobs processing happens in two steps (transactions).
     # First, the jobs gets an instance assigned (or no instance).
@@ -584,6 +578,85 @@ async def _load_submitted_job_context(
         # If master job chooses no fleet, the new fleet will be created.
         fleet_model=run_model.fleet or job_model.fleet,
         multinode=job.job_spec.jobs_per_replica > 1,
+    )
+
+
+async def _resolve_master_job_dependency(
+    session: AsyncSession,
+    job_model: JobModel,
+    run: Run,
+    job: Job,
+) -> Optional[_MasterJobDependency]:
+    if job.job_spec.job_num == 0:
+        return _MasterJobDependency(provisioning_data=None)
+    master_job = find_job(run.jobs, job_model.replica_num, 0)
+    if master_job.job_submissions[-1].job_provisioning_data is None:
+        await _defer_submitted_job(
+            session=session,
+            job_model=job_model,
+            log_message="waiting for master job to be provisioned",
+        )
+        return None
+    return _MasterJobDependency(
+        provisioning_data=JobProvisioningData.__response__.parse_obj(
+            master_job.job_submissions[-1].job_provisioning_data
+        )
+    )
+
+
+async def _resolve_fleet_dependency(
+    session: AsyncSession,
+    job_model: JobModel,
+    run_model: RunModel,
+    job: Job,
+) -> bool:
+    if job.job_spec.job_num == 0 and job.job_spec.replica_num == 0:
+        return True
+    if run_model.fleet_id is not None:
+        return True
+    await _defer_submitted_job(
+        session=session,
+        job_model=job_model,
+        log_message="waiting for the run to be assigned to the fleet",
+    )
+    return False
+
+
+async def _prepare_job_volumes(
+    session: AsyncSession,
+    job_model: JobModel,
+    project: ProjectModel,
+    run_spec,
+    job: Job,
+) -> Optional[_PreparedJobVolumes]:
+    try:
+        volume_models = await get_job_configured_volume_models(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job_num=job.job_spec.job_num,
+            job_spec=job.job_spec,
+        )
+        volumes = await get_job_configured_volumes(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job_num=job.job_spec.job_num,
+            job_spec=job.job_spec,
+        )
+        check_can_attach_job_volumes(volumes)
+    except ServerClientError as e:
+        logger.warning("%s: failed to prepare run volumes: %s", fmt(job_model), repr(e))
+        await _terminate_submitted_job(
+            session=session,
+            job_model=job_model,
+            reason=JobTerminationReason.VOLUME_ERROR,
+            message=e.msg,
+        )
+        return None
+    return _PreparedJobVolumes(
+        volume_models=volume_models,
+        volumes=volumes,
     )
 
 
