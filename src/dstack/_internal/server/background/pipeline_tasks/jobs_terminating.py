@@ -59,6 +59,7 @@ from dstack._internal.server.services.jobs import (
     emit_job_status_change_event,
     get_job_provisioning_data,
     get_job_runtime_data,
+    get_job_spec,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
@@ -797,7 +798,7 @@ async def _detach_volumes_from_job_instance(
     jpd: JobProvisioningData,
     run_termination_reason: Optional[RunTerminationReason],
 ) -> _VolumeDetachResult:
-    job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
+    job_spec = get_job_spec(job_model)
     backend = await backends_services.get_project_backend_by_type(
         project=instance_model.project,
         backend_type=jpd.backend,

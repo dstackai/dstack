@@ -32,7 +32,7 @@ from dstack._internal.core.models.routers import (
     RouterType,
     SGLangServiceRouterConfig,
 )
-from dstack._internal.core.models.runs import JobSpec, Run, RunSpec, ServiceModelSpec, ServiceSpec
+from dstack._internal.core.models.runs import Run, RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.proxy.gateway.const import SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE
 from dstack._internal.server import settings
@@ -322,7 +322,7 @@ async def register_replica(
             async with conn.client() as client:
                 await client.register_replica(
                     run=run,
-                    job_spec=JobSpec.__response__.parse_raw(job_model.job_spec_data),
+                    job_spec=jobs_services.get_job_spec(job_model),
                     job_submission=job_submission,
                     instance_project_ssh_private_key=instance_project_ssh_private_key,
                     ssh_head_proxy=ssh_head_proxy,

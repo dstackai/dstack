@@ -24,7 +24,6 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Job,
-    JobSpec,
     JobStatus,
     JobSubmission,
     JobTerminationReason,
@@ -54,6 +53,7 @@ from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     delay_job_instance_termination,
     get_job_configured_volumes,
+    get_job_spec,
     get_jobs_from_run_spec,
     job_model_to_job_submission,
     remove_job_spec_sensitive_info,
@@ -835,7 +835,7 @@ def _get_run_jobs_with_submissions(
                     submissions.append(job_submission)
             if job_model is not None:
                 # Use the spec from the latest submission. Submissions can have different specs
-                job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
+                job_spec = get_job_spec(job_model)
                 if not include_sensitive:
                     remove_job_spec_sensitive_info(job_spec)
                 jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
@@ -861,7 +861,7 @@ def _get_run_status_message(run_model: RunModel) -> str:
     if run_model.status in [RunStatus.SUBMITTED, RunStatus.PENDING]:
         # Show `retrying` if any job caused the run to retry
         for job_models in job_models_grouped_by_job:
-            last_job_spec = JobSpec.__response__.parse_raw(job_models[-1].job_spec_data)
+            last_job_spec = get_job_spec(job_models[-1])
             retry_on_events = last_job_spec.retry.on_events if last_job_spec.retry else []
             last_job_termination_reason = _get_last_job_termination_reason(job_models)
             if (
