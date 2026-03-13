@@ -290,83 +290,14 @@ async def _process_submitted_job(
     # First, the jobs gets an instance assigned (or no instance).
     # Then, the job runs on the assigned instance or a new instance is provisioned.
     # This is needed to avoid holding instances lock for a long time.
-    if not job_model.instance_assigned:
-        fleet_filters, instance_filters = await get_run_candidate_fleet_models_filters(
+    if not context.job_model.instance_assigned:
+        await _process_assignment_phase(
+            exit_stack=exit_stack,
             session=session,
-            project=project,
-            run_model=run_model,
-            run_spec=run_spec,
-        )
-        (
-            fleet_models_with_instances,
-            fleet_models_without_instances,
-        ) = await select_run_candidate_fleet_models_with_filters(
-            session=session,
-            fleet_filters=fleet_filters,
-            instance_filters=instance_filters,
-            lock_instances=True,
-        )
-        instances_ids = sorted(
-            itertools.chain.from_iterable(
-                [i.id for i in f.instances] for f in fleet_models_with_instances
-            )
-        )
-        await sqlite_commit(session)
-        await exit_stack.enter_async_context(
-            get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids)
-        )
-        if is_db_sqlite():
-            fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
-            fleet_models_with_instances = await _refetch_fleet_models_with_instances(
-                session=session,
-                fleets_ids=fleets_with_instances_ids,
-                instances_ids=instances_ids,
-                fleet_filters=fleet_filters,
-                instance_filters=instance_filters,
-            )
-        fleet_models = fleet_models_with_instances + fleet_models_without_instances
-        fleet_model, fleet_instances_with_offers, _ = await find_optimal_fleet_with_offers(
-            project=project,
-            fleet_models=fleet_models,
-            run_model=run_model,
-            run_spec=run.run_spec,
-            job=job,
+            context=context,
             master_job_provisioning_data=master_job_provisioning_data,
             volumes=volumes,
-            exclude_not_available=True,
         )
-        if fleet_model is None:
-            if run_spec.merged_profile.fleets is not None:
-                # Run cannot create new fleets when fleets are specified
-                logger.debug("%s: failed to use specified fleets", fmt(job_model))
-                await _terminate_submitted_job(
-                    session=session,
-                    job_model=job_model,
-                    reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
-                    message="Failed to use specified fleets",
-                )
-                return
-            if not FeatureFlags.AUTOCREATED_FLEETS_ENABLED:
-                logger.debug("%s: no fleet found", fmt(job_model))
-                # Note: `_get_job_status_message` relies on the "No fleet found" substring to return "no fleets"
-                await _terminate_submitted_job(
-                    session=session,
-                    job_model=job_model,
-                    reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
-                    message=(
-                        "No matching fleet found. Possible reasons: "
-                        "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
-                    ),
-                )
-                return
-        instance = await _assign_job_to_fleet_instance(
-            session=session,
-            fleet_model=fleet_model,
-            instances_with_offers=fleet_instances_with_offers,
-            job_model=job_model,
-            multinode=context.multinode,
-        )
-        await _mark_job_processed(session=session, job_model=job_model)
         return
 
     jobs_to_provision = _get_jobs_to_provision(job, context.replica_jobs, job_model)
@@ -658,6 +589,109 @@ async def _prepare_job_volumes(
         volume_models=volume_models,
         volumes=volumes,
     )
+
+
+async def _process_assignment_phase(
+    exit_stack: AsyncExitStack,
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+    master_job_provisioning_data: Optional[JobProvisioningData],
+    volumes: list[list[Volume]],
+) -> None:
+    fleet_model, fleet_instances_with_offers = await _find_assignment_fleet_with_offers(
+        exit_stack=exit_stack,
+        session=session,
+        context=context,
+        master_job_provisioning_data=master_job_provisioning_data,
+        volumes=volumes,
+    )
+    if fleet_model is None:
+        if context.run.run_spec.merged_profile.fleets is not None:
+            # Run cannot create new fleets when fleets are specified
+            logger.debug("%s: failed to use specified fleets", fmt(context.job_model))
+            await _terminate_submitted_job(
+                session=session,
+                job_model=context.job_model,
+                reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                message="Failed to use specified fleets",
+            )
+            return
+        if not FeatureFlags.AUTOCREATED_FLEETS_ENABLED:
+            logger.debug("%s: no fleet found", fmt(context.job_model))
+            # Note: `_get_job_status_message` relies on the "No fleet found" substring to return "no fleets"
+            await _terminate_submitted_job(
+                session=session,
+                job_model=context.job_model,
+                reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                message=(
+                    "No matching fleet found. Possible reasons: "
+                    "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
+                ),
+            )
+            return
+
+    await _assign_job_to_fleet_instance(
+        session=session,
+        fleet_model=fleet_model,
+        instances_with_offers=fleet_instances_with_offers,
+        job_model=context.job_model,
+        multinode=context.multinode,
+    )
+    await _mark_job_processed(session=session, job_model=context.job_model)
+
+
+async def _find_assignment_fleet_with_offers(
+    exit_stack: AsyncExitStack,
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+    master_job_provisioning_data: Optional[JobProvisioningData],
+    volumes: list[list[Volume]],
+) -> tuple[Optional[FleetModel], list[tuple[InstanceModel, InstanceOfferWithAvailability]]]:
+    fleet_filters, instance_filters = await get_run_candidate_fleet_models_filters(
+        session=session,
+        project=context.project,
+        run_model=context.run_model,
+        run_spec=context.run.run_spec,
+    )
+    (
+        fleet_models_with_instances,
+        fleet_models_without_instances,
+    ) = await select_run_candidate_fleet_models_with_filters(
+        session=session,
+        fleet_filters=fleet_filters,
+        instance_filters=instance_filters,
+        lock_instances=True,
+    )
+    instances_ids = sorted(
+        itertools.chain.from_iterable(
+            [i.id for i in f.instances] for f in fleet_models_with_instances
+        )
+    )
+    await sqlite_commit(session)
+    await exit_stack.enter_async_context(
+        get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids)
+    )
+    if is_db_sqlite():
+        fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
+        fleet_models_with_instances = await _refetch_fleet_models_with_instances(
+            session=session,
+            fleets_ids=fleets_with_instances_ids,
+            instances_ids=instances_ids,
+            fleet_filters=fleet_filters,
+            instance_filters=instance_filters,
+        )
+    fleet_models = fleet_models_with_instances + fleet_models_without_instances
+    fleet_model, fleet_instances_with_offers, _ = await find_optimal_fleet_with_offers(
+        project=context.project,
+        fleet_models=fleet_models,
+        run_model=context.run_model,
+        run_spec=context.run.run_spec,
+        job=context.job,
+        master_job_provisioning_data=master_job_provisioning_data,
+        volumes=volumes,
+        exclude_not_available=True,
+    )
+    return fleet_model, fleet_instances_with_offers
 
 
 async def _defer_submitted_job(
