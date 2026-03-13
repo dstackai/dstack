@@ -243,8 +243,8 @@ class _PreparedJobVolumes:
 @dataclass
 class _ProvisioningPhaseResult:
     jobs_to_provision: list[Job]
-    instance: Optional[InstanceModel]
-    need_volume_attachment: bool
+    instance_models: list[InstanceModel]
+    compute_group_model: Optional[ComputeGroupModel]
 
 
 @dataclass
@@ -564,39 +564,65 @@ async def _process_provisioning_phase(
     master_job_provisioning_data: Optional[JobProvisioningData],
     volumes: list[list[Volume]],
 ) -> Optional[_ProvisioningPhaseResult]:
-    job_model = context.job_model
-    run = context.run
-    job = context.job
-    jobs_to_provision = _select_jobs_to_provision(job, context.replica_jobs, job_model)
-    # TODO: Volume attachment for compute groups is not yet supported since
-    # currently supported compute groups (e.g. Runpod) don't need explicit volume attachment.
-    need_volume_attachment = True
-
-    if job_model.instance is not None:
-        res = await session.execute(
-            select(InstanceModel)
-            .where(InstanceModel.id == job_model.instance.id)
-            .options(selectinload(InstanceModel.volume_attachments))
-            .execution_options(populate_existing=True)
-        )
-        instance = res.unique().scalar_one()
-        switch_job_status(session, job_model, JobStatus.PROVISIONING)
-        return _ProvisioningPhaseResult(
+    jobs_to_provision = _select_jobs_to_provision(
+        context.job, context.replica_jobs, context.job_model
+    )
+    if context.job_model.instance is not None:
+        return await _process_existing_instance_provisioning_path(
+            session=session,
+            job_model=context.job_model,
             jobs_to_provision=jobs_to_provision,
-            instance=instance,
-            need_volume_attachment=need_volume_attachment,
         )
 
-    if run.run_spec.merged_profile.creation_policy == CreationPolicy.REUSE:
-        logger.debug("%s: reuse instance failed", fmt(job_model))
+    if context.run.run_spec.merged_profile.creation_policy == CreationPolicy.REUSE:
+        logger.debug("%s: reuse instance failed", fmt(context.job_model))
         await _terminate_submitted_job(
             session=session,
-            job_model=job_model,
+            job_model=context.job_model,
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
             message="Could not reuse any instances for this job",
         )
         return None
 
+    return await _process_new_capacity_provisioning_path(
+        exit_stack=exit_stack,
+        session=session,
+        context=context,
+        jobs_to_provision=jobs_to_provision,
+        master_job_provisioning_data=master_job_provisioning_data,
+        volumes=volumes,
+    )
+
+
+async def _process_existing_instance_provisioning_path(
+    session: AsyncSession,
+    job_model: JobModel,
+    jobs_to_provision: list[Job],
+) -> _ProvisioningPhaseResult:
+    assert job_model.instance is not None
+    res = await session.execute(
+        select(InstanceModel)
+        .where(InstanceModel.id == job_model.instance.id)
+        .options(selectinload(InstanceModel.volume_attachments))
+        .execution_options(populate_existing=True)
+    )
+    instance = res.unique().scalar_one()
+    switch_job_status(session, job_model, JobStatus.PROVISIONING)
+    return _ProvisioningPhaseResult(
+        jobs_to_provision=jobs_to_provision,
+        instance_models=[instance],
+        compute_group_model=None,
+    )
+
+
+async def _process_new_capacity_provisioning_path(
+    exit_stack: AsyncExitStack,
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+    jobs_to_provision: list[Job],
+    master_job_provisioning_data: Optional[JobProvisioningData],
+    volumes: list[list[Volume]],
+) -> Optional[_ProvisioningPhaseResult]:
     (
         fleet_model,
         master_instance_provisioning_data,
@@ -604,7 +630,7 @@ async def _process_provisioning_phase(
         exit_stack=exit_stack,
         session=session,
         fleet_model=context.fleet_model,
-        job=job,
+        job=context.job,
     )
 
     # master_job_provisioning_data is present if there is a master job.
@@ -614,8 +640,8 @@ async def _process_provisioning_phase(
         session=session,
         project=context.project,
         fleet_model=fleet_model,
-        job_model=job_model,
-        run=run,
+        job_model=context.job_model,
+        run=context.run,
         jobs=jobs_to_provision,
         project_ssh_public_key=context.project.ssh_public_key,
         project_ssh_private_key=context.project.ssh_private_key,
@@ -623,10 +649,10 @@ async def _process_provisioning_phase(
         volumes=volumes,
     )
     if provision_new_capacity_result is None:
-        logger.debug("%s: provisioning failed", fmt(job_model))
+        logger.debug("%s: provisioning failed", fmt(context.job_model))
         await _terminate_submitted_job(
             session=session,
-            job_model=job_model,
+            job_model=context.job_model,
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
         )
         return None
@@ -637,7 +663,7 @@ async def _process_provisioning_phase(
             exit_stack=exit_stack,
             session=session,
             project=context.project,
-            run=run,
+            run=context.run,
         )
         session.add(fleet_model)
         events.emit(
@@ -646,16 +672,31 @@ async def _process_provisioning_phase(
             actor=events.SystemActor(),
             targets=[
                 events.Target.from_model(fleet_model),
-                events.Target.from_model(job_model),
+                events.Target.from_model(context.job_model),
             ],
         )
 
+    return await _materialize_newly_provisioned_capacity(
+        session=session,
+        context=context,
+        jobs_to_provision=jobs_to_provision,
+        fleet_model=fleet_model,
+        provision_new_capacity_result=provision_new_capacity_result,
+    )
+
+
+async def _materialize_newly_provisioned_capacity(
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+    jobs_to_provision: list[Job],
+    fleet_model: FleetModel,
+    provision_new_capacity_result: _ProvisionNewCapacityResult,
+) -> _ProvisioningPhaseResult:
     provisioning_data = provision_new_capacity_result.provisioning_data
     offer = provision_new_capacity_result.offer
     effective_profile = provision_new_capacity_result.effective_profile
     compute_group_model = None
     if isinstance(provisioning_data, ComputeGroupProvisioningData):
-        need_volume_attachment = False
         provisioned_jobs = jobs_to_provision
         jpds = provisioning_data.job_provisioning_datas
         compute_group_model = ComputeGroupModel(
@@ -667,12 +708,16 @@ async def _process_provisioning_phase(
         )
         session.add(compute_group_model)
     else:
-        provisioned_jobs = [job]
+        provisioned_jobs = [context.job]
         jpds = [provisioning_data]
 
-    logger.info("%s: provisioned %s new instance(s)", fmt(job_model), len(provisioned_jobs))
+    logger.info(
+        "%s: provisioned %s new instance(s)",
+        fmt(context.job_model),
+        len(provisioned_jobs),
+    )
     provisioned_job_models = _get_job_models_for_jobs(context.run_model.jobs, provisioned_jobs)
-    instance = None  # Instance for attaching volumes in case of single job provisioned
+    instances: list[InstanceModel] = []
     # FIXME: Fleet is not locked which may lead to duplicate instance_num.
     # This is currently hard to fix without locking the fleet for entire provisioning duration.
     # Processing should be done in multiple steps so that
@@ -692,6 +737,7 @@ async def _process_provisioning_phase(
             instance_num=instance_num,
             profile=effective_profile,
         )
+        instances.append(instance)
         taken_instance_nums.add(instance_num)
         provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
             offer, context.multinode
@@ -711,8 +757,8 @@ async def _process_provisioning_phase(
 
     return _ProvisioningPhaseResult(
         jobs_to_provision=jobs_to_provision,
-        instance=instance,
-        need_volume_attachment=need_volume_attachment,
+        instance_models=instances,
+        compute_group_model=compute_group_model,
     )
 
 
@@ -731,7 +777,9 @@ async def _finalize_submitted_job_processing(
 
     volume_models = prepared_job_volumes.volume_models
     volumes_ids = sorted([v.id for vs in volume_models for v in vs])
-    if provisioning_phase_result.need_volume_attachment:
+    # TODO: Volume attachment for compute groups is not yet supported since
+    # currently supported compute groups (e.g. Runpod) don't need explicit volume attachment.
+    if provisioning_phase_result.compute_group_model is None:
         # Take lock to prevent attaching volumes that are to be deleted.
         # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
         # TODO: Lock instances for attaching volumes?
@@ -746,12 +794,12 @@ async def _finalize_submitted_job_processing(
             get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids)
         )
         if len(volume_models) > 0:
-            assert provisioning_phase_result.instance is not None
+            assert len(provisioning_phase_result.instance_models) == 1
             await _attach_volumes(
                 session=session,
                 project=context.project,
                 job_model=context.job_model,
-                instance=provisioning_phase_result.instance,
+                instance=provisioning_phase_result.instance_models[0],
                 volume_models=volume_models,
             )
     await session.commit()
