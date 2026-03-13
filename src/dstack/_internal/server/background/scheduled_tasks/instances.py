@@ -77,8 +77,8 @@ from dstack._internal.server.schemas.runner import (
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services.fleets import (
-    fleet_model_to_fleet,
     get_create_instance_offers,
+    get_fleet_spec,
     is_cloud_cluster,
 )
 from dstack._internal.server.services.instances import (
@@ -310,12 +310,12 @@ def _can_terminate_fleet_instances_on_idle_duration(fleet_model: FleetModel) -> 
     # There may be race conditions since we don't take the fleet lock.
     # That's ok: in the worst case we go below `nodes.min`, but
     # the fleet consolidation logic will provision new nodes.
-    fleet = fleet_model_to_fleet(fleet_model)
-    if fleet.spec.configuration.nodes is None or fleet.spec.autocreated:
+    fleet_spec = get_fleet_spec(fleet_model)
+    if fleet_spec.configuration.nodes is None or fleet_spec.autocreated:
         return True
     active_instances = [i for i in fleet_model.instances if i.status.is_active()]
     active_instances_num = len(active_instances)
-    return active_instances_num > fleet.spec.configuration.nodes.min
+    return active_instances_num > fleet_spec.configuration.nodes.min
 
 
 async def _add_remote(session: AsyncSession, instance: InstanceModel) -> None:
@@ -1223,8 +1223,8 @@ def _get_instance_offer_for_instance(
 ) -> InstanceOfferWithAvailability:
     if instance.fleet is None:
         return instance_offer
-    fleet = fleet_model_to_fleet(instance.fleet)
-    if fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
+    fleet_spec = get_fleet_spec(instance.fleet)
+    if fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
         master_job_provisioning_data = get_instance_provisioning_data(master_instance)
         return get_instance_offer_with_restricted_az(
             instance_offer=instance_offer,

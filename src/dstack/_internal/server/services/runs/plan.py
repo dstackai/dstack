@@ -3,10 +3,10 @@ from typing import Optional, Union
 
 from sqlalchemy import and_, exists, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager, joinedload, noload
+from sqlalchemy.orm import contains_eager, noload
 
 from dstack._internal.core.backends.base.backend import Backend
-from dstack._internal.core.models.fleets import Fleet, FleetSpec, InstanceGroupPlacement
+from dstack._internal.core.models.fleets import FleetSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -31,7 +31,6 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
-    fleet_model_to_fleet,
     get_fleet_master_instance_provisioning_data,
     get_fleet_requirements,
     get_fleet_spec,
@@ -251,12 +250,7 @@ async def select_run_candidate_fleet_models_with_filters(
         .join(FleetModel.instances)
         .where(*fleet_filters)
         .where(*instance_filters)
-        .options(
-            contains_eager(FleetModel.instances),
-            joinedload(FleetModel.project)
-            .load_only(ProjectModel.name)
-            .joinedload(ProjectModel.backends),
-        )
+        .options(contains_eager(FleetModel.instances))
         .execution_options(populate_existing=True)
     )
     if lock_instances:
@@ -341,18 +335,18 @@ async def find_optimal_fleet_with_offers(
         ]
     ] = []
     for candidate_fleet_model in fleet_models:
-        candidate_fleet = fleet_model_to_fleet(candidate_fleet_model)
+        candidate_fleet_spec = get_fleet_spec(candidate_fleet_model)
         if (
             is_multinode_job(job)
-            and candidate_fleet.spec.configuration.placement != InstanceGroupPlacement.CLUSTER
+            and candidate_fleet_spec.configuration.placement != InstanceGroupPlacement.CLUSTER
         ):
             # Limit multinode runs to cluster fleets to guarantee best connectivity.
             continue
 
-        if not _run_can_fit_into_fleet(run_spec, candidate_fleet):
+        if not _run_can_fit_into_fleet(run_spec, candidate_fleet_model, candidate_fleet_spec):
             logger.debug(
                 "Skipping fleet %s from consideration: run cannot fit into fleet",
-                candidate_fleet.name,
+                candidate_fleet_model.name,
             )
             continue
 
@@ -376,7 +370,7 @@ async def find_optimal_fleet_with_offers(
         backend_offers = await _get_backend_offers_in_fleet(
             project=project,
             fleet_model=candidate_fleet_model,
-            fleet_spec=candidate_fleet.spec,
+            fleet_spec=candidate_fleet_spec,
             run_spec=run_spec,
             job=job,
             volumes=volumes,
@@ -509,7 +503,9 @@ def _get_instance_offers_in_fleet(
     return instances_with_offers
 
 
-def _run_can_fit_into_fleet(run_spec: RunSpec, fleet: Fleet) -> bool:
+def _run_can_fit_into_fleet(
+    run_spec: RunSpec, fleet_model: FleetModel, fleet_spec: FleetSpec
+) -> bool:
     """
     Returns `False` if the run cannot fit into fleet for sure.
     This is helpful heuristic to avoid even considering fleets too small for a run.
@@ -522,19 +518,19 @@ def _run_can_fit_into_fleet(run_spec: RunSpec, fleet: Fleet) -> bool:
     # how many jobs such fleets can accommodate.
     nodes_required_num = get_nodes_required_num(run_spec)
     if (
-        fleet.spec.configuration.nodes is not None
-        and fleet.spec.configuration.blocks == 1
-        and fleet.spec.configuration.nodes.max is not None
+        fleet_spec.configuration.nodes is not None
+        and fleet_spec.configuration.blocks == 1
+        and fleet_spec.configuration.nodes.max is not None
     ):
-        busy_instances = [i for i in fleet.instances if i.busy_blocks > 0]
-        fleet_available_capacity = fleet.spec.configuration.nodes.max - len(busy_instances)
+        busy_instances = [i for i in fleet_model.instances if i.busy_blocks > 0]
+        fleet_available_capacity = fleet_spec.configuration.nodes.max - len(busy_instances)
         if fleet_available_capacity < nodes_required_num:
             return False
-    elif fleet.spec.configuration.ssh_config is not None:
+    elif fleet_spec.configuration.ssh_config is not None:
         # Currently assume that each idle block can run a job.
         # TODO: Take resources / eligible offers into account.
         total_idle_blocks = 0
-        for instance in fleet.instances:
+        for instance in fleet_model.instances:
             total_blocks = instance.total_blocks or 1
             total_idle_blocks += total_blocks - instance.busy_blocks
         if total_idle_blocks < nodes_required_num:
