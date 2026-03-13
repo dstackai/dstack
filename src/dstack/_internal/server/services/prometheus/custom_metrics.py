@@ -187,7 +187,7 @@ async def get_job_metrics(session: AsyncSession) -> Iterable[Metric]:
                     )
                 ):
                     gpu_labels = labels.copy()
-                    gpu_labels["dstack_gpu_num"] = gpu_num
+                    gpu_labels["dstack_gpu_num"] = str(gpu_num)
                     metrics.add_sample(_JOB_GPU_USAGE_RATIO, gpu_labels, gpu_util / 100)
                     metrics.add_sample(_JOB_GPU_MEMORY_TOTAL, gpu_labels, gpu_memory_total)
                     metrics.add_sample(_JOB_GPU_MEMORY_USAGE, gpu_labels, gpu_memory_usage)
