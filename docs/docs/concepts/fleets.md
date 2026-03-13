@@ -470,8 +470,8 @@ ssh_config:
 
 ## Tenant isolation
 
-Workloads running on a fleet have access to the host, including mounted folders. For distributed workloads,
-containers use host network mode.
+Users running workloads on a fleet have access to the host, including the folders that may be used as instance volumes,
+and containers use host network mode unless the host has multiple [blocks](#blocks) configured and the job uses only a subset of them.
 
 Tighter isolation is on the roadmap, including [SSH reverse proxy](https://github.com/dstackai/dstack/issues/3644){:target="_blank"} and rootless access to the host.
 
