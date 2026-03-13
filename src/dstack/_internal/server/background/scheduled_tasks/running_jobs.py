@@ -102,6 +102,8 @@ MIN_PROCESSING_INTERVAL = timedelta(seconds=10)
 JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 
 
+# NOTE: This scheduled task is going to be deprecated in favor of `JobRunningPipeline`.
+# If this logic changes before removal, keep `pipeline_tasks/jobs_running.py` in sync.
 async def process_running_jobs(batch_size: int = 1):
     tasks = []
     for _ in range(batch_size):

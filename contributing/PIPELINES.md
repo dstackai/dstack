@@ -37,6 +37,55 @@ Brief checklist for implementing a new pipeline:
 8. Register the pipeline in `PipelineManager` and hint fetch from services after commit via `pipeline_hinter.hint_fetch(Model.__name__)`.
 9. Add minimum tests: fetch eligibility/order, successful unlock path, stale lock token path, and related lock contention retry path.
 
+## Typical worker structure
+
+Most workers are easiest to reason about when `process()` is split into three phases:
+
+1. Load/refetch: open a short DB session, refetch the locked main row by `id + lock_token`, lock any required related rows, and gather any extra data needed for processing.
+2. Process: do the heavy work outside DB sessions and build result objects or update maps instead of mutating detached ORM models.
+3. Apply: open a short DB session, guard the main update by `id + lock_token`, resolve time placeholders, apply related updates, emit events, and unlock rows.
+
+A dedicated context object is often useful for the load step when the worker needs multiple loaded models, related lock metadata, or derived values that should be passed cleanly into processing and apply. For very small pipelines, a direct load -> process -> apply flow may still be clearer.
+
+Workers can share one context type and one apply function across all states even if the processing logic differs by state:
+
+```python
+async def process(item):
+    context = await _load_process_context(item)
+    if context is None:
+        return
+    result = await _process_item(context)
+    await _apply_process_result(item, context, result)
+```
+
+Sometimes state-specific helpers are still the cleanest option, but they can still share a common apply phase if all states write results in the same general shape:
+
+```python
+async def process(item):
+    if item.status == Status.PENDING:
+        context = await _load_pending_context(item)
+    elif item.status == Status.RUNNING:
+        context = await _load_running_context(item)
+    else:
+        return
+    if context is None:
+        return
+    result = await _process_item(context)
+    await _apply_process_result(item, context, result)
+```
+
+If different states have materially different write-side behavior, different apply paths are fine as well. This commonly happens when one state does a normal guarded update while another does delete-or-cleanup work with different related updates:
+
+```python
+async def process(item):
+    if item.to_be_deleted:
+        await _process_to_be_deleted_item(item)
+    elif item.status == Status.SUBMITTED:
+        await _process_submitted_item(item)
+```
+
+It's ok not to force all pipelines into one exact shape.
+
 ## Implementation patterns
 
 **Guarded apply by lock token**

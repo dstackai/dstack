@@ -5,7 +5,7 @@ from contextlib import AsyncExitStack
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     contains_eager,
@@ -105,7 +105,10 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.offers import (
+    get_instance_offer_with_restricted_az,
+    get_offers_by_requirements,
+)
 from dstack._internal.server.services.placement import (
     find_or_create_suitable_placement_group,
     get_fleet_placement_group_models,
@@ -409,13 +412,14 @@ async def _process_submitted_job(
             await session.commit()
             return
 
-        master_instance_provisioning_data = (
-            await _fetch_fleet_with_master_instance_provisioning_data(
-                exit_stack=exit_stack,
-                session=session,
-                fleet_model=fleet_model,
-                job=job,
-            )
+        (
+            fleet_model,
+            master_instance_provisioning_data,
+        ) = await _fetch_fleet_with_master_instance_provisioning_data(
+            exit_stack=exit_stack,
+            session=session,
+            fleet_model=fleet_model,
+            job=job,
         )
         master_provisioning_data = (
             master_job_provisioning_data or master_instance_provisioning_data
@@ -573,7 +577,7 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
     session: AsyncSession,
     fleet_model: Optional[FleetModel],
     job: Job,
-) -> Optional[JobProvisioningData]:
+) -> tuple[Optional[FleetModel], Optional[JobProvisioningData]]:
     # TODO: When submitted-jobs provisioning moves to pipelines, stop inferring the
     # cluster master from loaded fleet instances here. Resolve the current master via
     # FleetModel.current_master_instance_id so jobs follow the same master election
@@ -595,12 +599,11 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
             await sqlite_commit(session)
             res = await session.execute(
                 select(FleetModel)
-                .outerjoin(FleetModel.instances)
                 .where(
                     FleetModel.id == fleet_model.id,
-                    or_(
-                        InstanceModel.id.is_(None),
-                        InstanceModel.deleted == True,
+                    ~exists().where(
+                        InstanceModel.fleet_id == fleet_model.id,
+                        InstanceModel.deleted == False,
                     ),
                 )
                 .with_for_update(key_share=True, of=FleetModel)
@@ -626,7 +629,7 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
                 fleet_model=fleet_model,
                 fleet_spec=fleet_spec,
             )
-    return master_instance_provisioning_data
+    return fleet_model, master_instance_provisioning_data
 
 
 async def _assign_job_to_fleet_instance(
@@ -781,6 +784,13 @@ async def _run_jobs_on_new_instances(
         offer_volumes = _get_offer_volumes(volumes, offer)
         job_configurations = [JobConfiguration(job=j, volumes=offer_volumes) for j in jobs]
         compute = backend.compute()
+        if master_job_provisioning_data is not None:
+            # `get_offers_by_requirements()` already restricts backend and region from the master.
+            # Availability zone still has to be narrowed per offer.
+            offer = get_instance_offer_with_restricted_az(
+                instance_offer=offer,
+                master_job_provisioning_data=master_job_provisioning_data,
+            )
         if (
             fleet_model is not None
             and len(fleet_model.instances) == 0

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone
 from unittest.mock import Mock, patch
 
 import pytest
@@ -57,7 +57,6 @@ class TestProcessTerminatingJobs:
             run=run,
             status=JobStatus.TERMINATING,
             termination_reason=JobTerminationReason.TERMINATED_BY_USER,
-            submitted_at=datetime(2023, 1, 2, 5, 12, 30, 5, tzinfo=timezone.utc),
             job_provisioning_data=job_provisioning_data,
             instance=instance,
         )
@@ -70,7 +69,6 @@ class TestProcessTerminatingJobs:
             SSHTunnelMock.assert_called_once()
             shim_client_mock.healthcheck.assert_called_once()
         await session.refresh(job)
-        assert job is not None
         assert job.status == JobStatus.TERMINATED
 
     async def test_detaches_job_volumes(self, session: AsyncSession):
@@ -103,7 +101,6 @@ class TestProcessTerminatingJobs:
             run=run,
             status=JobStatus.TERMINATING,
             termination_reason=JobTerminationReason.TERMINATED_BY_USER,
-            submitted_at=datetime(2023, 1, 2, 5, 12, 30, 5, tzinfo=timezone.utc),
             job_provisioning_data=job_provisioning_data,
             instance=instance,
         )
@@ -149,7 +146,6 @@ class TestProcessTerminatingJobs:
             run=run,
             status=JobStatus.TERMINATING,
             termination_reason=JobTerminationReason.TERMINATED_BY_USER,
-            submitted_at=datetime(2023, 1, 2, 5, 12, 30, 5, tzinfo=timezone.utc),
             job_provisioning_data=job_provisioning_data,
             instance=instance,
         )
@@ -304,7 +300,6 @@ class TestProcessTerminatingJobs:
             run=run,
             status=JobStatus.TERMINATING,
             termination_reason=JobTerminationReason.TERMINATED_BY_USER,
-            submitted_at=datetime(2023, 1, 2, 5, 12, 30, 5, tzinfo=timezone.utc),
             job_provisioning_data=job_provisioning_data,
             job_runtime_data=get_job_runtime_data(volume_names=["vol-1"]),
             instance=instance,

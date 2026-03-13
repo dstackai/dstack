@@ -144,6 +144,10 @@ async def _process_next_run():
                 .where(
                     JobModel.run_id == run_model.id,
                     JobModel.id.not_in(job_lockset),
+                    or_(
+                        JobModel.lock_expires_at.is_(None),
+                        JobModel.lock_expires_at < now,
+                    ),
                 )
                 .options(
                     load_only(JobModel.id),

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.volumes import VolumeProvisioningData, VolumeStatus
+from dstack._internal.server.background.pipeline_tasks import volumes as volumes_pipeline
 from dstack._internal.server.background.pipeline_tasks.volumes import (
     VolumeFetcher,
     VolumePipeline,
@@ -348,6 +349,72 @@ class TestVolumeWorkerSubmitted:
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Volume status changed SUBMITTED -> FAILED (Some error)"
+
+    async def test_skips_processing_if_lock_token_changed_before_refetch(
+        self, test_db, session: AsyncSession, worker: VolumeWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+        )
+        volume.lock_token = uuid.uuid4()
+        volume.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+        item = _volume_to_pipeline_item(volume)
+
+        volume.lock_token = uuid.uuid4()
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.volumes._process_submitted_volume"
+        ) as process_volume_mock:
+            await worker.process(item)
+            process_volume_mock.assert_not_awaited()
+
+        await session.refresh(volume)
+        assert volume.status == VolumeStatus.SUBMITTED
+        events = await list_events(session)
+        assert len(events) == 0
+
+    async def test_skips_apply_if_lock_token_changed_after_processing(
+        self, test_db, session: AsyncSession, worker: VolumeWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.SUBMITTED,
+        )
+        volume.lock_token = uuid.uuid4()
+        volume.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        async def _change_lock_token_and_return_result(_volume_model: VolumeModel):
+            volume.lock_token = uuid.uuid4()
+            await session.commit()
+            return volumes_pipeline._ProcessResult(
+                update_map={
+                    "status": VolumeStatus.ACTIVE,
+                }
+            )
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.volumes._process_submitted_volume",
+            side_effect=_change_lock_token_and_return_result,
+        ) as process_volume_mock:
+            await worker.process(_volume_to_pipeline_item(volume))
+            process_volume_mock.assert_awaited_once()
+
+        await session.refresh(volume)
+        assert volume.status == VolumeStatus.SUBMITTED
+        events = await list_events(session)
+        assert len(events) == 0
 
 
 @pytest.mark.asyncio

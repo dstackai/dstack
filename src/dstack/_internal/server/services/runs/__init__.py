@@ -987,9 +987,8 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
 
 async def process_terminating_run(session: AsyncSession, run_model: RunModel):
     """
-    Used by both `process_runs` and `stop_run` to process a TERMINATING run.
     Stops the jobs gracefully and marks them as TERMINATING.
-    Jobs should be terminated by `process_terminating_jobs`.
+    Jobs then should be terminated by `process_terminating_jobs`.
     When all jobs are terminated, assigns a finished status to the run.
     Caller must acquire the lock on run.
     """
