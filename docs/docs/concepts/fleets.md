@@ -468,6 +468,20 @@ ssh_config:
 !!! info "Reference"
     The fleet configuration file supports additional options, including [`instance_types`](../reference/dstack.yml/fleet.md#instance_types), [`max_price`](../reference/dstack.yml/fleet.md#max_price), [`regions`](../reference/dstack.yml/fleet.md#max_price), among others. For the complete list, see the [reference](../reference/dstack.yml/fleet.md).
 
+## Tenant isolation
+
+Users running workloads on a fleet have access to the host, including the folders that may be used as instance volumes,
+and containers use host network mode unless the host has multiple [blocks](#blocks) configured and the job uses only a subset of them.
+
+Tighter isolation is on the roadmap, including [SSH reverse proxy](https://github.com/dstackai/dstack/issues/3644){:target="_blank"} and rootless access to the host.
+
+When [exporting fleets](exports.md) to other projects, the same access model applies to members of the importer projects.
+
+## Export fleets
+
+Fleets can be exported to other projects, allowing those projects to use the exported fleets
+for running dev environments, tasks, and services. See [Exports](exports.md) for more details.
+
 ## Manage fleets
 
 ### List fleets
@@ -507,5 +521,6 @@ To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
     1. Check [dev environments](dev-environments.md), [tasks](tasks.md), and
     [services](services.md)
     2. Read about [Backends](backends.md) guide
-    3. Explore the [`.dstack.yml` reference](../reference/dstack.yml/fleet.md)
-    4. See the [Clusters](../../examples.md#clusters) example
+    3. Learn how to [export fleets](exports.md) to other projects
+    4. Explore the [`.dstack.yml` reference](../reference/dstack.yml/fleet.md)
+    5. See the [Clusters](../../examples.md#clusters) example
