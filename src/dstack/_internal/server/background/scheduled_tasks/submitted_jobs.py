@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import uuid
 from contextlib import AsyncExitStack
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
 
@@ -216,49 +217,33 @@ async def _process_next_submitted_job():
         last_processed_at = common_utils.get_current_datetime()
 
 
+@dataclass
+class _SubmittedJobContext:
+    job_model: JobModel
+    run_model: RunModel
+    project: ProjectModel
+    run: Run
+    job: Job
+    replica_jobs: list[Job]
+    replica_job_models: list[JobModel]
+    fleet_model: Optional[FleetModel]
+    multinode: bool
+
+
 async def _process_submitted_job(
     exit_stack: AsyncExitStack, session: AsyncSession, job_model: JobModel
 ):
-    # Refetch to load related attributes.
-    res = await session.execute(
-        select(JobModel)
-        .where(JobModel.id == job_model.id)
-        .options(joinedload(JobModel.instance))
-        .options(
-            joinedload(JobModel.fleet).selectinload(
-                FleetModel.instances.and_(InstanceModel.deleted == False)
-            ),
-        )
-    )
-    job_model = res.unique().scalar_one()
-    res = await session.execute(
-        select(RunModel)
-        .where(RunModel.id == job_model.run_id)
-        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(RunModel.user).load_only(UserModel.name))
-        .options(
-            joinedload(RunModel.fleet).selectinload(
-                FleetModel.instances.and_(InstanceModel.deleted == False)
-            ),
-        )
-    )
-    run_model = res.unique().scalar_one()
-    logger.debug("%s: provisioning has started", fmt(job_model))
+    context = await _load_submitted_job_context(session=session, job_model=job_model)
+    logger.debug("%s: provisioning has started", fmt(context.job_model))
 
-    project = run_model.project
-    run = run_model_to_run(run_model)
+    job_model = context.job_model
+    run_model = context.run_model
+    project = context.project
+    run = context.run
+    job = context.job
+    fleet_model = context.fleet_model
     run_spec = run.run_spec
     run_profile = run_spec.merged_profile
-    job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
-    replica_jobs = find_jobs(run.jobs, replica_num=job_model.replica_num)
-    replica_job_models = _get_job_models_for_jobs(run_model.jobs, replica_jobs)
-    multinode = job.job_spec.jobs_per_replica > 1
-
-    # Master job chooses fleet for the run.
-    # Due to two-step processing, it's saved to job_model.fleet.
-    # Other jobs just inherit fleet from run_model.fleet.
-    # If master job chooses no fleet, the new fleet will be created.
-    fleet_model = run_model.fleet or job_model.fleet
 
     master_job = find_job(run.jobs, job_model.replica_num, 0)
     master_job_provisioning_data = None
@@ -382,13 +367,13 @@ async def _process_submitted_job(
             fleet_model=fleet_model,
             instances_with_offers=fleet_instances_with_offers,
             job_model=job_model,
-            multinode=multinode,
+            multinode=context.multinode,
         )
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
         return
 
-    jobs_to_provision = _get_jobs_to_provision(job, replica_jobs, job_model)
+    jobs_to_provision = _get_jobs_to_provision(job, context.replica_jobs, job_model)
     # TODO: Volume attachment for compute groups is not yet supported since
     # currently supported compute groups (e.g. Runpod) don't need explicit volume attachment.
     need_volume_attachment = True
@@ -504,7 +489,7 @@ async def _process_submitted_job(
             )
             taken_instance_nums.add(instance_num)
             provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
-                offer, multinode
+                offer, context.multinode
             ).json()
             session.add(instance)
             events.emit(
@@ -519,7 +504,9 @@ async def _process_submitted_job(
             provisioned_job_model.used_instance_id = instance.id
             provisioned_job_model.last_processed_at = common_utils.get_current_datetime()
 
-    _allow_other_replica_jobs_to_provision(job_model, replica_job_models, jobs_to_provision)
+    _allow_other_replica_jobs_to_provision(
+        job_model, context.replica_job_models, jobs_to_provision
+    )
 
     volumes_ids = sorted([v.id for vs in volume_models for v in vs])
     if need_volume_attachment:
@@ -546,6 +533,54 @@ async def _process_submitted_job(
                 volume_models=volume_models,
             )
     await session.commit()
+
+
+async def _load_submitted_job_context(
+    session: AsyncSession, job_model: JobModel
+) -> _SubmittedJobContext:
+    # Refetch to load related attributes.
+    res = await session.execute(
+        select(JobModel)
+        .where(JobModel.id == job_model.id)
+        .options(joinedload(JobModel.instance))
+        .options(
+            joinedload(JobModel.fleet).selectinload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
+            ),
+        )
+    )
+    job_model = res.unique().scalar_one()
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == job_model.run_id)
+        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
+        .options(
+            joinedload(RunModel.fleet).selectinload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
+            ),
+        )
+    )
+    run_model = res.unique().scalar_one()
+
+    run = run_model_to_run(run_model)
+    job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+    replica_jobs = find_jobs(run.jobs, replica_num=job_model.replica_num)
+    return _SubmittedJobContext(
+        job_model=job_model,
+        run_model=run_model,
+        project=run_model.project,
+        run=run,
+        job=job,
+        replica_jobs=replica_jobs,
+        replica_job_models=_get_job_models_for_jobs(run_model.jobs, replica_jobs),
+        # Master job chooses fleet for the run.
+        # Due to two-step processing, it's saved to job_model.fleet.
+        # Other jobs just inherit fleet from run_model.fleet.
+        # If master job chooses no fleet, the new fleet will be created.
+        fleet_model=run_model.fleet or job_model.fleet,
+        multinode=job.job_spec.jobs_per_replica > 1,
+    )
 
 
 async def _refetch_fleet_models_with_instances(
