@@ -262,7 +262,6 @@ async def _process_submitted_job(
 
     job_model = context.job_model
     run_model = context.run_model
-    project = context.project
     run = context.run
     job = context.job
     run_spec = run.run_spec
@@ -288,14 +287,12 @@ async def _process_submitted_job(
     prepared_job_volumes = await _prepare_job_volumes(
         session=session,
         job_model=job_model,
-        project=project,
+        project=context.project,
         run_spec=run_spec,
         job=job,
     )
     if prepared_job_volumes is None:
         return
-    volume_models = prepared_job_volumes.volume_models
-    volumes = prepared_job_volumes.volumes
 
     # Submitted jobs processing happens in two steps (transactions).
     # First, the jobs gets an instance assigned (or no instance).
@@ -307,7 +304,7 @@ async def _process_submitted_job(
             session=session,
             context=context,
             master_job_provisioning_data=master_job_provisioning_data,
-            volumes=volumes,
+            volumes=prepared_job_volumes.volumes,
         )
         return
 
@@ -316,42 +313,18 @@ async def _process_submitted_job(
         session=session,
         context=context,
         master_job_provisioning_data=master_job_provisioning_data,
-        volumes=volumes,
+        volumes=prepared_job_volumes.volumes,
     )
     if provisioning_phase_result is None:
         return
 
-    _release_replica_jobs_from_master_wait(
-        job_model,
-        replica_job_models=context.replica_job_models,
-        jobs_to_provision=provisioning_phase_result.jobs_to_provision,
+    await _finalize_submitted_job_processing(
+        exit_stack=exit_stack,
+        session=session,
+        context=context,
+        prepared_job_volumes=prepared_job_volumes,
+        provisioning_phase_result=provisioning_phase_result,
     )
-
-    volumes_ids = sorted([v.id for vs in volume_models for v in vs])
-    if provisioning_phase_result.need_volume_attachment:
-        # Take lock to prevent attaching volumes that are to be deleted.
-        # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
-        # TODO: Lock instances for attaching volumes?
-        await session.execute(
-            select(VolumeModel)
-            .where(VolumeModel.id.in_(volumes_ids))
-            .options(joinedload(VolumeModel.user).load_only(UserModel.name))
-            .order_by(VolumeModel.id)  # take locks in order
-            .with_for_update(key_share=True, of=VolumeModel)
-        )
-        await exit_stack.enter_async_context(
-            get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids)
-        )
-        if len(volume_models) > 0:
-            assert provisioning_phase_result.instance is not None
-            await _attach_volumes(
-                session=session,
-                project=project,
-                job_model=job_model,
-                instance=provisioning_phase_result.instance,
-                volume_models=volume_models,
-            )
-    await session.commit()
 
 
 async def _load_submitted_job_context(
@@ -741,6 +714,47 @@ async def _process_provisioning_phase(
         instance=instance,
         need_volume_attachment=need_volume_attachment,
     )
+
+
+async def _finalize_submitted_job_processing(
+    exit_stack: AsyncExitStack,
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+    prepared_job_volumes: _PreparedJobVolumes,
+    provisioning_phase_result: _ProvisioningPhaseResult,
+) -> None:
+    _release_replica_jobs_from_master_wait(
+        context.job_model,
+        replica_job_models=context.replica_job_models,
+        jobs_to_provision=provisioning_phase_result.jobs_to_provision,
+    )
+
+    volume_models = prepared_job_volumes.volume_models
+    volumes_ids = sorted([v.id for vs in volume_models for v in vs])
+    if provisioning_phase_result.need_volume_attachment:
+        # Take lock to prevent attaching volumes that are to be deleted.
+        # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
+        # TODO: Lock instances for attaching volumes?
+        await session.execute(
+            select(VolumeModel)
+            .where(VolumeModel.id.in_(volumes_ids))
+            .options(joinedload(VolumeModel.user).load_only(UserModel.name))
+            .order_by(VolumeModel.id)  # take locks in order
+            .with_for_update(key_share=True, of=VolumeModel)
+        )
+        await exit_stack.enter_async_context(
+            get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids)
+        )
+        if len(volume_models) > 0:
+            assert provisioning_phase_result.instance is not None
+            await _attach_volumes(
+                session=session,
+                project=context.project,
+                job_model=context.job_model,
+                instance=provisioning_phase_result.instance,
+                volume_models=volume_models,
+            )
+    await session.commit()
 
 
 async def _defer_submitted_job(
