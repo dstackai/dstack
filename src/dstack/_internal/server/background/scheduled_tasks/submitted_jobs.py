@@ -51,7 +51,6 @@ from dstack._internal.core.models.runs import (
     JobRuntimeData,
     JobStatus,
     JobTerminationReason,
-    Requirements,
     Run,
 )
 from dstack._internal.core.models.volumes import Volume
@@ -248,6 +247,13 @@ class _ProvisioningPhaseResult:
     need_volume_attachment: bool
 
 
+@dataclass
+class _ProvisionNewCapacityResult:
+    provisioning_data: Union[JobProvisioningData, ComputeGroupProvisioningData]
+    offer: InstanceOfferWithAvailability
+    effective_profile: Profile
+
+
 async def _process_submitted_job(
     exit_stack: AsyncExitStack, session: AsyncSession, job_model: JobModel
 ):
@@ -305,24 +311,24 @@ async def _process_submitted_job(
         )
         return
 
-    provisioning_phase_res = await _process_provisioning_phase(
+    provisioning_phase_result = await _process_provisioning_phase(
         exit_stack=exit_stack,
         session=session,
         context=context,
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
     )
-    if provisioning_phase_res is None:
+    if provisioning_phase_result is None:
         return
 
-    _allow_other_replica_jobs_to_provision(
+    _release_replica_jobs_from_master_wait(
         job_model,
         replica_job_models=context.replica_job_models,
-        jobs_to_provision=provisioning_phase_res.jobs_to_provision,
+        jobs_to_provision=provisioning_phase_result.jobs_to_provision,
     )
 
     volumes_ids = sorted([v.id for vs in volume_models for v in vs])
-    if provisioning_phase_res.need_volume_attachment:
+    if provisioning_phase_result.need_volume_attachment:
         # Take lock to prevent attaching volumes that are to be deleted.
         # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
         # TODO: Lock instances for attaching volumes?
@@ -337,12 +343,12 @@ async def _process_submitted_job(
             get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids)
         )
         if len(volume_models) > 0:
-            assert provisioning_phase_res.instance is not None
+            assert provisioning_phase_result.instance is not None
             await _attach_volumes(
                 session=session,
                 project=project,
                 job_model=job_model,
-                instance=provisioning_phase_res.instance,
+                instance=provisioning_phase_result.instance,
                 volume_models=volume_models,
             )
     await session.commit()
@@ -514,7 +520,7 @@ async def _process_assignment_phase(
             )
             return
 
-    await _assign_job_to_fleet_instance(
+    await _assign_existing_instance_to_job(
         session=session,
         fleet_model=fleet_model,
         instances_with_offers=fleet_instances_with_offers,
@@ -588,7 +594,7 @@ async def _process_provisioning_phase(
     job_model = context.job_model
     run = context.run
     job = context.job
-    jobs_to_provision = _get_jobs_to_provision(job, context.replica_jobs, job_model)
+    jobs_to_provision = _select_jobs_to_provision(job, context.replica_jobs, job_model)
     # TODO: Volume attachment for compute groups is not yet supported since
     # currently supported compute groups (e.g. Runpod) don't need explicit volume attachment.
     need_volume_attachment = True
@@ -621,7 +627,7 @@ async def _process_provisioning_phase(
     (
         fleet_model,
         master_instance_provisioning_data,
-    ) = await _fetch_fleet_with_master_instance_provisioning_data(
+    ) = await _lock_fleet_and_get_master_provisioning_data(
         exit_stack=exit_stack,
         session=session,
         fleet_model=context.fleet_model,
@@ -631,7 +637,7 @@ async def _process_provisioning_phase(
     # master_job_provisioning_data is present if there is a master job.
     # master_instance_provisioning_data is present if there is a master instance (non empty cluster fleet).
     master_provisioning_data = master_job_provisioning_data or master_instance_provisioning_data
-    run_job_result = await _run_jobs_on_new_instances(
+    provision_new_capacity_result = await _provision_new_capacity(
         session=session,
         project=context.project,
         fleet_model=fleet_model,
@@ -643,7 +649,7 @@ async def _process_provisioning_phase(
         master_job_provisioning_data=master_provisioning_data,
         volumes=volumes,
     )
-    if run_job_result is None:
+    if provision_new_capacity_result is None:
         logger.debug("%s: provisioning failed", fmt(job_model))
         await _terminate_submitted_job(
             session=session,
@@ -652,6 +658,7 @@ async def _process_provisioning_phase(
         )
         return None
 
+    # TODO: Drop once autocreated fleets are dropped.
     if fleet_model is None:
         fleet_model = await _create_fleet_model_for_job(
             exit_stack=exit_stack,
@@ -670,7 +677,9 @@ async def _process_provisioning_phase(
             ],
         )
 
-    provisioning_data, offer, effective_profile, _ = run_job_result
+    provisioning_data = provision_new_capacity_result.provisioning_data
+    offer = provision_new_capacity_result.offer
+    effective_profile = provision_new_capacity_result.effective_profile
     compute_group_model = None
     if isinstance(provisioning_data, ComputeGroupProvisioningData):
         need_volume_attachment = False
@@ -785,7 +794,7 @@ async def _refetch_fleet_models_with_instances(
     return fleet_models
 
 
-async def _fetch_fleet_with_master_instance_provisioning_data(
+async def _lock_fleet_and_get_master_provisioning_data(
     exit_stack: AsyncExitStack,
     session: AsyncSession,
     fleet_model: Optional[FleetModel],
@@ -845,7 +854,7 @@ async def _fetch_fleet_with_master_instance_provisioning_data(
     return fleet_model, master_instance_provisioning_data
 
 
-async def _assign_job_to_fleet_instance(
+async def _assign_existing_instance_to_job(
     session: AsyncSession,
     fleet_model: Optional[FleetModel],
     job_model: JobModel,
@@ -888,7 +897,7 @@ async def _assign_job_to_fleet_instance(
     return instance
 
 
-def _get_jobs_to_provision(job: Job, replica_jobs: list[Job], job_model: JobModel) -> list[Job]:
+def _select_jobs_to_provision(job: Job, replica_jobs: list[Job], job_model: JobModel) -> list[Job]:
     """
     Returns the passed job for non-master jobs and all replica jobs for master jobs in multinode setups.
     """
@@ -905,7 +914,7 @@ def _get_jobs_to_provision(job: Job, replica_jobs: list[Job], job_model: JobMode
     return jobs_to_provision
 
 
-def _allow_other_replica_jobs_to_provision(
+def _release_replica_jobs_from_master_wait(
     job_model: JobModel,
     replica_job_models: list[JobModel],
     jobs_to_provision: list[Job],
@@ -916,7 +925,7 @@ def _allow_other_replica_jobs_to_provision(
             replica_job_model.waiting_master_job = False
 
 
-async def _run_jobs_on_new_instances(
+async def _provision_new_capacity(
     session: AsyncSession,
     project: ProjectModel,
     job_model: JobModel,
@@ -927,14 +936,7 @@ async def _run_jobs_on_new_instances(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[list[list[Volume]]] = None,
     fleet_model: Optional[FleetModel] = None,
-) -> Optional[
-    tuple[
-        Union[JobProvisioningData, ComputeGroupProvisioningData],
-        InstanceOfferWithAvailability,
-        Profile,
-        Requirements,
-    ]
-]:
+) -> Optional[_ProvisionNewCapacityResult]:
     """
     Provisions an instance for a job or a compute group for multiple jobs and runs the jobs.
     Even when multiple jobs are passes, it may still provision only one instance
@@ -1037,7 +1039,11 @@ async def _run_jobs_on_new_instances(
                     project_ssh_private_key,
                     placement_group_model_to_placement_group_optional(placement_group_model),
                 )
-                return cgpd, offer, profile, requirements
+                return _ProvisionNewCapacityResult(
+                    provisioning_data=cgpd,
+                    offer=offer,
+                    effective_profile=profile,
+                )
             else:
                 jpd = await common_utils.run_async(
                     compute.run_job,
@@ -1049,7 +1055,11 @@ async def _run_jobs_on_new_instances(
                     offer_volumes,
                     placement_group_model_to_placement_group_optional(placement_group_model),
                 )
-                return jpd, offer, profile, requirements
+                return _ProvisionNewCapacityResult(
+                    provisioning_data=jpd,
+                    offer=offer,
+                    effective_profile=profile,
+                )
         except BackendError as e:
             logger.warning(
                 "%s: %s launch in %s/%s failed: %s",
