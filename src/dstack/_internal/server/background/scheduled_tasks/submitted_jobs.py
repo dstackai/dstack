@@ -686,13 +686,49 @@ async def _materialize_newly_provisioned_capacity(
     fleet_model: FleetModel,
     provision_new_capacity_result: _ProvisionNewCapacityResult,
 ) -> _ProvisioningPhaseResult:
-    provisioning_data = provision_new_capacity_result.provisioning_data
-    offer = provision_new_capacity_result.offer
-    effective_profile = provision_new_capacity_result.effective_profile
-    compute_group_model = None
+    (
+        provisioned_jobs,
+        job_provisioning_datas,
+        compute_group_model,
+    ) = _resolve_provisioned_jobs_and_data(
+        session=session,
+        context=context,
+        jobs_to_provision=jobs_to_provision,
+        fleet_model=fleet_model,
+        provisioning_data=provision_new_capacity_result.provisioning_data,
+    )
+
+    instance_models = await _create_instance_models_for_provisioned_jobs(
+        session=session,
+        context=context,
+        fleet_model=fleet_model,
+        compute_group_model=compute_group_model,
+        provisioned_jobs=provisioned_jobs,
+        job_provisioning_datas=job_provisioning_datas,
+        offer=provision_new_capacity_result.offer,
+        effective_profile=provision_new_capacity_result.effective_profile,
+    )
+
+    logger.info(
+        "%s: provisioned %s new instance(s)",
+        fmt(context.job_model),
+        len(provisioned_jobs),
+    )
+    return _ProvisioningPhaseResult(
+        jobs_to_provision=jobs_to_provision,
+        instance_models=instance_models,
+        compute_group_model=compute_group_model,
+    )
+
+
+def _resolve_provisioned_jobs_and_data(
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+    jobs_to_provision: list[Job],
+    fleet_model: FleetModel,
+    provisioning_data: Union[JobProvisioningData, ComputeGroupProvisioningData],
+) -> tuple[list[Job], list[JobProvisioningData], Optional[ComputeGroupModel]]:
     if isinstance(provisioning_data, ComputeGroupProvisioningData):
-        provisioned_jobs = jobs_to_provision
-        jpds = provisioning_data.job_provisioning_datas
         compute_group_model = ComputeGroupModel(
             id=uuid.uuid4(),
             project=context.project,
@@ -701,59 +737,65 @@ async def _materialize_newly_provisioned_capacity(
             provisioning_data=provisioning_data.json(),
         )
         session.add(compute_group_model)
-    else:
-        provisioned_jobs = [context.job]
-        jpds = [provisioning_data]
+        return (
+            jobs_to_provision,
+            provisioning_data.job_provisioning_datas,
+            compute_group_model,
+        )
+    return [context.job], [provisioning_data], None
 
-    logger.info(
-        "%s: provisioned %s new instance(s)",
-        fmt(context.job_model),
-        len(provisioned_jobs),
-    )
+
+async def _create_instance_models_for_provisioned_jobs(
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+    fleet_model: FleetModel,
+    compute_group_model: Optional[ComputeGroupModel],
+    provisioned_jobs: list[Job],
+    job_provisioning_datas: list[JobProvisioningData],
+    offer: InstanceOfferWithAvailability,
+    effective_profile: Profile,
+) -> list[InstanceModel]:
     provisioned_job_models = _get_job_models_for_jobs(context.run_model.jobs, provisioned_jobs)
-    instances: list[InstanceModel] = []
+    instance_models: list[InstanceModel] = []
     # FIXME: Fleet is not locked which may lead to duplicate instance_num.
     # This is currently hard to fix without locking the fleet for entire provisioning duration.
     # Processing should be done in multiple steps so that
     # InstanceModel is created before provisioning.
     taken_instance_nums = await _get_taken_instance_nums(session, fleet_model)
-    for provisioned_job_model, jpd in zip(provisioned_job_models, jpds):
-        provisioned_job_model.job_provisioning_data = jpd.json()
+    for provisioned_job_model, job_provisioning_data in zip(
+        provisioned_job_models, job_provisioning_datas
+    ):
+        provisioned_job_model.job_provisioning_data = job_provisioning_data.json()
         switch_job_status(session, provisioned_job_model, JobStatus.PROVISIONING)
         instance_num = get_next_instance_num(taken_instance_nums)
-        instance = _create_instance_model_for_job(
+        instance_model = _create_instance_model_for_job(
             project=context.project,
             fleet_model=fleet_model,
             compute_group_model=compute_group_model,
             job_model=provisioned_job_model,
-            job_provisioning_data=jpd,
+            job_provisioning_data=job_provisioning_data,
             offer=offer,
             instance_num=instance_num,
             profile=effective_profile,
         )
-        instances.append(instance)
+        instance_models.append(instance_model)
         taken_instance_nums.add(instance_num)
         provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
             offer, context.multinode
         ).json()
-        session.add(instance)
+        session.add(instance_model)
         events.emit(
             session,
-            f"Instance created for job. Instance status: {instance.status.upper()}",
+            f"Instance created for job. Instance status: {instance_model.status.upper()}",
             actor=events.SystemActor(),
             targets=[
-                events.Target.from_model(instance),
+                events.Target.from_model(instance_model),
                 events.Target.from_model(provisioned_job_model),
             ],
         )
-        provisioned_job_model.used_instance_id = instance.id
+        provisioned_job_model.used_instance_id = instance_model.id
         provisioned_job_model.last_processed_at = common_utils.get_current_datetime()
-
-    return _ProvisioningPhaseResult(
-        jobs_to_provision=jobs_to_provision,
-        instance_models=instances,
-        compute_group_model=compute_group_model,
-    )
+    return instance_models
 
 
 async def _finalize_submitted_job_processing(
