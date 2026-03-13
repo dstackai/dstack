@@ -517,7 +517,7 @@
                 "name_constraint": "Example: 'my-fleet' or 'default'. If not specified, generated automatically.",
                 "name_placeholder": "Optional",
                 "ide": "IDE",
-                "ide_description": "Select which IDE would you like to use with the dev environment.",
+                "ide_description": "Optionally select an IDE to pre-install in the dev environment.",
                 "docker": "Docker",
                 "docker_image": "Image",
                 "docker_image_description": "A Docker image name, e.g. 'lmsysorg/sglang:latest'",

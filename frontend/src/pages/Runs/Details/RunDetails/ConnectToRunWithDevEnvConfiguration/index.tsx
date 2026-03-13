@@ -44,8 +44,11 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
     const configuration = run.run_spec.configuration as TDevEnvironmentConfiguration;
     const latestSubmission = run.jobs[0]?.job_submissions?.slice(-1)[0];
     const workingDir = latestSubmission?.job_runtime_data?.working_dir ?? '/';
-    const openInIDEUrl = `${configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}${workingDir}`;
-    const ideDisplayName = getIDEDisplayName(configuration.ide);
+    const hasIDE = !!configuration.ide;
+    const openInIDEUrl = hasIDE
+        ? `${configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}${workingDir}`
+        : undefined;
+    const ideDisplayName = hasIDE ? getIDEDisplayName(configuration.ide!) : undefined;
 
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
 
@@ -210,52 +213,82 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                             ),
                             isOptional: true,
                         },
-                        {
-                            title: 'Open',
-                            description: `After the CLI is attached, you can open the dev environment in ${ideDisplayName}.`,
-                            content: (
-                                <SpaceBetween size="s">
-                                    <Button
-                                        variant="primary"
-                                        external={true}
-                                        onClick={() => window.open(openInIDEUrl, '_blank')}
-                                    >
-                                        Open in {ideDisplayName}
-                                    </Button>
+                        hasIDE
+                            ? {
+                                  title: 'Open',
+                                  description: `After the CLI is attached, you can open the dev environment in ${ideDisplayName}.`,
+                                  content: (
+                                      <SpaceBetween size="s">
+                                          <Button
+                                              variant="primary"
+                                              external={true}
+                                              onClick={() => window.open(openInIDEUrl, '_blank')}
+                                          >
+                                              Open in {ideDisplayName}
+                                          </Button>
 
-                                    <ExpandableSection headerText="Need plain SSH?">
-                                        <SpaceBetween size="s">
-                                            <Box />
-                                            <div className={styles.codeWrapper}>
-                                                <Code className={styles.code}>{sshCommand}</Code>
+                                          <ExpandableSection headerText="Need plain SSH?">
+                                              <SpaceBetween size="s">
+                                                  <Box />
+                                                  <div className={styles.codeWrapper}>
+                                                      <Code className={styles.code}>{sshCommand}</Code>
 
-                                                <div className={styles.copy}>
-                                                    <Popover
-                                                        dismissButton={false}
-                                                        position="top"
-                                                        size="small"
-                                                        triggerType="custom"
-                                                        content={
-                                                            <StatusIndicator type="success">
-                                                                {t('common.copied')}
-                                                            </StatusIndicator>
-                                                        }
-                                                    >
-                                                        <Button
-                                                            formAction="none"
-                                                            iconName="copy"
-                                                            variant="normal"
-                                                            onClick={() => copySSHCommand()}
-                                                        />
-                                                    </Popover>
-                                                </div>
-                                            </div>
-                                        </SpaceBetween>
-                                    </ExpandableSection>
-                                </SpaceBetween>
-                            ),
-                            isOptional: true,
-                        },
+                                                      <div className={styles.copy}>
+                                                          <Popover
+                                                              dismissButton={false}
+                                                              position="top"
+                                                              size="small"
+                                                              triggerType="custom"
+                                                              content={
+                                                                  <StatusIndicator type="success">
+                                                                      {t('common.copied')}
+                                                                  </StatusIndicator>
+                                                              }
+                                                          >
+                                                              <Button
+                                                                  formAction="none"
+                                                                  iconName="copy"
+                                                                  variant="normal"
+                                                                  onClick={() => copySSHCommand()}
+                                                              />
+                                                          </Popover>
+                                                      </div>
+                                                  </div>
+                                              </SpaceBetween>
+                                          </ExpandableSection>
+                                      </SpaceBetween>
+                                  ),
+                                  isOptional: true,
+                              }
+                            : {
+                                  title: 'Connect via SSH',
+                                  description: 'After the CLI is attached, you can connect to the dev environment via SSH.',
+                                  content: (
+                                      <div className={styles.codeWrapper}>
+                                          <Code className={styles.code}>{sshCommand}</Code>
+
+                                          <div className={styles.copy}>
+                                              <Popover
+                                                  dismissButton={false}
+                                                  position="top"
+                                                  size="small"
+                                                  triggerType="custom"
+                                                  content={
+                                                      <StatusIndicator type="success">{t('common.copied')}</StatusIndicator>
+                                                  }
+                                              >
+                                                  <Button
+                                                      formAction="none"
+                                                      iconName="copy"
+                                                      variant="normal"
+                                                      onClick={() => copySSHCommand()}
+                                                  />
+                                              </Popover>
+                                          </div>
+                                      </div>
+                                  ),
+                                  isOptional: true,
+                              },
                     ]}
                 />
             )}

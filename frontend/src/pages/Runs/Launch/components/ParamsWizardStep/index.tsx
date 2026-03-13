@@ -94,6 +94,11 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
             return null;
         }
 
+        const templateIde =
+            template?.configuration && 'ide' in template.configuration
+                ? ((template.configuration as TDevEnvironmentConfiguration).ide ?? '')
+                : '';
+
         return (
             <FormSelect
                 label={t('runs.launch.wizard.ide')}
@@ -102,7 +107,7 @@ export const ParamsWizardStep: React.FC<ParamsWizardStepProps> = ({ formMethods,
                 name={FORM_FIELD_NAMES.ide}
                 options={IDE_OPTIONS}
                 disabled={loading}
-                defaultValue={'cursor'}
+                defaultValue={templateIde}
             />
         );
     };

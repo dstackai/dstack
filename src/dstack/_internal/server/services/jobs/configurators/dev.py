@@ -23,30 +23,36 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
     ):
         assert run_spec.configuration.type == "dev-environment"
 
-        if run_spec.configuration.ide == "vscode":
-            __class = VSCodeDesktop
-        elif run_spec.configuration.ide == "cursor":
-            __class = CursorDesktop
-        elif run_spec.configuration.ide == "windsurf":
-            __class = WindsurfDesktop
+        if run_spec.configuration.ide is None:
+            self.ide = None
         else:
-            raise ServerClientError(f"Unsupported IDE: {run_spec.configuration.ide}")
-        self.ide = __class(
-            run_name=run_spec.run_name,
-            version=run_spec.configuration.version,
-            extensions=["ms-python.python", "ms-toolsai.jupyter"],
-        )
+            if run_spec.configuration.ide == "vscode":
+                __class = VSCodeDesktop
+            elif run_spec.configuration.ide == "cursor":
+                __class = CursorDesktop
+            elif run_spec.configuration.ide == "windsurf":
+                __class = WindsurfDesktop
+            else:
+                raise ServerClientError(f"Unsupported IDE: {run_spec.configuration.ide}")
+            self.ide = __class(
+                run_name=run_spec.run_name,
+                version=run_spec.configuration.version,
+                extensions=["ms-python.python", "ms-toolsai.jupyter"],
+            )
         super().__init__(run_spec=run_spec, secrets=secrets, replica_group_name=replica_group_name)
 
     def _shell_commands(self) -> List[str]:
         assert self.run_spec.configuration.type == "dev-environment"
 
-        commands = self.ide.get_install_commands()
+        commands = []
+        if self.ide is not None:
+            commands += self.ide.get_install_commands()
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup
         commands.append("echo")
         commands += self.run_spec.configuration.init
-        commands += self.ide.get_print_readme_commands()
+        if self.ide is not None:
+            commands += self.ide.get_print_readme_commands()
         commands += [
             f"echo 'To connect via SSH, use: `ssh {self.run_spec.run_name}`'",
             "echo",

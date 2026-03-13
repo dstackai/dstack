@@ -159,7 +159,7 @@ declare type TServiceConfiguration = TBaseConfiguration & {
 
 declare type TDevEnvironmentConfiguration = TBaseConfiguration & {
     type?: 'dev-environment';
-    ide: TIde;
+    ide?: TIde | null;
     version?: string;
     init?: string[];
     inactivity_duration?: string | number | boolean | 'off';
