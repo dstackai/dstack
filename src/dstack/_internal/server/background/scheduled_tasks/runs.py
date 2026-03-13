@@ -13,7 +13,6 @@ from dstack._internal.core.models.configurations import ReplicaGroup
 from dstack._internal.core.models.profiles import RetryEvent, StopCriteria
 from dstack._internal.core.models.runs import (
     Job,
-    JobSpec,
     JobStatus,
     JobTerminationReason,
     Run,
@@ -33,6 +32,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events
 from dstack._internal.server.services.jobs import (
     find_job,
+    get_job_spec,
     get_job_specs_from_run_spec,
     group_jobs_by_replica_latest,
     is_master_job,
@@ -531,7 +531,7 @@ async def _handle_run_replicas(
             if job.status.is_finished():
                 continue
             try:
-                job_spec = JobSpec.__response__.parse_raw(job.job_spec_data)
+                job_spec = get_job_spec(job)
                 existing_group_names.add(job_spec.replica_group)
             except Exception:
                 continue
@@ -647,7 +647,7 @@ async def _update_jobs_to_new_deployment_in_place(
         replica_group_name = None
 
         if replicas:
-            job_spec = JobSpec.__response__.parse_raw(job_models[0].job_spec_data)
+            job_spec = get_job_spec(job_models[0])
             replica_group_name = job_spec.replica_group
 
         # FIXME: Handle getting image configuration errors or skip it.
@@ -662,7 +662,7 @@ async def _update_jobs_to_new_deployment_in_place(
         )
         can_update_all_jobs = True
         for old_job_model, new_job_spec in zip(job_models, new_job_specs):
-            old_job_spec = JobSpec.__response__.parse_raw(old_job_model.job_spec_data)
+            old_job_spec = get_job_spec(old_job_model)
             if new_job_spec != old_job_spec:
                 can_update_all_jobs = False
                 break

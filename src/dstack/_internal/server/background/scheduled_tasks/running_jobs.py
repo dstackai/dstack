@@ -34,7 +34,6 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     ProbeSpec,
     Run,
-    RunSpec,
     RunStatus,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
@@ -67,6 +66,7 @@ from dstack._internal.server.services.jobs import (
     find_job,
     get_job_attached_volumes,
     get_job_runtime_data,
+    get_job_spec,
     is_master_job,
     job_model_to_job_submission,
     switch_job_status,
@@ -82,6 +82,7 @@ from dstack._internal.server.services.repos import (
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
+    get_run_spec,
     is_job_ready,
     run_model_to_run,
 )
@@ -734,7 +735,7 @@ def _process_provisioning_with_shim(
     Returns:
         is successful
     """
-    job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
+    job_spec = get_job_spec(job_model)
 
     shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
 
@@ -982,7 +983,7 @@ def _terminate_if_inactivity_duration_exceeded(
     job_model: JobModel,
     no_connections_secs: Optional[int],
 ) -> None:
-    conf = RunSpec.__response__.parse_raw(run_model.run_spec).configuration
+    conf = get_run_spec(run_model).configuration
     if not isinstance(conf, DevEnvironmentConfiguration) or not isinstance(
         conf.inactivity_duration, int
     ):

@@ -12,9 +12,7 @@ from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
-    JobSpec,
     JobStatus,
-    RunSpec,
     RunStatus,
     ServiceSpec,
     get_service_port,
@@ -32,6 +30,8 @@ from dstack._internal.proxy.lib.models import (
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.instances import get_instance_remote_connection_info
+from dstack._internal.server.services.jobs import get_job_spec
+from dstack._internal.server.services.runs import get_run_spec
 from dstack._internal.server.settings import DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE
 from dstack._internal.utils.common import get_or_error
 
@@ -68,7 +68,7 @@ class ServerProxyRepo(BaseProxyRepo):
         if not len(jobs):
             return None
         run = jobs[0].run
-        run_spec = RunSpec.__response__.parse_raw(run.run_spec)
+        run_spec = get_run_spec(run)
         if not isinstance(run_spec.configuration, ServiceConfiguration):
             return None
         replicas = []
@@ -108,7 +108,7 @@ class ServerProxyRepo(BaseProxyRepo):
             if rci is not None and rci.ssh_proxy is not None:
                 ssh_head_proxy = rci.ssh_proxy
                 ssh_head_proxy_private_key = get_or_error(rci.ssh_proxy_keys)[0].private
-            job_spec: JobSpec = JobSpec.__response__.parse_raw(job.job_spec_data)
+            job_spec = get_job_spec(job)
             replica = Replica(
                 id=job.id.hex,
                 app_port=get_service_port(job_spec, run_spec.configuration),

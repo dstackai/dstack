@@ -369,7 +369,7 @@ class TestGetPrometheusMetrics:
     async def test_returns_403_if_not_authenticated(
         self, monkeypatch: pytest.MonkeyPatch, client: AsyncClient, token: Optional[str]
     ):
-        monkeypatch.setattr("dstack._internal.server.routers.prometheus._auth._token", "secret")
+        monkeypatch.setattr("dstack._internal.server.routers.prometheus._auth._token", b"secret")
         if token is not None:
             headers = get_auth_headers(token)
         else:
@@ -380,7 +380,7 @@ class TestGetPrometheusMetrics:
     async def test_returns_200_if_token_is_valid(
         self, monkeypatch: pytest.MonkeyPatch, client: AsyncClient
     ):
-        monkeypatch.setattr("dstack._internal.server.routers.prometheus._auth._token", "secret")
+        monkeypatch.setattr("dstack._internal.server.routers.prometheus._auth._token", b"secret")
         response = await client.get("/metrics", headers=get_auth_headers("secret"))
         assert response.status_code == 200
 
