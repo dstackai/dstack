@@ -8,6 +8,7 @@ from dstack._internal.core.models.runs import (
     DEFAULT_REPLICA_GROUP_NAME,
     ApplyRunPlanInput,
     JobSpec,
+    JobSubmission,
     RunSpec,
 )
 from dstack._internal.server.schemas.runs import GetRunPlanRequest, ListRunsRequest
@@ -36,8 +37,21 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
         current_resource_excludes["jobs"] = {
             "__all__": {
                 "job_spec": get_job_spec_excludes([job.job_spec for job in current_resource.jobs]),
+                "job_submissions": {
+                    "__all__": get_job_submission_excludes(
+                        [
+                            submission
+                            for job in current_resource.jobs
+                            for submission in job.job_submissions
+                        ]
+                    ),
+                },
             }
         }
+        if current_resource.latest_job_submission is not None:
+            current_resource_excludes["latest_job_submission"] = get_job_submission_excludes(
+                [current_resource.latest_job_submission]
+            )
     return {"plan": apply_plan_excludes}
 
 
@@ -104,3 +118,23 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
         probe_excludes["until_ready"] = True
 
     return spec_excludes
+
+
+def get_job_submission_excludes(job_submissions: list[JobSubmission]) -> IncludeExcludeDictType:
+    submission_excludes: IncludeExcludeDictType = {}
+
+    if any(s.job_runtime_data is not None for s in job_submissions):
+        jrd_excludes = {}
+        if all(
+            s.job_runtime_data is None or s.job_runtime_data.username is None
+            for s in job_submissions
+        ):
+            jrd_excludes["username"] = True
+        if all(
+            s.job_runtime_data is None or s.job_runtime_data.working_dir is None
+            for s in job_submissions
+        ):
+            jrd_excludes["working_dir"] = True
+        submission_excludes["job_runtime_data"] = jrd_excludes
+
+    return submission_excludes
