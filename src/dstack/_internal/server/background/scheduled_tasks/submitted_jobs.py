@@ -51,6 +51,7 @@ from dstack._internal.core.models.runs import (
     JobRuntimeData,
     JobStatus,
     JobTerminationReason,
+    Requirements,
     Run,
 )
 from dstack._internal.core.models.volumes import Volume
@@ -1074,24 +1075,18 @@ async def _provision_new_capacity(
     and run only the master job in case there are no offers supporting cluster groups.
     Other jobs should be provisioned one-by-one later.
     """
+    job = jobs[0]
     if volumes is None:
         volumes = []
-    job = jobs[0]
-    profile = run.run_spec.merged_profile
-    requirements = job.job_spec.requirements
-    if fleet_model is not None:
-        fleet_spec = get_fleet_spec(fleet_model)
-        try:
-            check_can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec)
-            profile, requirements = get_run_profile_and_requirements_in_fleet(
-                job=job,
-                run_spec=run.run_spec,
-                fleet_spec=fleet_spec,
-            )
-        except ValueError as e:
-            logger.debug("%s: %s", fmt(job_model), e.args[0])
-            return None
-        # TODO: Respect fleet provisioning properties such as tags
+    effective_profile_and_requirements = _get_effective_profile_and_requirements(
+        job_model=job_model,
+        run=run,
+        job=job,
+        fleet_model=fleet_model,
+    )
+    if effective_profile_and_requirements is None:
+        return None
+    profile, requirements = effective_profile_and_requirements
 
     # The placement group is determined when provisioning the master instance
     # and used for all other instances in the fleet.
@@ -1175,22 +1170,21 @@ async def _provision_new_capacity(
                     offer=offer,
                     effective_profile=profile,
                 )
-            else:
-                jpd = await common_utils.run_async(
-                    compute.run_job,
-                    run,
-                    job,
-                    offer,
-                    project_ssh_public_key,
-                    project_ssh_private_key,
-                    offer_volumes,
-                    placement_group_model_to_placement_group_optional(placement_group_model),
-                )
-                return _ProvisionNewCapacityResult(
-                    provisioning_data=jpd,
-                    offer=offer,
-                    effective_profile=profile,
-                )
+            jpd = await common_utils.run_async(
+                compute.run_job,
+                run,
+                job,
+                offer,
+                project_ssh_public_key,
+                project_ssh_private_key,
+                offer_volumes,
+                placement_group_model_to_placement_group_optional(placement_group_model),
+            )
+            return _ProvisionNewCapacityResult(
+                provisioning_data=jpd,
+                offer=offer,
+                effective_profile=profile,
+            )
         except BackendError as e:
             logger.warning(
                 "%s: %s launch in %s/%s failed: %s",
@@ -1217,6 +1211,32 @@ async def _provision_new_capacity(
                     if placement_group_model is None or pg.id != placement_group_model.id:
                         pg.fleet_deleted = True
     return None
+
+
+def _get_effective_profile_and_requirements(
+    job_model: JobModel,
+    run: Run,
+    job: Job,
+    fleet_model: Optional[FleetModel],
+) -> Optional[tuple[Profile, Requirements]]:
+    effective_profile = run.run_spec.merged_profile
+    requirements = job.job_spec.requirements
+    if fleet_model is None:
+        return effective_profile, requirements
+
+    fleet_spec = get_fleet_spec(fleet_model)
+    try:
+        check_can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec)
+        effective_profile, requirements = get_run_profile_and_requirements_in_fleet(
+            job=job,
+            run_spec=run.run_spec,
+            fleet_spec=fleet_spec,
+        )
+    except ValueError as e:
+        logger.debug("%s: %s", fmt(job_model), e.args[0])
+        return None
+    # TODO: Respect fleet provisioning properties such as tags
+    return effective_profile, requirements
 
 
 async def _create_fleet_model_for_job(
