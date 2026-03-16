@@ -4,10 +4,11 @@ from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.configurations import ReplicaGroup
-from dstack._internal.core.models.runs import JobSpec, JobStatus, JobTerminationReason, RunSpec
+from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunSpec
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services import events
 from dstack._internal.server.services.jobs import (
+    get_job_spec,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
     switch_job_status,
@@ -15,6 +16,7 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import (
     create_job_model_for_new_submission,
+    get_run_spec,
     logger,
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
@@ -30,8 +32,8 @@ async def retry_run_replica_jobs(
     )
 
     # Determine replica group from existing job
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-    job_spec = JobSpec.__response__.parse_raw(latest_jobs[0].job_spec_data)
+    run_spec = get_run_spec(run_model)
+    job_spec = get_job_spec(latest_jobs[0])
     replica_group_name = job_spec.replica_group
 
     new_jobs = await get_jobs_from_run_spec(
@@ -86,7 +88,7 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
     )
 
     active_replicas, inactive_replicas = build_replica_lists(run_model)
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    run_spec = get_run_spec(run_model)
 
     if replicas_diff < 0:
         scale_down_replicas(session, active_replicas, abs(replicas_diff))
@@ -259,7 +261,7 @@ async def scale_run_replicas_per_group(
                 run_model=run_model,
                 group=group,
                 replicas_diff=group_diff,
-                run_spec=RunSpec.__response__.parse_raw(run_model.run_spec),
+                run_spec=get_run_spec(run_model),
                 active_replicas=active_replicas,
                 inactive_replicas=inactive_replicas,
             )
@@ -300,7 +302,7 @@ async def scale_run_replicas_for_group(
 
 
 def job_belongs_to_group(job: JobModel, group_name: str) -> bool:
-    job_spec = JobSpec.__response__.parse_raw(job.job_spec_data)
+    job_spec = get_job_spec(job)
     return job_spec.replica_group == group_name
 
 

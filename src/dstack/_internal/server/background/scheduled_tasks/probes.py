@@ -12,7 +12,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import SSHError
-from dstack._internal.core.models.runs import JobSpec, JobStatus, ProbeSpec
+from dstack._internal.core.models.runs import JobStatus, ProbeSpec
 from dstack._internal.core.services.ssh.tunnel import (
     SSH_DEFAULT_OPTIONS,
     IPSocket,
@@ -21,6 +21,7 @@ from dstack._internal.core.services.ssh.tunnel import (
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProbeModel
+from dstack._internal.server.services.jobs import get_job_spec
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.ssh import container_ssh_tunnel
@@ -71,7 +72,7 @@ async def process_probes():
                 if probe.job.status != JobStatus.RUNNING:
                     probe.active = False
                 else:
-                    job_spec: JobSpec = JobSpec.__response__.parse_raw(probe.job.job_spec_data)
+                    job_spec = get_job_spec(probe.job)
                     probe_spec = job_spec.probes[probe.probe_num]
                     if probe_spec.until_ready and probe.success_streak >= probe_spec.ready_after:
                         probe.active = False
@@ -148,7 +149,7 @@ async def _get_service_replica_client(job: JobModel) -> AsyncGenerator[AsyncClie
         **SSH_DEFAULT_OPTIONS,
         "ConnectTimeout": str(int(SSH_CONNECT_TIMEOUT.total_seconds())),
     }
-    job_spec: JobSpec = JobSpec.__response__.parse_raw(job.job_spec_data)
+    job_spec = get_job_spec(job)
     with TemporaryDirectory() as temp_dir:
         app_socket_path = (Path(temp_dir) / "replica.sock").absolute()
         async with container_ssh_tunnel(

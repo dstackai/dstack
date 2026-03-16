@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, joinedload
 
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.runs import JobStatus, RunSpec, RunStatus
+from dstack._internal.core.models.runs import JobStatus, RunStatus
 from dstack._internal.server.models import (
     InstanceModel,
     JobMetricsPoint,
@@ -25,6 +25,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services.instances import get_instance_offer
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_runtime_data
+from dstack._internal.server.services.runs import get_run_spec
 from dstack._internal.utils.common import get_current_datetime
 
 
@@ -152,7 +153,7 @@ async def get_job_metrics(session: AsyncSession) -> Iterable[Metric]:
             price = jrd.offer.price
         gpus = resources.gpus
         cpus = resources.cpus
-        run_spec = RunSpec.__response__.parse_raw(job.run.run_spec)
+        run_spec = get_run_spec(job.run)
         labels = {
             "dstack_project_name": job.project.name,
             "dstack_user_name": job.run.user.name,
@@ -186,7 +187,7 @@ async def get_job_metrics(session: AsyncSession) -> Iterable[Metric]:
                     )
                 ):
                     gpu_labels = labels.copy()
-                    gpu_labels["dstack_gpu_num"] = gpu_num
+                    gpu_labels["dstack_gpu_num"] = str(gpu_num)
                     metrics.add_sample(_JOB_GPU_USAGE_RATIO, gpu_labels, gpu_util / 100)
                     metrics.add_sample(_JOB_GPU_MEMORY_TOTAL, gpu_labels, gpu_memory_total)
                     metrics.add_sample(_JOB_GPU_MEMORY_USAGE, gpu_labels, gpu_memory_usage)

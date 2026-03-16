@@ -39,6 +39,7 @@ from dstack._internal.server.services.instances import (
 from dstack._internal.server.services.jobs import (
     get_job_provisioning_data,
     get_job_runtime_data,
+    get_job_spec,
     switch_job_status,
 )
 from dstack._internal.server.services.locking import get_locker
@@ -356,7 +357,7 @@ async def _detach_volumes_from_job_instance(
     instance_model: InstanceModel,
     volume_models: list[VolumeModel],
 ) -> bool:
-    job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
+    job_spec = get_job_spec(job_model)
     backend = await backends_services.get_project_backend_by_type(
         project=project,
         backend_type=jpd.backend,

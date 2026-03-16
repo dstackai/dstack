@@ -130,8 +130,8 @@ class KubernetesCompute(
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
-        # There is a one jump pod per Kubernetes backend that is used
-        # as an ssh proxy jump to connect to all other services in Kubernetes.
+        # There is one jump pod per project that is used as an ssh proxy jump to connect
+        # to all job pods of the same project.
         # The service is created here and configured later in update_provisioning_data()
         jump_pod_name = f"dstack-{run.project_name}-ssh-jump-pod"
         jump_pod_service_name = _get_pod_service_name(jump_pod_name)
