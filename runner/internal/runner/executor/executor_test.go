@@ -141,6 +141,28 @@ func TestExecutor_MaxDuration(t *testing.T) {
 	assert.ErrorContains(t, err, "killed")
 }
 
+func TestExecutor_LogQuota(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	ex := makeTestExecutor(t)
+	ex.killDelay = 500 * time.Millisecond
+	// Output >100 bytes to trigger the quota
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "for i in $(seq 1 20); do echo 'This line is long enough to exceed the quota easily'; done")
+	ex.jobSpec.LogQuotaHour = 100 // 100 bytes
+	ex.jobLogs.SetQuota(100)
+	makeCodeTar(t, ex)
+
+	err := ex.Run(t.Context())
+	assert.ErrorContains(t, err, "log quota exceeded")
+
+	// Verify the termination state was set
+	history := ex.GetHistory(0)
+	lastState := history.JobStates[len(history.JobStates)-1]
+	assert.Equal(t, schemas.JobStateFailed, lastState.State)
+}
+
 func TestExecutor_RemoteRepo(t *testing.T) {
 	if testing.Short() {
 		t.Skip()

@@ -261,6 +261,17 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		default:
 		}
 
+		if errors.Is(err, ErrLogQuotaExceeded) {
+			log.Error(ctx, "Log quota exceeded", "quota", ex.jobSpec.LogQuotaHour)
+			ex.SetJobStateWithTerminationReason(
+				ctx,
+				schemas.JobStateFailed,
+				types.TerminationReasonLogQuotaExceeded,
+				fmt.Sprintf("Job log output exceeded the hourly quota of %d bytes", ex.jobSpec.LogQuotaHour),
+			)
+			return fmt.Errorf("log quota exceeded: %w", err)
+		}
+
 		// todo fail reason?
 		log.Error(ctx, "Exec failed", "err", err)
 		var exitError *exec.ExitError
@@ -283,6 +294,7 @@ func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
 	ex.clusterInfo = body.ClusterInfo
 	ex.secrets = body.Secrets
 	ex.repoCredentials = body.RepoCredentials
+	ex.jobLogs.SetQuota(body.JobSpec.LogQuotaHour)
 	ex.state = WaitCode
 }
 
@@ -586,14 +598,47 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
 	stripper := ansistrip.NewWriter(ex.jobLogs, AnsiStripFlushInterval, AnsiStripMaxDelay, MaxBufferSize)
-	defer func() { _ = stripper.Close() }()
 	logger := io.MultiWriter(jobLogFile, ex.jobWsLogs, stripper)
-	_, err = io.Copy(logger, ptm)
-	if err != nil && !isPtyError(err) {
-		return fmt.Errorf("copy command output: %w", err)
+
+	if err := ex.copyOutputWithQuota(cmd, ptm, stripper, logger); err != nil {
+		return err
 	}
 	if err = cmd.Wait(); err != nil {
 		return fmt.Errorf("wait for command: %w", err)
+	}
+	return nil
+}
+
+// copyOutputWithQuota streams process output through the log pipeline and
+// monitors for log quota exceeded. The quota signal is out-of-band (via channel)
+// because the ansistrip writer is async and swallows downstream write errors.
+func (ex *RunExecutor) copyOutputWithQuota(cmd *exec.Cmd, ptm io.Reader, stripper io.Closer, logger io.Writer) error {
+	copyDone := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(logger, ptm)
+		copyDone <- err
+	}()
+
+	// Wait for either io.Copy to finish or quota to be exceeded.
+	var copyErr error
+	select {
+	case copyErr = <-copyDone:
+	case <-ex.jobLogs.QuotaExceeded():
+		_ = cmd.Process.Kill()
+		<-copyDone
+	}
+
+	// Flush the ansistrip buffer — may also trigger quota exceeded.
+	_ = stripper.Close()
+
+	select {
+	case <-ex.jobLogs.QuotaExceeded():
+		return ErrLogQuotaExceeded
+	default:
+	}
+
+	if copyErr != nil && !isPtyError(copyErr) {
+		return fmt.Errorf("copy command output: %w", copyErr)
 	}
 	return nil
 }

@@ -151,6 +151,7 @@ class JobTerminationReason(str, Enum):
     CREATING_CONTAINER_ERROR = "creating_container_error"
     EXECUTOR_ERROR = "executor_error"
     MAX_DURATION_EXCEEDED = "max_duration_exceeded"
+    LOG_QUOTA_EXCEEDED = "log_quota_exceeded"
 
     def to_status(self) -> JobStatus:
         mapping = {
@@ -173,6 +174,7 @@ class JobTerminationReason(str, Enum):
             self.CREATING_CONTAINER_ERROR: JobStatus.FAILED,
             self.EXECUTOR_ERROR: JobStatus.FAILED,
             self.MAX_DURATION_EXCEEDED: JobStatus.TERMINATED,
+            self.LOG_QUOTA_EXCEEDED: JobStatus.FAILED,
         }
         return mapping[self]
 
@@ -205,6 +207,7 @@ class JobTerminationReason(str, Enum):
             JobTerminationReason.CREATING_CONTAINER_ERROR: "runner error",
             JobTerminationReason.EXECUTOR_ERROR: "executor error",
             JobTerminationReason.MAX_DURATION_EXCEEDED: "max duration exceeded",
+            JobTerminationReason.LOG_QUOTA_EXCEEDED: "log quota exceeded",
         }
         return error_mapping.get(self)
 
@@ -275,6 +278,9 @@ class JobSpec(CoreModel):
     privileged: bool = False
     single_branch: Optional[bool] = None
     max_duration: Optional[int]
+    log_quota_hour: Optional[int] = None
+    """`log_quota_hour` is the maximum number of bytes of log output per calendar hour.
+    `None` means unlimited. Set from `DSTACK_SERVER_LOG_QUOTA_PER_JOB_HOUR`."""
     stop_duration: Optional[int] = None
     utilization_policy: Optional[UtilizationPolicy] = None
     registry_auth: Optional[RegistryAuth]

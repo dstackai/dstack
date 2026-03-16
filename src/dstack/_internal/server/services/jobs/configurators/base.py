@@ -48,6 +48,7 @@ from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeMountPoint
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
+from dstack._internal.server import settings as server_settings
 from dstack._internal.server.services.docker import ImageConfig, get_image_config
 from dstack._internal.utils import crypto
 from dstack._internal.utils.common import run_async
@@ -169,6 +170,7 @@ class JobConfigurator(ABC):
             privileged=self._privileged(),
             single_branch=self._single_branch(),
             max_duration=self._max_duration(),
+            log_quota_hour=self._log_quota_hour(),
             stop_duration=self._stop_duration(),
             utilization_policy=self._utilization_policy(),
             registry_auth=self._registry_auth(),
@@ -303,6 +305,10 @@ class JobConfigurator(ABC):
         if self.run_spec.merged_profile.max_duration == "off":
             return None
         return self.run_spec.merged_profile.max_duration
+
+    def _log_quota_hour(self) -> Optional[int]:
+        quota = server_settings.SERVER_LOG_QUOTA_PER_JOB_HOUR
+        return quota if quota > 0 else None
 
     def _stop_duration(self) -> Optional[int]:
         if self.run_spec.merged_profile.stop_duration is None:

@@ -79,6 +79,7 @@ type JobSpec struct {
 	Env            map[string]string `json:"env"`
 	SingleBranch   bool              `json:"single_branch"`
 	MaxDuration    int               `json:"max_duration"`
+	LogQuotaHour   int               `json:"log_quota_hour"` // bytes per hour, 0 = unlimited
 	SSHKey         *SSHKey           `json:"ssh_key"`
 	WorkingDir     *string           `json:"working_dir"`
 	RepoDir        *string           `json:"repo_dir"`
