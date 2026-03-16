@@ -370,6 +370,18 @@ async def _load_submitted_job_context(
     )
 
 
+def _get_job_models_for_jobs(
+    job_models: list[JobModel],
+    jobs: list[Job],
+) -> list[JobModel]:
+    """
+    Returns job models of latest submissions for a list of jobs.
+    Preserves jobs order.
+    """
+    id_to_job_model_map = {jm.id: jm for jm in job_models}
+    return [id_to_job_model_map[j.job_submissions[-1].id] for j in jobs]
+
+
 async def _resolve_master_job_dependency(
     session: AsyncSession,
     job_model: JobModel,
@@ -797,6 +809,84 @@ async def _create_instance_models_for_provisioned_jobs(
         provisioned_job_model.used_instance_id = instance_model.id
         provisioned_job_model.last_processed_at = common_utils.get_current_datetime()
     return instance_models
+
+
+async def _get_taken_instance_nums(session: AsyncSession, fleet_model: FleetModel) -> set[int]:
+    res = await session.execute(
+        select(InstanceModel.instance_num).where(
+            InstanceModel.fleet_id == fleet_model.id,
+            InstanceModel.deleted.is_(False),
+        )
+    )
+    return set(res.scalars().all())
+
+
+def _create_instance_model_for_job(
+    project: ProjectModel,
+    fleet_model: FleetModel,
+    compute_group_model: Optional[ComputeGroupModel],
+    job_model: JobModel,
+    job_provisioning_data: JobProvisioningData,
+    offer: InstanceOfferWithAvailability,
+    instance_num: int,
+    profile: Profile,
+) -> InstanceModel:
+    if not job_provisioning_data.dockerized:
+        # terminate vastai/k8s instances immediately
+        termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+        termination_idle_time = 0
+    else:
+        termination_policy, termination_idle_time = get_termination(
+            profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
+        )
+    instance = InstanceModel(
+        id=uuid.uuid4(),
+        name=f"{fleet_model.name}-{instance_num}",
+        instance_num=instance_num,
+        project=project,
+        fleet=fleet_model,
+        compute_group=compute_group_model,
+        created_at=common_utils.get_current_datetime(),
+        started_at=common_utils.get_current_datetime(),
+        status=InstanceStatus.PROVISIONING,
+        unreachable=False,
+        job_provisioning_data=job_provisioning_data.json(),
+        offer=offer.json(),
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
+        jobs=[job_model],
+        backend=offer.backend,
+        price=offer.price,
+        region=offer.region,
+        volume_attachments=[],
+        total_blocks=1,
+        busy_blocks=1,
+    )
+    return instance
+
+
+def _prepare_job_runtime_data(
+    offer: InstanceOfferWithAvailability, multinode: bool
+) -> JobRuntimeData:
+    if offer.blocks == offer.total_blocks:
+        if settings.JOB_NETWORK_MODE == settings.JobNetworkMode.FORCED_BRIDGE:
+            network_mode = NetworkMode.BRIDGE
+        elif settings.JOB_NETWORK_MODE == settings.JobNetworkMode.HOST_WHEN_POSSIBLE:
+            network_mode = NetworkMode.HOST
+        else:
+            assert settings.JOB_NETWORK_MODE == settings.JobNetworkMode.HOST_FOR_MULTINODE_ONLY
+            network_mode = NetworkMode.HOST if multinode else NetworkMode.BRIDGE
+        return JobRuntimeData(
+            network_mode=network_mode,
+            offer=offer,
+        )
+    return JobRuntimeData(
+        network_mode=NetworkMode.BRIDGE,
+        offer=offer,
+        cpu=offer.instance.resources.cpus,
+        gpu=len(offer.instance.resources.gpus),
+        memory=Memory(offer.instance.resources.memory_mib / 1024),
+    )
 
 
 async def _finalize_submitted_job_processing(
@@ -1286,84 +1376,6 @@ async def _create_fleet_model_for_job(
     return fleet_model
 
 
-async def _get_taken_instance_nums(session: AsyncSession, fleet_model: FleetModel) -> set[int]:
-    res = await session.execute(
-        select(InstanceModel.instance_num).where(
-            InstanceModel.fleet_id == fleet_model.id,
-            InstanceModel.deleted.is_(False),
-        )
-    )
-    return set(res.scalars().all())
-
-
-def _create_instance_model_for_job(
-    project: ProjectModel,
-    fleet_model: FleetModel,
-    compute_group_model: Optional[ComputeGroupModel],
-    job_model: JobModel,
-    job_provisioning_data: JobProvisioningData,
-    offer: InstanceOfferWithAvailability,
-    instance_num: int,
-    profile: Profile,
-) -> InstanceModel:
-    if not job_provisioning_data.dockerized:
-        # terminate vastai/k8s instances immediately
-        termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        termination_idle_time = 0
-    else:
-        termination_policy, termination_idle_time = get_termination(
-            profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
-        )
-    instance = InstanceModel(
-        id=uuid.uuid4(),
-        name=f"{fleet_model.name}-{instance_num}",
-        instance_num=instance_num,
-        project=project,
-        fleet=fleet_model,
-        compute_group=compute_group_model,
-        created_at=common_utils.get_current_datetime(),
-        started_at=common_utils.get_current_datetime(),
-        status=InstanceStatus.PROVISIONING,
-        unreachable=False,
-        job_provisioning_data=job_provisioning_data.json(),
-        offer=offer.json(),
-        termination_policy=termination_policy,
-        termination_idle_time=termination_idle_time,
-        jobs=[job_model],
-        backend=offer.backend,
-        price=offer.price,
-        region=offer.region,
-        volume_attachments=[],
-        total_blocks=1,
-        busy_blocks=1,
-    )
-    return instance
-
-
-def _prepare_job_runtime_data(
-    offer: InstanceOfferWithAvailability, multinode: bool
-) -> JobRuntimeData:
-    if offer.blocks == offer.total_blocks:
-        if settings.JOB_NETWORK_MODE == settings.JobNetworkMode.FORCED_BRIDGE:
-            network_mode = NetworkMode.BRIDGE
-        elif settings.JOB_NETWORK_MODE == settings.JobNetworkMode.HOST_WHEN_POSSIBLE:
-            network_mode = NetworkMode.HOST
-        else:
-            assert settings.JOB_NETWORK_MODE == settings.JobNetworkMode.HOST_FOR_MULTINODE_ONLY
-            network_mode = NetworkMode.HOST if multinode else NetworkMode.BRIDGE
-        return JobRuntimeData(
-            network_mode=network_mode,
-            offer=offer,
-        )
-    return JobRuntimeData(
-        network_mode=NetworkMode.BRIDGE,
-        offer=offer,
-        cpu=offer.instance.resources.cpus,
-        gpu=len(offer.instance.resources.gpus),
-        memory=Memory(offer.instance.resources.memory_mib / 1024),
-    )
-
-
 def _get_offer_volumes(
     volumes: List[List[Volume]],
     offer: InstanceOfferWithAvailability,
@@ -1480,15 +1492,3 @@ async def _attach_volume(
     instance.volume_attachments.append(volume_attachment_model)
 
     volume_model.last_job_processed_at = common_utils.get_current_datetime()
-
-
-def _get_job_models_for_jobs(
-    job_models: list[JobModel],
-    jobs: list[Job],
-) -> list[JobModel]:
-    """
-    Returns job models of latest submissions for a list of jobs.
-    Preserves jobs order.
-    """
-    id_to_job_model_map = {jm.id: jm for jm in job_models}
-    return [id_to_job_model_map[j.job_submissions[-1].id] for j in jobs]
