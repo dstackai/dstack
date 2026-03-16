@@ -225,6 +225,7 @@ class _SubmittedJobContext:
     project: ProjectModel
     run: Run
     job: Job
+    jobs_to_provision: list[Job]
     replica_jobs: list[Job]
     replica_job_models: list[JobModel]
     fleet_model: Optional[FleetModel]
@@ -244,7 +245,6 @@ class _PreparedJobVolumes:
 
 @dataclass
 class _ProvisioningPhaseResult:
-    jobs_to_provision: list[Job]
     instance_models: list[InstanceModel]
     compute_group_model: Optional[ComputeGroupModel]
 
@@ -360,6 +360,7 @@ async def _load_submitted_job_context(
         project=run_model.project,
         run=run,
         job=job,
+        jobs_to_provision=_select_jobs_to_provision(job, replica_jobs, job_model),
         replica_jobs=replica_jobs,
         replica_job_models=_get_job_models_for_jobs(run_model.jobs, replica_jobs),
         # Master job chooses fleet for the run.
@@ -572,14 +573,10 @@ async def _process_provisioning_phase(
     master_job_provisioning_data: Optional[JobProvisioningData],
     volumes: list[list[Volume]],
 ) -> Optional[_ProvisioningPhaseResult]:
-    jobs_to_provision = _select_jobs_to_provision(
-        context.job, context.replica_jobs, context.job_model
-    )
     if context.job_model.instance is not None:
         return await _process_existing_instance_provisioning_path(
             session=session,
             job_model=context.job_model,
-            jobs_to_provision=jobs_to_provision,
         )
 
     if context.run.run_spec.merged_profile.creation_policy == CreationPolicy.REUSE:
@@ -596,7 +593,6 @@ async def _process_provisioning_phase(
         exit_stack=exit_stack,
         session=session,
         context=context,
-        jobs_to_provision=jobs_to_provision,
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
     )
@@ -605,7 +601,6 @@ async def _process_provisioning_phase(
 async def _process_existing_instance_provisioning_path(
     session: AsyncSession,
     job_model: JobModel,
-    jobs_to_provision: list[Job],
 ) -> _ProvisioningPhaseResult:
     assert job_model.instance is not None
     res = await session.execute(
@@ -617,7 +612,6 @@ async def _process_existing_instance_provisioning_path(
     instance = res.unique().scalar_one()
     switch_job_status(session, job_model, JobStatus.PROVISIONING)
     return _ProvisioningPhaseResult(
-        jobs_to_provision=jobs_to_provision,
         instance_models=[instance],
         compute_group_model=None,
     )
@@ -627,7 +621,6 @@ async def _process_new_capacity_provisioning_path(
     exit_stack: AsyncExitStack,
     session: AsyncSession,
     context: _SubmittedJobContext,
-    jobs_to_provision: list[Job],
     master_job_provisioning_data: Optional[JobProvisioningData],
     volumes: list[list[Volume]],
 ) -> Optional[_ProvisioningPhaseResult]:
@@ -650,7 +643,7 @@ async def _process_new_capacity_provisioning_path(
         fleet_model=fleet_model,
         job_model=context.job_model,
         run=context.run,
-        jobs=jobs_to_provision,
+        jobs=context.jobs_to_provision,
         project_ssh_public_key=context.project.ssh_public_key,
         project_ssh_private_key=context.project.ssh_private_key,
         master_job_provisioning_data=master_provisioning_data,
@@ -687,7 +680,6 @@ async def _process_new_capacity_provisioning_path(
     return await _materialize_newly_provisioned_capacity(
         session=session,
         context=context,
-        jobs_to_provision=jobs_to_provision,
         fleet_model=fleet_model,
         provision_new_capacity_result=provision_new_capacity_result,
     )
@@ -696,7 +688,6 @@ async def _process_new_capacity_provisioning_path(
 async def _materialize_newly_provisioned_capacity(
     session: AsyncSession,
     context: _SubmittedJobContext,
-    jobs_to_provision: list[Job],
     fleet_model: FleetModel,
     provision_new_capacity_result: _ProvisionNewCapacityResult,
 ) -> _ProvisioningPhaseResult:
@@ -707,7 +698,6 @@ async def _materialize_newly_provisioned_capacity(
     ) = _resolve_provisioned_jobs_and_data(
         session=session,
         context=context,
-        jobs_to_provision=jobs_to_provision,
         fleet_model=fleet_model,
         provisioning_data=provision_new_capacity_result.provisioning_data,
     )
@@ -729,7 +719,6 @@ async def _materialize_newly_provisioned_capacity(
         len(provisioned_jobs),
     )
     return _ProvisioningPhaseResult(
-        jobs_to_provision=jobs_to_provision,
         instance_models=instance_models,
         compute_group_model=compute_group_model,
     )
@@ -738,7 +727,6 @@ async def _materialize_newly_provisioned_capacity(
 def _resolve_provisioned_jobs_and_data(
     session: AsyncSession,
     context: _SubmittedJobContext,
-    jobs_to_provision: list[Job],
     fleet_model: FleetModel,
     provisioning_data: Union[JobProvisioningData, ComputeGroupProvisioningData],
 ) -> tuple[list[Job], list[JobProvisioningData], Optional[ComputeGroupModel]]:
@@ -752,7 +740,7 @@ def _resolve_provisioned_jobs_and_data(
         )
         session.add(compute_group_model)
         return (
-            jobs_to_provision,
+            context.jobs_to_provision,
             provisioning_data.job_provisioning_datas,
             compute_group_model,
         )
@@ -900,7 +888,7 @@ async def _finalize_submitted_job_processing(
     _release_replica_jobs_from_master_wait(
         context.job_model,
         replica_job_models=context.replica_job_models,
-        jobs_to_provision=provisioning_phase_result.jobs_to_provision,
+        jobs_to_provision=context.jobs_to_provision,
     )
 
     await _attach_job_volumes_if_needed(
