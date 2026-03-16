@@ -4,7 +4,7 @@ import uuid
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List, Optional, Union, cast
+from typing import List, Optional, Union
 
 from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,6 +53,7 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     Requirements,
     Run,
+    RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.core.services.profiles import get_termination
@@ -427,7 +428,7 @@ async def _prepare_job_volumes(
     session: AsyncSession,
     job_model: JobModel,
     project: ProjectModel,
-    run_spec,
+    run_spec: RunSpec,
     job: Job,
 ) -> Optional[_PreparedJobVolumes]:
     try:
@@ -964,11 +965,11 @@ async def _terminate_submitted_job(
     session: AsyncSession,
     job_model: JobModel,
     reason: JobTerminationReason,
-    message: object = common_utils.UNSET,
+    message: Optional[str] = None,
 ):
     job_model.termination_reason = reason
-    if message is not common_utils.UNSET:
-        job_model.termination_reason_message = cast(Optional[str], message)
+    if message is not None:
+        job_model.termination_reason_message = message
     switch_job_status(session, job_model, JobStatus.TERMINATING)
     await _mark_job_processed(session=session, job_model=job_model)
 
