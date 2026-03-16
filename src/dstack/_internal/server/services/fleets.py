@@ -156,7 +156,8 @@ async def list_projects_with_no_active_fleets(
     user: UserModel,
 ) -> List[Project]:
     """
-    Returns all projects where the user is a member that have no active fleets.
+    Returns all projects where the user is a member that have no active fleets,
+    neither owned nor imported.
 
     Active fleets are those with `deleted == False`. Projects with only deleted fleets
     (or no fleets) are included. Deleted projects are excluded.
@@ -178,7 +179,14 @@ async def list_projects_with_no_active_fleets(
         .outerjoin(
             active_fleet_alias,
             and_(
-                active_fleet_alias.project_id == ProjectModel.id,
+                or_(
+                    active_fleet_alias.project_id == ProjectModel.id,
+                    exists().where(
+                        ImportModel.project_id == ProjectModel.id,
+                        ImportModel.export_id == ExportedFleetModel.export_id,
+                        ExportedFleetModel.fleet_id == active_fleet_alias.id,
+                    ),
+                ),
                 active_fleet_alias.deleted == False,
             ),
         )
