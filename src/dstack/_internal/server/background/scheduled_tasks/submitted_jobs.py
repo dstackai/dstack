@@ -4,7 +4,7 @@ import uuid
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -696,11 +696,12 @@ async def _materialize_newly_provisioned_capacity(
         job_provisioning_datas,
         compute_group_model,
     ) = _resolve_provisioned_jobs_and_data(
-        session=session,
         context=context,
         fleet_model=fleet_model,
         provisioning_data=provision_new_capacity_result.provisioning_data,
     )
+    if compute_group_model is not None:
+        session.add(compute_group_model)
 
     instance_models = await _create_instance_models_for_provisioned_jobs(
         session=session,
@@ -725,7 +726,6 @@ async def _materialize_newly_provisioned_capacity(
 
 
 def _resolve_provisioned_jobs_and_data(
-    session: AsyncSession,
     context: _SubmittedJobContext,
     fleet_model: FleetModel,
     provisioning_data: Union[JobProvisioningData, ComputeGroupProvisioningData],
@@ -738,7 +738,6 @@ def _resolve_provisioned_jobs_and_data(
             status=ComputeGroupStatus.RUNNING,
             provisioning_data=provisioning_data.json(),
         )
-        session.add(compute_group_model)
         return (
             context.jobs_to_provision,
             provisioning_data.job_provisioning_datas,
@@ -914,6 +913,8 @@ async def _attach_job_volumes_if_needed(
         return
 
     volume_models = prepared_job_volumes.volume_models
+    if len(volume_models) == 0:
+        return
     volumes_ids = sorted([v.id for vs in volume_models for v in vs])
     # Take lock to prevent attaching volumes that are to be deleted.
     # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
@@ -928,8 +929,6 @@ async def _attach_job_volumes_if_needed(
     await exit_stack.enter_async_context(
         get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids)
     )
-    if len(volume_models) == 0:
-        return
     assert len(provisioning_phase_result.instance_models) == 1
     await _attach_volumes(
         session=session,
@@ -1071,11 +1070,11 @@ async def _assign_existing_instance_to_job(
     job_model: JobModel,
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]],
     multinode: bool,
-) -> Optional[InstanceModel]:
+) -> None:
     job_model.fleet = fleet_model
     job_model.instance_assigned = True
     if len(instances_with_offers) == 0:
-        return None
+        return
 
     instances_with_offers.sort(key=lambda instance_with_offer: instance_with_offer[0].price or 0)
     instance, offer = instances_with_offers[0]
@@ -1105,7 +1104,6 @@ async def _assign_existing_instance_to_job(
             events.Target.from_model(instance),
         ],
     )
-    return instance
 
 
 def _select_jobs_to_provision(job: Job, replica_jobs: list[Job], job_model: JobModel) -> list[Job]:
@@ -1366,9 +1364,9 @@ async def _create_fleet_model_for_job(
 
 
 def _get_offer_volumes(
-    volumes: List[List[Volume]],
+    volumes: list[list[Volume]],
     offer: InstanceOfferWithAvailability,
-) -> List[Volume]:
+) -> list[Volume]:
     """
     Returns volumes suitable for the offer for each mount point.
     """
@@ -1379,7 +1377,7 @@ def _get_offer_volumes(
 
 
 def _get_offer_mount_point_volume(
-    volumes: List[Volume],
+    volumes: list[Volume],
     offer: InstanceOfferWithAvailability,
 ) -> Volume:
     """
@@ -1400,7 +1398,7 @@ async def _attach_volumes(
     project: ProjectModel,
     job_model: JobModel,
     instance: InstanceModel,
-    volume_models: List[List[VolumeModel]],
+    volume_models: list[list[VolumeModel]],
 ):
     job_provisioning_data = common_utils.get_or_error(get_instance_provisioning_data(instance))
     backend = await get_project_backend_by_type_or_error(
