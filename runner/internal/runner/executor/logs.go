@@ -15,10 +15,10 @@ type appendWriter struct {
 	history   []schemas.LogEvent
 	timestamp *MonotonicTimestamp // shares with executor
 
-	quota         int            // bytes per hour, 0 = unlimited
-	bytesInHour   int            // bytes written in current hour bucket
-	hourStart     int64          // unix timestamp (seconds) of current hour bucket start
-	quotaExceeded chan struct{}   // closed when quota is exceeded (out-of-band signal)
+	quota         int           // bytes per hour, 0 = unlimited
+	bytesInHour   int           // bytes written in current hour bucket
+	hourStart     int64         // unix timestamp (seconds) of current hour bucket start
+	quotaExceeded chan struct{} // closed when quota is exceeded (out-of-band signal)
 	exceededOnce  sync.Once
 }
 
