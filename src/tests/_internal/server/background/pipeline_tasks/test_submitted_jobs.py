@@ -4,9 +4,19 @@ from datetime import timedelta
 from unittest.mock import Mock
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.models.runs import JobStatus
+from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
+from dstack._internal.core.models.users import GlobalRole
+from dstack._internal.core.models.volumes import VolumeMountPoint, VolumeStatus
+from dstack._internal.server.background.pipeline_tasks import (
+    jobs_submitted as jobs_submitted_pipeline,
+)
 from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
     JobSubmittedFetcher,
     JobSubmittedPipeline,
@@ -15,12 +25,22 @@ from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
 )
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.testing.common import (
+    create_export,
+    create_fleet,
+    create_instance,
     create_job,
     create_project,
     create_repo,
     create_run,
     create_user,
+    create_volume,
+    get_fleet_spec,
+    get_job_provisioning_data,
+    get_run_spec,
+    get_ssh_fleet_configuration,
+    get_volume_provisioning_data,
 )
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
@@ -54,6 +74,12 @@ def _lock_job_expired_same_owner(job_model: JobModel) -> None:
     job_model.lock_owner = JobSubmittedPipeline.__name__
 
 
+def _lock_job(job_model: JobModel) -> None:
+    job_model.lock_expires_at = get_current_datetime() + timedelta(seconds=30)
+    job_model.lock_token = uuid.uuid4()
+    job_model.lock_owner = JobSubmittedPipeline.__name__
+
+
 def _job_to_pipeline_item(job_model: JobModel) -> JobSubmittedPipelineItem:
     assert job_model.lock_token is not None
     assert job_model.lock_expires_at is not None
@@ -65,6 +91,27 @@ def _job_to_pipeline_item(job_model: JobModel) -> JobSubmittedPipelineItem:
         prev_lock_expired=False,
         instance_assigned=job_model.instance_assigned,
     )
+
+
+async def _process_job(
+    session: AsyncSession,
+    worker: JobSubmittedWorker,
+    job_model: JobModel,
+) -> None:
+    _lock_job(job_model)
+    await session.commit()
+    await worker.process(_job_to_pipeline_item(job_model))
+
+
+async def _get_job(session: AsyncSession, job_id) -> JobModel:
+    res = await session.execute(
+        select(JobModel)
+        .where(JobModel.id == job_id)
+        .options(joinedload(JobModel.instance))
+        .options(joinedload(JobModel.fleet))
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
 
 
 @pytest.mark.asyncio
@@ -268,7 +315,27 @@ class TestJobSubmittedFetcher:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestJobSubmittedWorker:
-    async def test_process_is_placeholder_noop(
+    async def test_unlocks_assigned_job_stub(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run, instance_assigned=True)
+        last_processed_at = job.last_processed_at
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.last_processed_at == last_processed_at
+        assert job.lock_owner is None
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+
+    async def test_ignores_lock_token_mismatch(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
         project = await create_project(session=session)
@@ -276,15 +343,421 @@ class TestJobSubmittedWorker:
         repo = await create_repo(session=session, project_id=project.id)
         run = await create_run(session=session, project=project, repo=repo, user=user)
         job = await create_job(session=session, run=run)
-        job.lock_token = uuid.uuid4()
-        job.lock_expires_at = get_current_datetime() + timedelta(seconds=30)
-        job.lock_owner = JobSubmittedPipeline.__name__
+        _lock_job(job)
         await session.commit()
-
         item = _job_to_pipeline_item(job)
+
+        job.lock_token = uuid.uuid4()
+        await session.commit()
 
         await worker.process(item)
 
         await session.refresh(job)
         assert job.status == JobStatus.SUBMITTED
+        assert job.lock_token is not None
+
+    async def test_assigns_job_to_instance(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+        previous_last_processed_at = job.last_processed_at
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        await session.refresh(instance)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == instance.id
+        assert job.used_instance_id == instance.id
+        assert job.fleet_id == fleet.id
+        assert job.job_provisioning_data == instance.job_provisioning_data
+        assert job.job_runtime_data is not None
+        assert job.last_processed_at > previous_last_processed_at
+        assert job.lock_owner is None
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+        assert instance.status == InstanceStatus.BUSY
+        assert instance.busy_blocks == 1
+
+    async def test_assigns_job_to_imported_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        exporter_user = await create_user(
+            session, name="exporter-user", global_role=GlobalRole.USER
+        )
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(
+            session, name="exporter-project", owner=exporter_user
+        )
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=importer_user,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == instance.id
+        assert job.fleet_id == fleet.id
+
+    async def test_assigns_job_to_specific_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_1 = await create_fleet(session=session, project=project, name="fleet-1")
+        fleet_2 = await create_fleet(session=session, project=project, name="fleet-2")
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet_1,
+            status=InstanceStatus.IDLE,
+            name="fleet-1-instance",
+        )
+        instance_2 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet_2,
+            status=InstanceStatus.IDLE,
+            name="fleet-2-instance",
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(name="default", fleets=[fleet_2.name]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == instance_2.id
+        assert job.fleet_id == fleet_2.id
+
+    async def test_defers_job_while_waiting_for_master_provisioning(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration = TaskConfiguration(nodes=2, commands=["echo"])
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            waiting_master_job=False,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            waiting_master_job=False,
+        )
+        previous_last_processed_at = job.last_processed_at
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.SUBMITTED
+        assert not job.instance_assigned
+        assert job.instance_id is None
+        assert job.fleet_id is None
+        assert job.last_processed_at > previous_last_processed_at
+        assert job.lock_owner is None
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+
+    async def test_defers_job_while_waiting_for_run_fleet_assignment(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration = TaskConfiguration(nodes=2, commands=["echo"])
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            instance_assigned=True,
+            job_provisioning_data=get_job_provisioning_data(),
+            waiting_master_job=False,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            waiting_master_job=False,
+        )
+        previous_last_processed_at = job.last_processed_at
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.SUBMITTED
+        assert not job.instance_assigned
+        assert job.fleet_id is None
+        assert job.last_processed_at > previous_last_processed_at
+        assert job.lock_owner is None
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+
+    async def test_terminates_job_when_volume_preparation_fails(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+        )
+        volume.to_be_deleted = True
+        await session.commit()
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.VOLUME_ERROR
+        assert job.termination_reason_message is not None
+        assert "marked for deletion" in job.termination_reason_message
+        assert job.lock_owner is None
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+
+    async def test_terminates_job_when_specified_fleets_cannot_be_used(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(name="default", fleets=["missing-fleet"]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message == "Failed to use specified fleets"
+
+    async def test_terminates_job_when_no_matching_fleet_and_autocreated_disabled(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message is not None
+        assert "No matching fleet found" in job.termination_reason_message
+
+    async def test_marks_job_assigned_without_fleet_when_autocreated_enabled(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(FeatureFlags, "AUTOCREATED_FLEETS_ENABLED", True)
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.fleet_id is None
+        assert job.instance_id is None
+        assert job.lock_owner is None
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+
+    async def test_resets_lock_for_retry_when_selected_instance_cannot_be_locked(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        instance.lock_expires_at = get_current_datetime() + timedelta(minutes=1)
+        instance.lock_token = uuid.uuid4()
+        instance.lock_owner = "OtherPipeline"
+        await session.commit()
+
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+        previous_last_processed_at = job.last_processed_at
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        await session.refresh(instance)
+        assert job.status == JobStatus.SUBMITTED
+        assert not job.instance_assigned
+        assert job.instance_id is None
+        assert job.used_instance_id is None
+        assert job.last_processed_at > previous_last_processed_at
         assert job.lock_owner == JobSubmittedPipeline.__name__
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+        assert instance.status == InstanceStatus.IDLE
+        assert instance.busy_blocks == 0
+
+    async def test_resets_lock_for_retry_when_selected_instance_becomes_busy(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        await session.commit()
+
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+        previous_last_processed_at = job.last_processed_at
+
+        original_lock_selected_instance = jobs_submitted_pipeline._lock_selected_instance
+
+        async def _lock_selected_instance_and_mark_busy(
+            session: AsyncSession, instance_id: uuid.UUID
+        ):
+            locked_instance = await original_lock_selected_instance(session, instance_id)
+            assert locked_instance is not None
+            locked_instance.status = InstanceStatus.BUSY
+            locked_instance.busy_blocks = 1
+            return locked_instance
+
+        monkeypatch.setattr(
+            jobs_submitted_pipeline,
+            "_lock_selected_instance",
+            _lock_selected_instance_and_mark_busy,
+        )
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        await session.refresh(instance)
+        assert job.status == JobStatus.SUBMITTED
+        assert not job.instance_assigned
+        assert job.instance_id is None
+        assert job.used_instance_id is None
+        assert job.last_processed_at > previous_last_processed_at
+        assert job.lock_owner == JobSubmittedPipeline.__name__
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+        assert instance.status == InstanceStatus.BUSY
+        assert instance.busy_blocks == 1

@@ -2,24 +2,78 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Sequence
+from typing import Optional, Sequence, Union
 
-from sqlalchemy import or_, select
-from sqlalchemy.orm import load_only
+from sqlalchemy import or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm.attributes import set_committed_value
 
-from dstack._internal.core.models.runs import JobStatus
+from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.models.common import NetworkMode
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOfferWithAvailability,
+    InstanceStatus,
+)
+from dstack._internal.core.models.resources import Memory
+from dstack._internal.core.models.runs import (
+    Job,
+    JobProvisioningData,
+    JobRuntimeData,
+    JobStatus,
+    JobTerminationReason,
+    Run,
+)
+from dstack._internal.core.models.volumes import Volume
+from dstack._internal.server import settings
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
     Pipeline,
     PipelineItem,
     Worker,
+    log_lock_token_changed_after_processing,
+    log_lock_token_changed_on_reset,
+    log_lock_token_mismatch,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.models import (
+    FleetModel,
+    InstanceModel,
+    JobModel,
+    ProjectModel,
+    RunModel,
+    UserModel,
+)
+from dstack._internal.server.services import events
+from dstack._internal.server.services.instances import (
+    filter_pool_instances,
+    format_instance_blocks_for_event,
+    get_instance_offer,
+    get_shared_pool_instances_with_offers,
+    switch_instance_status,
+)
+from dstack._internal.server.services.jobs import (
+    check_can_attach_job_volumes,
+    find_job,
+    get_job_configured_volumes,
+    switch_job_status,
+)
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.runs import run_model_to_run
+from dstack._internal.server.services.runs.plan import (
+    find_optimal_fleet_with_offers,
+    get_run_candidate_fleet_models_filters,
+    select_run_candidate_fleet_models_with_filters,
+)
 from dstack._internal.server.utils import sentry_utils
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -175,4 +229,582 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
 
     @sentry_utils.instrument_named_task("pipeline_tasks.JobSubmittedWorker.process")
     async def process(self, item: JobSubmittedPipelineItem):
+        if item.instance_assigned:
+            await _unlock_assigned_job_stub(item)
+            return
+
+        assignment_input = await _load_assignment_input(item)
+        if assignment_input is None:
+            return
+
+        assignment_selection = await _select_assignment(assignment_input)
+        await _apply_assignment_selection(
+            item=item,
+            assignment_input=assignment_input,
+            assignment_selection=assignment_selection,
+        )
+
+
+@dataclass
+class _SubmittedJobContext:
+    job_model: JobModel
+    run_model: RunModel
+    project: ProjectModel
+    run: Run
+    job: Job
+    fleet_model: Optional[FleetModel]
+    multinode: bool
+
+
+@dataclass
+class _AssignmentInput:
+    context: _SubmittedJobContext
+    master_job_provisioning_data: Optional[JobProvisioningData]
+    volumes: list[list[Volume]]
+    candidate_fleet_models: list[FleetModel]
+
+
+@dataclass
+class _NoFleetAssignmentSelection:
+    pass
+
+
+@dataclass
+class _FleetAssignmentSelection:
+    fleet_id: uuid.UUID
+
+
+@dataclass
+class _SelectedInstanceSelection:
+    id: uuid.UUID
+    blocks: int
+    total_blocks: int
+
+
+@dataclass
+class _InstanceAssignmentSelection:
+    fleet_id: uuid.UUID
+    selected_instance: _SelectedInstanceSelection
+
+
+AssignmentSelection = Union[
+    _NoFleetAssignmentSelection,
+    _FleetAssignmentSelection,
+    _InstanceAssignmentSelection,
+]
+
+
+async def _unlock_assigned_job_stub(item: JobSubmittedPipelineItem) -> None:
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            update(JobModel)
+            .where(
+                JobModel.id == item.id,
+                JobModel.lock_token == item.lock_token,
+            )
+            .values(
+                lock_expires_at=None,
+                lock_token=None,
+                lock_owner=None,
+            )
+            .returning(JobModel.id)
+        )
+        if res.scalar_one_or_none() is None:
+            log_lock_token_changed_after_processing(
+                logger, item, action="unlock", expected_outcome="unlocked"
+            )
+
+
+async def _load_assignment_input(item: JobSubmittedPipelineItem) -> Optional[_AssignmentInput]:
+    async with get_session_ctx() as session:
+        job_model = await _refetch_locked_job(session=session, item=item)
+        if job_model is None:
+            log_lock_token_mismatch(logger, item)
+            return None
+
+        context = await _load_submitted_job_context(session=session, job_model=job_model)
+        logger.debug("%s: assignment has started", fmt(context.job_model))
+
+        master_job_provisioning_data = await _resolve_master_job_dependency(
+            session=session,
+            job_model=context.job_model,
+            run=context.run,
+            job=context.job,
+        )
+        if master_job_provisioning_data is None and context.job.job_spec.job_num != 0:
+            return None
+
+        if not await _resolve_fleet_dependency(
+            session=session,
+            job_model=context.job_model,
+            run_model=context.run_model,
+            job=context.job,
+        ):
+            return None
+
+        volumes = await _prepare_job_volumes(
+            session=session,
+            job_model=context.job_model,
+            project=context.project,
+            run=context.run,
+            job=context.job,
+        )
+        if volumes is None:
+            return None
+
+        candidate_fleet_models = await _load_assignment_candidate_fleets(
+            session=session,
+            context=context,
+        )
+        return _AssignmentInput(
+            context=context,
+            master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
+            candidate_fleet_models=candidate_fleet_models,
+        )
+
+
+async def _select_assignment(assignment_input: _AssignmentInput) -> AssignmentSelection:
+    # Getting backend offers can be slow, so fleet selection must happen outside the DB transaction.
+    fleet_model, fleet_instances_with_offers, _ = await find_optimal_fleet_with_offers(
+        project=assignment_input.context.project,
+        fleet_models=assignment_input.candidate_fleet_models,
+        run_model=assignment_input.context.run_model,
+        run_spec=assignment_input.context.run.run_spec,
+        job=assignment_input.context.job,
+        master_job_provisioning_data=assignment_input.master_job_provisioning_data,
+        volumes=assignment_input.volumes,
+        exclude_not_available=True,
+    )
+
+    if fleet_model is None:
+        return _NoFleetAssignmentSelection()
+
+    if fleet_instances_with_offers:
+        fleet_instances_with_offers.sort(
+            key=lambda instance_with_offer: instance_with_offer[0].price or 0
+        )
+        selected_instance, selected_instance_offer = fleet_instances_with_offers[0]
+        return _InstanceAssignmentSelection(
+            fleet_id=fleet_model.id,
+            selected_instance=_SelectedInstanceSelection(
+                id=selected_instance.id,
+                blocks=selected_instance_offer.blocks,
+                total_blocks=selected_instance_offer.total_blocks,
+            ),
+        )
+
+    return _FleetAssignmentSelection(fleet_id=fleet_model.id)
+
+
+async def _apply_assignment_selection(
+    item: JobSubmittedPipelineItem,
+    assignment_input: _AssignmentInput,
+    assignment_selection: AssignmentSelection,
+) -> None:
+    async with get_session_ctx() as session:
+        job_model = await _refetch_locked_job(session=session, item=item)
+        if job_model is None:
+            log_lock_token_changed_after_processing(logger, item)
+            return
+
+        if isinstance(assignment_selection, _NoFleetAssignmentSelection):
+            await _apply_no_fleet_selection(
+                session=session,
+                job_model=job_model,
+                run=assignment_input.context.run,
+            )
+            return
+
+        if isinstance(assignment_selection, _FleetAssignmentSelection):
+            job_model.fleet_id = assignment_selection.fleet_id
+            job_model.instance_assigned = True
+            await _mark_job_processed(session=session, job_model=job_model)
+            return
+
+        instance_model = await _lock_selected_instance(
+            session=session,
+            instance_id=assignment_selection.selected_instance.id,
+        )
+        if instance_model is None:
+            await _reset_job_lock_for_retry(session=session, item=item)
+            return
+
+        current_offer = _revalidate_selected_instance_offer(
+            instance_model=instance_model,
+            assignment_input=assignment_input,
+            selected_instance=assignment_selection.selected_instance,
+        )
+        if current_offer is None:
+            await _reset_job_lock_for_retry(session=session, item=item)
+            return
+
+        _assign_selected_instance_to_job(
+            session=session,
+            job_model=job_model,
+            instance_model=instance_model,
+            offer=current_offer,
+            multinode=assignment_input.context.multinode,
+        )
+        await _mark_job_processed(session=session, job_model=job_model)
+
+
+async def _refetch_locked_job(
+    session: AsyncSession,
+    item: JobSubmittedPipelineItem,
+) -> Optional[JobModel]:
+    res = await session.execute(
+        select(JobModel)
+        .where(
+            JobModel.id == item.id,
+            JobModel.lock_token == item.lock_token,
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one_or_none()
+
+
+async def _load_submitted_job_context(
+    session: AsyncSession, job_model: JobModel
+) -> _SubmittedJobContext:
+    res = await session.execute(
+        select(JobModel)
+        .where(JobModel.id == job_model.id)
+        .options(
+            joinedload(JobModel.fleet).selectinload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
+            )
+        )
+    )
+    job_model = res.unique().scalar_one()
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == job_model.run_id)
+        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
+        .options(
+            joinedload(RunModel.fleet).selectinload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
+            )
+        )
+    )
+    run_model = res.unique().scalar_one()
+    run = run_model_to_run(run_model)
+    job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+    return _SubmittedJobContext(
+        job_model=job_model,
+        run_model=run_model,
+        project=run_model.project,
+        run=run,
+        job=job,
+        fleet_model=run_model.fleet or job_model.fleet,
+        multinode=job.job_spec.jobs_per_replica > 1,
+    )
+
+
+async def _resolve_master_job_dependency(
+    session: AsyncSession,
+    job_model: JobModel,
+    run: Run,
+    job: Job,
+) -> Optional[JobProvisioningData]:
+    if job.job_spec.job_num == 0:
+        return None
+
+    master_job = find_job(run.jobs, job_model.replica_num, 0)
+    if master_job.job_submissions[-1].job_provisioning_data is None:
+        await _defer_submitted_job(
+            session=session,
+            job_model=job_model,
+            log_message="waiting for master job to be provisioned",
+        )
+        return None
+
+    return JobProvisioningData.__response__.parse_obj(
+        master_job.job_submissions[-1].job_provisioning_data
+    )
+
+
+async def _resolve_fleet_dependency(
+    session: AsyncSession,
+    job_model: JobModel,
+    run_model: RunModel,
+    job: Job,
+) -> bool:
+    if job.job_spec.job_num == 0 and job.job_spec.replica_num == 0:
+        return True
+    if run_model.fleet_id is not None:
+        return True
+
+    await _defer_submitted_job(
+        session=session,
+        job_model=job_model,
+        log_message="waiting for the run to be assigned to the fleet",
+    )
+    return False
+
+
+async def _prepare_job_volumes(
+    session: AsyncSession,
+    job_model: JobModel,
+    project: ProjectModel,
+    run: Run,
+    job: Job,
+) -> Optional[list[list[Volume]]]:
+    try:
+        volumes = await get_job_configured_volumes(
+            session=session,
+            project=project,
+            run_spec=run.run_spec,
+            job_num=job.job_spec.job_num,
+            job_spec=job.job_spec,
+        )
+        check_can_attach_job_volumes(volumes)
+    except ServerClientError as e:
+        logger.warning("%s: failed to prepare run volumes: %s", fmt(job_model), repr(e))
+        await _terminate_submitted_job(
+            session=session,
+            job_model=job_model,
+            reason=JobTerminationReason.VOLUME_ERROR,
+            message=e.msg,
+        )
+        return None
+
+    return volumes
+
+
+async def _load_assignment_candidate_fleets(
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+) -> list[FleetModel]:
+    fleet_filters, instance_filters = await get_run_candidate_fleet_models_filters(
+        session=session,
+        project=context.project,
+        run_model=context.run_model,
+        run_spec=context.run.run_spec,
+    )
+    (
+        fleets_with_instances,
+        fleets_without_instances,
+    ) = await select_run_candidate_fleet_models_with_filters(
+        session=session,
+        fleet_filters=fleet_filters,
+        instance_filters=instance_filters,
+        lock_instances=False,
+    )
+    for fleet_model in fleets_with_instances:
+        for instance_model in fleet_model.instances:
+            set_committed_value(instance_model, "fleet", fleet_model)
+    return fleets_with_instances + fleets_without_instances
+
+
+async def _apply_no_fleet_selection(
+    session: AsyncSession,
+    job_model: JobModel,
+    run: Run,
+) -> None:
+    if run.run_spec.merged_profile.fleets is not None:
+        logger.debug("%s: failed to use specified fleets", fmt(job_model))
+        await _terminate_submitted_job(
+            session=session,
+            job_model=job_model,
+            reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            message="Failed to use specified fleets",
+        )
         return
+
+    if not FeatureFlags.AUTOCREATED_FLEETS_ENABLED:
+        logger.debug("%s: no fleet found", fmt(job_model))
+        await _terminate_submitted_job(
+            session=session,
+            job_model=job_model,
+            reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            message=(
+                "No matching fleet found. Possible reasons: "
+                "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
+            ),
+        )
+        return
+
+    job_model.instance_assigned = True
+    await _mark_job_processed(session=session, job_model=job_model)
+
+
+async def _lock_selected_instance(
+    session: AsyncSession,
+    instance_id: uuid.UUID,
+) -> Optional[InstanceModel]:
+    instance_lock, _ = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
+    async with instance_lock:
+        res = await session.execute(
+            select(InstanceModel)
+            .where(
+                InstanceModel.id == instance_id,
+                InstanceModel.deleted == False,
+                or_(
+                    InstanceModel.lock_expires_at.is_(None),
+                    InstanceModel.lock_expires_at < get_current_datetime(),
+                ),
+            )
+            .options(joinedload(InstanceModel.fleet))
+            .options(joinedload(InstanceModel.volume_attachments))
+            .with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
+        )
+        return res.unique().scalar_one_or_none()
+
+
+def _revalidate_selected_instance_offer(
+    instance_model: InstanceModel,
+    assignment_input: _AssignmentInput,
+    selected_instance: _SelectedInstanceSelection,
+) -> Optional[InstanceOfferWithAvailability]:
+    assert instance_model.fleet is not None
+
+    profile = assignment_input.context.run.run_spec.merged_profile
+    requirements = assignment_input.context.job.job_spec.requirements
+
+    if selected_instance.total_blocks == 1:
+        nonshared_instances = filter_pool_instances(
+            pool_instances=[instance_model],
+            profile=profile,
+            requirements=requirements,
+            fleet_model=instance_model.fleet,
+            multinode=assignment_input.context.multinode,
+            master_job_provisioning_data=assignment_input.master_job_provisioning_data,
+            volumes=assignment_input.volumes,
+            shared=False,
+        )
+        if not nonshared_instances:
+            return None
+        if instance_model.status != InstanceStatus.IDLE:
+            return None
+        current_offer = get_instance_offer(instance_model)
+        if current_offer is None:
+            return None
+        current_offer.availability = InstanceAvailability.IDLE
+        return current_offer
+
+    # The selected instance was chosen from a detached snapshot, so ask the current
+    # shared-pool view for the offer shape that still fits on the locked instance.
+    shared_instances_with_offers = get_shared_pool_instances_with_offers(
+        pool_instances=[instance_model],
+        profile=profile,
+        requirements=requirements,
+        fleet_model=instance_model.fleet,
+        multinode=assignment_input.context.multinode,
+        volumes=assignment_input.volumes,
+        idle_only=True,
+    )
+    for _, offer in shared_instances_with_offers:
+        if (
+            offer.blocks == selected_instance.blocks
+            and offer.total_blocks == selected_instance.total_blocks
+        ):
+            return offer
+    return None
+
+
+def _assign_selected_instance_to_job(
+    session: AsyncSession,
+    job_model: JobModel,
+    instance_model: InstanceModel,
+    offer: InstanceOfferWithAvailability,
+    multinode: bool,
+) -> None:
+    job_model.fleet_id = instance_model.fleet_id
+    job_model.instance_assigned = True
+    job_model.instance = instance_model
+    job_model.used_instance_id = instance_model.id
+    job_model.job_provisioning_data = instance_model.job_provisioning_data
+    job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
+
+    switch_instance_status(session, instance_model, InstanceStatus.BUSY)
+    instance_model.busy_blocks += offer.blocks
+    events.emit(
+        session,
+        (
+            "Job assigned to instance."
+            f" Instance blocks: {format_instance_blocks_for_event(instance_model)}"
+        ),
+        actor=events.SystemActor(),
+        targets=[
+            events.Target.from_model(job_model),
+            events.Target.from_model(instance_model),
+        ],
+    )
+
+
+def _prepare_job_runtime_data(
+    offer: InstanceOfferWithAvailability, multinode: bool
+) -> JobRuntimeData:
+    if offer.blocks == offer.total_blocks:
+        if settings.JOB_NETWORK_MODE == settings.JobNetworkMode.FORCED_BRIDGE:
+            network_mode = NetworkMode.BRIDGE
+        elif settings.JOB_NETWORK_MODE == settings.JobNetworkMode.HOST_WHEN_POSSIBLE:
+            network_mode = NetworkMode.HOST
+        else:
+            assert settings.JOB_NETWORK_MODE == settings.JobNetworkMode.HOST_FOR_MULTINODE_ONLY
+            network_mode = NetworkMode.HOST if multinode else NetworkMode.BRIDGE
+        return JobRuntimeData(
+            network_mode=network_mode,
+            offer=offer,
+        )
+    return JobRuntimeData(
+        network_mode=NetworkMode.BRIDGE,
+        offer=offer,
+        cpu=offer.instance.resources.cpus,
+        gpu=len(offer.instance.resources.gpus),
+        memory=Memory(offer.instance.resources.memory_mib / 1024),
+    )
+
+
+async def _defer_submitted_job(
+    session: AsyncSession,
+    job_model: JobModel,
+    log_message: str,
+) -> None:
+    logger.debug("%s: %s", fmt(job_model), log_message)
+    await _mark_job_processed(session=session, job_model=job_model)
+
+
+async def _terminate_submitted_job(
+    session: AsyncSession,
+    job_model: JobModel,
+    reason: JobTerminationReason,
+    message: Optional[str] = None,
+) -> None:
+    job_model.termination_reason = reason
+    if message is not None:
+        job_model.termination_reason_message = message
+    switch_job_status(session, job_model, JobStatus.TERMINATING)
+    await _mark_job_processed(session=session, job_model=job_model)
+
+
+async def _mark_job_processed(session: AsyncSession, job_model: JobModel) -> None:
+    job_model.last_processed_at = get_current_datetime()
+    job_model.lock_expires_at = None
+    job_model.lock_token = None
+    job_model.lock_owner = None
+    await session.commit()
+
+
+async def _reset_job_lock_for_retry(
+    session: AsyncSession,
+    item: JobSubmittedPipelineItem,
+) -> None:
+    res = await session.execute(
+        update(JobModel)
+        .where(
+            JobModel.id == item.id,
+            JobModel.lock_token == item.lock_token,
+        )
+        .values(
+            lock_expires_at=None,
+            lock_token=None,
+            last_processed_at=get_current_datetime(),
+        )
+        .returning(JobModel.id)
+    )
+    if res.scalar_one_or_none() is None:
+        log_lock_token_changed_on_reset(logger)
+    await session.commit()
