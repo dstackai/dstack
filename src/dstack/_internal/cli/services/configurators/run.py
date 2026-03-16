@@ -112,7 +112,7 @@ class BaseRunConfigurator(
 
         no_fleets = False
         if len(run_plan.job_plans[0].offers) == 0:
-            if len(self.api.client.fleets.list(self.api.project)) == 0:
+            if len(self.api.client.fleets.list(self.api.project, include_imported=True)) == 0:
                 no_fleets = True
 
         print_run_plan(
