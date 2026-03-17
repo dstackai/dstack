@@ -7,7 +7,7 @@ from typing import Optional, Sequence, Union
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.backends.base.compute import (
     ComputeWithGroupProvisioningSupport,
@@ -353,6 +353,12 @@ class _DeferSubmittedJobResult:
 class _TerminateSubmittedJobResult:
     reason: JobTerminationReason
     message: Optional[str] = None
+    locked_fleet_id: Optional[uuid.UUID] = None
+
+
+@dataclass
+class _RetrySubmittedJobResult:
+    pass
 
 
 @dataclass
@@ -416,11 +422,13 @@ class _NewCapacityProvisioning:
     created_fleet_model: Optional[FleetModel]
     new_placement_group_models: list[PlacementGroupModel]
     volume_attachment_result: Optional[_VolumeAttachmentResult]
+    locked_fleet_id: Optional[uuid.UUID]
 
 
 _ProvisioningResult = Union[
     _DeferSubmittedJobResult,
     _TerminateSubmittedJobResult,
+    _RetrySubmittedJobResult,
     _ExistingInstanceProvisioning,
     _NewCapacityProvisioning,
 ]
@@ -924,6 +932,10 @@ async def _apply_provisioning_result(
     provisioning: _ProvisioningResult,
 ) -> None:
     async with get_session_ctx() as session:
+        if isinstance(provisioning, _RetrySubmittedJobResult):
+            await _reset_job_lock_for_retry(session=session, item=item)
+            return
+
         job_model = await _refetch_locked_job(session=session, item=item)
         if job_model is None:
             # FIXME: Placement-group creation, provisioning, and volume attachment all run
@@ -934,7 +946,11 @@ async def _apply_provisioning_result(
                 item=item,
                 volume_ids=_get_locked_volume_ids_from_provisioning(provisioning),
             )
-            await session.commit()
+            await _unlock_related_fleet(
+                session=session,
+                item=item,
+                fleet_id=_get_locked_fleet_id_from_provisioning(provisioning),
+            )
             log_lock_token_changed_after_processing(logger, item)
             return
 
@@ -947,6 +963,11 @@ async def _apply_provisioning_result(
             return
 
         if isinstance(provisioning, _TerminateSubmittedJobResult):
+            await _unlock_related_fleet(
+                session=session,
+                item=item,
+                fleet_id=provisioning.locked_fleet_id,
+            )
             await _terminate_submitted_job(
                 session=session,
                 job_model=job_model,
@@ -1032,16 +1053,29 @@ async def _process_new_capacity_provisioning(
     context: _SubmittedJobContext,
     preconditions: _ProcessedPreconditions,
 ) -> _ProvisioningResult:
+    fleet_model = context.fleet_model
+    locked_fleet_id = None
+    if _should_lock_related_cluster_master_fleet(context=context):
+        assert fleet_model is not None
+        fleet_model = await _lock_related_cluster_master_fleet(
+            item=item,
+            fleet_id=fleet_model.id,
+        )
+        if fleet_model is None:
+            logger.debug("%s: cluster fleet is locked for provisioning", fmt(context.job_model))
+            return _RetrySubmittedJobResult()
+        locked_fleet_id = fleet_model.id
+
     master_provisioning_data = (
         preconditions.master_job_provisioning_data
         or _get_fleet_master_provisioning_data(
-            fleet_model=context.fleet_model,
+            fleet_model=fleet_model,
             job=context.job,
         )
     )
     provision_new_capacity_result = await _provision_new_capacity(
         project=context.project,
-        fleet_model=context.fleet_model,
+        fleet_model=fleet_model,
         job_model=context.job_model,
         run=context.run,
         jobs=context.jobs_to_provision,
@@ -1054,6 +1088,7 @@ async def _process_new_capacity_provisioning(
         logger.debug("%s: provisioning failed", fmt(context.job_model))
         return _TerminateSubmittedJobResult(
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            locked_fleet_id=locked_fleet_id,
         )
 
     created_fleet_model = None
@@ -1080,6 +1115,7 @@ async def _process_new_capacity_provisioning(
         created_fleet_model=created_fleet_model,
         new_placement_group_models=provision_new_capacity_result.new_placement_group_models,
         volume_attachment_result=volume_attachment_result,
+        locked_fleet_id=locked_fleet_id,
     )
 
 
@@ -1110,6 +1146,8 @@ async def _apply_new_capacity_provisioning(
 
     assert fleet_model is not None
     for placement_group_model in provisioning.new_placement_group_models:
+        placement_group_model.project = fresh_context.project
+        placement_group_model.fleet = fleet_model
         session.add(placement_group_model)
 
     instance_models, _ = await _materialize_newly_provisioned_capacity(
@@ -1142,6 +1180,11 @@ async def _apply_new_capacity_provisioning(
         volume_ids=_get_locked_volume_ids_from_volume_attachment_result(
             provisioning.volume_attachment_result
         ),
+    )
+    await _unlock_related_fleet(
+        session=session,
+        item=item,
+        fleet_id=provisioning.locked_fleet_id,
     )
     await _mark_job_processed(session=session, job_model=fresh_context.job_model)
 
@@ -1507,7 +1550,23 @@ def _get_locked_volume_ids_from_volume_attachment_result(
     return volume_attachment_result.locked_volume_ids
 
 
+def _get_locked_fleet_id_from_provisioning(
+    provisioning: _ProvisioningResult,
+) -> Optional[uuid.UUID]:
+    if isinstance(provisioning, _TerminateSubmittedJobResult):
+        return provisioning.locked_fleet_id
+
+    if isinstance(provisioning, _NewCapacityProvisioning):
+        return provisioning.locked_fleet_id
+
+    return None
+
+
 def _get_related_volume_lock_owner(job_id: uuid.UUID) -> str:
+    return f"{JobSubmittedPipeline.__name__}:{job_id}"
+
+
+def _get_related_fleet_lock_owner(job_id: uuid.UUID) -> str:
     return f"{JobSubmittedPipeline.__name__}:{job_id}"
 
 
@@ -1553,6 +1612,75 @@ def _get_cluster_fleet_spec(fleet_model: FleetModel) -> Optional[FleetSpec]:
     if fleet_spec.configuration.placement != InstanceGroupPlacement.CLUSTER:
         return None
     return fleet_spec
+
+
+def _should_lock_related_cluster_master_fleet(context: _SubmittedJobContext) -> bool:
+    return (
+        is_master_job(context.job)
+        and context.fleet_model is not None
+        and _get_cluster_fleet_spec(context.fleet_model) is not None
+    )
+
+
+async def _lock_related_cluster_master_fleet(
+    item: JobSubmittedPipelineItem,
+    fleet_id: uuid.UUID,
+) -> Optional[FleetModel]:
+    now = get_current_datetime()
+    related_fleet_lock_owner = _get_related_fleet_lock_owner(item.id)
+    fleet_lock, _ = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
+    async with fleet_lock:
+        async with get_session_ctx() as session:
+            res = await session.execute(
+                select(FleetModel)
+                .where(
+                    FleetModel.id == fleet_id,
+                    or_(
+                        FleetModel.lock_expires_at.is_(None),
+                        and_(
+                            FleetModel.lock_owner == related_fleet_lock_owner,
+                            FleetModel.lock_expires_at < now,
+                        ),
+                    ),
+                )
+                .options(
+                    joinedload(FleetModel.project).load_only(ProjectModel.id, ProjectModel.name)
+                )
+                .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+                .with_for_update(skip_locked=True, key_share=True, of=FleetModel)
+            )
+            fleet_model = res.unique().scalar_one_or_none()
+            if fleet_model is None:
+                return None
+
+            fleet_model.lock_expires_at = item.lock_expires_at
+            fleet_model.lock_token = item.lock_token
+            fleet_model.lock_owner = related_fleet_lock_owner
+            await session.commit()
+            return fleet_model
+
+
+async def _unlock_related_fleet(
+    session: AsyncSession,
+    item: JobSubmittedPipelineItem,
+    fleet_id: Optional[uuid.UUID],
+) -> None:
+    if fleet_id is None:
+        return
+
+    await session.execute(
+        update(FleetModel)
+        .where(
+            FleetModel.id == fleet_id,
+            FleetModel.lock_owner == _get_related_fleet_lock_owner(item.id),
+            FleetModel.lock_token == item.lock_token,
+        )
+        .values(
+            lock_expires_at=None,
+            lock_token=None,
+            lock_owner=None,
+        )
+    )
 
 
 def _get_fleet_master_provisioning_data(
