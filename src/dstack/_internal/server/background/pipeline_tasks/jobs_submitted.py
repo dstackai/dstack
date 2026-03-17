@@ -1655,6 +1655,7 @@ def _should_lock_related_cluster_master_fleet(context: _SubmittedJobContext) -> 
         is_master_job(context.job)
         and context.fleet_model is not None
         and _get_cluster_fleet_spec(context.fleet_model) is not None
+        and len(context.fleet_model.instances) == 0
     )
 
 

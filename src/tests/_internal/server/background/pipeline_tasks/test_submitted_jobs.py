@@ -438,6 +438,12 @@ class TestJobSubmittedWorker:
             fleet=fleet,
         )
         job = await create_job(session=session, run=run, instance_assigned=True)
+        fleet_lock_expires_at = get_current_datetime() + timedelta(minutes=1)
+        fleet_lock_token = uuid.uuid4()
+        fleet.lock_expires_at = fleet_lock_expires_at
+        fleet.lock_token = fleet_lock_token
+        fleet.lock_owner = "OtherPipeline:cluster-master"
+        await session.commit()
 
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock = Mock()
@@ -461,9 +467,81 @@ class TestJobSubmittedWorker:
         await session.refresh(job)
         await session.refresh(fleet)
         assert job.status == JobStatus.PROVISIONING
-        assert fleet.lock_owner is None
-        assert fleet.lock_token is None
-        assert fleet.lock_expires_at is None
+        assert fleet.lock_owner == "OtherPipeline:cluster-master"
+        assert fleet.lock_token == fleet_lock_token
+        assert fleet.lock_expires_at == fleet_lock_expires_at
+        backend_mock.compute.return_value.run_job.assert_called_once()
+        selected_offer = backend_mock.compute.return_value.run_job.call_args[0][2]
+        assert selected_offer.region == "eu-west-1"
+
+    async def test_provisioning_non_master_job_ignores_cluster_master_fleet_lock(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        configuration = TaskConfiguration(image="debian", nodes=2)
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            instance_assigned=True,
+            job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
+            waiting_master_job=False,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            instance_assigned=True,
+            waiting_master_job=False,
+        )
+        fleet_lock_expires_at = get_current_datetime() + timedelta(minutes=1)
+        fleet_lock_token = uuid.uuid4()
+        fleet.lock_expires_at = fleet_lock_expires_at
+        fleet.lock_token = fleet_lock_token
+        fleet.lock_owner = "OtherPipeline:cluster-master"
+        await session.commit()
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            offer_1 = get_instance_offer_with_availability(
+                backend=BackendType.AWS,
+                region="eu-west-2",
+            )
+            offer_2 = get_instance_offer_with_availability(
+                backend=BackendType.AWS,
+                region="eu-west-1",
+            )
+            backend_mock.compute.return_value.get_offers.return_value = [offer_1, offer_2]
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
+                backend=BackendType.AWS,
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        await session.refresh(fleet)
+        assert job.status == JobStatus.PROVISIONING
+        assert fleet.lock_owner == "OtherPipeline:cluster-master"
+        assert fleet.lock_token == fleet_lock_token
+        assert fleet.lock_expires_at == fleet_lock_expires_at
         backend_mock.compute.return_value.run_job.assert_called_once()
         selected_offer = backend_mock.compute.return_value.run_job.call_args[0][2]
         assert selected_offer.region == "eu-west-1"
