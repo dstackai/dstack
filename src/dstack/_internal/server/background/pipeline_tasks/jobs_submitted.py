@@ -926,6 +926,9 @@ async def _apply_provisioning_result(
     async with get_session_ctx() as session:
         job_model = await _refetch_locked_job(session=session, item=item)
         if job_model is None:
+            # FIXME: Placement-group creation, provisioning, and volume attachment all run
+            # before guarded apply, so a stale lock token here means provider-side
+            # side effects may already have happened.
             log_lock_token_changed_after_processing(logger, item)
             return
 
