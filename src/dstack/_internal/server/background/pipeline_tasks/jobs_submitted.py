@@ -347,12 +347,12 @@ class _ProcessedPreconditions:
 
 
 @dataclass
-class _DeferSubmittedJob:
+class _DeferSubmittedJobResult:
     log_message: str
 
 
 @dataclass
-class _TerminateSubmittedJob:
+class _TerminateSubmittedJobResult:
     reason: JobTerminationReason
     message: Optional[str] = None
 
@@ -387,9 +387,9 @@ class _NewCapacityAssignment:
     fleet_id: uuid.UUID
 
 
-_Assignment = Union[
-    _DeferSubmittedJob,
-    _TerminateSubmittedJob,
+_AssignmentResult = Union[
+    _DeferSubmittedJobResult,
+    _TerminateSubmittedJobResult,
     _NoFleetAssignment,
     _NewCapacityAssignment,
     _ExistingInstanceAssignment,
@@ -420,9 +420,9 @@ class _NewCapacityProvisioning:
     volume_attachment_result: Optional[_VolumeAttachmentResult]
 
 
-_Provisioning = Union[
-    _DeferSubmittedJob,
-    _TerminateSubmittedJob,
+_ProvisioningResult = Union[
+    _DeferSubmittedJobResult,
+    _TerminateSubmittedJobResult,
     _ExistingInstanceProvisioning,
     _NewCapacityProvisioning,
 ]
@@ -436,7 +436,7 @@ async def _load_process_context(item: JobSubmittedPipelineItem) -> Optional[_Sub
         return await _load_submitted_job_context(session=session, job_model=job_model)
 
 
-async def _process_assignment(context: _SubmittedJobContext) -> _Assignment:
+async def _process_assignment(context: _SubmittedJobContext) -> _AssignmentResult:
     preconditions = await _process_preconditions(context=context)
     if not isinstance(preconditions, _ProcessedPreconditions):
         return preconditions
@@ -453,7 +453,7 @@ async def _select_assignment(
     context: _SubmittedJobContext,
     preconditions: _ProcessedPreconditions,
     candidate_fleet_models: list[FleetModel],
-) -> _Assignment:
+) -> _AssignmentResult:
     # Getting backend offers can be slow, so fleet selection must happen outside the DB transaction.
     fleet_model, fleet_instances_with_offers, _ = await find_optimal_fleet_with_offers(
         project=context.project,
@@ -482,7 +482,7 @@ async def _select_assignment(
 async def _apply_assignment_result(
     item: JobSubmittedPipelineItem,
     context: _SubmittedJobContext,
-    assignment: _Assignment,
+    assignment: _AssignmentResult,
 ) -> None:
     async with get_session_ctx() as session:
         job_model = await _refetch_locked_job(session=session, item=item)
@@ -490,16 +490,16 @@ async def _apply_assignment_result(
             log_lock_token_changed_after_processing(logger, item)
             return
 
-        if isinstance(assignment, _DeferSubmittedJob):
-            await _apply_defer_submitted_job(
+        if isinstance(assignment, _DeferSubmittedJobResult):
+            await _defer_submitted_job(
                 session=session,
                 job_model=job_model,
                 log_message=assignment.log_message,
             )
             return
 
-        if isinstance(assignment, _TerminateSubmittedJob):
-            await _apply_terminate_submitted_job(
+        if isinstance(assignment, _TerminateSubmittedJobResult):
+            await _terminate_submitted_job(
                 session=session,
                 job_model=job_model,
                 reason=assignment.reason,
@@ -643,16 +643,22 @@ def _get_job_models_by_ids(
 
 async def _process_preconditions(
     context: _SubmittedJobContext,
-) -> Union[_ProcessedPreconditions, _DeferSubmittedJob, _TerminateSubmittedJob]:
+) -> Union[
+    _ProcessedPreconditions,
+    _DeferSubmittedJobResult,
+    _TerminateSubmittedJobResult,
+]:
     master_job_provisioning_data = _get_master_job_provisioning_data(context=context)
     if context.job.job_spec.job_num != 0 and master_job_provisioning_data is None:
-        return _DeferSubmittedJob(log_message="waiting for master job to be provisioned")
+        return _DeferSubmittedJobResult(log_message="waiting for master job to be provisioned")
 
     if _should_wait_for_run_fleet_assignment(context=context):
-        return _DeferSubmittedJob(log_message="waiting for the run to be assigned to the fleet")
+        return _DeferSubmittedJobResult(
+            log_message="waiting for the run to be assigned to the fleet"
+        )
 
     prepared_job_volumes = await _prepare_job_volumes(context=context)
-    if isinstance(prepared_job_volumes, _TerminateSubmittedJob):
+    if isinstance(prepared_job_volumes, _TerminateSubmittedJobResult):
         return prepared_job_volumes
 
     return _ProcessedPreconditions(
@@ -684,7 +690,7 @@ def _should_wait_for_run_fleet_assignment(context: _SubmittedJobContext) -> bool
 
 async def _prepare_job_volumes(
     context: _SubmittedJobContext,
-) -> Union[_PreparedJobVolumes, _TerminateSubmittedJob]:
+) -> Union[_PreparedJobVolumes, _TerminateSubmittedJobResult]:
     async with get_session_ctx() as session:
         try:
             volume_models = await get_job_configured_volume_models(
@@ -706,7 +712,7 @@ async def _prepare_job_volumes(
             logger.warning(
                 "%s: failed to prepare run volumes: %s", fmt(context.job_model), repr(e)
             )
-            return _TerminateSubmittedJob(
+            return _TerminateSubmittedJobResult(
                 reason=JobTerminationReason.VOLUME_ERROR,
                 message=e.msg,
             )
@@ -892,7 +898,7 @@ def _prepare_job_runtime_data(
     )
 
 
-async def _process_provisioning(context: _SubmittedJobContext) -> _Provisioning:
+async def _process_provisioning(context: _SubmittedJobContext) -> _ProvisioningResult:
     preconditions = await _process_preconditions(context=context)
     if not isinstance(preconditions, _ProcessedPreconditions):
         return preconditions
@@ -905,7 +911,7 @@ async def _process_provisioning(context: _SubmittedJobContext) -> _Provisioning:
 
     if context.run.run_spec.merged_profile.creation_policy == CreationPolicy.REUSE:
         logger.debug("%s: reuse instance failed", fmt(context.job_model))
-        return _TerminateSubmittedJob(
+        return _TerminateSubmittedJobResult(
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
             message="Could not reuse any instances for this job",
         )
@@ -918,7 +924,7 @@ async def _process_provisioning(context: _SubmittedJobContext) -> _Provisioning:
 
 async def _apply_provisioning_result(
     item: JobSubmittedPipelineItem,
-    provisioning: _Provisioning,
+    provisioning: _ProvisioningResult,
 ) -> None:
     async with get_session_ctx() as session:
         job_model = await _refetch_locked_job(session=session, item=item)
@@ -926,16 +932,16 @@ async def _apply_provisioning_result(
             log_lock_token_changed_after_processing(logger, item)
             return
 
-        if isinstance(provisioning, _DeferSubmittedJob):
-            await _apply_defer_submitted_job(
+        if isinstance(provisioning, _DeferSubmittedJobResult):
+            await _defer_submitted_job(
                 session=session,
                 job_model=job_model,
                 log_message=provisioning.log_message,
             )
             return
 
-        if isinstance(provisioning, _TerminateSubmittedJob):
-            await _apply_terminate_submitted_job(
+        if isinstance(provisioning, _TerminateSubmittedJobResult):
+            await _terminate_submitted_job(
                 session=session,
                 job_model=job_model,
                 reason=provisioning.reason,
@@ -1014,7 +1020,7 @@ async def _apply_existing_instance_provisioning(
 async def _process_new_capacity_provisioning(
     context: _SubmittedJobContext,
     preconditions: _ProcessedPreconditions,
-) -> _Provisioning:
+) -> _ProvisioningResult:
     master_provisioning_data = (
         preconditions.master_job_provisioning_data
         or _get_fleet_master_provisioning_data(
@@ -1035,7 +1041,7 @@ async def _process_new_capacity_provisioning(
     )
     if provision_new_capacity_result is None:
         logger.debug("%s: provisioning failed", fmt(context.job_model))
-        return _TerminateSubmittedJob(
+        return _TerminateSubmittedJobResult(
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
         )
 
@@ -1700,32 +1706,6 @@ def _get_offer_mount_point_volume(
             continue
         return volume
     raise ServerClientError("Failed to find an eligible volume for the mount point")
-
-
-async def _apply_defer_submitted_job(
-    session: AsyncSession,
-    job_model: JobModel,
-    log_message: str,
-) -> None:
-    await _defer_submitted_job(
-        session=session,
-        job_model=job_model,
-        log_message=log_message,
-    )
-
-
-async def _apply_terminate_submitted_job(
-    session: AsyncSession,
-    job_model: JobModel,
-    reason: JobTerminationReason,
-    message: Optional[str] = None,
-) -> None:
-    await _terminate_submitted_job(
-        session=session,
-        job_model=job_model,
-        reason=reason,
-        message=message,
-    )
 
 
 async def _defer_submitted_job(
