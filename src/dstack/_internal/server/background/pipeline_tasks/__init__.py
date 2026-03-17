@@ -6,6 +6,9 @@ from dstack._internal.server.background.pipeline_tasks.fleets import FleetPipeli
 from dstack._internal.server.background.pipeline_tasks.gateways import GatewayPipeline
 from dstack._internal.server.background.pipeline_tasks.instances import InstancePipeline
 from dstack._internal.server.background.pipeline_tasks.jobs_running import JobRunningPipeline
+from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
+    JobSubmittedPipeline,
+)
 from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     JobTerminatingPipeline,
 )
@@ -24,6 +27,7 @@ class PipelineManager:
             ComputeGroupPipeline(),
             FleetPipeline(),
             GatewayPipeline(),
+            JobSubmittedPipeline(),
             JobRunningPipeline(),
             JobTerminatingPipeline(),
             InstancePipeline(),
@@ -60,14 +64,17 @@ class PipelineManager:
 class PipelineHinter:
     def __init__(self, pipelines: list[Pipeline]) -> None:
         self._pipelines = pipelines
-        self._hint_fetch_map = {p.hint_fetch_model_name: p for p in self._pipelines}
+        self._hint_fetch_map: dict[str, list[Pipeline]] = {}
+        for pipeline in self._pipelines:
+            self._hint_fetch_map.setdefault(pipeline.hint_fetch_model_name, []).append(pipeline)
 
     def hint_fetch(self, model_name: str):
-        pipeline = self._hint_fetch_map.get(model_name)
-        if pipeline is None:
+        pipelines = self._hint_fetch_map.get(model_name)
+        if pipelines is None:
             logger.warning("Model %s not registered for fetch hints", model_name)
             return
-        pipeline.hint_fetch()
+        for pipeline in pipelines:
+            pipeline.hint_fetch()
 
 
 def start_pipeline_tasks() -> PipelineManager:
