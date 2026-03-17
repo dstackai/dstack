@@ -1082,16 +1082,17 @@ async def _process_new_capacity_provisioning(
 ) -> _ProvisioningResult:
     fleet_model = context.fleet_model
     locked_fleet_id = None
-    if _should_lock_related_cluster_master_fleet(context=context):
+    if _should_refresh_related_cluster_master_fleet(context=context):
         assert fleet_model is not None
-        fleet_model = await _lock_related_cluster_master_fleet(
+        related_cluster_master_fleet = await _resolve_related_cluster_master_fleet(
             item=item,
             fleet_id=fleet_model.id,
         )
-        if fleet_model is None:
+        if related_cluster_master_fleet is None:
             logger.debug("%s: cluster fleet is locked for provisioning", fmt(context.job_model))
             return _RetrySubmittedJobResult()
-        locked_fleet_id = fleet_model.id
+        fleet_model = related_cluster_master_fleet.fleet_model
+        locked_fleet_id = related_cluster_master_fleet.locked_fleet_id
 
     master_provisioning_data = (
         preconditions.master_job_provisioning_data
@@ -1650,51 +1651,69 @@ def _get_cluster_fleet_spec(fleet_model: FleetModel) -> Optional[FleetSpec]:
     return fleet_spec
 
 
-def _should_lock_related_cluster_master_fleet(context: _SubmittedJobContext) -> bool:
+def _should_refresh_related_cluster_master_fleet(context: _SubmittedJobContext) -> bool:
     return (
         is_master_job(context.job)
         and context.fleet_model is not None
         and _get_cluster_fleet_spec(context.fleet_model) is not None
-        and len(context.fleet_model.instances) == 0
     )
 
 
-async def _lock_related_cluster_master_fleet(
+@dataclass
+class _ResolvedRelatedClusterMasterFleet:
+    fleet_model: FleetModel
+    locked_fleet_id: Optional[uuid.UUID]
+
+
+async def _resolve_related_cluster_master_fleet(
     item: JobSubmittedPipelineItem,
     fleet_id: uuid.UUID,
-) -> Optional[FleetModel]:
+) -> Optional[_ResolvedRelatedClusterMasterFleet]:
     now = get_current_datetime()
     related_fleet_lock_owner = _get_related_fleet_lock_owner(item.id)
     fleet_lock, _ = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
     async with fleet_lock:
         async with get_session_ctx() as session:
+            # To avoid violating cluster placement during master provisioning,
+            # lock empty fleets and respect existing instances in non-empty fleets.
+            # Refetch the fleet under lock before deciding which case we are in.
             res = await session.execute(
                 select(FleetModel)
                 .where(
                     FleetModel.id == fleet_id,
-                    or_(
-                        FleetModel.lock_expires_at.is_(None),
-                        and_(
-                            FleetModel.lock_owner == related_fleet_lock_owner,
-                            FleetModel.lock_expires_at < now,
-                        ),
-                    ),
                 )
                 .options(
                     joinedload(FleetModel.project).load_only(ProjectModel.id, ProjectModel.name)
                 )
                 .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
-                .with_for_update(skip_locked=True, key_share=True, of=FleetModel)
+                .execution_options(populate_existing=True)
+                .with_for_update(skip_locked=True, of=FleetModel)
             )
             fleet_model = res.unique().scalar_one_or_none()
             if fleet_model is None:
+                return None
+            if len(fleet_model.instances) != 0:
+                return _ResolvedRelatedClusterMasterFleet(
+                    fleet_model=fleet_model,
+                    locked_fleet_id=None,
+                )
+            if not (
+                fleet_model.lock_expires_at is None
+                or (
+                    fleet_model.lock_owner == related_fleet_lock_owner
+                    and fleet_model.lock_expires_at < now
+                )
+            ):
                 return None
 
             fleet_model.lock_expires_at = item.lock_expires_at
             fleet_model.lock_token = item.lock_token
             fleet_model.lock_owner = related_fleet_lock_owner
             await session.commit()
-            return fleet_model
+            return _ResolvedRelatedClusterMasterFleet(
+                fleet_model=fleet_model,
+                locked_fleet_id=fleet_model.id,
+            )
 
 
 async def _unlock_related_fleet(
