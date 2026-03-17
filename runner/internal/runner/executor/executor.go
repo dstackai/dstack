@@ -262,12 +262,12 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		}
 
 		if errors.Is(err, ErrLogQuotaExceeded) {
-			log.Error(ctx, "Log quota exceeded", "quota", ex.jobSpec.LogQuotaHour)
+			log.Error(ctx, "Log quota exceeded", "quota", ex.jobLogs.quota)
 			ex.SetJobStateWithTerminationReason(
 				ctx,
 				schemas.JobStateFailed,
 				types.TerminationReasonLogQuotaExceeded,
-				fmt.Sprintf("Job log output exceeded the hourly quota of %d bytes", ex.jobSpec.LogQuotaHour),
+				fmt.Sprintf("Job log output exceeded the hourly quota of %d bytes", ex.jobLogs.quota),
 			)
 			return fmt.Errorf("log quota exceeded: %w", err)
 		}
@@ -294,7 +294,7 @@ func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
 	ex.clusterInfo = body.ClusterInfo
 	ex.secrets = body.Secrets
 	ex.repoCredentials = body.RepoCredentials
-	ex.jobLogs.SetQuota(body.JobSpec.LogQuotaHour)
+	ex.jobLogs.SetQuota(body.LogQuotaHour)
 	ex.state = WaitCode
 }
 

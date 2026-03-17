@@ -15,6 +15,7 @@ from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, Job, Run
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
+from dstack._internal.server import settings as server_settings
 from dstack._internal.server.schemas.instances import InstanceCheck
 from dstack._internal.server.schemas.runner import (
     ComponentInfo,
@@ -93,6 +94,7 @@ class RunnerClient:
             merged_env.update(job_spec.env)
             job_spec = job_spec.copy(deep=True)
             job_spec.env = merged_env
+        quota = server_settings.SERVER_LOG_QUOTA_PER_JOB_HOUR
         body = SubmitBody(
             run=run,
             job_spec=job_spec,
@@ -100,6 +102,7 @@ class RunnerClient:
             cluster_info=cluster_info,
             secrets=secrets,
             repo_credentials=repo_credentials,
+            log_quota_hour=quota if quota > 0 else None,
             run_spec=run.run_spec,
         )
         resp = requests.post(

@@ -150,7 +150,6 @@ func TestExecutor_LogQuota(t *testing.T) {
 	ex.killDelay = 500 * time.Millisecond
 	// Output >100 bytes to trigger the quota
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "for i in $(seq 1 20); do echo 'This line is long enough to exceed the quota easily'; done")
-	ex.jobSpec.LogQuotaHour = 100 // 100 bytes
 	ex.jobLogs.SetQuota(100)
 	makeCodeTar(t, ex)
 

@@ -278,9 +278,6 @@ class JobSpec(CoreModel):
     privileged: bool = False
     single_branch: Optional[bool] = None
     max_duration: Optional[int]
-    log_quota_hour: Optional[int] = None
-    """`log_quota_hour` is the maximum number of bytes of log output per calendar hour.
-    `None` means unlimited. Set from `DSTACK_SERVER_LOG_QUOTA_PER_JOB_HOUR`."""
     stop_duration: Optional[int] = None
     utilization_policy: Optional[UtilizationPolicy] = None
     registry_auth: Optional[RegistryAuth]
