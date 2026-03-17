@@ -103,6 +103,8 @@ class SubmitBody(CoreModel):
     cluster_info: Annotated[Optional[ClusterInfo], Field(include=True)]
     secrets: Annotated[Optional[Dict[str, str]], Field(include=True)]
     repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)]
+    log_quota_hour: Annotated[Optional[int], Field(include=True)] = None
+    """Maximum bytes of log output per hour. None means unlimited."""
     # TODO: remove `run_spec` once instances deployed with 0.19.8 or earlier are no longer supported.
     run_spec: Annotated[
         RunSpec,

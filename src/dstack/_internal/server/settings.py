@@ -133,6 +133,11 @@ SERVER_CODE_UPLOAD_LIMIT = int(os.getenv("DSTACK_SERVER_CODE_UPLOAD_LIMIT", 2 * 
 
 SERVER_TEMPLATES_REPO = os.getenv("DSTACK_SERVER_TEMPLATES_REPO")
 
+# Per-job log quota: maximum bytes of log output per calendar hour. 0 = unlimited.
+SERVER_LOG_QUOTA_PER_JOB_HOUR = int(
+    os.getenv("DSTACK_SERVER_LOG_QUOTA_PER_JOB_HOUR", 50 * 1024 * 1024)  # 50 MB
+)
+
 # Development settings
 
 SQL_ECHO_ENABLED = os.getenv("DSTACK_SQL_ECHO_ENABLED") is not None

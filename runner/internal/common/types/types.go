@@ -10,4 +10,5 @@ const (
 	TerminationReasonTerminatedByUser         TerminationReason = "terminated_by_user"
 	TerminationReasonTerminatedByServer       TerminationReason = "terminated_by_server"
 	TerminationReasonMaxDurationExceeded      TerminationReason = "max_duration_exceeded"
+	TerminationReasonLogQuotaExceeded         TerminationReason = "log_quota_exceeded"
 )

@@ -36,6 +36,7 @@ type SubmitBody struct {
 	ClusterInfo     ClusterInfo       `json:"cluster_info"`
 	Secrets         map[string]string `json:"secrets"`
 	RepoCredentials *RepoCredentials  `json:"repo_credentials"`
+	LogQuotaHour    int               `json:"log_quota_hour"` // bytes per hour, 0 = unlimited
 }
 
 type PullResponse struct {
