@@ -14,9 +14,6 @@ from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import VolumeMountPoint, VolumeStatus
-from dstack._internal.server.background.pipeline_tasks import (
-    jobs_submitted as jobs_submitted_pipeline,
-)
 from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
     JobSubmittedFetcher,
     JobSubmittedPipeline,
@@ -670,7 +667,7 @@ class TestJobSubmittedWorker:
         assert job.lock_token is None
         assert job.lock_expires_at is None
 
-    async def test_resets_lock_for_retry_when_selected_instance_cannot_be_locked(
+    async def test_resets_lock_for_retry_when_existing_instance_offer_cannot_be_locked(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
         project = await create_project(session=session)
@@ -706,58 +703,3 @@ class TestJobSubmittedWorker:
         assert job.lock_expires_at is None
         assert instance.status == InstanceStatus.IDLE
         assert instance.busy_blocks == 0
-
-    async def test_resets_lock_for_retry_when_selected_instance_becomes_busy(
-        self,
-        test_db,
-        session: AsyncSession,
-        worker: JobSubmittedWorker,
-        monkeypatch: pytest.MonkeyPatch,
-    ):
-        project = await create_project(session=session)
-        user = await create_user(session=session)
-        repo = await create_repo(session=session, project_id=project.id)
-        fleet = await create_fleet(session=session, project=project)
-        instance = await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet,
-            status=InstanceStatus.IDLE,
-        )
-        await session.commit()
-
-        run = await create_run(session=session, project=project, repo=repo, user=user)
-        job = await create_job(session=session, run=run)
-        previous_last_processed_at = job.last_processed_at
-
-        original_lock_selected_instance = jobs_submitted_pipeline._lock_selected_instance
-
-        async def _lock_selected_instance_and_mark_busy(
-            session: AsyncSession, instance_id: uuid.UUID
-        ):
-            locked_instance = await original_lock_selected_instance(session, instance_id)
-            assert locked_instance is not None
-            locked_instance.status = InstanceStatus.BUSY
-            locked_instance.busy_blocks = 1
-            return locked_instance
-
-        monkeypatch.setattr(
-            jobs_submitted_pipeline,
-            "_lock_selected_instance",
-            _lock_selected_instance_and_mark_busy,
-        )
-
-        await _process_job(session=session, worker=worker, job_model=job)
-
-        await session.refresh(job)
-        await session.refresh(instance)
-        assert job.status == JobStatus.SUBMITTED
-        assert not job.instance_assigned
-        assert job.instance_id is None
-        assert job.used_instance_id is None
-        assert job.last_processed_at > previous_last_processed_at
-        assert job.lock_owner == JobSubmittedPipeline.__name__
-        assert job.lock_token is None
-        assert job.lock_expires_at is None
-        assert instance.status == InstanceStatus.BUSY
-        assert instance.busy_blocks == 1

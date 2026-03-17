@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Sequence, Union
@@ -7,12 +8,10 @@ from typing import Optional, Sequence, Union
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
-from sqlalchemy.orm.attributes import set_committed_value
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.instances import (
-    InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceStatus,
 )
@@ -37,7 +36,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     log_lock_token_changed_on_reset,
     log_lock_token_mismatch,
 )
-from dstack._internal.server.db import get_db, get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx, is_db_sqlite, sqlite_commit
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -48,10 +47,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import events
 from dstack._internal.server.services.instances import (
-    filter_pool_instances,
     format_instance_blocks_for_event,
-    get_instance_offer,
-    get_shared_pool_instances_with_offers,
     switch_instance_status,
 )
 from dstack._internal.server.services.jobs import (
@@ -65,6 +61,7 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.services.runs.plan import (
     find_optimal_fleet_with_offers,
+    get_instance_offers_in_fleet,
     get_run_candidate_fleet_models_filters,
     select_run_candidate_fleet_models_with_filters,
 )
@@ -237,11 +234,11 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
         if assignment_input is None:
             return
 
-        assignment_selection = await _select_assignment(assignment_input)
+        assignment = await _select_assignment(assignment_input)
         await _apply_assignment_selection(
             item=item,
             assignment_input=assignment_input,
-            assignment_selection=assignment_selection,
+            assignment=assignment,
         )
 
 
@@ -265,32 +262,24 @@ class _AssignmentInput:
 
 
 @dataclass
-class _NoFleetAssignmentSelection:
+class _NoFleetAssignment:
     pass
 
 
 @dataclass
-class _FleetAssignmentSelection:
+class _NewCapacityAssignment:
     fleet_id: uuid.UUID
 
 
 @dataclass
-class _SelectedInstanceSelection:
-    id: uuid.UUID
-    blocks: int
-    total_blocks: int
-
-
-@dataclass
-class _InstanceAssignmentSelection:
+class _ExistingInstanceAssignment:
     fleet_id: uuid.UUID
-    selected_instance: _SelectedInstanceSelection
 
 
-AssignmentSelection = Union[
-    _NoFleetAssignmentSelection,
-    _FleetAssignmentSelection,
-    _InstanceAssignmentSelection,
+_Assignment = Union[
+    _NoFleetAssignment,
+    _NewCapacityAssignment,
+    _ExistingInstanceAssignment,
 ]
 
 
@@ -364,7 +353,7 @@ async def _load_assignment_input(item: JobSubmittedPipelineItem) -> Optional[_As
         )
 
 
-async def _select_assignment(assignment_input: _AssignmentInput) -> AssignmentSelection:
+async def _select_assignment(assignment_input: _AssignmentInput) -> _Assignment:
     # Getting backend offers can be slow, so fleet selection must happen outside the DB transaction.
     fleet_model, fleet_instances_with_offers, _ = await find_optimal_fleet_with_offers(
         project=assignment_input.context.project,
@@ -378,29 +367,18 @@ async def _select_assignment(assignment_input: _AssignmentInput) -> AssignmentSe
     )
 
     if fleet_model is None:
-        return _NoFleetAssignmentSelection()
+        return _NoFleetAssignment()
 
     if fleet_instances_with_offers:
-        fleet_instances_with_offers.sort(
-            key=lambda instance_with_offer: instance_with_offer[0].price or 0
-        )
-        selected_instance, selected_instance_offer = fleet_instances_with_offers[0]
-        return _InstanceAssignmentSelection(
-            fleet_id=fleet_model.id,
-            selected_instance=_SelectedInstanceSelection(
-                id=selected_instance.id,
-                blocks=selected_instance_offer.blocks,
-                total_blocks=selected_instance_offer.total_blocks,
-            ),
-        )
+        return _ExistingInstanceAssignment(fleet_id=fleet_model.id)
 
-    return _FleetAssignmentSelection(fleet_id=fleet_model.id)
+    return _NewCapacityAssignment(fleet_id=fleet_model.id)
 
 
 async def _apply_assignment_selection(
     item: JobSubmittedPipelineItem,
     assignment_input: _AssignmentInput,
-    assignment_selection: AssignmentSelection,
+    assignment: _Assignment,
 ) -> None:
     async with get_session_ctx() as session:
         job_model = await _refetch_locked_job(session=session, item=item)
@@ -408,7 +386,7 @@ async def _apply_assignment_selection(
             log_lock_token_changed_after_processing(logger, item)
             return
 
-        if isinstance(assignment_selection, _NoFleetAssignmentSelection):
+        if isinstance(assignment, _NoFleetAssignment):
             await _apply_no_fleet_selection(
                 session=session,
                 job_model=job_model,
@@ -416,37 +394,46 @@ async def _apply_assignment_selection(
             )
             return
 
-        if isinstance(assignment_selection, _FleetAssignmentSelection):
-            job_model.fleet_id = assignment_selection.fleet_id
+        if isinstance(assignment, _NewCapacityAssignment):
+            job_model.fleet_id = assignment.fleet_id
             job_model.instance_assigned = True
             await _mark_job_processed(session=session, job_model=job_model)
             return
 
-        instance_model = await _lock_selected_instance(
-            session=session,
-            instance_id=assignment_selection.selected_instance.id,
-        )
-        if instance_model is None:
-            await _reset_job_lock_for_retry(session=session, item=item)
-            return
+        async with AsyncExitStack() as exit_stack:
+            fleet_model = await _lock_assignment_fleet_for_existing_instance_assignment(
+                exit_stack=exit_stack,
+                session=session,
+                assignment_input=assignment_input,
+                fleet_id=assignment.fleet_id,
+            )
+            if fleet_model is None:
+                await _reset_job_lock_for_retry(session=session, item=item)
+                return
 
-        current_offer = _revalidate_selected_instance_offer(
-            instance_model=instance_model,
-            assignment_input=assignment_input,
-            selected_instance=assignment_selection.selected_instance,
-        )
-        if current_offer is None:
-            await _reset_job_lock_for_retry(session=session, item=item)
-            return
+            # The optimal fleet was chosen from a detached snapshot. Recompute reusable
+            # offers after locking the fleet instances so concurrent jobs can spread
+            # across the remaining free instances instead of racing on one stale choice.
+            current_instance_offers = _get_current_reusable_instance_offers(
+                assignment_input=assignment_input,
+                fleet_model=fleet_model,
+            )
+            if not current_instance_offers:
+                # If the reusable offers vanished under the fleet lock, retry full
+                # assignment later instead of forcing new-capacity provisioning in a
+                # fleet that may no longer be optimal.
+                await _reset_job_lock_for_retry(session=session, item=item)
+                return
 
-        _assign_selected_instance_to_job(
-            session=session,
-            job_model=job_model,
-            instance_model=instance_model,
-            offer=current_offer,
-            multinode=assignment_input.context.multinode,
-        )
-        await _mark_job_processed(session=session, job_model=job_model)
+            instance_model, current_offer = current_instance_offers[0]
+            _assign_instance_to_job(
+                session=session,
+                job_model=job_model,
+                instance_model=instance_model,
+                offer=current_offer,
+                multinode=assignment_input.context.multinode,
+            )
+            await _mark_job_processed(session=session, job_model=job_model)
 
 
 async def _refetch_locked_job(
@@ -592,9 +579,6 @@ async def _load_assignment_candidate_fleets(
         instance_filters=instance_filters,
         lock_instances=False,
     )
-    for fleet_model in fleets_with_instances:
-        for instance_model in fleet_model.instances:
-            set_committed_value(instance_model, "fleet", fleet_model)
     return fleets_with_instances + fleets_without_instances
 
 
@@ -630,81 +614,71 @@ async def _apply_no_fleet_selection(
     await _mark_job_processed(session=session, job_model=job_model)
 
 
-async def _lock_selected_instance(
+async def _lock_assignment_fleet_for_existing_instance_assignment(
+    exit_stack: AsyncExitStack,
     session: AsyncSession,
-    instance_id: uuid.UUID,
-) -> Optional[InstanceModel]:
-    instance_lock, _ = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
-    async with instance_lock:
-        res = await session.execute(
-            select(InstanceModel)
-            .where(
-                InstanceModel.id == instance_id,
-                InstanceModel.deleted == False,
-                or_(
-                    InstanceModel.lock_expires_at.is_(None),
-                    InstanceModel.lock_expires_at < get_current_datetime(),
-                ),
-            )
-            .options(joinedload(InstanceModel.fleet))
-            .options(joinedload(InstanceModel.volume_attachments))
-            .with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
-        )
-        return res.unique().scalar_one_or_none()
-
-
-def _revalidate_selected_instance_offer(
-    instance_model: InstanceModel,
     assignment_input: _AssignmentInput,
-    selected_instance: _SelectedInstanceSelection,
-) -> Optional[InstanceOfferWithAvailability]:
-    assert instance_model.fleet is not None
-
-    profile = assignment_input.context.run.run_spec.merged_profile
-    requirements = assignment_input.context.job.job_spec.requirements
-
-    if selected_instance.total_blocks == 1:
-        nonshared_instances = filter_pool_instances(
-            pool_instances=[instance_model],
-            profile=profile,
-            requirements=requirements,
-            fleet_model=instance_model.fleet,
-            multinode=assignment_input.context.multinode,
-            master_job_provisioning_data=assignment_input.master_job_provisioning_data,
-            volumes=assignment_input.volumes,
-            shared=False,
-        )
-        if not nonshared_instances:
-            return None
-        if instance_model.status != InstanceStatus.IDLE:
-            return None
-        current_offer = get_instance_offer(instance_model)
-        if current_offer is None:
-            return None
-        current_offer.availability = InstanceAvailability.IDLE
-        return current_offer
-
-    # The selected instance was chosen from a detached snapshot, so ask the current
-    # shared-pool view for the offer shape that still fits on the locked instance.
-    shared_instances_with_offers = get_shared_pool_instances_with_offers(
-        pool_instances=[instance_model],
-        profile=profile,
-        requirements=requirements,
-        fleet_model=instance_model.fleet,
-        multinode=assignment_input.context.multinode,
-        volumes=assignment_input.volumes,
-        idle_only=True,
+    fleet_id: uuid.UUID,
+) -> Optional[FleetModel]:
+    fleet_filters, instance_filters = await get_run_candidate_fleet_models_filters(
+        session=session,
+        project=assignment_input.context.project,
+        run_model=assignment_input.context.run_model,
+        run_spec=assignment_input.context.run.run_spec,
     )
-    for _, offer in shared_instances_with_offers:
-        if (
-            offer.blocks == selected_instance.blocks
-            and offer.total_blocks == selected_instance.total_blocks
-        ):
-            return offer
-    return None
+    fleet_filters.append(FleetModel.id == fleet_id)
+
+    (
+        fleets_with_instances,
+        _,
+    ) = await select_run_candidate_fleet_models_with_filters(
+        session=session,
+        fleet_filters=fleet_filters,
+        instance_filters=instance_filters,
+        lock_instances=True,
+    )
+    if not fleets_with_instances:
+        return None
+
+    instance_ids = sorted(instance.id for instance in fleets_with_instances[0].instances)
+    if not instance_ids:
+        return None
+
+    if is_db_sqlite():
+        await sqlite_commit(session)
+
+    await exit_stack.enter_async_context(
+        get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instance_ids)
+    )
+    (
+        fleets_with_locked_instances,
+        _,
+    ) = await select_run_candidate_fleet_models_with_filters(
+        session=session,
+        fleet_filters=fleet_filters,
+        instance_filters=[*instance_filters, InstanceModel.id.in_(instance_ids)],
+        lock_instances=True,
+    )
+    if not fleets_with_locked_instances:
+        return None
+    return fleets_with_locked_instances[0]
 
 
-def _assign_selected_instance_to_job(
+def _get_current_reusable_instance_offers(
+    assignment_input: _AssignmentInput,
+    fleet_model: FleetModel,
+) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
+    return get_instance_offers_in_fleet(
+        fleet_model=fleet_model,
+        run_spec=assignment_input.context.run.run_spec,
+        job=assignment_input.context.job,
+        master_job_provisioning_data=assignment_input.master_job_provisioning_data,
+        volumes=assignment_input.volumes,
+        exclude_not_available=True,
+    )
+
+
+def _assign_instance_to_job(
     session: AsyncSession,
     job_model: JobModel,
     instance_model: InstanceModel,
