@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Sequence, Union
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
@@ -68,7 +68,6 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 from dstack._internal.server.db import (
     get_db,
     get_session_ctx,
-    is_db_postgres,
     is_db_sqlite,
     sqlite_commit,
 )
@@ -111,7 +110,7 @@ from dstack._internal.server.services.jobs import (
     is_multinode_job,
     switch_job_status,
 )
-from dstack._internal.server.services.locking import get_locker, string_to_lock_id
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import (
     get_instance_offer_with_restricted_az,
@@ -1922,16 +1921,10 @@ async def _create_fleet_model_for_job(
     if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
         placement = InstanceGroupPlacement.CLUSTER
     nodes = get_nodes_required_num(run.run_spec)
-    lock_namespace = f"fleet_names_{project.name}"
     async with get_session_ctx() as session:
-        if is_db_sqlite():
-            await session.commit()
-        elif is_db_postgres():
-            await session.execute(
-                select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
-            )
-        async with get_locker(get_db().dialect_name).get_lockset(lock_namespace)[0]:
-            fleet_name = await generate_fleet_name(session=session, project=project)
+        # Duplicate fleet names are possible because of the missing fleet lock.
+        # Unfixed since autocreated are to be dropped anyway.
+        fleet_name = await generate_fleet_name(session=session, project=project)
     spec = FleetSpec(
         configuration=FleetConfiguration(
             name=fleet_name,
