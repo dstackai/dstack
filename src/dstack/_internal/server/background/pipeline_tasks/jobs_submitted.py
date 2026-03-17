@@ -146,7 +146,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class JobSubmittedPipelineItem(PipelineItem):
-    instance_assigned: bool
+    pass
 
 
 class JobSubmittedPipeline(Pipeline[JobSubmittedPipelineItem]):
@@ -256,7 +256,6 @@ class JobSubmittedFetcher(Fetcher[JobSubmittedPipelineItem]):
                             JobModel.id,
                             JobModel.lock_token,
                             JobModel.lock_expires_at,
-                            JobModel.instance_assigned,
                         )
                     )
                 )
@@ -276,7 +275,6 @@ class JobSubmittedFetcher(Fetcher[JobSubmittedPipelineItem]):
                             lock_expires_at=lock_expires_at,
                             lock_token=lock_token,
                             prev_lock_expired=prev_lock_expired,
-                            instance_assigned=job_model.instance_assigned,
                         )
                     )
                 await session.commit()
@@ -398,7 +396,6 @@ _AssignmentResult = Union[
 
 @dataclass
 class _ExistingInstanceProvisioning:
-    instance_id: uuid.UUID
     volume_attachment_result: _VolumeAttachmentResult
 
 
@@ -976,7 +973,6 @@ async def _process_existing_instance_provisioning(
         job_provisioning_data=get_or_error(get_instance_provisioning_data(instance_model)),
     )
     return _ExistingInstanceProvisioning(
-        instance_id=instance_model.id,
         volume_attachment_result=volume_attachment_result,
     )
 
@@ -987,12 +983,7 @@ async def _apply_existing_instance_provisioning(
     provisioning: _ExistingInstanceProvisioning,
 ) -> None:
     context = await _load_submitted_job_context(session=session, job_model=job_model)
-    res = await session.execute(
-        select(InstanceModel)
-        .where(InstanceModel.id == provisioning.instance_id)
-        .execution_options(populate_existing=True)
-    )
-    instance_model = res.unique().scalar_one()
+    instance_model = get_or_error(context.job_model.instance)
     context.job_model.job_provisioning_data = instance_model.job_provisioning_data
     if context.job_model.job_runtime_data is None:
         context.job_model.job_runtime_data = _prepare_job_runtime_data(
@@ -1368,7 +1359,11 @@ async def _load_volume_models(
         res = await session.execute(
             select(VolumeModel)
             .where(VolumeModel.id.in_(volume_ids))
+            .options(joinedload(VolumeModel.project))
             .options(joinedload(VolumeModel.user).load_only(UserModel.name))
+            .options(
+                joinedload(VolumeModel.attachments).joinedload(VolumeAttachmentModel.instance)
+            )
         )
         loaded_volume_models = list(res.unique().scalars().all())
     volume_models_by_id = {volume_model.id: volume_model for volume_model in loaded_volume_models}

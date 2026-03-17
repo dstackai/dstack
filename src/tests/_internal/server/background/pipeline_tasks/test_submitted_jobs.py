@@ -90,7 +90,6 @@ def _job_to_pipeline_item(job_model: JobModel) -> JobSubmittedPipelineItem:
         lock_expires_at=job_model.lock_expires_at,
         lock_token=job_model.lock_token,
         prev_lock_expired=False,
-        instance_assigned=job_model.instance_assigned,
     )
 
 
@@ -188,12 +187,6 @@ class TestJobSubmittedFetcher:
             provisioning_job.id,
             fresh_job.id,
         ]
-        assert [(item.id, item.instance_assigned) for item in items] == [
-            (assignment_job.id, False),
-            (provisioning_job.id, True),
-            (fresh_job.id, False),
-        ]
-
         for job in [
             assignment_job,
             provisioning_job,
