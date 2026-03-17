@@ -2,6 +2,7 @@ package executor
 
 import (
 	"errors"
+	"math"
 	"sync"
 	"time"
 
@@ -17,7 +18,8 @@ type appendWriter struct {
 
 	quota         int           // bytes per hour, 0 = unlimited
 	bytesInHour   int           // bytes written in current hour bucket
-	hourStart     int64         // unix timestamp (seconds) of current hour bucket start
+	currentHour   int           // monotonic hour bucket index since timeStarted
+	timeStarted   time.Time     // monotonic reference point for hour buckets
 	quotaExceeded chan struct{} // closed when quota is exceeded (out-of-band signal)
 	exceededOnce  sync.Once
 }
@@ -33,6 +35,7 @@ func newAppendWriter(mu *sync.RWMutex, timestamp *MonotonicTimestamp) *appendWri
 
 func (w *appendWriter) SetQuota(quota int) {
 	w.quota = quota
+	w.timeStarted = time.Now()
 }
 
 // QuotaExceeded returns a channel that is closed when the log quota is exceeded.
@@ -45,11 +48,10 @@ func (w *appendWriter) Write(p []byte) (n int, err error) {
 	defer w.mu.Unlock()
 
 	if w.quota > 0 {
-		now := time.Now().Unix()
-		currentHour := (now / 3600) * 3600
-		if currentHour != w.hourStart {
+		hour := int(math.Floor(time.Since(w.timeStarted).Hours()))
+		if hour != w.currentHour {
 			w.bytesInHour = 0
-			w.hourStart = currentHour
+			w.currentHour = hour
 		}
 		if w.bytesInHour+len(p) > w.quota {
 			w.exceededOnce.Do(func() { close(w.quotaExceeded) })
