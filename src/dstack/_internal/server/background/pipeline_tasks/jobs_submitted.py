@@ -1097,12 +1097,15 @@ async def _process_new_capacity_provisioning(
 
     created_fleet_model = None
     if context.fleet_model is None:
+        # TODO: Drop once autocreated fleets are dropped.
         created_fleet_model = await _create_fleet_model_for_job(
             project=context.project,
             run=context.run,
         )
 
     volume_attachment_result = None
+    # TODO: Volume attachment for compute groups is not yet supported since
+    # currently supported compute groups don't require explicit volume attachment.
     if isinstance(provision_new_capacity_result.provisioning_data, JobProvisioningData):
         volume_attachment_result = await _process_volume_attachments(
             item=item,
@@ -1265,6 +1268,9 @@ async def _create_instance_models_for_provisioned_jobs(
 ) -> list[InstanceModel]:
     provisioned_job_models = _get_job_models_for_jobs(context.run_model.jobs, provisioned_jobs)
     instance_models: list[InstanceModel] = []
+    # FIXME: Fleet is not locked here, which may lead to duplicate `instance_num`.
+    # This likely needs a separate reservation step so instance rows are created
+    # before provisioning and `instance_num` is allocated under fleet serialization.
     taken_instance_nums = await _get_taken_instance_nums(session, fleet_model)
     for provisioned_job_model, job_provisioning_data in zip(
         provisioned_job_models, job_provisioning_datas
@@ -1904,6 +1910,7 @@ def _get_effective_profile_and_requirements(
     except ValueError as e:
         logger.debug("%s: %s", fmt(job_model), e.args[0])
         return None
+    # TODO: Respect fleet provisioning properties such as tags.
     return effective_profile, requirements
 
 
