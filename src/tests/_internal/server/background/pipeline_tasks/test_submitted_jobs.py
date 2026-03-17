@@ -907,10 +907,132 @@ class TestJobSubmittedWorker:
             .execution_options(populate_existing=True)
         )
         job = res.unique().scalar_one()
+        await session.refresh(volume)
         assert job.status == JobStatus.PROVISIONING
         assert job.instance is not None
         assert len(job.instance.volume_attachments) == 1
         assert job.instance.volume_attachments[0].volume_id == volume.id
+        assert volume.lock_owner is None
+        assert volume.lock_token is None
+        assert volume.lock_expires_at is None
+        backend_mock.compute.return_value.attach_volume.assert_called_once()
+
+    async def test_terminates_job_when_volume_is_locked_for_processing(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        volume.lock_expires_at = get_current_datetime() + timedelta(minutes=1)
+        volume.lock_token = uuid.uuid4()
+        volume.lock_owner = "OtherPipeline"
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            busy_blocks=1,
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            instance_assigned=True,
+        )
+        await session.commit()
+
+        with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
+            backend_mock = Mock()
+            m.return_value = backend_mock
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        await session.refresh(volume)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.VOLUME_ERROR
+        assert job.termination_reason_message is not None
+        assert "locked for processing" in job.termination_reason_message
+        assert volume.lock_owner == "OtherPipeline"
+        assert volume.lock_token is not None
+        assert volume.lock_expires_at is not None
+        backend_mock.compute.return_value.attach_volume.assert_not_called()
+
+    async def test_reclaims_stale_related_volume_lock(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            busy_blocks=1,
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            instance_assigned=True,
+        )
+        volume.lock_expires_at = get_current_datetime() - timedelta(minutes=1)
+        volume.lock_token = uuid.uuid4()
+        volume.lock_owner = f"{JobSubmittedPipeline.__name__}:{job.id}"
+        await session.commit()
+
+        with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
+            backend_mock = Mock()
+            m.return_value = backend_mock
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value.attach_volume.return_value = VolumeAttachmentData()
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        await session.refresh(volume)
+        assert job.status == JobStatus.PROVISIONING
+        assert volume.lock_owner is None
+        assert volume.lock_token is None
+        assert volume.lock_expires_at is None
         backend_mock.compute.return_value.attach_volume.assert_called_once()
 
     async def test_provisions_new_capacity_with_autocreated_fleet(

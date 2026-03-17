@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Sequence, Union
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
@@ -302,7 +302,7 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
 
         if context.job_model.instance_assigned:
             logger.debug("%s: provisioning has started", fmt(context.job_model))
-            provisioning = await _process_provisioning(context=context)
+            provisioning = await _process_provisioning(item=item, context=context)
             await _apply_provisioning_result(
                 item=item,
                 provisioning=provisioning,
@@ -365,6 +365,7 @@ class _VolumeAttachmentPayload:
 @dataclass
 class _VolumeAttachmentResult:
     attachments: list[_VolumeAttachmentPayload]
+    locked_volume_ids: list[uuid.UUID]
     termination_message: Optional[str] = None
 
 
@@ -889,13 +890,17 @@ def _prepare_job_runtime_data(
     )
 
 
-async def _process_provisioning(context: _SubmittedJobContext) -> _ProvisioningResult:
+async def _process_provisioning(
+    item: JobSubmittedPipelineItem,
+    context: _SubmittedJobContext,
+) -> _ProvisioningResult:
     preconditions = await _process_preconditions(context=context)
     if not isinstance(preconditions, _ProcessedPreconditions):
         return preconditions
 
     if context.job_model.instance is not None:
         return await _process_existing_instance_provisioning(
+            item=item,
             context=context,
             prepared_job_volumes=preconditions.prepared_job_volumes,
         )
@@ -908,6 +913,7 @@ async def _process_provisioning(context: _SubmittedJobContext) -> _ProvisioningR
         )
 
     return await _process_new_capacity_provisioning(
+        item=item,
         context=context,
         preconditions=preconditions,
     )
@@ -923,6 +929,12 @@ async def _apply_provisioning_result(
             # FIXME: Placement-group creation, provisioning, and volume attachment all run
             # before guarded apply, so a stale lock token here means provider-side
             # side effects may already have happened.
+            await _unlock_related_volumes(
+                session=session,
+                item=item,
+                volume_ids=_get_locked_volume_ids_from_provisioning(provisioning),
+            )
+            await session.commit()
             log_lock_token_changed_after_processing(logger, item)
             return
 
@@ -946,6 +958,7 @@ async def _apply_provisioning_result(
         if isinstance(provisioning, _ExistingInstanceProvisioning):
             await _apply_existing_instance_provisioning(
                 session=session,
+                item=item,
                 job_model=job_model,
                 provisioning=provisioning,
             )
@@ -953,17 +966,20 @@ async def _apply_provisioning_result(
 
         await _apply_new_capacity_provisioning(
             session=session,
+            item=item,
             job_model=job_model,
             provisioning=provisioning,
         )
 
 
 async def _process_existing_instance_provisioning(
+    item: JobSubmittedPipelineItem,
     context: _SubmittedJobContext,
     prepared_job_volumes: _PreparedJobVolumes,
 ) -> _ExistingInstanceProvisioning:
     instance_model = get_or_error(context.job_model.instance)
     volume_attachment_result = await _process_volume_attachments(
+        item=item,
         project=context.project,
         job_model=context.job_model,
         prepared_job_volumes=prepared_job_volumes,
@@ -976,6 +992,7 @@ async def _process_existing_instance_provisioning(
 
 async def _apply_existing_instance_provisioning(
     session: AsyncSession,
+    item: JobSubmittedPipelineItem,
     job_model: JobModel,
     provisioning: _ExistingInstanceProvisioning,
 ) -> None:
@@ -1002,10 +1019,16 @@ async def _apply_existing_instance_provisioning(
         ),
         jobs_to_provision=context.jobs_to_provision,
     )
+    await _unlock_related_volumes(
+        session=session,
+        item=item,
+        volume_ids=provisioning.volume_attachment_result.locked_volume_ids,
+    )
     await _mark_job_processed(session=session, job_model=context.job_model)
 
 
 async def _process_new_capacity_provisioning(
+    item: JobSubmittedPipelineItem,
     context: _SubmittedJobContext,
     preconditions: _ProcessedPreconditions,
 ) -> _ProvisioningResult:
@@ -1043,6 +1066,7 @@ async def _process_new_capacity_provisioning(
     volume_attachment_result = None
     if isinstance(provision_new_capacity_result.provisioning_data, JobProvisioningData):
         volume_attachment_result = await _process_volume_attachments(
+            item=item,
             project=context.project,
             job_model=context.job_model,
             prepared_job_volumes=preconditions.prepared_job_volumes,
@@ -1061,6 +1085,7 @@ async def _process_new_capacity_provisioning(
 
 async def _apply_new_capacity_provisioning(
     session: AsyncSession,
+    item: JobSubmittedPipelineItem,
     job_model: JobModel,
     provisioning: _NewCapacityProvisioning,
 ) -> None:
@@ -1110,6 +1135,13 @@ async def _apply_new_capacity_provisioning(
             job_model_ids=fresh_context.replica_job_model_ids,
         ),
         jobs_to_provision=fresh_context.jobs_to_provision,
+    )
+    await _unlock_related_volumes(
+        session=session,
+        item=item,
+        volume_ids=_get_locked_volume_ids_from_volume_attachment_result(
+            provisioning.volume_attachment_result
+        ),
     )
     await _mark_job_processed(session=session, job_model=fresh_context.job_model)
 
@@ -1277,17 +1309,15 @@ def _create_instance_model_for_job(
 
 
 async def _process_volume_attachments(
+    item: JobSubmittedPipelineItem,
     project: ProjectModel,
     job_model: JobModel,
     prepared_job_volumes: _PreparedJobVolumes,
     job_provisioning_data: JobProvisioningData,
 ) -> _VolumeAttachmentResult:
     if len(prepared_job_volumes.volume_model_ids) == 0:
-        return _VolumeAttachmentResult(attachments=[])
+        return _VolumeAttachmentResult(attachments=[], locked_volume_ids=[])
 
-    volume_models = await _load_volume_models(
-        volume_model_ids=prepared_job_volumes.volume_model_ids
-    )
     backend = await get_project_backend_by_type_or_error(
         project=project,
         backend_type=job_provisioning_data.backend,
@@ -1295,7 +1325,25 @@ async def _process_volume_attachments(
     compute = backend.compute()
     assert isinstance(compute, ComputeWithVolumeSupport)
 
+    volume_models = await _lock_related_volume_models(
+        item=item, volume_model_ids=prepared_job_volumes.volume_model_ids
+    )
+    if volume_models is None:
+        return _VolumeAttachmentResult(
+            attachments=[],
+            locked_volume_ids=[],
+            termination_message="Failed to attach volume: Cannot attach a volume locked for processing",
+        )
+
+    locked_volume_ids = sorted(
+        {
+            volume_model.id
+            for mount_point_volume_models in volume_models
+            for volume_model in mount_point_volume_models
+        }
+    )
     attachments: list[_VolumeAttachmentPayload] = []
+    related_volume_lock_owner = _get_related_volume_lock_owner(item.id)
     for mount_point_volume_models in volume_models:
         for volume_model in mount_point_volume_models:
             volume = volume_model_to_volume(volume_model)
@@ -1304,7 +1352,10 @@ async def _process_volume_attachments(
                     raise ServerClientError("Cannot attach a deleted volume")
                 if volume_model.to_be_deleted:
                     raise ServerClientError("Cannot attach a volume marked for deletion")
-                if volume_model.lock_expires_at is not None:
+                if (
+                    volume_model.lock_expires_at is not None
+                    and volume_model.lock_owner != related_volume_lock_owner
+                ):
                     raise ServerClientError("Cannot attach a volume locked for processing")
                 if (
                     job_provisioning_data.get_base_backend() != volume.configuration.backend
@@ -1330,47 +1381,134 @@ async def _process_volume_attachments(
                 logger.info("%s: failed to attach volume: %s", fmt(job_model), repr(e))
                 return _VolumeAttachmentResult(
                     attachments=attachments,
+                    locked_volume_ids=locked_volume_ids,
                     termination_message=f"Failed to attach volume: {e.msg}",
                 )
             except BackendError as e:
                 logger.warning("%s: failed to attach volume: %s", fmt(job_model), repr(e))
                 return _VolumeAttachmentResult(
                     attachments=attachments,
+                    locked_volume_ids=locked_volume_ids,
                     termination_message=f"Failed to attach volume: {str(e)}",
                 )
             except Exception:
                 logger.exception("%s: got exception when attaching volume", fmt(job_model))
                 return _VolumeAttachmentResult(
                     attachments=attachments,
+                    locked_volume_ids=locked_volume_ids,
                     termination_message="Failed to attach volume: unexpected error",
                 )
-    return _VolumeAttachmentResult(attachments=attachments)
-
-
-async def _load_volume_models(
-    volume_model_ids: list[list[uuid.UUID]],
-) -> list[list[VolumeModel]]:
-    volume_ids = sorted(
-        volume_id
-        for mount_point_volume_ids in volume_model_ids
-        for volume_id in mount_point_volume_ids
+    return _VolumeAttachmentResult(
+        attachments=attachments,
+        locked_volume_ids=locked_volume_ids,
     )
-    async with get_session_ctx() as session:
-        res = await session.execute(
-            select(VolumeModel)
-            .where(VolumeModel.id.in_(volume_ids))
-            .options(joinedload(VolumeModel.project))
-            .options(joinedload(VolumeModel.user).load_only(UserModel.name))
-            .options(
-                joinedload(VolumeModel.attachments).joinedload(VolumeAttachmentModel.instance)
+
+
+async def _lock_related_volume_models(
+    item: JobSubmittedPipelineItem,
+    volume_model_ids: list[list[uuid.UUID]],
+) -> Optional[list[list[VolumeModel]]]:
+    now = get_current_datetime()
+    volume_ids = sorted(
+        {
+            volume_id
+            for mount_point_volume_ids in volume_model_ids
+            for volume_id in mount_point_volume_ids
+        }
+    )
+    if not volume_ids:
+        return []
+
+    related_volume_lock_owner = _get_related_volume_lock_owner(item.id)
+    volume_lock, _ = get_locker(get_db().dialect_name).get_lockset(VolumeModel.__tablename__)
+    async with volume_lock:
+        async with get_session_ctx() as session:
+            # Persist related volume locks before attach because the attach call itself
+            # must run outside a DB transaction in the processing phase.
+            res = await session.execute(
+                select(VolumeModel)
+                .where(
+                    VolumeModel.id.in_(volume_ids),
+                    or_(
+                        VolumeModel.lock_expires_at.is_(None),
+                        and_(
+                            VolumeModel.lock_owner == related_volume_lock_owner,
+                            VolumeModel.lock_expires_at < now,
+                        ),
+                    ),
+                )
+                .options(joinedload(VolumeModel.project))
+                .options(joinedload(VolumeModel.user).load_only(UserModel.name))
+                .options(
+                    joinedload(VolumeModel.attachments).joinedload(VolumeAttachmentModel.instance)
+                )
+                .with_for_update(skip_locked=True, key_share=True, of=VolumeModel)
             )
-        )
-        loaded_volume_models = list(res.unique().scalars().all())
-    volume_models_by_id = {volume_model.id: volume_model for volume_model in loaded_volume_models}
+            locked_volume_models = list(res.unique().scalars().all())
+            if len(locked_volume_models) != len(volume_ids):
+                return None
+
+            for volume_model in locked_volume_models:
+                volume_model.lock_expires_at = item.lock_expires_at
+                volume_model.lock_token = item.lock_token
+                volume_model.lock_owner = related_volume_lock_owner
+
+            await session.commit()
+
+    volume_models_by_id = {volume_model.id: volume_model for volume_model in locked_volume_models}
     return [
         [volume_models_by_id[volume_id] for volume_id in mount_point_volume_ids]
         for mount_point_volume_ids in volume_model_ids
     ]
+
+
+async def _unlock_related_volumes(
+    session: AsyncSession,
+    item: JobSubmittedPipelineItem,
+    volume_ids: list[uuid.UUID],
+) -> None:
+    if not volume_ids:
+        return
+
+    await session.execute(
+        update(VolumeModel)
+        .where(
+            VolumeModel.id.in_(volume_ids),
+            VolumeModel.lock_owner == _get_related_volume_lock_owner(item.id),
+            VolumeModel.lock_token == item.lock_token,
+        )
+        .values(
+            lock_expires_at=None,
+            lock_token=None,
+            lock_owner=None,
+        )
+    )
+
+
+def _get_locked_volume_ids_from_provisioning(
+    provisioning: _ProvisioningResult,
+) -> list[uuid.UUID]:
+    if isinstance(provisioning, _ExistingInstanceProvisioning):
+        return provisioning.volume_attachment_result.locked_volume_ids
+
+    if isinstance(provisioning, _NewCapacityProvisioning):
+        return _get_locked_volume_ids_from_volume_attachment_result(
+            provisioning.volume_attachment_result
+        )
+
+    return []
+
+
+def _get_locked_volume_ids_from_volume_attachment_result(
+    volume_attachment_result: Optional[_VolumeAttachmentResult],
+) -> list[uuid.UUID]:
+    if volume_attachment_result is None:
+        return []
+    return volume_attachment_result.locked_volume_ids
+
+
+def _get_related_volume_lock_owner(job_id: uuid.UUID) -> str:
+    return f"{JobSubmittedPipeline.__name__}:{job_id}"
 
 
 async def _apply_volume_attachment_result(
