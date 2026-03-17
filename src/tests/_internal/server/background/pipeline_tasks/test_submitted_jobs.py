@@ -1,13 +1,14 @@
 import asyncio
 import uuid
 from datetime import timedelta
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import Profile
@@ -20,8 +21,9 @@ from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
     JobSubmittedPipelineItem,
     JobSubmittedWorker,
 )
-from dstack._internal.server.models import JobModel
+from dstack._internal.server.models import ComputeGroupModel, JobModel
 from dstack._internal.server.testing.common import (
+    ComputeMockSpec,
     create_export,
     create_fleet,
     create_instance,
@@ -31,7 +33,9 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     create_volume,
+    get_compute_group_provisioning_data,
     get_fleet_spec,
+    get_instance_offer_with_availability,
     get_job_provisioning_data,
     get_run_spec,
     get_ssh_fleet_configuration,
@@ -312,25 +316,105 @@ class TestJobSubmittedFetcher:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestJobSubmittedWorker:
-    async def test_unlocks_assigned_job_stub(
+    async def test_provisions_assigned_job_on_existing_instance(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
         run = await create_run(session=session, project=project, repo=repo, user=user)
-        job = await create_job(session=session, run=run, instance_assigned=True)
-        last_processed_at = job.last_processed_at
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+            busy_blocks=1,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            instance_assigned=True,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+        )
+        previous_last_processed_at = job.last_processed_at
 
         await _process_job(session=session, worker=worker, job_model=job)
 
-        await session.refresh(job)
-        assert job.status == JobStatus.SUBMITTED
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.PROVISIONING
         assert job.instance_assigned
-        assert job.last_processed_at == last_processed_at
+        assert job.instance is not None and job.instance.id == instance.id
+        assert job.last_processed_at > previous_last_processed_at
         assert job.lock_owner is None
         assert job.lock_token is None
         assert job.lock_expires_at is None
+
+    async def test_provisions_new_capacity_for_assigned_job(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+        )
+        job = await create_job(session=session, run=run, instance_assigned=True)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
+                dockerized=True,
+                backend=BackendType.AWS,
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.PROVISIONING
+        assert job.instance is not None
+        assert job.instance.fleet_id == fleet.id
+        assert job.lock_owner is None
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+
+    async def test_processes_assignment_and_provisioning_in_separate_passes(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+        )
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == instance.id
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.PROVISIONING
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == instance.id
 
     async def test_ignores_lock_token_mismatch(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
@@ -478,6 +562,62 @@ class TestJobSubmittedWorker:
         assert job.instance_assigned
         assert job.instance is not None and job.instance.id == instance_2.id
         assert job.fleet_id == fleet_2.id
+
+    async def test_provisions_compute_group(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration = TaskConfiguration(nodes=2, commands=["echo"])
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        job1 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+            job_num=0,
+            waiting_master_job=False,
+        )
+        job2 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+            job_num=1,
+            waiting_master_job=True,
+        )
+
+        offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.run_jobs.return_value = get_compute_group_provisioning_data(
+                job_provisioning_datas=[
+                    get_job_provisioning_data(dockerized=True, backend=BackendType.RUNPOD),
+                    get_job_provisioning_data(dockerized=True, backend=BackendType.RUNPOD),
+                ]
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job1)
+
+        await session.refresh(job1)
+        await session.refresh(job2)
+        assert job1.status == JobStatus.PROVISIONING
+        assert job2.status == JobStatus.PROVISIONING
+        res = await session.execute(select(ComputeGroupModel))
+        assert res.scalar_one_or_none() is not None
 
     async def test_defers_job_while_waiting_for_master_provisioning(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
