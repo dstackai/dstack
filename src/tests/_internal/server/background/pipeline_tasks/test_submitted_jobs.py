@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
@@ -40,6 +41,7 @@ from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
     create_job,
+    create_placement_group,
     create_project,
     create_repo,
     create_run,
@@ -125,6 +127,18 @@ async def _get_job(session: AsyncSession, job_id) -> JobModel:
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one()
+
+
+async def _get_placement_groups(
+    session: AsyncSession,
+    fleet_id: uuid.UUID,
+) -> list[PlacementGroupModel]:
+    res = await session.execute(
+        select(PlacementGroupModel)
+        .where(PlacementGroupModel.fleet_id == fleet_id)
+        .execution_options(populate_existing=True)
+    )
+    return list(res.scalars().all())
 
 
 @pytest.mark.asyncio
@@ -503,6 +517,130 @@ class TestJobSubmittedWorker:
         assert isinstance(compute_mock.run_job.call_args[0][6], PlacementGroup)
         placement_group = (await session.execute(select(PlacementGroupModel))).scalar()
         assert placement_group is not None
+
+    async def test_marks_unused_existing_placement_groups_for_cleanup(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        selected_pg = await create_placement_group(
+            session=session,
+            project=project,
+            fleet=fleet,
+            name="selected-pg",
+        )
+        await create_placement_group(
+            session=session,
+            project=project,
+            fleet=fleet,
+            name="stale-pg",
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_name="test-run",
+            run_spec=get_run_spec(run_name="test-run", repo_id=repo.name),
+        )
+        job = await create_job(session=session, run=run, instance_assigned=True)
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.is_suitable_placement_group.side_effect = (
+                lambda placement_group, _: placement_group.name == selected_pg.name
+            )
+            compute_mock.run_job.return_value = get_job_provisioning_data(
+                backend=BackendType.AWS,
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.PROVISIONING
+        placement_groups = await _get_placement_groups(session=session, fleet_id=fleet.id)
+        assert {placement_group.name for placement_group in placement_groups} == {
+            "selected-pg",
+            "stale-pg",
+        }
+        placement_groups_by_name = {
+            placement_group.name: placement_group for placement_group in placement_groups
+        }
+        assert not placement_groups_by_name["selected-pg"].fleet_deleted
+        assert placement_groups_by_name["stale-pg"].fleet_deleted
+        compute_mock.create_placement_group.assert_not_called()
+
+    async def test_marks_new_and_existing_placement_groups_for_cleanup_on_failed_provisioning(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        await create_placement_group(
+            session=session,
+            project=project,
+            fleet=fleet,
+            name="existing-pg",
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_name="test-run",
+            run_spec=get_run_spec(run_name="test-run", repo_id=repo.name),
+        )
+        job = await create_job(session=session, run=run, instance_assigned=True)
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.is_suitable_placement_group.return_value = False
+            compute_mock.create_placement_group.return_value = (
+                get_placement_group_provisioning_data()
+            )
+            compute_mock.run_job.side_effect = BackendError("boom")
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        placement_groups = await _get_placement_groups(session=session, fleet_id=fleet.id)
+        assert len(placement_groups) == 2
+        placement_groups_by_name = {
+            placement_group.name: placement_group for placement_group in placement_groups
+        }
+        assert placement_groups_by_name["existing-pg"].fleet_deleted
+        new_placement_groups = [
+            placement_group
+            for placement_group in placement_groups
+            if placement_group.name != "existing-pg"
+        ]
+        assert len(new_placement_groups) == 1
+        assert new_placement_groups[0].fleet_deleted
+        compute_mock.create_placement_group.assert_called_once()
 
     async def test_resets_lock_for_retry_when_cluster_master_fleet_lock_is_unavailable(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker

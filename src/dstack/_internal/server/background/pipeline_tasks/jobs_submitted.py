@@ -118,9 +118,9 @@ from dstack._internal.server.services.offers import (
 )
 from dstack._internal.server.services.placement import (
     find_or_create_suitable_placement_group,
-    get_fleet_placement_group_models,
     get_placement_group_model_for_job,
     placement_group_model_to_placement_group_optional,
+    schedule_fleet_placement_groups_deletion,
 )
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.services.runs.plan import (
@@ -358,10 +358,18 @@ class _RetrySubmittedJobResult:
 
 
 @dataclass
+class _PlacementGroupCleanup:
+    fleet_id: uuid.UUID
+    selected_placement_group_id: Optional[uuid.UUID]
+    new_placement_group_models: list[PlacementGroupModel]
+
+
+@dataclass
 class _TerminateSubmittedJobResult:
     reason: JobTerminationReason
     message: Optional[str] = None
     locked_fleet_id: Optional[uuid.UUID] = None
+    placement_group_cleanup: Optional[_PlacementGroupCleanup] = None
 
 
 @dataclass
@@ -410,11 +418,16 @@ class _ExistingInstanceProvisioning:
 
 
 @dataclass
+class _FailedNewCapacityProvisioning:
+    placement_group_cleanup: Optional[_PlacementGroupCleanup]
+
+
+@dataclass
 class _ProvisionNewCapacityResult:
     provisioning_data: Union[JobProvisioningData, ComputeGroupProvisioningData]
     offer: InstanceOfferWithAvailability
     effective_profile: Profile
-    new_placement_group_models: list[PlacementGroupModel]
+    placement_group_cleanup: Optional[_PlacementGroupCleanup]
 
 
 @dataclass
@@ -423,7 +436,7 @@ class _NewCapacityProvisioning:
     offer: InstanceOfferWithAvailability
     effective_profile: Profile
     created_fleet_model: Optional[FleetModel]
-    new_placement_group_models: list[PlacementGroupModel]
+    placement_group_cleanup: Optional[_PlacementGroupCleanup]
     volume_attachment_result: Optional[_VolumeAttachmentResult]
     locked_fleet_id: Optional[uuid.UUID]
 
@@ -966,6 +979,17 @@ async def _apply_provisioning_result(
             return
 
         if isinstance(provisioning, _TerminateSubmittedJobResult):
+            if provisioning.placement_group_cleanup is not None:
+                cleanup_fleet_model = await _load_placement_group_cleanup_fleet(
+                    session=session,
+                    fleet_id=provisioning.placement_group_cleanup.fleet_id,
+                )
+                await _persist_placement_group_cleanup(
+                    session=session,
+                    fleet_model=cleanup_fleet_model,
+                    project=cleanup_fleet_model.project,
+                    placement_group_cleanup=provisioning.placement_group_cleanup,
+                )
             await _unlock_related_fleet(
                 session=session,
                 item=item,
@@ -1087,11 +1111,12 @@ async def _process_new_capacity_provisioning(
         master_job_provisioning_data=master_provisioning_data,
         volumes=preconditions.prepared_job_volumes.volumes,
     )
-    if provision_new_capacity_result is None:
+    if isinstance(provision_new_capacity_result, _FailedNewCapacityProvisioning):
         logger.debug("%s: provisioning failed", fmt(context.job_model))
         return _TerminateSubmittedJobResult(
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
             locked_fleet_id=locked_fleet_id,
+            placement_group_cleanup=provision_new_capacity_result.placement_group_cleanup,
         )
 
     created_fleet_model = None
@@ -1119,7 +1144,7 @@ async def _process_new_capacity_provisioning(
         offer=provision_new_capacity_result.offer,
         effective_profile=provision_new_capacity_result.effective_profile,
         created_fleet_model=created_fleet_model,
-        new_placement_group_models=provision_new_capacity_result.new_placement_group_models,
+        placement_group_cleanup=provision_new_capacity_result.placement_group_cleanup,
         volume_attachment_result=volume_attachment_result,
         locked_fleet_id=locked_fleet_id,
     )
@@ -1151,10 +1176,12 @@ async def _apply_new_capacity_provisioning(
         )
 
     assert fleet_model is not None
-    for placement_group_model in provisioning.new_placement_group_models:
-        placement_group_model.project = fresh_context.project
-        placement_group_model.fleet = fleet_model
-        session.add(placement_group_model)
+    await _persist_placement_group_cleanup(
+        session=session,
+        fleet_model=fleet_model,
+        project=fresh_context.project,
+        placement_group_cleanup=provisioning.placement_group_cleanup,
+    )
 
     instance_models, _ = await _materialize_newly_provisioned_capacity(
         session=session,
@@ -1737,7 +1764,7 @@ async def _provision_new_capacity(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[list[list[Volume]]] = None,
     fleet_model: Optional[FleetModel] = None,
-) -> Optional[_ProvisionNewCapacityResult]:
+) -> Union[_FailedNewCapacityProvisioning, _ProvisionNewCapacityResult]:
     job = jobs[0]
     if volumes is None:
         volumes = []
@@ -1748,13 +1775,16 @@ async def _provision_new_capacity(
         fleet_model=fleet_model,
     )
     if effective_profile_and_requirements is None:
-        return None
+        return _FailedNewCapacityProvisioning(placement_group_cleanup=None)
     profile, requirements = effective_profile_and_requirements
 
     placement_group_models = await _load_fleet_placement_group_models(
         fleet_id=fleet_model.id if fleet_model else None,
     )
     new_placement_group_models: list[PlacementGroupModel] = []
+    known_placement_group_ids = {
+        placement_group_model.id for placement_group_model in placement_group_models
+    }
     placement_group_model = get_placement_group_model_for_job(
         placement_group_models=placement_group_models,
         fleet_model=fleet_model,
@@ -1772,6 +1802,7 @@ async def _provision_new_capacity(
         instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
         placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
     )
+    offers_tried = 0
     for backend, offer in offers[: settings.MAX_OFFERS_TRIED]:
         logger.debug(
             "%s: trying %s in %s/%s for $%0.4f per hour",
@@ -1810,9 +1841,11 @@ async def _provision_new_capacity(
             )
             if placement_group_model is None:
                 continue
-            if placement_group_model.id not in {pg.id for pg in placement_group_models}:
+            if placement_group_model.id not in known_placement_group_ids:
                 new_placement_group_models.append(placement_group_model)
                 placement_group_models.append(placement_group_model)
+                known_placement_group_ids.add(placement_group_model.id)
+        offers_tried += 1
         try:
             if len(jobs) > 1 and offer.backend in BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT:
                 assert isinstance(compute, ComputeWithGroupProvisioningSupport)
@@ -1829,7 +1862,14 @@ async def _provision_new_capacity(
                     provisioning_data=compute_group_provisioning_data,
                     offer=offer,
                     effective_profile=profile,
-                    new_placement_group_models=new_placement_group_models,
+                    placement_group_cleanup=_build_placement_group_cleanup(
+                        fleet_model=fleet_model,
+                        offers_tried=offers_tried,
+                        selected_placement_group_id=(
+                            None if placement_group_model is None else placement_group_model.id
+                        ),
+                        new_placement_group_models=new_placement_group_models,
+                    ),
                 )
             job_provisioning_data = await run_async(
                 compute.run_job,
@@ -1845,7 +1885,14 @@ async def _provision_new_capacity(
                 provisioning_data=job_provisioning_data,
                 offer=offer,
                 effective_profile=profile,
-                new_placement_group_models=new_placement_group_models,
+                placement_group_cleanup=_build_placement_group_cleanup(
+                    fleet_model=fleet_model,
+                    offers_tried=offers_tried,
+                    selected_placement_group_id=(
+                        None if placement_group_model is None else placement_group_model.id
+                    ),
+                    new_placement_group_models=new_placement_group_models,
+                ),
             )
         except BackendError as e:
             logger.warning(
@@ -1866,25 +1913,94 @@ async def _provision_new_capacity(
                 offer.region,
             )
             continue
-        finally:
-            if fleet_model is not None and len(fleet_model.instances) == 0:
-                for placement_group in placement_group_models:
-                    if (
-                        placement_group_model is None
-                        or placement_group.id != placement_group_model.id
-                    ):
-                        placement_group.fleet_deleted = True
-    return None
+    return _FailedNewCapacityProvisioning(
+        placement_group_cleanup=_build_placement_group_cleanup(
+            fleet_model=fleet_model,
+            offers_tried=offers_tried,
+            selected_placement_group_id=None,
+            new_placement_group_models=new_placement_group_models,
+        )
+    )
 
 
 async def _load_fleet_placement_group_models(
     fleet_id: Optional[uuid.UUID],
 ) -> list["PlacementGroupModel"]:
+    if fleet_id is None:
+        return []
+
     async with get_session_ctx() as session:
-        return await get_fleet_placement_group_models(
-            session=session,
-            fleet_id=fleet_id,
+        res = await session.execute(
+            select(PlacementGroupModel)
+            .where(
+                and_(
+                    PlacementGroupModel.fleet_id == fleet_id,
+                    PlacementGroupModel.deleted == False,
+                    PlacementGroupModel.fleet_deleted == False,
+                )
+            )
+            .options(
+                joinedload(PlacementGroupModel.project).load_only(
+                    ProjectModel.id,
+                    ProjectModel.name,
+                )
+            )
         )
+        return list(res.scalars().all())
+
+
+def _build_placement_group_cleanup(
+    fleet_model: Optional[FleetModel],
+    offers_tried: int,
+    selected_placement_group_id: Optional[uuid.UUID],
+    new_placement_group_models: list[PlacementGroupModel],
+) -> Optional[_PlacementGroupCleanup]:
+    if fleet_model is None or len(fleet_model.instances) != 0 or offers_tried == 0:
+        return None
+    return _PlacementGroupCleanup(
+        fleet_id=fleet_model.id,
+        selected_placement_group_id=selected_placement_group_id,
+        new_placement_group_models=new_placement_group_models,
+    )
+
+
+async def _load_placement_group_cleanup_fleet(
+    session: AsyncSession,
+    fleet_id: uuid.UUID,
+) -> FleetModel:
+    res = await session.execute(
+        select(FleetModel)
+        .where(FleetModel.id == fleet_id)
+        .options(joinedload(FleetModel.project).load_only(ProjectModel.id, ProjectModel.name))
+    )
+    return res.unique().scalar_one()
+
+
+async def _persist_placement_group_cleanup(
+    session: AsyncSession,
+    fleet_model: FleetModel,
+    project: ProjectModel,
+    placement_group_cleanup: Optional[_PlacementGroupCleanup],
+) -> None:
+    if placement_group_cleanup is None:
+        return
+
+    assert fleet_model.id == placement_group_cleanup.fleet_id
+    except_placement_group_ids = ()
+    if placement_group_cleanup.selected_placement_group_id is not None:
+        except_placement_group_ids = (placement_group_cleanup.selected_placement_group_id,)
+    await schedule_fleet_placement_groups_deletion(
+        session=session,
+        fleet_id=placement_group_cleanup.fleet_id,
+        except_placement_group_ids=except_placement_group_ids,
+    )
+    for placement_group_model in placement_group_cleanup.new_placement_group_models:
+        placement_group_model.project = project
+        placement_group_model.fleet = fleet_model
+        placement_group_model.fleet_deleted = (
+            placement_group_model.id != placement_group_cleanup.selected_placement_group_id
+        )
+        session.add(placement_group_model)
 
 
 def _get_effective_profile_and_requirements(

@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Iterable
 from typing import Optional
 from uuid import UUID
@@ -174,6 +175,7 @@ async def create_placement_group(
     compute: ComputeWithPlacementGroupSupport,
 ) -> Optional[PlacementGroupModel]:
     placement_group_model = PlacementGroupModel(
+        id=uuid.uuid4(),
         # TODO: generate the name in Compute.create_placement_group to allow
         # backend-specific name length limits
         name=generate_unique_placement_group_name(
