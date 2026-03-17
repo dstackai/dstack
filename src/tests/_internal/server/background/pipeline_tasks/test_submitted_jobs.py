@@ -14,14 +14,23 @@ from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.core.models.volumes import VolumeMountPoint, VolumeStatus
+from dstack._internal.core.models.volumes import (
+    VolumeAttachmentData,
+    VolumeMountPoint,
+    VolumeStatus,
+)
 from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
     JobSubmittedFetcher,
     JobSubmittedPipeline,
     JobSubmittedPipelineItem,
     JobSubmittedWorker,
 )
-from dstack._internal.server.models import ComputeGroupModel, JobModel
+from dstack._internal.server.models import (
+    ComputeGroupModel,
+    InstanceModel,
+    JobModel,
+    VolumeAttachmentModel,
+)
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_export,
@@ -144,6 +153,8 @@ class TestJobSubmittedFetcher:
             instance_assigned=True,
             job_num=1,
         )
+        # submitted_at == last_processed_at bypasses the min_processing_interval filter
+        # so freshly submitted jobs are picked up immediately
         fresh_job = await create_job(
             session=session,
             run=run,
@@ -831,8 +842,117 @@ class TestJobSubmittedWorker:
         assert job.instance_id is None
         assert job.used_instance_id is None
         assert job.last_processed_at > previous_last_processed_at
+        # lock_owner is intentionally preserved so the fetcher can distinguish
+        # an in-progress lock from a reset that came from this pipeline
         assert job.lock_owner == JobSubmittedPipeline.__name__
         assert job.lock_token is None
         assert job.lock_expires_at is None
         assert instance.status == InstanceStatus.IDLE
         assert instance.busy_blocks == 0
+
+    async def test_attaches_volume_on_existing_instance(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        volume = await create_volume(
+            session=session,
+            project=project,
+            user=user,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            busy_blocks=1,
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        run_spec = get_run_spec(repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance=instance,
+            instance_assigned=True,
+        )
+
+        with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
+            backend_mock = Mock()
+            m.return_value = backend_mock
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value.attach_volume.return_value = VolumeAttachmentData()
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        res = await session.execute(
+            select(JobModel)
+            .where(JobModel.id == job.id)
+            .options(
+                joinedload(JobModel.instance)
+                .joinedload(InstanceModel.volume_attachments)
+                .joinedload(VolumeAttachmentModel.volume)
+            )
+            .execution_options(populate_existing=True)
+        )
+        job = res.unique().scalar_one()
+        assert job.status == JobStatus.PROVISIONING
+        assert job.instance is not None
+        assert len(job.instance.volume_attachments) == 1
+        assert job.instance.volume_attachments[0].volume_id == volume.id
+        backend_mock.compute.return_value.attach_volume.assert_called_once()
+
+    async def test_provisions_new_capacity_with_autocreated_fleet(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(FeatureFlags, "AUTOCREATED_FLEETS_ENABLED", True)
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
+
+        # First pass: no fleet found, mark instance_assigned=True with no fleet
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.fleet_id is None
+
+        # Second pass: provision new capacity and autocreate fleet
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
+                dockerized=True,
+                backend=BackendType.AWS,
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.PROVISIONING
+        assert job.instance is not None
+        assert job.fleet_id is not None
+        assert job.lock_owner is None
+        assert job.lock_token is None
+        assert job.lock_expires_at is None

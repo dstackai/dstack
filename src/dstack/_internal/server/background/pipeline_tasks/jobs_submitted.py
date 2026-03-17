@@ -608,18 +608,12 @@ async def _load_submitted_job_context(
         job=job,
         jobs_to_provision=_select_jobs_to_provision(job, replica_jobs, job_model),
         replica_jobs=replica_jobs,
-        replica_job_model_ids=_get_job_model_ids_for_jobs(run_model.jobs, replica_jobs),
+        replica_job_model_ids=[
+            jm.id for jm in _get_job_models_for_jobs(run_model.jobs, replica_jobs)
+        ],
         fleet_model=run_model.fleet or job_model.fleet,
         multinode=job.job_spec.jobs_per_replica > 1,
     )
-
-
-def _get_job_model_ids_for_jobs(
-    job_models: list[JobModel],
-    jobs: list[Job],
-) -> list[uuid.UUID]:
-    id_to_job_model_map = {job_model.id: job_model for job_model in job_models}
-    return [id_to_job_model_map[job.job_submissions[-1].id].id for job in jobs]
 
 
 def _get_job_models_for_jobs(
@@ -1074,6 +1068,9 @@ async def _apply_new_capacity_provisioning(
     fleet_model = fresh_context.fleet_model
     if provisioning.created_fleet_model is not None:
         fleet_model = provisioning.created_fleet_model
+        # Replace the project loaded in the processing session with the one
+        # bound to this apply session to avoid a duplicate-identity conflict.
+        fleet_model.project = fresh_context.project
         session.add(fleet_model)
         fresh_context.job_model.fleet = fleet_model
         events.emit(
