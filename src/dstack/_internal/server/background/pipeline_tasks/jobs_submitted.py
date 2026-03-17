@@ -346,7 +346,16 @@ class _ProcessedPreconditions:
 
 @dataclass
 class _DeferSubmittedJobResult:
+    """The job is not ready yet, so apply should just mark it processed and unlock it."""
+
     log_message: str
+
+
+@dataclass
+class _RetrySubmittedJobResult:
+    """Transient contention outcome that resets the main job lock for a quick retry later without clearing lock_owner."""
+
+    pass
 
 
 @dataclass
@@ -354,11 +363,6 @@ class _TerminateSubmittedJobResult:
     reason: JobTerminationReason
     message: Optional[str] = None
     locked_fleet_id: Optional[uuid.UUID] = None
-
-
-@dataclass
-class _RetrySubmittedJobResult:
-    pass
 
 
 @dataclass
@@ -2009,6 +2013,8 @@ async def _reset_job_lock_for_retry(
             JobModel.id == item.id,
             JobModel.lock_token == item.lock_token,
         )
+        # Keep `lock_owner` so retry paths preserve submitted-jobs ownership intent
+        # while dropping only the stale token/expiry fields.
         .values(
             lock_expires_at=None,
             lock_token=None,
