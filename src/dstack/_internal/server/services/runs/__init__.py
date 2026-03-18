@@ -62,6 +62,7 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.probes import is_probe_ready
 from dstack._internal.server.services.projects import list_user_project_models
@@ -382,6 +383,7 @@ async def apply_plan(
     project: ProjectModel,
     plan: ApplyRunPlanInput,
     force: bool,
+    pipeline_hinter: Optional[PipelineHinterProtocol] = None,
     legacy_repo_dir: bool = False,
 ) -> Run:
     run_spec = plan.run_spec
@@ -401,6 +403,7 @@ async def apply_plan(
             user=user,
             project=project,
             run_spec=run_spec,
+            pipeline_hinter=pipeline_hinter,
         )
     current_resource_model = await get_run_model_by_name(
         session=session,
@@ -413,6 +416,7 @@ async def apply_plan(
             user=user,
             project=project,
             run_spec=run_spec,
+            pipeline_hinter=pipeline_hinter,
         )
     current_resource = run_model_to_run(current_resource_model, return_in_api=True)
 
@@ -471,6 +475,7 @@ async def submit_run(
     user: UserModel,
     project: ProjectModel,
     run_spec: RunSpec,
+    pipeline_hinter: Optional[PipelineHinterProtocol] = None,
 ) -> Run:
     validate_run_spec_and_set_defaults(user, run_spec)
     repo = await _get_run_repo_or_error(
@@ -606,6 +611,8 @@ async def submit_run(
                         ],
                     )
         await session.commit()
+        if pipeline_hinter is not None:
+            pipeline_hinter.hint_fetch(JobModel.__name__)
         await session.refresh(run_model)
 
         run = await get_run_by_id(session, project, run_model.id)

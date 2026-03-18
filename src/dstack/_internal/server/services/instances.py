@@ -357,8 +357,8 @@ def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, O
     return host_private_key, proxy_private_keys[0]
 
 
-def filter_pool_instances(
-    pool_instances: List[InstanceModel],
+def filter_instances(
+    instances: List[InstanceModel],
     profile: Profile,
     *,
     requirements: Optional[Requirements] = None,
@@ -369,7 +369,7 @@ def filter_pool_instances(
     volumes: Optional[List[List[Volume]]] = None,
     shared: bool = False,
 ) -> List[InstanceModel]:
-    instances: List[InstanceModel] = []
+    filtered_instances: List[InstanceModel] = []
     candidates: List[InstanceModel] = []
 
     backend_types = profile.backends
@@ -412,16 +412,17 @@ def filter_pool_instances(
     if instance_types is not None:
         instance_types = [i.lower() for i in instance_types]
 
-    for instance in pool_instances:
-        if fleet_model is not None and instance.fleet_id != fleet_model.id:
-            continue
+    for instance in instances:
         if instance.unreachable:
             continue
         if instance.health.is_failure():
             continue
-        fleet = instance.fleet
-        if profile.fleets is not None and (fleet is None or fleet.name not in profile.fleets):
-            continue
+        if profile.fleets is not None:
+            fleet_name = fleet_model.name if fleet_model is not None else None
+            if fleet_name is None and instance.fleet is not None:
+                fleet_name = instance.fleet.name
+            if fleet_name is None or fleet_name not in profile.fleets:
+                continue
         if status is not None and instance.status != status:
             continue
         jpd = get_instance_provisioning_data(instance)
@@ -456,12 +457,12 @@ def filter_pool_instances(
         offer = InstanceOffer.__response__.parse_raw(instance.offer)
         catalog_item = offer_to_catalog_item(offer)
         if gpuhunt.matches(catalog_item, query_filter):
-            instances.append(instance)
-    return instances
+            filtered_instances.append(instance)
+    return filtered_instances
 
 
-def get_shared_pool_instances_with_offers(
-    pool_instances: List[InstanceModel],
+def get_shared_instances_with_offers(
+    instances: List[InstanceModel],
     profile: Profile,
     requirements: Requirements,
     *,
@@ -472,8 +473,8 @@ def get_shared_pool_instances_with_offers(
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
     query_filter = requirements_to_query_filter(requirements)
-    filtered_instances = filter_pool_instances(
-        pool_instances=pool_instances,
+    filtered_instances = filter_instances(
+        instances=instances,
         profile=profile,
         fleet_model=fleet_model,
         multinode=multinode,

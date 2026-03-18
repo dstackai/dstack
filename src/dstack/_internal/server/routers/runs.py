@@ -20,6 +20,7 @@ from dstack._internal.server.schemas.runs import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs, users
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
@@ -148,6 +149,7 @@ async def apply_plan(
     body: ApplyRunPlanRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
     user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],
+    pipeline_hinter: Annotated[PipelineHinterProtocol, Depends(get_pipeline_hinter)],
     legacy_repo_dir: Annotated[bool, Depends(use_legacy_repo_dir)],
     client_version: Annotated[Optional[Version], Depends(get_client_version)],
 ):
@@ -166,6 +168,7 @@ async def apply_plan(
         project=project,
         plan=body.plan,
         force=body.force,
+        pipeline_hinter=pipeline_hinter,
         legacy_repo_dir=legacy_repo_dir,
     )
     patch_run(run, client_version)
@@ -210,6 +213,7 @@ async def submit_run(
     body: SubmitRunRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
 ) -> Run:
     user, project = user_project
     return await runs.submit_run(
@@ -217,4 +221,5 @@ async def submit_run(
         user=user,
         project=project,
         run_spec=body.run_spec,
+        pipeline_hinter=pipeline_hinter,
     )

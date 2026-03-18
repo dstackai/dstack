@@ -84,7 +84,7 @@ class JobTerminatingPipelineItem(PipelineItem):
 class JobTerminatingPipeline(Pipeline[JobTerminatingPipelineItem]):
     def __init__(
         self,
-        workers_num: int = 10,
+        workers_num: int = 20,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
         min_processing_interval: timedelta = timedelta(seconds=5),

@@ -938,19 +938,27 @@ def get_fleet_master_instance_provisioning_data(
     fleet_model: FleetModel,
     fleet_spec: FleetSpec,
 ) -> Optional[JobProvisioningData]:
-    master_instance_provisioning_data = None
-    if fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER:
-        # TODO: This legacy helper infers the cluster master from fleet instances.
-        # Pipeline-based provisioning should use FleetModel.current_master_instance_id
-        # instead of relying on instance ordering in the loaded relationship.
-        # Offers for master jobs must be in the same cluster as existing instances.
-        fleet_instance_models = [im for im in fleet_model.instances if not im.deleted]
-        if len(fleet_instance_models) > 0:
-            master_instance_model = fleet_instance_models[0]
-            master_instance_provisioning_data = JobProvisioningData.__response__.parse_raw(
-                master_instance_model.job_provisioning_data
-            )
-    return master_instance_provisioning_data
+    if fleet_spec.configuration.placement != InstanceGroupPlacement.CLUSTER:
+        return None
+
+    if fleet_model.current_master_instance_id is not None:
+        for instance_model in fleet_model.instances:
+            if (
+                instance_model.id == fleet_model.current_master_instance_id
+                and not instance_model.deleted
+                and instance_model.job_provisioning_data is not None
+            ):
+                return JobProvisioningData.__response__.parse_raw(
+                    instance_model.job_provisioning_data
+                )
+
+    # TODO: Drop the legacy instance-list fallback after scheduled tasks stop
+    # inferring cluster masters from loaded fleet instances.
+    for instance_model in fleet_model.instances:
+        if not instance_model.deleted and instance_model.job_provisioning_data is not None:
+            return JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
+
+    return None
 
 
 def can_create_new_cloud_instance_in_fleet(fleet_model: FleetModel, fleet_spec: FleetSpec) -> bool:

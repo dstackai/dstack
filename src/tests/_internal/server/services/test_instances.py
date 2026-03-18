@@ -76,8 +76,7 @@ class TestSwitchInstanceStatus:
         )
 
 
-class TestFilterPoolInstances:
-    # TODO: Refactor filter_pool_instances to not depend on InstanceModel and simplify tests
+class TestFilterInstances:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_all_instances(self, test_db, session: AsyncSession):
@@ -94,8 +93,8 @@ class TestFilterPoolInstances:
             backend=BackendType.RUNPOD,
         )
         instances = [aws_instance, runpod_instance]
-        res = instances_services.filter_pool_instances(
-            pool_instances=instances,
+        res = instances_services.filter_instances(
+            instances=instances,
             profile=Profile(name="test"),
         )
         assert res == instances
@@ -116,8 +115,8 @@ class TestFilterPoolInstances:
             backend=BackendType.VASTAI,
         )
         instances = [aws_instance, vastai_instance]
-        res = instances_services.filter_pool_instances(
-            pool_instances=instances,
+        res = instances_services.filter_instances(
+            instances=instances,
             profile=Profile(name="test"),
             multinode=True,
         )
@@ -146,8 +145,8 @@ class TestFilterPoolInstances:
             region="us",
         )
         instances = [aws_instance, runpod_instance1, runpod_instance2]
-        res = instances_services.filter_pool_instances(
-            pool_instances=instances,
+        res = instances_services.filter_instances(
+            instances=instances,
             profile=Profile(name="test"),
             volumes=[
                 [
