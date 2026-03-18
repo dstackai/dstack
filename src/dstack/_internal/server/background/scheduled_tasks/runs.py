@@ -705,11 +705,8 @@ async def _handle_run_replicas(
         for job in run_model.jobs:
             if job.status.is_finished():
                 continue
-            try:
-                job_spec = get_job_spec(job)
-                existing_group_names.add(job_spec.replica_group)
-            except Exception:
-                continue
+            job_spec = get_job_spec(job)
+            existing_group_names.add(job_spec.replica_group)
         new_group_names = {group.name for group in replicas}
         removed_group_names = existing_group_names - new_group_names
         for removed_group_name in removed_group_names:
