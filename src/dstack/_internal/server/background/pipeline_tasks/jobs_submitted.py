@@ -235,6 +235,11 @@ class JobSubmittedFetcher(Fetcher[JobSubmittedPipelineItem]):
                         JobModel.status == JobStatus.SUBMITTED,
                         JobModel.waiting_master_job.is_not(True),
                         or_(
+                            # Non-master jobs must wait for the run to have the fleet assigned.
+                            JobModel.job_num == 0,
+                            RunModel.fleet_id.is_not(None),
+                        ),
+                        or_(
                             JobModel.last_processed_at <= now - self._min_processing_interval,
                             JobModel.last_processed_at == JobModel.submitted_at,
                         ),
