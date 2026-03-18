@@ -220,7 +220,7 @@ async def _scale_up_replicas(
                 run_model.jobs.append(job_model)
 
 
-async def scale_run_replicas_per_group(
+async def scale_run_replicas_for_all_groups(
     session: AsyncSession,
     run_model: RunModel,
     replicas: List[ReplicaGroup],

@@ -55,7 +55,8 @@ from dstack._internal.server.services.runs.replicas import (
     retry_run_replica_jobs,
     scale_down_replicas,
     scale_run_replicas,
-    scale_run_replicas_per_group,
+    scale_run_replicas_for_all_groups,
+    scale_run_replicas_for_group,
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.services import update_service_desired_replica_count
@@ -257,7 +258,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
 
         replicas: List[ReplicaGroup] = run.run_spec.configuration.replica_groups
 
-        await scale_run_replicas_per_group(session, run_model, replicas)
+        await scale_run_replicas_for_all_groups(session, run_model, replicas)
     else:
         # Non-service pending runs may have 0 job submissions and require new submission, e.g. scheduled tasks.
         run_model.desired_replica_count = 1
@@ -685,7 +686,7 @@ async def _handle_run_replicas(
         replicas: List[ReplicaGroup] = run_spec.configuration.replica_groups
         assert replicas, "replica groups should always return at least one group"
 
-        await scale_run_replicas_per_group(session, run_model, replicas)
+        await scale_run_replicas_for_all_groups(session, run_model, replicas)
 
         # Handle per-group rolling deployment
         await _update_jobs_to_new_deployment_in_place(
@@ -899,11 +900,6 @@ async def _handle_rolling_deployment_for_group(
     """
     Handle rolling deployment for a single replica group.
     """
-    from dstack._internal.server.services.runs.replicas import (
-        build_replica_lists,
-        scale_run_replicas_for_group,
-    )
-
     desired_replica_counts = (
         json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
     )
