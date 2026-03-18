@@ -1,7 +1,8 @@
 import asyncio
 import datetime
 import json
-from typing import List, Optional, Set, Tuple
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +32,6 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import events
 from dstack._internal.server.services.jobs import (
-    find_job,
     get_job_spec,
     get_job_specs_from_run_spec,
     group_jobs_by_replica_latest,
@@ -297,6 +297,30 @@ def _get_retry_delay(resubmission_attempt: int) -> datetime.timedelta:
     return _PENDING_RETRY_DELAYS[-1]
 
 
+@dataclass
+class _ReplicaAnalysis:
+    replica_num: int
+    job_models: List[JobModel]
+    replica_info: autoscalers.ReplicaInfo
+    replica_statuses: Set[RunStatus] = field(default_factory=set)
+    run_termination_reasons: Set[RunTerminationReason] = field(default_factory=set)
+    replica_needs_retry: bool = False
+
+
+@dataclass
+class _ActiveRunAnalysis:
+    run_statuses: Set[RunStatus] = field(default_factory=set)
+    run_termination_reasons: Set[RunTerminationReason] = field(default_factory=set)
+    replicas_to_retry: List[Tuple[int, List[JobModel]]] = field(default_factory=list)
+    replicas_info: List[autoscalers.ReplicaInfo] = field(default_factory=list)
+
+
+@dataclass
+class _ActiveRunTransition:
+    new_status: RunStatus
+    termination_reason: Optional[RunTerminationReason] = None
+
+
 async def _process_active_run(session: AsyncSession, run_model: RunModel):
     """
     Run is submitted, provisioning, or running.
@@ -305,149 +329,285 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
     run = run_model_to_run(run_model)
     run_spec = run.run_spec
     retry_single_job = _can_retry_single_job(run_spec)
+    _maybe_set_run_fleet_id_from_jobs(run_model)
+    run_jobs_by_position = _get_run_jobs_by_position(run)
+    analysis = await _analyze_active_run(
+        session=session,
+        run_model=run_model,
+        run=run,
+        run_jobs_by_position=run_jobs_by_position,
+        retry_single_job=retry_single_job,
+    )
+    transition = _get_active_run_transition(run, analysis)
+    await _apply_active_run_transition(
+        session=session,
+        run_model=run_model,
+        run_spec=run_spec,
+        transition=transition,
+        replicas_to_retry=analysis.replicas_to_retry,
+        retry_single_job=retry_single_job,
+        replicas_info=analysis.replicas_info,
+    )
 
-    run_statuses: Set[RunStatus] = set()
-    run_termination_reasons: Set[RunTerminationReason] = set()
-    replicas_to_retry: List[Tuple[int, List[JobModel]]] = []
 
-    replicas_info: List[autoscalers.ReplicaInfo] = []
+def _get_run_jobs_by_position(run: Run) -> Dict[Tuple[int, int], Job]:
+    return {(job.job_spec.replica_num, job.job_spec.job_num): job for job in run.jobs}
+
+
+async def _analyze_active_run(
+    session: AsyncSession,
+    run_model: RunModel,
+    run: Run,
+    run_jobs_by_position: Dict[Tuple[int, int], Job],
+    retry_single_job: bool,
+) -> _ActiveRunAnalysis:
+    analysis = _ActiveRunAnalysis()
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
-        replica_statuses: Set[RunStatus] = set()
-        replica_needs_retry = False
-        replica_active = True
-        jobs_done_num = 0
-        for job_model in job_models:
-            job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
-            if (
-                run_model.fleet_id is None
-                and job_model.instance is not None
-                and job_model.instance.fleet_id is not None
-            ):
-                run_model.fleet_id = job_model.instance.fleet_id
-            if job_model.status == JobStatus.DONE or (
-                job_model.status == JobStatus.TERMINATING
-                and job_model.termination_reason == JobTerminationReason.DONE_BY_RUNNER
-            ):
-                # the job is done or going to be done
-                replica_statuses.add(RunStatus.DONE)
-                jobs_done_num += 1
-            elif job_model.termination_reason == JobTerminationReason.SCALED_DOWN:
-                # the job was scaled down
-                replica_active = False
-            elif job_model.status == JobStatus.RUNNING:
-                # the job is running
-                replica_statuses.add(RunStatus.RUNNING)
-            elif job_model.status in {JobStatus.PROVISIONING, JobStatus.PULLING}:
-                # the job is provisioning
-                replica_statuses.add(RunStatus.PROVISIONING)
-            elif job_model.status == JobStatus.SUBMITTED:
-                # the job is submitted
-                replica_statuses.add(RunStatus.SUBMITTED)
-            elif job_model.status == JobStatus.FAILED or (
-                job_model.status
-                in [JobStatus.TERMINATING, JobStatus.TERMINATED, JobStatus.ABORTED]
-                and job_model.termination_reason
-                not in {JobTerminationReason.DONE_BY_RUNNER, JobTerminationReason.SCALED_DOWN}
-            ):
-                current_duration = await _should_retry_job(session, run, job, job_model)
-                if current_duration is None:
-                    replica_statuses.add(RunStatus.FAILED)
-                    run_termination_reasons.add(RunTerminationReason.JOB_FAILED)
-                else:
-                    if _is_retry_duration_exceeded(job, current_duration):
-                        replica_statuses.add(RunStatus.FAILED)
-                        run_termination_reasons.add(RunTerminationReason.RETRY_LIMIT_EXCEEDED)
-                    else:
-                        replica_needs_retry = True
-            else:
-                raise ValueError(f"Unexpected job status {job_model.status}")
+        replica_analysis = await _analyze_active_run_replica(
+            session=session,
+            run_model=run_model,
+            run=run,
+            run_jobs_by_position=run_jobs_by_position,
+            replica_num=replica_num,
+            job_models=job_models,
+        )
+        _update_active_run_analysis(analysis, replica_analysis, retry_single_job)
+    return analysis
 
-        if RunStatus.FAILED in replica_statuses:
-            run_statuses.add(RunStatus.FAILED)
-        else:
-            if replica_needs_retry:
-                replicas_to_retry.append((replica_num, job_models))
-            if not replica_needs_retry or retry_single_job:
-                run_statuses.update(replica_statuses)
 
-        if jobs_done_num == len(job_models):
-            # Consider replica inactive if all its jobs are done for some reason.
-            # If only some jobs are done, replica is considered active to avoid
-            # provisioning new replicas for partially done multi-node tasks.
+async def _analyze_active_run_replica(
+    session: AsyncSession,
+    run_model: RunModel,
+    run: Run,
+    run_jobs_by_position: Dict[Tuple[int, int], Job],
+    replica_num: int,
+    job_models: List[JobModel],
+) -> _ReplicaAnalysis:
+    replica_statuses: Set[RunStatus] = set()
+    run_termination_reasons: Set[RunTerminationReason] = set()
+    replica_needs_retry = False
+    replica_active = True
+    jobs_done_num = 0
+
+    for job_model in job_models:
+        job = run_jobs_by_position[(job_model.replica_num, job_model.job_num)]
+
+        if _job_is_done_or_finishing_done(job_model):
+            replica_statuses.add(RunStatus.DONE)
+            jobs_done_num += 1
+            continue
+
+        if _job_was_scaled_down(job_model):
             replica_active = False
+            continue
 
-        replica_info = _get_replica_info(job_models, replica_active)
-        replicas_info.append(replica_info)
+        replica_status = _get_non_terminal_replica_status(job_model)
+        if replica_status is not None:
+            replica_statuses.add(replica_status)
+            continue
 
-    termination_reason: Optional[RunTerminationReason] = None
-    if RunStatus.FAILED in run_statuses:
-        new_status = RunStatus.TERMINATING
-        if RunTerminationReason.JOB_FAILED in run_termination_reasons:
+        if _job_needs_retry_evaluation(job_model):
+            current_duration = await _should_retry_job(session, run, job, job_model)
+            if current_duration is None:
+                replica_statuses.add(RunStatus.FAILED)
+                run_termination_reasons.add(RunTerminationReason.JOB_FAILED)
+            elif _is_retry_duration_exceeded(job, current_duration):
+                replica_statuses.add(RunStatus.FAILED)
+                run_termination_reasons.add(RunTerminationReason.RETRY_LIMIT_EXCEEDED)
+            else:
+                replica_needs_retry = True
+            continue
+
+        raise ValueError(f"Unexpected job status {job_model.status}")
+
+    if jobs_done_num == len(job_models):
+        # Consider replica inactive if all its jobs are done for some reason.
+        # If only some jobs are done, replica is considered active to avoid
+        # provisioning new replicas for partially done multi-node tasks.
+        replica_active = False
+
+    return _ReplicaAnalysis(
+        replica_num=replica_num,
+        job_models=job_models,
+        replica_info=_get_replica_info(job_models, replica_active),
+        replica_statuses=replica_statuses,
+        run_termination_reasons=run_termination_reasons,
+        replica_needs_retry=replica_needs_retry,
+    )
+
+
+def _update_active_run_analysis(
+    analysis: _ActiveRunAnalysis,
+    replica_analysis: _ReplicaAnalysis,
+    retry_single_job: bool,
+) -> None:
+    analysis.replicas_info.append(replica_analysis.replica_info)
+
+    if RunStatus.FAILED in replica_analysis.replica_statuses:
+        analysis.run_statuses.add(RunStatus.FAILED)
+        analysis.run_termination_reasons.update(replica_analysis.run_termination_reasons)
+        return
+
+    if replica_analysis.replica_needs_retry:
+        analysis.replicas_to_retry.append(
+            (replica_analysis.replica_num, replica_analysis.job_models)
+        )
+
+    if not replica_analysis.replica_needs_retry or retry_single_job:
+        analysis.run_statuses.update(replica_analysis.replica_statuses)
+
+
+def _maybe_set_run_fleet_id_from_jobs(run_model: RunModel) -> None:
+    """
+    The master job gets fleet assigned with the instance.
+    The run then gets from the master job's instance, and non-master jobs wait for the run's fleet to be assigned.
+    """
+    if run_model.fleet_id is not None:
+        return
+
+    for job_model in run_model.jobs:
+        if job_model.instance is not None and job_model.instance.fleet_id is not None:
+            run_model.fleet_id = job_model.instance.fleet_id
+            return
+
+
+def _job_is_done_or_finishing_done(job_model: JobModel) -> bool:
+    return job_model.status == JobStatus.DONE or (
+        job_model.status == JobStatus.TERMINATING
+        and job_model.termination_reason == JobTerminationReason.DONE_BY_RUNNER
+    )
+
+
+def _job_was_scaled_down(job_model: JobModel) -> bool:
+    return job_model.termination_reason == JobTerminationReason.SCALED_DOWN
+
+
+def _get_non_terminal_replica_status(job_model: JobModel) -> Optional[RunStatus]:
+    if job_model.status == JobStatus.RUNNING:
+        return RunStatus.RUNNING
+    if job_model.status in {JobStatus.PROVISIONING, JobStatus.PULLING}:
+        return RunStatus.PROVISIONING
+    if job_model.status == JobStatus.SUBMITTED:
+        return RunStatus.SUBMITTED
+    return None
+
+
+def _job_needs_retry_evaluation(job_model: JobModel) -> bool:
+    return job_model.status == JobStatus.FAILED or (
+        job_model.status in [JobStatus.TERMINATING, JobStatus.TERMINATED, JobStatus.ABORTED]
+        and job_model.termination_reason
+        not in {JobTerminationReason.DONE_BY_RUNNER, JobTerminationReason.SCALED_DOWN}
+    )
+
+
+def _get_active_run_transition(run: Run, analysis: _ActiveRunAnalysis) -> _ActiveRunTransition:
+    if RunStatus.FAILED in analysis.run_statuses:
+        if RunTerminationReason.JOB_FAILED in analysis.run_termination_reasons:
             termination_reason = RunTerminationReason.JOB_FAILED
-        elif RunTerminationReason.RETRY_LIMIT_EXCEEDED in run_termination_reasons:
+        elif RunTerminationReason.RETRY_LIMIT_EXCEEDED in analysis.run_termination_reasons:
             termination_reason = RunTerminationReason.RETRY_LIMIT_EXCEEDED
         else:
-            raise ValueError(f"Unexpected termination reason {run_termination_reasons}")
-    elif _should_stop_on_master_done(run):
-        new_status = RunStatus.TERMINATING
+            raise ValueError(f"Unexpected termination reason {analysis.run_termination_reasons}")
+        return _ActiveRunTransition(
+            new_status=RunStatus.TERMINATING,
+            termination_reason=termination_reason,
+        )
+
+    if _should_stop_on_master_done(run):
         # ALL_JOBS_DONE is used for all DONE reasons including master-done
-        termination_reason = RunTerminationReason.ALL_JOBS_DONE
-    elif RunStatus.RUNNING in run_statuses:
-        new_status = RunStatus.RUNNING
-    elif RunStatus.PROVISIONING in run_statuses:
-        new_status = RunStatus.PROVISIONING
-    elif RunStatus.SUBMITTED in run_statuses:
-        new_status = RunStatus.SUBMITTED
-    elif RunStatus.DONE in run_statuses and not replicas_to_retry:
-        new_status = RunStatus.TERMINATING
-        termination_reason = RunTerminationReason.ALL_JOBS_DONE
-    else:
-        new_status = RunStatus.PENDING
+        return _ActiveRunTransition(
+            new_status=RunStatus.TERMINATING,
+            termination_reason=RunTerminationReason.ALL_JOBS_DONE,
+        )
 
-    # Terminate active jobs if the run is to be resubmitted
-    if new_status == RunStatus.PENDING and not retry_single_job:
-        for _, replica_jobs in replicas_to_retry:
-            for job_model in replica_jobs:
-                if not (
-                    job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING
-                ):
-                    job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-                    job_model.termination_reason_message = "Run is to be resubmitted"
-                    switch_job_status(session, job_model, JobStatus.TERMINATING)
+    if RunStatus.RUNNING in analysis.run_statuses:
+        return _ActiveRunTransition(new_status=RunStatus.RUNNING)
+    if RunStatus.PROVISIONING in analysis.run_statuses:
+        return _ActiveRunTransition(new_status=RunStatus.PROVISIONING)
+    if RunStatus.SUBMITTED in analysis.run_statuses:
+        return _ActiveRunTransition(new_status=RunStatus.SUBMITTED)
+    if RunStatus.DONE in analysis.run_statuses and not analysis.replicas_to_retry:
+        return _ActiveRunTransition(
+            new_status=RunStatus.TERMINATING,
+            termination_reason=RunTerminationReason.ALL_JOBS_DONE,
+        )
+    return _ActiveRunTransition(new_status=RunStatus.PENDING)
 
-    if new_status not in {RunStatus.TERMINATING, RunStatus.PENDING}:
+
+async def _apply_active_run_transition(
+    session: AsyncSession,
+    run_model: RunModel,
+    run_spec: RunSpec,
+    transition: _ActiveRunTransition,
+    replicas_to_retry: List[Tuple[int, List[JobModel]]],
+    retry_single_job: bool,
+    replicas_info: List[autoscalers.ReplicaInfo],
+) -> None:
+    if transition.new_status == RunStatus.PENDING and not retry_single_job:
+        _terminate_retrying_replica_jobs(session, replicas_to_retry)
+
+    if transition.new_status not in {RunStatus.TERMINATING, RunStatus.PENDING}:
         # No need to retry, scale, or redeploy replicas if the run is terminating,
         # pending run will retry replicas in `process_pending_run`
         await _handle_run_replicas(
-            session, run_model, run_spec, replicas_to_retry, retry_single_job, replicas_info
+            session,
+            run_model,
+            run_spec,
+            replicas_to_retry,
+            retry_single_job,
+            replicas_info,
         )
 
-    if run_model.status != new_status:
-        if run_model.status == RunStatus.SUBMITTED and new_status == RunStatus.PROVISIONING:
-            current_time = common.get_current_datetime()
-            submit_to_provision_duration = (current_time - run_model.submitted_at).total_seconds()
-            logger.info(
-                "%s: run took %.2f seconds from submission to provisioning.",
-                fmt(run_model),
-                submit_to_provision_duration,
-            )
-            project_name = run_model.project.name
-            run_metrics.log_submit_to_provision_duration(
-                submit_to_provision_duration, project_name, run_spec.configuration.type
-            )
+    _maybe_switch_active_run_status(session, run_model, run_spec, transition)
 
-        if new_status == RunStatus.PENDING:
-            run_metrics.increment_pending_runs(run_model.project.name, run_spec.configuration.type)
-            # Unassign run from fleet so that the new fleet can be chosen when retrying
-            run_model.fleet = None
 
-        run_model.termination_reason = termination_reason
-        switch_run_status(session, run_model, new_status)
-        # While a run goes to pending without provisioning, resubmission_attempt increases.
-        if new_status == RunStatus.PROVISIONING:
-            run_model.resubmission_attempt = 0
-        elif new_status == RunStatus.PENDING:
-            run_model.resubmission_attempt += 1
+def _terminate_retrying_replica_jobs(
+    session: AsyncSession,
+    replicas_to_retry: List[Tuple[int, List[JobModel]]],
+) -> None:
+    for _, replica_jobs in replicas_to_retry:
+        for job_model in replica_jobs:
+            if job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING:
+                continue
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = "Run is to be resubmitted"
+            switch_job_status(session, job_model, JobStatus.TERMINATING)
+
+
+def _maybe_switch_active_run_status(
+    session: AsyncSession,
+    run_model: RunModel,
+    run_spec: RunSpec,
+    transition: _ActiveRunTransition,
+) -> None:
+    if run_model.status == transition.new_status:
+        return
+
+    if run_model.status == RunStatus.SUBMITTED and transition.new_status == RunStatus.PROVISIONING:
+        current_time = common.get_current_datetime()
+        submit_to_provision_duration = (current_time - run_model.submitted_at).total_seconds()
+        logger.info(
+            "%s: run took %.2f seconds from submission to provisioning.",
+            fmt(run_model),
+            submit_to_provision_duration,
+        )
+        project_name = run_model.project.name
+        run_metrics.log_submit_to_provision_duration(
+            submit_to_provision_duration, project_name, run_spec.configuration.type
+        )
+
+    if transition.new_status == RunStatus.PENDING:
+        run_metrics.increment_pending_runs(run_model.project.name, run_spec.configuration.type)
+        # Unassign run from fleet so that the new fleet can be chosen when retrying
+        run_model.fleet = None
+
+    run_model.termination_reason = transition.termination_reason
+    switch_run_status(session=session, run_model=run_model, new_status=transition.new_status)
+    # While a run goes to pending without provisioning, resubmission_attempt increases.
+    if transition.new_status == RunStatus.PROVISIONING:
+        run_model.resubmission_attempt = 0
+    elif transition.new_status == RunStatus.PENDING:
+        run_model.resubmission_attempt += 1
 
 
 def _get_replica_info(
