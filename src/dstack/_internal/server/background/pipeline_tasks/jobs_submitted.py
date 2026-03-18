@@ -151,12 +151,12 @@ class JobSubmittedPipelineItem(PipelineItem):
 class JobSubmittedPipeline(Pipeline[JobSubmittedPipelineItem]):
     def __init__(
         self,
-        workers_num: int = 20,
+        workers_num: int = 40,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
         min_processing_interval: timedelta = timedelta(seconds=4),
-        lock_timeout: timedelta = timedelta(seconds=30),
-        heartbeat_trigger: timedelta = timedelta(seconds=15),
+        lock_timeout: timedelta = timedelta(seconds=40),
+        heartbeat_trigger: timedelta = timedelta(seconds=20),
     ) -> None:
         super().__init__(
             workers_num=workers_num,
