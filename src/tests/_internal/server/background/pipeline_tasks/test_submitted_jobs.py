@@ -150,7 +150,11 @@ class TestJobSubmittedFetcher:
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
-        run = await create_run(session=session, project=project, repo=repo, user=user)
+        fleet = await create_fleet(session=session, project=project)
+        run = await create_run(session=session, project=project, repo=repo, user=user, fleet=fleet)
+        run_without_fleet = await create_run(
+            session=session, project=project, repo=repo, user=user
+        )
         now = get_current_datetime()
         stale = now - timedelta(minutes=1)
 
@@ -190,6 +194,15 @@ class TestJobSubmittedFetcher:
             waiting_master_job=True,
             job_num=3,
         )
+        waiting_run_fleet = await create_job(
+            session=session,
+            run=run_without_fleet,
+            status=JobStatus.SUBMITTED,
+            submitted_at=stale - timedelta(minutes=3),
+            last_processed_at=stale - timedelta(seconds=3),
+            waiting_master_job=True,
+            job_num=3,
+        )
         recent_retry = await create_job(
             session=session,
             run=run,
@@ -221,6 +234,7 @@ class TestJobSubmittedFetcher:
             provisioning_job,
             fresh_job,
             waiting_master,
+            waiting_run_fleet,
             recent_retry,
             foreign_locked,
         ]:
@@ -233,6 +247,7 @@ class TestJobSubmittedFetcher:
         assert len({job.lock_token for job in fetched_jobs}) == 1
 
         assert waiting_master.lock_owner is None
+        assert waiting_run_fleet.lock_owner is None
         assert recent_retry.lock_owner is None
         assert foreign_locked.lock_owner == "OtherPipeline"
 
@@ -278,7 +293,6 @@ class TestJobSubmittedFetcher:
             run=high_priority_run,
             submitted_at=now - timedelta(minutes=5),
             last_processed_at=now - timedelta(minutes=2, seconds=30),
-            job_num=1,
         )
 
         items = await fetcher.fetch(limit=3)
@@ -310,14 +324,12 @@ class TestJobSubmittedFetcher:
             run=run,
             submitted_at=stale - timedelta(minutes=1),
             last_processed_at=stale - timedelta(seconds=1),
-            job_num=1,
         )
         newest = await create_job(
             session=session,
             run=run,
             submitted_at=stale,
             last_processed_at=stale,
-            job_num=2,
         )
         _lock_job_expired_same_owner(expired_same_owner)
         await session.commit()
