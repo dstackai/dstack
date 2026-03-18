@@ -363,7 +363,6 @@ def filter_instances(
     *,
     requirements: Optional[Requirements] = None,
     status: Optional[InstanceStatus] = None,
-    fleet_model: Optional[FleetModel] = None,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[List[Volume]]] = None,
@@ -417,12 +416,6 @@ def filter_instances(
             continue
         if instance.health.is_failure():
             continue
-        if profile.fleets is not None:
-            fleet_name = fleet_model.name if fleet_model is not None else None
-            if fleet_name is None and instance.fleet is not None:
-                fleet_name = instance.fleet.name
-            if fleet_name is None or fleet_name not in profile.fleets:
-                continue
         if status is not None and instance.status != status:
             continue
         jpd = get_instance_provisioning_data(instance)
@@ -467,7 +460,6 @@ def get_shared_instances_with_offers(
     requirements: Requirements,
     *,
     idle_only: bool = False,
-    fleet_model: Optional[FleetModel] = None,
     multinode: bool = False,
     volumes: Optional[List[List[Volume]]] = None,
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
@@ -476,7 +468,6 @@ def get_shared_instances_with_offers(
     filtered_instances = filter_instances(
         instances=instances,
         profile=profile,
-        fleet_model=fleet_model,
         multinode=multinode,
         volumes=volumes,
         shared=True,

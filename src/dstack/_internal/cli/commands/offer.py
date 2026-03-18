@@ -15,7 +15,10 @@ from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.configurations import ApplyConfigurationType, TaskConfiguration
 from dstack._internal.core.models.gpus import GpuGroup
 from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.utils.logging import get_logger
 from dstack.api.utils import load_profile
+
+logger = get_logger(__name__)
 
 
 class OfferConfigurator(BaseRunConfigurator):
@@ -74,6 +77,11 @@ class OfferCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
+        if args.fleets:
+            logger.warning(
+                "Specifying `--fleet` in `dstack offer` has no defined effect"
+                " and may be disallowed in a future release"
+            )
         # Set image and user so that the server (a) does not default gpu.vendor
         # to nvidia — `dstack offer` should show all vendors, and (b) does not
         # attempt to pull image config from the Docker registry.
