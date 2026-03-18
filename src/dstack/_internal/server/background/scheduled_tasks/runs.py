@@ -259,6 +259,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
 
         await scale_run_replicas_per_group(session, run_model, replicas)
     else:
+        # Non-service pending runs may have 0 job submissions and require new submission, e.g. scheduled tasks.
         run_model.desired_replica_count = 1
         await scale_run_replicas(session, run_model, replicas_diff=run_model.desired_replica_count)
 
@@ -570,47 +571,10 @@ async def _handle_run_replicas(
         run_spec=run_spec,
     )
     if has_out_of_date_replicas(run_model):
-        assert run_spec.configuration.type == "service", (
-            "Rolling deployment is only supported for services"
-        )
-        non_terminated_replica_count = len(
-            {j.replica_num for j in run_model.jobs if not j.status.is_finished()}
-        )
-        # Avoid using too much hardware during a deployment - never have
-        # more than max_replica_count non-terminated replicas.
-        if non_terminated_replica_count < max_replica_count:
-            # Start more up-to-date replicas that will eventually replace out-of-date replicas.
-            await scale_run_replicas(
-                session,
-                run_model,
-                replicas_diff=max_replica_count - non_terminated_replica_count,
-            )
-
-        replicas_to_stop_count = 0
-        # stop any out-of-date replicas that are not registered
-        replicas_to_stop_count += sum(
-            any(j.deployment_num < run_model.deployment_num for j in jobs)
-            and any(
-                j.status not in [JobStatus.TERMINATING] + JobStatus.finished_statuses()
-                for j in jobs
-            )
-            and not is_replica_registered(jobs)
-            for _, jobs in group_jobs_by_replica_latest(run_model.jobs)
-        )
-        # stop excessive registered out-of-date replicas, except those that are already `terminating`
-        non_terminating_registered_replicas_count = sum(
-            is_replica_registered(jobs) and all(j.status != JobStatus.TERMINATING for j in jobs)
-            for _, jobs in group_jobs_by_replica_latest(run_model.jobs)
-        )
-        replicas_to_stop_count += max(
-            0, non_terminating_registered_replicas_count - run_model.desired_replica_count
-        )
-        if replicas_to_stop_count:
-            await scale_run_replicas(
-                session,
-                run_model,
-                replicas_diff=-replicas_to_stop_count,
-            )
+        # Currently, only services can change job spec on update,
+        # so for other runs out-of-date replicas are not possible.
+        # Keeping assert in case this changes.
+        assert "Rolling deployment is only supported for services"
 
 
 async def _update_jobs_to_new_deployment_in_place(
