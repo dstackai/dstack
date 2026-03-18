@@ -436,7 +436,7 @@ async def _analyze_active_run_replica(
                 needs_retry = True
             continue
 
-        raise ValueError(f"Unexpected job status {job_model.status}")
+        raise ServerError(f"Unexpected job status {job_model.status}")
 
     if jobs_done_num == len(job_models):
         # Consider replica inactive if all its jobs are done for some reason.
@@ -525,7 +525,7 @@ def _get_active_run_transition(run: Run, analysis: _ActiveRunAnalysis) -> _Activ
         elif RunTerminationReason.RETRY_LIMIT_EXCEEDED in analysis.termination_reasons:
             termination_reason = RunTerminationReason.RETRY_LIMIT_EXCEEDED
         else:
-            raise ValueError(f"Unexpected termination reason {analysis.termination_reasons}")
+            raise ServerError(f"Unexpected termination reason {analysis.termination_reasons}")
         return _ActiveRunTransition(
             new_status=RunStatus.TERMINATING,
             termination_reason=termination_reason,
@@ -757,7 +757,7 @@ async def _handle_run_replicas(
         # Currently, only services can change job spec on update,
         # so for other runs out-of-date replicas are not possible.
         # Keeping assert in case this changes.
-        assert "Rolling deployment is only supported for services"
+        assert False, "Rolling deployment is only supported for services"
 
 
 async def _update_jobs_to_new_deployment_in_place(
