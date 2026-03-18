@@ -11,11 +11,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import dstack._internal.server.background.scheduled_tasks.runs as process_runs
 from dstack._internal.core.models.configurations import (
     ProbeConfig,
+    ReplicaGroup,
     ServiceConfiguration,
     TaskConfiguration,
 )
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.profiles import Profile, ProfileRetry, RetryEvent, Schedule
+from dstack._internal.core.models.profiles import (
+    Profile,
+    ProfileRetry,
+    RetryEvent,
+    Schedule,
+    StopCriteria,
+)
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     JobSpec,
@@ -234,6 +241,43 @@ class TestProcessRuns:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_retry_running_to_retry_limit_exceeded(self, test_db, session: AsyncSession):
+        run = await make_run(
+            session,
+            status=RunStatus.RUNNING,
+            retry=ProfileRetry(duration=180, on_events=[RetryEvent.NO_CAPACITY]),
+        )
+        now = run.submitted_at + datetime.timedelta(minutes=10)
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.EXECUTOR_ERROR,
+            last_processed_at=now - datetime.timedelta(minutes=4),
+            replica_num=0,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            replica_num=0,
+            submission_num=1,
+            last_processed_at=now - datetime.timedelta(minutes=2),
+            job_provisioning_data=None,
+        )
+
+        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
+            datetime_mock.return_value = now
+            await process_runs.process_runs()
+
+        await session.refresh(run)
+        assert run.status == RunStatus.TERMINATING
+        assert run.termination_reason == RunTerminationReason.RETRY_LIMIT_EXCEEDED
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_calculates_retry_duration_since_last_successful_submission(
         self, test_db, session: AsyncSession
     ):
@@ -282,6 +326,53 @@ class TestProcessRuns:
         assert len(run.jobs) == 2
         assert run.jobs[0].status == JobStatus.FAILED
         assert run.jobs[1].status == JobStatus.SUBMITTED
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_stops_when_master_job_done(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=["echo hello"],
+                nodes=2,
+            ),
+            profile=Profile(
+                name="test-profile",
+                stop_criteria=StopCriteria.MASTER_DONE,
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.DONE,
+            termination_reason=JobTerminationReason.DONE_BY_RUNNER,
+            replica_num=0,
+            job_num=0,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=0,
+            job_num=1,
+        )
+
+        await process_runs.process_runs()
+
+        await session.refresh(run)
+        assert run.status == RunStatus.TERMINATING
+        assert run.termination_reason == RunTerminationReason.ALL_JOBS_DONE
 
 
 class TestProcessRunsReplicas:
@@ -477,6 +568,64 @@ class TestProcessRunsReplicas:
         assert run.status == RunStatus.RUNNING
         # Should not create new replica with new jobs
         assert len(run.jobs) == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_retrying_multinode_replica_terminates_active_sibling_jobs(
+        self,
+        test_db,
+        session: AsyncSession,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=["echo hello"],
+                nodes=2,
+            ),
+            profile=Profile(
+                name="test-profile",
+                retry=ProfileRetry(duration="10m", on_events=[RetryEvent.NO_CAPACITY]),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        failed_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            replica_num=0,
+            job_num=0,
+        )
+        running_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=0,
+            job_num=1,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+
+        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
+            datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=1)
+            await process_runs.process_runs()
+
+        await session.refresh(run)
+        await session.refresh(failed_job)
+        await session.refresh(running_job)
+        assert run.status == RunStatus.PENDING
+        assert failed_job.status == JobStatus.FAILED
+        assert running_job.status == JobStatus.TERMINATING
+        assert running_job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -707,6 +856,82 @@ class TestRollingDeployment:
         assert events[0].message == "Job updated. Deployment: 1"
         assert len(events[0].targets) == 1
         assert events[0].targets[0].entity_id == run.jobs[0].id
+
+    async def test_terminates_replicas_from_removed_group(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                port=8000,
+                image="ubuntu:latest",
+                replicas=[
+                    ReplicaGroup(
+                        name="group-a",
+                        count=parse_obj_as(Range[int], 1),
+                        commands=["echo group-a"],
+                    ),
+                    ReplicaGroup(
+                        name="group-b",
+                        count=parse_obj_as(Range[int], 1),
+                        commands=["echo group-b"],
+                    ),
+                ],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        group_a_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=0,
+            registered=True,
+        )
+        group_b_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=1,
+            registered=True,
+        )
+
+        group_a_job_spec = cast(JobSpec, JobSpec.__response__.parse_raw(group_a_job.job_spec_data))
+        group_a_job_spec.replica_group = "group-a"
+        group_a_job.job_spec_data = group_a_job_spec.json()
+
+        group_b_job_spec = cast(JobSpec, JobSpec.__response__.parse_raw(group_b_job.job_spec_data))
+        group_b_job_spec.replica_group = "group-b"
+        group_b_job.job_spec_data = group_b_job_spec.json()
+
+        updated_run_spec: RunSpec = RunSpec.__response__.parse_raw(run.run_spec)
+        assert isinstance(updated_run_spec.configuration, ServiceConfiguration)
+        updated_run_spec.configuration.replicas = [
+            ReplicaGroup(
+                name="group-a",
+                count=parse_obj_as(Range[int], 1),
+                commands=["echo group-a"],
+            )
+        ]
+        run.run_spec = updated_run_spec.json()
+        await session.commit()
+
+        await process_runs.process_runs()
+
+        await session.refresh(run)
+        await session.refresh(group_a_job)
+        await session.refresh(group_b_job)
+        assert run.status == RunStatus.RUNNING
+        assert group_a_job.status == JobStatus.RUNNING
+        assert group_b_job.status == JobStatus.TERMINATING
+        assert group_b_job.termination_reason == JobTerminationReason.SCALED_DOWN
 
     async def test_starts_new_replica(self, test_db, session: AsyncSession) -> None:
         run = await make_run(session, status=RunStatus.RUNNING, replicas=2, image="old")
