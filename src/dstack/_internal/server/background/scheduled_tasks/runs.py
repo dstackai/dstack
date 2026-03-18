@@ -549,8 +549,12 @@ def _get_active_run_transition(run: Run, analysis: _ActiveRunAnalysis) -> _Activ
             new_status=RunStatus.TERMINATING,
             termination_reason=RunTerminationReason.ALL_JOBS_DONE,
         )
-    # All contributing replicas need full retry — resubmit the entire run.
-    return _ActiveRunTransition(new_status=RunStatus.PENDING)
+    if not analysis.contributed_statuses or analysis.contributed_statuses == {RunStatus.DONE}:
+        # No active replicas remain — resubmit the entire run.
+        # `contributed_statuses` is either empty (every replica is retrying) or contains
+        # only DONE (some replicas finished, others need retry).
+        return _ActiveRunTransition(new_status=RunStatus.PENDING)
+    raise ServerError("Failed to determine run transition: unexpected active run state")
 
 
 async def _apply_active_run_transition(
