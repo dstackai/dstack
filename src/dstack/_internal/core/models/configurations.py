@@ -645,11 +645,11 @@ class ConfigurationWithCommandsParams(CoreModel):
 
 class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[
-        Union[Literal["vscode"], Literal["cursor"], Literal["windsurf"]],
+        Optional[Union[Literal["vscode"], Literal["cursor"], Literal["windsurf"]]],
         Field(
-            description="The IDE to run. Supported values include `vscode`, `cursor`, and `windsurf`"
+            description="The IDE to pre-install. Supported values include `vscode`, `cursor`, and `windsurf`. Defaults to no IDE (SSH only)"
         ),
-    ]
+    ] = None
     version: Annotated[
         Optional[str],
         Field(
@@ -683,9 +683,11 @@ class DevEnvironmentConfigurationParams(CoreModel):
         return None
 
     @root_validator
-    def validate_windsurf_version_format(cls, values):
+    def validate_ide_and_version(cls, values):
         ide = values.get("ide")
         version = values.get("version")
+        if version and ide is None:
+            raise ValueError("`version` requires `ide` to be set")
         if ide == "windsurf" and version:
             # Validate format: version@commit
             if not re.match(r"^.+@[a-f0-9]+$", version):

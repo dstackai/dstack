@@ -5,7 +5,7 @@ description: Provisioning remote instances for cloud-based development
 
 # Dev environments
 
-A dev environment lets you provision an instance and access it with your desktop IDE.
+A dev environment lets you provision an instance and access it with your desktop IDE or SSH.
 
 ??? info "Prerequisites"
     Before running a dev environment, make sure you’ve [installed](../installation.md) the server and CLI, and created a [fleet](fleets.md).
@@ -25,6 +25,8 @@ name: vscode
 python: "3.11"
 # Uncomment to use a custom Docker image
 #image: huggingface/trl-latest-gpu
+
+# Comment if not required
 ide: vscode
 
 # Uncomment to leverage spot instances
@@ -55,11 +57,31 @@ Launching `vscode`...
 
 To open in VS Code Desktop, use this link:
   vscode://vscode-remote/ssh-remote+vscode/workflow
+
+To connect via SSH, use: `ssh vscode`
 ```
 
 </div>
 
 `dstack apply` automatically provisions an instance and sets up an IDE on it.
+
+??? info "SSH-only"
+    The `ide` property is optional. If omitted, no IDE is pre-installed, but the dev environment
+    is still accessible via SSH:
+
+    <div editor-title=".dstack.yml">
+
+    ```yaml
+    type: dev-environment
+    name: my-env
+
+    python: "3.11"
+
+    resources:
+      gpu: 24GB
+    ```
+
+    </div>
 
 ??? info "Windows"
     On Windows, `dstack` works both natively and inside WSL. But, for dev environments, 

@@ -230,3 +230,12 @@ class TestDevEnvironmentConfigurationParams:
         params = DevEnvironmentConfigurationParams(ide="cursor", version="0.40.0")
         assert params.ide == "cursor"
         assert params.version == "0.40.0"
+
+    def test_ide_optional(self):
+        params = DevEnvironmentConfigurationParams()
+        assert params.ide is None
+        assert params.version is None
+
+    def test_version_requires_ide(self):
+        with pytest.raises(ValueError, match="`version` requires `ide` to be set"):
+            DevEnvironmentConfigurationParams(version="1.80.0")
