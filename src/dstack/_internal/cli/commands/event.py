@@ -129,7 +129,7 @@ class EventCommand(APIBaseCommand):
             events = reversed(self.api.client.events.list(ascending=False, **asdict(filters)))
         try:
             for event in events:
-                print_event(event)
+                print_event(current_project=self.api.project, event=event)
         except KeyboardInterrupt:
             pass
 
