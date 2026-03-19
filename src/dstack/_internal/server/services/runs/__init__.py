@@ -40,6 +40,7 @@ from dstack._internal.core.services.diff import format_diff_fields_for_event
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
+    InstanceModel,
     JobModel,
     ProbeModel,
     ProjectModel,
@@ -104,13 +105,47 @@ def switch_run_status(
         return
 
     run_model.status = new_status
+    emit_run_status_change_event(
+        session=session,
+        run_model=run_model,
+        old_status=old_status,
+        new_status=new_status,
+        actor=actor,
+    )
 
+
+def emit_run_status_change_event(
+    session: AsyncSession,
+    run_model: RunModel,
+    old_status: RunStatus,
+    new_status: RunStatus,
+    actor: events.AnyActor = events.SystemActor(),
+) -> None:
+    if old_status == new_status:
+        return
+    events.emit(
+        session,
+        get_run_status_change_message(
+            old_status=old_status,
+            new_status=new_status,
+            termination_reason=run_model.termination_reason,
+        ),
+        actor=actor,
+        targets=[events.Target.from_model(run_model)],
+    )
+
+
+def get_run_status_change_message(
+    old_status: RunStatus,
+    new_status: RunStatus,
+    termination_reason: Optional[RunTerminationReason],
+) -> str:
     msg = f"Run status changed {old_status.upper()} -> {new_status.upper()}"
     if new_status == RunStatus.TERMINATING:
-        if run_model.termination_reason is None:
+        if termination_reason is None:
             raise ValueError("termination_reason must be set when switching to TERMINATING status")
-        msg += f". Termination reason: {run_model.termination_reason.upper()}"
-    events.emit(session, msg, actor=actor, targets=[events.Target.from_model(run_model)])
+        msg += f". Termination reason: {termination_reason.upper()}"
+    return msg
 
 
 def get_run_spec(run_model: RunModel) -> RunSpec:
@@ -1020,7 +1055,10 @@ async def process_terminating_run(session: AsyncSession, run_model: RunModel):
             JobTerminationReason.DONE_BY_RUNNER,
         }:
             # Send a signal to stop the job gracefully
-            await stop_runner(session, job_model)
+            instance_model = await _load_job_instance_for_stop(
+                session=session, job_model=job_model
+            )
+            await stop_runner(job_model, common_utils.get_or_error(instance_model))
             delay_job_instance_termination(job_model)
         job_model.termination_reason = job_termination_reason
         switch_job_status(session, job_model, JobStatus.TERMINATING)
@@ -1063,3 +1101,17 @@ def _get_next_triggered_at(run_spec: RunSpec) -> Optional[datetime]:
             )
         )
     return min(fire_times)
+
+
+async def _load_job_instance_for_stop(
+    session: AsyncSession,
+    job_model: JobModel,
+) -> Optional[InstanceModel]:
+    if job_model.instance_id is None:
+        return None
+    res = await session.execute(
+        select(InstanceModel)
+        .where(InstanceModel.id == job_model.instance_id)
+        .options(joinedload(InstanceModel.project))
+    )
+    return res.scalar_one_or_none()

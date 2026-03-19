@@ -239,6 +239,9 @@ class InstanceWorker(Worker[InstancePipelineItem]):
         if process_context is None:
             return
 
+        # Keep apply centralized here because every instance path returns the same
+        # `ProcessResult` shape for one primary model, with only a small set of
+        # optional side effects such as health checks or placement-group scheduling.
         await _apply_process_result(
             item=item,
             instance_model=process_context.instance_model,
