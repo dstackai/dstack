@@ -987,7 +987,7 @@ class ServiceConfigurationParams(CoreModel):
     @root_validator()
     def validate_top_level_properties_with_replica_groups(cls, values):
         """
-        When replicas is a list of ReplicaGroup, forbid top-level scaling, commands, and resources
+        When replicas is a list of ReplicaGroup, forbid top-level scaling and commands.
         """
         replicas = values.get("replicas")
 
@@ -1006,15 +1006,6 @@ class ServiceConfigurationParams(CoreModel):
             raise ValueError(
                 "Top-level `commands` is not allowed when `replicas` is a list. "
                 "Specify `commands` in each replica group instead."
-            )
-
-        resources = values.get("resources")
-
-        default_resources = ResourcesSpec()
-        if resources and resources.dict() != default_resources.dict():
-            raise ValueError(
-                "Top-level `resources` is not allowed when `replicas` is a list. "
-                "Specify `resources` in each replica group instead."
             )
 
         return values
