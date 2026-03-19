@@ -691,7 +691,6 @@ async def _handle_run_replicas(
             session=session,
             run_model=run_model,
             run_spec=run_spec,
-            replicas=replica_groups,
         )
 
         for group in replica_groups:
@@ -720,7 +719,6 @@ async def _update_jobs_to_new_deployment_in_place(
     session: AsyncSession,
     run_model: RunModel,
     run_spec: RunSpec,
-    replicas: Optional[List] = None,
 ) -> None:
     """
     Bump deployment_num for jobs that do not require redeployment.
@@ -736,10 +734,8 @@ async def _update_jobs_to_new_deployment_in_place(
         if all(j.deployment_num == run_model.deployment_num for j in job_models):
             continue
 
-        # Determine which group this replica belongs to
         replica_group_name = None
-
-        if replicas:
+        if run_spec.configuration.type == "service":
             job_spec = get_job_spec(job_models[0])
             replica_group_name = job_spec.replica_group
 
