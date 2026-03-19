@@ -1,3 +1,4 @@
+import copy
 from datetime import datetime
 from typing import List, Optional, Union
 from uuid import UUID
@@ -8,6 +9,7 @@ from dstack._internal.core.compatibility.runs import (
     get_apply_plan_excludes,
     get_get_plan_excludes,
     get_list_runs_excludes,
+    patch_run_spec,
 )
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
@@ -73,6 +75,8 @@ class RunsAPIClient(APIClientGroup):
         self, project_name: str, run_spec: RunSpec, max_offers: Optional[int] = None
     ) -> RunPlan:
         body = GetRunPlanRequest(run_spec=run_spec, max_offers=max_offers)
+        body = copy.deepcopy(body)
+        patch_run_spec(body.run_spec)
         resp = self._request(
             f"/api/project/{project_name}/runs/get_plan",
             body=body.json(exclude=get_get_plan_excludes(body)),
@@ -87,6 +91,10 @@ class RunsAPIClient(APIClientGroup):
     ) -> Run:
         plan_input: ApplyRunPlanInput = ApplyRunPlanInput.__response__.parse_obj(plan)
         body = ApplyRunPlanRequest(plan=plan_input, force=force)
+        body = copy.deepcopy(body)
+        patch_run_spec(body.plan.run_spec)
+        if body.plan.current_resource is not None:
+            patch_run_spec(body.plan.current_resource.run_spec)
         resp = self._request(
             f"/api/project/{project_name}/runs/apply",
             body=body.json(exclude=get_apply_plan_excludes(plan_input)),

@@ -4,7 +4,7 @@ from packaging.version import Version
 
 from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.runs import Run, RunPlan, RunSpec
-from dstack._internal.server.compatibility.common import patch_offers_list
+from dstack._internal.server.compatibility.common import patch_offers_list, patch_profile_params
 
 
 def patch_run_plan(run_plan: RunPlan, client_version: Optional[Version]) -> None:
@@ -41,3 +41,6 @@ def patch_run_spec(run_spec: RunSpec, client_version: Optional[Version]) -> None
         and run_spec.configuration.https is None
     ):
         run_spec.configuration.https = SERVICE_HTTPS_DEFAULT
+    patch_profile_params(run_spec.configuration, client_version)
+    if run_spec.profile is not None:
+        patch_profile_params(run_spec.profile, client_version)

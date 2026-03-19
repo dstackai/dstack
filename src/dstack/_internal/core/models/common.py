@@ -143,3 +143,31 @@ class ApplyAction(str, Enum):
 class NetworkMode(str, Enum):
     HOST = "host"
     BRIDGE = "bridge"
+
+
+class EntityReference(CoreModel):
+    """
+    Cross-project entity reference.
+    """
+
+    project: Annotated[
+        Optional[str],
+        Field(description="The project name. If unspecified, refers to the current project"),
+    ]
+    name: Annotated[str, Field(description="The entity name")]
+
+    @classmethod
+    def parse(cls, v: Union[str, "EntityReference"]) -> "EntityReference":
+        if isinstance(v, EntityReference):
+            return v
+        parts = v.split("/")
+        if len(parts) == 1:
+            return cls(project=None, name=parts[0])
+        if len(parts) == 2:
+            return cls(project=parts[0], name=parts[1])
+        raise ValueError("Invalid entity reference. Only `<project>/<name>` format is allowed")
+
+    def format(self) -> str:
+        if self.project is None:
+            return self.name
+        return f"{self.project}/{self.name}"

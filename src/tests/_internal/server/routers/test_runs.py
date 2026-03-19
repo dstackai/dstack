@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal import settings
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction
+from dstack._internal.core.models.common import ApplyAction, EntityReference
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
@@ -32,7 +32,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.profiles import Schedule
+from dstack._internal.core.models.profiles import Profile, Schedule
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
@@ -1122,6 +1122,77 @@ class TestGetRun:
         assert response.status_code == 200
         assert response.json()["run_spec"]["configuration"]["probes"] == expected_probes
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "client_version,expected_fleets",
+        [
+            (
+                "0.20.13",
+                [
+                    "my-fleet",
+                    "other-project/other-fleet",
+                ],
+            ),
+            (
+                "0.20.14",
+                [
+                    {"project": None, "name": "my-fleet"},
+                    {"project": "other-project", "name": "other-fleet"},
+                ],
+            ),
+            (
+                None,
+                [
+                    {"project": None, "name": "my-fleet"},
+                    {"project": "other-project", "name": "other-fleet"},
+                ],
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_patches_fleets_for_old_clients(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        expected_fleets: list,
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+
+        fleets: list[Union[EntityReference, str]] = [
+            EntityReference(project=None, name="my-fleet"),
+            EntityReference(project="other-project", name="other-fleet"),
+        ]
+        run_spec = get_run_spec(
+            configuration=TaskConfiguration(
+                commands=["echo hello"],
+                fleets=fleets,
+            ),
+            repo_id=repo.name,
+            profile=Profile(
+                fleets=fleets,
+            ),
+        )
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get",
+            headers=headers,
+            json={"run_name": run.run_name},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["run_spec"]["configuration"]["fleets"] == expected_fleets
+        assert response.json()["run_spec"]["profile"]["fleets"] == expected_fleets
+
 
 class TestGetRunPlan:
     @pytest.mark.asyncio
@@ -1477,6 +1548,161 @@ class TestGetRunPlan:
         assert response.status_code == 200, response.json()
         response_json = response.json()
         assert response_json["project_name"] == "importer-project"
+        assert len(response_json["job_plans"][0]["offers"]) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("configured_fleet", "expected_price"),
+        [
+            ("exporter-a/test-fleet", 1.0),
+            ("exporter-b/test-fleet", 2.0),
+            ("importer/test-fleet", 3.0),
+            ("test-fleet", 3.0),
+        ],
+    )
+    async def test_returns_run_plan_offers_from_specified_fleet_across_projects(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        configured_fleet: str,
+        expected_price: float,
+    ) -> None:
+        user = await create_user(session, global_role=GlobalRole.USER)
+        exporter_a = await create_project(session, name="exporter-a", owner=user)
+        exporter_b = await create_project(session, name="exporter-b", owner=user)
+        importer = await create_project(session, name="importer", owner=user)
+        await add_project_member(
+            session=session,
+            project=importer,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        fleet_a = await create_fleet(
+            session=session,
+            project=exporter_a,
+            name="test-fleet",
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        await create_instance(
+            session=session,
+            project=exporter_a,
+            fleet=fleet_a,
+            backend=BackendType.REMOTE,
+            price=1.0,
+        )
+        fleet_b = await create_fleet(
+            session=session,
+            project=exporter_b,
+            name="test-fleet",
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        await create_instance(
+            session=session,
+            project=exporter_b,
+            fleet=fleet_b,
+            backend=BackendType.REMOTE,
+            price=2.0,
+        )
+        fleet_importer = await create_fleet(
+            session=session,
+            project=importer,
+            name="test-fleet",
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        await create_instance(
+            session=session,
+            project=importer,
+            fleet=fleet_importer,
+            backend=BackendType.REMOTE,
+            price=3.0,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_a,
+            importer_projects=[importer],
+            exported_fleets=[fleet_a],
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_b,
+            importer_projects=[importer],
+            exported_fleets=[fleet_b],
+        )
+
+        run_spec = {
+            "configuration": {
+                "type": "dev-environment",
+                "ide": "vscode",
+                "fleets": [configured_fleet],
+            }
+        }
+        body = {"run_spec": run_spec}
+        response = await client.post(
+            "/api/project/importer/runs/get_plan",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 200, response.json()
+        response_json = response.json()
+        assert response_json["project_name"] == "importer"
+        offers = response_json["job_plans"][0]["offers"]
+        assert offers[0]["price"] == expected_price
+        assert len(offers) == 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_no_offers_if_imported_fleet_specified_without_project_prefix(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        importer_user = await create_user(session, global_role=GlobalRole.USER)
+        exporter_a = await create_project(session, name="exporter-a")
+        importer = await create_project(session, name="importer", owner=importer_user)
+        await add_project_member(
+            session=session,
+            project=importer,
+            user=importer_user,
+            project_role=ProjectRole.USER,
+        )
+        fleet_a = await create_fleet(
+            session=session,
+            project=exporter_a,
+            name="test-fleet",
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        await create_instance(
+            session=session,
+            project=exporter_a,
+            fleet=fleet_a,
+            backend=BackendType.REMOTE,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_a,
+            importer_projects=[importer],
+            exported_fleets=[fleet_a],
+        )
+
+        run_spec = {
+            "configuration": {
+                "type": "dev-environment",
+                "ide": "vscode",
+                "fleets": ["test-fleet"],  # won't work, should be exporter-a/test-fleet
+            }
+        }
+        body = {"run_spec": run_spec}
+        response = await client.post(
+            "/api/project/importer/runs/get_plan",
+            headers=get_auth_headers(importer_user.token),
+            json=body,
+        )
+        assert response.status_code == 200, response.json()
+        response_json = response.json()
+        assert response_json["project_name"] == "importer"
         assert len(response_json["job_plans"][0]["offers"]) == 0
 
     @pytest.mark.parametrize(
