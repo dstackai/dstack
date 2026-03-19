@@ -732,20 +732,6 @@ async def _handle_run_replicas(
                     scale_down_replicas(session, inactive_replicas, len(inactive_replicas))
         return
 
-    max_replica_count = run_model.desired_replica_count
-    if has_out_of_date_replicas(run_model):
-        # allow extra replicas when deployment is in progress
-        max_replica_count += ROLLING_DEPLOYMENT_MAX_SURGE
-
-    active_replica_count = sum(1 for r in replicas_info if r.active)
-    if active_replica_count not in range(run_model.desired_replica_count, max_replica_count + 1):
-        await scale_run_replicas(
-            session,
-            run_model,
-            replicas_diff=run_model.desired_replica_count - active_replica_count,
-        )
-        return
-
     await _update_jobs_to_new_deployment_in_place(
         session=session,
         run_model=run_model,
