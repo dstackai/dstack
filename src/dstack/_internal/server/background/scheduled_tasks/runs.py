@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import json
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -49,9 +48,9 @@ from dstack._internal.server.services.runs import (
 )
 from dstack._internal.server.services.runs.replicas import (
     build_replica_lists,
+    get_group_desired_replica_count,
+    get_group_rollout_state,
     has_out_of_date_replicas,
-    is_replica_registered,
-    job_belongs_to_group,
     retry_run_replica_jobs,
     scale_down_replicas,
     scale_run_replicas,
@@ -851,86 +850,41 @@ async def _handle_rolling_deployment_for_group(
     """
     Handle rolling deployment for a single replica group.
     """
-    if not has_out_of_date_replicas(run_model, group_filter=group.name):
+    group_desired = get_group_desired_replica_count(run_model, group)
+    state = get_group_rollout_state(run_model, group)
+    if not state.has_out_of_date_replicas:
         return
 
-    desired_replica_counts = (
-        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
-    )
-    group_desired = desired_replica_counts.get(group.name, group.count.min or 0)
     group_max_replica_count = group_desired + ROLLING_DEPLOYMENT_MAX_SURGE
 
-    non_terminated_replica_count = len(
-        {
-            j.replica_num
-            for j in run_model.jobs
-            if not j.status.is_finished()
-            and group.name is not None
-            and job_belongs_to_group(job=j, group_name=group.name)
-        }
-    )
-
     # Start new up-to-date replicas if needed
-    if non_terminated_replica_count < group_max_replica_count:
-        active_replicas, inactive_replicas = build_replica_lists(
-            run_model=run_model,
-            group_filter=group.name,
-        )
-
+    if state.non_terminated_replica_count < group_max_replica_count:
         await scale_run_replicas_for_group(
             session=session,
             run_model=run_model,
             group=group,
-            replicas_diff=group_max_replica_count - non_terminated_replica_count,
+            replicas_diff=group_max_replica_count - state.non_terminated_replica_count,
             run_spec=run_spec,
-            active_replicas=active_replicas,
-            inactive_replicas=inactive_replicas,
+            active_replicas=state.active_replicas,
+            inactive_replicas=state.inactive_replicas,
         )
+        state = get_group_rollout_state(run_model, group)
 
-    # Stop out-of-date replicas that are not registered
-    replicas_to_stop_count = 0
-    for _, jobs in group_jobs_by_replica_latest(run_model.jobs):
-        assert group.name is not None, "Group name is always set"
-        if not job_belongs_to_group(jobs[0], group.name):
-            continue
-        # Check if replica is out-of-date and not registered
-        if (
-            any(j.deployment_num < run_model.deployment_num for j in jobs)
-            and any(
-                j.status not in [JobStatus.TERMINATING] + JobStatus.finished_statuses()
-                for j in jobs
-            )
-            and not is_replica_registered(jobs)
-        ):
-            replicas_to_stop_count += 1
-
-    # Stop excessive registered out-of-date replicas
-    non_terminating_registered_replicas_count = 0
-    for _, jobs in group_jobs_by_replica_latest(run_model.jobs):
-        assert group.name is not None, "Group name is always set"
-        if not job_belongs_to_group(jobs[0], group.name):
-            continue
-
-        if is_replica_registered(jobs) and all(j.status != JobStatus.TERMINATING for j in jobs):
-            non_terminating_registered_replicas_count += 1
-
-    replicas_to_stop_count += max(0, non_terminating_registered_replicas_count - group_desired)
+    replicas_to_stop_count = state.unregistered_out_of_date_replica_count
+    replicas_to_stop_count += max(
+        0,
+        state.registered_non_terminating_replica_count - group_desired,
+    )
 
     if replicas_to_stop_count > 0:
-        # Build lists again to get current state
-        active_replicas, inactive_replicas = build_replica_lists(
-            run_model=run_model,
-            group_filter=group.name,
-        )
-
         await scale_run_replicas_for_group(
             session=session,
             run_model=run_model,
             group=group,
             replicas_diff=-replicas_to_stop_count,
             run_spec=run_spec,
-            active_replicas=active_replicas,
-            inactive_replicas=inactive_replicas,
+            active_replicas=state.active_replicas,
+            inactive_replicas=state.inactive_replicas,
         )
 
 

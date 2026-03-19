@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -220,6 +221,65 @@ async def _scale_up_replicas(
                 run_model.jobs.append(job_model)
 
 
+@dataclass
+class GroupRolloutState:
+    active_replicas: List[Tuple[int, bool, int, List[JobModel]]]
+    inactive_replicas: List[Tuple[int, bool, int, List[JobModel]]]
+    has_out_of_date_replicas: bool
+    non_terminated_replica_count: int
+    unregistered_out_of_date_replica_count: int
+    registered_non_terminating_replica_count: int
+
+
+def get_group_desired_replica_count(run_model: RunModel, group: ReplicaGroup) -> int:
+    assert group.name is not None, "Group name is always set"
+    desired_replica_counts = (
+        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
+    )
+    return desired_replica_counts.get(group.name, group.count.min or 0)
+
+
+def get_group_rollout_state(run_model: RunModel, group: ReplicaGroup) -> GroupRolloutState:
+    assert group.name is not None, "Group name is always set"
+    active_replicas, inactive_replicas = build_replica_lists(
+        run_model=run_model,
+        group_filter=group.name,
+    )
+
+    non_terminated_replica_nums = set()
+    unregistered_out_of_date_replica_count = 0
+    registered_non_terminating_replica_count = 0
+
+    for _, jobs in group_jobs_by_replica_latest(run_model.jobs):
+        if not job_belongs_to_group(jobs[0], group.name):
+            continue
+
+        if any(not j.status.is_finished() for j in jobs):
+            non_terminated_replica_nums.add(jobs[0].replica_num)
+
+        if (
+            any(j.deployment_num < run_model.deployment_num for j in jobs)
+            and any(
+                j.status not in [JobStatus.TERMINATING] + JobStatus.finished_statuses()
+                for j in jobs
+            )
+            and not is_replica_registered(jobs)
+        ):
+            unregistered_out_of_date_replica_count += 1
+
+        if is_replica_registered(jobs) and all(j.status != JobStatus.TERMINATING for j in jobs):
+            registered_non_terminating_replica_count += 1
+
+    return GroupRolloutState(
+        active_replicas=active_replicas,
+        inactive_replicas=inactive_replicas,
+        has_out_of_date_replicas=has_out_of_date_replicas(run_model, group_filter=group.name),
+        non_terminated_replica_count=len(non_terminated_replica_nums),
+        unregistered_out_of_date_replica_count=unregistered_out_of_date_replica_count,
+        registered_non_terminating_replica_count=registered_non_terminating_replica_count,
+    )
+
+
 async def scale_run_replicas_for_all_groups(
     session: AsyncSession,
     run_model: RunModel,
@@ -229,31 +289,17 @@ async def scale_run_replicas_for_all_groups(
     if not replicas:
         return
 
-    desired_replica_counts = (
-        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
-    )
+    run_spec = get_run_spec(run_model)
 
     for group in replicas:
-        assert group.name is not None, "Group name is always set"
-        group_desired = desired_replica_counts.get(group.name, group.count.min or 0)
-
-        # Build replica lists filtered by this group
-        active_replicas, inactive_replicas = build_replica_lists(
-            run_model=run_model, group_filter=group.name
-        )
-
-        # Count active replicas
-        active_group_count = len(active_replicas)
-        group_diff = group_desired - active_group_count
+        group_desired = get_group_desired_replica_count(run_model, group)
+        state = get_group_rollout_state(run_model, group)
+        group_diff = group_desired - len(state.active_replicas)
 
         if group_diff != 0:
-            # Check if rolling deployment is in progress for THIS GROUP
-
-            group_has_out_of_date = has_out_of_date_replicas(run_model, group_filter=group.name)
-
             # During rolling deployment, don't scale down old replicas
             # Let rolling deployment handle stopping old replicas
-            if group_diff < 0 and group_has_out_of_date:
+            if group_diff < 0 and state.has_out_of_date_replicas:
                 # Skip scaling down during rolling deployment
                 continue
             await scale_run_replicas_for_group(
@@ -261,9 +307,9 @@ async def scale_run_replicas_for_all_groups(
                 run_model=run_model,
                 group=group,
                 replicas_diff=group_diff,
-                run_spec=get_run_spec(run_model),
-                active_replicas=active_replicas,
-                inactive_replicas=inactive_replicas,
+                run_spec=run_spec,
+                active_replicas=state.active_replicas,
+                inactive_replicas=state.inactive_replicas,
             )
 
 
