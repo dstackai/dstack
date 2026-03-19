@@ -317,7 +317,7 @@ class _ReplicaAnalysis:
 
 
 @dataclass
-class _ActiveRunAnalysis:
+class _RunAnalysis:
     """Aggregated replica analysis used to determine the run's next status.
 
     Each replica contributes `RunStatus` based on its jobs' statuses.
@@ -379,8 +379,8 @@ async def _analyze_active_run(
     run: Run,
     run_jobs_by_position: Dict[Tuple[int, int], Job],
     retry_single_job: bool,
-) -> _ActiveRunAnalysis:
-    analysis = _ActiveRunAnalysis()
+) -> _RunAnalysis:
+    run_analysis = _RunAnalysis()
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         replica_analysis = await _analyze_active_run_replica(
             session=session,
@@ -390,8 +390,8 @@ async def _analyze_active_run(
             replica_num=replica_num,
             job_models=job_models,
         )
-        _update_active_run_analysis(analysis, replica_analysis, retry_single_job)
-    return analysis
+        _apply_replica_analysis(run_analysis, replica_analysis, retry_single_job)
+    return run_analysis
 
 
 async def _analyze_active_run_replica(
@@ -455,8 +455,8 @@ async def _analyze_active_run_replica(
     )
 
 
-def _update_active_run_analysis(
-    analysis: _ActiveRunAnalysis,
+def _apply_replica_analysis(
+    analysis: _RunAnalysis,
     replica_analysis: _ReplicaAnalysis,
     retry_single_job: bool,
 ) -> None:
@@ -519,7 +519,7 @@ def _job_needs_retry_evaluation(job_model: JobModel) -> bool:
     )
 
 
-def _get_active_run_transition(run: Run, analysis: _ActiveRunAnalysis) -> _ActiveRunTransition:
+def _get_active_run_transition(run: Run, analysis: _RunAnalysis) -> _ActiveRunTransition:
     # Check `analysis.contributed_statuses` in the priority order.
     if RunStatus.FAILED in analysis.contributed_statuses:
         if RunTerminationReason.JOB_FAILED in analysis.termination_reasons:
