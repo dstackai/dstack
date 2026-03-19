@@ -75,7 +75,7 @@ async def list_only_no_fleets(
 ):
     """
     Returns only projects where the user is a member and that have no active fleets,
-    sorted by ascending `created_at`.
+    neither owned nor imported, sorted by ascending `created_at`.
 
     Active fleets are those with `deleted == False`. Projects with deleted fleets
     (but no active fleets) are included.

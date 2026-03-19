@@ -15,6 +15,7 @@ from dstack._internal.server.models import MemberModel, ProjectModel
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_export,
     create_fleet,
     create_project,
     create_repo,
@@ -31,14 +32,6 @@ class TestListProjects:
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/projects/list")
-        assert response.status_code in [401, 403]
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_list_only_no_fleets_returns_40x_if_not_authenticated(
-        self, test_db, client: AsyncClient
-    ):
-        response = await client.post("/api/projects/list_only_no_fleets")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
@@ -393,6 +386,14 @@ class TestListProjects:
 class TestListOnlyNoFleets:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_list_only_no_fleets_returns_40x_if_not_authenticated(
+        self, test_db, client: AsyncClient
+    ):
+        response = await client.post("/api/projects/list_only_no_fleets")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_only_no_fleets_returns_projects_without_active_fleets(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -555,6 +556,48 @@ class TestListOnlyNoFleets:
         assert response.status_code == 200
         projects = response.json()
         assert len(projects) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_only_no_fleets_not_includes_project_with_imported_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        exporter_project = await create_project(
+            session=session, owner=user, name="exporter_project"
+        )
+        await add_project_member(
+            session=session, project=exporter_project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=exporter_project)
+        importer_project = await create_project(
+            session=session, owner=user, name="importer_project"
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.USER
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        project_no_fleets = await create_project(
+            session=session, owner=user, name="project_no_fleets"
+        )
+        await add_project_member(
+            session=session, project=project_no_fleets, user=user, project_role=ProjectRole.USER
+        )
+
+        response = await client.post(
+            "/api/projects/list_only_no_fleets",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        projects = response.json()
+
+        assert len(projects) == 1
+        assert projects[0]["project_name"] == "project_no_fleets"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
