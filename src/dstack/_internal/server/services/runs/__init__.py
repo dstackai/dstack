@@ -24,6 +24,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Job,
+    JobConnectionInfo,
     JobStatus,
     JobSubmission,
     JobTerminationReason,
@@ -53,6 +54,7 @@ from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
     delay_job_instance_termination,
     get_job_configured_volumes,
+    get_job_connection_info,
     get_job_spec,
     get_jobs_from_run_spec,
     job_model_to_job_submission,
@@ -294,7 +296,7 @@ async def get_run_by_name(
     run_model = await get_run_model_by_name(session=session, project=project, run_name=run_name)
     if run_model is None:
         return None
-    return run_model_to_run(run_model, return_in_api=True)
+    return run_model_to_run(run_model, return_in_api=True, include_job_connection_info=True)
 
 
 async def get_run_by_id(
@@ -315,7 +317,7 @@ async def get_run_by_id(
     run_model = res.scalar()
     if run_model is None:
         return None
-    return run_model_to_run(run_model, return_in_api=True)
+    return run_model_to_run(run_model, return_in_api=True, include_job_connection_info=True)
 
 
 async def get_plan(
@@ -744,17 +746,20 @@ def run_model_to_run(
     job_submissions_limit: Optional[int] = None,
     return_in_api: bool = False,
     include_sensitive: bool = False,
+    include_job_connection_info: bool = False,
 ) -> Run:
+    run_spec = get_run_spec(run_model)
+
     jobs: List[Job] = []
     if include_jobs:
         jobs = _get_run_jobs_with_submissions(
             run_model=run_model,
+            run_spec=run_spec,
             job_submissions_limit=job_submissions_limit,
             return_in_api=return_in_api,
             include_sensitive=include_sensitive,
+            include_job_connection_info=include_job_connection_info,
         )
-
-    run_spec = get_run_spec(run_model)
 
     latest_job_submission = None
     if len(jobs) > 0 and len(jobs[0].job_submissions) > 0:
@@ -808,9 +813,11 @@ def _set_run_resources_defaults(run_spec: RunSpec) -> None:
 
 def _get_run_jobs_with_submissions(
     run_model: RunModel,
+    run_spec: RunSpec,
     job_submissions_limit: Optional[int],
     return_in_api: bool = False,
     include_sensitive: bool = False,
+    include_job_connection_info: bool = False,
 ) -> List[Job]:
     jobs: List[Job] = []
     run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
@@ -845,7 +852,16 @@ def _get_run_jobs_with_submissions(
                 job_spec = get_job_spec(job_model)
                 if not include_sensitive:
                     remove_job_spec_sensitive_info(job_spec)
-                jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
+                job_connection_info: Optional[JobConnectionInfo] = None
+                if include_job_connection_info and job_model.status == JobStatus.RUNNING:
+                    job_connection_info = get_job_connection_info(job_model, run_spec)
+                jobs.append(
+                    Job(
+                        job_spec=job_spec,
+                        job_submissions=submissions,
+                        job_connection_info=job_connection_info,
+                    )
+                )
     return jobs
 
 

@@ -3,7 +3,7 @@ from typing import Union
 
 import pytest
 
-from dstack._internal.utils.env import Environ, _Value
+from dstack._internal.utils.env import Environ
 
 
 class _TestEnviron:
@@ -87,7 +87,9 @@ class TestEnvironGetEnum(_TestEnviron):
             pytest.param(_IntEnum, int, "100", id="int"),
         ],
     )
-    def test_is_set(self, enum_cls: type[_Enum], value_type: type[_Value], value: str):
+    def test_is_set(
+        self, enum_cls: type[_Enum], value_type: Union[type[str], type[int]], value: str
+    ):
         environ = self.get_environ(VAR=value)
         assert environ.get_enum("VAR", enum_cls, value_type=value_type) is enum_cls.FOO
 
@@ -107,7 +109,31 @@ class TestEnvironGetEnum(_TestEnviron):
             pytest.param(_IntEnum, int, "10a", id="invalid-int"),
         ],
     )
-    def test_error_bad_value(self, enum_cls: type[_Enum], value_type: type[_Value], value: str):
+    def test_error_bad_value(
+        self, enum_cls: type[_Enum], value_type: Union[type[str], type[int]], value: str
+    ):
         environ = self.get_environ(VAR=value)
         with pytest.raises(ValueError, match=f"VAR={value}"):
             environ.get_enum("VAR", enum_cls, value_type=value_type)
+
+
+class TestEnvironGetCallback(_TestEnviron):
+    def test_is_set(self):
+        environ = self.get_environ(VAR="foo bar")
+        assert environ.get_callback("VAR", str.split) == ["foo", "bar"]
+
+    def test_not_set_default_not_set(self):
+        environ = self.get_environ()
+        assert environ.get_callback("VAR", str.split) is None
+
+    def test_not_set_default_is_set(self):
+        environ = self.get_environ()
+        assert environ.get_callback("VAR", str.split, default=["default"]) == ["default"]
+
+    def test_error_bad_value(self):
+        def callback(value: str) -> list[str]:
+            raise ValueError("bad value")
+
+        environ = self.get_environ(VAR="value")
+        with pytest.raises(ValueError, match="bad value: VAR=value"):
+            environ.get_callback("VAR", callback=callback)

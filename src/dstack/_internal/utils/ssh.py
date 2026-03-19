@@ -344,3 +344,64 @@ def find_ssh_util(name: str) -> Optional[Path]:
     if path.exists():
         return path
     return None
+
+
+def build_ssh_command(
+    *,
+    username: Optional[str] = None,
+    hostname: str,
+    port: Optional[int] = None,
+    ssh_executable: Optional[str] = None,
+) -> list[str]:
+    """
+    Builds an SSH client command line to connect.
+
+    The resulting command is:
+
+        ssh [username@]hostname [-p port]
+
+    The port argument -p is only included if the port is not the default SSH port (22).
+
+    :param username: an optional user login name.
+    :param hostname: a hostname, required.
+    :param port: an optional SSH port, defaults to 22.
+    :param ssh_executable: an optional file name or path of the SSH client, defaults to `ssh`.
+    :return: a list of command line arguments including the executable.
+    """
+    if ssh_executable is None:
+        ssh_executable = "ssh"
+    command: list[str] = [ssh_executable]
+    if username is not None:
+        command.append(f"{username}@{hostname}")
+    else:
+        command.append(hostname)
+    if port is not None and port != 22:
+        command.extend(("-p", str(port)))
+    return command
+
+
+def build_ssh_url_authority(
+    *, username: Optional[str] = None, hostname: str, port: Optional[int] = None
+) -> str:
+    """
+    Builds an authority URL component for use with ssh:// and ssh-based URLs (e.g., vscode://).
+
+    The authority component consists of subcomponents:
+
+        authority = [userinfo "@"] host [":" port]
+
+    The port subcomponent is only included if the port is not the default SSH port (22).
+
+    :param username: an optional user login name, used as the userinfo if provided.
+    :param hostname: a hostname, required.
+    :param port: an optional SSH port, defaults to 22.
+    :return: the authority URL component as a string.
+    """
+    if ":" in hostname and not hostname.startswith("["):
+        hostname = f"[{hostname}]"
+    authority = hostname
+    if username is not None:
+        authority = f"{username}@{authority}"
+    if port is not None and port != 22:
+        authority = f"{authority}:{port}"
+    return authority

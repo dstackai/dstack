@@ -1,21 +1,21 @@
-import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.server import settings
 from dstack._internal.server.db import get_session
 from dstack._internal.server.schemas.sshproxy import GetUpstreamRequest, GetUpstreamResponse
 from dstack._internal.server.security.permissions import AlwaysForbidden, ServiceAccount
-from dstack._internal.server.services.sshproxy import get_upstream_response
+from dstack._internal.server.services.sshproxy.handlers import get_upstream_response
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
     get_base_api_additional_responses,
 )
 
-if _token := os.getenv("DSTACK_SSHPROXY_API_TOKEN"):
-    _auth = ServiceAccount(_token)
+if settings.SSHPROXY_API_TOKEN is not None:
+    _auth = ServiceAccount(settings.SSHPROXY_API_TOKEN)
 else:
     _auth = AlwaysForbidden()
 

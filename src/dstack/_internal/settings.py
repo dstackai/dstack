@@ -50,3 +50,8 @@ class FeatureFlags:
     # DSTACK_FF_PIPELINE_PROCESSING_ENABLED enables new pipeline-based processing tasks (background/pipeline_tasks/)
     # instead of scheduler-based processing tasks (background/scheduled_tasks/) for tasks that implement pipelines.
     PIPELINE_PROCESSING_ENABLED = os.getenv("DSTACK_FF_PIPELINE_PROCESSING_ENABLED") is not None
+    # If DSTACK_FF_CLI_PRINT_JOB_CONNECTION_INFO enabled, `dstack apply` command prints server-provided
+    # IDE URL(s) and SSH command(s) before job logs (for dev-environments only).
+    CLI_PRINT_JOB_CONNECTION_INFO = (
+        os.getenv("DSTACK_FF_CLI_PRINT_JOB_CONNECTION_INFO") is not None
+    )

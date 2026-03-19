@@ -57,6 +57,7 @@ from dstack._internal.core.services.repos import (
     get_repo_creds_and_default_branch,
 )
 from dstack._internal.core.services.ssh.ports import PortUsedError
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import local_time
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
@@ -215,6 +216,7 @@ class BaseRunConfigurator(
                 current_job_submission = run._run.latest_job_submission
                 if run.status in (RunStatus.RUNNING, RunStatus.DONE):
                     _print_service_urls(run)
+                    _print_dev_environment_connection_info(run)
                     bind_address: Optional[str] = getattr(
                         configurator_args, _BIND_ADDRESS_ARG, None
                     )
@@ -802,6 +804,30 @@ def _print_service_urls(run: Run) -> None:
     if model := run.service_model:
         console.print(
             f"Model [code]{model.name}[/] is published at:\n  [link={model.url}]{model.url}[/]"
+        )
+    console.print()
+
+
+def _print_dev_environment_connection_info(run: Run) -> None:
+    if not FeatureFlags.CLI_PRINT_JOB_CONNECTION_INFO:
+        return
+    if run._run.run_spec.configuration.type != RunConfigurationType.DEV_ENVIRONMENT.value:
+        return
+    jci = run._run.jobs[0].job_connection_info
+    if jci is None:
+        return
+    if jci.ide_name:
+        urls = [u for u in (jci.attached_ide_url, jci.proxied_ide_url) if u]
+        if urls:
+            console.print(
+                f"To open in {jci.ide_name}, use link{'s' if len(urls) > 1 else ''} below:\n"
+            )
+            for link in urls:
+                console.print(f"  [link={link}]{link}[/]\n")
+    ssh_commands = [" ".join(c) for c in (jci.attached_ssh_command, jci.proxied_ssh_command) if c]
+    if ssh_commands:
+        console.print(
+            f"To connect via SSH, use: {' or '.join(f'[code]{c}[/]' for c in ssh_commands)}\n"
         )
     console.print()
 
