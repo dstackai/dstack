@@ -348,12 +348,10 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
     run_spec = run.run_spec
     retry_single_job = _can_retry_single_job(run_spec)
     _maybe_set_run_fleet_id_from_jobs(run_model)
-    run_jobs_by_position = _get_run_jobs_by_position(run)
     analysis = await _analyze_active_run(
         session=session,
         run_model=run_model,
         run=run,
-        run_jobs_by_position=run_jobs_by_position,
         retry_single_job=retry_single_job,
     )
     transition = _get_active_run_transition(run, analysis)
@@ -368,18 +366,16 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
     )
 
 
-def _get_run_jobs_by_position(run: Run) -> Dict[Tuple[int, int], Job]:
-    return {(job.job_spec.replica_num, job.job_spec.job_num): job for job in run.jobs}
-
-
 async def _analyze_active_run(
     session: AsyncSession,
     run_model: RunModel,
     run: Run,
-    run_jobs_by_position: Dict[Tuple[int, int], Job],
     retry_single_job: bool,
 ) -> _RunAnalysis:
     run_analysis = _RunAnalysis()
+    run_jobs_by_position = {
+        (job.job_spec.replica_num, job.job_spec.job_num): job for job in run.jobs
+    }
     for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         replica_analysis = await _analyze_active_run_replica(
             session=session,
