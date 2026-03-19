@@ -484,7 +484,6 @@ def get_instance_offers_in_fleet(
         instances=fleet_model.instances,
         profile=profile,
         requirements=job.job_spec.requirements,
-        fleet_model=fleet_model,
         multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
@@ -495,7 +494,6 @@ def get_instance_offers_in_fleet(
         instances=fleet_model.instances,
         profile=profile,
         requirements=job.job_spec.requirements,
-        fleet_model=fleet_model,
         multinode=multinode,
         volumes=volumes,
     )
