@@ -320,7 +320,7 @@ class _ReplicaAnalysis:
 class _ActiveRunAnalysis:
     """Aggregated replica analysis used to determine the run's next status.
 
-    Each replica contributes `RunStatus` based on its jobs.
+    Each replica contributes `RunStatus` based on its jobs' statuses.
     The run's new status is the highest-priority value across all
     contributing replicas: FAILED > RUNNING > PROVISIONING > SUBMITTED > DONE.
     Replicas that need full retry do not contribute and instead cause a PENDING transition.
@@ -520,6 +520,7 @@ def _job_needs_retry_evaluation(job_model: JobModel) -> bool:
 
 
 def _get_active_run_transition(run: Run, analysis: _ActiveRunAnalysis) -> _ActiveRunTransition:
+    # Check `analysis.contributed_statuses` in the priority order.
     if RunStatus.FAILED in analysis.contributed_statuses:
         if RunTerminationReason.JOB_FAILED in analysis.termination_reasons:
             termination_reason = RunTerminationReason.JOB_FAILED
@@ -660,12 +661,10 @@ async def _handle_run_replicas(
     replicas_info: list[autoscalers.ReplicaInfo],
 ) -> None:
     """
-    Does ONE of:
-    - replica retry
-    - replica scaling
-    - replica rolling deployment
-
-    Does not do everything at once to avoid conflicts between the stages and long DB transactions.
+    Performs one or more steps:
+    - replicas retry
+    - replicas scaling
+    - replicas rolling deployment
     """
 
     if replicas_to_retry:
@@ -683,53 +682,26 @@ async def _handle_run_replicas(
             # FIXME: should only include scaling events, not retries and deployments
             last_scaled_at=max((r.timestamp for r in replicas_info), default=None),
         )
-        replicas: List[ReplicaGroup] = run_spec.configuration.replica_groups
-        assert replicas, "replica groups should always return at least one group"
+        replica_groups: List[ReplicaGroup] = run_spec.configuration.replica_groups
+        assert replica_groups, "replica groups should always return at least one group"
 
-        await scale_run_replicas_for_all_groups(session, run_model, replicas)
+        await scale_run_replicas_for_all_groups(session, run_model, replica_groups)
 
-        # Handle per-group rolling deployment
         await _update_jobs_to_new_deployment_in_place(
             session=session,
             run_model=run_model,
             run_spec=run_spec,
-            replicas=replicas,
+            replicas=replica_groups,
         )
-        # Process per-group rolling deployment
-        for group in replicas:
+
+        for group in replica_groups:
             await _handle_rolling_deployment_for_group(
                 session=session, run_model=run_model, group=group, run_spec=run_spec
             )
-        # Terminate replicas from groups that were removed from the configuration
-        existing_group_names = set()
-        for job in run_model.jobs:
-            if job.status.is_finished():
-                continue
-            job_spec = get_job_spec(job)
-            existing_group_names.add(job_spec.replica_group)
-        new_group_names = {group.name for group in replicas}
-        removed_group_names = existing_group_names - new_group_names
-        for removed_group_name in removed_group_names:
-            # Build replica lists for this removed group
-            active_replicas, inactive_replicas = build_replica_lists(
-                run_model=run_model,
-                group_filter=removed_group_name,
-            )
 
-            total_replicas = len(active_replicas) + len(inactive_replicas)
-            if total_replicas > 0:
-                logger.info(
-                    "%s: terminating %d replica(s) from removed group '%s'",
-                    fmt(run_model),
-                    total_replicas,
-                    removed_group_name,
-                )
-                # Terminate all active replicas in the removed group
-                if active_replicas:
-                    scale_down_replicas(session, active_replicas, len(active_replicas))
-                # Terminate all inactive replicas in the removed group
-                if inactive_replicas:
-                    scale_down_replicas(session, inactive_replicas, len(inactive_replicas))
+        _terminate_removed_replica_groups(
+            session=session, run_model=run_model, replica_groups=replica_groups
+        )
         return
 
     await _update_jobs_to_new_deployment_in_place(
@@ -883,20 +855,14 @@ async def _handle_rolling_deployment_for_group(
     """
     Handle rolling deployment for a single replica group.
     """
+    if not has_out_of_date_replicas(run_model, group_filter=group.name):
+        return
+
     desired_replica_counts = (
         json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
     )
-
     group_desired = desired_replica_counts.get(group.name, group.count.min or 0)
-
-    # Check if group has out-of-date replicas
-    if not has_out_of_date_replicas(run_model, group_filter=group.name):
-        return  # Group is up-to-date
-
-    # Calculate max replicas (allow surge during deployment)
     group_max_replica_count = group_desired + ROLLING_DEPLOYMENT_MAX_SURGE
-
-    # Count non-terminated replicas for this group only
 
     non_terminated_replica_count = len(
         {
@@ -970,3 +936,33 @@ async def _handle_rolling_deployment_for_group(
             active_replicas=active_replicas,
             inactive_replicas=inactive_replicas,
         )
+
+
+def _terminate_removed_replica_groups(
+    session: AsyncSession, run_model: RunModel, replica_groups: List[ReplicaGroup]
+):
+    existing_group_names = set()
+    for job in run_model.jobs:
+        if job.status.is_finished():
+            continue
+        job_spec = get_job_spec(job)
+        existing_group_names.add(job_spec.replica_group)
+    new_group_names = {group.name for group in replica_groups}
+    removed_group_names = existing_group_names - new_group_names
+    for removed_group_name in removed_group_names:
+        active_replicas, inactive_replicas = build_replica_lists(
+            run_model=run_model,
+            group_filter=removed_group_name,
+        )
+        total_replicas = len(active_replicas) + len(inactive_replicas)
+        if total_replicas > 0:
+            logger.info(
+                "%s: terminating %d replica(s) from removed group '%s'",
+                fmt(run_model),
+                total_replicas,
+                removed_group_name,
+            )
+            if active_replicas:
+                scale_down_replicas(session, active_replicas, len(active_replicas))
+            if inactive_replicas:
+                scale_down_replicas(session, inactive_replicas, len(inactive_replicas))
