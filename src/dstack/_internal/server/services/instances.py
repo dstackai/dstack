@@ -504,7 +504,14 @@ async def get_pool_instances(
     res = await session.execute(
         select(InstanceModel)
         .where(
-            InstanceModel.project_id == project.id,
+            or_(
+                InstanceModel.project_id == project.id,
+                exists().where(
+                    ImportModel.project_id == project.id,
+                    ImportModel.export_id == ExportedFleetModel.export_id,
+                    ExportedFleetModel.fleet_id == InstanceModel.fleet_id,
+                ),
+            ),
             InstanceModel.deleted == False,
         )
         .options(joinedload(InstanceModel.fleet))

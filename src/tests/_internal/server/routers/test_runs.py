@@ -1388,11 +1388,22 @@ class TestGetRunPlan:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "configuration",
+        [
+            pytest.param({"type": "dev-environment", "ide": "vscode"}, id="regular-configuration"),
+            pytest.param(
+                {"type": "task", "commands": [":"], "image": "scratch"},
+                id="special-configuration-used-by-dstack-offer-cli-command",
+            ),
+        ],
+    )
     async def test_returns_run_plan_with_offer_from_imported_fleet(
         self,
         test_db,
         session: AsyncSession,
         client: AsyncClient,
+        configuration: dict,
     ) -> None:
         importer_user = await create_user(session, global_role=GlobalRole.USER)
         exporter_project = await create_project(session, name="exporter-project")
@@ -1424,7 +1435,7 @@ class TestGetRunPlan:
             exported_fleets=[fleet],
         )
 
-        run_spec = {"configuration": {"type": "dev-environment", "ide": "vscode"}}
+        run_spec = {"configuration": configuration}
         body = {"run_spec": run_spec}
         response = await client.post(
             "/api/project/importer-project/runs/get_plan",
