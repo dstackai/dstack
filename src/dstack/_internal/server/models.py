@@ -391,7 +391,7 @@ class FileArchiveModel(BaseModel):
     """`blob` is stored on S3 when it is `None`."""
 
 
-class RunModel(BaseModel):
+class RunModel(PipelineModelMixin, BaseModel):
     __tablename__ = "runs"
 
     id: Mapped[uuid.UUID] = mapped_column(
