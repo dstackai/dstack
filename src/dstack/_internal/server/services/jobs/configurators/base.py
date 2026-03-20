@@ -280,7 +280,7 @@ class JobConfigurator(ABC):
 
     async def _user(self) -> Optional[UnixUser]:
         user = self.run_spec.configuration.user
-        if user is None:
+        if user is None and self.run_spec.configuration.image is not None:
             image_config = await self._get_image_config()
             user = image_config.user
         if user is None:
