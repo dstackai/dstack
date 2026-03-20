@@ -28,13 +28,13 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class RunUpdateMap(ItemUpdateMap, total=False):
+class TerminatingRunUpdateMap(ItemUpdateMap, total=False):
     status: RunStatus
     next_triggered_at: Optional[datetime]
     fleet_id: Optional[uuid.UUID]
 
 
-class JobUpdateMap(ItemUpdateMap, total=False):
+class TerminatingRunJobUpdateMap(ItemUpdateMap, total=False):
     status: JobStatus
     termination_reason: Optional[JobTerminationReason]
     remove_at: Optional[datetime]
@@ -54,8 +54,8 @@ class TerminatingContext:
 
 @dataclass
 class TerminatingResult:
-    run_update_map: RunUpdateMap = field(default_factory=RunUpdateMap)
-    job_id_to_update_map: dict[uuid.UUID, JobUpdateMap] = field(default_factory=dict)
+    run_update_map: TerminatingRunUpdateMap = field(default_factory=TerminatingRunUpdateMap)
+    job_id_to_update_map: dict[uuid.UUID, TerminatingRunJobUpdateMap] = field(default_factory=dict)
     service_unregistration: Optional[ServiceUnregistration] = None
 
 
@@ -113,15 +113,15 @@ def _get_job_id_to_update_map(
     delayed_job_ids: list[uuid.UUID],
     regular_job_ids: list[uuid.UUID],
     job_termination_reason: JobTerminationReason,
-) -> dict[uuid.UUID, JobUpdateMap]:
+) -> dict[uuid.UUID, TerminatingRunJobUpdateMap]:
     job_id_to_update_map = {}
     for job_id in regular_job_ids:
-        job_id_to_update_map[job_id] = JobUpdateMap(
+        job_id_to_update_map[job_id] = TerminatingRunJobUpdateMap(
             status=JobStatus.TERMINATING,
             termination_reason=job_termination_reason,
         )
     for job_id in delayed_job_ids:
-        job_id_to_update_map[job_id] = JobUpdateMap(
+        job_id_to_update_map[job_id] = TerminatingRunJobUpdateMap(
             status=JobStatus.TERMINATING,
             termination_reason=job_termination_reason,
             remove_at=get_current_datetime() + timedelta(seconds=15),
@@ -129,19 +129,19 @@ def _get_job_id_to_update_map(
     return job_id_to_update_map
 
 
-def _get_run_update_map(run_model: models.RunModel) -> RunUpdateMap:
+def _get_run_update_map(run_model: models.RunModel) -> TerminatingRunUpdateMap:
     termination_reason = get_or_error(run_model.termination_reason)
     run_spec = get_run_spec(run_model)
     if run_spec.merged_profile.schedule is not None and termination_reason not in {
         RunTerminationReason.ABORTED_BY_USER,
         RunTerminationReason.STOPPED_BY_USER,
     }:
-        return RunUpdateMap(
+        return TerminatingRunUpdateMap(
             status=RunStatus.PENDING,
             next_triggered_at=_get_next_triggered_at(run_spec),
             fleet_id=None,
         )
-    return RunUpdateMap(status=termination_reason.to_status())
+    return TerminatingRunUpdateMap(status=termination_reason.to_status())
 
 
 async def _unregister_service(run_model: models.RunModel) -> Optional[ServiceUnregistration]:

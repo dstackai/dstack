@@ -28,11 +28,10 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services import events
-from dstack._internal.server.services.jobs import (
-    emit_job_status_change_event,
-)
+from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
-from dstack._internal.server.services.runs import emit_run_status_change_event
+from dstack._internal.server.services.runs import emit_run_status_change_event, get_run_spec
+from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -238,7 +237,147 @@ class RunWorker(Worker[RunPipelineItem]):
 
 
 async def _process_pending_item(item: RunPipelineItem) -> None:
-    await pending.process_pending_run(pending.PendingContext(run_id=item.id))
+    async with get_session_ctx() as session:
+        context = await _load_pending_context(session=session, item=item)
+        if context is None:
+            return
+
+    result = await pending.process_pending_run(context)
+    if result is None:
+        await _apply_noop_result(
+            item=item,
+            locked_job_ids=[jm.id for jm in context.locked_job_models],
+        )
+        return
+
+    await _apply_pending_result(item=item, context=context, result=result)
+
+
+async def _load_pending_context(
+    session: AsyncSession,
+    item: RunPipelineItem,
+) -> Optional[pending.PendingContext]:
+    run_model = await _refetch_locked_run_for_pending(session=session, item=item)
+    if run_model is None:
+        log_lock_token_mismatch(logger, item)
+        return None
+    locked_job_models = await _lock_related_jobs(session=session, item=item)
+    if locked_job_models is None:
+        return None
+    secrets = await get_project_secrets_mapping(session=session, project=run_model.project)
+    run_spec = get_run_spec(run_model)
+    return pending.PendingContext(
+        run_model=run_model,
+        run_spec=run_spec,
+        secrets=secrets,
+        locked_job_models=locked_job_models,
+    )
+
+
+async def _refetch_locked_run_for_pending(
+    session: AsyncSession,
+    item: RunPipelineItem,
+) -> Optional[RunModel]:
+    res = await session.execute(
+        select(RunModel)
+        .where(
+            RunModel.id == item.id,
+            RunModel.lock_token == item.lock_token,
+        )
+        .options(
+            joinedload(RunModel.project).load_only(
+                ProjectModel.id,
+                ProjectModel.name,
+            ),
+            selectinload(RunModel.jobs),
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one_or_none()
+
+
+async def _apply_pending_result(
+    item: RunPipelineItem,
+    context: pending.PendingContext,
+    result: pending.PendingResult,
+) -> None:
+    set_processed_update_map_fields(result.run_update_map)
+    set_unlock_update_map_fields(result.run_update_map)
+
+    async with get_session_ctx() as session:
+        now = get_current_datetime()
+        resolve_now_placeholders(result.run_update_map, now=now)
+
+        res = await session.execute(
+            update(RunModel)
+            .where(
+                RunModel.id == item.id,
+                RunModel.lock_token == item.lock_token,
+            )
+            .values(**result.run_update_map)
+            .returning(RunModel.id)
+        )
+        updated_run_ids = list(res.scalars().all())
+        if len(updated_run_ids) == 0:
+            log_lock_token_changed_after_processing(logger, item)
+            await _unlock_related_jobs(
+                session=session,
+                item=item,
+                locked_job_ids=[jm.id for jm in context.locked_job_models],
+            )
+            await session.commit()
+            return
+
+        for job_model in result.new_job_models:
+            session.add(job_model)
+            events.emit(
+                session,
+                f"Job created on new submission. Status: {job_model.status.upper()}",
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(job_model)],
+            )
+
+        emit_run_status_change_event(
+            session=session,
+            run_model=context.run_model,
+            old_status=context.run_model.status,
+            new_status=result.run_update_map.get("status", context.run_model.status),
+        )
+
+        await _unlock_related_jobs(
+            session=session,
+            item=item,
+            locked_job_ids=[jm.id for jm in context.locked_job_models],
+        )
+        await session.commit()
+
+
+async def _apply_noop_result(
+    item: RunPipelineItem,
+    locked_job_ids: Sequence[uuid.UUID],
+) -> None:
+    """Unlock the run without changing state. Used when processing decides to skip."""
+    async with get_session_ctx() as session:
+        now = get_current_datetime()
+        await session.execute(
+            update(RunModel)
+            .where(
+                RunModel.id == item.id,
+                RunModel.lock_token == item.lock_token,
+            )
+            .values(
+                lock_expires_at=None,
+                lock_token=None,
+                lock_owner=None,
+                last_processed_at=now,
+            )
+        )
+        await _unlock_related_jobs(
+            session=session,
+            item=item,
+            locked_job_ids=locked_job_ids,
+        )
+        await session.commit()
 
 
 async def _process_active_item(item: RunPipelineItem) -> None:
@@ -412,6 +551,8 @@ async def _apply_terminating_result(
         )
         updated_run_ids = list(res.scalars().all())
         if len(updated_run_ids) == 0:
+            # The only side-effects are runner stop signal and service deregistration,
+            # and they are idempotent, so no need for cleanup.
             log_lock_token_changed_after_processing(logger, item)
             await _unlock_related_jobs(
                 session=session,
@@ -449,17 +590,17 @@ async def _apply_terminating_result(
         await session.commit()
 
 
-class _JobUpdateRow(terminating.JobUpdateMap, total=False):
+class _TerminatingRunJobUpdateRow(terminating.TerminatingRunJobUpdateMap, total=False):
     id: uuid.UUID
 
 
 def _build_terminating_job_update_rows(
-    job_id_to_update_map: dict[uuid.UUID, terminating.JobUpdateMap],
+    job_id_to_update_map: dict[uuid.UUID, terminating.TerminatingRunJobUpdateMap],
     unlock_job_ids: set[uuid.UUID],
-) -> list[_JobUpdateRow]:
+) -> list[_TerminatingRunJobUpdateRow]:
     job_update_rows = []
     for job_id in sorted(job_id_to_update_map.keys() | unlock_job_ids):
-        update_row = _JobUpdateRow(id=job_id)
+        update_row = _TerminatingRunJobUpdateRow(id=job_id)
         job_update_map = job_id_to_update_map.get(job_id)
         if job_update_map is not None:
             for key, value in job_update_map.items():
