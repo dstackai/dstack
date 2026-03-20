@@ -199,19 +199,13 @@ class FleetWorker(Worker[PipelineItem]):
         process_context = await _load_process_context(item)
         if process_context is None:
             return
-        result = await _process_fleet(
-            process_context.fleet_model,
-            consolidation_fleet_spec=process_context.consolidation_fleet_spec,
-            consolidation_instances=process_context.consolidation_instances,
-        )
+        result = await _process_fleet(process_context.fleet_model)
         await _apply_process_result(item, process_context, result)
 
 
 @dataclass
 class _ProcessContext:
     fleet_model: FleetModel
-    consolidation_fleet_spec: Optional[FleetSpec]
-    consolidation_instances: Optional[list[InstanceModel]]
     locked_instance_ids: set[uuid.UUID] = field(default_factory=set)
 
 
@@ -260,34 +254,64 @@ class _MaintainNodesResult:
 
 async def _load_process_context(item: PipelineItem) -> Optional[_ProcessContext]:
     async with get_session_ctx() as session:
-        fleet_model = await _refetch_locked_fleet(session=session, item=item)
+        fleet_model = await _refetch_locked_fleet_for_lock_decision(session=session, item=item)
         if fleet_model is None:
             log_lock_token_mismatch(logger, item)
             return None
 
-        consolidation_fleet_spec = _get_fleet_spec_if_ready_for_consolidation(fleet_model)
-        consolidation_instances = None
-        if consolidation_fleet_spec is not None:
-            consolidation_instances = await _lock_fleet_instances_for_consolidation(
-                session=session,
-                item=item,
-            )
-            if consolidation_instances is None:
-                return None
+        locked_instance_ids = await _lock_fleet_instances_for_processing(
+            session=session,
+            item=item,
+            fleet_model=fleet_model,
+        )
+        if locked_instance_ids is None:
+            return None
+
+        fleet_model = await _refetch_locked_fleet_for_processing(session=session, item=item)
+        if fleet_model is None:
+            log_lock_token_mismatch(logger, item)
+            if locked_instance_ids:
+                await _unlock_fleet_locked_instances(
+                    session=session,
+                    item=item,
+                    locked_instance_ids=locked_instance_ids,
+                )
+                await session.commit()
+            return None
 
         return _ProcessContext(
             fleet_model=fleet_model,
-            consolidation_fleet_spec=consolidation_fleet_spec,
-            consolidation_instances=consolidation_instances,
-            locked_instance_ids=(
-                set()
-                if consolidation_instances is None
-                else {i.id for i in consolidation_instances}
-            ),
+            locked_instance_ids=locked_instance_ids,
         )
 
 
-async def _refetch_locked_fleet(
+async def _refetch_locked_fleet_for_lock_decision(
+    session: AsyncSession,
+    item: PipelineItem,
+) -> Optional[FleetModel]:
+    res = await session.execute(
+        select(FleetModel)
+        .where(
+            FleetModel.id == item.id,
+            FleetModel.lock_token == item.lock_token,
+        )
+        .options(
+            load_only(
+                FleetModel.id,
+                FleetModel.status,
+                FleetModel.spec,
+                FleetModel.current_master_instance_id,
+                FleetModel.consolidation_attempt,
+                FleetModel.last_consolidated_at,
+                FleetModel.last_processed_at,
+            )
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one_or_none()
+
+
+async def _refetch_locked_fleet_for_processing(
     session: AsyncSession,
     item: PipelineItem,
 ) -> Optional[FleetModel]:
@@ -308,6 +332,7 @@ async def _refetch_locked_fleet(
                 FleetModel.runs.and_(RunModel.status.not_in(RunStatus.finished_statuses()))
             ).load_only(RunModel.status)
         )
+        .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
 
@@ -326,10 +351,17 @@ def _get_fleet_spec_if_ready_for_consolidation(fleet_model: FleetModel) -> Optio
     return consolidation_fleet_spec
 
 
-async def _lock_fleet_instances_for_consolidation(
+async def _lock_fleet_instances_for_processing(
     session: AsyncSession,
     item: PipelineItem,
-) -> Optional[list[InstanceModel]]:
+    fleet_model: FleetModel,
+) -> Optional[set[uuid.UUID]]:
+    if _get_fleet_spec_if_ready_for_consolidation(fleet_model) is None:
+        if fleet_model.current_master_instance_id is None:
+            return set()
+        if not _is_cloud_cluster_fleet_spec(get_fleet_spec(fleet_model)):
+            return set()
+
     instance_lock, _ = get_locker(get_db().dialect_name).get_lockset(InstanceModel.__tablename__)
     async with instance_lock:
         res = await session.execute(
@@ -347,6 +379,7 @@ async def _lock_fleet_instances_for_consolidation(
                 ),
             )
             .with_for_update(skip_locked=True, key_share=True, of=InstanceModel)
+            .options(load_only(InstanceModel.id))
         )
         locked_instance_models = list(res.scalars().all())
         locked_instance_ids = {instance_model.id for instance_model in locked_instance_models}
@@ -389,7 +422,7 @@ async def _lock_fleet_instances_for_consolidation(
             instance_model.lock_token = item.lock_token
             instance_model.lock_owner = FleetPipeline.__name__
         await session.commit()
-        return locked_instance_models
+        return locked_instance_ids
 
 
 async def _apply_process_result(
@@ -461,16 +494,14 @@ async def _apply_process_result(
 
 async def _process_fleet(
     fleet_model: FleetModel,
-    consolidation_fleet_spec: Optional[FleetSpec] = None,
-    consolidation_instances: Optional[Sequence[InstanceModel]] = None,
 ) -> _ProcessResult:
     result = _ProcessResult()
-    effective_instances = list(consolidation_instances or fleet_model.instances)
+    consolidation_fleet_spec = _get_fleet_spec_if_ready_for_consolidation(fleet_model)
     if consolidation_fleet_spec is not None:
         result = _consolidate_fleet_state_with_spec(
             fleet_model,
             consolidation_fleet_spec=consolidation_fleet_spec,
-            consolidation_instances=effective_instances,
+            consolidation_instances=fleet_model.instances,
         )
     if len(result.new_instance_creates) == 0 and _should_delete_fleet(fleet_model):
         result.fleet_update_map["status"] = FleetStatus.TERMINATED
@@ -478,13 +509,13 @@ async def _process_fleet(
         result.fleet_update_map["deleted_at"] = NOW_PLACEHOLDER
     _set_fail_instances_on_master_bootstrap_failure(
         fleet_model=fleet_model,
-        instance_models=effective_instances,
+        instance_models=fleet_model.instances,
         instance_id_to_update_map=result.instance_id_to_update_map,
     )
     _set_current_master_instance_id(
         fleet_model=fleet_model,
         fleet_update_map=result.fleet_update_map,
-        instance_models=effective_instances,
+        instance_models=fleet_model.instances,
         instance_id_to_update_map=result.instance_id_to_update_map,
         new_instance_creates=result.new_instance_creates,
     )

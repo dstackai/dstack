@@ -743,6 +743,77 @@ class TestFleetWorker:
         assert sibling2.termination_reason == InstanceTerminationReason.MASTER_FAILED
         assert fleet.current_master_instance_id is None
 
+    async def test_master_failure_path_resets_when_sibling_instance_is_locked(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    nodes=FleetNodesSpec(min=0, target=3, max=3),
+                )
+            ),
+        )
+        failed_master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.TERMINATED,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=0,
+        )
+        failed_master.termination_reason = InstanceTerminationReason.NO_OFFERS
+        locked_sibling = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=1,
+        )
+        free_sibling = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            job_provisioning_data=None,
+            offer=None,
+            instance_num=2,
+        )
+        original_last_processed_at = fleet.last_processed_at
+        fleet.current_master_instance_id = failed_master.id
+        fleet.consolidation_attempt = 1
+        fleet.last_consolidated_at = datetime.now(timezone.utc)
+        await _lock_fleet_for_processing(session, fleet)
+        fleet.lock_owner = FleetPipeline.__name__
+        locked_sibling.lock_token = uuid.uuid4()
+        locked_sibling.lock_expires_at = get_current_datetime() + timedelta(minutes=1)
+        locked_sibling.lock_owner = "OtherPipeline"
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        await session.refresh(failed_master)
+        await session.refresh(locked_sibling)
+        await session.refresh(free_sibling)
+        assert fleet.current_master_instance_id == failed_master.id
+        assert fleet.lock_owner == FleetPipeline.__name__
+        assert fleet.lock_token is None
+        assert fleet.lock_expires_at is None
+        assert fleet.last_processed_at > original_last_processed_at
+        assert not failed_master.deleted
+        assert locked_sibling.status == InstanceStatus.PENDING
+        assert locked_sibling.termination_reason is None
+        assert locked_sibling.lock_owner == "OtherPipeline"
+        assert free_sibling.status == InstanceStatus.PENDING
+        assert free_sibling.termination_reason is None
+
     async def test_min_zero_failed_master_preserves_provisioned_survivor(
         self, test_db, session: AsyncSession, worker: FleetWorker
     ):

@@ -6,7 +6,12 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.instances import InstanceStatus
-from dstack._internal.core.models.profiles import Profile, ProfileRetry, RetryEvent
+from dstack._internal.core.models.profiles import (
+    Profile,
+    ProfileRetry,
+    RetryEvent,
+    StopCriteria,
+)
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
@@ -251,7 +256,7 @@ class TestRunActiveWorker:
         repo = await create_repo(session=session, project_id=project.id)
         run_spec = get_run_spec(
             repo_id=repo.name,
-            profile=Profile(name="default", stop_criteria="master-done"),
+            profile=Profile(name="default", stop_criteria=StopCriteria.MASTER_DONE),
         )
         run = await create_run(
             session=session,
