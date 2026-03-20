@@ -1,5 +1,6 @@
 """Pending-run processing helpers for the run pipeline."""
 
+import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
@@ -26,7 +27,7 @@ class PendingContext:
     run_model: RunModel
     run_spec: RunSpec
     secrets: dict
-    locked_job_models: list
+    locked_job_ids: list[uuid.UUID]
 
 
 @dataclass

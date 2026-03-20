@@ -220,9 +220,6 @@ class RunWorker(Worker[RunPipelineItem]):
         # Keep status dispatch explicit because run states have distinct processing
         # flows and related-row requirements. Preload, lock handling, and apply
         # stay here, while state modules own the readable business logic.
-        if item.status == RunStatus.TERMINATING:
-            await _process_terminating_item(item)
-            return
         if item.status == RunStatus.PENDING:
             await _process_pending_item(item)
             return
@@ -232,6 +229,9 @@ class RunWorker(Worker[RunPipelineItem]):
             RunStatus.RUNNING,
         }:
             await _process_active_item(item)
+            return
+        if item.status == RunStatus.TERMINATING:
+            await _process_terminating_item(item)
             return
 
         logger.debug("Skipping run %s with unexpected status %s", item.id, item.status)
@@ -247,7 +247,7 @@ async def _process_pending_item(item: RunPipelineItem) -> None:
     if result is None:
         await _apply_noop_result(
             item=item,
-            locked_job_ids=[jm.id for jm in context.locked_job_models],
+            locked_job_ids=context.locked_job_ids,
         )
         return
 
@@ -258,12 +258,18 @@ async def _load_pending_context(
     session: AsyncSession,
     item: RunPipelineItem,
 ) -> Optional[pending.PendingContext]:
+    locked_job_ids = await _lock_related_jobs(session=session, item=item)
+    if locked_job_ids is None:
+        return None
     run_model = await _refetch_locked_run_for_pending(session=session, item=item)
     if run_model is None:
         log_lock_token_mismatch(logger, item)
-        return None
-    locked_job_models = await _lock_related_jobs(session=session, item=item)
-    if locked_job_models is None:
+        await _unlock_related_jobs(
+            session=session,
+            item=item,
+            locked_job_ids=locked_job_ids,
+        )
+        await session.commit()
         return None
     secrets = await get_project_secrets_mapping(session=session, project=run_model.project)
     run_spec = get_run_spec(run_model)
@@ -271,7 +277,7 @@ async def _load_pending_context(
         run_model=run_model,
         run_spec=run_spec,
         secrets=secrets,
-        locked_job_models=locked_job_models,
+        locked_job_ids=locked_job_ids,
     )
 
 
@@ -351,7 +357,7 @@ async def _apply_pending_result(
             await _unlock_related_jobs(
                 session=session,
                 item=item,
-                locked_job_ids=[jm.id for jm in context.locked_job_models],
+                locked_job_ids=context.locked_job_ids,
             )
             await session.commit()
             return
@@ -375,7 +381,7 @@ async def _apply_pending_result(
         await _unlock_related_jobs(
             session=session,
             item=item,
-            locked_job_ids=[jm.id for jm in context.locked_job_models],
+            locked_job_ids=context.locked_job_ids,
         )
         await session.commit()
 
@@ -413,13 +419,13 @@ async def _process_active_item(item: RunPipelineItem) -> None:
         load_result = await _load_active_context(session=session, item=item)
         if load_result is None:
             return
-        context, locked_job_models = load_result
+        context, locked_job_ids = load_result
 
     if context is None:
         # Service or other skip — unlock without state change.
         await _apply_noop_result(
             item=item,
-            locked_job_ids=[jm.id for jm in locked_job_models],
+            locked_job_ids=locked_job_ids,
         )
         return
 
@@ -430,16 +436,22 @@ async def _process_active_item(item: RunPipelineItem) -> None:
 async def _load_active_context(
     session: AsyncSession,
     item: RunPipelineItem,
-) -> Optional[tuple[Optional[active.ActiveContext], list[JobModel]]]:
+) -> Optional[tuple[Optional[active.ActiveContext], list[uuid.UUID]]]:
     """Returns None on lock mismatch (already handled).
-    Returns (None, locked_jobs) when the run should be skipped (e.g. service).
-    Returns (context, locked_jobs) when processing should proceed."""
+    Returns (None, locked_job_ids) when the run should be skipped (e.g. service).
+    Returns (context, locked_job_ids) when processing should proceed."""
+    locked_job_ids = await _lock_related_jobs(session=session, item=item)
+    if locked_job_ids is None:
+        return None
     run_model = await _refetch_locked_run_for_active(session=session, item=item)
     if run_model is None:
         log_lock_token_mismatch(logger, item)
-        return None
-    locked_job_models = await _lock_related_jobs(session=session, item=item)
-    if locked_job_models is None:
+        await _unlock_related_jobs(
+            session=session,
+            item=item,
+            locked_job_ids=locked_job_ids,
+        )
+        await session.commit()
         return None
     secrets = await get_project_secrets_mapping(session=session, project=run_model.project)
     run_spec = get_run_spec(run_model)
@@ -448,16 +460,16 @@ async def _load_active_context(
         logger.debug(
             "Skipping service run %s: active service path not yet implemented", run_model.id
         )
-        return None, locked_job_models
+        return None, locked_job_ids
 
     return (
         active.ActiveContext(
             run_model=run_model,
             run_spec=run_spec,
             secrets=secrets,
-            locked_job_models=locked_job_models,
+            locked_job_ids=locked_job_ids,
         ),
-        locked_job_models,
+        locked_job_ids,
     )
 
 
@@ -513,7 +525,7 @@ async def _apply_active_result(
         resolve_now_placeholders(result.run_update_map, now=now)
         job_update_rows = _build_active_job_update_rows(
             job_id_to_update_map=result.job_id_to_update_map,
-            unlock_job_ids={jm.id for jm in context.locked_job_models},
+            unlock_job_ids=set(context.locked_job_ids),
         )
         if job_update_rows:
             resolve_now_placeholders(job_update_rows, now=now)
@@ -533,7 +545,7 @@ async def _apply_active_result(
             await _unlock_related_jobs(
                 session=session,
                 item=item,
-                locked_job_ids=[jm.id for jm in context.locked_job_models],
+                locked_job_ids=context.locked_job_ids,
             )
             await session.commit()
             return
@@ -572,7 +584,7 @@ async def _apply_active_result(
         await _unlock_related_jobs(
             session=session,
             item=item,
-            locked_job_ids=[jm.id for jm in context.locked_job_models],
+            locked_job_ids=context.locked_job_ids,
         )
         await session.commit()
 
@@ -655,19 +667,25 @@ async def _load_terminating_context(
     session: AsyncSession,
     item: RunPipelineItem,
 ) -> Optional[terminating.TerminatingContext]:
-    run_model = await _refetch_locked_run_for_terminating(session=session, item=item)
-    if run_model is None:
-        log_lock_token_mismatch(logger, item)
-        return None
-    locked_job_models = await _lock_related_jobs(
+    locked_job_ids = await _lock_related_jobs(
         session=session,
         item=item,
     )
-    if locked_job_models is None:
+    if locked_job_ids is None:
+        return None
+    run_model = await _refetch_locked_run_for_terminating(session=session, item=item)
+    if run_model is None:
+        log_lock_token_mismatch(logger, item)
+        await _unlock_related_jobs(
+            session=session,
+            item=item,
+            locked_job_ids=locked_job_ids,
+        )
+        await session.commit()
         return None
     return terminating.TerminatingContext(
         run_model=run_model,
-        locked_job_models=locked_job_models,
+        locked_job_ids=locked_job_ids,
     )
 
 
@@ -716,7 +734,7 @@ async def _refetch_locked_run_for_terminating(
 async def _lock_related_jobs(
     session: AsyncSession,
     item: RunPipelineItem,
-) -> Optional[list[JobModel]]:
+) -> Optional[list[uuid.UUID]]:
     now = get_current_datetime()
     job_lock, _ = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with job_lock:
@@ -760,7 +778,7 @@ async def _lock_related_jobs(
             job_model.lock_token = item.lock_token
             job_model.lock_owner = RunPipeline.__name__
         await session.commit()
-    return locked_job_models
+    return [jm.id for jm in locked_job_models]
 
 
 async def _reset_run_lock_for_retry(
@@ -802,7 +820,7 @@ async def _apply_terminating_result(
         resolve_now_placeholders(result.run_update_map, now=now)
         job_update_rows = _build_terminating_job_update_rows(
             job_id_to_update_map=result.job_id_to_update_map,
-            unlock_job_ids={job_model.id for job_model in context.locked_job_models},
+            unlock_job_ids=set(context.locked_job_ids),
         )
         if job_update_rows:
             resolve_now_placeholders(job_update_rows, now=now)
@@ -823,7 +841,7 @@ async def _apply_terminating_result(
             await _unlock_related_jobs(
                 session=session,
                 item=item,
-                locked_job_ids=[job_model.id for job_model in context.locked_job_models],
+                locked_job_ids=context.locked_job_ids,
             )
             await session.commit()
             return

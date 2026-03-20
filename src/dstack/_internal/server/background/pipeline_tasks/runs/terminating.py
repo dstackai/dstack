@@ -49,7 +49,7 @@ class ServiceUnregistration:
 @dataclass
 class TerminatingContext:
     run_model: models.RunModel
-    locked_job_models: list[models.JobModel]
+    locked_job_ids: list[uuid.UUID]
 
 
 @dataclass
@@ -70,10 +70,12 @@ async def process_terminating_run(context: TerminatingContext) -> TerminatingRes
     assert run_model.termination_reason is not None
 
     job_termination_reason = run_model.termination_reason.to_job_termination_reason()
-    if len(context.locked_job_models) > 0:
+    if len(context.locked_job_ids) > 0:
+        locked_job_ids_set = set(context.locked_job_ids)
+        locked_jobs = [j for j in run_model.jobs if j.id in locked_job_ids_set]
         delayed_job_ids = []
         regular_job_ids = []
-        for job_model in context.locked_job_models:
+        for job_model in locked_jobs:
             if job_model.status == JobStatus.RUNNING and job_termination_reason not in {
                 JobTerminationReason.ABORTED_BY_USER,
                 JobTerminationReason.DONE_BY_RUNNER,

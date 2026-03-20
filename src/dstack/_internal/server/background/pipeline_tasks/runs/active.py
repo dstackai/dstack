@@ -53,7 +53,7 @@ class ActiveContext:
     run_model: RunModel
     run_spec: RunSpec
     secrets: dict
-    locked_job_models: list[JobModel]
+    locked_job_ids: list[uuid.UUID]
 
 
 @dataclass
