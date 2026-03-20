@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID
 
 import pytest
-from fastapi.testclient import TestClient
 from freezegun import freeze_time
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -45,7 +44,6 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.models.volumes import InstanceMountPoint, MountPoint
-from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.schemas.runs import ApplyRunPlanRequest
 from dstack._internal.server.services.projects import add_project_member
@@ -70,15 +68,19 @@ from dstack._internal.server.testing.common import (
     get_auth_headers,
     get_fleet_spec,
     get_job_provisioning_data,
+    get_job_runtime_data,
     get_run_spec,
     get_ssh_fleet_configuration,
     list_events,
 )
 from dstack._internal.server.testing.matchers import SomeUUID4Str
 
-pytestmark = pytest.mark.usefixtures("image_config_mock")
+pytestmark = pytest.mark.usefixtures("image_config_mock", "disable_sshproxy")
 
-client = TestClient(app)
+
+@pytest.fixture
+def disable_sshproxy(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("dstack._internal.server.settings.SSHPROXY_ENABLED", False)
 
 
 def get_dev_env_run_plan_dict(
@@ -107,7 +109,7 @@ def get_dev_env_run_plan_dict(
                 " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
                 " || echo 'no pip, ipykernel was not installed'"
                 " && echo"
-                " && echo 'To open in VS Code Desktop, use link below:'"
+                " && echo 'To open in VS Code, use link below:'"
                 " && echo"
                 ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_WORKING_DIR"'
                 " && echo"
@@ -134,7 +136,7 @@ def get_dev_env_run_plan_dict(
                 " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
                 " || echo 'no pip, ipykernel was not installed'"
                 " && echo"
-                " && echo 'To open in VS Code Desktop, use link below:'"
+                " && echo 'To open in VS Code, use link below:'"
                 " && echo"
                 ' && echo "  vscode://vscode-remote/ssh-remote+dry-run$DSTACK_WORKING_DIR"'
                 " && echo"
@@ -340,7 +342,7 @@ def get_dev_env_run_dict(
                 " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
                 " || echo 'no pip, ipykernel was not installed'"
                 " && echo"
-                " && echo 'To open in VS Code Desktop, use link below:'"
+                " && echo 'To open in VS Code, use link below:'"
                 " && echo"
                 ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_WORKING_DIR"'
                 " && echo"
@@ -367,7 +369,7 @@ def get_dev_env_run_dict(
                 " && pip install -q --no-cache-dir ipykernel 2> /dev/null)"
                 " || echo 'no pip, ipykernel was not installed'"
                 " && echo"
-                " && echo 'To open in VS Code Desktop, use link below:'"
+                " && echo 'To open in VS Code, use link below:'"
                 " && echo"
                 ' && echo "  vscode://vscode-remote/ssh-remote+test-run$DSTACK_WORKING_DIR"'
                 " && echo"
@@ -561,6 +563,7 @@ def get_dev_env_run_dict(
                         "probes": [],
                     }
                 ],
+                "job_connection_info": None,
             }
         ],
         "latest_job_submission": {
@@ -729,6 +732,7 @@ class TestListRuns:
                                 "probes": [],
                             }
                         ],
+                        "job_connection_info": None,
                     }
                 ],
                 "latest_job_submission": {
@@ -919,6 +923,7 @@ class TestListRuns:
                                 "probes": [],
                             }
                         ],
+                        "job_connection_info": None,
                     }
                 ],
                 "latest_job_submission": {
@@ -1121,6 +1126,136 @@ class TestGetRun:
 
         assert response.status_code == 200
         assert response.json()["run_spec"]["configuration"]["probes"] == expected_probes
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "sshproxy",
+        [
+            pytest.param(False, id="without-sshproxy"),
+            pytest.param(True, id="with-sshproxy"),
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_run_with_job_connection_info_dev_environment(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        sshproxy: bool,
+    ):
+        monkeypatch.setattr("dstack._internal.server.settings.SSHPROXY_ENABLED", sshproxy)
+        monkeypatch.setattr("dstack._internal.server.settings.SSHPROXY_HOSTNAME", "example.com")
+        monkeypatch.setattr("dstack._internal.server.settings.SSHPROXY_PORT", 2222)
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="dev-env",
+            configuration=DevEnvironmentConfiguration(ide="cursor"),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            run_name=run_spec.run_name,
+        )
+        job_runtime_data = get_job_runtime_data(working_dir="/test")
+        job = await create_job(
+            session=session, run=run, status=JobStatus.RUNNING, job_runtime_data=job_runtime_data
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get",
+            headers=get_auth_headers(user.token),
+            json={"run_name": run.run_name},
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json()["jobs"][0]["job_connection_info"] == {
+            "ide_name": "Cursor",
+            "attached_ide_url": "cursor://vscode-remote/ssh-remote+dev-env/test",
+            "proxied_ide_url": f"cursor://vscode-remote/ssh-remote+{job.id.hex}@example.com:2222/test"
+            if sshproxy
+            else None,
+            "attached_ssh_command": ["ssh", "dev-env"],
+            "proxied_ssh_command": ["ssh", f"{job.id.hex}@example.com", "-p", "2222"]
+            if sshproxy
+            else None,
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_run_with_job_connection_info_task(
+        self, monkeypatch: pytest.MonkeyPatch, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="test-task",
+            configuration=TaskConfiguration(commands=["sleep inf"]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            run_name=run_spec.run_name,
+        )
+        job_runtime_data = get_job_runtime_data(working_dir="/test")
+        for replica_num in range(2):
+            for job_num in range(2):
+                await create_job(
+                    session=session,
+                    run=run,
+                    # test-task-1-1 is still PULLING, other jobs are RUNNING
+                    status=JobStatus.PULLING if replica_num == job_num == 1 else JobStatus.RUNNING,
+                    job_runtime_data=job_runtime_data,
+                    replica_num=replica_num,
+                    job_num=job_num,
+                )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get",
+            headers=get_auth_headers(user.token),
+            json={"run_name": run.run_name},
+        )
+        assert response.status_code == 200, response.json()
+        jobs = response.json()["jobs"]
+        common_fields = {
+            "ide_name": None,
+            "attached_ide_url": None,
+            "proxied_ide_url": None,
+            "proxied_ssh_command": None,
+        }
+        assert jobs[0]["job_connection_info"] == {
+            "attached_ssh_command": ["ssh", "test-task"],
+            **common_fields,
+        }
+        assert jobs[1]["job_connection_info"] == {
+            "attached_ssh_command": ["ssh", "test-task-1-0"],
+            **common_fields,
+        }
+        assert jobs[2]["job_connection_info"] == {
+            "attached_ssh_command": ["ssh", "test-task-0-1"],
+            **common_fields,
+        }
+        assert jobs[3]["job_connection_info"] is None
 
 
 class TestGetRunPlan:
