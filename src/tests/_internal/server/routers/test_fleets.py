@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Union
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
     FleetStatus,
@@ -25,6 +26,7 @@ from dstack._internal.core.models.instances import (
     Resources,
     SSHKey,
 )
+from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import FleetModel, InstanceModel
 from dstack._internal.server.services.fleets import fleet_model_to_fleet
@@ -846,6 +848,66 @@ class TestGetFleet:
             json=body,
         )
         assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "client_version,expected_fleets",
+        [
+            (
+                "0.20.13",
+                [
+                    "my-fleet",
+                    "other-project/other-fleet",
+                ],
+            ),
+            (
+                "0.20.14",
+                [
+                    {"project": None, "name": "my-fleet"},
+                    {"project": "other-project", "name": "other-fleet"},
+                ],
+            ),
+            (
+                None,
+                [
+                    {"project": None, "name": "my-fleet"},
+                    {"project": "other-project", "name": "other-fleet"},
+                ],
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_patches_profile_fleets_for_old_clients(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        expected_fleets: list,
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+
+        fleets: list[Union[EntityReference, str]] = [
+            EntityReference(project=None, name="my-fleet"),
+            EntityReference(project="other-project", name="other-fleet"),
+        ]
+        spec = get_fleet_spec(
+            profile=Profile(fleets=fleets),
+        )
+        fleet = await create_fleet(session=session, project=project, spec=spec)
+
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/get",
+            headers=headers,
+            json={"id": str(fleet.id)},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["spec"]["profile"]["fleets"] == expected_fleets
 
 
 class TestApplyFleetPlan:

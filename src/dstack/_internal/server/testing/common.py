@@ -667,13 +667,17 @@ async def create_fleet(
     return fm
 
 
-def get_fleet_spec(conf: Optional[FleetConfiguration] = None) -> FleetSpec:
+def get_fleet_spec(
+    conf: Optional[FleetConfiguration] = None, profile: Optional[Profile] = None
+) -> FleetSpec:
     if conf is None:
         conf = get_fleet_configuration()
+    if profile is None:
+        profile = Profile()
     return FleetSpec(
         configuration=conf,
         configuration_path="fleet.dstack.yml",
-        profile=Profile(),
+        profile=profile,
     )
 
 
