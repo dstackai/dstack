@@ -41,6 +41,13 @@ const supportedFields: (keyof TDevEnvironmentConfiguration | keyof TServiceConfi
     'gateway',
     'https',
     'probes',
+    'model',
+    'strip_prefix',
+    'rate_limits',
+    'replicas',
+    'scaling',
+    'replica_groups',
+    'version',
 ];
 
 export const useGetRunSpecFromYaml = ({ projectName = '' }) => {
