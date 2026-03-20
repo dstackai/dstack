@@ -116,8 +116,20 @@ Use `-y` to skip the confirmation prompt.
 
 ## Access imported fleets
 
-From the importer project's perspective, exported fleets appear automatically in `dstack fleet list`
-with a `<project>/<fleet>` prefix:
+From the importer project's perspective, use `dstack import list` (or simply `dstack import`) to list all imports in the project — i.e., all exports from other projects that this project has been granted access to:
+
+<div class="termy">
+
+```shell
+$ dstack import list
+ NAME              FLEETS
+ team-a/my-export  my-fleet, another-fleet
+
+```
+
+</div>
+
+Imported fleets also appear in `dstack fleet list` in the `<project>/<fleet>` format:
 
 <div class="termy">
 
@@ -139,5 +151,6 @@ Imported fleets can be used for runs just like the project's own fleets.
 
 !!! info "What's next?"
     1. Check the [`dstack export` CLI reference](../reference/cli/dstack/export.md)
-    2. Learn how to manage [fleets](fleets.md)
-    3. Read about [projects](projects.md) and project roles
+    1. Check the [`dstack import` CLI reference](../reference/cli/dstack/import.md)
+    1. Learn how to manage [fleets](fleets.md)
+    1. Read about [projects](projects.md) and project roles
