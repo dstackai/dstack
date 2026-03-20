@@ -24,7 +24,7 @@ async def build_scale_up_job_models(
     new_job_models: list[JobModel] = []
     scheduled_replicas = 0
 
-    # Retry inactive replicas first
+    # Retry inactive replicas first.
     for _, _, replica_num, replica_jobs in inactive_replicas:
         if scheduled_replicas == replicas_diff:
             break

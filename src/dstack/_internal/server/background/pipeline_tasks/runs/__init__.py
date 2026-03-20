@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Sequence
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, selectinload
+from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
 import dstack._internal.server.background.pipeline_tasks.runs.active as active
 import dstack._internal.server.background.pipeline_tasks.runs.pending as pending
@@ -30,6 +30,7 @@ from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel
 from dstack._internal.server.services import events
 from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import emit_run_status_change_event, get_run_spec
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.utils import sentry_utils
@@ -274,23 +275,50 @@ async def _load_pending_context(
     )
 
 
+def _build_latest_submissions_subquery(run_id: uuid.UUID):
+    """Subquery selecting only the latest submission per (replica_num, job_num)."""
+    return (
+        select(
+            JobModel.run_id.label("run_id"),
+            JobModel.replica_num.label("replica_num"),
+            JobModel.job_num.label("job_num"),
+            func.max(JobModel.submission_num).label("max_submission_num"),
+        )
+        .where(JobModel.run_id == run_id)
+        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
+        .subquery()
+    )
+
+
 async def _refetch_locked_run_for_pending(
     session: AsyncSession,
     item: RunPipelineItem,
 ) -> Optional[RunModel]:
+    latest_sq = _build_latest_submissions_subquery(item.id)
+    job_alias = aliased(JobModel)
     res = await session.execute(
         select(RunModel)
         .where(
             RunModel.id == item.id,
             RunModel.lock_token == item.lock_token,
         )
+        .outerjoin(latest_sq, latest_sq.c.run_id == RunModel.id)
+        .outerjoin(
+            job_alias,
+            and_(
+                job_alias.run_id == latest_sq.c.run_id,
+                job_alias.replica_num == latest_sq.c.replica_num,
+                job_alias.job_num == latest_sq.c.job_num,
+                job_alias.submission_num == latest_sq.c.max_submission_num,
+            ),
+        )
         .options(
             joinedload(RunModel.project).load_only(
                 ProjectModel.id,
                 ProjectModel.name,
             ),
-            selectinload(RunModel.jobs),
         )
+        .options(contains_eager(RunModel.jobs, alias=job_alias))
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
@@ -381,12 +409,236 @@ async def _apply_noop_result(
 
 
 async def _process_active_item(item: RunPipelineItem) -> None:
-    await active.process_active_run(
-        active.ActiveContext(
-            run_id=item.id,
-            status=item.status,
+    async with get_session_ctx() as session:
+        load_result = await _load_active_context(session=session, item=item)
+        if load_result is None:
+            return
+        context, locked_job_models = load_result
+
+    if context is None:
+        # Service or other skip — unlock without state change.
+        await _apply_noop_result(
+            item=item,
+            locked_job_ids=[jm.id for jm in locked_job_models],
         )
+        return
+
+    result = await active.process_active_run(context)
+    await _apply_active_result(item=item, context=context, result=result)
+
+
+async def _load_active_context(
+    session: AsyncSession,
+    item: RunPipelineItem,
+) -> Optional[tuple[Optional[active.ActiveContext], list[JobModel]]]:
+    """Returns None on lock mismatch (already handled).
+    Returns (None, locked_jobs) when the run should be skipped (e.g. service).
+    Returns (context, locked_jobs) when processing should proceed."""
+    run_model = await _refetch_locked_run_for_active(session=session, item=item)
+    if run_model is None:
+        log_lock_token_mismatch(logger, item)
+        return None
+    locked_job_models = await _lock_related_jobs(session=session, item=item)
+    if locked_job_models is None:
+        return None
+    secrets = await get_project_secrets_mapping(session=session, project=run_model.project)
+    run_spec = get_run_spec(run_model)
+
+    if run_spec.configuration.type == "service":
+        logger.debug(
+            "Skipping service run %s: active service path not yet implemented", run_model.id
+        )
+        return None, locked_job_models
+
+    return (
+        active.ActiveContext(
+            run_model=run_model,
+            run_spec=run_spec,
+            secrets=secrets,
+            locked_job_models=locked_job_models,
+        ),
+        locked_job_models,
     )
+
+
+async def _refetch_locked_run_for_active(
+    session: AsyncSession,
+    item: RunPipelineItem,
+) -> Optional[RunModel]:
+    latest_sq = _build_latest_submissions_subquery(item.id)
+    job_alias = aliased(JobModel)
+    res = await session.execute(
+        select(RunModel)
+        .where(
+            RunModel.id == item.id,
+            RunModel.lock_token == item.lock_token,
+        )
+        .outerjoin(latest_sq, latest_sq.c.run_id == RunModel.id)
+        .outerjoin(
+            job_alias,
+            and_(
+                job_alias.run_id == latest_sq.c.run_id,
+                job_alias.replica_num == latest_sq.c.replica_num,
+                job_alias.job_num == latest_sq.c.job_num,
+                job_alias.submission_num == latest_sq.c.max_submission_num,
+            ),
+        )
+        .options(
+            joinedload(RunModel.project).load_only(
+                ProjectModel.id,
+                ProjectModel.name,
+            ),
+        )
+        .options(
+            contains_eager(RunModel.jobs, alias=job_alias)
+            .joinedload(JobModel.instance)
+            .load_only(InstanceModel.fleet_id),
+        )
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one_or_none()
+
+
+async def _apply_active_result(
+    item: RunPipelineItem,
+    context: active.ActiveContext,
+    result: active.ActiveResult,
+) -> None:
+    run_model = context.run_model
+    set_processed_update_map_fields(result.run_update_map)
+    set_unlock_update_map_fields(result.run_update_map)
+
+    async with get_session_ctx() as session:
+        now = get_current_datetime()
+        resolve_now_placeholders(result.run_update_map, now=now)
+        job_update_rows = _build_active_job_update_rows(
+            job_id_to_update_map=result.job_id_to_update_map,
+            unlock_job_ids={jm.id for jm in context.locked_job_models},
+        )
+        if job_update_rows:
+            resolve_now_placeholders(job_update_rows, now=now)
+
+        res = await session.execute(
+            update(RunModel)
+            .where(
+                RunModel.id == item.id,
+                RunModel.lock_token == item.lock_token,
+            )
+            .values(**result.run_update_map)
+            .returning(RunModel.id)
+        )
+        updated_run_ids = list(res.scalars().all())
+        if len(updated_run_ids) == 0:
+            log_lock_token_changed_after_processing(logger, item)
+            await _unlock_related_jobs(
+                session=session,
+                item=item,
+                locked_job_ids=[jm.id for jm in context.locked_job_models],
+            )
+            await session.commit()
+            return
+
+        if job_update_rows:
+            await session.execute(update(JobModel), job_update_rows)
+
+        for job_model in result.new_job_models:
+            session.add(job_model)
+            events.emit(
+                session,
+                f"Job created on retry. Status: {job_model.status.upper()}",
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(job_model)],
+            )
+
+        old_status = run_model.status
+        new_status = result.run_update_map.get("status", old_status)
+        _emit_active_metrics(run_model, context.run_spec, old_status, new_status)
+
+        _emit_active_job_status_change_events(
+            session=session,
+            context=context,
+            result=result,
+        )
+        # Set termination_reason on the model so emit_run_status_change_event can read it.
+        if "termination_reason" in result.run_update_map:
+            run_model.termination_reason = result.run_update_map["termination_reason"]
+        emit_run_status_change_event(
+            session=session,
+            run_model=run_model,
+            old_status=old_status,
+            new_status=new_status,
+        )
+
+        await _unlock_related_jobs(
+            session=session,
+            item=item,
+            locked_job_ids=[jm.id for jm in context.locked_job_models],
+        )
+        await session.commit()
+
+
+def _emit_active_metrics(
+    run_model: RunModel,
+    run_spec,
+    old_status: RunStatus,
+    new_status: RunStatus,
+) -> None:
+    if old_status == new_status:
+        return
+    project_name = run_model.project.name
+    run_type = run_spec.configuration.type
+    if old_status == RunStatus.SUBMITTED and new_status == RunStatus.PROVISIONING:
+        duration = (get_current_datetime() - run_model.submitted_at).total_seconds()
+        run_metrics.log_submit_to_provision_duration(duration, project_name, run_type)
+    if new_status == RunStatus.PENDING:
+        run_metrics.increment_pending_runs(project_name, run_type)
+
+
+class _ActiveRunJobUpdateRow(active.ActiveRunJobUpdateMap, total=False):
+    id: uuid.UUID
+
+
+def _build_active_job_update_rows(
+    job_id_to_update_map: dict[uuid.UUID, active.ActiveRunJobUpdateMap],
+    unlock_job_ids: set[uuid.UUID],
+) -> list[_ActiveRunJobUpdateRow]:
+    job_update_rows = []
+    for job_id in sorted(job_id_to_update_map.keys() | unlock_job_ids):
+        update_row = _ActiveRunJobUpdateRow(id=job_id)
+        job_update_map = job_id_to_update_map.get(job_id)
+        if job_update_map is not None:
+            for key, value in job_update_map.items():
+                update_row[key] = value
+        if job_id in unlock_job_ids:
+            set_unlock_update_map_fields(update_row)
+        set_processed_update_map_fields(update_row)
+        job_update_rows.append(update_row)
+    return job_update_rows
+
+
+def _emit_active_job_status_change_events(
+    session: AsyncSession,
+    context: active.ActiveContext,
+    result: active.ActiveResult,
+) -> None:
+    for job_model in context.run_model.jobs:
+        job_update_map = result.job_id_to_update_map.get(job_model.id)
+        if job_update_map is None:
+            continue
+        emit_job_status_change_event(
+            session=session,
+            job_model=job_model,
+            old_status=job_model.status,
+            new_status=job_update_map.get("status", job_model.status),
+            termination_reason=job_update_map.get(
+                "termination_reason",
+                job_model.termination_reason,
+            ),
+            termination_reason_message=job_update_map.get(
+                "termination_reason_message",
+                job_model.termination_reason_message,
+            ),
+        )
 
 
 async def _process_terminating_item(item: RunPipelineItem) -> None:
@@ -423,18 +675,32 @@ async def _refetch_locked_run_for_terminating(
     session: AsyncSession,
     item: RunPipelineItem,
 ) -> Optional[RunModel]:
+    latest_sq = _build_latest_submissions_subquery(item.id)
+    job_alias = aliased(JobModel)
     res = await session.execute(
         select(RunModel)
         .where(
             RunModel.id == item.id,
             RunModel.lock_token == item.lock_token,
         )
+        .outerjoin(latest_sq, latest_sq.c.run_id == RunModel.id)
+        .outerjoin(
+            job_alias,
+            and_(
+                job_alias.run_id == latest_sq.c.run_id,
+                job_alias.replica_num == latest_sq.c.replica_num,
+                job_alias.job_num == latest_sq.c.job_num,
+                job_alias.submission_num == latest_sq.c.max_submission_num,
+            ),
+        )
         .options(
             joinedload(RunModel.project).load_only(
                 ProjectModel.id,
                 ProjectModel.name,
             ),
-            selectinload(RunModel.jobs)
+        )
+        .options(
+            contains_eager(RunModel.jobs, alias=job_alias)
             .joinedload(JobModel.instance)
             .joinedload(InstanceModel.project)
             .load_only(
