@@ -507,6 +507,7 @@ async def _process_fleet(
         result.fleet_update_map["status"] = FleetStatus.TERMINATED
         result.fleet_update_map["deleted"] = True
         result.fleet_update_map["deleted_at"] = NOW_PLACEHOLDER
+        return result
     _set_fail_instances_on_master_bootstrap_failure(
         fleet_model=fleet_model,
         instance_models=fleet_model.instances,
