@@ -123,6 +123,10 @@ func (c *dockerParametersMock) DockerPorts() []int {
 	return []int{}
 }
 
+func (c *dockerParametersMock) RunnerHTTPPort() int {
+	return 10999
+}
+
 func (c *dockerParametersMock) DockerMounts(string) ([]mount.Mount, error) {
 	return nil, nil
 }

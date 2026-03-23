@@ -3,12 +3,13 @@ package types
 type TerminationReason string
 
 const (
-	TerminationReasonExecutorError            TerminationReason = "executor_error"
-	TerminationReasonCreatingContainerError   TerminationReason = "creating_container_error"
-	TerminationReasonContainerExitedWithError TerminationReason = "container_exited_with_error"
-	TerminationReasonDoneByRunner             TerminationReason = "done_by_runner"
-	TerminationReasonTerminatedByUser         TerminationReason = "terminated_by_user"
-	TerminationReasonTerminatedByServer       TerminationReason = "terminated_by_server"
-	TerminationReasonMaxDurationExceeded      TerminationReason = "max_duration_exceeded"
-	TerminationReasonLogQuotaExceeded         TerminationReason = "log_quota_exceeded"
+	TerminationReasonExecutorError             TerminationReason = "executor_error"
+	TerminationReasonCreatingContainerError    TerminationReason = "creating_container_error"
+	TerminationReasonContainerExitedWithError  TerminationReason = "container_exited_with_error"
+	TerminationReasonDoneByRunner              TerminationReason = "done_by_runner"
+	TerminationReasonTerminatedByUser          TerminationReason = "terminated_by_user"
+	TerminationReasonTerminatedByServer        TerminationReason = "terminated_by_server"
+	TerminationReasonMaxDurationExceeded       TerminationReason = "max_duration_exceeded"
+	TerminationReasonLogQuotaExceeded          TerminationReason = "log_quota_exceeded"
+	TerminationReasonDataTransferQuotaExceeded TerminationReason = "data_transfer_quota_exceeded"
 )
