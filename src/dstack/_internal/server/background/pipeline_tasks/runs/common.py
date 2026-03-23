@@ -16,16 +16,19 @@ from dstack._internal.server.services.runs import create_job_model_for_new_submi
 from dstack._internal.server.services.runs.replicas import build_replica_lists
 from dstack._internal.server.services.services.autoscalers import get_service_scaler
 
+PerGroupDesiredCounts = dict[str, int]
+"""Maps group_name → desired replica count"""
+
 
 def compute_desired_replica_counts(
     run_model: RunModel,
     configuration: ServiceConfiguration,
     gateway_stats: Optional[PerWindowStats],
     last_scaled_at: Optional[datetime],
-) -> tuple[int, dict[str, int]]:
-    """Returns (total_desired, per_group_desired_dict)."""
+) -> tuple[int, PerGroupDesiredCounts]:
+    """Returns (total_desired, per_group_desired_counts)."""
     replica_groups = configuration.replica_groups
-    prev_counts: dict[str, int] = (
+    prev_counts: PerGroupDesiredCounts = (
         json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
     )
     if (
@@ -37,7 +40,7 @@ def compute_desired_replica_counts(
         # when a 0.20.7+ server first processes a service created by a pre-0.20.7 server.
         # TODO: remove once most users upgrade to 0.20.7+.
         prev_counts = {DEFAULT_REPLICA_GROUP_NAME: run_model.desired_replica_count}
-    desired_replica_counts: dict[str, int] = {}
+    desired_counts: PerGroupDesiredCounts = {}
     total = 0
     for group in replica_groups:
         scaler = get_service_scaler(group.count, group.scaling)
@@ -47,9 +50,9 @@ def compute_desired_replica_counts(
             stats=gateway_stats,
             last_scaled_at=last_scaled_at,
         )
-        desired_replica_counts[group.name] = group_desired
+        desired_counts[group.name] = group_desired
         total += group_desired
-    return total, desired_replica_counts
+    return total, desired_counts
 
 
 async def build_scale_up_job_models(
@@ -60,13 +63,7 @@ async def build_scale_up_job_models(
     group_name: Optional[str] = None,
     replica_num_start: Optional[int] = None,
 ) -> list[JobModel]:
-    """Build new JobModel instances for scaling up.
-
-    If replica_num_start is given, new replicas are numbered from that value
-    instead of computing the next number from run_model.jobs.  This lets
-    callers avoid mutating run_model.jobs when building jobs for multiple
-    groups sequentially.
-    """
+    """Build new JobModel instances for scaling up."""
     if replicas_diff <= 0:
         return []
 

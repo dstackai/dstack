@@ -79,7 +79,7 @@ async def _process_pending_service(context: PendingContext) -> Optional[PendingR
     assert isinstance(run_spec.configuration, ServiceConfiguration)
     configuration = run_spec.configuration
 
-    total, per_group = compute_desired_replica_counts(
+    total, per_group_desired = compute_desired_replica_counts(
         run_model=run_model,
         configuration=configuration,
         gateway_stats=context.gateway_stats,
@@ -92,7 +92,7 @@ async def _process_pending_service(context: PendingContext) -> Optional[PendingR
     next_replica_num = max((j.replica_num for j in run_model.jobs), default=-1) + 1
     for group in configuration.replica_groups:
         assert group.name is not None
-        group_desired = per_group.get(group.name, 0)
+        group_desired = per_group_desired.get(group.name, 0)
         if group_desired <= 0:
             continue
         new_job_models = await build_scale_up_job_models(
@@ -110,7 +110,7 @@ async def _process_pending_service(context: PendingContext) -> Optional[PendingR
         run_update_map=PendingRunUpdateMap(
             status=RunStatus.SUBMITTED,
             desired_replica_count=total,
-            desired_replica_counts=json.dumps(per_group),
+            desired_replica_counts=json.dumps(per_group_desired),
         ),
         new_job_models=all_new_job_models,
     )

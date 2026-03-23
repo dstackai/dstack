@@ -614,6 +614,7 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
             return name
 
 
+# TODO: Connect to gateway outside session
 async def get_or_add_gateway_connection(
     session: AsyncSession, gateway_id: uuid.UUID
 ) -> tuple[GatewayModel, GatewayConnection]:

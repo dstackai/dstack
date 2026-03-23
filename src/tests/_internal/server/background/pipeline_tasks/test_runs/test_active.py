@@ -1,10 +1,16 @@
+import json
 import uuid
 from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.configurations import (
+    ScalingSpec,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import (
     Profile,
@@ -12,6 +18,7 @@ from dstack._internal.core.models.profiles import (
     RetryEvent,
     StopCriteria,
 )
+from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
@@ -19,6 +26,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunWorker
+from dstack._internal.server.models import JobModel
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
@@ -319,11 +327,10 @@ class TestRunActiveWorker:
         await session.refresh(run)
         assert run.fleet_id == fleet.id
 
-    async def test_skips_service_run(
+    async def test_service_noop_when_at_desired_count(
         self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:
-        from dstack._internal.core.models.configurations import ServiceConfiguration
-
+        """Service with 1 RUNNING replica and desired=1 stays RUNNING, no new jobs."""
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
@@ -355,8 +362,167 @@ class TestRunActiveWorker:
         await worker.process(run_to_pipeline_item(run))
 
         await session.refresh(run)
-        # Service run should be skipped (no state change)
         assert run.status == RunStatus.RUNNING
+        assert run.desired_replica_count == 1
+        assert run.desired_replica_counts is not None
+        counts = json.loads(run.desired_replica_counts)
+        assert counts == {"0": 1}
+        assert run.lock_token is None
+
+    async def test_service_scale_up(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        """Service with min=2 and 1 RUNNING replica creates 1 new SUBMITTED job."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo Hi!"],
+                replicas=Range[int](min=2, max=2),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.SUBMITTED,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=0,
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+        assert run.desired_replica_count == 2
+
+        res = await session.execute(
+            select(JobModel).where(JobModel.run_id == run.id).order_by(JobModel.replica_num)
+        )
+        jobs = list(res.scalars().all())
+        assert len(jobs) == 2
+        assert jobs[0].status == JobStatus.RUNNING
+        assert jobs[0].replica_num == 0
+        assert jobs[1].status == JobStatus.SUBMITTED
+        assert jobs[1].replica_num == 1
+
+    async def test_service_scale_down(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        """Service with min=1 and 2 RUNNING replicas terminates 1 with SCALED_DOWN."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo Hi!"],
+                replicas=Range[int](min=1, max=1),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        run.desired_replica_count = 2
+        run.desired_replica_counts = json.dumps({"0": 2})
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=0,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=1,
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+        assert run.desired_replica_count == 1
+
+        res = await session.execute(
+            select(JobModel).where(JobModel.run_id == run.id).order_by(JobModel.replica_num)
+        )
+        jobs = list(res.scalars().all())
+        assert len(jobs) == 2
+        # One should remain RUNNING, the other should be TERMINATING with SCALED_DOWN
+        running = [j for j in jobs if j.status == JobStatus.RUNNING]
+        terminating = [j for j in jobs if j.status == JobStatus.TERMINATING]
+        assert len(running) == 1
+        assert len(terminating) == 1
+        assert terminating[0].termination_reason == JobTerminationReason.SCALED_DOWN
+
+    async def test_service_zero_scale_noop(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        """Active service with 0 desired and no active replicas stays in current status."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo Hi!"],
+                replicas=Range[int](min=0, max=2),
+                scaling=ScalingSpec(metric="rps", target=10),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        run.desired_replica_count = 0
+        run.desired_replica_counts = json.dumps({"0": 0})
+        # Create a terminated/scaled-down job to have some job history
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATED,
+            termination_reason=JobTerminationReason.SCALED_DOWN,
+            replica_num=0,
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        # All replicas scaled down → transitions to PENDING
+        assert run.status == RunStatus.PENDING
         assert run.lock_token is None
 
     async def test_noops_when_run_lock_changes_after_processing(

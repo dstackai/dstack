@@ -1,14 +1,16 @@
 """Active-run analysis and transition helpers for the run pipeline."""
 
+import json
 import uuid
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
 
 from dstack._internal.core.errors import ServerError
+from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.profiles import RetryEvent, StopCriteria
 from dstack._internal.core.models.runs import (
     JobStatus,
@@ -17,7 +19,13 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
 )
+from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server.background.pipeline_tasks.base import ItemUpdateMap
+from dstack._internal.server.background.pipeline_tasks.runs.common import (
+    PerGroupDesiredCounts,
+    build_scale_up_job_models,
+    compute_desired_replica_counts,
+)
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.jobs import (
@@ -27,7 +35,10 @@ from dstack._internal.server.services.jobs import (
     group_jobs_by_replica_latest,
 )
 from dstack._internal.server.services.runs import create_job_model_for_new_submission
-from dstack._internal.server.services.runs.replicas import has_out_of_date_replicas
+from dstack._internal.server.services.runs.replicas import (
+    build_replica_lists,
+    has_out_of_date_replicas,
+)
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -39,6 +50,8 @@ class ActiveRunUpdateMap(ItemUpdateMap, total=False):
     termination_reason: Optional[RunTerminationReason]
     fleet_id: Optional[uuid.UUID]
     resubmission_attempt: int
+    desired_replica_count: int
+    desired_replica_counts: Optional[str]  # JSON
 
 
 class ActiveRunJobUpdateMap(ItemUpdateMap, total=False):
@@ -54,6 +67,7 @@ class ActiveContext:
     run_spec: RunSpec
     secrets: dict
     locked_job_ids: list[uuid.UUID]
+    gateway_stats: Optional[PerWindowStats] = None
 
 
 @dataclass
@@ -119,6 +133,11 @@ async def process_active_run(context: ActiveContext) -> ActiveResult:
     elif transition.new_status not in {RunStatus.TERMINATING, RunStatus.PENDING}:
         if analysis.replicas_to_retry:
             new_job_models = await _build_retry_job_models(context, analysis.replicas_to_retry)
+        elif run_spec.configuration.type == "service":
+            per_group_desired = _apply_desired_counts_to_update_map(run_update_map, context)
+            new_job_models, job_id_to_update_map = await _build_service_scaling_maps(
+                context, per_group_desired
+            )
         else:
             job_id_to_update_map = await _build_deployment_update_map(context)
 
@@ -478,3 +497,92 @@ async def _build_deployment_update_map(
                 )
 
     return job_id_to_update_map
+
+
+def _compute_last_scaled_at(run_model: RunModel) -> Optional[datetime]:
+    """Compute the timestamp of the most recent scaling event from replica data."""
+    timestamps: list[datetime] = []
+    active, inactive = build_replica_lists(run_model)
+    for _, _, _, jobs in active:
+        timestamps.append(min(j.submitted_at for j in jobs))
+    for _, _, _, jobs in inactive:
+        timestamps.append(max(j.last_processed_at for j in jobs))
+    return max(timestamps) if timestamps else None
+
+
+def _apply_desired_counts_to_update_map(
+    run_update_map: ActiveRunUpdateMap,
+    context: ActiveContext,
+) -> PerGroupDesiredCounts:
+    """Compute desired counts and add to run_update_map. Returns per-group desired counts."""
+    configuration = context.run_spec.configuration
+    assert isinstance(configuration, ServiceConfiguration)
+    last_scaled_at = _compute_last_scaled_at(context.run_model)
+    total, per_group_desired = compute_desired_replica_counts(
+        context.run_model, configuration, context.gateway_stats, last_scaled_at
+    )
+    run_update_map["desired_replica_count"] = total
+    run_update_map["desired_replica_counts"] = json.dumps(per_group_desired)
+    return per_group_desired
+
+
+def _build_scale_down_job_update_maps(
+    active_replicas: list[tuple[int, bool, int, list[JobModel]]],
+    count: int,
+) -> dict[uuid.UUID, ActiveRunJobUpdateMap]:
+    """Build job update maps for scaling down the least-important replicas."""
+    job_id_to_update_map: dict[uuid.UUID, ActiveRunJobUpdateMap] = {}
+    if count <= 0:
+        return job_id_to_update_map
+    for _, _, _, replica_jobs in reversed(active_replicas[-count:]):
+        for job in replica_jobs:
+            if job.status.is_finished() or job.status == JobStatus.TERMINATING:
+                continue
+            job_id_to_update_map[job.id] = ActiveRunJobUpdateMap(
+                status=JobStatus.TERMINATING,
+                termination_reason=JobTerminationReason.SCALED_DOWN,
+            )
+    return job_id_to_update_map
+
+
+async def _build_service_scaling_maps(
+    context: ActiveContext,
+    per_group_desired: PerGroupDesiredCounts,
+) -> tuple[list[JobModel], dict[uuid.UUID, ActiveRunJobUpdateMap]]:
+    """Build new jobs for scale-up and update maps for scale-down across all groups."""
+    run_model = context.run_model
+    configuration = context.run_spec.configuration
+    assert isinstance(configuration, ServiceConfiguration)
+    new_job_models: list[JobModel] = []
+    job_id_to_update_map: dict[uuid.UUID, ActiveRunJobUpdateMap] = {}
+
+    next_replica_num = max((job.replica_num for job in run_model.jobs), default=-1) + 1
+
+    for group in configuration.replica_groups:
+        assert group.name is not None
+        group_desired = per_group_desired.get(group.name, 0)
+        active_replicas, _ = build_replica_lists(run_model, group_filter=group.name)
+        diff = group_desired - len(active_replicas)
+
+        if diff > 0:
+            new_jobs = await build_scale_up_job_models(
+                run_model=run_model,
+                run_spec=context.run_spec,
+                secrets=context.secrets,
+                replicas_diff=diff,
+                group_name=group.name,
+                replica_num_start=next_replica_num,
+            )
+            new_job_models.extend(new_jobs)
+            # Advance next_replica_num past any newly created replicas
+            if new_jobs:
+                max_new = max(j.replica_num for j in new_jobs)
+                next_replica_num = max(next_replica_num, max_new + 1)
+        elif diff < 0:
+            scale_down_maps = _build_scale_down_job_update_maps(active_replicas, abs(diff))
+            job_id_to_update_map.update(scale_down_maps)
+
+    return (
+        new_job_models,
+        job_id_to_update_map,
+    )
