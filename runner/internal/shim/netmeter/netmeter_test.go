@@ -1,0 +1,98 @@
+package netmeter
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestParseByteCounter(t *testing.T) {
+	tests := []struct {
+		name      string
+		output    string
+		chain     string
+		expected  int64
+		expectErr bool
+	}{
+		{
+			name: "typical output with traffic",
+			output: `Chain dstack-nm-abcd1234 (1 references)
+    pkts      bytes target     prot opt in     out     source               destination
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            10.0.0.0/8
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            172.16.0.0/12
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            192.168.0.0/16
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            169.254.0.0/16
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            127.0.0.0/8
+     123   456789 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0
+`,
+			chain:    "dstack-nm-abcd1234",
+			expected: 456789,
+		},
+		{
+			name: "zero traffic",
+			output: `Chain dstack-nm-abcd1234 (1 references)
+    pkts      bytes target     prot opt in     out     source               destination
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            10.0.0.0/8
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            172.16.0.0/12
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            192.168.0.0/16
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            169.254.0.0/16
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            127.0.0.0/8
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0
+`,
+			chain:    "dstack-nm-abcd1234",
+			expected: 0,
+		},
+		{
+			name: "large byte count",
+			output: `Chain dstack-nm-test1234 (1 references)
+    pkts      bytes target     prot opt in     out     source               destination
+   10000  5000000 RETURN     all  --  *      *       0.0.0.0/0            10.0.0.0/8
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            172.16.0.0/12
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            192.168.0.0/16
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            169.254.0.0/16
+       0        0 RETURN     all  --  *      *       0.0.0.0/0            127.0.0.0/8
+  500000 107374182400 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0
+`,
+			chain:    "dstack-nm-test1234",
+			expected: 107374182400, // ~100 GB
+		},
+		{
+			name:      "empty output",
+			output:    "",
+			chain:     "dstack-nm-abcd1234",
+			expectErr: true,
+		},
+		{
+			name: "only headers no rules",
+			output: `Chain dstack-nm-abcd1234 (1 references)
+    pkts      bytes target     prot opt in     out     source               destination
+`,
+			chain:     "dstack-nm-abcd1234",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseByteCounter(tt.output, tt.chain)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestNew(t *testing.T) {
+	nm := New("abcdefghijklmnop", 1000000)
+	assert.Equal(t, int64(1000000), nm.quota)
+	assert.Equal(t, "dstack-nm-abcdefgh", nm.chainName)
+}
+
+func TestNew_ShortID(t *testing.T) {
+	nm := New("abc", 500)
+	assert.Equal(t, "dstack-nm-abc", nm.chainName)
+}

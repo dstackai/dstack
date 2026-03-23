@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
@@ -37,6 +38,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/common/types"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
+	"github.com/dstackai/dstack/runner/internal/shim/netmeter"
 )
 
 // TODO: Allow for configuration via cli arguments or environment variables.
@@ -380,7 +382,8 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		if err := d.tasks.Update(task); err != nil {
 			return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 		}
-		err = d.waitContainer(ctx, &task)
+
+		err = d.waitContainerWithQuota(ctx, &task, cfg)
 	}
 	if err != nil {
 		log.Error(ctx, "failed to run container", "err", err)
@@ -910,6 +913,49 @@ func (d *DockerRunner) waitContainer(ctx context.Context, task *Task) error {
 	return nil
 }
 
+// waitContainerWithQuota waits for the container to finish, optionally enforcing
+// a data transfer quota. If the quota is exceeded, it notifies the runner
+// (so the server reads the termination reason via /api/pull) and stops the container.
+func (d *DockerRunner) waitContainerWithQuota(ctx context.Context, task *Task, cfg TaskConfig) error {
+	if cfg.DataTransferQuota <= 0 {
+		return d.waitContainer(ctx, task)
+	}
+
+	nm := netmeter.New(task.ID, cfg.DataTransferQuota)
+	if err := nm.Start(ctx); err != nil {
+		errMessage := fmt.Sprintf("data transfer quota configured but metering unavailable: %s", err)
+		log.Error(ctx, errMessage)
+		task.SetStatusTerminated(string(types.TerminationReasonExecutorError), errMessage)
+		return fmt.Errorf("data transfer meter: %w", err)
+	}
+	defer nm.Stop()
+
+	waitDone := make(chan error, 1)
+	go func() { waitDone <- d.waitContainer(ctx, task) }()
+
+	select {
+	case err := <-waitDone:
+		return err
+	case <-nm.Exceeded():
+		log.Error(ctx, "Data transfer quota exceeded", "task", task.ID, "quota", cfg.DataTransferQuota)
+		terminateMsg := fmt.Sprintf("Outbound data transfer exceeded quota of %d bytes", cfg.DataTransferQuota)
+		if err := terminateRunner(ctx, d.dockerParams.RunnerHTTPPort(),
+			types.TerminationReasonDataTransferQuotaExceeded, terminateMsg); err != nil {
+			log.Error(ctx, "failed to notify runner of termination", "err", err)
+		}
+		stopTimeout := 10
+		stopOpts := container.StopOptions{Timeout: &stopTimeout}
+		if err := d.client.ContainerStop(ctx, task.containerID, stopOpts); err != nil {
+			log.Error(ctx, "failed to stop container after quota exceeded", "err", err)
+		}
+		<-waitDone
+		// The runner already set the job state with the termination reason.
+		// The server will read it via /api/pull.
+		task.SetStatusTerminated(string(types.TerminationReasonDoneByRunner), "")
+		return nil
+	}
+}
+
 func encodeRegistryAuth(username string, password string) (string, error) {
 	if username == "" && password == "" {
 		return "", nil
@@ -1180,6 +1226,31 @@ func getContainerLastLogs(ctx context.Context, client docker.APIClient, containe
 	return lines, nil
 }
 
+// terminateRunner calls the runner's /api/terminate endpoint to set the job termination state.
+// This allows the server to read the termination reason via /api/pull before the container dies.
+func terminateRunner(ctx context.Context, runnerPort int, reason types.TerminationReason, message string) error {
+	url := fmt.Sprintf("http://localhost:%d/api/terminate", runnerPort)
+	body := fmt.Sprintf(`{"reason":%q,"message":%q}`, reason, message)
+	// 5s is generous for a localhost HTTP call; if the runner doesn't respond in time,
+	// we proceed with stopping the container anyway (the server will handle the termination).
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+	return nil
+}
+
 /* DockerParameters interface implementation for CLIArgs */
 
 func (c *CLIArgs) DockerPrivileged() bool {
@@ -1226,6 +1297,10 @@ func (c *CLIArgs) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {
 
 func (c *CLIArgs) DockerPorts() []int {
 	return []int{c.Runner.HTTPPort, c.Runner.SSHPort}
+}
+
+func (c *CLIArgs) RunnerHTTPPort() int {
+	return c.Runner.HTTPPort
 }
 
 func (c *CLIArgs) MakeRunnerDir(name string) (string, error) {
