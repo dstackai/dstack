@@ -416,6 +416,7 @@ class ShimClient:
         host_ssh_keys: list[str],
         container_ssh_keys: list[str],
         instance_id: str,
+        data_transfer_quota: int = 0,
     ) -> None:
         if not self.is_api_v2_supported():
             raise ShimAPIVersionError()
@@ -439,6 +440,7 @@ class ShimClient:
             host_ssh_user=host_ssh_user,
             host_ssh_keys=host_ssh_keys,
             container_ssh_keys=container_ssh_keys,
+            data_transfer_quota=data_transfer_quota,
         )
         self._request("POST", "/api/tasks", body, raise_for_status=True)
 

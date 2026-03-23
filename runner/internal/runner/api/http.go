@@ -194,6 +194,24 @@ func (s *Server) stopPostHandler(w http.ResponseWriter, r *http.Request) (interf
 	return nil, nil
 }
 
+func (s *Server) terminatePostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	var body schemas.TerminateBody
+	if err := api.DecodeJSONBody(w, r, &body, true); err != nil {
+		return nil, err
+	}
+	ctx := r.Context()
+	log.Error(ctx, "Terminate requested", "reason", body.Reason, "message", body.Message)
+	// No executor.Lock() needed — SetJobStateWithTerminationReason acquires its own lock.
+	// Using the external lock would deadlock with io.Copy holding it during job execution.
+	s.executor.SetJobStateWithTerminationReason(
+		ctx,
+		schemas.JobStateFailed,
+		body.Reason,
+		body.Message,
+	)
+	return nil, nil
+}
+
 func isMaxBytesError(err error) bool {
 	var maxBytesError *http.MaxBytesError
 	return errors.As(err, &maxBytesError)

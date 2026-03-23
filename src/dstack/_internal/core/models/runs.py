@@ -152,6 +152,7 @@ class JobTerminationReason(str, Enum):
     EXECUTOR_ERROR = "executor_error"
     MAX_DURATION_EXCEEDED = "max_duration_exceeded"
     LOG_QUOTA_EXCEEDED = "log_quota_exceeded"
+    DATA_TRANSFER_QUOTA_EXCEEDED = "data_transfer_quota_exceeded"
 
     def to_status(self) -> JobStatus:
         mapping = {
@@ -175,6 +176,7 @@ class JobTerminationReason(str, Enum):
             self.EXECUTOR_ERROR: JobStatus.FAILED,
             self.MAX_DURATION_EXCEEDED: JobStatus.TERMINATED,
             self.LOG_QUOTA_EXCEEDED: JobStatus.FAILED,
+            self.DATA_TRANSFER_QUOTA_EXCEEDED: JobStatus.FAILED,
         }
         return mapping[self]
 
@@ -208,6 +210,7 @@ class JobTerminationReason(str, Enum):
             JobTerminationReason.EXECUTOR_ERROR: "executor error",
             JobTerminationReason.MAX_DURATION_EXCEEDED: "max duration exceeded",
             JobTerminationReason.LOG_QUOTA_EXCEEDED: "log quota exceeded",
+            JobTerminationReason.DATA_TRANSFER_QUOTA_EXCEEDED: "data transfer quota exceeded",
         }
         return error_mapping.get(self)
 
