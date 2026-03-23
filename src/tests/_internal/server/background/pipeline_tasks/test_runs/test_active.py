@@ -27,6 +27,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunWorker
 from dstack._internal.server.models import JobModel
+from dstack._internal.server.services.jobs import get_job_spec
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
@@ -577,3 +578,227 @@ class TestRunActiveWorker:
         await session.refresh(run)
         assert run.status == RunStatus.RUNNING
         assert run.lock_token == new_lock_token
+
+    async def test_service_in_place_deployment_bump(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        """Service with 1 RUNNING replica at deployment_num=0, run at deployment_num=1,
+        same job spec → job gets deployment_num bumped to 1."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo Hi!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+        )
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(job)
+        assert job.deployment_num == 1
+
+    async def test_service_rolling_deployment_scale_up(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        """Service with 1 out-of-date RUNNING replica whose spec differs from the new
+        deployment, desired=1 → creates 1 new replica (surge), old registered replica
+        untouched."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo new!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        old_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=True,
+            replica_num=0,
+        )
+        # Make the old job's spec differ from the current run_spec so in-place bump
+        # cannot be applied and rolling deployment is triggered instead.
+        old_spec = get_job_spec(old_job)
+        old_spec.commands = ["echo old!"]
+        old_job.job_spec_data = old_spec.json()
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        res = await session.execute(
+            select(JobModel).where(JobModel.run_id == run.id).order_by(JobModel.replica_num)
+        )
+        jobs = list(res.scalars().all())
+        assert len(jobs) == 2
+        # Old replica still RUNNING (registered, not terminated during rolling)
+        assert jobs[0].status == JobStatus.RUNNING
+        assert jobs[0].deployment_num == 0
+        # New surge replica created
+        assert jobs[1].status == JobStatus.SUBMITTED
+        assert jobs[1].deployment_num == 1
+
+    async def test_service_rolling_deployment_scale_down_old_unregistered(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        """Service with 1 up-to-date RUNNING+registered and 1 out-of-date RUNNING+unregistered
+        replica (with a different spec) → old unregistered replica terminated."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo new!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+            deployment_num=1,
+        )
+        # Up-to-date registered replica
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=1,
+            registered=True,
+            replica_num=0,
+        )
+        # Out-of-date unregistered replica with different spec
+        old_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            deployment_num=0,
+            registered=False,
+            replica_num=1,
+        )
+        old_spec = get_job_spec(old_job)
+        old_spec.commands = ["echo old!"]
+        old_job.job_spec_data = old_spec.json()
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_job)
+        assert old_job.status == JobStatus.TERMINATING
+        assert old_job.termination_reason == JobTerminationReason.SCALED_DOWN
+
+    async def test_service_removed_group_cleanup(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        """Service run with jobs belonging to group "old" not in current config →
+        those jobs get TERMINATING with SCALED_DOWN."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        # Current config only has group "0" (default)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            run_name="service-run",
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo Hi!"],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="service-run",
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        # Active replica in current group "0"
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=0,
+        )
+        # Replica belonging to a removed group "old" — manually set job_spec_data
+        old_group_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=1,
+        )
+        # Patch the job spec to have replica_group="old"
+        old_spec = get_job_spec(old_group_job)
+        old_spec.replica_group = "old"
+        old_group_job.job_spec_data = old_spec.json()
+        await session.commit()
+
+        lock_run(run)
+        await session.commit()
+
+        await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.RUNNING
+
+        await session.refresh(old_group_job)
+        assert old_group_job.status == JobStatus.TERMINATING
+        assert old_group_job.termination_reason == JobTerminationReason.SCALED_DOWN

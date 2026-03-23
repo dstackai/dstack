@@ -37,12 +37,16 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.runs import create_job_model_for_new_submission
 from dstack._internal.server.services.runs.replicas import (
     build_replica_lists,
+    get_group_rollout_state,
     has_out_of_date_replicas,
+    job_belongs_to_group,
 )
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+ROLLING_DEPLOYMENT_MAX_SURGE = 1  # at most one extra replica during rolling deployment
 
 
 class ActiveRunUpdateMap(ItemUpdateMap, total=False):
@@ -138,6 +142,18 @@ async def process_active_run(context: ActiveContext) -> ActiveResult:
             new_job_models, job_id_to_update_map = await _build_service_scaling_maps(
                 context, per_group_desired
             )
+
+            deployment_maps = await _build_deployment_update_map(context)
+            job_id_to_update_map.update(deployment_maps)
+
+            rolling_new, rolling_maps = await _build_rolling_deployment_maps(
+                context, per_group_desired, in_place_bumped_job_ids=set(deployment_maps.keys())
+            )
+            new_job_models.extend(rolling_new)
+            job_id_to_update_map.update(rolling_maps)
+
+            cleanup_maps = _build_removed_groups_cleanup_maps(context)
+            job_id_to_update_map.update(cleanup_maps)
         else:
             job_id_to_update_map = await _build_deployment_update_map(context)
 
@@ -476,10 +492,16 @@ async def _build_deployment_update_map(
         if all(j.deployment_num == run_model.deployment_num for j in job_models):
             continue
 
+        replica_group_name = None
+        if run_spec.configuration.type == "service":
+            job_spec = get_job_spec(job_models[0])
+            replica_group_name = job_spec.replica_group
+
         new_job_specs = await get_job_specs_from_run_spec(
             run_spec=run_spec,
             secrets=context.secrets,
             replica_num=replica_num,
+            replica_group_name=replica_group_name,
         )
         assert len(new_job_specs) == len(job_models), (
             "Changing the number of jobs within a replica is not yet supported"
@@ -586,3 +608,118 @@ async def _build_service_scaling_maps(
         new_job_models,
         job_id_to_update_map,
     )
+
+
+def _has_out_of_date_replicas(
+    run_model: RunModel,
+    group_name: str,
+    exclude_job_ids: Set[uuid.UUID],
+) -> bool:
+    """Check for out-of-date replicas, treating jobs in `exclude_job_ids` as up-to-date."""
+    for job in run_model.jobs:
+        if job.id in exclude_job_ids:
+            continue
+        if not job_belongs_to_group(job, group_name):
+            continue
+        if job.deployment_num < run_model.deployment_num and not (
+            job.status.is_finished() or job.termination_reason == JobTerminationReason.SCALED_DOWN
+        ):
+            return True
+    return False
+
+
+async def _build_rolling_deployment_maps(
+    context: ActiveContext,
+    per_group_desired: PerGroupDesiredCounts,
+    in_place_bumped_job_ids: Set[uuid.UUID],
+) -> tuple[list[JobModel], dict[uuid.UUID, ActiveRunJobUpdateMap]]:
+    """Build scale-up models and scale-down maps for rolling deployment across all groups.
+
+    Jobs in `in_place_bumped_job_ids` are about to have their deployment_num bumped
+    in-place. We exclude them from the out-of-date check so rolling deployment only
+    targets replicas that actually need replacement.
+    """
+    run_model = context.run_model
+    configuration = context.run_spec.configuration
+    assert isinstance(configuration, ServiceConfiguration)
+    new_job_models: list[JobModel] = []
+    job_id_to_update_map: dict[uuid.UUID, ActiveRunJobUpdateMap] = {}
+
+    next_replica_num = max((job.replica_num for job in run_model.jobs), default=-1) + 1
+
+    for group in configuration.replica_groups:
+        assert group.name is not None
+        group_desired = per_group_desired.get(group.name, 0)
+        # Check if there are truly out-of-date replicas (excluding in-place bumped jobs)
+        if not _has_out_of_date_replicas(run_model, group.name, in_place_bumped_job_ids):
+            continue
+
+        state = get_group_rollout_state(run_model, group)
+        group_max = group_desired + ROLLING_DEPLOYMENT_MAX_SURGE
+
+        # Scale up: create new up-to-date replicas if below max
+        if state.non_terminated_replica_count < group_max:
+            new_jobs = await build_scale_up_job_models(
+                run_model=run_model,
+                run_spec=context.run_spec,
+                secrets=context.secrets,
+                replicas_diff=group_max - state.non_terminated_replica_count,
+                group_name=group.name,
+                replica_num_start=next_replica_num,
+            )
+            new_job_models.extend(new_jobs)
+            if new_jobs:
+                max_new = max(j.replica_num for j in new_jobs)
+                next_replica_num = max(next_replica_num, max_new + 1)
+
+        # Scale down: terminate unregistered out-of-date + excess registered replicas
+        replicas_to_stop = state.unregistered_out_of_date_replica_count
+        replicas_to_stop += max(
+            0,
+            state.registered_non_terminating_replica_count - group_desired,
+        )
+        if replicas_to_stop > 0:
+            scale_down_maps = _build_scale_down_job_update_maps(
+                state.active_replicas, replicas_to_stop
+            )
+            job_id_to_update_map.update(scale_down_maps)
+
+    return new_job_models, job_id_to_update_map
+
+
+def _build_removed_groups_cleanup_maps(
+    context: ActiveContext,
+) -> dict[uuid.UUID, ActiveRunJobUpdateMap]:
+    """Terminate replicas from groups no longer in the configuration."""
+    run_model = context.run_model
+    configuration = context.run_spec.configuration
+    assert isinstance(configuration, ServiceConfiguration)
+    job_id_to_update_map: dict[uuid.UUID, ActiveRunJobUpdateMap] = {}
+
+    existing_group_names: set[str] = set()
+    for job in run_model.jobs:
+        if job.status.is_finished():
+            continue
+        job_spec = get_job_spec(job)
+        existing_group_names.add(job_spec.replica_group)
+
+    new_group_names = {group.name for group in configuration.replica_groups}
+    removed_group_names = existing_group_names - new_group_names
+
+    for removed_group_name in removed_group_names:
+        active_replicas, inactive_replicas = build_replica_lists(
+            run_model=run_model,
+            group_filter=removed_group_name,
+        )
+        if active_replicas:
+            scale_down_maps = _build_scale_down_job_update_maps(
+                active_replicas, len(active_replicas)
+            )
+            job_id_to_update_map.update(scale_down_maps)
+        if inactive_replicas:
+            scale_down_maps = _build_scale_down_job_update_maps(
+                inactive_replicas, len(inactive_replicas)
+            )
+            job_id_to_update_map.update(scale_down_maps)
+
+    return job_id_to_update_map
