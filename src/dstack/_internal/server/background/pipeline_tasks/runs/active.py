@@ -139,6 +139,10 @@ async def process_active_run(context: ActiveContext) -> ActiveResult:
             new_job_models = await _build_retry_job_models(context, analysis.replicas_to_retry)
         elif run_spec.configuration.type == "service":
             per_group_desired = _apply_desired_counts_to_update_map(run_update_map, context)
+            # Service processing has multiple stages that never conflict:
+            # - scaling skips groups with out-of-date replicas (rolling in progress),
+            #   so for those groups only rolling manages replica creation and teardown;
+            # - cleanup only targets removed groups (not in configuration.replica_groups).
             new_job_models, job_id_to_update_map = await _build_service_scaling_maps(
                 context, per_group_desired
             )
@@ -586,6 +590,14 @@ async def _build_service_scaling_maps(
         active_replicas, _ = build_replica_lists(run_model, group_filter=group.name)
         diff = group_desired - len(active_replicas)
 
+        if diff == 0:
+            continue
+
+        # During rolling deployment, skip the group entirely —
+        # _build_rolling_deployment_maps handles both surge and teardown.
+        if has_out_of_date_replicas(run_model, group_filter=group.name):
+            continue
+
         if diff > 0:
             new_jobs = await build_scale_up_job_models(
                 run_model=run_model,
@@ -600,7 +612,7 @@ async def _build_service_scaling_maps(
             if new_jobs:
                 max_new = max(j.replica_num for j in new_jobs)
                 next_replica_num = max(next_replica_num, max_new + 1)
-        elif diff < 0:
+        else:
             scale_down_maps = _build_scale_down_job_update_maps(active_replicas, abs(diff))
             job_id_to_update_map.update(scale_down_maps)
 
