@@ -28,6 +28,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services import events
+from dstack._internal.server.services.gateways import get_or_add_gateway_connection
 from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
@@ -234,7 +235,7 @@ class RunWorker(Worker[RunPipelineItem]):
             await _process_terminating_item(item)
             return
 
-        logger.debug("Skipping run %s with unexpected status %s", item.id, item.status)
+        logger.error("Skipping run %s with unexpected status %s", item.id, item.status)
 
 
 async def _process_pending_item(item: RunPipelineItem) -> None:
@@ -273,11 +274,18 @@ async def _load_pending_context(
         return None
     secrets = await get_project_secrets_mapping(session=session, project=run_model.project)
     run_spec = get_run_spec(run_model)
+
+    gateway_stats = None
+    if run_spec.configuration.type == "service" and run_model.gateway_id is not None:
+        _, conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
+        gateway_stats = await conn.get_stats(run_model.project.name, run_model.run_name)
+
     return pending.PendingContext(
         run_model=run_model,
         run_spec=run_spec,
         secrets=secrets,
         locked_job_ids=locked_job_ids,
+        gateway_stats=gateway_stats,
     )
 
 

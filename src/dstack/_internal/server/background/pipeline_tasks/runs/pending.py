@@ -1,14 +1,18 @@
 """Pending-run processing helpers for the run pipeline."""
 
+import json
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional
 
+from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.runs import RunSpec, RunStatus
+from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server.background.pipeline_tasks.base import ItemUpdateMap
 from dstack._internal.server.background.pipeline_tasks.runs.common import (
     build_scale_up_job_models,
+    compute_desired_replica_counts,
 )
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.utils.common import get_current_datetime
@@ -20,6 +24,7 @@ logger = get_logger(__name__)
 class PendingRunUpdateMap(ItemUpdateMap, total=False):
     status: RunStatus
     desired_replica_count: int
+    desired_replica_counts: Optional[str]
 
 
 @dataclass
@@ -28,6 +33,7 @@ class PendingContext:
     run_spec: RunSpec
     secrets: dict
     locked_job_ids: list[uuid.UUID]
+    gateway_stats: Optional[PerWindowStats] = None
 
 
 @dataclass
@@ -49,10 +55,7 @@ async def process_pending_run(context: PendingContext) -> Optional[PendingResult
         return None
 
     if run_spec.configuration.type == "service":
-        logger.debug(
-            "Skipping service run %s: pending service path not yet implemented", run_model.id
-        )
-        return None
+        return await _process_pending_service(context)
 
     desired_replica_count = 1
     new_job_models = await build_scale_up_job_models(
@@ -67,6 +70,49 @@ async def process_pending_run(context: PendingContext) -> Optional[PendingResult
             desired_replica_count=desired_replica_count,
         ),
         new_job_models=new_job_models,
+    )
+
+
+async def _process_pending_service(context: PendingContext) -> Optional[PendingResult]:
+    run_model = context.run_model
+    run_spec = context.run_spec
+    assert isinstance(run_spec.configuration, ServiceConfiguration)
+    configuration = run_spec.configuration
+
+    total, per_group = compute_desired_replica_counts(
+        run_model=run_model,
+        configuration=configuration,
+        gateway_stats=context.gateway_stats,
+        last_scaled_at=None,
+    )
+    if total == 0:
+        return None
+
+    all_new_job_models: list[JobModel] = []
+    next_replica_num = max((j.replica_num for j in run_model.jobs), default=-1) + 1
+    for group in configuration.replica_groups:
+        assert group.name is not None
+        group_desired = per_group.get(group.name, 0)
+        if group_desired <= 0:
+            continue
+        new_job_models = await build_scale_up_job_models(
+            run_model=run_model,
+            run_spec=run_spec,
+            secrets=context.secrets,
+            replicas_diff=group_desired,
+            group_name=group.name,
+            replica_num_start=next_replica_num,
+        )
+        next_replica_num += group_desired
+        all_new_job_models.extend(new_job_models)
+
+    return PendingResult(
+        run_update_map=PendingRunUpdateMap(
+            status=RunStatus.SUBMITTED,
+            desired_replica_count=total,
+            desired_replica_counts=json.dumps(per_group),
+        ),
+        new_job_models=all_new_job_models,
     )
 
 

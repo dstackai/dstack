@@ -1,12 +1,55 @@
 """Shared helpers for run pipeline state modules."""
 
+import json
+from datetime import datetime
 from typing import Optional
 
+from dstack._internal.core.models.configurations import (
+    DEFAULT_REPLICA_GROUP_NAME,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.runs import JobStatus, RunSpec
+from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.jobs import get_job_spec, get_jobs_from_run_spec
 from dstack._internal.server.services.runs import create_job_model_for_new_submission
 from dstack._internal.server.services.runs.replicas import build_replica_lists
+from dstack._internal.server.services.services.autoscalers import get_service_scaler
+
+
+def compute_desired_replica_counts(
+    run_model: RunModel,
+    configuration: ServiceConfiguration,
+    gateway_stats: Optional[PerWindowStats],
+    last_scaled_at: Optional[datetime],
+) -> tuple[int, dict[str, int]]:
+    """Returns (total_desired, per_group_desired_dict)."""
+    replica_groups = configuration.replica_groups
+    prev_counts: dict[str, int] = (
+        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
+    )
+    if (
+        prev_counts == {}
+        and len(replica_groups) == 1
+        and replica_groups[0].name == DEFAULT_REPLICA_GROUP_NAME
+    ):
+        # Special case to avoid dropping the replica count to group.count.min
+        # when a 0.20.7+ server first processes a service created by a pre-0.20.7 server.
+        # TODO: remove once most users upgrade to 0.20.7+.
+        prev_counts = {DEFAULT_REPLICA_GROUP_NAME: run_model.desired_replica_count}
+    desired_replica_counts: dict[str, int] = {}
+    total = 0
+    for group in replica_groups:
+        scaler = get_service_scaler(group.count, group.scaling)
+        assert group.name is not None, "Group name is always set"
+        group_desired = scaler.get_desired_count(
+            current_desired_count=prev_counts.get(group.name, group.count.min or 0),
+            stats=gateway_stats,
+            last_scaled_at=last_scaled_at,
+        )
+        desired_replica_counts[group.name] = group_desired
+        total += group_desired
+    return total, desired_replica_counts
 
 
 async def build_scale_up_job_models(
@@ -15,8 +58,15 @@ async def build_scale_up_job_models(
     secrets: dict,
     replicas_diff: int,
     group_name: Optional[str] = None,
+    replica_num_start: Optional[int] = None,
 ) -> list[JobModel]:
-    """Build new JobModel instances for scaling up."""
+    """Build new JobModel instances for scaling up.
+
+    If replica_num_start is given, new replicas are numbered from that value
+    instead of computing the next number from run_model.jobs.  This lets
+    callers avoid mutating run_model.jobs when building jobs for multiple
+    groups sequentially.
+    """
     if replicas_diff <= 0:
         return []
 
@@ -48,10 +98,13 @@ async def build_scale_up_job_models(
 
     # Create new replicas for the remainder
     if scheduled_replicas < replicas_diff:
-        max_replica_num = max((job.replica_num for job in run_model.jobs), default=-1)
+        if replica_num_start is not None:
+            first_replica_num = replica_num_start
+        else:
+            first_replica_num = max((job.replica_num for job in run_model.jobs), default=-1) + 1
         new_replicas_needed = replicas_diff - scheduled_replicas
         for i in range(new_replicas_needed):
-            new_replica_num = max_replica_num + 1 + i
+            new_replica_num = first_replica_num + i
             new_jobs = await get_jobs_from_run_spec(
                 run_spec=run_spec,
                 secrets=secrets,
