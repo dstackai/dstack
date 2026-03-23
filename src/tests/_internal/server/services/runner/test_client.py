@@ -455,6 +455,7 @@ class TestShimClientV2(BaseShimClientTest):
             "host_ssh_user": "dstack",
             "host_ssh_keys": ["host_key"],
             "container_ssh_keys": ["project_key", "user_key"],
+            "data_transfer_quota": 0,
         }
         self.assert_request(adapter, 1, "POST", "/api/tasks", expected_request)
 
