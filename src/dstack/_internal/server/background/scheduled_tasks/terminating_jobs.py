@@ -81,6 +81,7 @@ async def _process_next_terminating_job():
             res = await session.execute(
                 select(JobModel)
                 .where(
+                    JobModel.lock_expires_at.is_(None),
                     JobModel.id.not_in(job_lockset),
                     JobModel.status == JobStatus.TERMINATING,
                     or_(

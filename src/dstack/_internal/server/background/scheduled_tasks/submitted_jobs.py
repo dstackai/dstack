@@ -151,6 +151,8 @@ BATCH_SIZE_RESET_TIMEOUT = timedelta(minutes=2)
 last_processed_at: Optional[datetime] = None
 
 
+# NOTE: This scheduled task is going to be deprecated in favor of `JobSubmittedPipeline`.
+# If this logic changes before removal, keep `pipeline_tasks/jobs_submitted.py` in sync.
 async def process_submitted_jobs(batch_size: int = 1):
     tasks = []
     effective_batch_size = _get_effective_batch_size(batch_size)
@@ -177,6 +179,7 @@ async def _process_next_submitted_job():
                 select(JobModel)
                 .join(JobModel.run)
                 .where(
+                    JobModel.lock_expires_at.is_(None),
                     JobModel.status == JobStatus.SUBMITTED,
                     JobModel.waiting_master_job.is_not(True),
                     JobModel.id.not_in(lockset),

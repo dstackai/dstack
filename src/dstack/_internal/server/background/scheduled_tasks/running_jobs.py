@@ -121,6 +121,7 @@ async def _process_next_running_job():
                 select(JobModel)
                 .join(JobModel.run)
                 .where(
+                    JobModel.lock_expires_at.is_(None),
                     JobModel.status.in_(
                         [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                     ),

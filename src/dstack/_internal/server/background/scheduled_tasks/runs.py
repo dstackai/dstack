@@ -73,6 +73,8 @@ JOB_STATUSES_EXCLUDED_FOR_LOCKING = JobStatus.finished_statuses() + [JobStatus.T
 ROLLING_DEPLOYMENT_MAX_SURGE = 1  # at most one extra replica during rolling deployment
 
 
+# NOTE: This scheduled task is going to be deprecated in favor of `RunPipeline`.
+# If this logic changes before removal, keep `pipeline_tasks/runs/__init__.py` in sync.
 async def process_runs(batch_size: int = 1):
     tasks = []
     for _ in range(batch_size):
@@ -90,6 +92,7 @@ async def _process_next_run():
             res = await session.execute(
                 select(RunModel)
                 .where(
+                    RunModel.lock_expires_at.is_(None),
                     RunModel.id.not_in(run_lockset),
                     RunModel.last_processed_at < now - MIN_PROCESSING_INTERVAL,
                     # Filter out runs that don't need to be processed.
