@@ -135,6 +135,9 @@ async def process_active_run(context: ActiveContext) -> ActiveResult:
     elif transition.new_status not in {RunStatus.TERMINATING, RunStatus.PENDING}:
         if analysis.replicas_to_retry:
             new_job_models = await _build_retry_job_models(context, analysis.replicas_to_retry)
+            # In a multi-node replica, one job may fail while siblings are still running.
+            # Terminate those siblings so the entire replica retries cleanly.
+            job_id_to_update_map = _build_terminate_retrying_jobs_map(analysis.replicas_to_retry)
         elif run_spec.configuration.type == "service":
             per_group_desired = _apply_desired_counts_to_update_map(run_update_map, context)
             # Service processing has multiple stages that never conflict:
@@ -460,13 +463,7 @@ async def _build_retry_job_models(
             "Changing the number of jobs within a replica is not yet supported"
         )
         for old_job_model, new_job in zip(replica_jobs, new_jobs):
-            if not (
-                old_job_model.status.is_finished() or old_job_model.status == JobStatus.TERMINATING
-            ):
-                # The job is not finished, but we have to retry all jobs. Terminate it.
-                # This will be applied via the returned new_job_models only;
-                # the caller should not also update these jobs via job_id_to_update_map.
-                continue
+            # If some jobs in a retry replica are not finished, they must be terminated by the caller.
             job_model = create_job_model_for_new_submission(
                 run_model=context.run_model,
                 job=new_job,

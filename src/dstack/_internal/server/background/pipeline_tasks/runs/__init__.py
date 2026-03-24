@@ -218,9 +218,14 @@ class RunWorker(Worker[RunPipelineItem]):
 
     @sentry_utils.instrument_named_task("pipeline_tasks.RunWorker.process")
     async def process(self, item: RunPipelineItem):
-        # Keep status dispatch explicit because run states have distinct processing
-        # flows and related-row requirements. Preload, lock handling, and apply
-        # stay here, while state modules own the readable business logic.
+        # Currently `dstack` supports runs with
+        # * one multi-node replica (multi-node tasks)
+        # * or multiple single-node replicas (services)
+        # The multiple multi-node replica is not supported but the most of the processing logic
+        # is written to be able to handle this generic case.
+        #
+        # Different run stats have completely separate load/process/apply phases
+        # due to distinct processing flows and related-row requirements.
         if item.status == RunStatus.PENDING:
             await _process_pending_item(item)
             return
