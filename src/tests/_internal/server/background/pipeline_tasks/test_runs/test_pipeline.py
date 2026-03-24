@@ -102,8 +102,9 @@ class TestRunFetcher:
             repo=repo,
             user=user,
             run_name="recent",
-            status=RunStatus.SUBMITTED,
+            status=RunStatus.RUNNING,
             submitted_at=now,
+            last_processed_at=now + dt.timedelta(seconds=10),
         )
 
         items = await fetcher.fetch(limit=10)
