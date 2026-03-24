@@ -47,7 +47,7 @@ class ServiceUnregistration:
 @dataclass
 class TerminatingContext:
     run_model: models.RunModel
-    locked_job_ids: list[uuid.UUID]
+    locked_job_ids: set[uuid.UUID]
 
 
 @dataclass
@@ -69,8 +69,7 @@ async def process_terminating_run(context: TerminatingContext) -> TerminatingRes
 
     job_termination_reason = run_model.termination_reason.to_job_termination_reason()
     if len(context.locked_job_ids) > 0:
-        locked_job_ids_set = set(context.locked_job_ids)
-        locked_jobs = [j for j in run_model.jobs if j.id in locked_job_ids_set]
+        locked_jobs = [j for j in run_model.jobs if j.id in context.locked_job_ids]
         delayed_job_ids = []
         regular_job_ids = []
         for job_model in locked_jobs:

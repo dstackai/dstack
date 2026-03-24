@@ -396,7 +396,7 @@ async def _apply_pending_result(
 
 async def _apply_noop_result(
     item: RunPipelineItem,
-    locked_job_ids: Sequence[uuid.UUID],
+    locked_job_ids: set[uuid.UUID],
 ) -> None:
     """Unlock the run without changing state. Used when processing decides to skip."""
     async with get_session_ctx() as session:
@@ -522,7 +522,7 @@ async def _apply_active_result(
         resolve_now_placeholders(result.run_update_map, now=now)
         job_update_rows = _build_active_job_update_rows(
             job_id_to_update_map=result.job_id_to_update_map,
-            unlock_job_ids=set(context.locked_job_ids),
+            unlock_job_ids=context.locked_job_ids,
         )
         if job_update_rows:
             resolve_now_placeholders(job_update_rows, now=now)
@@ -576,12 +576,6 @@ async def _apply_active_result(
             run_model=run_model,
             old_status=old_status,
             new_status=new_status,
-        )
-
-        await _unlock_related_jobs(
-            session=session,
-            item=item,
-            locked_job_ids=context.locked_job_ids,
         )
         await session.commit()
 
@@ -731,7 +725,7 @@ async def _refetch_locked_run_for_terminating(
 async def _lock_related_jobs(
     session: AsyncSession,
     item: RunPipelineItem,
-) -> Optional[list[uuid.UUID]]:
+) -> Optional[set[uuid.UUID]]:
     now = get_current_datetime()
     job_lock, _ = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
     async with job_lock:
@@ -775,7 +769,7 @@ async def _lock_related_jobs(
             job_model.lock_token = item.lock_token
             job_model.lock_owner = RunPipeline.__name__
         await session.commit()
-    return [jm.id for jm in locked_job_models]
+    return {jm.id for jm in locked_job_models}
 
 
 async def _reset_run_lock_for_retry(
@@ -817,7 +811,7 @@ async def _apply_terminating_result(
         resolve_now_placeholders(result.run_update_map, now=now)
         job_update_rows = _build_terminating_job_update_rows(
             job_id_to_update_map=result.job_id_to_update_map,
-            unlock_job_ids=set(context.locked_job_ids),
+            unlock_job_ids=context.locked_job_ids,
         )
         if job_update_rows:
             resolve_now_placeholders(job_update_rows, now=now)
@@ -918,7 +912,7 @@ def _emit_terminating_job_status_change_events(
 async def _unlock_related_jobs(
     session: AsyncSession,
     item: RunPipelineItem,
-    locked_job_ids: Sequence[uuid.UUID],
+    locked_job_ids: set[uuid.UUID],
 ) -> None:
     if len(locked_job_ids) == 0:
         return

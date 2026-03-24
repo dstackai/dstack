@@ -68,7 +68,7 @@ class ActiveContext:
     run_model: RunModel
     run_spec: RunSpec
     secrets: dict
-    locked_job_ids: list[uuid.UUID]
+    locked_job_ids: set[uuid.UUID]
     gateway_stats: Optional[PerWindowStats] = None
 
 
