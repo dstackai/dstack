@@ -1,6 +1,6 @@
-import datetime as dt
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -42,7 +42,7 @@ def _lock_job(
     job_model,
     *,
     lock_owner: str = RunPipeline.__name__,
-    lock_expires_at: dt.datetime | None = None,
+    lock_expires_at: Optional[datetime] = None,
 ) -> None:
     if lock_expires_at is None:
         lock_expires_at = get_current_datetime() + timedelta(seconds=30)
@@ -200,7 +200,7 @@ class TestRunTerminatingWorker:
         assert run.lock_expires_at is None
         assert run.lock_owner is None
 
-    @freeze_time(dt.datetime(2023, 1, 2, 3, 10, tzinfo=dt.timezone.utc))
+    @freeze_time(datetime(2023, 1, 2, 3, 10, tzinfo=timezone.utc))
     async def test_reschedules_scheduled_run_and_clears_fleet(
         self, test_db, session: AsyncSession, worker: RunWorker
     ) -> None:
@@ -236,7 +236,7 @@ class TestRunTerminatingWorker:
 
         await session.refresh(run)
         assert run.status == RunStatus.PENDING
-        assert run.next_triggered_at == dt.datetime(2023, 1, 2, 3, 15, tzinfo=dt.timezone.utc)
+        assert run.next_triggered_at == datetime(2023, 1, 2, 3, 15, tzinfo=timezone.utc)
         assert run.fleet_id is None
         assert run.lock_token is None
         assert run.lock_expires_at is None
