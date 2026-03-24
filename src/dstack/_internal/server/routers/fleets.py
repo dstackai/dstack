@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import dstack._internal.server.services.fleets as fleets_services
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.fleets import Fleet, FleetPlan
-from dstack._internal.server.compatibility.common import patch_offers_list
+from dstack._internal.server.compatibility.fleets import patch_fleet, patch_fleet_plan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -50,6 +50,7 @@ async def list_fleets(
     body: ListFleetsRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
+    client_version: Optional[Version] = Depends(get_client_version),
 ):
     """
     Returns all fleets and instances within them visible to user sorted by descending `created_at`.
@@ -59,19 +60,20 @@ async def list_fleets(
     The results are paginated. To get the next page, pass `created_at` and `id` of
     the last fleet from the previous page as `prev_created_at` and `prev_id`.
     """
-    return CustomORJSONResponse(
-        await fleets_services.list_fleets(
-            session=session,
-            user=user,
-            project_name=body.project_name,
-            only_active=body.only_active,
-            include_imported=body.include_imported,
-            prev_created_at=body.prev_created_at,
-            prev_id=body.prev_id,
-            limit=body.limit,
-            ascending=body.ascending,
-        )
+    fleet_list = await fleets_services.list_fleets(
+        session=session,
+        user=user,
+        project_name=body.project_name,
+        only_active=body.only_active,
+        include_imported=body.include_imported,
+        prev_created_at=body.prev_created_at,
+        prev_id=body.prev_id,
+        limit=body.limit,
+        ascending=body.ascending,
     )
+    for fleet in fleet_list:
+        patch_fleet(fleet, client_version)
+    return CustomORJSONResponse(fleet_list)
 
 
 @project_router.post("/list", response_model=List[Fleet])
@@ -79,6 +81,7 @@ async def list_project_fleets(
     body: Optional[ListProjectFleetsRequest] = None,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    client_version: Optional[Version] = Depends(get_client_version),
 ):
     """
     Returns all fleets in the project.
@@ -87,13 +90,14 @@ async def list_project_fleets(
     _, project = user_project
     if body is None:
         body = ListProjectFleetsRequest()
-    return CustomORJSONResponse(
-        await fleets_services.list_project_fleets(
-            session=session,
-            project=project,
-            include_imported=body.include_imported,
-        )
+    fleet_list = await fleets_services.list_project_fleets(
+        session=session,
+        project=project,
+        include_imported=body.include_imported,
     )
+    for fleet in fleet_list:
+        patch_fleet(fleet, client_version)
+    return CustomORJSONResponse(fleet_list)
 
 
 @project_router.post("/get", response_model=Fleet)
@@ -102,6 +106,7 @@ async def get_fleet(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
     project: ProjectModel = Depends(Project()),
+    client_version: Optional[Version] = Depends(get_client_version),
 ):
     """
     Returns a fleet given `name` or `id`.
@@ -116,6 +121,7 @@ async def get_fleet(
     )
     if fleet is None:
         raise ResourceNotExistsError()
+    patch_fleet(fleet, client_version)
     return CustomORJSONResponse(fleet)
 
 
@@ -136,7 +142,7 @@ async def get_plan(
         user=user,
         spec=body.spec,
     )
-    patch_offers_list(plan.offers, client_version)
+    patch_fleet_plan(plan, client_version)
     return CustomORJSONResponse(plan)
 
 
@@ -146,6 +152,7 @@ async def apply_plan(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
     pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
+    client_version: Optional[Version] = Depends(get_client_version),
 ):
     """
     Creates a new fleet or updates an existing fleet.
@@ -153,16 +160,16 @@ async def apply_plan(
     Use `force: true` to apply even if the current resource does not match.
     """
     user, project = user_project
-    return CustomORJSONResponse(
-        await fleets_services.apply_plan(
-            session=session,
-            user=user,
-            project=project,
-            plan=body.plan,
-            force=body.force,
-            pipeline_hinter=pipeline_hinter,
-        )
+    fleet = await fleets_services.apply_plan(
+        session=session,
+        user=user,
+        project=project,
+        plan=body.plan,
+        force=body.force,
+        pipeline_hinter=pipeline_hinter,
     )
+    patch_fleet(fleet, client_version)
+    return CustomORJSONResponse(fleet)
 
 
 @project_router.post("/create", response_model=Fleet, deprecated=True)
@@ -171,20 +178,21 @@ async def create_fleet(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
     pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
+    client_version: Optional[Version] = Depends(get_client_version),
 ):
     """
     Creates a fleet given a fleet configuration.
     """
     user, project = user_project
-    return CustomORJSONResponse(
-        await fleets_services.create_fleet(
-            session=session,
-            project=project,
-            user=user,
-            spec=body.spec,
-            pipeline_hinter=pipeline_hinter,
-        )
+    fleet = await fleets_services.create_fleet(
+        session=session,
+        project=project,
+        user=user,
+        spec=body.spec,
+        pipeline_hinter=pipeline_hinter,
     )
+    patch_fleet(fleet, client_version)
+    return CustomORJSONResponse(fleet)
 
 
 @project_router.post("/delete")

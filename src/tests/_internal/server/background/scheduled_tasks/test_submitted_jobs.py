@@ -8,7 +8,10 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode
-from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.configurations import (
+    DevEnvironmentConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
@@ -34,6 +37,7 @@ from dstack._internal.server.background.scheduled_tasks.submitted_jobs import (
 )
 from dstack._internal.server.models import (
     ComputeGroupModel,
+    FleetModel,
     InstanceModel,
     JobModel,
     PlacementGroupModel,
@@ -1217,6 +1221,120 @@ class TestProcessSubmittedJobs:
         assert job.instance_assigned
         assert job.instance_id is None
         assert job.fleet_id == fleet.id
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("configured_fleet", "expected_fleet_project_name"),
+        [
+            ("exporter-a/test-fleet", "exporter-a"),
+            ("exporter-b/test-fleet", "exporter-b"),
+            ("importer/test-fleet", "importer"),
+            ("test-fleet", "importer"),
+        ],
+    )
+    async def test_assigns_job_to_specified_fleet_across_projects(
+        self,
+        test_db,
+        session: AsyncSession,
+        configured_fleet: str,
+        expected_fleet_project_name: str,
+    ):
+        user = await create_user(session)
+        exporter_a = await create_project(session, name="exporter-a", owner=user)
+        exporter_b = await create_project(session, name="exporter-b", owner=user)
+        importer = await create_project(session, name="importer", owner=user)
+        fleet_a = await create_fleet(session=session, project=exporter_a, name="test-fleet")
+        fleet_b = await create_fleet(session=session, project=exporter_b, name="test-fleet")
+        await create_fleet(session=session, project=importer, name="test-fleet")
+        await create_export(
+            session=session,
+            exporter_project=exporter_a,
+            importer_projects=[importer],
+            exported_fleets=[fleet_a],
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_b,
+            importer_projects=[importer],
+            exported_fleets=[fleet_b],
+        )
+        repo = await create_repo(session=session, project_id=importer.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=DevEnvironmentConfiguration.parse_obj(
+                {"type": "dev-environment", "ide": "vscode", "fleets": [configured_fleet]}
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=importer,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run, instance_assigned=False)
+
+        await process_submitted_jobs()
+        res = await session.execute(
+            select(JobModel)
+            .where(JobModel.id == job.id)
+            .options(joinedload(JobModel.fleet).joinedload(FleetModel.project))
+            .execution_options(populate_existing=True)
+        )
+        job = res.scalar_one()
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.fleet is not None
+        assert job.fleet.project.name == expected_fleet_project_name
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_not_assigns_job_to_imported_fleet_if_specified_without_project_prefix(
+        self,
+        test_db,
+        session: AsyncSession,
+    ):
+        user = await create_user(session)
+        exporter_a = await create_project(session, name="exporter-a", owner=user)
+        importer = await create_project(session, name="importer", owner=user)
+        fleet_a = await create_fleet(session=session, project=exporter_a, name="test-fleet")
+        await create_export(
+            session=session,
+            exporter_project=exporter_a,
+            importer_projects=[importer],
+            exported_fleets=[fleet_a],
+        )
+        repo = await create_repo(session=session, project_id=importer.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=DevEnvironmentConfiguration.parse_obj(
+                {
+                    "type": "dev-environment",
+                    "ide": "vscode",
+                    "fleets": ["test-fleet"],  # won't work, should be exporter-a/test-fleet
+                }
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=importer,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run, instance_assigned=False)
+
+        await process_submitted_jobs()
+        res = await session.execute(
+            select(JobModel)
+            .where(JobModel.id == job.id)
+            .options(joinedload(JobModel.fleet).joinedload(FleetModel.project))
+            .execution_options(populate_existing=True)
+        )
+        job = res.scalar_one()
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

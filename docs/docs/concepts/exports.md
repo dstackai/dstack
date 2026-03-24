@@ -134,6 +134,19 @@ $ dstack fleet list
 
 Imported fleets can be used for runs just like the project's own fleets.
 
+<div editor-title=".dstack.yml">
+    
+```yaml
+type: dev-environment
+ide: vscode
+
+fleets:
+- my-local-fleet
+- team-a/my-fleet
+```
+
+</div>
+
 !!! info "Tenant isolation"
     Exported fleets share the same access model as regular fleets. See [Tenant isolation](fleets.md#tenant-isolation) for details.
 

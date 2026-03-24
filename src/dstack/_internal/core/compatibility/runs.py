@@ -1,6 +1,10 @@
 from typing import Optional
 
-from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeExcludeSetType
+from dstack._internal.core.compatibility.common import patch_profile_params
+from dstack._internal.core.models.common import (
+    IncludeExcludeDictType,
+    IncludeExcludeSetType,
+)
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.routers import SGLangServiceRouterConfig
 from dstack._internal.core.models.runs import (
@@ -140,3 +144,9 @@ def get_job_submission_excludes(job_submissions: list[JobSubmission]) -> Include
         submission_excludes["job_runtime_data"] = jrd_excludes
 
     return submission_excludes
+
+
+def patch_run_spec(run_spec: RunSpec) -> None:
+    patch_profile_params(run_spec.configuration)
+    if run_spec.profile is not None:
+        patch_profile_params(run_spec.profile)

@@ -975,6 +975,7 @@ async def _refetch_fleet_models_with_instances(
 ) -> list[FleetModel]:
     res = await session.execute(
         select(FleetModel)
+        .join(FleetModel.project)  # can be referenced by fleet_filters
         .outerjoin(FleetModel.instances)
         .where(
             FleetModel.id.in_(fleets_ids),
