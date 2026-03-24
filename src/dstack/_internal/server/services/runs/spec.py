@@ -134,7 +134,6 @@ def validate_run_spec_and_set_defaults(
             docker=getattr(run_spec.configuration, "docker", None),
         )
     else:
-        assert isinstance(run_spec.configuration, ServiceConfiguration)
         if not isinstance(run_spec.configuration.replicas, list):
             set_resources_defaults(run_spec.configuration.resources)
             set_gpu_vendor_default(
