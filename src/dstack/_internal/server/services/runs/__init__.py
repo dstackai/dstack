@@ -648,6 +648,7 @@ async def submit_run(
         await session.commit()
         if pipeline_hinter is not None:
             pipeline_hinter.hint_fetch(JobModel.__name__)
+            pipeline_hinter.hint_fetch(RunModel.__name__)
         await session.refresh(run_model)
 
         run = await get_run_by_id(session, project, run_model.id)
