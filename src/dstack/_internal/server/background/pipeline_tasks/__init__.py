@@ -15,6 +15,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
 from dstack._internal.server.background.pipeline_tasks.placement_groups import (
     PlacementGroupPipeline,
 )
+from dstack._internal.server.background.pipeline_tasks.runs import RunPipeline
 from dstack._internal.server.background.pipeline_tasks.volumes import VolumePipeline
 from dstack._internal.utils.logging import get_logger
 
@@ -32,6 +33,7 @@ class PipelineManager:
             JobTerminatingPipeline(),
             InstancePipeline(),
             PlacementGroupPipeline(),
+            RunPipeline(),
             VolumePipeline(),
         ]
         self._hinter = PipelineHinter(self._pipelines)
