@@ -273,6 +273,7 @@ nav:
               - dstack gateway: docs/reference/cli/dstack/gateway.md
               - dstack secret: docs/reference/cli/dstack/secret.md
               - dstack export: docs/reference/cli/dstack/export.md
+              - dstack import: docs/reference/cli/dstack/import.md
           - API:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md

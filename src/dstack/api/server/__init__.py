@@ -22,6 +22,7 @@ from dstack.api.server._files import FilesAPIClient
 from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._gpus import GpusAPIClient
+from dstack.api.server._imports import ImportsAPIClient
 from dstack.api.server._logs import LogsAPIClient
 from dstack.api.server._metrics import MetricsAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
@@ -131,6 +132,10 @@ class APIClient:
     @property
     def exports(self) -> ExportsAPIClient:
         return ExportsAPIClient(self._request, self._logger)
+
+    @property
+    def imports(self) -> ImportsAPIClient:
+        return ImportsAPIClient(self._request, self._logger)
 
     @property
     def files(self) -> FilesAPIClient:

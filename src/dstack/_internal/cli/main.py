@@ -12,6 +12,7 @@ from dstack._internal.cli.commands.event import EventCommand
 from dstack._internal.cli.commands.export import ExportCommand
 from dstack._internal.cli.commands.fleet import FleetCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
+from dstack._internal.cli.commands.import_ import ImportCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.login import LoginCommand
 from dstack._internal.cli.commands.logs import LogsCommand
@@ -69,6 +70,7 @@ def main():
     EventCommand.register(subparsers)
     ExportCommand.register(subparsers)
     FleetCommand.register(subparsers)
+    ImportCommand.register(subparsers)
     GatewayCommand.register(subparsers)
     InitCommand.register(subparsers)
     OfferCommand.register(subparsers)
