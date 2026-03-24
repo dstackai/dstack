@@ -125,12 +125,7 @@ def validate_run_spec_and_set_defaults(
                 )
     if run_spec.configuration.priority is None:
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
-    # set_resources_defaults(run_spec.configuration.resources)
-    # set_gpu_vendor_default(
-    #     run_spec.configuration.resources,
-    #     image=run_spec.configuration.image,
-    #     docker=getattr(run_spec.configuration, "docker", None),
-    # )
+
     if not isinstance(run_spec.configuration, ServiceConfiguration):
         set_resources_defaults(run_spec.configuration.resources)
         set_gpu_vendor_default(
