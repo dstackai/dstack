@@ -40,6 +40,7 @@ from dstack._internal.server.background.pipeline_tasks.instances.termination imp
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
+    FleetModel,
     InstanceHealthCheckModel,
     InstanceModel,
     JobModel,
@@ -147,6 +148,7 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                 now = get_current_datetime()
                 res = await session.execute(
                     select(InstanceModel)
+                    .join(InstanceModel.fleet, isouter=True)
                     .where(
                         InstanceModel.status.in_(
                             [
@@ -164,6 +166,11 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                             )
                         ),
                         InstanceModel.deleted == False,
+                        or_(
+                            # Do not try to lock instances if the fleet is waiting for the lock.
+                            InstanceModel.fleet_id.is_(None),
+                            FleetModel.lock_owner.is_(None),
+                        ),
                         or_(
                             InstanceModel.last_processed_at <= now - self._min_processing_interval,
                             InstanceModel.last_processed_at == InstanceModel.created_at,
@@ -239,6 +246,9 @@ class InstanceWorker(Worker[InstancePipelineItem]):
         if process_context is None:
             return
 
+        # Keep apply centralized here because every instance path returns the same
+        # `ProcessResult` shape for one primary model, with only a small set of
+        # optional side effects such as health checks or placement-group scheduling.
         await _apply_process_result(
             item=item,
             instance_model=process_context.instance_model,

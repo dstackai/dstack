@@ -391,7 +391,7 @@ class FileArchiveModel(BaseModel):
     """`blob` is stored on S3 when it is `None`."""
 
 
-class RunModel(BaseModel):
+class RunModel(PipelineModelMixin, BaseModel):
     __tablename__ = "runs"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -443,7 +443,15 @@ class RunModel(BaseModel):
     )
     gateway: Mapped[Optional["GatewayModel"]] = relationship()
 
-    __table_args__ = (Index("ix_submitted_at_id", submitted_at.desc(), id),)
+    __table_args__ = (
+        Index("ix_submitted_at_id", submitted_at.desc(), id),
+        Index(
+            "ix_runs_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=status.not_in(RunStatus.finished_statuses()),
+            sqlite_where=status.not_in(RunStatus.finished_statuses()),
+        ),
+    )
 
 
 class JobModel(PipelineModelMixin, BaseModel):
@@ -697,6 +705,7 @@ class InstanceModel(PipelineModelMixin, BaseModel):
         back_populates="instances",
         foreign_keys=[fleet_id],
     )
+    """`fleet` can be `None` only for legacy instances created before fleets."""
 
     compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
     compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")

@@ -582,7 +582,7 @@ async def _process_terminating_job(
     """
     Stops the job: tells shim to stop the container, detaches the job from the instance,
     and detaches volumes from the instance.
-    Graceful stop should already be done by `process_terminating_run`.
+    Graceful stop should already be done by the run terminating path.
     """
     instance_update_map = None if instance_model is None else _InstanceUpdateMap()
     result = _ProcessResult(instance_update_map=instance_update_map)

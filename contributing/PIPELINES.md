@@ -92,6 +92,10 @@ It's ok not to force all pipelines into one exact shape.
 
 When writing processing results, update the main row with a filter by both `id` and `lock_token`. This guarantees that only the worker that still owns the lock can apply its results. If the update affects no rows, treat the item as stale and skip applying other changes (status changes, related updates, events). A stale item means another worker or replica already continued processing.
 
+**Locking related resources before refetch**
+
+If you first refetch a main resource and only after lock the related resources, you need to ensure the worker doesn't get the stale view on related resources or works properly even in this case. It's often more robust to first lock related resources and then refetch the main resource with related resources already locked.
+
 **Locking many related resources**
 
 A pipeline may need to lock a potentially big set of related resource, e.g. fleet pipeline locking all fleet's instances. For this, do one SELECT FOR UPDATE of non-locked instances and one SELECT to see how many instances there are, and check if you managed to lock all of them. If fail to lock, release the main lock and try processing on another fetch iteration. You may keep `lock_owner` on the main resource or set `lock_owner` on locked related resource and make other pipelines respect that to guarantee the eventual locking of all related resources and avoid lock starvation.

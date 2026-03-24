@@ -322,6 +322,7 @@ async def create_run(
     deployment_num: int = 0,
     resubmission_attempt: int = 0,
     next_triggered_at: Optional[datetime] = None,
+    last_processed_at: Optional[datetime] = None,
 ) -> RunModel:
     if run_name is None:
         run_name = "test-run"
@@ -332,6 +333,8 @@ async def create_run(
         )
     if run_id is None:
         run_id = uuid.uuid4()
+    if last_processed_at is None:
+        last_processed_at = submitted_at
     run = RunModel(
         id=run_id,
         deleted=deleted,
@@ -344,7 +347,7 @@ async def create_run(
         status=status,
         termination_reason=termination_reason,
         run_spec=run_spec.json(),
-        last_processed_at=submitted_at,
+        last_processed_at=last_processed_at,
         jobs=[],
         priority=priority,
         deployment_num=deployment_num,

@@ -7,7 +7,7 @@ from uuid import UUID
 import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import load_only
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT
 from dstack._internal.core.errors import (
@@ -309,15 +309,12 @@ _job_configurator_classes = [
 _configuration_type_to_configurator_class_map = {c.TYPE: c for c in _job_configurator_classes}
 
 
-async def stop_runner(session: AsyncSession, job_model: JobModel):
-    res = await session.execute(
-        select(InstanceModel)
-        .where(InstanceModel.id == job_model.instance_id)
-        .options(joinedload(InstanceModel.project))
-    )
-    instance: Optional[InstanceModel] = res.scalar()
-
-    ssh_private_keys = get_instance_ssh_private_keys(common.get_or_error(instance))
+async def stop_runner(job_model: JobModel, instance_model: InstanceModel):
+    """
+    Stops the runner using a preloaded instance model.
+    `instance_model.project` must be loaded because SSH key resolution uses the project keys.
+    """
+    ssh_private_keys = get_instance_ssh_private_keys(instance_model)
     try:
         jpd = get_job_provisioning_data(job_model)
         if jpd is not None:
