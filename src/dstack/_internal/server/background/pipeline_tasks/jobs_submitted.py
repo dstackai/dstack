@@ -98,6 +98,7 @@ from dstack._internal.server.services.instances import (
     get_instance_offer,
     get_instance_provisioning_data,
     switch_instance_status,
+    try_atomic_busy_blocks_increment,
 )
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
@@ -574,13 +575,36 @@ async def _apply_assignment_result(
                 await _reset_job_lock_for_retry(session=session, item=item)
                 return
 
-            instance_model, current_offer = current_instance_offers[0]
+            instance_model = None
+            current_offer = None
+            for candidate_instance, candidate_offer in current_instance_offers:
+                if await try_atomic_busy_blocks_increment(
+                    session=session,
+                    instance_id=candidate_instance.id,
+                    blocks=candidate_offer.blocks,
+                ):
+                    instance_model = candidate_instance
+                    current_offer = candidate_offer
+                    break
+            if instance_model is None or current_offer is None:
+                await _reset_job_lock_for_retry(session=session, item=item)
+                return
+
+            # Refetch instance to get updated busy_blocks from the atomic update
+            res = await session.execute(
+                select(InstanceModel)
+                .where(InstanceModel.id == instance_model.id)
+                .options(joinedload(InstanceModel.volume_attachments))
+            )
+            instance_model = res.unique().scalar_one()
+
             _assign_instance_to_job(
                 session=session,
                 job_model=job_model,
                 instance_model=instance_model,
                 offer=current_offer,
                 multinode=context.multinode,
+                busy_blocks_already_updated=True,
             )
             await _mark_job_processed(session=session, job_model=job_model)
 
@@ -871,6 +895,7 @@ def _assign_instance_to_job(
     instance_model: InstanceModel,
     offer: InstanceOfferWithAvailability,
     multinode: bool,
+    busy_blocks_already_updated: bool = False,
 ) -> None:
     job_model.fleet_id = instance_model.fleet_id
     job_model.instance_assigned = True
@@ -880,7 +905,8 @@ def _assign_instance_to_job(
     job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
 
     switch_instance_status(session, instance_model, InstanceStatus.BUSY)
-    instance_model.busy_blocks += offer.blocks
+    if not busy_blocks_already_updated:
+        instance_model.busy_blocks += offer.blocks
     events.emit(
         session,
         (

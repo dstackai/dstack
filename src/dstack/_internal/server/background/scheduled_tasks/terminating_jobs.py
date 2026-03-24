@@ -194,7 +194,7 @@ async def _process_terminating_job(
                 volume_models=volume_models,
             )
 
-    instance_model.busy_blocks -= _get_job_occupied_blocks(jrd)
+    instance_model.busy_blocks = max(0, instance_model.busy_blocks - _get_job_occupied_blocks(jrd))
     if instance_model.status != InstanceStatus.BUSY or jpd is None or not jpd.dockerized:
         # Terminate instances that:
         # - have not finished provisioning yet

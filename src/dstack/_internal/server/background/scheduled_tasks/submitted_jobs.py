@@ -93,6 +93,7 @@ from dstack._internal.server.services.instances import (
     format_instance_blocks_for_event,
     get_instance_provisioning_data,
     switch_instance_status,
+    try_atomic_busy_blocks_increment,
 )
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
@@ -543,15 +544,14 @@ async def _find_assignment_fleet_with_offers(
     await exit_stack.enter_async_context(
         get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids)
     )
-    if is_db_sqlite():
-        fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
-        fleet_models_with_instances = await _refetch_fleet_models_with_instances(
-            session=session,
-            fleets_ids=fleets_with_instances_ids,
-            instances_ids=instances_ids,
-            fleet_filters=fleet_filters,
-            instance_filters=instance_filters,
-        )
+    fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
+    fleet_models_with_instances = await _refetch_fleet_models_with_instances(
+        session=session,
+        fleets_ids=fleets_with_instances_ids,
+        instances_ids=instances_ids,
+        fleet_filters=fleet_filters,
+        instance_filters=instance_filters,
+    )
     fleet_models = fleet_models_with_instances + fleet_models_without_instances
     fleet_model, fleet_instances_with_offers, _ = await find_optimal_fleet_with_offers(
         project=context.project,
@@ -1078,7 +1078,15 @@ async def _assign_existing_instance_to_job(
         return
 
     instances_with_offers.sort(key=lambda instance_with_offer: instance_with_offer[0].price or 0)
-    instance, offer = instances_with_offers[0]
+    for instance, offer in instances_with_offers:
+        if await try_atomic_busy_blocks_increment(
+            session=session, instance_id=instance.id, blocks=offer.blocks
+        ):
+            break
+    else:
+        job_model.instance_assigned = False
+        return
+
     # Reload InstanceModel with volume attachments
     res = await session.execute(
         select(InstanceModel)
@@ -1087,7 +1095,6 @@ async def _assign_existing_instance_to_job(
     )
     instance = res.unique().scalar_one()
     switch_instance_status(session, instance, InstanceStatus.BUSY)
-    instance.busy_blocks += offer.blocks
 
     job_model.instance = instance
     job_model.used_instance_id = instance.id

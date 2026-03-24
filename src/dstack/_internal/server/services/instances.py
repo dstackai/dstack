@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, List, Literal, Optional, Union
 
 import gpuhunt
-from sqlalchemy import and_, exists, false, or_, select
+from sqlalchemy import and_, exists, false, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
@@ -61,6 +61,29 @@ from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+async def try_atomic_busy_blocks_increment(
+    session: AsyncSession,
+    instance_id: uuid.UUID,
+    blocks: int,
+) -> bool:
+    """
+    Atomically increment busy_blocks if the instance has capacity.
+    Returns True if the update affected a row, False otherwise.
+    """
+    res = await session.execute(
+        update(InstanceModel)
+        .where(
+            InstanceModel.id == instance_id,
+            or_(
+                InstanceModel.total_blocks.is_(None),
+                InstanceModel.busy_blocks + blocks <= InstanceModel.total_blocks,
+            ),
+        )
+        .values(busy_blocks=InstanceModel.busy_blocks + blocks)
+    )
+    return res.rowcount > 0
 
 
 def switch_instance_status(
