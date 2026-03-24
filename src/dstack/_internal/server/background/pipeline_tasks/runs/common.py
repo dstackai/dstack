@@ -1,5 +1,3 @@
-"""Shared helpers for run pipeline state modules."""
-
 import json
 from datetime import datetime
 from typing import Optional

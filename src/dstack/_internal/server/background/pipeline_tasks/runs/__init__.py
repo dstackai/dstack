@@ -289,21 +289,6 @@ async def _load_pending_context(
     )
 
 
-def _build_latest_submissions_subquery(run_id: uuid.UUID):
-    """Subquery selecting only the latest submission per (replica_num, job_num)."""
-    return (
-        select(
-            JobModel.run_id.label("run_id"),
-            JobModel.replica_num.label("replica_num"),
-            JobModel.job_num.label("job_num"),
-            func.max(JobModel.submission_num).label("max_submission_num"),
-        )
-        .where(JobModel.run_id == run_id)
-        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
-        .subquery()
-    )
-
-
 async def _refetch_locked_run_for_pending(
     session: AsyncSession,
     item: RunPipelineItem,
@@ -336,6 +321,21 @@ async def _refetch_locked_run_for_pending(
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
+
+
+def _build_latest_submissions_subquery(run_id: uuid.UUID):
+    """Subquery selecting only the latest submission per (replica_num, job_num)."""
+    return (
+        select(
+            JobModel.run_id.label("run_id"),
+            JobModel.replica_num.label("replica_num"),
+            JobModel.job_num.label("job_num"),
+            func.max(JobModel.submission_num).label("max_submission_num"),
+        )
+        .where(JobModel.run_id == run_id)
+        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
+        .subquery()
+    )
 
 
 async def _apply_pending_result(

@@ -1,5 +1,3 @@
-"""Active-run analysis and transition helpers for the run pipeline."""
-
 import json
 import uuid
 from dataclasses import dataclass, field

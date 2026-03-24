@@ -1,5 +1,3 @@
-"""Pending-run processing helpers for the run pipeline."""
-
 import json
 import uuid
 from dataclasses import dataclass

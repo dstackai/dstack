@@ -1,5 +1,3 @@
-"""Terminating-run processing helpers for the run pipeline."""
-
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta

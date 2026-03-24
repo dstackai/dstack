@@ -443,8 +443,8 @@ class RunModel(PipelineModelMixin, BaseModel):
     )
     gateway: Mapped[Optional["GatewayModel"]] = relationship()
 
-    __table_args__ = (Index("ix_submitted_at_id", submitted_at.desc(), id),)
     __table_args__ = (
+        Index("ix_submitted_at_id", submitted_at.desc(), id),
         Index(
             "ix_runs_pipeline_fetch_q",
             last_processed_at.asc(),
