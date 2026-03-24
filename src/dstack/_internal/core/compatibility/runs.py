@@ -50,6 +50,8 @@ def get_apply_plan_excludes(plan: ApplyRunPlanInput) -> Optional[IncludeExcludeD
                         ]
                     ),
                 },
+                # Contains only informational computed fields, safe to exclude unconditionally
+                "job_connection_info": True,
             }
         }
         if current_resource.latest_job_submission is not None:

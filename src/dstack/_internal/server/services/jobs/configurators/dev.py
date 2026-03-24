@@ -4,10 +4,8 @@ from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.configurations import PortMapping, RunConfigurationType
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.server.services.ides import get_ide
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
-from dstack._internal.server.services.jobs.configurators.extensions.cursor import CursorDesktop
-from dstack._internal.server.services.jobs.configurators.extensions.vscode import VSCodeDesktop
-from dstack._internal.server.services.jobs.configurators.extensions.windsurf import WindsurfDesktop
 
 INSTALL_IPYKERNEL = (
     "(echo 'pip install ipykernel...' && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
@@ -18,6 +16,8 @@ INSTALL_IPYKERNEL = (
 class DevEnvironmentJobConfigurator(JobConfigurator):
     TYPE: RunConfigurationType = RunConfigurationType.DEV_ENVIRONMENT
 
+    ide_extensions = ["ms-python.python", "ms-toolsai.jupyter"]
+
     def __init__(
         self, run_spec: RunSpec, secrets: Dict[str, str], replica_group_name: Optional[str] = None
     ):
@@ -26,19 +26,10 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         if run_spec.configuration.ide is None:
             self.ide = None
         else:
-            if run_spec.configuration.ide == "vscode":
-                __class = VSCodeDesktop
-            elif run_spec.configuration.ide == "cursor":
-                __class = CursorDesktop
-            elif run_spec.configuration.ide == "windsurf":
-                __class = WindsurfDesktop
-            else:
+            ide = get_ide(run_spec.configuration.ide)
+            if ide is None:
                 raise ServerClientError(f"Unsupported IDE: {run_spec.configuration.ide}")
-            self.ide = __class(
-                run_name=run_spec.run_name,
-                version=run_spec.configuration.version,
-                extensions=["ms-python.python", "ms-toolsai.jupyter"],
-            )
+            self.ide = ide
         super().__init__(run_spec=run_spec, secrets=secrets, replica_group_name=replica_group_name)
 
     def _shell_commands(self) -> List[str]:
@@ -46,13 +37,16 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
 
         commands = []
         if self.ide is not None:
-            commands += self.ide.get_install_commands()
+            commands += self.ide.get_install_commands(
+                version=self.run_spec.configuration.version, extensions=self.ide_extensions
+            )
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup
         commands.append("echo")
         commands += self.run_spec.configuration.init
         if self.ide is not None:
-            commands += self.ide.get_print_readme_commands()
+            assert self.run_spec.run_name is not None
+            commands += self.ide.get_print_readme_commands(self.run_spec.run_name)
         commands += [
             f"echo 'To connect via SSH, use: `ssh {self.run_spec.run_name}`'",
             "echo",
