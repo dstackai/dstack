@@ -114,6 +114,7 @@ from dstack._internal.server.models import (
     RunModel,
     SecretModel,
     UserModel,
+    UserPublicKeyModel,
     VolumeAttachmentModel,
     VolumeModel,
 )
@@ -161,6 +162,28 @@ async def create_user(
     session.add(user)
     await session.commit()
     return user
+
+
+async def create_user_public_key(
+    session: AsyncSession,
+    user: UserModel,
+    name: str = "test-key",
+    type: str = "ssh-ed25519",
+    fingerprint: str = "SHA256:testfingerprint",
+    key: str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5",
+    created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+) -> UserPublicKeyModel:
+    user_public_key = UserPublicKeyModel(
+        user=user,
+        name=name,
+        type=type,
+        fingerprint=fingerprint,
+        key=key,
+        created_at=created_at,
+    )
+    session.add(user_public_key)
+    await session.commit()
+    return user_public_key
 
 
 async def create_project(

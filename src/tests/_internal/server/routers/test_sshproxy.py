@@ -19,6 +19,7 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    create_user_public_key,
     get_auth_headers,
     get_job_provisioning_data,
     get_job_runtime_data,
@@ -97,6 +98,12 @@ class TestGetUpstream:
             session=session, project=project, backend=BackendType.RUNPOD
         )
         user = await create_user(session=session, ssh_public_key="user-key")
+        await create_user_public_key(
+            session=session, user=user, fingerprint="SHA256:fp1", key="user-uploaded-key-1"
+        )
+        await create_user_public_key(
+            session=session, user=user, fingerprint="SHA256:fp2", key="user-uploaded-key-2"
+        )
         repo = await create_repo(session=session, project_id=project.id)
         run_spec = get_run_spec(repo_id=repo.name, ssh_key_pub="run-spec-key")
         run = await create_run(
@@ -138,6 +145,8 @@ class TestGetUpstream:
             "authorized_keys": unordered(
                 [
                     "user-key",
+                    "user-uploaded-key-1",
+                    "user-uploaded-key-2",
                     "run-spec-key",
                 ]
             ),
