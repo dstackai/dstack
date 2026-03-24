@@ -10,6 +10,7 @@ from dstack._internal.core.models.common import (
     CoreConfig,
     CoreModel,
     Duration,
+    EntityReference,
     generate_dual_core_model,
 )
 from dstack._internal.utils.common import list_enum_values_for_annotation
@@ -360,7 +361,21 @@ class ProfileParams(CoreModel):
         Field(description=("The schedule for starting the run at specified time")),
     ] = None
     fleets: Annotated[
-        Optional[list[str]], Field(description="The fleets considered for reuse")
+        Optional[
+            list[
+                Union[
+                    EntityReference,
+                    str,  # For server response compatibility with pre-0.20.14 clients
+                ]
+            ]
+        ],
+        Field(
+            description=(
+                "The fleets considered for reuse."
+                " For fleets owned by the current project, specify fleet names."
+                " For imported fleets, specify `<project name>/<fleet name>`"
+            ),
+        ),
     ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
@@ -382,6 +397,7 @@ class ProfileParams(CoreModel):
     _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
         parse_idle_duration
     )
+    _validate_fleets = validator("fleets", allow_reuse=True, each_item=True)(EntityReference.parse)
     _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
 
 

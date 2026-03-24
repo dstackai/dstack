@@ -1,6 +1,10 @@
 from typing import Optional
 
-from dstack._internal.core.models.common import IncludeExcludeDictType, IncludeExcludeSetType
+from dstack._internal.core.compatibility.common import patch_profile_params
+from dstack._internal.core.models.common import (
+    IncludeExcludeDictType,
+    IncludeExcludeSetType,
+)
 from dstack._internal.core.models.fleets import ApplyFleetPlanInput, FleetSpec
 
 
@@ -56,3 +60,7 @@ def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeDic
     if spec_excludes:
         return spec_excludes
     return None
+
+
+def patch_fleet_spec(spec: FleetSpec) -> None:
+    patch_profile_params(spec.profile)

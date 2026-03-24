@@ -8,7 +8,7 @@ from typing import Optional
 from rich.text import Text
 
 from dstack._internal.cli.utils.common import LIVE_TABLE_PROVISION_INTERVAL_SECS, console
-from dstack._internal.core.models.events import Event, EventTargetType
+from dstack._internal.core.models.events import Event, EventTarget, EventTargetType
 from dstack._internal.server.schemas.events import LIST_EVENTS_DEFAULT_LIMIT
 from dstack.api.server._events import EventsAPIClient
 
@@ -127,9 +127,9 @@ class _SeenEvent:
     recorded_at: datetime
 
 
-def print_event(event: Event) -> None:
+def print_event(current_project: str, event: Event) -> None:
     recorded_at = event.recorded_at.astimezone().strftime("%Y-%m-%d %H:%M:%S")
-    targets = ", ".join(f"{target.type} {target.name}" for target in event.targets)
+    targets = ", ".join(_format_target(current_project, target) for target in event.targets)
     message = [
         Text(f"[{recorded_at}]", style="log.time"),
     ]
@@ -143,3 +143,14 @@ def print_event(event: Event) -> None:
         *message,
         soft_wrap=True,  # Strictly one line per event. Allows for grepping
     )
+
+
+def _format_target(current_project: str, target: EventTarget) -> str:
+    name = target.name
+    if (
+        target.project_name is not None
+        and target.type != EventTargetType.PROJECT
+        and target.project_name != current_project
+    ):
+        name = f"{target.project_name}/{name}"
+    return f"{target.type} {name}"

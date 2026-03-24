@@ -5,6 +5,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
 )
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import LEGACY_REPO_DIR, AnyRunConfiguration, RunSpec
 from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.core.services import validate_dstack_resource_name
@@ -112,6 +113,16 @@ def validate_run_spec_and_set_defaults(
             raise ServerClientError(
                 f"Probe timeout cannot be longer than {settings.MAX_PROBE_TIMEOUT}s"
             )
+        if isinstance(run_spec.configuration.replicas, list):
+            default_resources = ResourcesSpec()
+            if (
+                run_spec.configuration.resources
+                and run_spec.configuration.resources.dict() != default_resources.dict()
+            ):
+                raise ServerClientError(
+                    "Top-level `resources` is not allowed when `replicas` is a list. "
+                    "Specify `resources` in each replica group instead."
+                )
     if run_spec.configuration.priority is None:
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
     set_resources_defaults(run_spec.configuration.resources)

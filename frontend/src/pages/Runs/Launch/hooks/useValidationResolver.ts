@@ -25,7 +25,7 @@ export const useYupValidationResolver = (template?: ITemplate) => {
                         break;
 
                     case 'ide':
-                        schema['ide'] = yup.string().required(requiredFieldError);
+                        schema['ide'] = yup.string().nullable();
                         break;
 
                     case 'resources':
