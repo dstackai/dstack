@@ -427,7 +427,7 @@ async def _process_active_item(item: RunPipelineItem) -> None:
         load_result = await _load_active_context(session=session, item=item)
         if load_result is None:
             return
-        context, _locked_job_ids = load_result
+        context = load_result
 
     result = await active.process_active_run(context)
     await _apply_active_result(item=item, context=context, result=result)
@@ -436,9 +436,10 @@ async def _process_active_item(item: RunPipelineItem) -> None:
 async def _load_active_context(
     session: AsyncSession,
     item: RunPipelineItem,
-) -> Optional[tuple[active.ActiveContext, list[uuid.UUID]]]:
+) -> Optional[active.ActiveContext]:
     """Returns None on lock mismatch (already handled).
-    Returns (context, locked_job_ids) when processing should proceed."""
+    Returns context when processing should proceed.
+    """
     locked_job_ids = await _lock_related_jobs(session=session, item=item)
     if locked_job_ids is None:
         return None
@@ -460,15 +461,12 @@ async def _load_active_context(
         _, conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
         gateway_stats = await conn.get_stats(run_model.project.name, run_model.run_name)
 
-    return (
-        active.ActiveContext(
-            run_model=run_model,
-            run_spec=run_spec,
-            secrets=secrets,
-            locked_job_ids=locked_job_ids,
-            gateway_stats=gateway_stats,
-        ),
-        locked_job_ids,
+    return active.ActiveContext(
+        run_model=run_model,
+        run_spec=run_spec,
+        secrets=secrets,
+        locked_job_ids=locked_job_ids,
+        gateway_stats=gateway_stats,
     )
 
 
