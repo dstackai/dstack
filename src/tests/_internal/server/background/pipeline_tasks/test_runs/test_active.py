@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.configurations import (
     ScalingSpec,
     ServiceConfiguration,
+    TaskConfiguration,
 )
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import (
@@ -214,6 +215,149 @@ class TestRunActiveWorker:
         assert run.status == RunStatus.PENDING
         assert run.resubmission_attempt == 1
         assert run.lock_token is None
+
+    async def test_retries_no_capacity_replica_and_keeps_service_running(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(
+                name="default",
+                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.INTERRUPTION]),
+            ),
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo Hi!"],
+                replicas=Range[int](min=2, max=2),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        interrupted_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.last_processed_at,
+            replica_num=0,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+        healthy_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.last_processed_at,
+            replica_num=1,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+        lock_run(run)
+        await session.commit()
+
+        now = run.submitted_at + timedelta(minutes=3)
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.runs.active.get_current_datetime",
+            return_value=now,
+        ):
+            await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        await session.refresh(interrupted_job)
+        await session.refresh(healthy_job)
+
+        jobs = list(
+            (
+                await session.execute(
+                    select(JobModel)
+                    .where(JobModel.run_id == run.id)
+                    .order_by(JobModel.replica_num, JobModel.submission_num)
+                )
+            ).scalars()
+        )
+        retried_job = next(job for job in jobs if job.replica_num == 0 and job.submission_num == 1)
+
+        assert run.status == RunStatus.RUNNING
+        assert interrupted_job.status == JobStatus.TERMINATING
+        assert (
+            interrupted_job.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+        )
+        assert healthy_job.status == JobStatus.RUNNING
+        assert retried_job.status == JobStatus.SUBMITTED
+        assert len(jobs) == 3
+
+    async def test_retrying_multinode_replica_terminates_active_sibling_jobs(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(
+                name="default",
+                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.ERROR]),
+            ),
+            configuration=TaskConfiguration(
+                commands=["echo hello"],
+                nodes=2,
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            status=RunStatus.RUNNING,
+        )
+        failed_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.CONTAINER_EXITED_WITH_ERROR,
+            replica_num=0,
+            job_num=0,
+            job_provisioning_data=get_job_provisioning_data(),
+            last_processed_at=run.submitted_at,
+        )
+        running_job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            replica_num=0,
+            job_num=1,
+            job_provisioning_data=get_job_provisioning_data(),
+            last_processed_at=run.submitted_at,
+        )
+        lock_run(run)
+        await session.commit()
+
+        now = run.submitted_at + timedelta(minutes=1)
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.runs.active.get_current_datetime",
+            return_value=now,
+        ):
+            await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        await session.refresh(failed_job)
+        await session.refresh(running_job)
+
+        assert run.status == RunStatus.PENDING
+        assert failed_job.status == JobStatus.FAILED
+        assert running_job.status == JobStatus.TERMINATING
+        assert running_job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
+        assert running_job.termination_reason_message == "Run is to be resubmitted"
 
     async def test_transitions_to_pending_when_retry_duration_exceeded(
         self, test_db, session: AsyncSession, worker: RunWorker
