@@ -705,6 +705,7 @@ class InstanceModel(PipelineModelMixin, BaseModel):
         back_populates="instances",
         foreign_keys=[fleet_id],
     )
+    """`fleet` can be `None` only for legacy instances created before fleets."""
 
     compute_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("compute_groups.id"))
     compute_group: Mapped[Optional["ComputeGroupModel"]] = relationship(back_populates="instances")

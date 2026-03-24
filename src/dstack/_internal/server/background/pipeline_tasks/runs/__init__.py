@@ -55,7 +55,7 @@ class RunPipeline(Pipeline[RunPipelineItem]):
         workers_num: int = 10,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=5),
+        min_processing_interval: timedelta = timedelta(seconds=10),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
     ) -> None:
@@ -132,7 +132,6 @@ class RunFetcher(Fetcher[RunPipelineItem]):
                 res = await session.execute(
                     select(RunModel)
                     .where(
-                        RunModel.last_processed_at < now - self._min_processing_interval,
                         # Filter out runs that do not need processing.
                         # This is only to reduce unnecessary fetch/apply churn.
                         # Otherwise, we could fetch all active runs and filter them in the worker.
@@ -163,6 +162,10 @@ class RunFetcher(Fetcher[RunPipelineItem]):
                                 RunModel.resubmission_attempt == 0,
                                 RunModel.next_triggered_at.is_(None),
                             ),
+                        ),
+                        or_(
+                            RunModel.last_processed_at <= now - self._min_processing_interval,
+                            RunModel.last_processed_at == RunModel.submitted_at,
                         ),
                         or_(
                             RunModel.lock_expires_at.is_(None),
