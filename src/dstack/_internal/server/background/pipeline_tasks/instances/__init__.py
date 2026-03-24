@@ -148,7 +148,7 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                 now = get_current_datetime()
                 res = await session.execute(
                     select(InstanceModel)
-                    .join(InstanceModel.fleet)
+                    .join(InstanceModel.fleet, isouter=True)
                     .where(
                         InstanceModel.status.in_(
                             [
@@ -166,8 +166,11 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                             )
                         ),
                         InstanceModel.deleted == False,
-                        # Do not try to lock instances if the fleet is waiting for the lock.
-                        FleetModel.lock_owner.is_(None),
+                        or_(
+                            # Do not try to lock instances if the fleet is waiting for the lock.
+                            InstanceModel.fleet_id.is_(None),
+                            FleetModel.lock_owner.is_(None),
+                        ),
                         or_(
                             InstanceModel.last_processed_at <= now - self._min_processing_interval,
                             InstanceModel.last_processed_at == InstanceModel.created_at,
