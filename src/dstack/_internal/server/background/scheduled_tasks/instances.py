@@ -1177,9 +1177,14 @@ async def _capture_final_data_transfer_bytes(
             _read_instance_health,
             get_instance_ssh_private_keys(instance),
             jpd,
+            None,
             instance=instance,
         )
-        if health_response is not None and health_response.data_transfer_bytes is not None:
+        if (
+            health_response is not False
+            and health_response is not None
+            and health_response.data_transfer_bytes is not None
+        ):
             instance.data_transfer_bytes = health_response.data_transfer_bytes
     except Exception as exc:
         logger.debug(
