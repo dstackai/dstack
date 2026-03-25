@@ -124,8 +124,13 @@ class Pipeline(Generic[ItemT], ABC):
             raise PipelineError("Cannot drain running pipeline. Call `shutdown()` first.")
         results = await asyncio.gather(*self._tasks, return_exceptions=True)
         for task, result in zip(self._tasks, results):
-            if isinstance(result, BaseException) and not isinstance(
-                result, asyncio.CancelledError
+            if (
+                isinstance(result, BaseException)
+                and not isinstance(result, asyncio.CancelledError)
+                and not isinstance(
+                    result,
+                    asyncio.TimeoutError,  # At least on Python 3.9 a task may raise TimeoutError from CancelledError.
+                )
             ):
                 logger.error(
                     "Unexpected exception when draining pipeline task %r",
