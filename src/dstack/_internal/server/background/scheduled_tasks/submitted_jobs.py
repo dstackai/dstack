@@ -1078,12 +1078,10 @@ async def _assign_existing_instance_to_job(
         return
 
     instances_with_offers.sort(key=lambda instance_with_offer: instance_with_offer[0].price or 0)
-    for instance, offer in instances_with_offers:
-        if await try_atomic_busy_blocks_increment(
-            session=session, instance_id=instance.id, blocks=offer.blocks
-        ):
-            break
-    else:
+    instance, offer = instances_with_offers[0]
+    if not await try_atomic_busy_blocks_increment(
+        session=session, instance_id=instance.id, blocks=offer.blocks
+    ):
         job_model.instance_assigned = False
         return
 

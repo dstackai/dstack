@@ -620,7 +620,7 @@ async def _process_terminating_job(
         result.job_update_map["volumes_detached_at"] = NOW_PLACEHOLDER
 
     instance_update_map = get_or_error(result.instance_update_map)
-    busy_blocks = max(0, instance_model.busy_blocks - _get_job_occupied_blocks(jrd))
+    busy_blocks = instance_model.busy_blocks - _get_job_occupied_blocks(jrd)
     instance_update_map["busy_blocks"] = busy_blocks
     if instance_model.status != InstanceStatus.BUSY or jpd is None or not jpd.dockerized:
         if instance_model.status not in InstanceStatus.finished_statuses():
