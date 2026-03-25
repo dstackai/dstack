@@ -37,7 +37,6 @@ from dstack._internal.core.models.runs import (
     RunStatus,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
-from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.scheduled_tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
@@ -787,9 +786,6 @@ def _process_provisioning_with_shim(
         memory = None
         network_mode = NetworkMode.HOST
     image_name = resolve_provisioning_image_name(job_spec, jpd)
-    data_transfer_quota = 0
-    if jpd.backend == BackendType.AWS:
-        data_transfer_quota = server_settings.SERVER_DATA_TRANSFER_QUOTA_PER_JOB_AWS
     if shim_client.is_api_v2_supported():
         shim_client.submit_task(
             task_id=job_model.id,
@@ -812,7 +808,6 @@ def _process_provisioning_with_shim(
             host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
             instance_id=jpd.instance_id,
-            data_transfer_quota=data_transfer_quota,
         )
     else:
         submitted = shim_client.submit(

@@ -128,6 +128,7 @@ class HealthcheckResponse(CoreModel):
 
 class InstanceHealthResponse(CoreModel):
     dcgm: Optional[DCGMHealthResponse] = None
+    data_transfer_bytes: Optional[int] = None
 
 
 class ShutdownRequest(CoreModel):
@@ -245,7 +246,6 @@ class TaskSubmitRequest(CoreModel):
     host_ssh_user: str
     host_ssh_keys: list[str]
     container_ssh_keys: list[str]
-    data_transfer_quota: int = 0  # total bytes; 0 = unlimited
 
 
 class TaskTerminateRequest(CoreModel):

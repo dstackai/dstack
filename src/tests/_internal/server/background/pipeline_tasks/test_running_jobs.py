@@ -573,7 +573,6 @@ class TestJobRunningWorker:
             host_ssh_keys=["user_ssh_key"],
             container_ssh_keys=[project_ssh_pub_key, "user_ssh_key"],
             instance_id=job_provisioning_data.instance_id,
-            data_transfer_quota=0,
         )
         await session.refresh(job)
         assert job.status == JobStatus.PULLING

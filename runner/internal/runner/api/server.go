@@ -68,7 +68,6 @@ func NewServer(ctx context.Context, address string, version string, ex executor.
 	r.AddHandler("POST", "/api/run", s.runPostHandler)
 	r.AddHandler("GET", "/api/pull", s.pullGetHandler)
 	r.AddHandler("POST", "/api/stop", s.stopPostHandler)
-	r.AddHandler("POST", "/api/terminate", s.terminatePostHandler)
 	r.AddHandler("GET", "/logs_ws", s.logsWsGetHandler)
 	return s, nil
 }

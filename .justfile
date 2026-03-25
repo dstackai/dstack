@@ -17,4 +17,4 @@ import "runner/.justfile"
 import "frontend/.justfile"
 
 docs-serve:
-    uv run mkdocs serve --livereload -w examples -s
+    DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib mkdocs serve --livereload -w examples -s

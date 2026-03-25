@@ -39,11 +39,6 @@ type SubmitBody struct {
 	LogQuotaHour    int               `json:"log_quota_hour"` // bytes per hour, 0 = unlimited
 }
 
-type TerminateBody struct {
-	Reason  types.TerminationReason `json:"reason"`
-	Message string                  `json:"message"`
-}
-
 type PullResponse struct {
 	JobStates         []JobStateEvent `json:"job_states"`
 	JobLogs           []LogEvent      `json:"job_logs"`

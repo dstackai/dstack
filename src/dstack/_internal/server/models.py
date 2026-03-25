@@ -776,6 +776,9 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     """`total_blocks` uses `NULL` to mean `auto` during provisioning; once ready it is not `NULL`."""
     busy_blocks: Mapped[int] = mapped_column(Integer, default=0)
 
+    data_transfer_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    """Cumulative outbound data transfer bytes (external/billable traffic only)."""
+
     jobs: Mapped[list["JobModel"]] = relationship(back_populates="instance")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 

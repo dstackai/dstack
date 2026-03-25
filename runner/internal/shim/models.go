@@ -98,11 +98,10 @@ type TaskConfig struct {
 	InstanceMounts   []InstanceMountPoint `json:"instance_mounts"`
 	// GPUDevices allows the server to set gpu devices instead of relying on the runner default logic.
 	// E.g. passing nvidia devices directly instead of using nvidia-container-toolkit.
-	GPUDevices        []GPUDevice `json:"gpu_devices"`
-	HostSshUser       string      `json:"host_ssh_user"`
-	HostSshKeys       []string    `json:"host_ssh_keys"`
-	ContainerSshKeys  []string    `json:"container_ssh_keys"`
-	DataTransferQuota int64       `json:"data_transfer_quota"` // total bytes for job lifetime; 0 = unlimited
+	GPUDevices       []GPUDevice `json:"gpu_devices"`
+	HostSshUser      string      `json:"host_ssh_user"`
+	HostSshKeys      []string    `json:"host_ssh_keys"`
+	ContainerSshKeys []string    `json:"container_ssh_keys"`
 }
 
 type TaskListItem struct {

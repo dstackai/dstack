@@ -13,6 +13,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/components"
 	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
+	"github.com/dstackai/dstack/runner/internal/shim/netmeter"
 )
 
 type TaskRunner interface {
@@ -45,6 +46,8 @@ type ShimServer struct {
 	runnerManager components.ComponentManager
 	shimManager   components.ComponentManager
 
+	netMeter *netmeter.NetMeter // may be nil if metering is unavailable
+
 	version string
 }
 
@@ -52,6 +55,7 @@ func NewShimServer(
 	ctx context.Context, address string, version string,
 	runner TaskRunner, dcgmExporter *dcgm.DCGMExporter, dcgmWrapper dcgm.DCGMWrapperInterface,
 	runnerManager components.ComponentManager, shimManager components.ComponentManager,
+	nm *netmeter.NetMeter,
 ) *ShimServer {
 	bgJobsCtx, bgJobsCancel := context.WithCancel(ctx)
 	if dcgmWrapper != nil && reflect.ValueOf(dcgmWrapper).IsNil() {
@@ -77,6 +81,8 @@ func NewShimServer(
 
 		runnerManager: runnerManager,
 		shimManager:   shimManager,
+
+		netMeter: nm,
 
 		version: version,
 	}

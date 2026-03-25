@@ -166,6 +166,10 @@ async def check_instance(instance_model: InstanceModel) -> ProcessResult:
             status=health_status,
             response=instance_check.health_response.json(),
         )
+        if instance_check.health_response.data_transfer_bytes is not None:
+            result.instance_update_map["data_transfer_bytes"] = (
+                instance_check.health_response.data_transfer_bytes
+            )
 
     set_health_update(
         update_map=result.instance_update_map,

@@ -37,7 +37,10 @@ class InstanceCheck(CoreModel):
     def has_health_checks(self) -> bool:
         if self.health_response is None:
             return False
-        return self.health_response.dcgm is not None
+        return (
+            self.health_response.dcgm is not None
+            or self.health_response.data_transfer_bytes is not None
+        )
 
 
 class GetInstanceHealthChecksRequest(CoreModel):

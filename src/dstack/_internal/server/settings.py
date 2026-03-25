@@ -145,20 +145,6 @@ SERVER_LOG_QUOTA_PER_JOB_HOUR = int(
     os.getenv("DSTACK_SERVER_LOG_QUOTA_PER_JOB_HOUR", 50 * 1024 * 1024)  # 50 MB
 )
 
-# Per-job data transfer quota for AWS backend: maximum total outbound bytes to external IPs.
-# 0 = unlimited. Only applied to instances running on AWS.
-# Limitations:
-# - Meters all outbound traffic to non-private IPs (excludes 10.0.0.0/8, 172.16.0.0/12,
-#   192.168.0.0/16, 169.254.0.0/16). This covers inter-region and internet egress.
-# - Does not differentiate by destination region — the same quota applies regardless of
-#   whether traffic goes to another AWS region ($0.01-0.02/GB) or the internet ($0.09/GB).
-# - Only effective on Linux instances with iptables available.
-#   Task fails with executor_error on systems without iptables if quota is set.
-# To add support for other backends, add DSTACK_SERVER_DATA_TRANSFER_QUOTA_PER_JOB_GCP, etc.
-SERVER_DATA_TRANSFER_QUOTA_PER_JOB_AWS = int(
-    os.getenv("DSTACK_SERVER_DATA_TRANSFER_QUOTA_PER_JOB_AWS", 0)  # disabled by default
-)
-
 # Development settings
 
 SQL_ECHO_ENABLED = os.getenv("DSTACK_SQL_ECHO_ENABLED") is not None

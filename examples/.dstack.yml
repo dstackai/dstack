@@ -1,12 +1,11 @@
 type: dev-environment
-name: cursor
+name: dev
 
 python: 3.12
-ide: cursor
 
 # Mount the repo directory to `/workflow` (the default working directory)
 repos:
   - ..
 
-resources:
- gpu: 1
+#resources:
+# gpu: 1
