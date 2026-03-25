@@ -1025,6 +1025,7 @@ class TestApplyFleetPlan:
                     "price": None,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "data_transfer_bytes": 0,
                 }
             ],
         }
@@ -1167,6 +1168,7 @@ class TestApplyFleetPlan:
                     "price": 0.0,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "data_transfer_bytes": 0,
                 }
             ],
         }
@@ -1347,6 +1349,7 @@ class TestApplyFleetPlan:
                     "price": 0.0,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "data_transfer_bytes": 0,
                 },
                 {
                     "id": SomeUUID4Str(),
@@ -1382,6 +1385,7 @@ class TestApplyFleetPlan:
                     "price": 0.0,
                     "total_blocks": 1,
                     "busy_blocks": 0,
+                    "data_transfer_bytes": 0,
                 },
             ],
         }

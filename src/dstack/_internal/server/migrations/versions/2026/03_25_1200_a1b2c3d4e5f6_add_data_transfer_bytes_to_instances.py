@@ -1,7 +1,7 @@
 """Add data_transfer_bytes to instances
 
 Revision ID: a1b2c3d4e5f6
-Revises: 8b6d5d8c1b9a
+Revises: c1c2ecaee45c
 Create Date: 2026-03-25 12:00:00.000000+00:00
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "a1b2c3d4e5f6"
-down_revision = "8b6d5d8c1b9a"
+down_revision = "c1c2ecaee45c"
 branch_labels = None
 depends_on = None
 
