@@ -544,14 +544,15 @@ async def _find_assignment_fleet_with_offers(
     await exit_stack.enter_async_context(
         get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instances_ids)
     )
-    fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
-    fleet_models_with_instances = await _refetch_fleet_models_with_instances(
-        session=session,
-        fleets_ids=fleets_with_instances_ids,
-        instances_ids=instances_ids,
-        fleet_filters=fleet_filters,
-        instance_filters=instance_filters,
-    )
+    if is_db_sqlite():
+        fleets_with_instances_ids = [f.id for f in fleet_models_with_instances]
+        fleet_models_with_instances = await _refetch_fleet_models_with_instances(
+            session=session,
+            fleets_ids=fleets_with_instances_ids,
+            instances_ids=instances_ids,
+            fleet_filters=fleet_filters,
+            instance_filters=instance_filters,
+        )
     fleet_models = fleet_models_with_instances + fleet_models_without_instances
     fleet_model, fleet_instances_with_offers, _ = await find_optimal_fleet_with_offers(
         project=context.project,
