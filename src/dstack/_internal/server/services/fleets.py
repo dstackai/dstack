@@ -684,7 +684,7 @@ async def create_fleet_ssh_instance_model(
         port = ssh_params.port
         proxy_jump = ssh_params.proxy_jump
         internal_ip = None
-        blocks = 1
+        blocks = spec.configuration.blocks
     else:
         hostname = host.hostname
         ssh_user = host.user or ssh_params.user
