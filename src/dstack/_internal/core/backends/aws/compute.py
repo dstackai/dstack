@@ -351,6 +351,9 @@ class AWSCompute(
                     raise ComputeError(f"Invalid AWS request: {msg}")
                 continue
             instance = response[0]
+            # wait_until_running() is only needed so that instance is immediately ready for volume attach.
+            # TODO: Drop wait_until_running() once attach readiness is checked outside.
+            instance.wait_until_running()
             if instance_offer.instance.resources.spot:
                 # it will not terminate the instance
                 try:
