@@ -832,9 +832,10 @@ async def _lock_assignment_fleet_for_existing_instance_assignment(
     if not instance_ids:
         return None
 
-    if is_db_sqlite():
-        await sqlite_commit(session)
+    if not is_db_sqlite():
+        return fleets_with_instances[0]
 
+    await sqlite_commit(session)
     await exit_stack.enter_async_context(
         get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instance_ids)
     )
