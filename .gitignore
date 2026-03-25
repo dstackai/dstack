@@ -27,5 +27,3 @@ uv.lock
 
 profiling_results.html
 docs/docs/reference/api/rest/openapi.json
-.agents/skills
-.claude/skills
