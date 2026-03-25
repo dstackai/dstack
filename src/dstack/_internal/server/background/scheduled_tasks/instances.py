@@ -176,6 +176,7 @@ async def _process_next_instance():
                             InstanceModel.compute_group_id.is_not(None),
                         )
                     ),
+                    InstanceModel.lock_expires_at.is_(None),
                     InstanceModel.id.not_in(lockset),
                     InstanceModel.last_processed_at
                     < get_current_datetime() - MIN_PROCESSING_INTERVAL,

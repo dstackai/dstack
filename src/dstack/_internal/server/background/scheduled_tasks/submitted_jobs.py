@@ -151,6 +151,8 @@ BATCH_SIZE_RESET_TIMEOUT = timedelta(minutes=2)
 last_processed_at: Optional[datetime] = None
 
 
+# NOTE: This scheduled task is going to be deprecated in favor of `JobSubmittedPipeline`.
+# If this logic changes before removal, keep `pipeline_tasks/jobs_submitted.py` in sync.
 async def process_submitted_jobs(batch_size: int = 1):
     tasks = []
     effective_batch_size = _get_effective_batch_size(batch_size)
@@ -177,6 +179,7 @@ async def _process_next_submitted_job():
                 select(JobModel)
                 .join(JobModel.run)
                 .where(
+                    JobModel.lock_expires_at.is_(None),
                     JobModel.status == JobStatus.SUBMITTED,
                     JobModel.waiting_master_job.is_not(True),
                     JobModel.id.not_in(lockset),
@@ -634,6 +637,14 @@ async def _process_new_capacity_provisioning_path(
         job=context.job,
     )
 
+    if context.fleet_model is not None and fleet_model is None:
+        await _defer_submitted_job(
+            session=session,
+            job_model=context.job_model,
+            log_message="cluster fleet is locked",
+        )
+        return None
+
     # master_job_provisioning_data is present if there is a master job.
     # master_instance_provisioning_data is present if there is a master instance (non empty cluster fleet).
     master_provisioning_data = master_job_provisioning_data or master_instance_provisioning_data
@@ -1018,6 +1029,8 @@ async def _lock_fleet_and_get_master_provisioning_data(
     )
     await sqlite_commit(session)
     fleet_model = await _refetch_cluster_master_fleet(session=session, fleet_model=fleet_model)
+    if fleet_model is None:
+        return None, None
     master_instance_provisioning_data = get_fleet_master_instance_provisioning_data(
         fleet_model=fleet_model,
         fleet_spec=fleet_spec,
@@ -1034,7 +1047,7 @@ def _get_cluster_fleet_spec(fleet_model: FleetModel) -> Optional[FleetSpec]:
 
 async def _refetch_cluster_master_fleet(
     session: AsyncSession, fleet_model: FleetModel
-) -> FleetModel:
+) -> Optional[FleetModel]:
     res = await session.execute(
         select(FleetModel)
         .where(
@@ -1050,6 +1063,9 @@ async def _refetch_cluster_master_fleet(
     )
     empty_fleet_model = res.unique().scalar()
     if empty_fleet_model is not None:
+        if empty_fleet_model.lock_expires_at is not None:
+            # Defer while a pipeline owns the empty cluster fleet.
+            return None
         return empty_fleet_model
 
     res = await session.execute(

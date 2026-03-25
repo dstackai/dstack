@@ -31,6 +31,7 @@ async def process_placement_groups():
             res = await session.execute(
                 select(PlacementGroupModel)
                 .where(
+                    PlacementGroupModel.lock_expires_at.is_(None),
                     PlacementGroupModel.fleet_deleted == True,
                     PlacementGroupModel.deleted == False,
                     PlacementGroupModel.id.not_in(lockset),

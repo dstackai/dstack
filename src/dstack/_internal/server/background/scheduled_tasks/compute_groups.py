@@ -49,6 +49,7 @@ async def _process_next_compute_group():
             res = await session.execute(
                 select(ComputeGroupModel)
                 .where(
+                    ComputeGroupModel.lock_expires_at.is_(None),
                     ComputeGroupModel.deleted == False,
                     ComputeGroupModel.id.not_in(lockset),
                     ComputeGroupModel.last_processed_at

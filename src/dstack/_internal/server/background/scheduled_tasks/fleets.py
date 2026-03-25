@@ -55,6 +55,7 @@ async def process_fleets():
             res = await session.execute(
                 select(FleetModel)
                 .where(
+                    FleetModel.lock_expires_at.is_(None),
                     FleetModel.deleted == False,
                     FleetModel.id.not_in(fleet_lockset),
                     FleetModel.last_processed_at
@@ -75,6 +76,7 @@ async def process_fleets():
             res = await session.execute(
                 select(InstanceModel)
                 .where(
+                    InstanceModel.lock_expires_at.is_(None),
                     InstanceModel.id.not_in(instance_lockset),
                     InstanceModel.fleet_id.in_(fleet_ids),
                     InstanceModel.deleted == False,

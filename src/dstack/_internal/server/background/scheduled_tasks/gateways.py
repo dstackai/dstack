@@ -45,6 +45,7 @@ async def process_gateways():
             res = await session.execute(
                 select(GatewayModel)
                 .where(
+                    GatewayModel.lock_expires_at.is_(None),
                     GatewayModel.status.in_([GatewayStatus.SUBMITTED, GatewayStatus.PROVISIONING]),
                     GatewayModel.id.not_in(lockset),
                 )

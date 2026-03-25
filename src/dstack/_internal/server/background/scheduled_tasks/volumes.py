@@ -34,6 +34,7 @@ async def process_submitted_volumes():
             res = await session.execute(
                 select(VolumeModel)
                 .where(
+                    VolumeModel.lock_expires_at.is_(None),
                     VolumeModel.status == VolumeStatus.SUBMITTED,
                     VolumeModel.deleted == False,
                     VolumeModel.id.not_in(lockset),
