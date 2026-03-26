@@ -670,12 +670,21 @@ def generate_unique_backend_name(
     )
 
 
+def generate_unique_short_backend_name() -> str:
+    """
+    Generates a unique 15-char resource name of the form "dstack-12345678".
+    Can be used for resources that have a very small length limit like AWS LBs.
+    """
+    return _generate_unique_backend_name_with_prefix("dstack")
+
+
 def _generate_unique_backend_name_with_prefix(
     prefix: str,
-    max_length: int,
+    max_length: Optional[int] = None,
 ) -> str:
-    prefix_len = max_length - _CLOUD_RESOURCE_SUFFIX_LEN - 1
-    prefix = prefix[:prefix_len]
+    if max_length is not None:
+        prefix_len = max_length - _CLOUD_RESOURCE_SUFFIX_LEN - 1
+        prefix = prefix[:prefix_len]
     suffix = "".join(
         random.choice(string.ascii_lowercase + string.digits)
         for _ in range(_CLOUD_RESOURCE_SUFFIX_LEN)
