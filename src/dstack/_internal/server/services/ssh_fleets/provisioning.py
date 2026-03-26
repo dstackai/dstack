@@ -73,7 +73,11 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
     tmp_file_path = f"/tmp/{DSTACK_SHIM_ENV_FILE}"
     sftp_upload(client, tmp_file_path, dot_env)
     try:
-        cmd = f"sudo mkdir -p {working_dir} && sudo mv {tmp_file_path} {working_dir}/"
+        dest = f"{working_dir}/{DSTACK_SHIM_ENV_FILE}"
+        cmd = (
+            f"sudo mkdir -p {working_dir} && sudo mv {tmp_file_path} {dest}"
+            f" && {{ sudo chcon system_u:object_r:etc_t:s0 {dest} 2>/dev/null || true; }}"
+        )
         _, stdout, stderr = client.exec_command(cmd, timeout=20)
         out = stdout.read().strip().decode()
         err = stderr.read().strip().decode()
@@ -148,6 +152,7 @@ def run_shim_as_systemd_service(
     try:
         cmd = """\
             sudo mv /tmp/dstack-shim.service /etc/systemd/system/dstack-shim.service && \
+            { sudo chcon system_u:object_r:systemd_unit_file_t:s0 /etc/systemd/system/dstack-shim.service 2>/dev/null || true; } && \
             sudo systemctl daemon-reload && \
             sudo systemctl --quiet enable dstack-shim && \
             sudo systemctl restart dstack-shim

@@ -906,7 +906,7 @@ def get_shim_pre_start_commands(
         f"dlpath=$(sudo mktemp -t {DSTACK_SHIM_BINARY_NAME}.XXXXXXXXXX)",
         # -sS -- disable progress meter and warnings, but still show errors (unlike bare -s)
         f'sudo curl -sS --compressed --connect-timeout 60 --max-time 240 --retry 1 --output "$dlpath" "{url}"',
-        f'sudo mv "$dlpath" {dstack_shim_binary_path}',
+        f'sudo cp "$dlpath" {dstack_shim_binary_path} && sudo rm "$dlpath"',
         f"sudo chmod +x {dstack_shim_binary_path}",
         f"sudo mkdir {dstack_working_dir} -p",
     ]
