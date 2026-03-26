@@ -78,17 +78,17 @@ class SSHHostParams(CoreModel):
     ssh_key: Optional[SSHKey] = None
 
     blocks: Annotated[
-        Union[Literal["auto"], int],
+        Optional[Union[Literal["auto"], int]],
         Field(
             description=(
                 "The amount of blocks to split the instance into, a number or `auto`."
                 " `auto` means as many as possible."
                 " The number of GPUs and CPUs must be divisible by the number of blocks."
-                " Defaults to `1`, i.e. do not split"
+                " Defaults to the top-level `blocks` value."
             ),
             ge=1,
         ),
-    ] = 1
+    ] = None
 
     @validator("internal_ip")
     def validate_internal_ip(cls, value):

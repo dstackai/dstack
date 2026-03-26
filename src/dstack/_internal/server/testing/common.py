@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
 import gpuhunt
@@ -703,6 +703,7 @@ def get_ssh_fleet_configuration(
     hosts: Optional[list[Union[SSHHostParams, str]]] = None,
     network: Optional[str] = None,
     placement: Optional[InstanceGroupPlacement] = None,
+    blocks: Optional[Union[int, Literal["auto"]]] = None,
 ) -> FleetConfiguration:
     if ssh_key is None:
         ssh_key = SSHKey(public="", private=get_private_key_string())
@@ -714,10 +715,14 @@ def get_ssh_fleet_configuration(
         hosts=hosts,
         network=network,
     )
+    optional_properties: dict[str, Any] = {}
+    if blocks is not None:
+        optional_properties["blocks"] = blocks
     return FleetConfiguration(
         name=name,
         ssh_config=ssh_config,
         placement=placement,
+        **optional_properties,
     )
 
 

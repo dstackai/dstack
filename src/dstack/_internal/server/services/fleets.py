@@ -674,6 +674,7 @@ async def create_fleet_ssh_instance_model(
     spec: FleetSpec,
     ssh_params: SSHParams,
     env: Env,
+    blocks: Union[int, Literal["auto"]],
     instance_num: int,
     host: Union[SSHHostParams, str],
 ) -> InstanceModel:
@@ -684,7 +685,6 @@ async def create_fleet_ssh_instance_model(
         port = ssh_params.port
         proxy_jump = ssh_params.proxy_jump
         internal_ip = None
-        blocks = 1
     else:
         hostname = host.hostname
         ssh_user = host.user or ssh_params.user
@@ -692,7 +692,8 @@ async def create_fleet_ssh_instance_model(
         port = host.port or ssh_params.port
         proxy_jump = host.proxy_jump or ssh_params.proxy_jump
         internal_ip = host.internal_ip
-        blocks = host.blocks
+        if host.blocks is not None:
+            blocks = host.blocks
 
     if ssh_user is None or ssh_key is None:
         # This should not be reachable but checked by fleet spec validation
@@ -1042,6 +1043,7 @@ async def _create_fleet(
                     spec=spec,
                     ssh_params=spec.configuration.ssh_config,
                     env=spec.configuration.env,
+                    blocks=spec.configuration.blocks,
                     instance_num=i,
                     host=host,
                 )
@@ -1152,6 +1154,7 @@ async def _update_fleet(
                     spec=spec,
                     ssh_params=spec.configuration.ssh_config,
                     env=spec.configuration.env,
+                    blocks=spec.configuration.blocks,
                     instance_num=instance_num,
                     host=host,
                 )
