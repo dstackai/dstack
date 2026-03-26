@@ -373,6 +373,7 @@ def get_subnets_ids_for_vpc(
     """
     If `allocate_public_ip` is True, returns public subnets found in the VPC.
     If `allocate_public_ip` is False, returns subnets with NAT found in the VPC.
+    Returns
     """
     subnets = _get_subnets_by_vpc_id(
         ec2_client=ec2_client,
@@ -423,9 +424,9 @@ def get_availability_zone_by_subnet_id(
 
 
 def get_subnets_availability_zones(
-    ec2_client: botocore.client.BaseClient, subnet_ids: List[str]
+    ec2_client: botocore.client.BaseClient, subnets_ids: List[str]
 ) -> Dict[str, str]:
-    response = ec2_client.describe_subnets(SubnetIds=subnet_ids)
+    response = ec2_client.describe_subnets(SubnetIds=subnets_ids)
     subnet_id_to_az_map = {
         subnet["SubnetId"]: subnet["AvailabilityZone"] for subnet in response["Subnets"]
     }

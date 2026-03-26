@@ -177,7 +177,7 @@ class AWSConfigurator(
             for region in regions:
                 ec2_client = session.client("ec2", region_name=region)
                 future = executor.submit(
-                    compute.get_vpc_id_subnet_id_or_error,
+                    compute.get_vpc_id_subnets_ids_or_error,
                     ec2_client=ec2_client,
                     config=AWSConfig.parse_obj(config),
                     region=region,

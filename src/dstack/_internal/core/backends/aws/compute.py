@@ -141,7 +141,7 @@ class AWSCompute(
         if zones_cache is None:
             zones_cache = ComputeCache(cache=Cache(maxsize=10))
         self._regions_to_zones_cache = zones_cache
-        self._vpc_id_subnet_id_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
+        self._vpc_id_subnets_ids_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
         self._maximum_efa_interfaces_cache = ComputeCache(cache=Cache(maxsize=100))
         self._subnets_availability_zones_cache = ComputeCache(cache=Cache(maxsize=100))
         self._security_group_cache = ComputeTTLCache(cache=TTLCache(maxsize=100, ttl=600))
@@ -266,7 +266,7 @@ class AWSCompute(
         enable_efa = max_efa_interfaces > 0
         is_capacity_block = False
         try:
-            vpc_id, subnet_ids = self._get_vpc_id_subnet_id_or_error(
+            vpc_id, subnets_ids = self._get_vpc_id_subnets_ids_or_error(
                 ec2_client=ec2_client,
                 config=self.config,
                 region=instance_offer.region,
@@ -276,7 +276,7 @@ class AWSCompute(
             subnet_id_to_az_map = self._get_subnets_availability_zones(
                 ec2_client=ec2_client,
                 region=instance_offer.region,
-                subnet_ids=subnet_ids,
+                subnets_ids=subnets_ids,
             )
             if instance_config.reservation:
                 reservation = aws_resources.get_reservation(
@@ -498,7 +498,7 @@ class AWSCompute(
         tags = aws_resources.filter_invalid_tags(tags)
         tags = aws_resources.make_tags(tags)
 
-        vpc_id, subnets_ids = self._get_vpc_id_subnet_id_or_error(
+        vpc_id, subnets_ids = self._get_vpc_id_subnets_ids_or_error(
             ec2_client=ec2_client,
             config=self.config,
             region=configuration.region,
@@ -549,7 +549,10 @@ class AWSCompute(
 
         elb_client = self.session.client("elbv2", region_name=configuration.region)
 
-        if len(subnets_ids) < 2:
+        lb_subnets_ids = self._get_gateway_lb_subnets_ids(
+            ec2_client=ec2_client, region=configuration.region, subnets_ids=subnets_ids
+        )
+        if len(lb_subnets_ids) < 2:
             raise ComputeError(
                 "Deploying gateway with ACM certificate requires at least two subnets in different AZs"
             )
@@ -560,7 +563,7 @@ class AWSCompute(
         logger.debug("Creating ALB for gateway %s...", configuration.instance_name)
         response = elb_client.create_load_balancer(
             Name=f"{resources_name_prefix}-lb",
-            Subnets=subnets_ids,
+            Subnets=lb_subnets_ids,
             SecurityGroups=[security_group_id],
             Scheme="internet-facing" if configuration.public_ip else "internal",
             Tags=tags,
@@ -881,7 +884,7 @@ class AWSCompute(
     ) -> Dict[str, List[str]]:
         return _get_regions_to_zones(session=session, regions=regions)
 
-    def _get_vpc_id_subnet_id_or_error_cache_key(
+    def _get_vpc_id_subnets_ids_or_error_cache_key(
         self,
         ec2_client: botocore.client.BaseClient,
         config: AWSConfig,
@@ -894,11 +897,11 @@ class AWSCompute(
         )
 
     @cachedmethod(
-        cache=lambda self: self._vpc_id_subnet_id_cache.cache,
-        key=_get_vpc_id_subnet_id_or_error_cache_key,
-        lock=lambda self: self._vpc_id_subnet_id_cache.lock,
+        cache=lambda self: self._vpc_id_subnets_ids_cache.cache,
+        key=_get_vpc_id_subnets_ids_or_error_cache_key,
+        lock=lambda self: self._vpc_id_subnets_ids_cache.lock,
     )
-    def _get_vpc_id_subnet_id_or_error(
+    def _get_vpc_id_subnets_ids_or_error(
         self,
         ec2_client: botocore.client.BaseClient,
         config: AWSConfig,
@@ -906,7 +909,7 @@ class AWSCompute(
         allocate_public_ip: bool,
         availability_zones: Optional[List[str]] = None,
     ) -> Tuple[str, List[str]]:
-        return get_vpc_id_subnet_id_or_error(
+        return get_vpc_id_subnets_ids_or_error(
             ec2_client=ec2_client,
             config=config,
             region=region,
@@ -934,9 +937,9 @@ class AWSCompute(
         self,
         ec2_client: botocore.client.BaseClient,
         region: str,
-        subnet_ids: List[str],
+        subnets_ids: List[str],
     ) -> tuple:
-        return hashkey(region, tuple(subnet_ids))
+        return hashkey(region, tuple(subnets_ids))
 
     @cachedmethod(
         cache=lambda self: self._subnets_availability_zones_cache.cache,
@@ -947,11 +950,11 @@ class AWSCompute(
         self,
         ec2_client: botocore.client.BaseClient,
         region: str,
-        subnet_ids: List[str],
+        subnets_ids: List[str],
     ) -> Dict[str, str]:
         return aws_resources.get_subnets_availability_zones(
             ec2_client=ec2_client,
-            subnet_ids=subnet_ids,
+            subnets_ids=subnets_ids,
         )
 
     @cachedmethod(
@@ -1004,8 +1007,26 @@ class AWSCompute(
             image_config=image_config,
         )
 
+    def _get_gateway_lb_subnets_ids(
+        self,
+        ec2_client: botocore.client.BaseClient,
+        region: str,
+        subnets_ids: List[str],
+    ) -> List[str]:
+        """
+        Returns subnet IDs to be used for gateway Load Balancer among `subnets_ids`.
+        Filters out subnets from the same AZ since Load Balancer requires all subnets to be in different AZ.
+        """
+        subnet_id_to_az_map = self._get_subnets_availability_zones(
+            ec2_client=ec2_client,
+            region=region,
+            subnets_ids=subnets_ids,
+        )
+        az_to_subnet_id_map = {az: subnet_id for subnet_id, az in subnet_id_to_az_map.items()}
+        return list(az_to_subnet_id_map.values())
 
-def get_vpc_id_subnet_id_or_error(
+
+def get_vpc_id_subnets_ids_or_error(
     ec2_client: botocore.client.BaseClient,
     config: AWSConfig,
     region: str,
@@ -1036,7 +1057,7 @@ def get_vpc_id_subnet_id_or_error(
         if not config.use_default_vpcs:
             raise ComputeError(f"No VPC ID configured for region {region}")
 
-    return _get_vpc_id_subnet_id_by_vpc_name_or_error(
+    return _get_vpc_id_subnets_ids_by_vpc_name_or_error(
         ec2_client=ec2_client,
         vpc_name=config.vpc_name,
         region=region,
@@ -1045,7 +1066,7 @@ def get_vpc_id_subnet_id_or_error(
     )
 
 
-def _get_vpc_id_subnet_id_by_vpc_name_or_error(
+def _get_vpc_id_subnets_ids_by_vpc_name_or_error(
     ec2_client: botocore.client.BaseClient,
     vpc_name: Optional[str],
     region: str,
