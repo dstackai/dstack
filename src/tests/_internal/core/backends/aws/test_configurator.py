@@ -17,7 +17,7 @@ class TestAWSConfigurator:
         )
         with (
             patch("dstack._internal.core.backends.aws.auth.authenticate"),
-            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnets_ids_or_error"),
         ):
             AWSConfigurator().validate_config(config, default_creds_enabled=True)
 

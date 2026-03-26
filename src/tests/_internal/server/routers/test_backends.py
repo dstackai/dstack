@@ -141,7 +141,7 @@ class TestCreateBackend:
         }
         with (
             patch("dstack._internal.core.backends.aws.auth.authenticate"),
-            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnets_ids_or_error"),
         ):
             response = await client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -542,7 +542,7 @@ class TestCreateBackend:
         }
         with (
             patch("dstack._internal.core.backends.aws.auth.authenticate"),
-            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnets_ids_or_error"),
         ):
             response = await client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -605,7 +605,7 @@ class TestUpdateBackend:
         }
         with (
             patch("dstack._internal.core.backends.aws.auth.authenticate"),
-            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnets_ids_or_error"),
         ):
             response = await client.post(
                 f"/api/project/{project.name}/backends/update",
@@ -857,7 +857,7 @@ class TestCreateBackendYAML:
         body = {"config_yaml": yaml.dump(config_dict)}
         with (
             patch("dstack._internal.core.backends.aws.auth.authenticate"),
-            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnets_ids_or_error"),
         ):
             response = await client.post(
                 f"/api/project/{project.name}/backends/create_yaml",
@@ -945,7 +945,7 @@ class TestUpdateBackendYAML:
         body = {"config_yaml": yaml.dump(config_dict)}
         with (
             patch("dstack._internal.core.backends.aws.auth.authenticate"),
-            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnets_ids_or_error"),
         ):
             response = await client.post(
                 f"/api/project/{project.name}/backends/update_yaml",
