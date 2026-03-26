@@ -72,12 +72,16 @@ class RiftClient:
 
         return vm_recipes
 
-    def get_vm_image_url(self) -> Optional[str]:
+    def get_vm_image_url(self, gpu_vendor: Optional[str] = None) -> Optional[str]:
         recipes = self.get_vm_recipies()
+        if gpu_vendor == "amd":
+            driver_tag = "amd-driver"
+        else:
+            driver_tag = "nvidia-driver"
+
         ubuntu_images = []
         for recipe in recipes:
-            has_nvidia_driver = "nvidia-driver" in recipe.get("tags", [])
-            if not has_nvidia_driver:
+            if driver_tag not in recipe.get("tags", []):
                 continue
 
             recipe_name = recipe.get("name", "")
@@ -97,9 +101,14 @@ class RiftClient:
         return None
 
     def deploy_instance(
-        self, instance_type: str, region: str, ssh_keys: List[str], cmd: str
+        self,
+        instance_type: str,
+        region: str,
+        ssh_keys: List[str],
+        cmd: str,
+        gpu_vendor: Optional[str] = None,
     ) -> List[str]:
-        image_url = self.get_vm_image_url()
+        image_url = self.get_vm_image_url(gpu_vendor=gpu_vendor)
         if not image_url:
             raise BackendError("No suitable VM image found.")
 

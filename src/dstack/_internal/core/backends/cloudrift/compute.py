@@ -73,17 +73,31 @@ class CloudRiftCompute(
         instance_config: InstanceConfiguration,
         placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
-        commands = get_shim_commands()
+        # TODO: Remove once CloudRift fixes their VM RTC clock.
+        # Wrong RTC + NTP backward jump breaks Docker container lifecycle.
+        ntp_sync_commands = [
+            (
+                "timeout 60 bash -c '"
+                "while ! timedatectl show -p NTPSynchronized --value | grep -q yes;"
+                " do sleep 1; done' || true"
+            ),
+        ]
+        commands = ntp_sync_commands + get_shim_commands()
         startup_script = " ".join([" && ".join(commands)])
         logger.debug(
             f"Creating instance for offer {instance_offer.instance.name} in region {instance_offer.region} with commands: {startup_script}"
         )
+
+        gpu_vendor = None
+        if instance_offer.instance.resources.gpus:
+            gpu_vendor = instance_offer.instance.resources.gpus[0].vendor.value
 
         instance_ids = self.client.deploy_instance(
             instance_type=instance_offer.instance.name,
             region=instance_offer.region,
             ssh_keys=instance_config.get_public_keys(),
             cmd=startup_script,
+            gpu_vendor=gpu_vendor,
         )
 
         if len(instance_ids) == 0:
