@@ -33,6 +33,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name,
+    generate_unique_short_backend_name,
     generate_unique_volume_name,
     get_gateway_user_data,
     get_user_data,
@@ -553,9 +554,12 @@ class AWSCompute(
                 "Deploying gateway with ACM certificate requires at least two subnets in different AZs"
             )
 
+        # Using short names as LB and target groups have length limit of 32.
+        resources_name_prefix = generate_unique_short_backend_name()
+
         logger.debug("Creating ALB for gateway %s...", configuration.instance_name)
         response = elb_client.create_load_balancer(
-            Name=f"{instance_name}-lb",
+            Name=f"{resources_name_prefix}-lb",
             Subnets=subnets_ids,
             SecurityGroups=[security_group_id],
             Scheme="internet-facing" if configuration.public_ip else "internal",
@@ -570,7 +574,7 @@ class AWSCompute(
 
         logger.debug("Creating Target Group for gateway %s...", configuration.instance_name)
         response = elb_client.create_target_group(
-            Name=f"{instance_name}-tg",
+            Name=f"{resources_name_prefix}-tg",
             Protocol="HTTP",
             Port=80,
             VpcId=vpc_id,
