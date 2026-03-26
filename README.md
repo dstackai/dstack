@@ -38,43 +38,21 @@ It streamlines development, training, and inference, and is compatible with any 
   <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11.svg" width="750" />
 </picture>
 
-### Installation
+### Launch the server
 
-> Before using `dstack` through CLI or API, set up a `dstack` server. If you already have a running `dstack` server, you only need to [set up the CLI](#set-up-the-cli).
+> Before using `dstack` through CLI or API, set up a `dstack` server. If you already have a running `dstack` server, you only need to [install the CLI](#install-the-cli).
 
-#### Set up the server
-
-##### Configure backends
-
-To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure backends.
-
-Backends can be set up in `~/.dstack/server/config.yml` or through the [project settings page](https://dstack.ai/docs/concepts/projects#backends) in the UI.
-
-For more details, see [Backends](https://dstack.ai/docs/concepts/backends).
+To orchestrate compute across GPU clouds or Kubernetes clusters, you need to [configure backends](https://dstack.ai/docs/concepts/backends).
 
 > When using `dstack` with on-prem servers, backend configuration isn’t required. Simply create [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets) once the server is up.
 
-##### Start the server
-
-You can install the server on Linux, macOS, and Windows (via WSL 2). It requires Git and
+The server can be installed on Linux, macOS, and Windows (via WSL 2). It requires Git and
 OpenSSH.
-
-##### uv
 
 ```shell
 $ uv tool install "dstack[all]" -U
-```
-
-##### pip
-
-```shell
-$ pip install "dstack[all]" -U
-```
-
-Once it's installed, go ahead and start the server.
-
-```shell
 $ dstack server
+
 Applying ~/.dstack/server/config.yml...
 
 The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
@@ -84,25 +62,16 @@ The server is running at http://127.0.0.1:3000/
 > For more details on server configuration options, see the
 [Server deployment](https://dstack.ai/docs/guides/server-deployment) guide.
 
+### Install the CLI
 
-<details><summary>Set up the CLI</summary>
+<details><summary>If the CLI is not installed with the server</summary>
 
-#### Set up the CLI
-
-Once the server is up, you can access it via the `dstack` CLI. 
+Once the server is up, you can access it via the `dstack` CLI.
 
 The CLI can be installed on Linux, macOS, and Windows. It requires Git and OpenSSH.
 
-##### uv
-
 ```shell
 $ uv tool install dstack -U
-```
-
-##### pip
-
-```shell
-$ pip install dstack -U
 ```
 
 To point the CLI to the `dstack` server, configure it
@@ -113,11 +82,21 @@ $ dstack project add \
     --name main \
     --url http://127.0.0.1:3000 \
     --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
-    
+
 Configuration is updated at ~/.dstack/config.yml
 ```
 
 </details>
+
+### Install AI agent skills
+
+Install [skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the `dstack` CLI and edit configuration files.
+
+```shell
+$ npx skills add dstackai/dstack
+```
+
+AI agents like Claude, Codex, and Cursor can now create and manage fleets and submit workloads on your behalf.
 
 ### Define configurations
 
@@ -133,7 +112,7 @@ Configuration can be defined as YAML files within your repo.
 
 ### Apply configurations
 
-Apply the configuration either via the `dstack apply` CLI command or through a programmatic API.
+Apply the configuration via the `dstack apply` CLI command, a programmatic API, or through [AI agent skills](#install-ai-agent-skills).
 
 `dstack` automatically manages provisioning, job queuing, auto-scaling, networking, volumes, run failures,
 out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-prem clusters.

@@ -9,7 +9,7 @@ description: How to install the dstack server and CLI
     If you don't want to host the `dstack` server (or want to access GPU marketplace),
     skip installation and proceed to [dstack Sky](https://sky.dstack.ai). -->
 
-## Set up the server
+## Launch the server
 
 The server can run on your laptop or any environment with access to the cloud and on-prem clusters you plan to use.
 
@@ -70,11 +70,11 @@ The server can run on your laptop or any environment with access to the cloud an
 
 For more details on server deployment options, see the [Server deployment](guides/server-deployment.md) guide.
 
-### Configure backends
+!!! info "Configure backends"
 
-> To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure [backends](concepts/backends.md).
+    To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure [backends](concepts/backends.md).
 
-## Set up the CLI
+## Install the CLI
 
 Once the server is up, you can access it via the `dstack` CLI. 
 
@@ -175,7 +175,7 @@ Once the server is up, you can access it via the `dstack` CLI.
         > If you get an error similar to `2: command not found: compdef`, then add the following line to the beginning of your `~/.zshrc` file:
         > `autoload -Uz compinit && compinit`.
 
-### Configure the default project
+### Configure the project
 
 To point the CLI to the `dstack` server, configure it
 with the server address, user token, and project name:
@@ -195,7 +195,7 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-### Install agent skills
+## Install AI agent skills
 
 Install [skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the `dstack` CLI and edit configuration files.
 
@@ -207,7 +207,34 @@ $ npx skills add dstackai/dstack
 
 </div>
 
-Agent skills are experimental. Share your feedback via [GitHub issues](https://github.com/dstackai/dstack/issues).
+AI agents like Claude, Codex, and Cursor can now create and manage fleets and submit workloads on your behalf.
+
+<div class="termy">
+
+```shell
+ ▐▛███▜▌   Claude Code v2.1.83
+▝▜█████▛▘  Opus 4.6 (1M context) · Claude Team
+  ▘▘ ▝▝    ~/skills-demo
+
+$ /dstack
+
+dstack skill loaded. How can I help? For example:
+
+  - Apply a configuration (*.dstack.yml)
+  - Check run status (dstack ps)
+  - Manage fleets, volumes, or services
+  - Create or edit a dstack configuration
+  - Troubleshoot provisioning or connectivity issues
+
+  What would you like to do?
+
+$ 
+```
+
+</div>
+
+!!! info "Feedback"
+    We're actively improving Skills and would love your feedback in [GitHub issues](https://github.com/dstackai/dstack/issues).
 
 !!! info "What's next?"
     1. See [Backends](concepts/backends.md)
