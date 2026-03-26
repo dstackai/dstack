@@ -119,6 +119,21 @@ class Termynal {
 
             line.removeAttribute(`${this.pfx}-cursor`);
         }
+        // Keep cursor visible if the last input has no output after it
+        let lastInputIdx = -1;
+        let hasOutputAfter = false;
+        for (let i = this.lines.length - 1; i >= 0; i--) {
+            if (this.lines[i].getAttribute(this.pfx) === 'input') {
+                lastInputIdx = i;
+                break;
+            }
+            if (this.lines[i].textContent.trim()) {
+                hasOutputAfter = true;
+            }
+        }
+        if (lastInputIdx >= 0 && !hasOutputAfter) {
+            this.lines[lastInputIdx].setAttribute(`${this.pfx}-cursor`, this.cursor);
+        }
         this.addRestart()
         this.finishElement.style.visibility = 'hidden'
         this.lineDelay = this.originalLineDelay
