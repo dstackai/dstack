@@ -1,5 +1,7 @@
 import argparse
 import os
+from pathlib import Path
+from typing import Optional
 
 from dstack._internal import settings
 from dstack._internal.cli.commands import BaseCommand
@@ -81,11 +83,21 @@ class ServerCommand(BaseCommand):
         uvicorn_log_level = os.getenv("DSTACK_SERVER_UVICORN_LOG_LEVEL", "ERROR").lower()
         reload_disabled = os.getenv("DSTACK_SERVER_RELOAD_DISABLED") is not None
 
+        reload = settings.DSTACK_VERSION is None and not reload_disabled
+        reload_excludes: Optional[list[str]] = None
+        if reload:
+            # Don't reload on dstack._internal.cli package changes
+            for parent in Path(__file__).parents:
+                if parent.name == "cli":
+                    reload_excludes = [str(parent)]
+                    break
+
         uvicorn.run(  # type: ignore[unbound-variable]
             "dstack._internal.server.main:app",
             host=args.host,
             port=args.port,
-            reload=settings.DSTACK_VERSION is None and not reload_disabled,
+            reload=reload,
+            reload_excludes=reload_excludes,
             log_level=uvicorn_log_level,
             workers=1,
         )
