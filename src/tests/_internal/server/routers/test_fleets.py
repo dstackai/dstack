@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -16,6 +16,7 @@ from dstack._internal.core.models.fleets import (
     FleetConfiguration,
     FleetStatus,
     InstanceGroupPlacement,
+    SSHHostParams,
     SSHParams,
 )
 from dstack._internal.core.models.instances import (
@@ -1177,6 +1178,56 @@ class TestApplyFleetPlan:
         res = await session.execute(select(InstanceModel))
         instance = res.unique().scalar_one()
         assert instance.remote_connection_info is not None
+
+    @pytest.mark.parametrize(
+        ["top_level_blocks", "host_blocks", "host_type", "expected_blocks"],
+        [
+            pytest.param(None, None, str, 1, id="global-default-string"),
+            pytest.param(None, None, SSHHostParams, 1, id="global-default-object"),
+            pytest.param(4, None, str, 4, id="top-level-int-string"),
+            pytest.param(4, None, SSHHostParams, 4, id="top-level-int-object"),
+            pytest.param("auto", None, str, None, id="top-level-auto-string"),
+            pytest.param("auto", None, SSHHostParams, None, id="top-level-auto-object"),
+            pytest.param("auto", 4, SSHHostParams, 4, id="host-level-int"),
+            pytest.param(4, "auto", SSHHostParams, None, id="host-level-auto"),
+        ],
+    )
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_creates_ssh_fleet_with_blocks(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        top_level_blocks: Optional[Union[int, Literal["auto"]]],
+        host_blocks: Optional[Union[int, Literal["auto"]]],
+        host_type: Union[type[str], type[SSHHostParams]],
+        expected_blocks: Optional[int],
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        if host_type is str:
+            host = "1.1.1.1"
+        elif host_blocks is None:
+            host = SSHHostParams(hostname="1.1.1.1")
+        else:
+            host = SSHHostParams(hostname="1.1.1.1", blocks=host_blocks)
+        conf = get_ssh_fleet_configuration(blocks=top_level_blocks, hosts=[host])
+        spec = get_fleet_spec(conf=conf)
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/apply",
+            headers=get_auth_headers(user.token),
+            json={"plan": {"spec": spec.dict()}, "force": False},
+        )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(FleetModel))
+        assert len(res.scalars().all()) == 1
+        res = await session.execute(select(InstanceModel))
+        instance = res.scalar_one()
+        assert instance.total_blocks == expected_blocks
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
