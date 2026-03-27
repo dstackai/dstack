@@ -40,6 +40,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     _RunnerAvailability,
     _SubmitJobToRunnerResult,
 )
+from dstack._internal.server.background.pipeline_tasks.runs import RunPipeline
 from dstack._internal.server.models import JobModel, ProbeModel
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
@@ -306,6 +307,63 @@ class TestJobRunningFetcher:
 
         assert active_job.lock_owner == JobRunningPipeline.__name__
         assert terminating_run_job.lock_owner is None
+
+    async def test_fetch_allows_stale_job_locks_even_if_run_is_waiting_for_job_locks(
+        self, test_db, session: AsyncSession, fetcher: JobRunningFetcher
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        stale = get_current_datetime() - timedelta(minutes=1)
+
+        run.lock_owner = RunPipeline.__name__
+        run.lock_token = None
+        run.lock_expires_at = None
+
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            last_processed_at=stale - timedelta(seconds=1),
+        )
+        _lock_job_expired_same_owner(job)
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert [item.id for item in items] == [job.id]
+
+        await session.refresh(job)
+        assert job.lock_owner == JobRunningPipeline.__name__
+
+    async def test_fetch_excludes_jobs_when_run_is_waiting_for_related_job_locks(
+        self, test_db, session: AsyncSession, fetcher: JobRunningFetcher
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        stale = get_current_datetime() - timedelta(minutes=1)
+
+        run.lock_owner = RunPipeline.__name__
+        run.lock_token = None
+        run.lock_expires_at = None
+
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            last_processed_at=stale - timedelta(seconds=1),
+        )
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert items == []
+
+        await session.refresh(job)
+        assert job.lock_owner is None
 
     async def test_fetch_returns_oldest_jobs_first_up_to_limit(
         self, test_db, session: AsyncSession, fetcher: JobRunningFetcher

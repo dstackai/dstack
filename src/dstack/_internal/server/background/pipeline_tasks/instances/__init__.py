@@ -167,16 +167,20 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                         ),
                         InstanceModel.deleted == False,
                         or_(
-                            # Do not try to lock instances if the fleet is waiting for the lock.
-                            InstanceModel.fleet_id.is_(None),
-                            FleetModel.lock_owner.is_(None),
-                        ),
-                        or_(
                             InstanceModel.last_processed_at <= now - self._min_processing_interval,
                             InstanceModel.last_processed_at == InstanceModel.created_at,
                         ),
                         or_(
-                            InstanceModel.lock_expires_at.is_(None),
+                            and_(
+                                # Do not try to lock instances if the fleet is waiting for the
+                                # lock, but allow retrying instances whose own lock is stale
+                                # because the fleet pipeline cannot reclaim stale instance locks.
+                                or_(
+                                    InstanceModel.fleet_id.is_(None),
+                                    FleetModel.lock_owner.is_(None),
+                                ),
+                                InstanceModel.lock_expires_at.is_(None),
+                            ),
                             InstanceModel.lock_expires_at < now,
                         ),
                         or_(
