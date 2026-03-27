@@ -157,14 +157,28 @@ async def _register_service_in_gateway(
             f"'{gateway.name}' does not have the SGLang router configured."
         )
 
-    service_https = _get_service_https(run_spec, gateway_configuration)
-    router = _build_service_router_config(gateway_configuration, run_spec.configuration)
-    service_protocol = "https" if service_https else "http"
+    configure_service_https = _should_configure_service_https_on_gateway(
+        run_spec, gateway_configuration
+    )
+    show_service_https = _should_show_service_https(run_spec, gateway_configuration)
+    service_protocol = "https" if show_service_https else "http"
 
-    if service_https and gateway_configuration.certificate is None:
+    if (
+        not show_service_https
+        and gateway_configuration.certificate is not None
+        and gateway_configuration.certificate.type == "acm"
+    ):
+        # SSL termination is done globally at load balancer so cannot runs only some services via http.
+        raise ServerClientError(
+            "Cannot run HTTP service on gateway with ACM certificates configured"
+        )
+
+    if show_service_https and gateway_configuration.certificate is None:
         raise ServerClientError(
             "Cannot run HTTPS service on gateway with no SSL certificates configured"
         )
+
+    router = _build_service_router_config(gateway_configuration, run_spec.configuration)
 
     gateway_https = _get_gateway_https(gateway_configuration)
     gateway_protocol = "https" if gateway_https else "http"
@@ -195,7 +209,7 @@ async def _register_service_in_gateway(
                 project=run_model.project.name,
                 run_name=run_model.run_name,
                 domain=domain,
-                service_https=service_https,
+                service_https=configure_service_https,
                 gateway_https=gateway_https,
                 auth=run_spec.configuration.auth,
                 client_max_body_size=settings.DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
@@ -432,7 +446,13 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
     )
 
 
-def _get_service_https(run_spec: RunSpec, configuration: GatewayConfiguration) -> bool:
+def _should_configure_service_https_on_gateway(
+    run_spec: RunSpec, configuration: GatewayConfiguration
+) -> bool:
+    """
+    Returns `True` if the gateway needs to serve the service with HTTPS.
+    May be `False` for HTTPS services, e.g. SSL termination is done on a load balancer.
+    """
     assert run_spec.configuration.type == "service"
     https = run_spec.configuration.https
     if https is None:
@@ -448,6 +468,21 @@ def _get_service_https(run_spec: RunSpec, configuration: GatewayConfiguration) -
     if configuration.certificate is not None and configuration.certificate.type == "acm":
         return False
     return True
+
+
+def _should_show_service_https(run_spec: RunSpec, configuration: GatewayConfiguration) -> bool:
+    """
+    Returns `True` if the service needs to be accessed via https://.
+    """
+    assert run_spec.configuration.type == "service"
+    https = run_spec.configuration.https
+    if https is None:
+        https = SERVICE_HTTPS_DEFAULT
+    if https == "auto":
+        if configuration.certificate is None:
+            return False
+        return True
+    return https
 
 
 def _get_gateway_https(configuration: GatewayConfiguration) -> bool:
