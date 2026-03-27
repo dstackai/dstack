@@ -17,9 +17,12 @@
 <script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
     var typed = new Typed('#typed', {
-        strings: ['of AI infrastructure', 'for training', 'for inference', 'for sandboxes',
-            'across GPU clouds', 'across Kubernetes', 'across on-prem clusters',
-            'without vendor lock-in'],
+        strings: ['for AI infrastructure', 'for model training', 'for model inference',
+            // 'for sandboxes', 
+            'across GPU clouds', 'across Kubernetes', 'for bare-metal clusters',
+            'for AI researchers', 'for ML engineers',
+            'on NVIDIA GPUs', 'on AMD GPUs', 'on any GPU or CPU', 'without vendor lock-in',
+        ],
         backDelay: 5000,
         typeSpeed: 150,
         backSpeed: 100,
@@ -54,9 +57,7 @@
                 <h1 class="glitch" data-text="Agentic orchestration" style="min-height: 2.4em;">Agentic orchestration<br><span id="typed" style="white-space: nowrap;"></span></h1>
 
                 <p>
-                    <span class="highlight">dstack</span> is an open-source protocol and control plane that gives AI agents and engineers
-                    fine-grained primitives to provision compute and manage training, inference, and sandboxes
-                    across GPU clouds, Kubernetes, and on-prem clusters.
+                    <span class="highlight">dstack</span> is an open-source control plane for agents and engineers to provision compute and run training, inference, <!--and sandboxes--> across GPU vendors, GPU clouds, Kubernetes, and bare-metal clusters.
                 </p>
             </div>
 
@@ -83,7 +84,7 @@
                 </div>
             </div>
             <div class="tx-landing__hero_button_container_text" style="text-align: center; font-size: 85%; margin-top: 1.25rem">
-                Orchestration that doesn’t suck and works with agents.
+                Finally, an orchestration stack that doesn’t suck.
             </div>
         </div>
 
@@ -92,13 +93,18 @@
                 <div class="block margin right">
                     <h2>A unified control plane for compute orchestration</h2>
                     <p>
-                        Managing AI infrastructure requires fine-grained control over GPU provisioning
-                        tightly integrated with open-source training and inference frameworks.
+                        Managing AI infrastructure requires fine-grained primitives for compute provisioning, 
+                        with native integration across GPU vendors, clouds, and open-source frameworks.
                     </p>
 
                     <p>
-                        <span class="highlight">dstack</span> provides a unified control plane with a declarative interface
-                        that works across clouds, Kubernetes, and on-prem&mdash;whether operated by engineers or their AI agents.
+                        <span class="highlight">dstack</span> is a unified control plane for provisioning 
+                        clusters and running training, inference, and sandboxes across clouds, Kubernetes, 
+                        and bare-metal clusters.
+                    </p>
+                    
+                    <p>
+                        It’s built for containerized workloads and designed for both engineers and agents. No Kubernetes or Slurm hassle required.
                     </p>
 
                     <!-- TODO: Add `Why dstack?` -->
@@ -333,107 +339,6 @@
             </div>
         </div>
 
-        <div class="tx-landing__trusted_by">
-            <div class="tx-landing__highlights_text">
-                <h2>Loved by world-class AI teams</h2>
-
-                <div class="tx-landing__quotes_grid">
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="https://dstack.ai/static-assets/static-assets/images/quotes/keng.png?raw=true"/>
-                        </div>
-                        <h3>Wah Loon Keng</h3>
-
-                        <h4>Sr. AI Engineer @Electronic Arts</h4>
-
-                        <p>
-                            With <span class="highlight">dstack</span>, AI researchers at <span class="highlight">EA</span> can spin up and scale experiments without touching 
-                            infrastructure. It supports everything from quick prototyping to multi-node training on any cloud.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/movchan.jpg"/>
-                        </div>
-                        <h3>Aleksandr Movchan</h3>
-
-                        <h4>ML Engineer @Mobius Labs</h4>
-
-                        <p>
-                            Thanks to <span class="highlight">dstack</span>, my team can quickly tap into affordable
-                            GPUs and streamline our workflows
-                            from testing and development to full-scale application deployment.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/alvarobartt.jpg"/>
-                        </div>
-                        <h3>Alvaro Bartolome</h3>
-
-                        <h4>ML Engineer @Argilla</h4>
-
-                        <p>
-                            With <span class="highlight">dstack</span> it's incredibly easy to define a configuration
-                            within a
-                            repository
-                            and run it without worrying about GPU availability. It lets you focus on
-                            data and your research.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/chansung.jpg"/>
-                        </div>
-                        <h3>Park Chansung</h3>
-
-                        <h4>ML Researcher @ETRI</h4>
-
-                        <p>
-                            Thanks to <span class="highlight">dstack</span>, I can effortlessly access the top GPU
-                            options across
-                            different clouds,
-                            saving me time and money while pushing my AI work forward.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/eckart.png"/>
-                        </div>
-                        <h3>Eckart Burgwedel</h3>
-
-                        <h4>CEO @Uberchord</h4>
-
-                        <p>
-                            With <span class="highlight">dstack</span>, running LLMs on a cloud GPU is as
-                            easy as running a local Docker container.
-                            It combines the ease of Docker with the auto-scaling capabilities of K8S.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/cudopete.png"/>
-                        </div>
-                        <h3>Peter Hill</h3>
-
-                        <h4>Co-Founder @CUDO Compute</h4>
-
-                        <p>
-                            <span class="highlight">dstack</span> simplifies infrastructure provisioning and AI
-                            development.
-                            If your team is on the lookout for an AI platform, I
-                            wholeheartedly recommend <span class="highlight">dstack</span>.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="tx-faq">
             <div class="tx-landing__highlights_text">
                 <h2>FAQ</h2>
@@ -566,6 +471,107 @@
             </p>
         </div>
 
+        <div class="tx-landing__trusted_by">
+            <div class="tx-landing__highlights_text">
+                <h2>Trusted by thousands of engineers across 100+ AI-first companies</h2>
+
+                <div class="tx-landing__quotes_grid">
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="https://dstack.ai/static-assets/static-assets/images/quotes/keng.png?raw=true"/>
+                        </div>
+                        <h3>Wah Loon Keng</h3>
+
+                        <h4>Sr. AI Engineer @Electronic Arts</h4>
+
+                        <p>
+                            With <span class="highlight">dstack</span>, AI researchers at <span class="highlight">EA</span> can spin up and scale experiments without touching 
+                            infrastructure. It supports everything from quick prototyping to multi-node training on any cloud.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/movchan.jpg"/>
+                        </div>
+                        <h3>Aleksandr Movchan</h3>
+
+                        <h4>ML Engineer @Mobius Labs</h4>
+
+                        <p>
+                            Thanks to <span class="highlight">dstack</span>, my team can quickly tap into affordable
+                            GPUs and streamline our workflows
+                            from testing and development to full-scale application deployment.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/alvarobartt.jpg"/>
+                        </div>
+                        <h3>Alvaro Bartolome</h3>
+
+                        <h4>ML Engineer @Argilla</h4>
+
+                        <p>
+                            With <span class="highlight">dstack</span> it's incredibly easy to define a configuration
+                            within a
+                            repository
+                            and run it without worrying about GPU availability. It lets you focus on
+                            data and your research.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/chansung.jpg"/>
+                        </div>
+                        <h3>Park Chansung</h3>
+
+                        <h4>ML Researcher @ETRI</h4>
+
+                        <p>
+                            Thanks to <span class="highlight">dstack</span>, I can effortlessly access the top GPU
+                            options across
+                            different clouds,
+                            saving me time and money while pushing my AI work forward.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/eckart.png"/>
+                        </div>
+                        <h3>Eckart Burgwedel</h3>
+
+                        <h4>CEO @Uberchord</h4>
+
+                        <p>
+                            With <span class="highlight">dstack</span>, running LLMs on a cloud GPU is as
+                            easy as running a local Docker container.
+                            It combines the ease of Docker with the auto-scaling capabilities of K8S.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/cudopete.png"/>
+                        </div>
+                        <h3>Peter Hill</h3>
+
+                        <h4>Co-Founder @CUDO Compute</h4>
+
+                        <p>
+                            <span class="highlight">dstack</span> simplifies infrastructure provisioning and AI
+                            development.
+                            If your team is on the lookout for an AI platform, I
+                            wholeheartedly recommend <span class="highlight">dstack</span>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <span id="get-started"></span>
 
         <br><br><br>
@@ -577,10 +583,12 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <p>Install <span class="highlight">dstack</span> on your laptop via <span class="highlight">uv</span>
-                        and start it using the CLI, or deploy it anywhere with the <span class="highlight">dstackai/dstack</span> Docker image.</p>
+                    <p>
+                        Install <span class="highlight">dstack</span> on your laptop with <span class="highlight">uv</span>,
+                        or deploy it anywhere using the <span class="highlight">dstackai/dstack</span> Docker image.
+                    </p>
 
-                    <p>Set up backends or SSH fleets, then add your team.</p>
+                    <p>Bring your compute via <span class="highlight">backends</span> or <span class="highlight">SSH fleets</span>, then bring your team.</p>
 
                     <p>
                         <a href="/docs/quickstart" target="_blank"
@@ -613,9 +621,7 @@
 
                 <div class="tx-landing__bottom_cta_card_panel">
                     <div class="tx-landing__bottom_cta_card_text">
-                        <p>Don't want to host the <span class="highlight">dstack</span> server or want to get the
-                            cheapest GPUs
-                            from the marketplace?</p>
+                        <p>Hosted by us. Bring your own cloud, or tap into marketplace.</p>
                     </div>
                     <div class="tx-landing__bottom_cta_card_button_panel">
                         <div>
@@ -626,7 +632,7 @@
                         </div>
 
                         <div class="tx-landing__bottom_cta_card_button_subheader">
-                            Get $5 free credit. Already have an account? <a href="https://sky.dstack.ai" target="_blank"
+                            Get $5 in GPU credits. Already have an account? <a href="https://sky.dstack.ai" target="_blank"
                                 class="tx-footer__section-link external">Sign in</a>
                         </div>
                     </div>
@@ -638,19 +644,18 @@
 
                 <div class="tx-landing__bottom_cta_card_panel">
                     <div class="tx-landing__bottom_cta_card_text">
-                        <p>Looking for a self-hosted <span class="highlight">dstack</span> with SSO, governance
-                            controls, and enterprise support?</p>
+                        <p>Self-hosted with SSO, air-gapped environments, governance, and dedicated support.</p>
                     </div>
                     <div class="tx-landing__bottom_cta_card_button_panel">
                         <div>
                             <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
                                 class="md-button md-button--primary external">
-                                <span>Book a demo</span>
+                                <span>Talk to us</span>
                             </a>
                         </div>
 
                         <div class="tx-landing__bottom_cta_card_button_subheader">
-                            Talk to our experts and learn.
+                            See how dstack fits your infrastructure.
                         </div>
                     </div>
                 </div>
