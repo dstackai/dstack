@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	execute "github.com/alexellis/go-execute/v2"
 
@@ -114,6 +115,11 @@ type amdGpu struct {
 	Bus  amdBus  `json:"bus"`
 }
 
+// amd-smi >= 7.x wraps the array in {"gpu_data": [...]}
+type amdSmiOutput struct {
+	GpuData []amdGpu `json:"gpu_data"`
+}
+
 type amdAsic struct {
 	Name string `json:"market_name"`
 }
@@ -130,8 +136,26 @@ type amdBus struct {
 	BDF string `json:"bdf"` // PCIe Domain:Bus:Device.Function notation
 }
 
+// parseAmdSmiOutput handles both amd-smi output formats:
+// ROCm 6.x returns a flat array: [{"gpu": 0, ...}, ...]
+// ROCm 7.x wraps it: {"gpu_data": [{"gpu": 0, ...}, ...]}
+func parseAmdSmiOutput(data []byte) ([]amdGpu, error) {
+	var amdGpus []amdGpu
+	if err := json.Unmarshal(data, &amdGpus); err == nil {
+		return amdGpus, nil
+	}
+	var wrapped amdSmiOutput
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	return wrapped.GpuData, nil
+}
+
 func getAmdGpuInfo(ctx context.Context) []GpuInfo {
 	gpus := []GpuInfo{}
+
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
 
 	cmd := execute.ExecTask{
 		Command: "docker",
@@ -158,8 +182,8 @@ func getAmdGpuInfo(ctx context.Context) []GpuInfo {
 		return gpus
 	}
 
-	var amdGpus []amdGpu
-	if err := json.Unmarshal([]byte(res.Stdout), &amdGpus); err != nil {
+	amdGpus, err := parseAmdSmiOutput([]byte(res.Stdout))
+	if err != nil {
 		log.Error(ctx, "cannot read json", "err", err)
 		return gpus
 	}
