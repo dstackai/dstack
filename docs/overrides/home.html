@@ -17,8 +17,9 @@
 <script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
     var typed = new Typed('#typed', {
-        strings: ['for AI teams', 'for training', `for deployment of AI models`, `that works with on-prem`,
-            'that works with any cloud'],
+        strings: ['of AI infrastructure', 'for training', 'for inference', 'for sandboxes',
+            'across GPU clouds', 'across Kubernetes', 'across on-prem clusters',
+            'without vendor lock-in'],
         backDelay: 5000,
         typeSpeed: 150,
         backSpeed: 100,
@@ -35,10 +36,10 @@
                 {delay: 0, value: ' ', class: 'newline'},
                 {type: 'input', value: 'dstack server'},
                 {delay: 0, value: ' ', class: 'newline'},
-                {delay: 3000, value: 'Applying ~/.dstack/server/config.yml...', class: 'newline'},
                 {delay: 0, value: 'The admin token is d7ad7f92-9f35-470d-be0e-c7645ce71a4c', class: 'newline'},
                 {delay: 0, value: 'The dstack server 0.19.2 is running at http://127.0.0.1:3000', class: 'newline'},
                 {delay: 0, value: ' ', class: 'newline'},
+                {type: 'input', value: ''},
             ]
         }
     );
@@ -50,12 +51,12 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1 class="glitch" data-text="Open-source GPU-native orchestration">Open-source GPU-native orchestration</h1>
+                <h1 class="glitch" data-text="Agentic orchestration" style="min-height: 2.4em;">Agentic orchestration<br><span id="typed" style="white-space: nowrap;"></span></h1>
 
                 <p>
-                    <span class="highlight">dstack</span> enables AI teams to provision GPUs and
-                    orchestrate containerized workloads across clouds, Kubernetes, or bare-metal clusters — 
-                    increasing GPU utilization while reducing vendor lock-in.
+                    <span class="highlight">dstack</span> is an open-source protocol and control plane that gives AI agents and engineers
+                    fine-grained primitives to provision compute and manage training, inference, and sandboxes
+                    across GPU clouds, Kubernetes, and on-prem clusters.
                 </p>
             </div>
 
@@ -82,21 +83,22 @@
                 </div>
             </div>
             <div class="tx-landing__hero_button_container_text" style="text-align: center; font-size: 85%; margin-top: 1.25rem">
-                Run development, distributed training, and high-throughput inference.
+                Orchestration that doesn’t suck and works with agents.
             </div>
         </div>
 
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>A unified control plane for GPU orchestration</h2>
+                    <h2>A unified control plane for compute orchestration</h2>
                     <p>
-                        Managing AI infrastructure requires efficient GPU orchestration tightly integrated with open-source training and
-                        inference frameworks.
+                        Managing AI infrastructure requires fine-grained control over GPU provisioning
+                        tightly integrated with open-source training and inference frameworks.
                     </p>
 
                     <p>
-                        <span class="highlight">dstack</span> provides a unified control plane&mdash;so workloads stay portable, reproducible, and infrastructure remains interchangeable.
+                        <span class="highlight">dstack</span> provides a unified control plane with a declarative interface
+                        that works across clouds, Kubernetes, and on-prem&mdash;whether operated by engineers or their AI agents.
                     </p>
 
                     <!-- TODO: Add `Why dstack?` -->
@@ -170,7 +172,7 @@
                 </div>
 
                 <div class="block margin">
-                    <h2>Native integration with GPU clouds</h2>
+                    <h2>Natively works with every GPU cloud</h2>
                     <p>
                         <span class="highlight">dstack</span> natively integrates with leading GPU clouds for fast, efficient provisioning.
                     </p>
@@ -243,14 +245,14 @@
                 </div>
 
                 <div class="block margin left">
-                    <h2>Dev environments</h2>
+                    <h2>Launch agentic dev environments</h2>
                     <p>
                         Before training or deploying models, ML engineers need interactive GPU access to experiment and debug.
                     </p>
 
                     <p><span class="highlight">dstack</span>'s dev environments let you connect desktop IDEs such as <span class="highlight">VS
                         Code</span>, <span class="highlight">Cursor</span>, and
-                    <span class="highlight">Windsurf</span> directly to cloud or on-prem GPUs.
+                    <span class="highlight">Windsurf</span>&mdash;and their AI agents&mdash;directly to cloud or on-prem GPUs.
                     </p>
 
                     <p>
@@ -267,7 +269,7 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>Single-node &amp; distributed tasks</h2>
+                    <h2>Submit training and batch jobs</h2>
 
                     <p>
                         Run training or batch workloads on a single GPU, or scale to multi-GPU and multi-node clusters using simple task configurations.
@@ -302,7 +304,7 @@
                 </div>
 
                 <div class="block margin left">
-                    <h2>Scalable model inference</h2>
+                    <h2>Deploy model inference and apps</h2>
 
                     <p>
                         With <span class="highlight">dstack</span>, you can deploy models as secure,

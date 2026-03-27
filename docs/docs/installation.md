@@ -195,7 +195,7 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-## Install AI agent skills
+## Install agent skills
 
 Install [skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the `dstack` CLI and edit configuration files.
 
