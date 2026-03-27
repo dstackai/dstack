@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.server.background.pipeline_tasks.fleets import FleetPipeline
 from dstack._internal.server.background.pipeline_tasks.instances import (
     InstanceFetcher,
     InstancePipeline,
@@ -191,6 +192,64 @@ class TestInstanceFetcher:
         assert oldest.lock_owner == InstancePipeline.__name__
         assert middle.lock_owner == InstancePipeline.__name__
         assert newest.lock_owner is None
+
+    async def test_fetch_allows_stale_instance_locks_if_fleet_is_waiting_for_instance_locks(
+        self, test_db, session: AsyncSession, fetcher: InstanceFetcher
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(session=session, project=project)
+        stale = get_current_datetime() - dt.timedelta(minutes=1)
+
+        fleet.lock_owner = FleetPipeline.__name__
+        fleet.lock_token = None
+        fleet.lock_expires_at = None
+
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="stale-locked",
+            last_processed_at=stale - dt.timedelta(seconds=1),
+        )
+        lock_instance(instance)
+        instance.lock_expires_at = stale
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert [item.id for item in items] == [instance.id]
+
+        await session.refresh(instance)
+        assert instance.lock_owner == InstancePipeline.__name__
+
+    async def test_fetch_excludes_fresh_instances_when_fleet_is_waiting_for_instance_locks(
+        self, test_db, session: AsyncSession, fetcher: InstanceFetcher
+    ):
+        project = await create_project(session=session)
+        fleet = await create_fleet(session=session, project=project)
+        stale = get_current_datetime() - dt.timedelta(minutes=1)
+
+        fleet.lock_owner = FleetPipeline.__name__
+        fleet.lock_token = None
+        fleet.lock_expires_at = None
+
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="fresh-unlocked",
+            last_processed_at=stale - dt.timedelta(seconds=1),
+        )
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert items == []
+
+        await session.refresh(instance)
+        assert instance.lock_owner is None
 
 
 @pytest.mark.asyncio
