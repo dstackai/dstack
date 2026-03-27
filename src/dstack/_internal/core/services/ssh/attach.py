@@ -28,10 +28,17 @@ logger = get_logger(__name__)
 _SSH_TUNNEL_REGEX = re.compile(r"(?:[\w.-]+:)?(?P<local_port>\d+):localhost:(?P<remote_port>\d+)")
 
 
-class SSHAttach:
+class BaseSSHAttach:
+    """
+    A base class for SSH attach implementations.
+
+    Child classes must populate `self.hosts` inside overridden `__init__()` with at least one host
+    named as a `run_name` argument value.
+    """
+
     @classmethod
     def get_control_sock_path(cls, run_name: str) -> Path:
-        return ConfigManager().dstack_ssh_dir / f"%r@{run_name}.control.sock"
+        return ConfigManager().dstack_ssh_dir / f"{run_name}.control.sock"
 
     @classmethod
     def reuse_ports_lock(cls, run_name: str) -> Optional[PortsLock]:
@@ -57,21 +64,16 @@ class SSHAttach:
 
     def __init__(
         self,
-        hostname: str,
-        ssh_port: int,
-        container_ssh_port: int,
-        user: str,
-        container_user: str,
-        id_rsa_path: PathLike,
-        ports_lock: PortsLock,
+        *,
         run_name: str,
-        dockerized: bool,
-        ssh_proxy: Optional[SSHConnectionParams] = None,
+        identity_path: PathLike,
+        ports_lock: PortsLock,
+        destination: str,
         service_port: Optional[int] = None,
-        local_backend: bool = False,
         bind_address: Optional[str] = None,
     ):
         self._attached = False
+        self._hosts_added_to_ssh_config = False
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
         self.run_name = run_name
@@ -80,9 +82,9 @@ class SSHAttach:
         # Cast all path-like values used in configs to FilePath instances for automatic
         # path normalization in :func:`update_ssh_config`.
         self.control_sock_path = FilePath(control_sock_path)
-        self.identity_file = FilePath(id_rsa_path)
+        self.identity_file = FilePath(identity_path)
         self.tunnel = SSHTunnel(
-            destination=f"root@{run_name}",
+            destination=destination,
             identity=self.identity_file,
             forwarded_sockets=ports_to_forwarded_sockets(
                 ports=self.ports,
@@ -94,12 +96,92 @@ class SSHAttach:
                 "ExitOnForwardFailure": "yes",
             },
         )
-        self.ssh_proxy = ssh_proxy
         self.service_port = service_port
+        self.hosts: dict[str, dict[str, Union[str, int, FilePath]]] = {}
 
-        hosts: dict[str, dict[str, Union[str, int, FilePath]]] = {}
-        self.hosts = hosts
+    def __enter__(self):
+        self.attach()
+        return self
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.detach()
+
+    def attach(self):
+        include_ssh_config(self.ssh_config_path)
+        self._add_hosts_to_ssh_config()
+
+        self._ports_lock.release()
+
+        max_retries = 10
+        for i in range(max_retries):
+            try:
+                self.tunnel.open()
+                self._attached = True
+                atexit.register(self.detach)
+                return
+            except SSHError:
+                if i < max_retries - 1:
+                    time.sleep(1)
+        self._remove_hosts_from_ssh_config()
+        raise SSHError("Can't connect to the remote host")
+
+    def detach(self):
+        self._remove_hosts_from_ssh_config()
+        if not self._attached:
+            logger.debug("Not attached")
+            return
+        self.tunnel.close()
+        self._attached = False
+        logger.debug("Detached")
+
+    def _add_hosts_to_ssh_config(self):
+        if self._hosts_added_to_ssh_config:
+            return
+        for host, options in self.hosts.items():
+            update_ssh_config(self.ssh_config_path, host, options)
+        self._hosts_added_to_ssh_config = True
+
+    def _remove_hosts_from_ssh_config(self):
+        if not self._hosts_added_to_ssh_config:
+            return
+        for host in self.hosts:
+            update_ssh_config(self.ssh_config_path, host, {})
+        self._hosts_added_to_ssh_config = False
+
+
+class SSHAttach(BaseSSHAttach):
+    """
+    `SSHAttach` attaches to a job directly, via a backend-specific chain of hosts.
+
+    Used when `dstack-sshproxy` is not configured on the server.
+    """
+
+    def __init__(
+        self,
+        *,
+        run_name: str,
+        identity_path: PathLike,
+        ports_lock: PortsLock,
+        hostname: str,
+        ssh_port: int,
+        container_ssh_port: int,
+        user: str,
+        container_user: str,
+        dockerized: bool,
+        ssh_proxy: Optional[SSHConnectionParams] = None,
+        local_backend: bool = False,
+        service_port: Optional[int] = None,
+        bind_address: Optional[str] = None,
+    ):
+        super().__init__(
+            run_name=run_name,
+            identity_path=identity_path,
+            ports_lock=ports_lock,
+            destination=f"root@{run_name}",
+            service_port=service_port,
+            bind_address=bind_address,
+        )
+        hosts = self.hosts
         if local_backend:
             hosts[run_name] = {
                 "HostName": hostname,
@@ -195,47 +277,39 @@ class SSHAttach:
                     "StrictHostKeyChecking": "no",
                     "UserKnownHostsFile": "/dev/null",
                 }
-        if get_ssh_client_info().supports_multiplexing:
-            hosts[run_name].update(
-                {
-                    "ControlMaster": "auto",
-                    "ControlPath": self.control_sock_path,
-                }
-            )
 
-    def attach(self):
-        include_ssh_config(self.ssh_config_path)
-        for host, options in self.hosts.items():
-            update_ssh_config(self.ssh_config_path, host, options)
 
-        max_retries = 10
-        self._ports_lock.release()
-        for i in range(max_retries):
-            try:
-                self.tunnel.open()
-                self._attached = True
-                atexit.register(self.detach)
-                break
-            except SSHError:
-                if i < max_retries - 1:
-                    time.sleep(1)
-        else:
-            self.detach()
-            raise SSHError("Can't connect to the remote host")
+class SSHProxyAttach(BaseSSHAttach):
+    """
+    `SSHProxyAttach` attaches to a job via `dstack-sshproxy`.
 
-    def detach(self):
-        if not self._attached:
-            logger.debug("Not attached")
-            return
-        self.tunnel.close()
-        for host in self.hosts:
-            update_ssh_config(self.ssh_config_path, host, {})
-        self._attached = False
-        logger.debug("Detached")
+    Used when `dstack-sshproxy` is configured on the server.
+    """
 
-    def __enter__(self):
-        self.attach()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.detach()
+    def __init__(
+        self,
+        *,
+        run_name: str,
+        identity_path: PathLike,
+        ports_lock: PortsLock,
+        hostname: str,
+        upstream_id: str,
+        port: Optional[int] = None,
+        service_port: Optional[int] = None,
+        bind_address: Optional[str] = None,
+    ):
+        super().__init__(
+            run_name=run_name,
+            identity_path=identity_path,
+            ports_lock=ports_lock,
+            destination=f"{upstream_id}_root@{run_name}",
+            service_port=service_port,
+            bind_address=bind_address,
+        )
+        self.hosts[run_name] = {
+            "HostName": hostname,
+            "Port": port or 22,
+            "User": upstream_id,
+            "IdentityFile": self.identity_file,
+            "IdentitiesOnly": "yes",
+        }

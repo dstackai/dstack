@@ -29,6 +29,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume, VolumeMountPoint, VolumeStatus
+from dstack._internal.server import settings
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -56,6 +57,7 @@ from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.sshproxy import (
     build_proxied_job_ssh_command,
     build_proxied_job_ssh_url_authority,
+    build_proxied_job_upstream_id,
 )
 from dstack._internal.utils import common
 from dstack._internal.utils.common import run_async
@@ -526,12 +528,23 @@ def get_job_connection_info(job_model: JobModel, run_spec: RunSpec) -> JobConnec
                 if proxied_url_authority is not None:
                     proxied_ide_url = ide.get_url(proxied_url_authority, jrd.working_dir)
 
+    sshproxy_hostname: Optional[str] = None
+    sshproxy_port: Optional[int] = None
+    sshproxy_upstream_id: Optional[str] = None
+    if settings.SSHPROXY_ENABLED:
+        sshproxy_hostname = settings.SSHPROXY_HOSTNAME
+        sshproxy_port = settings.SSHPROXY_PORT
+        sshproxy_upstream_id = build_proxied_job_upstream_id(job_model)
+
     return JobConnectionInfo(
         ide_name=ide_name,
         attached_ide_url=attached_ide_url,
         proxied_ide_url=proxied_ide_url,
         attached_ssh_command=build_ssh_command(hostname=attached_hostname),
         proxied_ssh_command=build_proxied_job_ssh_command(job_model),
+        sshproxy_hostname=sshproxy_hostname,
+        sshproxy_port=sshproxy_port,
+        sshproxy_upstream_id=sshproxy_upstream_id,
     )
 
 

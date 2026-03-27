@@ -545,9 +545,90 @@ class TestJobRunningWorker:
         assert job_runtime_data.working_dir == "/dstack/run"
         assert job_runtime_data.username == "dstack"
 
+    @pytest.mark.parametrize("sshproxy_enforced", [False, True])
+    async def test_provisioning_shim(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+        sshproxy_enforced: bool,
+    ):
+        monkeypatch.setattr(
+            "dstack._internal.server.settings.SSHPROXY_ENFORCED", sshproxy_enforced
+        )
+        project_ssh_pub_key = "__project_ssh_pub_key__"
+        project = await create_project(session=session, ssh_public_key=project_ssh_pub_key)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="test-run",
+            run_spec=run_spec,
+        )
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        job_provisioning_data = get_job_provisioning_data(dockerized=True)
+
+        with patch(
+            "dstack._internal.server.services.jobs.configurators.base.get_default_python_verison"
+        ) as py_version:
+            py_version.return_value = "3.13"
+            job = await create_job(
+                session=session,
+                run=run,
+                status=JobStatus.PROVISIONING,
+                submitted_at=get_current_datetime(),
+                job_provisioning_data=job_provisioning_data,
+                instance=instance,
+                instance_assigned=True,
+            )
+
+        await _process_job(session, worker, job)
+
+        ssh_tunnel_mock.assert_called_once()
+        shim_client_mock.healthcheck.assert_called_once()
+        shim_client_mock.submit_task.assert_called_once_with(
+            task_id=job.id,
+            name="test-run-0-0",
+            registry_username="",
+            registry_password="",
+            image_name=(
+                f"dstackai/base:{settings.DSTACK_BASE_IMAGE_VERSION}-"
+                f"base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+            ),
+            container_user="root",
+            privileged=False,
+            gpu=None,
+            cpu=None,
+            memory=None,
+            shm_size=None,
+            network_mode=NetworkMode.HOST,
+            volumes=[],
+            volume_mounts=[],
+            instance_mounts=[],
+            gpu_devices=[],
+            host_ssh_user="" if sshproxy_enforced else "ubuntu",
+            host_ssh_keys=[] if sshproxy_enforced else ["user_ssh_key"],
+            container_ssh_keys=[project_ssh_pub_key]
+            if sshproxy_enforced
+            else [project_ssh_pub_key, "user_ssh_key"],
+            instance_id=job_provisioning_data.instance_id,
+        )
+        await session.refresh(job)
+        assert job.status == JobStatus.PULLING
+
     @pytest.mark.parametrize("privileged", [False, True])
     async def test_provisioning_shim_with_volumes(
         self,
+        monkeypatch: pytest.MonkeyPatch,
         test_db,
         session: AsyncSession,
         worker: JobRunningWorker,
@@ -555,6 +636,7 @@ class TestJobRunningWorker:
         shim_client_mock: Mock,
         privileged: bool,
     ):
+        monkeypatch.setattr("dstack._internal.server.settings.SSHPROXY_ENFORCED", False)
         project_ssh_pub_key = "__project_ssh_pub_key__"
         project = await create_project(session=session, ssh_public_key=project_ssh_pub_key)
         user = await create_user(session=session)

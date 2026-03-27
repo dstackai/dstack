@@ -472,6 +472,29 @@ class JobConnectionInfo(CoreModel):
             )
         ),
     ]
+    sshproxy_hostname: Annotated[
+        Optional[str],
+        Field(description="sshproxy hostname. Not set if sshproxy is not configured."),
+    ] = None
+    sshproxy_port: Annotated[
+        Optional[int],
+        Field(
+            description=(
+                "ssproxy port. Not set if sshproxy is not configured."
+                " May be not set if it is equal to the default SSH port 22."
+            )
+        ),
+    ] = None
+    sshproxy_upstream_id: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "sshproxy identifier for this job. SSH clients send this identifier as a username"
+                " to indicate which job they wish to connect."
+                " Not set if sshproxy is not configured."
+            )
+        ),
+    ] = None
 
 
 class Job(CoreModel):

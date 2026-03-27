@@ -5,7 +5,7 @@ import shlex
 import subprocess
 import tempfile
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Literal, Optional, Union
+from typing import Dict, Iterable, List, Literal, NoReturn, Optional, Union
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
@@ -181,9 +181,8 @@ class SSHTunnel:
             raise SSHError(msg) from e
         if r.returncode == 0:
             return
-        stderr = self._read_log_file()
-        logger.debug("SSH tunnel failed: %s", stderr)
-        raise get_ssh_error(stderr)
+        log_output = self._read_log_file()
+        self._raise_ssh_error_from_log_output(log_output)
 
     async def aopen(self) -> None:
         await run_async(self._remove_log_file)
@@ -199,9 +198,8 @@ class SSHTunnel:
             raise SSHError(msg) from e
         if proc.returncode == 0:
             return
-        stderr = await run_async(self._read_log_file)
-        logger.debug("SSH tunnel failed: %s", stderr)
-        raise get_ssh_error(stderr)
+        log_output = await run_async(self._read_log_file)
+        self._raise_ssh_error_from_log_output(log_output)
 
     def close(self) -> None:
         if not os.path.exists(self.control_sock_path):
@@ -299,9 +297,13 @@ class SSHTunnel:
         ]
         return "ProxyCommand=" + shlex.join(command)
 
-    def _read_log_file(self) -> bytes:
-        with open(self.log_path, "rb") as f:
-            return f.read()
+    def _read_log_file(self) -> Optional[bytes]:
+        try:
+            with open(self.log_path, "rb") as f:
+                return f.read()
+        except OSError as e:
+            logger.debug("Failed to read SSH tunnel log file %s: %s", self.log_path, e)
+            return None
 
     def _remove_log_file(self) -> None:
         try:
@@ -310,6 +312,16 @@ class SSHTunnel:
             pass
         except OSError as e:
             logger.debug("Failed to remove SSH tunnel log file %s: %s", self.log_path, e)
+
+    def _raise_ssh_error_from_log_output(self, output: Optional[bytes]) -> NoReturn:
+        if output is None:
+            msg = "(no log file)"
+            ssh_error = SSHError()
+        else:
+            msg = output
+            ssh_error = get_ssh_error(output)
+        logger.debug("SSH tunnel failed: %s", msg)
+        raise ssh_error
 
     def _get_identity_path(self, identity: FilePathOrContent, tmp_filename: str) -> PathLike:
         if isinstance(identity, FilePath):
