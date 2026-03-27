@@ -162,12 +162,23 @@ async def _register_service_in_gateway(
     )
     show_service_https = _should_show_service_https(run_spec, gateway_configuration)
     service_protocol = "https" if show_service_https else "http"
-    router = _build_service_router_config(gateway_configuration, run_spec.configuration)
 
-    if configure_service_https and gateway_configuration.certificate is None:
+    if (
+        not show_service_https
+        and gateway_configuration.certificate is not None
+        and gateway_configuration.certificate.type == "acm"
+    ):
+        # SSL termination is done globally at load balancer so cannot runs only some services via http.
+        raise ServerClientError(
+            "Cannot run HTTP service on gateway with ACM certificates configured"
+        )
+
+    if show_service_https and gateway_configuration.certificate is None:
         raise ServerClientError(
             "Cannot run HTTPS service on gateway with no SSL certificates configured"
         )
+
+    router = _build_service_router_config(gateway_configuration, run_spec.configuration)
 
     gateway_https = _get_gateway_https(gateway_configuration)
     gateway_protocol = "https" if gateway_https else "http"
