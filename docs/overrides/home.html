@@ -47,6 +47,32 @@
         }
     );
 </script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var highlighters = {
+            yaml: function(text) {
+                return text
+                    .replace(/^(#.*)$/gm, '<span class="c1">$1</span>')
+                    .replace(/^(\s*)([\w][\w.]*)(:)([^\S\n]+)(.*)/gm,
+                        '$1<span class="nt">$2</span><span class="p">$3</span><span class="w">$4</span><span class="l l-Scalar l-Scalar-Plain">$5</span>')
+                    .replace(/^(\s*)([\w][\w.]*)(:)\s*$/gm,
+                        '$1<span class="nt">$2</span><span class="p">$3</span>');
+            }
+        };
+        document.querySelectorAll('[editor-title] code[class^="language-"]').forEach(function(el) {
+            var lang = el.className.replace('language-', '');
+            var fn = highlighters[lang];
+            if (!fn) return;
+            el.innerHTML = fn(el.textContent);
+            var pre = el.parentElement;
+            if (pre.parentElement.classList.contains('highlight')) return;
+            var wrapper = document.createElement('div');
+            wrapper.className = 'highlight';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+        });
+    });
+</script>
 {% endblock %}
 
 {% block content %}
@@ -126,65 +152,46 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <div class="supported_clouds">
-                        <a href="/docs/concepts/backends#aws" target="_blank" class="supported_clouds_item">
-                            <img width="49" style="padding-top: 8px" src="/assets/images/aws-logo.svg">
-                        </a>
+                    <div editor-title="fleet.dstack.yml">
+                        <pre><code class="language-yaml">type: fleet
+name: my-fleet
 
-                        <a href="/docs/concepts/backends#gcp" target="_blank" class="supported_clouds_item">
-                            <img width="41" style="margin: 2px 0" src="/assets/images/gcp-logo.svg">
-                        </a>
+# Allow provisioning of up to 10 instances
+nodes: 0..10
+placement: cluster
 
-                        <a href="/docs/concepts/backends#lambda" target="_blank" class="supported_clouds_item">
-                            <img width="34" src="/assets/images/lambda-logo.svg">
-                        </a>
+# Deprovision instances if idle
+idle_duration: 1h
 
-                        <a href="/docs/concepts/backends#nebius" target="_blank" class="supported_clouds_item">
-                            <img width="39" style="margin: -2px 0" src="/assets/images/nebius-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#crusoe" target="_blank" class="supported_clouds_item">
-                            <img width="34" src="/assets/images/crusoe-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#verda" target="_blank" class="supported_clouds_item">
-                            <img width="32" style="margin: 9px 0" src="/assets/images/verda-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#runpod" target="_blank" class="supported_clouds_item">
-                            <img width="34" style="margin: -2px 0;" src="/assets/images/runpod-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#vastai" target="_blank" class="supported_clouds_item">
-                            <img width="36" src="/assets/images/vastai-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#vultr" target="_blank" class="supported_clouds_item">
-                            <img width="37" src="/assets/images/vultr-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#oci" target="_blank" class="supported_clouds_item">
-                            <img width="45" style="margin: 2px 0" src="/assets/images/oci-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#azure" target="_blank" class="supported_clouds_item">
-                            <img width="35" src="/assets/images/azure-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#kubernetes" target="_blank" class="supported_clouds_item">
-                            <img width="36" src="/assets/images/kubernetes-logo.svg">
-                        </a>
+resources:
+  gpu: H100:8</code></pre>
                     </div>
                 </div>
 
-                <div class="block margin">
-                    <h2>Natively works with every GPU cloud</h2>
+                <div class="block margin left">
+                    <h2>Provision GPUs across clouds</h2>
+
+                    <div class="supported_clouds_inline">
+                        <a href="/docs/concepts/backends#aws" target="_blank"><img width="33" src="/assets/images/aws-logo.svg"></a>
+                        <a href="/docs/concepts/backends#gcp" target="_blank"><img width="25" src="/assets/images/gcp-logo.svg"></a>
+                        <a href="/docs/concepts/backends#azure" target="_blank"><img width="22" src="/assets/images/azure-logo.svg"></a>
+                        <a href="/docs/concepts/backends#lambda" target="_blank"><img width="21" src="/assets/images/lambda-logo.svg"></a>
+                        <a href="/docs/concepts/backends#nebius" target="_blank"><img width="24" src="/assets/images/nebius-logo.svg"></a>
+                        <a href="/docs/concepts/backends#crusoe" target="_blank"><img width="21" src="/assets/images/crusoe-logo.svg"></a>
+                        <a href="/docs/concepts/backends#verda" target="_blank"><img width="20" src="/assets/images/verda-logo.svg"></a>
+                        <a href="/docs/concepts/backends#runpod" target="_blank"><img width="21" src="/assets/images/runpod-logo.svg"></a>
+                        <a href="/docs/concepts/backends#vastai" target="_blank"><img width="22" src="/assets/images/vastai-logo.svg"></a>
+                        <a href="/docs/concepts/backends#vultr" target="_blank"><img width="23" src="/assets/images/vultr-logo.svg"></a>
+                        <a href="/docs/concepts/backends#oci" target="_blank"><img width="28" src="/assets/images/oci-logo.svg"></a>
+                        <a href="/docs/concepts/backends#kubernetes" target="_blank"><img width="25" src="/assets/images/kubernetes-logo.svg"></a>
+                    </div>
+
                     <p>
-                        <span class="highlight">dstack</span> natively integrates with leading GPU clouds for fast, efficient provisioning.
+                        <span class="highlight">dstack</span> provisions GPU VMs directly through cloud APIs&mdash;no Kubernetes or middleware needed.
                     </p>
-                    
+
                     <p>
-                        It can provision and manage GPU VMs directly through cloud APIs, or operate through <span class="highlight">Kubernetes</span> when required.
+                        For teams already running <span class="highlight">Kubernetes</span>, it can be used as a backend too.
                     </p>
 
                     <p>
@@ -204,28 +211,19 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>Easy to use with on-prem clusters</h2>
+                    <h2>Bring your own clusters</h2>
                     
                     <p>
-                        If you already run <span class="highlight">Kubernetes</span> on-prem, connect your cluster to <span class="highlight">dstack</span> using the <span class="highlight">Kubernetes</span> backend.
+                        Have bare-metal servers or pre-provisioned VMs? Use <span class="highlight">SSH fleets</span> to connect them to <span class="highlight">dstack</span> and orchestrate GPUs directly&mdash;no extra infrastructure required.
                     </p>
 
                     <p>
-                        For bare-metal servers or VMs without <span class="highlight">Kubernetes</span>, use <span class="highlight">SSH fleets</span> to orchestrate GPUs directly.
+                        Just provide SSH credentials and host addresses, and <span class="highlight">dstack</span> handles the rest.
                     </p>
-                    
+
                     <p>
-                        <a href="/docs/concepts/backends#ssh-fleets" target="_blank" class="md-button md-button-secondary small">
+                        <a href="/docs/concepts/fleets#ssh-fleets" target="_blank" class="md-button md-button-secondary small">
                             <span>SSH fleets</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z"
-                                        fill-rule="nonzero" fill="currentColor" class="fill-main"></path>
-                                </svg></span>
-                        </a>
-
-                        <a href="/docs/concepts/backends#kubernetes" target="_blank" class="md-button md-button-secondary small">
-                            <span>Kubernetes</span>
                             <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
                                     <path
                                         d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z"
@@ -236,8 +234,22 @@
                 </div>
 
                 <div class="block large">
-                    <img src="https://dstack.ai/static-assets/static-assets/images/ssh-fleet.gif?raw=true"
-                        width="800" style="border-radius: 3px">
+                    <div editor-title="fleet.dstack.yml">
+                        <pre><code class="language-yaml">type: fleet
+name: my-fleet
+
+placement: cluster
+
+ssh_config:
+  user: ubuntu
+  identity_file: ~/.ssh/id_rsa
+  hosts:
+    - 3.255.177.51
+    - 3.255.177.52
+
+
+</code></pre>
+                    </div>
                 </div>
             </div>
         </div>
@@ -246,12 +258,26 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://dstack.ai/static-assets/static-assets/images/dev-environment.gif?raw=true"
-                        width="800" style="border-radius: 3px">
+                    <div editor-title=".dstack.yml">
+                        <pre><code class="language-yaml">type: dev-environment
+name: vscode
+
+python: "3.12"
+
+ide: vscode
+
+resources:
+  gpu: 24GB
+
+
+
+
+</code></pre>
+                    </div>
                 </div>
 
                 <div class="block margin left">
-                    <h2>Launch agentic dev environments</h2>
+                    <h2>Develop and experiment on GPUs</h2>
                     <p>
                         Before training or deploying models, ML engineers need interactive GPU access to experiment and debug.
                     </p>
@@ -275,7 +301,7 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>Submit training and batch jobs</h2>
+                    <h2>Train at any scale</h2>
 
                     <p>
                         Run training or batch workloads on a single GPU, or scale to multi-GPU and multi-node clusters using simple task configurations.
@@ -296,8 +322,32 @@
                 </div>
 
                 <div class="block large">
-                    <img src="https://dstack.ai/static-assets/static-assets/images/task.gif?raw=true"
-                        width="800" style="border-radius: 3px">
+                    <div editor-title=".dstack.yml">
+                        <pre><code class="language-yaml">type: task
+name: train-distrib
+
+nodes: 2
+
+python: 3.12
+env:
+  - NCCL_DEBUG=INFO
+files: .
+commands:
+  - uv pip install -r requirements.txt
+  - |
+    torchrun \
+      --nproc-per-node=$DSTACK_GPUS_PER_NODE \
+      --node-rank=$DSTACK_NODE_RANK \
+      --nnodes=$DSTACK_NODES_NUM \
+      --master-addr=$DSTACK_MASTER_NODE_IP \
+      --master-port=12345 \
+      multinode.py 50 10
+
+resources:
+  gpu: H100:8
+  shm_size: 24GB
+</code></pre>
+                    </div>
                 </div>
             </div>
         </div>
@@ -305,12 +355,34 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://dstack.ai/static-assets/static-assets/images/service.gif?raw=true"
-                        width="800" style="border-radius: 3px">
+                    <div editor-title=".dstack.yml">
+                        <pre><code class="language-yaml">type: service
+name: qwen3-235b
+
+image: lmsysorg/sglang
+env:
+  - HF_TOKEN
+  - MODEL_ID=Qwen/Qwen3-235B-A22B-FP8
+commands:
+  - |
+    python3 -m sglang.launch_server \
+      --model-path $MODEL_ID \
+      --tp $DSTACK_GPUS_NUM \
+      --reasoning-parser qwen3 \
+      --port 8000
+
+port: 8000
+model: Qwen/Qwen3-235B-A22B-FP8
+
+resources:
+  gpu: H100:4
+  disk: 500GB..
+</code></pre>
+                    </div>
                 </div>
 
                 <div class="block margin left">
-                    <h2>Deploy model inference and apps</h2>
+                    <h2>Serve models in production</h2>
 
                     <p>
                         With <span class="highlight">dstack</span>, you can deploy models as secure,
