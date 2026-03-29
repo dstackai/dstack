@@ -927,7 +927,8 @@
     color: #e37cff;
 }
 
-#get-started-code-snippet[data-termynal] {
+#get-started-code-snippet[data-termynal],
+#get-started-claude-snippet[data-termynal] {
     font-size: 14px !important;
 }
 
@@ -1035,6 +1036,73 @@
 
 .tx-landing__major_feature .supported_clouds_block.block.large {
     width: 600px
+}
+
+.code-carousel__slides {
+    position: relative;
+    display: grid;
+}
+
+.code-carousel__slide {
+    grid-area: 1 / 1;
+    display: none;
+}
+
+.code-carousel__slide.active {
+    display: block;
+}
+
+.code-carousel__slide > [data-termynal],
+.code-carousel__slide[data-termynal] {
+    margin: 0 !important;
+}
+
+.code-carousel .code-carousel__slide[editor-title] pre {
+    margin: 0;
+}
+
+.code-carousel .code-carousel__slide[editor-title] pre > code {
+    padding-top: 70px;
+}
+
+@media screen and (max-width: 44.9375em) {
+    .code-carousel {
+        margin-left: -0.8rem;
+        margin-right: -0.8rem;
+    }
+
+    .code-carousel .code-carousel__slide[editor-title] {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}
+
+.code-carousel__dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.code-carousel__dot {
+    width: 10px;
+    height: 10px;
+    display: block;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: transparent;
+    border: 0.5px solid #000;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+.code-carousel__dot.active {
+    border-color: #000;
+    background: #000;
+}
+
+.code-carousel__dot:hover {
+    border-color: #000;
 }
 
 .tx-landing [editor-title] pre {
