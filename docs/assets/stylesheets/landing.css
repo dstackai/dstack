@@ -362,6 +362,18 @@
     vertical-align: middle;
 }
 
+.md-typeset.md-banner__inner .icon {
+    display: inline-block;
+    width: 12.5px;
+    height: 12.5px;
+    transition: opacity .2s ease,transform .2s ease;
+}
+
+.md-typeset.md-banner__inner a:hover .icon {
+    transform: translateX(3px)
+}
+
+
 .md-typeset .md-button .icon,
 .md-typeset .md-post__action .icon {
     display: inline-block;
