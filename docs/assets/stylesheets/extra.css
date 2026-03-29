@@ -1277,7 +1277,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         padding-right: 22px;
     }
 
-    .md-tabs__item:nth-child(1), .md-tabs__item:nth-child(4) {
+    .md-tabs__item:nth-child(1) {
         display: none;
     }
 
