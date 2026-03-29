@@ -197,7 +197,7 @@ This configuration is stored in `~/.dstack/config.yml`.
 
 ## Install agent skills
 
-Install [skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the `dstack` CLI and edit configuration files.
+Install [`dstack` skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the CLI and edit configuration files.
 
 <div class="termy">
 

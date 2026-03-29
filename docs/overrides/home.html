@@ -83,11 +83,48 @@
             return termynal;
         }
 
+        function normalizeCarouselHeight(carousel) {
+            var slidesWrap = carousel.querySelector('.code-carousel__slides');
+            if (!slidesWrap) return;
+
+            var slides = Array.prototype.slice.call(carousel.querySelectorAll('.code-carousel__slide'));
+            if (!slides.length) return;
+
+            var maxHeight = 0;
+
+            slides.forEach(function(slide) {
+                var prevDisplay = slide.style.display;
+                var prevVisibility = slide.style.visibility;
+
+                if (!slide.classList.contains('active')) {
+                    slide.style.display = 'block';
+                    slide.style.visibility = 'hidden';
+                }
+
+                maxHeight = Math.max(maxHeight, slide.scrollHeight, slide.offsetHeight);
+
+                if (!slide.classList.contains('active')) {
+                    slide.style.display = prevDisplay;
+                    slide.style.visibility = prevVisibility;
+                }
+            });
+
+            if (maxHeight > 0) {
+                slidesWrap.style.minHeight = maxHeight + 'px';
+                slides.forEach(function(slide) {
+                    slide.style.minHeight = maxHeight + 'px';
+                });
+            }
+        }
+
         // Init termynal instances for carousel slides
         window._getStartedTermynal = initCarouselTermynal('get-started-code-snippet', [
             {type: 'input', value: 'uv tool install "dstack[all]" -U'},
+            {delay: 0, value: 'Downloading dstack-0.20.15-py3-none-any.whl', class: 'newline'},
+            {type: 'progress', progressPercent: 100, typeDelay: 50},
             {delay: 0, value: ' ', class: 'newline'},
             {type: 'input', value: 'npx skills add dstackai/dstack'},
+            {delay: 0, value: 'Installed skill dstack from dstackai/dstack', class: 'newline'},
             {delay: 0, value: ' ', class: 'newline'},
             {type: 'input', value: 'dstack server'},
             {delay: 0, value: ' ', class: 'newline'},
@@ -112,8 +149,6 @@
             {delay: 0, value: '  - Troubleshoot provisioning or connectivity issues', class: 'newline'},
             {delay: 0, value: ' ', class: 'newline'},
             {delay: 0, value: '  What would you like to do?', class: 'newline'},
-            {delay: 0, value: ' ', class: 'newline'},
-            {type: 'input', value: ''},
         ]);
 
         window._fleetTermynal = initCarouselTermynal('fleet-apply-terminal', [
@@ -231,7 +266,18 @@
                 });
             });
 
+            normalizeCarouselHeight(carousel);
+            setTimeout(function() {
+                normalizeCarouselHeight(carousel);
+            }, 350);
+
             timer = setInterval(next, 5000);
+        });
+
+        window.addEventListener('resize', function() {
+            document.querySelectorAll('.code-carousel').forEach(function(carousel) {
+                normalizeCarouselHeight(carousel);
+            });
         });
     });
 </script>
