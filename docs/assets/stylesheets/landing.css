@@ -933,7 +933,7 @@
 }
 
 /*.tx-landing__trusted_by*/ [data-termynal] {
-    font-size: 15px;
+    font-size: 14px;
 }
 
 .tx-landing__trusted_by .termy {
@@ -1062,6 +1062,7 @@
 }
 
 .code-carousel .code-carousel__slide[editor-title] pre > code {
+    font-size: 14px;
     padding-top: 70px;
 }
 
