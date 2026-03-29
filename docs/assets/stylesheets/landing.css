@@ -1079,9 +1079,34 @@
 }
 
 @media screen and (max-width: 44.9375em) {
+    .tx-landing__major_feature .block.large {
+        width: 100%;
+    }
+
     .code-carousel {
-        margin-left: -0.8rem;
-        margin-right: -0.8rem;
+        margin-left: 0;
+        margin-right: 0;
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .code-carousel__slides,
+    .code-carousel__slide,
+    .code-carousel .code-carousel__slide[editor-title],
+    .code-carousel .code-carousel__slide[editor-title] pre,
+    .code-carousel .code-carousel__slide[editor-title] pre > code,
+    .code-carousel .code-carousel__slide > [data-termynal],
+    .code-carousel .code-carousel__slide[data-termynal] {
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .code-carousel .code-carousel__slide[editor-title] pre,
+    .code-carousel .code-carousel__slide > [data-termynal],
+    .code-carousel .code-carousel__slide[data-termynal] {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .code-carousel .code-carousel__slide[editor-title] {
