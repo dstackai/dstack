@@ -4,6 +4,8 @@ date: 2026-03-11
 description: "Agentic engineering pulls compute discovery, provisioning, scheduling, and observability into the execution loop. Infrastructure orchestration is becoming an agent skill."
 slug: agentic-orchestration
 image: https://dstack.ai/static-assets/static-assets/images/agentic-orchestration.png
+categories:
+  - Changelog
 ---
 
 # Infrastructure orchestration is an agent skill

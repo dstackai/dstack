@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: AI container orchestration for AI teams
+title: Agentic orchestration for AI infrastructure
 hide:
    - navigation
    - toc

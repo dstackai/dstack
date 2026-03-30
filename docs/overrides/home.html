@@ -17,31 +17,269 @@
 <script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
     var typed = new Typed('#typed', {
-        strings: ['for AI teams', 'for training', `for deployment of AI models`, `that works with on-prem`,
-            'that works with any cloud'],
-        backDelay: 5000,
-        typeSpeed: 150,
-        backSpeed: 100,
+        strings: ['for AI infrastructure', 'for model training', 'for model inference',
+            // 'for sandboxes', 
+            'across GPU clouds', 'across Kubernetes', 'for bare-metal clusters',
+            'for AI researchers', 'for ML engineers',
+            'on NVIDIA GPUs', 'on AMD GPUs', 'on any GPU or CPU', 'without vendor lock-in',
+        ],
+        backDelay: 1800,
+        typeSpeed: 85,
+        backSpeed: 60,
         loop: true,
     });
 </script>
-<script type="text/javascript">
-    new Termynal('#get-started-code-snippet',
-        {
-            lineData: [
-                {type: 'input', value: 'uv tool install "dstack[all]"'},
-                {delay: 0, value: 'Downloading dstack-0.19.2-py3-none-any.whl', class: 'newline'},
-                {type: 'progress', progressPercent: 100, typeDelay: 50},
-                {delay: 0, value: ' ', class: 'newline'},
-                {type: 'input', value: 'dstack server'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 3000, value: 'Applying ~/.dstack/server/config.yml...', class: 'newline'},
-                {delay: 0, value: 'The admin token is d7ad7f92-9f35-470d-be0e-c7645ce71a4c', class: 'newline'},
-                {delay: 0, value: 'The dstack server 0.19.2 is running at http://127.0.0.1:3000', class: 'newline'},
-                {delay: 0, value: ' ', class: 'newline'},
-            ]
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var highlighters = {
+            yaml: function(text) {
+                return text
+                    .replace(/^(#.*)$/gm, '<span class="c1">$1</span>')
+                    .replace(/^(\s*)([\w][\w.]*)(:)([^\S\n]+)(.*)/gm,
+                        '$1<span class="nt">$2</span><span class="p">$3</span><span class="w">$4</span><span class="l l-Scalar l-Scalar-Plain">$5</span>')
+                    .replace(/^(\s*)([\w][\w.]*)(:)\s*$/gm,
+                        '$1<span class="nt">$2</span><span class="p">$3</span>');
+            }
+        };
+        document.querySelectorAll('[editor-title] code[class^="language-"]').forEach(function(el) {
+            var lang = el.className.replace('language-', '');
+            var fn = highlighters[lang];
+            if (fn) {
+                el.innerHTML = fn(el.textContent);
+            }
+            var pre = el.parentElement;
+            if (pre.parentElement.classList.contains('highlight')) return;
+            var wrapper = document.createElement('div');
+            wrapper.className = 'highlight';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+        });
+    });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        function initCarouselTermynal(terminalId, lineData) {
+            var termEl = document.getElementById(terminalId);
+            if (!termEl) return null;
+
+            // Temporarily show the slide so Termynal can measure height
+            var slide = termEl.closest('.code-carousel__slide');
+            if (slide) slide.style.display = 'block';
+
+            var termynal = new Termynal(termEl, { lineData: lineData });
+
+            // Sync editor code height to match termynal
+            var termH = termEl.style.minHeight;
+            if (termH) {
+                var carousel = termEl.closest('.code-carousel');
+                var codeEl = carousel && carousel.querySelector('[editor-title] code');
+                if (codeEl) {
+                    codeEl.style.minHeight = termH;
+                    codeEl.style.boxSizing = 'border-box';
+                }
+            }
+            if (slide) slide.style.display = '';
+
+            return termynal;
         }
-    );
+
+        function normalizeCarouselHeight(carousel) {
+            var slidesWrap = carousel.querySelector('.code-carousel__slides');
+            if (!slidesWrap) return;
+
+            var slides = Array.prototype.slice.call(carousel.querySelectorAll('.code-carousel__slide'));
+            if (!slides.length) return;
+
+            var maxHeight = 0;
+
+            slides.forEach(function(slide) {
+                var prevDisplay = slide.style.display;
+                var prevVisibility = slide.style.visibility;
+
+                if (!slide.classList.contains('active')) {
+                    slide.style.display = 'block';
+                    slide.style.visibility = 'hidden';
+                }
+
+                maxHeight = Math.max(maxHeight, slide.scrollHeight, slide.offsetHeight);
+
+                if (!slide.classList.contains('active')) {
+                    slide.style.display = prevDisplay;
+                    slide.style.visibility = prevVisibility;
+                }
+            });
+
+            if (maxHeight > 0) {
+                slidesWrap.style.minHeight = maxHeight + 'px';
+                slides.forEach(function(slide) {
+                    slide.style.minHeight = maxHeight + 'px';
+                });
+            }
+        }
+
+        // Init termynal instances for carousel slides
+        window._getStartedTermynal = initCarouselTermynal('get-started-code-snippet', [
+            {type: 'input', value: 'uv tool install "dstack[all]" -U'},
+            {delay: 0, value: 'Downloading dstack-0.20.15-py3-none-any.whl', class: 'newline'},
+            {type: 'progress', progressPercent: 100, typeDelay: 50},
+            {delay: 0, value: ' ', class: 'newline'},
+            {type: 'input', value: 'npx skills add dstackai/dstack'},
+            {delay: 0, value: 'Installed skill dstack from dstackai/dstack', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {type: 'input', value: 'dstack server'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Applying ~/.dstack/server/config.yml...', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"', class: 'newline'},
+            {delay: 0, value: 'The server is running at http://127.0.0.1:3000/', class: 'newline'},
+        ]);
+        window._getStartedClaudeTermynal = initCarouselTermynal('get-started-claude-snippet', [
+            {delay: 0, value: ' ▐▛███▜▌   Claude Code v2.1.83', class: 'newline'},
+            {delay: 0, value: '▝▜█████▛▘  Opus 4.6 (1M context) · Claude Team', class: 'newline'},
+            {delay: 0, value: '  ▘▘ ▝▝    ~/skills-demo', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {type: 'input', value: '/dstack'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'dstack skill loaded. How can I help? For example:', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: '  - Apply a configuration (*.dstack.yml)', class: 'newline'},
+            {delay: 0, value: '  - Check run status (dstack ps)', class: 'newline'},
+            {delay: 0, value: '  - Manage fleets, volumes, or services', class: 'newline'},
+            {delay: 0, value: '  - Create or edit a dstack configuration', class: 'newline'},
+            {delay: 0, value: '  - Troubleshoot provisioning or connectivity issues', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: '  What would you like to do?', class: 'newline'},
+        ]);
+
+        window._fleetTermynal = initCarouselTermynal('fleet-apply-terminal', [
+            {type: 'input', value: 'dstack apply -f fleet.dstack.yml'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: ' #  BACKEND         INSTANCE      GPU           PRICE', class: 'newline'},
+            {delay: 0, value: ' 1  aws (us-east-1) p5.48xlarge   8xH100 (80GB) $98.32', class: 'newline'},
+            {delay: 0, value: ' 2  aws (us-east-1) p5.48xlarge   8xH100 (80GB) $40.15 (spot)', class: 'newline'},
+            {delay: 0, value: ' 3  aws (us-east-1) p5.48xlarge   8xH100 (80GB) $101.22', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Create the fleet? [y/n]: y', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: ' NAME      NODES  GPU     SPOT       BACKEND         PRICE    STATUS', class: 'newline'},
+            {delay: 0, value: ' my-fleet  2..10  8xH100  on-demand  aws             $0..     submitted', class: 'newline'},
+            {delay: 0, value: '  instance=0                         aws (us-east-1)  $98.32   idle', class: 'newline'},
+            {delay: 0, value: '  instance=1                         aws (us-east-1)  $98.32   idle', class: 'newline'},
+        ]);
+
+        window._sshFleetTermynal = initCarouselTermynal('ssh-fleet-apply-terminal', [
+            {type: 'input', value: 'dstack apply -f fleet.dstack.yml'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Fleet my-fleet does not exist yet.', class: 'newline'},
+            {delay: 0, value: 'Create the fleet? [y/n]: y', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Provisioning...', class: 'newline'},
+            {type: 'progress', delay: 0},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: ' NAME          NODES  GPU                SPOT  BACKEND       PRICE  STATUS  CREATED', class: 'newline'},
+            {delay: 0, value: ' my-fleet      2      8xMI350X (288GB)   -     ssh           -      active  3 mins ago', class: 'newline'},
+            {delay: 0, value: '   instance=0          8xMI350X (288GB)  -     ssh (remote)  -      idle    3 mins ago', class: 'newline'},
+            {delay: 0, value: '   instance=1          8xMI350X (288GB)  -     ssh (remote)  -      idle    3 mins ago', class: 'newline'},
+        ]);
+
+        window._devEnvTermynal = initCarouselTermynal('dev-env-apply-terminal', [
+            {type: 'input', value: 'dstack apply -f .dstack.yml'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: ' #  BACKEND         GPU           PRICE', class: 'newline'},
+            {delay: 0, value: ' 1  aws (us-east-1) 1xH100 (80GB) $4.50', class: 'newline'},
+            {delay: 0, value: ' 2  aws (us-east-2) 1xH100 (80GB) $4.62', class: 'newline'},
+            {delay: 0, value: ' 3  aws (us-west-2) 1xH100 (80GB) $4.70', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Submit the run vscode? [y/n]: y', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Launching `vscode`...', class: 'newline'},
+            {type: 'progress', delay: 0},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'To open in VS Code Desktop, use this link:', class: 'newline'},
+            {delay: 0, value: '  vscode://vscode-remote/ssh-remote+vscode/dstack/run', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'To connect via SSH, use: `ssh vscode`', class: 'newline'},
+        ]);
+
+        window._taskTermynal = initCarouselTermynal('task-apply-terminal', [
+            {type: 'input', value: 'dstack apply -f .dstack.yml'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: ' #  BACKEND         INSTANCE      GPU           PRICE', class: 'newline'},
+            {delay: 0, value: ' 1  aws (us-east-1) p5.48xlarge   8xH100 (80GB) $98.32', class: 'newline'},
+            {delay: 0, value: ' 2  aws (us-west-2) p5.48xlarge   8xH100 (80GB) $101.22', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Submit the run train-distrib? [y/n]: y', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Launching `train-distrib` on 2 nodes...', class: 'newline'},
+            {type: 'progress', delay: 0},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: '[train-distrib-0] [rank=0] world_size=16, master_addr=10.0.0.12', class: 'newline'},
+            {delay: 0, value: '[train-distrib-1] [rank=8] joined rendezvous', class: 'newline'},
+            {delay: 0, value: '[train-distrib-0] step=1/50 loss=2.304', class: 'newline'},
+            {delay: 0, value: '[train-distrib-1] step=1/50 loss=2.301', class: 'newline'},
+            {delay: 0, value: '[train-distrib-0] step=50/50 loss=1.092', class: 'newline'},
+            {delay: 0, value: '[train-distrib-0] epoch=10/10 train_loss=1.041', class: 'newline'},
+        ]);
+
+        window._serviceTermynal = initCarouselTermynal('service-apply-terminal', [
+            {type: 'input', value: 'dstack apply -f .dstack.yml'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: ' #  BACKEND         INSTANCE      GPU           PRICE', class: 'newline'},
+            {delay: 0, value: ' 1  aws (us-east-1) p5.48xlarge   8xH100 (80GB) $98.32', class: 'newline'},
+            {delay: 0, value: ' 2  aws (us-east-1) p5.48xlarge   8xH100 (80GB) $101.22', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Submit the run qwen3-235b? [y/n]: y', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Provisioning `qwen3-235b`...', class: 'newline'},
+            {type: 'progress', delay: 0},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'Service is published at:', class: 'newline'},
+            {delay: 0, value: '  https://qwen3-235b.example.com/', class: 'newline'},
+            {delay: 0, value: ' ', class: 'newline'},
+            {delay: 0, value: 'INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)', class: 'newline'},
+            {delay: 0, value: 'INFO:     127.0.0.1:55784 - \"GET /health HTTP/1.1\" 200 OK', class: 'newline'},
+        ]);
+
+        document.querySelectorAll('.code-carousel').forEach(function(carousel) {
+            var slides = carousel.querySelectorAll('.code-carousel__slide');
+            var dots = carousel.querySelectorAll('.code-carousel__dot');
+            var current = 0;
+            var timer;
+
+            function goTo(index) {
+                slides[current].classList.remove('active');
+                dots[current].classList.remove('active');
+                current = index;
+                slides[current].classList.add('active');
+                dots[current].classList.add('active');
+            }
+
+            function next() {
+                goTo((current + 1) % slides.length);
+            }
+
+            dots.forEach(function(dot, i) {
+                dot.addEventListener('click', function() {
+                    goTo(i);
+                    clearInterval(timer);
+                    timer = null;
+                });
+            });
+
+            normalizeCarouselHeight(carousel);
+            setTimeout(function() {
+                normalizeCarouselHeight(carousel);
+            }, 350);
+
+            timer = setInterval(next, 5000);
+        });
+
+        window.addEventListener('resize', function() {
+            document.querySelectorAll('.code-carousel').forEach(function(carousel) {
+                normalizeCarouselHeight(carousel);
+            });
+        });
+    });
 </script>
 {% endblock %}
 
@@ -50,12 +288,12 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1 class="glitch" data-text="Open-source GPU-native orchestration">Open-source GPU-native orchestration</h1>
+                <h1 class="glitch" data-text="Agentic orchestration" style="min-height: 2.4em;">Agentic orchestration<br><span id="typed" style="white-space: nowrap;"></span></h1>
 
                 <p>
-                    <span class="highlight">dstack</span> enables AI teams to provision GPUs and
-                    orchestrate containerized workloads across clouds, Kubernetes, or bare-metal clusters — 
-                    increasing GPU utilization while reducing vendor lock-in.
+                    <span class="highlight">dstack</span> is an open-source control plane for agents and engineers to provision compute and run training, inference, and sandboxes across 
+                    <span class="nowrap-token"><span class="highlight">NVIDIA</span>,</span> <span class="nowrap-token"><span class="highlight">AMD</span>,</span> 
+                    <span class="nowrap-token"><span class="highlight">TPU</span>,</span> and <span class="highlight">Tenstorrent</span> GPUs—on clouds, Kubernetes, and bare-metal clusters.
                 </p>
             </div>
 
@@ -82,21 +320,28 @@
                 </div>
             </div>
             <div class="tx-landing__hero_button_container_text" style="text-align: center; font-size: 85%; margin-top: 1.25rem">
-                Run development, distributed training, and high-throughput inference.
+                Finally, an orchestration stack that doesn’t suck.
             </div>
         </div>
 
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>A unified control plane for GPU orchestration</h2>
+                    <h2>A unified control plane for compute orchestration</h2>
                     <p>
-                        Managing AI infrastructure requires efficient GPU orchestration tightly integrated with open-source training and
-                        inference frameworks.
+                        Managing AI infrastructure requires fine-grained primitives for compute provisioning, 
+                        with native integration across GPU vendors, clouds, and open-source frameworks.
                     </p>
 
                     <p>
-                        <span class="highlight">dstack</span> provides a unified control plane&mdash;so workloads stay portable, reproducible, and infrastructure remains interchangeable.
+                        <span class="highlight">dstack</span> is a unified control plane for provisioning 
+                        clusters and running training, inference, and sandboxes across clouds, Kubernetes, 
+                        and bare-metal clusters.
+                    </p>
+                    
+                    <p>
+                        It’s built for containerized workloads and designed for both engineers and agents. 
+                        No <span class="highlight">Kubernetes</span> or <span class="highlight">Slurm</span> hassle required.
                     </p>
 
                     <!-- TODO: Add `Why dstack?` -->
@@ -118,65 +363,63 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <div class="supported_clouds">
-                        <a href="/docs/concepts/backends#aws" target="_blank" class="supported_clouds_item">
-                            <img width="49" style="padding-top: 8px" src="/assets/images/aws-logo.svg">
-                        </a>
+                    <div class="code-carousel">
+                        <div class="code-carousel__slides">
+                            <div class="code-carousel__slide active" editor-title="fleet.dstack.yml">
+                                <pre><code class="language-yaml">type: fleet
+name: my-fleet
 
-                        <a href="/docs/concepts/backends#gcp" target="_blank" class="supported_clouds_item">
-                            <img width="41" style="margin: 2px 0" src="/assets/images/gcp-logo.svg">
-                        </a>
+# Pre-provision 2, scale up to 10
+nodes: 2..10
+placement: cluster
 
-                        <a href="/docs/concepts/backends#lambda" target="_blank" class="supported_clouds_item">
-                            <img width="34" src="/assets/images/lambda-logo.svg">
-                        </a>
+# Deprovision instances if idle
+idle_duration: 1h
 
-                        <a href="/docs/concepts/backends#nebius" target="_blank" class="supported_clouds_item">
-                            <img width="39" style="margin: -2px 0" src="/assets/images/nebius-logo.svg">
-                        </a>
+resources:
+  gpu: H100:8
 
-                        <a href="/docs/concepts/backends#crusoe" target="_blank" class="supported_clouds_item">
-                            <img width="34" src="/assets/images/crusoe-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#verda" target="_blank" class="supported_clouds_item">
-                            <img width="32" style="margin: 9px 0" src="/assets/images/verda-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#runpod" target="_blank" class="supported_clouds_item">
-                            <img width="34" style="margin: -2px 0;" src="/assets/images/runpod-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#vastai" target="_blank" class="supported_clouds_item">
-                            <img width="36" src="/assets/images/vastai-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#vultr" target="_blank" class="supported_clouds_item">
-                            <img width="37" src="/assets/images/vultr-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#oci" target="_blank" class="supported_clouds_item">
-                            <img width="45" style="margin: 2px 0" src="/assets/images/oci-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#azure" target="_blank" class="supported_clouds_item">
-                            <img width="35" src="/assets/images/azure-logo.svg">
-                        </a>
-
-                        <a href="/docs/concepts/backends#kubernetes" target="_blank" class="supported_clouds_item">
-                            <img width="36" src="/assets/images/kubernetes-logo.svg">
-                        </a>
+backends: [aws]</code></pre>
+                            </div>
+                            <div class="code-carousel__slide" id="fleet-apply-terminal">
+                            </div>
+                        </div>
+                        <div class="code-carousel__dots">
+                            <span class="code-carousel__dot active"></span>
+                            <span class="code-carousel__dot"></span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="block margin">
-                    <h2>Native integration with GPU clouds</h2>
+                <div class="block margin left">
+                    <h2>Provision compute in any GPU cloud</h2>
+
+                    <div class="supported_clouds_inline">
+                        <a href="/docs/concepts/backends#aws" target="_blank"><img width="33" src="/assets/images/aws-logo.svg"></a>
+                        <a href="/docs/concepts/backends#gcp" target="_blank"><img width="25" src="/assets/images/gcp-logo.svg"></a>
+                        <a href="/docs/concepts/backends#azure" target="_blank"><img width="22" src="/assets/images/azure-logo.svg"></a>
+                        <a href="/docs/concepts/backends#lambda" target="_blank"><img width="21" src="/assets/images/lambda-logo.svg"></a>
+                        <a href="/docs/concepts/backends#nebius" target="_blank"><img width="24" src="/assets/images/nebius-logo.svg"></a>
+                        <a href="/docs/concepts/backends#crusoe" target="_blank"><img width="21" src="/assets/images/crusoe-logo.svg"></a>
+                        <a href="/docs/concepts/backends#verda" target="_blank"><img width="20" src="/assets/images/verda-logo.svg"></a>
+                        <a href="/docs/concepts/backends#runpod" target="_blank"><img width="21" src="/assets/images/runpod-logo.svg"></a>
+                        <a href="/docs/concepts/backends#vastai" target="_blank"><img width="22" src="/assets/images/vastai-logo.svg"></a>
+                        <a href="/docs/concepts/backends#vultr" target="_blank"><img width="23" src="/assets/images/vultr-logo.svg"></a>
+                        <a href="/docs/concepts/backends#oci" target="_blank"><img width="28" src="/assets/images/oci-logo.svg"></a>
+                        <a href="/docs/concepts/backends#kubernetes" target="_blank"><img width="25" src="/assets/images/kubernetes-logo.svg"></a>
+                    </div>
+
                     <p>
-                        <span class="highlight">dstack</span> natively integrates with leading GPU clouds for fast, efficient provisioning.
+                        <span class="highlight">dstack</span> provisions GPU VMs directly through cloud APIs&mdash;no Kubernetes needed.
                     </p>
-                    
+
                     <p>
-                        It can provision and manage GPU VMs directly through cloud APIs, or operate through <span class="highlight">Kubernetes</span> when required.
+                        If you already have a <span class="highlight">Kubernetes</span> cluster, <span class="highlight">dstack</span> can manage it too.
+                    </p>
+
+                    <p>
+                        Once a <span class="highlight">backend fleet</span> is created, <span class="highlight">dstack</span> will let you run 
+                        <span class="highlight">dev environments</span>, <span class="highlight">tasks</span>, and <span class="highlight">services</span> on this fleet.
                     </p>
 
                     <p>
@@ -196,28 +439,24 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>Easy to use with on-prem clusters</h2>
+                    <h2>Bring your existing GPU clusters</h2>
                     
                     <p>
-                        If you already run <span class="highlight">Kubernetes</span> on-prem, connect your cluster to <span class="highlight">dstack</span> using the <span class="highlight">Kubernetes</span> backend.
+                        Have bare-metal servers or pre-provisioned VMs? Use <span class="highlight">SSH fleets</span> to connect them to <span class="highlight">dstack</span>.
                     </p>
 
                     <p>
-                        For bare-metal servers or VMs without <span class="highlight">Kubernetes</span>, use <span class="highlight">SSH fleets</span> to orchestrate GPUs directly.
+                        Just provide SSH credentials and host addresses, and <span class="highlight">dstack</span> creates an <span class="highlight">SSH fleet</span>.
                     </p>
-                    
+
                     <p>
-                        <a href="/docs/concepts/backends#ssh-fleets" target="_blank" class="md-button md-button-secondary small">
+                        Once created, <span class="highlight">dstack</span> will let you run 
+                        <span class="highlight">dev environments</span>, <span class="highlight">tasks</span>, and <span class="highlight">services</span> on this fleet.
+                    </p>
+
+                    <p>
+                        <a href="/docs/concepts/fleets#ssh-fleets" target="_blank" class="md-button md-button-secondary small">
                             <span>SSH fleets</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z"
-                                        fill-rule="nonzero" fill="currentColor" class="fill-main"></path>
-                                </svg></span>
-                        </a>
-
-                        <a href="/docs/concepts/backends#kubernetes" target="_blank" class="md-button md-button-secondary small">
-                            <span>Kubernetes</span>
                             <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg">
                                     <path
                                         d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z"
@@ -228,8 +467,35 @@
                 </div>
 
                 <div class="block large">
-                    <img src="https://dstack.ai/static-assets/static-assets/images/ssh-fleet.gif?raw=true"
-                        width="800" style="border-radius: 3px">
+                    <div class="code-carousel">
+                        <div class="code-carousel__slides">
+                            <div class="code-carousel__slide active" editor-title="fleet.dstack.yml">
+                                <pre><code class="language-yaml">type: fleet
+name: my-fleet
+
+placement: cluster
+
+# Allow concurrent workloads on the same host
+blocks: auto
+
+ssh_config:
+  user: ubuntu
+  identity_file: ~/.ssh/id_rsa
+  hosts:
+    - 3.255.177.51
+    - 3.255.177.52
+
+
+</code></pre>
+                            </div>
+                            <div class="code-carousel__slide" id="ssh-fleet-apply-terminal">
+                            </div>
+                        </div>
+                        <div class="code-carousel__dots">
+                            <span class="code-carousel__dot active"></span>
+                            <span class="code-carousel__dot"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -238,19 +504,50 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://dstack.ai/static-assets/static-assets/images/dev-environment.gif?raw=true"
-                        width="800" style="border-radius: 3px">
+                    <div class="code-carousel">
+                        <div class="code-carousel__slides">
+                            <div class="code-carousel__slide active" editor-title=".dstack.yml">
+                                <pre><code class="language-yaml">type: dev-environment
+name: vscode
+
+python: "3.12"
+
+# Clones this repo to the working dir (from default image)
+repos:
+  - .
+
+ide: vscode
+
+# Stop if inactive for 2 hours
+inactivity_duration: 2h
+
+resources:
+  gpu: H100:1
+
+
+
+
+</code></pre>
+                            </div>
+                            <div class="code-carousel__slide" id="dev-env-apply-terminal">
+                            </div>
+                        </div>
+                        <div class="code-carousel__dots">
+                            <span class="code-carousel__dot active"></span>
+                            <span class="code-carousel__dot"></span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="block margin left">
-                    <h2>Dev environments</h2>
+                    <h2>Run development environments</h2>
                     <p>
-                        Before training or deploying models, ML engineers need interactive GPU access to experiment and debug.
+                        If you or your agent need a development environment with a GPU, let <span class="highlight">dstack</span> create you a <span class="highlight">dev environment</span>.
                     </p>
 
-                    <p><span class="highlight">dstack</span>'s dev environments let you connect desktop IDEs such as <span class="highlight">VS
+                    <p>If you plan to work with it yourself, you can access it using your desktop IDE such as <span class="highlight">VS
                         Code</span>, <span class="highlight">Cursor</span>, and
-                    <span class="highlight">Windsurf</span> directly to cloud or on-prem GPUs.
+                    <span class="highlight">Windsurf</span>. <span class="highlight">dstack apply</span> prints both the IDE URL and SSH command.
                     </p>
 
                     <p>
@@ -267,10 +564,10 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>Single-node &amp; distributed tasks</h2>
+                    <h2>Run training or batch jobs at any scale</h2>
 
                     <p>
-                        Run training or batch workloads on a single GPU, or scale to multi-GPU and multi-node clusters using simple task configurations.
+                        Run training or batch workloads on a single GPU, or scale to multi-GPU and multi-node clusters using simple <span class="highlight">task</span> configurations.
                         <span class="highlight">dstack</span> automates cluster provisioning, resource allocation, and job scheduling.                    
                     </p>
 
@@ -288,8 +585,42 @@
                 </div>
 
                 <div class="block large">
-                    <img src="https://dstack.ai/static-assets/static-assets/images/task.gif?raw=true"
-                        width="800" style="border-radius: 3px">
+                    <div class="code-carousel">
+                        <div class="code-carousel__slides">
+                            <div class="code-carousel__slide active" editor-title=".dstack.yml">
+                                <pre><code class="language-yaml">type: task
+name: train-distrib
+
+nodes: 2
+
+python: 3.12
+env:
+  - NCCL_DEBUG=INFO
+files: .
+commands:
+  - uv pip install -r requirements.txt
+  - |
+    torchrun \
+      --nproc-per-node=$DSTACK_GPUS_PER_NODE \
+      --node-rank=$DSTACK_NODE_RANK \
+      --nnodes=$DSTACK_NODES_NUM \
+      --master-addr=$DSTACK_MASTER_NODE_IP \
+      --master-port=12345 \
+      multinode.py 50 10
+
+resources:
+  gpu: H100:8
+  shm_size: 24GB
+</code></pre>
+                            </div>
+                            <div class="code-carousel__slide" id="task-apply-terminal">
+                            </div>
+                        </div>
+                        <div class="code-carousel__dots">
+                            <span class="code-carousel__dot active"></span>
+                            <span class="code-carousel__dot"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -297,20 +628,54 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://dstack.ai/static-assets/static-assets/images/service.gif?raw=true"
-                        width="800" style="border-radius: 3px">
+                    <div class="code-carousel">
+                        <div class="code-carousel__slides">
+                            <div class="code-carousel__slide active" editor-title=".dstack.yml">
+                                <pre><code class="language-yaml">type: service
+name: qwen3-235b
+
+image: lmsysorg/sglang
+env:
+  - HF_TOKEN
+  - MODEL_ID=Qwen/Qwen3-235B-A22B-FP8
+commands:
+  - |
+    python3 -m sglang.launch_server \
+      --model-path $MODEL_ID \
+      --tp $DSTACK_GPUS_NUM \
+      --reasoning-parser qwen3 \
+      --port 8000
+
+port: 8000
+model: Qwen/Qwen3-235B-A22B-FP8
+
+resources:
+  gpu: H100:8
+  disk: 500GB..
+</code></pre>
+                            </div>
+                            <div class="code-carousel__slide" id="service-apply-terminal">
+                            </div>
+                        </div>
+                        <div class="code-carousel__dots">
+                            <span class="code-carousel__dot active"></span>
+                            <span class="code-carousel__dot"></span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="block margin left">
-                    <h2>Scalable model inference</h2>
+                    <h2>Run high-performance model inference</h2>
 
                     <p>
                         With <span class="highlight">dstack</span>, you can deploy models as secure,
-                        auto-scaling, OpenAI-compatible endpoints, integrating with top open-source serving frameworks.                    
+                        auto-scaling, OpenAI-compatible endpoints, integrating with top open-source serving frameworks
+                        such as <span class="highlight">SGLang</span>, <span class="highlight">vLLM</span>, 
+                        <span class="highlight">TensorRT-LLM</span>, or any other.                    
                     </p>
 
                     <p>
-                        <span class="highlight">dstack</span> supports disaggregated prefill/decode and cache-aware routing, providing
+                        <span class="highlight">dstack</span> enables <span class="highlight">Disaggregated Prefill/Decode</span> and cache-aware routing, providing
                         production-grade, optimized inference.
                     </p>
 
@@ -327,107 +692,6 @@
                             <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                         </a> -->
                     </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="tx-landing__trusted_by">
-            <div class="tx-landing__highlights_text">
-                <h2>Loved by world-class AI teams</h2>
-
-                <div class="tx-landing__quotes_grid">
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="https://dstack.ai/static-assets/static-assets/images/quotes/keng.png?raw=true"/>
-                        </div>
-                        <h3>Wah Loon Keng</h3>
-
-                        <h4>Sr. AI Engineer @Electronic Arts</h4>
-
-                        <p>
-                            With <span class="highlight">dstack</span>, AI researchers at <span class="highlight">EA</span> can spin up and scale experiments without touching 
-                            infrastructure. It supports everything from quick prototyping to multi-node training on any cloud.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/movchan.jpg"/>
-                        </div>
-                        <h3>Aleksandr Movchan</h3>
-
-                        <h4>ML Engineer @Mobius Labs</h4>
-
-                        <p>
-                            Thanks to <span class="highlight">dstack</span>, my team can quickly tap into affordable
-                            GPUs and streamline our workflows
-                            from testing and development to full-scale application deployment.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/alvarobartt.jpg"/>
-                        </div>
-                        <h3>Alvaro Bartolome</h3>
-
-                        <h4>ML Engineer @Argilla</h4>
-
-                        <p>
-                            With <span class="highlight">dstack</span> it's incredibly easy to define a configuration
-                            within a
-                            repository
-                            and run it without worrying about GPU availability. It lets you focus on
-                            data and your research.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/chansung.jpg"/>
-                        </div>
-                        <h3>Park Chansung</h3>
-
-                        <h4>ML Researcher @ETRI</h4>
-
-                        <p>
-                            Thanks to <span class="highlight">dstack</span>, I can effortlessly access the top GPU
-                            options across
-                            different clouds,
-                            saving me time and money while pushing my AI work forward.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/eckart.png"/>
-                        </div>
-                        <h3>Eckart Burgwedel</h3>
-
-                        <h4>CEO @Uberchord</h4>
-
-                        <p>
-                            With <span class="highlight">dstack</span>, running LLMs on a cloud GPU is as
-                            easy as running a local Docker container.
-                            It combines the ease of Docker with the auto-scaling capabilities of K8S.
-                        </p>
-                    </div>
-
-                    <div class="cell">
-                        <div class="photo">
-                            <img src="assets/images/quotes/cudopete.png"/>
-                        </div>
-                        <h3>Peter Hill</h3>
-
-                        <h4>Co-Founder @CUDO Compute</h4>
-
-                        <p>
-                            <span class="highlight">dstack</span> simplifies infrastructure provisioning and AI
-                            development.
-                            If your team is on the lookout for an AI platform, I
-                            wholeheartedly recommend <span class="highlight">dstack</span>.
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>
@@ -564,6 +828,107 @@
             </p>
         </div>
 
+        <div class="tx-landing__trusted_by">
+            <div class="tx-landing__highlights_text">
+                <h2>Trusted by thousands of engineers across 100+ AI-first companies</h2>
+
+                <div class="tx-landing__quotes_grid">
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="https://dstack.ai/static-assets/static-assets/images/quotes/keng.png?raw=true"/>
+                        </div>
+                        <h3>Wah Loon Keng</h3>
+
+                        <h4>Sr. AI Engineer @Electronic Arts</h4>
+
+                        <p>
+                            With <span class="highlight">dstack</span>, AI researchers at <span class="highlight">EA</span> can spin up and scale experiments without touching 
+                            infrastructure. It supports everything from quick prototyping to multi-node training on any cloud.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/movchan.jpg"/>
+                        </div>
+                        <h3>Aleksandr Movchan</h3>
+
+                        <h4>ML Engineer @Mobius Labs</h4>
+
+                        <p>
+                            Thanks to <span class="highlight">dstack</span>, my team can quickly tap into affordable
+                            GPUs and streamline our workflows
+                            from testing and development to full-scale application deployment.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/alvarobartt.jpg"/>
+                        </div>
+                        <h3>Alvaro Bartolome</h3>
+
+                        <h4>ML Engineer @Argilla</h4>
+
+                        <p>
+                            With <span class="highlight">dstack</span> it's incredibly easy to define a configuration
+                            within a
+                            repository
+                            and run it without worrying about GPU availability. It lets you focus on
+                            data and your research.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/chansung.jpg"/>
+                        </div>
+                        <h3>Park Chansung</h3>
+
+                        <h4>ML Researcher @ETRI</h4>
+
+                        <p>
+                            Thanks to <span class="highlight">dstack</span>, I can effortlessly access the top GPU
+                            options across
+                            different clouds,
+                            saving me time and money while pushing my AI work forward.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/eckart.png"/>
+                        </div>
+                        <h3>Eckart Burgwedel</h3>
+
+                        <h4>CEO @Uberchord</h4>
+
+                        <p>
+                            With <span class="highlight">dstack</span>, running LLMs on a cloud GPU is as
+                            easy as running a local Docker container.
+                            It combines the ease of Docker with the auto-scaling capabilities of K8S.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/cudopete.png"/>
+                        </div>
+                        <h3>Peter Hill</h3>
+
+                        <h4>Co-Founder @CUDO Compute</h4>
+
+                        <p>
+                            <span class="highlight">dstack</span> simplifies infrastructure provisioning and AI
+                            development.
+                            If your team is on the lookout for an AI platform, I
+                            wholeheartedly recommend <span class="highlight">dstack</span>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <span id="get-started"></span>
 
         <br><br><br>
@@ -575,10 +940,12 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <p>Install <span class="highlight">dstack</span> on your laptop via <span class="highlight">uv</span>
-                        and start it using the CLI, or deploy it anywhere with the <span class="highlight">dstackai/dstack</span> Docker image.</p>
+                    <p>
+                        Install <span class="highlight">dstack</span> on your laptop with <span class="highlight">uv</span>,
+                        or deploy it anywhere using the <span class="highlight">dstackai/dstack</span> Docker image.
+                    </p>
 
-                    <p>Set up backends or SSH fleets, then add your team.</p>
+                    <p>Bring your compute via <span class="highlight">backends</span> or <span class="highlight">SSH fleets</span>, then bring your team.</p>
 
                     <p>
                         <a href="/docs/quickstart" target="_blank"
@@ -598,8 +965,17 @@
                 </div>
 
                 <div class="block large">
-                    <div id="get-started-code-snippet">
-
+                    <div class="code-carousel">
+                        <div class="code-carousel__slides">
+                            <div class="code-carousel__slide active" id="get-started-code-snippet">
+                            </div>
+                            <div class="code-carousel__slide" id="get-started-claude-snippet">
+                            </div>
+                        </div>
+                        <div class="code-carousel__dots">
+                            <span class="code-carousel__dot active"></span>
+                            <span class="code-carousel__dot"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -611,9 +987,7 @@
 
                 <div class="tx-landing__bottom_cta_card_panel">
                     <div class="tx-landing__bottom_cta_card_text">
-                        <p>Don't want to host the <span class="highlight">dstack</span> server or want to get the
-                            cheapest GPUs
-                            from the marketplace?</p>
+                        <p>Hosted by us. Bring your own cloud, or tap into marketplace.</p>
                     </div>
                     <div class="tx-landing__bottom_cta_card_button_panel">
                         <div>
@@ -624,7 +998,7 @@
                         </div>
 
                         <div class="tx-landing__bottom_cta_card_button_subheader">
-                            Get $5 free credit. Already have an account? <a href="https://sky.dstack.ai" target="_blank"
+                            Get $5 in GPU credits. Already have an account? <a href="https://sky.dstack.ai" target="_blank"
                                 class="tx-footer__section-link external">Sign in</a>
                         </div>
                     </div>
@@ -636,19 +1010,18 @@
 
                 <div class="tx-landing__bottom_cta_card_panel">
                     <div class="tx-landing__bottom_cta_card_text">
-                        <p>Looking for a self-hosted <span class="highlight">dstack</span> with SSO, governance
-                            controls, and enterprise support?</p>
+                        <p>Self-hosted with SSO, air-gapped setup, and dedicated support.</p>
                     </div>
                     <div class="tx-landing__bottom_cta_card_button_panel">
                         <div>
                             <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
                                 class="md-button md-button--primary external">
-                                <span>Book a demo</span>
+                                <span>Talk to us</span>
                             </a>
                         </div>
 
                         <div class="tx-landing__bottom_cta_card_button_subheader">
-                            Talk to our experts and learn.
+                            See how dstack fits your infrastructure.
                         </div>
                     </div>
                 </div>

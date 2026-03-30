@@ -88,9 +88,9 @@ Configuration is updated at ~/.dstack/config.yml
 
 </details>
 
-### Install AI agent skills
+### Install agent skills
 
-Install [skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the `dstack` CLI and edit configuration files.
+Install [`dstack` skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the CLI and edit configuration files.
 
 ```shell
 $ npx skills add dstackai/dstack
