@@ -205,6 +205,11 @@ export const ROUTES = {
             TEMPLATE: `/users/:userName/events`,
             FORMAT: (userName: string) => buildRoute(ROUTES.USER.EVENTS.TEMPLATE, { userName }),
         },
+        PUBLIC_KEYS: {
+            TEMPLATE: `/users/:userName/public-keys`,
+            FORMAT: (userName: string) => buildRoute(ROUTES.USER.PUBLIC_KEYS.TEMPLATE, { userName }),
+        },
+
         BILLING: {
             LIST: {
                 TEMPLATE: `/users/:userName/billing`,

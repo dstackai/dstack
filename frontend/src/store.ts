@@ -11,6 +11,7 @@ import { gatewayApi } from 'services/gateway';
 import { instanceApi } from 'services/instance';
 import { mainApi } from 'services/mainApi';
 import { projectApi } from 'services/project';
+import { publicKeysApi } from 'services/publicKeys';
 import { repoApi } from 'services/repo';
 import { runApi } from 'services/run';
 import { secretApi } from 'services/secrets';
@@ -42,6 +43,7 @@ export const store = configureStore({
         [gpuApi.reducerPath]: gpuApi.reducer,
         [repoApi.reducerPath]: repoApi.reducer,
         [mainApi.reducerPath]: mainApi.reducer,
+        [publicKeysApi.reducerPath]: publicKeysApi.reducer,
         [eventApi.reducerPath]: eventApi.reducer,
         [templateApi.reducerPath]: templateApi.reducer,
     },
@@ -62,6 +64,7 @@ export const store = configureStore({
             .concat(volumeApi.middleware)
             .concat(secretApi.middleware)
             .concat(gpuApi.middleware)
+            .concat(publicKeysApi.middleware)
             .concat(eventApi.middleware)
             .concat(repoApi.middleware)
             .concat(templateApi.middleware)

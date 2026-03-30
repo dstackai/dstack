@@ -3,5 +3,6 @@ export enum UserDetailsTabTypeEnum {
     PROJECTS = 'projects',
     EVENTS = 'events',
     ACTIVITY = 'activity',
+    PUBLIC_KEYS = 'public-keys',
     BILLING = 'billing',
 }

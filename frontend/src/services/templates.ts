@@ -22,9 +22,7 @@ export const templateApi = createApi({
             },
 
             providesTags: (result) =>
-                result
-                    ? [...result.map(({ name }) => ({ type: 'Templates' as const, id: name })), 'Templates']
-                    : ['Templates'],
+                result ? [...result.map(({ name }) => ({ type: 'Templates' as const, id: name })), 'Templates'] : ['Templates'],
         }),
     }),
 });
