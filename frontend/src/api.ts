@@ -171,8 +171,7 @@ export const API = {
     INSTANCES: {
         BASE: () => `${API.BASE()}/instances`,
         LIST: () => `${API.INSTANCES.BASE()}/list`,
-        DETAILS: (projectName: IProject['project_name']) =>
-            `${API.BASE()}/project/${projectName}/instances/get`,
+        DETAILS: (projectName: IProject['project_name']) => `${API.BASE()}/project/${projectName}/instances/get`,
     },
 
     SERVER: {
@@ -183,5 +182,12 @@ export const API = {
     VOLUME: {
         BASE: () => `${API.BASE()}/volumes`,
         LIST: () => `${API.VOLUME.BASE()}/list`,
+    },
+
+    USER_PUBLIC_KEYS: {
+        BASE: () => `${API.BASE()}/users/public_keys`,
+        LIST: () => `${API.USER_PUBLIC_KEYS.BASE()}/list`,
+        ADD: () => `${API.USER_PUBLIC_KEYS.BASE()}/add`,
+        DELETE: () => `${API.USER_PUBLIC_KEYS.BASE()}/delete`,
     },
 };

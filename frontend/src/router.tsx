@@ -15,28 +15,20 @@ import { EventsList as FleetEventsList } from 'pages/Fleets/Details/Events';
 import { FleetDetails as FleetDetailsGeneral } from 'pages/Fleets/Details/FleetDetails';
 import { FleetInspect } from 'pages/Fleets/Details/Inspect';
 import { InstanceDetailsPage, InstanceList } from 'pages/Instances';
-import { InstanceDetails } from 'pages/Instances/Details/InstanceDetails';
 import { EventsList as InstanceEventsList } from 'pages/Instances/Details/Events';
 import { InstanceInspect } from 'pages/Instances/Details/Inspect';
+import { InstanceDetails } from 'pages/Instances/Details/InstanceDetails';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
 import { CreateProjectWizard, ProjectAdd, ProjectDetails, ProjectEvents, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
-import {
-    Launch,
-    EventsList as RunEvents,
-    JobLogs,
-    JobMetrics,
-    RunDetails,
-    RunDetailsPage,
-    RunList,
-} from 'pages/Runs';
+import { EventsList as RunEvents, JobLogs, JobMetrics, Launch, RunDetails, RunDetailsPage, RunList } from 'pages/Runs';
 import { RunInspect } from 'pages/Runs/Details/Inspect';
 import { JobDetailsPage } from 'pages/Runs/Details/Jobs/Details';
 import { EventsList as JobEvents } from 'pages/Runs/Details/Jobs/Events';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
-import { UserBilling, UserEvents, UserProjects, UserSettings } from 'pages/User/Details';
+import { UserBilling, UserEvents, UserProjects, UserPublicKeys, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
 import { EventList } from './pages/Events';
@@ -286,6 +278,10 @@ export const router = createBrowserRouter([
                     {
                         path: ROUTES.USER.EVENTS.TEMPLATE,
                         element: <UserEvents />,
+                    },
+                    {
+                        path: ROUTES.USER.PUBLIC_KEYS.TEMPLATE,
+                        element: <UserPublicKeys />,
                     },
                     process.env.UI_VERSION === 'sky' && {
                         path: ROUTES.USER.BILLING.LIST.TEMPLATE,

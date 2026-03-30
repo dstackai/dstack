@@ -212,10 +212,9 @@ export const RunDetails = () => {
                 <ConnectToServiceRun run={runData} />
             )}
 
-            {runData.run_spec.configuration.type === 'task' && !runIsStopped(runData.status) &&
-                (runData.jobs[0]?.job_spec?.app_specs?.length ?? 0) > 0 && (
-                <ConnectToTaskRun run={runData} />
-            )}
+            {runData.run_spec.configuration.type === 'task' &&
+                !runIsStopped(runData.status) &&
+                (runData.jobs[0]?.job_spec?.app_specs?.length ?? 0) > 0 && <ConnectToTaskRun run={runData} />}
 
             {runData.jobs.length > 1 && (
                 <JobList

@@ -1,8 +1,9 @@
 import { groupBy as _groupBy } from 'lodash';
 
-import { getBaseUrl } from 'App/helpers';
 import { formatBackend } from 'libs/fleet';
 import { formatResources } from 'libs/resources';
+
+import { getBaseUrl } from 'App/helpers';
 
 import { finishedJobs, finishedRunStatuses } from '../constants';
 import { getJobStatus } from '../Details/Jobs/List/helpers';

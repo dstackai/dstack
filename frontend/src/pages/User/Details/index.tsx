@@ -19,6 +19,7 @@ export { Settings as UserSettings } from './Settings';
 export { Billing as UserBilling } from './Billing';
 export { Events as UserEvents } from './Events';
 export { UserProjectList as UserProjects } from './Projects';
+export { PublicKeys as UserPublicKeys } from './PublicKeys';
 
 export const UserDetails: React.FC = () => {
     const { t } = useTranslation();
@@ -66,6 +67,11 @@ export const UserDetails: React.FC = () => {
             label: t('users.settings'),
             id: UserDetailsTabTypeEnum.SETTINGS,
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
+        },
+        {
+            label: t('users.public_keys.title'),
+            id: UserDetailsTabTypeEnum.PUBLIC_KEYS,
+            href: ROUTES.USER.PUBLIC_KEYS.FORMAT(paramUserName),
         },
         {
             label: t('users.projects'),

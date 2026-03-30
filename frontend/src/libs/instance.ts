@@ -20,11 +20,7 @@ export const getHealthStatusIconType = (healthStatus: THealthStatus): StatusIndi
 export const formatInstanceStatusText = (instance: IInstance): string => {
     const status = instance.status;
 
-    if (
-        (status === 'idle' || status === 'busy') &&
-        instance.total_blocks !== null &&
-        instance.total_blocks > 1
-    ) {
+    if ((status === 'idle' || status === 'busy') && instance.total_blocks !== null && instance.total_blocks > 1) {
         return `${instance.busy_blocks}/${instance.total_blocks} Busy`;
     }
 

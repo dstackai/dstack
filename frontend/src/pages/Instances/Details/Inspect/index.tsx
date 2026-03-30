@@ -58,12 +58,7 @@ export const InstanceInspect = () => {
 
     return (
         <Container header={<Header variant="h2">{t('fleets.instances.inspect')}</Header>}>
-            <CodeEditor
-                value={jsonContent}
-                language="json"
-                editorContentHeight={600}
-                onChange={() => {}}
-            />
+            <CodeEditor value={jsonContent} language="json" editorContentHeight={600} onChange={() => {}} />
         </Container>
     );
 };

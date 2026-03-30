@@ -78,9 +78,7 @@ export const useColumnsDefinitions = () => {
                                         </NavigateLink>
                                     )}
                                     /
-                                    <NavigateLink
-                                        href={ROUTES.INSTANCES.DETAILS.FORMAT(target.project_name ?? '', target.id)}
-                                    >
+                                    <NavigateLink href={ROUTES.INSTANCES.DETAILS.FORMAT(target.project_name ?? '', target.id)}>
                                         {target.name}
                                     </NavigateLink>
                                 </div>
