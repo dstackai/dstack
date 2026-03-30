@@ -128,6 +128,11 @@
     border: 0.5px solid rgba(0, 0, 0, 0.33);
 }
 
+.tx-landing .nowrap-token {
+    display: inline-block;
+    white-space: nowrap;
+}
+
 /*.tx-landing__hero_text p {
     font-size: 0.95rem;
 }*/
