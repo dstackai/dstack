@@ -20,6 +20,10 @@ from dstack._internal.server.background.pipeline_tasks.jobs_terminating import (
     JobTerminatingPipeline,
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunPipeline, RunWorker
+from dstack._internal.server.background.pipeline_tasks.runs.terminating import (
+    TerminatingResult,
+    process_terminating_run,
+)
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
@@ -84,32 +88,14 @@ class TestRunTerminatingWorker:
         )
         lock_run(run)
         await session.commit()
-        item = run_to_pipeline_item(run)
-        observed_job_lock = {}
-
-        async def record_stop_call(**kwargs) -> None:
-            observed_job_lock["lock_token"] = kwargs["job_model"].lock_token
-            observed_job_lock["lock_owner"] = kwargs["job_model"].lock_owner
-
-        with patch(
-            "dstack._internal.server.background.pipeline_tasks.runs.terminating.stop_runner",
-            new=AsyncMock(side_effect=record_stop_call),
-        ) as stop_runner:
-            await worker.process(item)
-
-        assert stop_runner.await_count == 1
-        stop_call = stop_runner.await_args
-        assert stop_call is not None
-        assert stop_call.kwargs["job_model"].id == job.id
-        assert observed_job_lock["lock_token"] == item.lock_token
-        assert observed_job_lock["lock_owner"] == RunPipeline.__name__
-        assert stop_call.kwargs["instance_model"].id == instance.id
+        await worker.process(run_to_pipeline_item(run))
 
         await session.refresh(job)
         await session.refresh(run)
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
-        assert job.remove_at is not None
+        assert job.graceful_termination is True
+        assert job.remove_at is None
         assert job.lock_token is None
         assert job.lock_expires_at is None
         assert job.lock_owner is None
@@ -154,19 +140,17 @@ class TestRunTerminatingWorker:
         lock_run(run)
         await session.commit()
 
-        with patch(
-            "dstack._internal.server.background.pipeline_tasks.runs.terminating.stop_runner",
-            new=AsyncMock(),
-        ):
-            await worker.process(run_to_pipeline_item(run))
+        await worker.process(run_to_pipeline_item(run))
 
         await session.refresh(delayed_job)
         await session.refresh(regular_job)
         assert delayed_job.status == JobStatus.TERMINATING
         assert delayed_job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
-        assert delayed_job.remove_at is not None
+        assert delayed_job.graceful_termination is True
+        assert delayed_job.remove_at is None
         assert regular_job.status == JobStatus.TERMINATING
         assert regular_job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
+        assert regular_job.graceful_termination is None
         assert regular_job.remove_at is None
 
     async def test_finishes_non_scheduled_run_when_all_jobs_are_finished(
@@ -273,14 +257,16 @@ class TestRunTerminatingWorker:
         await session.commit()
         item = run_to_pipeline_item(run)
         new_lock_token = uuid.uuid4()
+        original_process_terminating_run = process_terminating_run
 
-        async def change_run_lock(**kwargs) -> None:
+        async def change_run_lock(context) -> TerminatingResult:
             run.lock_token = new_lock_token
             run.lock_expires_at = get_current_datetime() + timedelta(minutes=1)
             await session.commit()
+            return await original_process_terminating_run(context)
 
         with patch(
-            "dstack._internal.server.background.pipeline_tasks.runs.terminating.stop_runner",
+            "dstack._internal.server.background.pipeline_tasks.runs.terminating.process_terminating_run",
             new=AsyncMock(side_effect=change_run_lock),
         ):
             await worker.process(item)
@@ -289,7 +275,10 @@ class TestRunTerminatingWorker:
         await session.refresh(job)
         assert run.status == RunStatus.TERMINATING
         assert run.lock_token == new_lock_token
+        assert run.lock_owner == RunPipeline.__name__
         assert job.status == JobStatus.RUNNING
+        assert job.graceful_termination is None
+        assert job.remove_at is None
         assert job.lock_token is None
         assert job.lock_expires_at is None
         assert job.lock_owner is None
