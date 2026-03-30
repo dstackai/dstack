@@ -117,7 +117,7 @@ class JobRunningPipeline(Pipeline[JobRunningPipelineItem]):
         workers_num: int = 20,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=10),
+        min_processing_interval: timedelta = timedelta(seconds=5),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
     ) -> None:
@@ -196,7 +196,19 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                             [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                         ),
                         RunModel.status.not_in([RunStatus.TERMINATING]),
-                        JobModel.last_processed_at <= now - self._min_processing_interval,
+                        or_(
+                            # Process provisioning and pulling jobs quicker for low-latency provisioning.
+                            # Active jobs processing can be less frequent to minimize contention with `RunPipeline`.
+                            and_(
+                                JobModel.status.in_([JobStatus.PROVISIONING, JobStatus.PULLING]),
+                                JobModel.last_processed_at <= now - self._min_processing_interval,
+                            ),
+                            and_(
+                                JobModel.status.in_([JobStatus.RUNNING]),
+                                JobModel.last_processed_at
+                                <= now - self._min_processing_interval * 2,
+                            ),
+                        ),
                         or_(
                             and_(
                                 # Do not try to lock jobs if the run is waiting for the lock,

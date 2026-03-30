@@ -255,6 +255,7 @@ class Heartbeater(Generic[ItemT]):
 
 class Fetcher(Generic[ItemT], ABC):
     _DEFAULT_FETCH_DELAYS = [0.5, 1, 2, 5]
+    """Increasing fetch delays on empty fetches to avoid frequent selects on low-activity/low-resource servers."""
 
     def __init__(
         self,
@@ -319,7 +320,15 @@ class Fetcher(Generic[ItemT], ABC):
         pass
 
     def _next_fetch_delay(self, empty_fetch_count: int) -> float:
-        next_delay = self._fetch_delays[min(empty_fetch_count, len(self._fetch_delays) - 1)]
+        effective_empty_fetch_count = empty_fetch_count
+        if random.random() < 0.1:
+            # Empty fetch count can be 0 not because there are no items in the DB,
+            # but for other reasons such as waiting parent resource processing.
+            # From time to time, force minimal next delay to avoid empty results due to rare fetches.
+            effective_empty_fetch_count = 0
+        next_delay = self._fetch_delays[
+            min(effective_empty_fetch_count, len(self._fetch_delays) - 1)
+        ]
         jitter = random.random() * 0.4 - 0.2
         return next_delay * (1 + jitter)
 

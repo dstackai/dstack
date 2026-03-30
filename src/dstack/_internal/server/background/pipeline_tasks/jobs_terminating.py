@@ -60,6 +60,7 @@ from dstack._internal.server.services.jobs import (
     get_job_provisioning_data,
     get_job_runtime_data,
     get_job_spec,
+    stop_runner,
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
@@ -265,8 +266,10 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
     termination_reason: Optional[JobTerminationReason]
     termination_reason_message: Optional[str]
     instance_id: Optional[uuid.UUID]
+    graceful_termination_attempts: int
     volumes_detached_at: UpdateMapDateTime
     registered: bool
+    remove_at: UpdateMapDateTime
 
 
 class _InstanceUpdateMap(ItemUpdateMap, total=False):
@@ -580,9 +583,11 @@ async def _process_terminating_job(
     instance_model: Optional[InstanceModel],
 ) -> _ProcessResult:
     """
-    Stops the job: tells shim to stop the container, detaches the job from the instance,
-    and detaches volumes from the instance.
-    Graceful stop should already be done by the run terminating path.
+    Terminates the job:
+        1. tells the runner to stop the job's command
+        2. tells the shim to stop the container
+        3. detaches the job from the instance
+        4. and detaches volumes from the instance.
     """
     instance_update_map = None if instance_model is None else _InstanceUpdateMap()
     result = _ProcessResult(instance_update_map=instance_update_map)
@@ -590,6 +595,10 @@ async def _process_terminating_job(
     if instance_model is None:
         await _unregister_replica_and_update_result(result=result, job_model=job_model)
         result.job_update_map["status"] = _get_job_termination_status(job_model)
+        return result
+
+    if job_model.graceful_termination_attempts == 0 and job_model.remove_at is None:
+        result.job_update_map = await _stop_job_gracefully(job_model, instance_model)
         return result
 
     jrd = get_job_runtime_data(job_model)
@@ -640,6 +649,20 @@ async def _process_terminating_job(
     if detach_result.all_detached:
         result.job_update_map["status"] = _get_job_termination_status(job_model)
     return result
+
+
+async def _stop_job_gracefully(
+    job_model: JobModel, instance_model: InstanceModel
+) -> _JobUpdateMap:
+    """
+    Tells the runner to stop the job's command. Records the first graceful-stop attempt and
+    sets `remove_at` so `_process_terminating_job()` stops the container on a later iteration.
+    """
+    job_update_map = _JobUpdateMap()
+    await stop_runner(job_model=job_model, instance_model=instance_model)
+    job_update_map["graceful_termination_attempts"] = 1
+    job_update_map["remove_at"] = get_current_datetime() + timedelta(seconds=10)
+    return job_update_map
 
 
 async def _process_job_volumes_detaching(
