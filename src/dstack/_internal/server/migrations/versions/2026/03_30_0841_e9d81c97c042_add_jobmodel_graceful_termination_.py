@@ -1,8 +1,8 @@
 """Add JobModel.graceful_termination_attempts
 
-Revision ID: aae8323e38f2
-Revises: c1c2ecaee45c
-Create Date: 2026-03-30 06:19:29.078302+00:00
+Revision ID: e9d81c97c042
+Revises: 59e328ced74c
+Create Date: 2026-03-30 08:41:29.308250+00:00
 
 """
 
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "aae8323e38f2"
-down_revision = "c1c2ecaee45c"
+revision = "e9d81c97c042"
+down_revision = "59e328ced74c"
 branch_labels = None
 depends_on = None
 
