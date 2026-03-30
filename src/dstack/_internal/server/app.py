@@ -42,6 +42,7 @@ from dstack._internal.server.routers import (
     metrics,
     projects,
     prometheus,
+    public_keys,
     repos,
     runs,
     secrets,
@@ -259,6 +260,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(exports.project_router)
     app.include_router(imports.project_router)
     app.include_router(sshproxy.router)
+    app.include_router(public_keys.router)
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):

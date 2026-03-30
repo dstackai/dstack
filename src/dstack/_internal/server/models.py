@@ -1123,3 +1123,24 @@ class ExportedFleetModel(BaseModel):
         ForeignKey("fleets.id", ondelete="CASCADE"), index=True
     )
     fleet: Mapped["FleetModel"] = relationship()
+
+
+class UserPublicKeyModel(BaseModel):
+    __tablename__ = "user_public_keys"
+    __table_args__ = (
+        UniqueConstraint("user_id", "fingerprint", name="uq_user_public_keys_user_id_fingerprint"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user: Mapped["UserModel"] = relationship()
+    name: Mapped[str] = mapped_column(String(100))
+    type: Mapped[str] = mapped_column(String(100))
+    """`type` is a key type identifier used by OpenSSH, e.g., `ssh-rsa`, `ecdsa-sha2-nistp521`."""
+    fingerprint: Mapped[str] = mapped_column(String(100))
+    """`fingerprint` stores a key digest in the format used by OpenSSH: `SHA256:<base64>`."""
+    key: Mapped[str] = mapped_column(Text)
+    """`key` stores a public key in the OpenSSH disk (ASCII-armored) format."""
