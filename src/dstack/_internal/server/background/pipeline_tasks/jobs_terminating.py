@@ -266,6 +266,7 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
     termination_reason: Optional[JobTerminationReason]
     termination_reason_message: Optional[str]
     instance_id: Optional[uuid.UUID]
+    graceful_termination_attempts: int
     volumes_detached_at: UpdateMapDateTime
     registered: bool
     remove_at: UpdateMapDateTime
@@ -596,7 +597,7 @@ async def _process_terminating_job(
         result.job_update_map["status"] = _get_job_termination_status(job_model)
         return result
 
-    if job_model.graceful_termination and job_model.remove_at is None:
+    if job_model.graceful_termination_attempts == 0 and job_model.remove_at is None:
         result.job_update_map = await _stop_job_gracefully(job_model, instance_model)
         return result
 
@@ -654,11 +655,12 @@ async def _stop_job_gracefully(
     job_model: JobModel, instance_model: InstanceModel
 ) -> _JobUpdateMap:
     """
-    Tells the runner to stop the job's command. Sets `removed_at` for graceful termination:
-    `_process_terminating_job()` will stop the container on the next iteration after that time.
+    Tells the runner to stop the job's command. Records the first graceful-stop attempt and
+    sets `remove_at` so `_process_terminating_job()` stops the container on a later iteration.
     """
     job_update_map = _JobUpdateMap()
     await stop_runner(job_model=job_model, instance_model=instance_model)
+    job_update_map["graceful_termination_attempts"] = 1
     job_update_map["remove_at"] = get_current_datetime() + timedelta(seconds=10)
     return job_update_map
 

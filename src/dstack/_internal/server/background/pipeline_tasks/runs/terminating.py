@@ -34,7 +34,7 @@ class TerminatingRunUpdateMap(ItemUpdateMap, total=False):
 class TerminatingRunJobUpdateMap(ItemUpdateMap, total=False):
     status: JobStatus
     termination_reason: Optional[JobTerminationReason]
-    graceful_termination: bool
+    graceful_termination_attempts: int
 
 
 @dataclass
@@ -118,7 +118,7 @@ def _get_job_id_to_update_map(
         job_id_to_update_map[job_id] = TerminatingRunJobUpdateMap(
             status=JobStatus.TERMINATING,
             termination_reason=job_termination_reason,
-            graceful_termination=True,
+            graceful_termination_attempts=0,
         )
     return job_id_to_update_map
 

@@ -256,7 +256,7 @@ class TestJobTerminatingWorker:
             job_provisioning_data=get_job_provisioning_data(dockerized=True),
             instance=instance,
         )
-        job.graceful_termination = True
+        job.graceful_termination_attempts = 0
         _lock_job(job)
         await session.commit()
 
@@ -278,7 +278,7 @@ class TestJobTerminatingWorker:
         await session.refresh(job)
         await session.refresh(instance)
         assert job.status == JobStatus.TERMINATING
-        assert job.graceful_termination is True
+        assert job.graceful_termination_attempts == 1
         assert job.remove_at is not None
         assert job.instance_id == instance.id
         assert job.volumes_detached_at is None
@@ -309,7 +309,7 @@ class TestJobTerminatingWorker:
             job_provisioning_data=get_job_provisioning_data(dockerized=True),
             instance=instance,
         )
-        job.graceful_termination = True
+        job.graceful_termination_attempts = 1
         job.remove_at = get_current_datetime() - timedelta(minutes=1)
         _lock_job(job)
         await session.commit()
@@ -332,7 +332,7 @@ class TestJobTerminatingWorker:
         await session.refresh(job)
         await session.refresh(instance)
         assert job.status == JobStatus.TERMINATED
-        assert job.graceful_termination is True
+        assert job.graceful_termination_attempts == 1
         assert job.remove_at is not None
         assert job.instance_id is None
         assert job.lock_token is None
