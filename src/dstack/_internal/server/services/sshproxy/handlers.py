@@ -3,7 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, load_only
 
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.models import (
@@ -12,6 +12,7 @@ from dstack._internal.server.models import (
     ProjectModel,
     RunModel,
     UserModel,
+    UserPublicKeyModel,
 )
 from dstack._internal.server.schemas.sshproxy import GetUpstreamResponse, UpstreamHost
 from dstack._internal.server.services.jobs import get_job_runtime_data, get_job_spec
@@ -46,7 +47,7 @@ async def get_upstream_response(
             ),
             (
                 joinedload(JobModel.run, innerjoin=True)
-                .load_only(RunModel.run_spec)
+                .load_only(RunModel.run_spec, RunModel.user_id)
                 .joinedload(RunModel.user, innerjoin=True)
                 .load_only(UserModel.ssh_public_key)
             ),
@@ -75,7 +76,12 @@ async def get_upstream_response(
     if username is not None:
         hosts[-1].user = username
 
-    authorized_keys: set[str] = set()
+    res = await session.execute(
+        select(UserPublicKeyModel)
+        .where(UserPublicKeyModel.user_id == job.run.user_id)
+        .options(load_only(UserPublicKeyModel.key))
+    )
+    authorized_keys = {k.key for k in res.scalars().all()}
     if (run_spec_key := get_run_spec(job.run).ssh_key_pub) is not None:
         authorized_keys.add(run_spec_key)
     if (user_key := job.run.user.ssh_public_key) is not None:
