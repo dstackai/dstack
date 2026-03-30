@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 import httpx
@@ -17,10 +17,9 @@ from dstack._internal.server.background.pipeline_tasks.base import ItemUpdateMap
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import get_or_add_gateway_connection
-from dstack._internal.server.services.jobs import stop_runner
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import _get_next_triggered_at, get_run_spec
-from dstack._internal.utils.common import get_current_datetime, get_or_error
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -35,7 +34,7 @@ class TerminatingRunUpdateMap(ItemUpdateMap, total=False):
 class TerminatingRunJobUpdateMap(ItemUpdateMap, total=False):
     status: JobStatus
     termination_reason: Optional[JobTerminationReason]
-    remove_at: Optional[datetime]
+    graceful_termination: bool
 
 
 @dataclass
@@ -77,10 +76,6 @@ async def process_terminating_run(context: TerminatingContext) -> TerminatingRes
                 JobTerminationReason.ABORTED_BY_USER,
                 JobTerminationReason.DONE_BY_RUNNER,
             }:
-                # Send a signal to stop the job gracefully.
-                await stop_runner(
-                    job_model=job_model, instance_model=get_or_error(job_model.instance)
-                )
                 delayed_job_ids.append(job_model.id)
                 continue
             regular_job_ids.append(job_model.id)
@@ -123,7 +118,7 @@ def _get_job_id_to_update_map(
         job_id_to_update_map[job_id] = TerminatingRunJobUpdateMap(
             status=JobStatus.TERMINATING,
             termination_reason=job_termination_reason,
-            remove_at=get_current_datetime() + timedelta(seconds=15),
+            graceful_termination=True,
         )
     return job_id_to_update_map
 

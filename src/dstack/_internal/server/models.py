@@ -497,8 +497,13 @@ class JobModel(PipelineModelMixin, BaseModel):
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
     inactivity_secs: Mapped[Optional[int]] = mapped_column(Integer)
     """`inactivity_secs` uses `0` for active jobs and `None` when inactivity is not applicable."""
+    graceful_termination: Mapped[Optional[bool]] = mapped_column(Boolean)
+    """`graceful_termination` is set for terminating jobs if they need graceful termination.
+    """
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    """`remove_at` is used to ensure the instance is killed after the job is finished."""
+    """`remove_at` is used to ensure the instance is killed after the job is finished
+    when performing graceful termination.
+    """
     volumes_detached_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
     """`instance_assigned` shows whether instance assignment has already been attempted.
