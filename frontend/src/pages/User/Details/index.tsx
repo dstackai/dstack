@@ -69,6 +69,11 @@ export const UserDetails: React.FC = () => {
             href: ROUTES.USER.DETAILS.FORMAT(paramUserName),
         },
         {
+            label: t('users.public_keys.title'),
+            id: UserDetailsTabTypeEnum.PUBLIC_KEYS,
+            href: ROUTES.USER.PUBLIC_KEYS.FORMAT(paramUserName),
+        },
+        {
             label: t('users.projects'),
             id: UserDetailsTabTypeEnum.PROJECTS,
             href: ROUTES.USER.PROJECTS.FORMAT(paramUserName),
@@ -77,11 +82,6 @@ export const UserDetails: React.FC = () => {
             label: t('users.events'),
             id: UserDetailsTabTypeEnum.EVENTS,
             href: ROUTES.USER.EVENTS.FORMAT(paramUserName),
-        },
-        {
-            label: t('users.public_keys.title'),
-            id: UserDetailsTabTypeEnum.PUBLIC_KEYS,
-            href: ROUTES.USER.PUBLIC_KEYS.FORMAT(paramUserName),
         },
         process.env.UI_VERSION === 'sky' && {
             label: t('billing.title'),

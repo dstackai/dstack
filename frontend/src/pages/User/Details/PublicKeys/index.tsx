@@ -4,18 +4,21 @@ import { useParams } from 'react-router-dom';
 import CloudscapeInput from '@cloudscape-design/components/input';
 import CloudscapeTextarea from '@cloudscape-design/components/textarea';
 
-import { Box, Button, ButtonWithConfirmation, FormField, Header, Modal, SpaceBetween, Table } from 'components';
+import { Box, Button, ButtonWithConfirmation, FormField, Header, InfoLink, Modal, SpaceBetween, Table } from 'components';
 
-import { useBreadcrumbs, useCollection, useNotifications } from 'hooks';
+import { useBreadcrumbs, useCollection, useHelpPanel, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
 import { ROUTES } from 'routes';
 import { IPublicKey, useAddPublicKeyMutation, useDeletePublicKeysMutation, useListPublicKeysQuery } from 'services/publicKeys';
+
+import { SSH_KEYS_INFO } from './constants';
 
 export const PublicKeys: React.FC = () => {
     const { t } = useTranslation();
     const params = useParams();
     const paramUserName = params.userName ?? '';
     const [pushNotification] = useNotifications();
+    const [openHelpPanel] = useHelpPanel();
 
     const [showAddModal, setShowAddModal] = useState(false);
     const [keyValue, setKeyValue] = useState('');
@@ -134,6 +137,7 @@ export const PublicKeys: React.FC = () => {
                 header={
                     <Header
                         counter={publicKeys.length ? `(${publicKeys.length})` : undefined}
+                        info={<InfoLink onFollow={() => openHelpPanel(SSH_KEYS_INFO)} />}
                         actions={
                             <SpaceBetween size="xs" direction="horizontal">
                                 <ButtonWithConfirmation
@@ -146,7 +150,7 @@ export const PublicKeys: React.FC = () => {
                                 </ButtonWithConfirmation>
 
                                 <Button variant="primary" onClick={openAddModal}>
-                                    {t('users.public_keys.add_key')}
+                                    {t('common.add')}
                                 </Button>
                             </SpaceBetween>
                         }
@@ -160,7 +164,7 @@ export const PublicKeys: React.FC = () => {
                         <Box padding={{ bottom: 's' }} variant="p" color="inherit">
                             {t('users.public_keys.empty_message')}
                         </Box>
-                        <Button onClick={openAddModal}>{t('users.public_keys.add_key')}</Button>
+                        <Button onClick={openAddModal}>{t('common.add')}</Button>
                     </Box>
                 }
             />
@@ -176,7 +180,7 @@ export const PublicKeys: React.FC = () => {
                                 {t('common.cancel')}
                             </Button>
                             <Button variant="primary" loading={isAdding} onClick={handleAdd}>
-                                {t('users.public_keys.add_key')}
+                                {t('common.add')}
                             </Button>
                         </SpaceBetween>
                     </Box>

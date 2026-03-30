@@ -743,7 +743,7 @@
         "projects": "Projects",
         "events": "Events",
         "public_keys": {
-            "title": "SSH Keys",
+            "title": "SSH keys",
             "add_key": "Add SSH key",
             "name": "Title",
             "fingerprint": "Fingerprint",
