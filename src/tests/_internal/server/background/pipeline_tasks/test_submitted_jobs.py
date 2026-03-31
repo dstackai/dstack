@@ -27,6 +27,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
     JobSubmittedPipeline,
     JobSubmittedPipelineItem,
     JobSubmittedWorker,
+    _load_submitted_job_context,
 )
 from dstack._internal.server.models import (
     ComputeGroupModel,
@@ -1504,3 +1505,135 @@ class TestJobSubmittedWorker:
         assert job.lock_owner is None
         assert job.lock_token is None
         assert job.lock_expires_at is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestLoadSubmittedJobContext:
+    async def test_single_node_master_loads_only_current_job(self, test_db, session: AsyncSession):
+        """Master single-node: run_model.jobs should contain only the current job (latest submission)."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run = await create_run(session=session, project=project, repo=repo, user=user, fleet=fleet)
+        job = await create_job(session=session, run=run, status=JobStatus.SUBMITTED)
+        await session.commit()
+
+        context = await _load_submitted_job_context(session=session, job_model=job)
+        # Only the current job's latest submission should be loaded.
+        assert len(context.run_model.jobs) == 1
+        assert context.run_model.jobs[0].id == job.id
+        assert not context.multinode
+        assert context.jobs_to_provision == [context.job]
+
+    async def test_non_master_loads_master_and_current_job(self, test_db, session: AsyncSession):
+        """Non-master: run_model.jobs should contain master job + current job (latest submissions)."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        configuration = TaskConfiguration(image="debian", nodes=2)
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        master_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            status=JobStatus.SUBMITTED,
+            instance_assigned=True,
+            job_provisioning_data=get_job_provisioning_data(),
+            waiting_master_job=False,
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        await session.commit()
+
+        context = await _load_submitted_job_context(session=session, job_model=worker_job)
+        # Only master (job_num=0) and current job (job_num=1) should be loaded.
+        loaded_job_ids = {jm.id for jm in context.run_model.jobs}
+        assert loaded_job_ids == {master_job.id, worker_job.id}
+        assert context.jobs_to_provision == [context.job]
+
+    async def test_multinode_master_loads_all_replica_jobs(self, test_db, session: AsyncSession):
+        """Master multinode: run_model.jobs should contain all same-replica jobs (latest submissions)."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        configuration = TaskConfiguration(image="debian", nodes=2)
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        master_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=False,
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            status=JobStatus.SUBMITTED,
+            waiting_master_job=True,
+        )
+        await session.commit()
+
+        context = await _load_submitted_job_context(session=session, job_model=master_job)
+        # All jobs in same replica should be loaded.
+        loaded_job_ids = {jm.id for jm in context.run_model.jobs}
+        assert loaded_job_ids == {master_job.id, worker_job.id}
+        assert context.multinode
+        assert len(context.jobs_to_provision) == 2
+        assert len(context.replica_job_model_ids) == 2
+
+    async def test_loads_only_latest_submission(self, test_db, session: AsyncSession):
+        """Only the latest submission per (replica_num, job_num) should be loaded, not historical ones."""
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run = await create_run(session=session, project=project, repo=repo, user=user, fleet=fleet)
+        # Create two submissions for the same job (simulating resubmission).
+        await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            submission_num=0,
+            status=JobStatus.SUBMITTED,
+        )
+        latest_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            submission_num=1,
+            status=JobStatus.SUBMITTED,
+        )
+        await session.commit()
+
+        context = await _load_submitted_job_context(session=session, job_model=latest_job)
+        # Only the latest submission should be loaded.
+        assert len(context.run_model.jobs) == 1
+        assert context.run_model.jobs[0].id == latest_job.id
