@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Sequence, TypedDict
 
 import httpx
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
@@ -88,7 +88,7 @@ class JobTerminatingPipeline(Pipeline[JobTerminatingPipelineItem]):
         workers_num: int = 20,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=5),
+        min_processing_interval: timedelta = timedelta(seconds=2),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
     ) -> None:
@@ -167,7 +167,18 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                             JobModel.remove_at.is_(None),
                             JobModel.remove_at < now,
                         ),
-                        JobModel.last_processed_at <= now - self._min_processing_interval,
+                        or_(
+                            # Processing volumes detach can be less frequent since it may take time.
+                            and_(
+                                JobModel.last_processed_at <= now - self._min_processing_interval,
+                                JobModel.volumes_detached_at.is_(None),
+                            ),
+                            and_(
+                                JobModel.last_processed_at
+                                <= now - self._min_processing_interval * 2,
+                                JobModel.volumes_detached_at.is_not(None),
+                            ),
+                        ),
                         or_(
                             JobModel.lock_expires_at.is_(None),
                             JobModel.lock_expires_at < now,
