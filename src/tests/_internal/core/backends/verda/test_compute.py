@@ -3,12 +3,11 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from verda.exceptions import APIException
-
-from dstack._internal.core.errors import BackendError, NoCapacityError
 
 if sys.version_info < (3, 10):
     pytest.skip("Verda requires Python 3.10", allow_module_level=True)
+
+from verda.exceptions import APIException
 
 from dstack._internal.core.backends.verda.compute import (
     VerdaCompute,
@@ -18,6 +17,7 @@ from dstack._internal.core.backends.verda.compute import (
     _is_ssh_key_not_found_error,
     _is_startup_script_not_found_error,
 )
+from dstack._internal.core.errors import BackendError, NoCapacityError
 
 
 class TestCreateSSHKey:
