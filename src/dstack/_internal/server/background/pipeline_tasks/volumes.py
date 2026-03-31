@@ -37,6 +37,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.volumes import (
     emit_volume_status_change_event,
     volume_model_to_volume,
@@ -63,6 +64,8 @@ class VolumePipeline(Pipeline[VolumePipelineItem]):
         min_processing_interval: timedelta = timedelta(seconds=15),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -85,7 +88,11 @@ class VolumePipeline(Pipeline[VolumePipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            VolumeWorker(queue=self._queue, heartbeater=self._heartbeater)
+            VolumeWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -194,10 +201,12 @@ class VolumeWorker(Worker[VolumePipelineItem]):
         self,
         queue: asyncio.Queue[VolumePipelineItem],
         heartbeater: Heartbeater[VolumePipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             queue=queue,
             heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.VolumeWorker.process")

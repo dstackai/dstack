@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Sequence, Union
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only, selectinload
+from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only, selectinload
 
 from dstack._internal.core.backends.base.compute import (
     ComputeWithGroupProvisioningSupport,
@@ -106,6 +106,7 @@ from dstack._internal.server.services.jobs import (
     get_job_configured_volume_models,
     get_job_configured_volumes,
     get_job_runtime_data,
+    get_job_spec,
     is_master_job,
     is_multinode_job,
     switch_job_status,
@@ -116,6 +117,7 @@ from dstack._internal.server.services.offers import (
     get_instance_offer_with_restricted_az,
     get_offers_by_requirements,
 )
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import (
     find_or_create_suitable_placement_group,
     get_placement_group_model_for_job,
@@ -157,6 +159,8 @@ class JobSubmittedPipeline(Pipeline[JobSubmittedPipelineItem]):
         min_processing_interval: timedelta = timedelta(seconds=4),
         lock_timeout: timedelta = timedelta(seconds=40),
         heartbeat_trigger: timedelta = timedelta(seconds=20),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -179,7 +183,11 @@ class JobSubmittedPipeline(Pipeline[JobSubmittedPipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            JobSubmittedWorker(queue=self._queue, heartbeater=self._heartbeater)
+            JobSubmittedWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -293,10 +301,12 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
         self,
         queue: asyncio.Queue[JobSubmittedPipelineItem],
         heartbeater: Heartbeater[JobSubmittedPipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             queue=queue,
             heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.JobSubmittedWorker.process")
@@ -558,6 +568,10 @@ async def _apply_assignment_result(
                 fleet_id=assignment.fleet_id,
             )
             if fleet_model is None:
+                logger.debug(
+                    "%s: failed to lock existing fleet instances for assignment",
+                    fmt(context.job_model),
+                )
                 await _reset_job_lock_for_retry(session=session, item=item)
                 return
 
@@ -605,6 +619,7 @@ async def _refetch_locked_job(
 async def _load_submitted_job_context(
     session: AsyncSession, job_model: JobModel
 ) -> _SubmittedJobContext:
+    run_model = await _fetch_run_model_for_submitted_job(session=session, job_model=job_model)
     res = await session.execute(
         select(JobModel)
         .where(JobModel.id == job_model.id)
@@ -614,21 +629,9 @@ async def _load_submitted_job_context(
                 FleetModel.instances.and_(InstanceModel.deleted == False)
             )
         )
+        .execution_options(populate_existing=True)
     )
     job_model = res.unique().scalar_one()
-    res = await session.execute(
-        select(RunModel)
-        .where(RunModel.id == job_model.run_id)
-        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(RunModel.jobs))
-        .options(joinedload(RunModel.user).load_only(UserModel.name))
-        .options(
-            joinedload(RunModel.fleet).selectinload(
-                FleetModel.instances.and_(InstanceModel.deleted == False)
-            )
-        )
-    )
-    run_model = res.unique().scalar_one()
     run = run_model_to_run(run_model)
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
     replica_jobs = find_jobs(run.jobs, replica_num=job_model.replica_num)
@@ -646,6 +649,73 @@ async def _load_submitted_job_context(
         fleet_model=run_model.fleet or job_model.fleet,
         multinode=job.job_spec.jobs_per_replica > 1,
     )
+
+
+async def _fetch_run_model_for_submitted_job(
+    session: AsyncSession, job_model: JobModel
+) -> RunModel:
+    """Fetch run model with only the relevant latest-submission jobs.
+
+    Only a small subset is needed depending on the job type:
+        * Master multinode: all same-replica jobs (for cluster provisioning and releasing sibling waits).
+        * Non-master: master job + current job (for master provisioning data lookup).
+        * Master single-node: current job only (no siblings needed).
+
+    Only the latest submission per (replica_num, job_num) is loaded since historical
+    submissions are never accessed in submitted job processing.
+    """
+    is_master = job_model.job_num == 0
+    is_multinode = get_job_spec(job_model).jobs_per_replica > 1
+
+    job_num_filters: list = []
+    if is_master and not is_multinode:
+        # Master single-node: only current job needed.
+        job_num_filters.append(JobModel.job_num == 0)
+    elif not is_master:
+        # Non-master: master job (for provisioning data) + current job.
+        job_num_filters.append(JobModel.job_num.in_([0, job_model.job_num]))
+    # else: master multinode — no job_num filter, load all jobs in replica.
+
+    latest_submissions_sq = (
+        select(
+            JobModel.run_id.label("run_id"),
+            JobModel.replica_num.label("replica_num"),
+            JobModel.job_num.label("job_num"),
+            func.max(JobModel.submission_num).label("max_submission_num"),
+        )
+        .where(
+            JobModel.run_id == job_model.run_id,
+            JobModel.replica_num == job_model.replica_num,
+            *job_num_filters,
+        )
+        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
+        .subquery()
+    )
+    job_alias = aliased(JobModel)
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == job_model.run_id)
+        .join(job_alias, job_alias.run_id == RunModel.id)
+        .join(
+            latest_submissions_sq,
+            onclause=and_(
+                job_alias.run_id == latest_submissions_sq.c.run_id,
+                job_alias.replica_num == latest_submissions_sq.c.replica_num,
+                job_alias.job_num == latest_submissions_sq.c.job_num,
+                job_alias.submission_num == latest_submissions_sq.c.max_submission_num,
+            ),
+        )
+        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(RunModel.user).load_only(UserModel.name))
+        .options(
+            joinedload(RunModel.fleet).selectinload(
+                FleetModel.instances.and_(InstanceModel.deleted == False)
+            )
+        )
+        .options(contains_eager(RunModel.jobs, alias=job_alias))
+        .execution_options(populate_existing=True)
+    )
+    return res.unique().scalar_one()
 
 
 def _get_job_models_for_jobs(

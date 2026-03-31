@@ -41,7 +41,7 @@ from dstack._internal.utils.common import get_current_datetime
 
 @pytest.fixture
 def worker() -> JobTerminatingWorker:
-    return JobTerminatingWorker(queue=Mock(), heartbeater=Mock())
+    return JobTerminatingWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
 
 
 @pytest.fixture

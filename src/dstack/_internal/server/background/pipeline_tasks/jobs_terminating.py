@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Sequence, TypedDict
 
 import httpx
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import and_, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
@@ -64,6 +64,7 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import (
@@ -88,9 +89,11 @@ class JobTerminatingPipeline(Pipeline[JobTerminatingPipelineItem]):
         workers_num: int = 20,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=5),
+        min_processing_interval: timedelta = timedelta(seconds=2),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -113,7 +116,11 @@ class JobTerminatingPipeline(Pipeline[JobTerminatingPipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            JobTerminatingWorker(queue=self._queue, heartbeater=self._heartbeater)
+            JobTerminatingWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -167,7 +174,18 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                             JobModel.remove_at.is_(None),
                             JobModel.remove_at < now,
                         ),
-                        JobModel.last_processed_at <= now - self._min_processing_interval,
+                        or_(
+                            # Processing volumes detach can be less frequent since it may take time.
+                            and_(
+                                JobModel.last_processed_at <= now - self._min_processing_interval,
+                                JobModel.volumes_detached_at.is_(None),
+                            ),
+                            and_(
+                                JobModel.last_processed_at
+                                <= now - self._min_processing_interval * 2,
+                                JobModel.volumes_detached_at.is_not(None),
+                            ),
+                        ),
                         or_(
                             JobModel.lock_expires_at.is_(None),
                             JobModel.lock_expires_at < now,
@@ -217,10 +235,12 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
         self,
         queue: asyncio.Queue[JobTerminatingPipelineItem],
         heartbeater: Heartbeater[JobTerminatingPipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             queue=queue,
             heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.JobTerminatingWorker.process")

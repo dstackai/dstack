@@ -31,7 +31,7 @@ from dstack._internal.utils.common import get_current_datetime
 
 @pytest.fixture
 def worker() -> GatewayWorker:
-    return GatewayWorker(queue=Mock(), heartbeater=Mock())
+    return GatewayWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
 
 
 @pytest.fixture

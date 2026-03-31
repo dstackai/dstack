@@ -20,4 +20,4 @@ def fetcher() -> RunFetcher:
 
 @pytest.fixture
 def worker() -> RunWorker:
-    return RunWorker(queue=Mock(), heartbeater=Mock())
+    return RunWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())

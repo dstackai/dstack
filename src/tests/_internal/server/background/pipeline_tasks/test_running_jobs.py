@@ -98,7 +98,7 @@ def fetcher() -> JobRunningFetcher:
 
 @pytest.fixture
 def worker() -> JobRunningWorker:
-    return JobRunningWorker(queue=Mock(), heartbeater=Mock())
+    return JobRunningWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
 
 
 @pytest.fixture
@@ -158,6 +158,7 @@ def _job_to_pipeline_item(job_model) -> JobRunningPipelineItem:
         lock_expires_at=job_model.lock_expires_at,
         prev_lock_expired=False,
         status=job_model.status,
+        replica_num=job_model.replica_num,
     )
 
 

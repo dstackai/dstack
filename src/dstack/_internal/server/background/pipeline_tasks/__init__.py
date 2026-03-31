@@ -27,16 +27,16 @@ class PipelineManager:
         self._pipelines: list[Pipeline] = []
         self._hinter = PipelineHinter()
         for builtin_pipeline in [
-            ComputeGroupPipeline(),
-            FleetPipeline(),
-            GatewayPipeline(),
-            JobSubmittedPipeline(),
-            JobRunningPipeline(),
-            JobTerminatingPipeline(),
-            InstancePipeline(),
-            PlacementGroupPipeline(),
-            RunPipeline(),
-            VolumePipeline(),
+            ComputeGroupPipeline(pipeline_hinter=self._hinter),
+            FleetPipeline(pipeline_hinter=self._hinter),
+            GatewayPipeline(pipeline_hinter=self._hinter),
+            JobSubmittedPipeline(pipeline_hinter=self._hinter),
+            JobRunningPipeline(pipeline_hinter=self._hinter),
+            JobTerminatingPipeline(pipeline_hinter=self._hinter),
+            InstancePipeline(pipeline_hinter=self._hinter),
+            PlacementGroupPipeline(pipeline_hinter=self._hinter),
+            RunPipeline(pipeline_hinter=self._hinter),
+            VolumePipeline(pipeline_hinter=self._hinter),
         ]:
             self.register_pipeline(builtin_pipeline)
 

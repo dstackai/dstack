@@ -52,6 +52,7 @@ from dstack._internal.server.services.instances import (
     is_ssh_instance,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import (
     schedule_fleet_placement_groups_deletion,
 )
@@ -60,6 +61,13 @@ from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+INSTANCE_STATUSES_WITH_MIN_PROCESSING_INTERVAL = [
+    InstanceStatus.PENDING,
+    InstanceStatus.PROVISIONING,
+    InstanceStatus.TERMINATING,
+]
 
 
 @dataclass
@@ -73,9 +81,11 @@ class InstancePipeline(Pipeline[InstancePipelineItem]):
         workers_num: int = 20,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=15),
+        min_processing_interval: timedelta = timedelta(seconds=7),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -98,7 +108,11 @@ class InstancePipeline(Pipeline[InstancePipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            InstanceWorker(queue=self._queue, heartbeater=self._heartbeater)
+            InstanceWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -167,7 +181,24 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                         ),
                         InstanceModel.deleted == False,
                         or_(
-                            InstanceModel.last_processed_at <= now - self._min_processing_interval,
+                            # Process fast-moving instances (pending, provisioning, terminating)
+                            # at base interval for low-latency state transitions.
+                            # Steady-state instances (idle, busy) use a longer interval
+                            # since they only need periodic health checks.
+                            and_(
+                                InstanceModel.status.in_(
+                                    INSTANCE_STATUSES_WITH_MIN_PROCESSING_INTERVAL
+                                ),
+                                InstanceModel.last_processed_at
+                                <= now - self._min_processing_interval,
+                            ),
+                            and_(
+                                InstanceModel.status.not_in(
+                                    INSTANCE_STATUSES_WITH_MIN_PROCESSING_INTERVAL
+                                ),
+                                InstanceModel.last_processed_at
+                                <= now - self._min_processing_interval * 2,
+                            ),
                             InstanceModel.last_processed_at == InstanceModel.created_at,
                         ),
                         or_(
@@ -228,10 +259,12 @@ class InstanceWorker(Worker[InstancePipelineItem]):
         self,
         queue: asyncio.Queue[InstancePipelineItem],
         heartbeater: Heartbeater[InstancePipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             queue=queue,
             heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.InstanceWorker.process")

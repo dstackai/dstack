@@ -31,6 +31,7 @@ from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import get_or_add_gateway_connection
 from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import emit_run_status_change_event, get_run_spec
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
@@ -42,6 +43,8 @@ logger = get_logger(__name__)
 
 # No need to lock finished or terminating jobs since run processing does not update them.
 JOB_STATUSES_EXCLUDED_FOR_LOCKING = JobStatus.finished_statuses() + [JobStatus.TERMINATING]
+
+RUN_STATUSES_WITH_MIN_PROCESSING_INTERVAL = [RunStatus.SUBMITTED, RunStatus.TERMINATING]
 
 
 @dataclass
@@ -58,6 +61,8 @@ class RunPipeline(Pipeline[RunPipelineItem]):
         min_processing_interval: timedelta = timedelta(seconds=5),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -80,7 +85,11 @@ class RunPipeline(Pipeline[RunPipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            RunWorker(queue=self._queue, heartbeater=self._heartbeater)
+            RunWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -164,14 +173,14 @@ class RunFetcher(Fetcher[RunPipelineItem]):
                             ),
                         ),
                         or_(
-                            # Process submitted runs quicker for low-latency provisioning.
+                            # Process submitted and terminating runs quicker for low-latency state transition.
                             # Active run processing can be less frequent to minimize contention with `JobRunningPipeline`.
                             and_(
-                                RunModel.status == RunStatus.SUBMITTED,
+                                RunModel.status.in_(RUN_STATUSES_WITH_MIN_PROCESSING_INTERVAL),
                                 RunModel.last_processed_at <= now - self._min_processing_interval,
                             ),
                             and_(
-                                RunModel.status != RunStatus.SUBMITTED,
+                                RunModel.status.not_in(RUN_STATUSES_WITH_MIN_PROCESSING_INTERVAL),
                                 RunModel.last_processed_at
                                 <= now - self._min_processing_interval * 2,
                             ),
@@ -226,8 +235,13 @@ class RunWorker(Worker[RunPipelineItem]):
         self,
         queue: asyncio.Queue[RunPipelineItem],
         heartbeater: Heartbeater[RunPipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
-        super().__init__(queue=queue, heartbeater=heartbeater)
+        super().__init__(
+            queue=queue,
+            heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
+        )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.RunWorker.process")
     async def process(self, item: RunPipelineItem):

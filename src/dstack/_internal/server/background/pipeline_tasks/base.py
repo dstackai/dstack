@@ -24,6 +24,7 @@ from sqlalchemy import and_, or_, update
 from sqlalchemy.orm import Mapped
 
 from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -338,9 +339,11 @@ class Worker(Generic[ItemT], ABC):
         self,
         queue: asyncio.Queue[ItemT],
         heartbeater: Heartbeater[ItemT],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         self._queue = queue
         self._heartbeater = heartbeater
+        self._pipeline_hinter = pipeline_hinter
         self._running = False
 
     async def start(self):
