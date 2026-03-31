@@ -73,7 +73,7 @@ class InstancePipeline(Pipeline[InstancePipelineItem]):
         workers_num: int = 20,
         queue_lower_limit_factor: float = 0.5,
         queue_upper_limit_factor: float = 2.0,
-        min_processing_interval: timedelta = timedelta(seconds=15),
+        min_processing_interval: timedelta = timedelta(seconds=7),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
     ) -> None:
@@ -167,7 +167,31 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                         ),
                         InstanceModel.deleted == False,
                         or_(
-                            InstanceModel.last_processed_at <= now - self._min_processing_interval,
+                            # Process fast-moving instances (pending, provisioning, terminating)
+                            # at base interval for low-latency state transitions.
+                            # Steady-state instances (idle, busy) use a longer interval
+                            # since they only need periodic health checks.
+                            and_(
+                                InstanceModel.status.in_(
+                                    [
+                                        InstanceStatus.PENDING,
+                                        InstanceStatus.PROVISIONING,
+                                        InstanceStatus.TERMINATING,
+                                    ]
+                                ),
+                                InstanceModel.last_processed_at
+                                <= now - self._min_processing_interval,
+                            ),
+                            and_(
+                                InstanceModel.status.in_(
+                                    [
+                                        InstanceStatus.IDLE,
+                                        InstanceStatus.BUSY,
+                                    ]
+                                ),
+                                InstanceModel.last_processed_at
+                                <= now - self._min_processing_interval * 2,
+                            ),
                             InstanceModel.last_processed_at == InstanceModel.created_at,
                         ),
                         or_(
