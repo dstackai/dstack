@@ -543,3 +543,52 @@ Common issues:
 - [Tenstorrent](https://dstack.ai/examples/accelerators/tenstorrent/index.md)
 
 **Full documentation:** https://dstack.ai/llms-full.txt
+
+## Model recipes
+
+### Qwen3-Next on SGLang
+
+**Models:** `Qwen/Qwen3-Next-80B-A3B-Instruct` (chat), `Qwen/Qwen3-Next-80B-A3B-Thinking` (reasoning)
+
+**GPU requirements:** 4x H100 or H200 (80GB each), tensor parallelism `--tp 4`
+
+**Service configuration:**
+
+```yaml
+type: service
+name: qwen3-next
+
+image: lmsysorg/sglang:latest
+env:
+  - HF_TOKEN
+commands:
+  - python3 -m sglang.launch_server
+      --model Qwen/Qwen3-Next-80B-A3B-Instruct
+      --tp 4
+      --host 0.0.0.0
+      --port 8000
+port: 8000
+model: Qwen/Qwen3-Next-80B-A3B-Instruct
+
+resources:
+  gpu: H100:4
+  disk: 200GB
+```
+
+**With EAGLE speculative decoding** (faster inference) — add these flags to the launch command:
+
+```
+--speculative-num-steps 3 --speculative-eagle-topk 1
+--speculative-num-draft-tokens 4 --speculative-algo NEXTN
+```
+
+**Tunable Qwen3-Next parameters:**
+
+| Flag | Description | Default |
+|---|---|---|
+| `--max-mamba-cache-size` | Increase mamba cache / request capacity (trades KV cache) | — |
+| `--mamba-ssm-dtype` | `bfloat16` (smaller) or `float32` (accurate) | `float32` |
+| `--mamba-full-memory-ratio` | Mamba state to KV cache memory ratio | `0.9` |
+| `--mamba-scheduler-strategy extra_buffer` | Optimized radix cache (overlap scheduling, speculative decoding) | `no_buffer` |
+
+**Reference:** [SGLang Qwen3 docs](https://docs.sglang.io/basic_usage/qwen3.html)
