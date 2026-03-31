@@ -31,6 +31,7 @@ from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import get_or_add_gateway_connection
 from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.prometheus.client_metrics import run_metrics
 from dstack._internal.server.services.runs import emit_run_status_change_event, get_run_spec
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
@@ -60,6 +61,8 @@ class RunPipeline(Pipeline[RunPipelineItem]):
         min_processing_interval: timedelta = timedelta(seconds=5),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -82,7 +85,11 @@ class RunPipeline(Pipeline[RunPipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            RunWorker(queue=self._queue, heartbeater=self._heartbeater)
+            RunWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -228,8 +235,13 @@ class RunWorker(Worker[RunPipelineItem]):
         self,
         queue: asyncio.Queue[RunPipelineItem],
         heartbeater: Heartbeater[RunPipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
-        super().__init__(queue=queue, heartbeater=heartbeater)
+        super().__init__(
+            queue=queue,
+            heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
+        )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.RunWorker.process")
     async def process(self, item: RunPipelineItem):

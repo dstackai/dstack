@@ -76,7 +76,7 @@ def fetcher() -> JobSubmittedFetcher:
 
 @pytest.fixture
 def worker() -> JobSubmittedWorker:
-    return JobSubmittedWorker(queue=Mock(), heartbeater=Mock())
+    return JobSubmittedWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
 
 
 def _lock_job_foreign(job_model: JobModel) -> None:

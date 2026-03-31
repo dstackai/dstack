@@ -25,7 +25,7 @@ from dstack._internal.utils.common import get_current_datetime
 
 @pytest.fixture
 def worker() -> PlacementGroupWorker:
-    return PlacementGroupWorker(queue=Mock(), heartbeater=Mock())
+    return PlacementGroupWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
 
 
 @pytest.fixture

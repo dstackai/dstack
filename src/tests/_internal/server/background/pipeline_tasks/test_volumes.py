@@ -31,7 +31,7 @@ from dstack._internal.utils.common import get_current_datetime
 
 @pytest.fixture
 def worker() -> VolumeWorker:
-    return VolumeWorker(queue=Mock(), heartbeater=Mock())
+    return VolumeWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
 
 
 @pytest.fixture

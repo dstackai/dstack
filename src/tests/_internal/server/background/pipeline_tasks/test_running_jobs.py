@@ -98,7 +98,7 @@ def fetcher() -> JobRunningFetcher:
 
 @pytest.fixture
 def worker() -> JobRunningWorker:
-    return JobRunningWorker(queue=Mock(), heartbeater=Mock())
+    return JobRunningWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
 
 
 @pytest.fixture

@@ -38,6 +38,7 @@ from dstack._internal.server.services.gateways import emit_gateway_status_change
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
@@ -60,6 +61,8 @@ class GatewayPipeline(Pipeline[GatewayPipelineItem]):
         min_processing_interval: timedelta = timedelta(seconds=15),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -82,7 +85,11 @@ class GatewayPipeline(Pipeline[GatewayPipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            GatewayWorker(queue=self._queue, heartbeater=self._heartbeater)
+            GatewayWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -192,10 +199,12 @@ class GatewayWorker(Worker[GatewayPipelineItem]):
         self,
         queue: asyncio.Queue[GatewayPipelineItem],
         heartbeater: Heartbeater[GatewayPipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             queue=queue,
             heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.GatewayWorker.process")

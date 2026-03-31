@@ -42,7 +42,7 @@ from dstack._internal.utils.common import get_current_datetime
 
 @pytest.fixture
 def worker() -> FleetWorker:
-    return FleetWorker(queue=Mock(), heartbeater=Mock())
+    return FleetWorker(queue=Mock(), heartbeater=Mock(), pipeline_hinter=Mock())
 
 
 @pytest.fixture

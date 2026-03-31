@@ -49,6 +49,7 @@ from dstack._internal.server.services.fleets import (
     is_fleet_in_use,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -65,6 +66,8 @@ class FleetPipeline(Pipeline[PipelineItem]):
         min_processing_interval: timedelta = timedelta(seconds=30),
         lock_timeout: timedelta = timedelta(seconds=20),
         heartbeat_trigger: timedelta = timedelta(seconds=10),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -87,7 +90,11 @@ class FleetPipeline(Pipeline[PipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            FleetWorker(queue=self._queue, heartbeater=self._heartbeater)
+            FleetWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -188,10 +195,12 @@ class FleetWorker(Worker[PipelineItem]):
         self,
         queue: asyncio.Queue[PipelineItem],
         heartbeater: Heartbeater[PipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             queue=queue,
             heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.FleetWorker.process")

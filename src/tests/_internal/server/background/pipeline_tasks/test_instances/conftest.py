@@ -28,7 +28,7 @@ def fetcher() -> InstanceFetcher:
 
 @pytest.fixture
 def worker() -> InstanceWorker:
-    return InstanceWorker(queue=asyncio.Queue(), heartbeater=Mock())
+    return InstanceWorker(queue=asyncio.Queue(), heartbeater=Mock(), pipeline_hinter=Mock())
 
 
 @pytest.fixture

@@ -117,6 +117,7 @@ from dstack._internal.server.services.offers import (
     get_instance_offer_with_restricted_az,
     get_offers_by_requirements,
 )
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import (
     find_or_create_suitable_placement_group,
     get_placement_group_model_for_job,
@@ -158,6 +159,8 @@ class JobSubmittedPipeline(Pipeline[JobSubmittedPipelineItem]):
         min_processing_interval: timedelta = timedelta(seconds=4),
         lock_timeout: timedelta = timedelta(seconds=40),
         heartbeat_trigger: timedelta = timedelta(seconds=20),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -180,7 +183,11 @@ class JobSubmittedPipeline(Pipeline[JobSubmittedPipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            JobSubmittedWorker(queue=self._queue, heartbeater=self._heartbeater)
+            JobSubmittedWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -294,10 +301,12 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
         self,
         queue: asyncio.Queue[JobSubmittedPipelineItem],
         heartbeater: Heartbeater[JobSubmittedPipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             queue=queue,
             heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.JobSubmittedWorker.process")

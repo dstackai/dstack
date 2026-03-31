@@ -52,6 +52,7 @@ from dstack._internal.server.services.instances import (
     is_ssh_instance,
 )
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.placement import (
     schedule_fleet_placement_groups_deletion,
 )
@@ -83,6 +84,8 @@ class InstancePipeline(Pipeline[InstancePipelineItem]):
         min_processing_interval: timedelta = timedelta(seconds=7),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -105,7 +108,11 @@ class InstancePipeline(Pipeline[InstancePipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            InstanceWorker(queue=self._queue, heartbeater=self._heartbeater)
+            InstanceWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -252,10 +259,12 @@ class InstanceWorker(Worker[InstancePipelineItem]):
         self,
         queue: asyncio.Queue[InstancePipelineItem],
         heartbeater: Heartbeater[InstancePipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             queue=queue,
             heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.InstanceWorker.process")

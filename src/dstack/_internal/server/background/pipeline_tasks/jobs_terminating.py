@@ -64,6 +64,7 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.volumes import (
@@ -91,6 +92,8 @@ class JobTerminatingPipeline(Pipeline[JobTerminatingPipelineItem]):
         min_processing_interval: timedelta = timedelta(seconds=2),
         lock_timeout: timedelta = timedelta(seconds=30),
         heartbeat_trigger: timedelta = timedelta(seconds=15),
+        *,
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             workers_num=workers_num,
@@ -113,7 +116,11 @@ class JobTerminatingPipeline(Pipeline[JobTerminatingPipelineItem]):
             heartbeater=self._heartbeater,
         )
         self.__workers = [
-            JobTerminatingWorker(queue=self._queue, heartbeater=self._heartbeater)
+            JobTerminatingWorker(
+                queue=self._queue,
+                heartbeater=self._heartbeater,
+                pipeline_hinter=pipeline_hinter,
+            )
             for _ in range(self._workers_num)
         ]
 
@@ -228,10 +235,12 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
         self,
         queue: asyncio.Queue[JobTerminatingPipelineItem],
         heartbeater: Heartbeater[JobTerminatingPipelineItem],
+        pipeline_hinter: PipelineHinterProtocol,
     ) -> None:
         super().__init__(
             queue=queue,
             heartbeater=heartbeater,
+            pipeline_hinter=pipeline_hinter,
         )
 
     @sentry_utils.instrument_named_task("pipeline_tasks.JobTerminatingWorker.process")
