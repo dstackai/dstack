@@ -158,6 +158,7 @@ def _job_to_pipeline_item(job_model) -> JobRunningPipelineItem:
         lock_expires_at=job_model.lock_expires_at,
         prev_lock_expired=False,
         status=job_model.status,
+        replica_num=job_model.replica_num,
     )
 
 

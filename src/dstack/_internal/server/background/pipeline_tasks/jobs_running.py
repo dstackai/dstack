@@ -78,6 +78,7 @@ from dstack._internal.server.services.jobs import (
     find_job,
     get_job_attached_volumes,
     get_job_runtime_data,
+    get_job_spec,
     is_master_job,
     job_model_to_job_submission,
 )
@@ -109,6 +110,7 @@ JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 @dataclass
 class JobRunningPipelineItem(PipelineItem):
     status: JobStatus
+    replica_num: int
 
 
 class JobRunningPipeline(Pipeline[JobRunningPipelineItem]):
@@ -233,6 +235,7 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                             JobModel.lock_token,
                             JobModel.lock_expires_at,
                             JobModel.status,
+                            JobModel.replica_num,
                         )
                     )
                 )
@@ -253,6 +256,7 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                             lock_token=lock_token,
                             prev_lock_expired=prev_lock_expired,
                             status=job_model.status,
+                            replica_num=job_model.replica_num,
                         )
                     )
                 await session.commit()
@@ -342,15 +346,29 @@ async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_Proce
         job_model = await _refetch_locked_job_model(session=session, item=item)
         if job_model is None:
             return None
-        run_model = await _fetch_run_model(session=session, run_id=job_model.run_id)
-        run = run_model_to_run(run_model, include_sensitive=True)
+        if item.status == JobStatus.RUNNING:
+            # RUNNING jobs don't access run.jobs — skip loading sibling jobs entirely.
+            run_model = await _fetch_run_model(session=session, run_id=job_model.run_id)
+            run = run_model_to_run(run_model, include_sensitive=True, include_jobs=False)
+            job = Job(
+                job_spec=get_job_spec(job_model),
+                job_submissions=[job_model_to_job_submission(job_model)],
+            )
+        else:
+            # PROVISIONING/PULLING jobs need same-replica siblings for cluster coordination.
+            # All sibling access is replica-scoped, so only load jobs for this replica.
+            run_model = await _fetch_run_model(
+                session=session, run_id=job_model.run_id, replica_num=item.replica_num
+            )
+            run = run_model_to_run(run_model, include_sensitive=True)
+            job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
         job_submission = job_model_to_job_submission(job_model)
         server_ssh_private_keys = get_instance_ssh_private_keys(get_or_error(job_model.instance))
         return _ProcessContext(
             job_model=job_model,
             run_model=run_model,
             run=run,
-            job=find_job(run.jobs, job_model.replica_num, job_model.job_num),
+            job=job,
             job_submission=job_submission,
             job_provisioning_data=job_submission.job_provisioning_data,
             server_ssh_private_keys=server_ssh_private_keys,
@@ -479,41 +497,53 @@ async def _refetch_locked_job_model(
     return res.unique().scalar_one_or_none()
 
 
-async def _fetch_run_model(session: AsyncSession, run_id: uuid.UUID) -> RunModel:
-    # FIXME: Selecting all run's jobs on every processing iteration is highly inefficient:
-    # it's quadratic w.r.t. the number jobs within a run.
-    # Avoid selecting other jobs as much as possible.
-    latest_submissions_sq = (
-        select(
-            JobModel.run_id.label("run_id"),
-            JobModel.replica_num.label("replica_num"),
-            JobModel.job_num.label("job_num"),
-            func.max(JobModel.submission_num).label("max_submission_num"),
-        )
-        .where(JobModel.run_id == run_id)
-        .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
-        .subquery()
-    )
-    job_alias = aliased(JobModel)
-    res = await session.execute(
+async def _fetch_run_model(
+    session: AsyncSession,
+    run_id: uuid.UUID,
+    replica_num: Optional[int] = None,
+) -> RunModel:
+    """Fetch run model with related project, user, repo, and fleet.
+
+    Args:
+        replica_num: If None, skip loading jobs (for RUNNING jobs that don't need siblings).
+            If set, load only latest-submission jobs for that replica (for PROVISIONING/PULLING
+            jobs that need same-replica siblings for cluster coordination).
+    """
+    query = (
         select(RunModel)
         .where(RunModel.id == run_id)
-        .join(job_alias, job_alias.run_id == RunModel.id)
-        .join(
-            latest_submissions_sq,
-            onclause=and_(
-                job_alias.run_id == latest_submissions_sq.c.run_id,
-                job_alias.replica_num == latest_submissions_sq.c.replica_num,
-                job_alias.job_num == latest_submissions_sq.c.job_num,
-                job_alias.submission_num == latest_submissions_sq.c.max_submission_num,
-            ),
-        )
         .options(joinedload(RunModel.project))
         .options(joinedload(RunModel.user))
         .options(joinedload(RunModel.repo))
         .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
-        .options(contains_eager(RunModel.jobs, alias=job_alias))
     )
+    if replica_num is not None:
+        latest_submissions_sq = (
+            select(
+                JobModel.run_id.label("run_id"),
+                JobModel.replica_num.label("replica_num"),
+                JobModel.job_num.label("job_num"),
+                func.max(JobModel.submission_num).label("max_submission_num"),
+            )
+            .where(JobModel.run_id == run_id, JobModel.replica_num == replica_num)
+            .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
+            .subquery()
+        )
+        job_alias = aliased(JobModel)
+        query = (
+            query.join(job_alias, job_alias.run_id == RunModel.id)
+            .join(
+                latest_submissions_sq,
+                onclause=and_(
+                    job_alias.run_id == latest_submissions_sq.c.run_id,
+                    job_alias.replica_num == latest_submissions_sq.c.replica_num,
+                    job_alias.job_num == latest_submissions_sq.c.job_num,
+                    job_alias.submission_num == latest_submissions_sq.c.max_submission_num,
+                ),
+            )
+            .options(contains_eager(RunModel.jobs, alias=job_alias))
+        )
+    res = await session.execute(query)
     return res.unique().scalar_one()
 
 
