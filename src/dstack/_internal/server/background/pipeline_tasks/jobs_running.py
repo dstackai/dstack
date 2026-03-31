@@ -103,6 +103,8 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+JOB_STATUSES_WITH_MIN_PROCESSING_INTERVAL = [JobStatus.PROVISIONING, JobStatus.PULLING]
+
 JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 """`The minimum time before terminating active job in case of connectivity issues."""
 
@@ -202,11 +204,11 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                             # Process provisioning and pulling jobs quicker for low-latency provisioning.
                             # Active jobs processing can be less frequent to minimize contention with `RunPipeline`.
                             and_(
-                                JobModel.status.in_([JobStatus.PROVISIONING, JobStatus.PULLING]),
+                                JobModel.status.in_(JOB_STATUSES_WITH_MIN_PROCESSING_INTERVAL),
                                 JobModel.last_processed_at <= now - self._min_processing_interval,
                             ),
                             and_(
-                                JobModel.status.in_([JobStatus.RUNNING]),
+                                JobModel.status.not_in(JOB_STATUSES_WITH_MIN_PROCESSING_INTERVAL),
                                 JobModel.last_processed_at
                                 <= now - self._min_processing_interval * 2,
                             ),

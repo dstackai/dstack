@@ -62,6 +62,13 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+INSTANCE_STATUSES_WITH_MIN_PROCESSING_INTERVAL = [
+    InstanceStatus.PENDING,
+    InstanceStatus.PROVISIONING,
+    InstanceStatus.TERMINATING,
+]
+
+
 @dataclass
 class InstancePipelineItem(PipelineItem):
     status: InstanceStatus
@@ -173,21 +180,14 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                             # since they only need periodic health checks.
                             and_(
                                 InstanceModel.status.in_(
-                                    [
-                                        InstanceStatus.PENDING,
-                                        InstanceStatus.PROVISIONING,
-                                        InstanceStatus.TERMINATING,
-                                    ]
+                                    INSTANCE_STATUSES_WITH_MIN_PROCESSING_INTERVAL
                                 ),
                                 InstanceModel.last_processed_at
                                 <= now - self._min_processing_interval,
                             ),
                             and_(
-                                InstanceModel.status.in_(
-                                    [
-                                        InstanceStatus.IDLE,
-                                        InstanceStatus.BUSY,
-                                    ]
+                                InstanceModel.status.not_in(
+                                    INSTANCE_STATUSES_WITH_MIN_PROCESSING_INTERVAL
                                 ),
                                 InstanceModel.last_processed_at
                                 <= now - self._min_processing_interval * 2,

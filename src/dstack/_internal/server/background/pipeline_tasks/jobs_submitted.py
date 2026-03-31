@@ -559,6 +559,10 @@ async def _apply_assignment_result(
                 fleet_id=assignment.fleet_id,
             )
             if fleet_model is None:
+                logger.debug(
+                    "%s: failed to lock existing fleet instances for assignment",
+                    fmt(context.job_model),
+                )
                 await _reset_job_lock_for_retry(session=session, item=item)
                 return
 

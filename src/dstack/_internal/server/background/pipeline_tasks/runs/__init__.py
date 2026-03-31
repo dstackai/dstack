@@ -43,6 +43,8 @@ logger = get_logger(__name__)
 # No need to lock finished or terminating jobs since run processing does not update them.
 JOB_STATUSES_EXCLUDED_FOR_LOCKING = JobStatus.finished_statuses() + [JobStatus.TERMINATING]
 
+RUN_STATUSES_WITH_MIN_PROCESSING_INTERVAL = [RunStatus.SUBMITTED, RunStatus.TERMINATING]
+
 
 @dataclass
 class RunPipelineItem(PipelineItem):
@@ -164,14 +166,14 @@ class RunFetcher(Fetcher[RunPipelineItem]):
                             ),
                         ),
                         or_(
-                            # Process submitted runs quicker for low-latency provisioning.
+                            # Process submitted and terminating runs quicker for low-latency state transition.
                             # Active run processing can be less frequent to minimize contention with `JobRunningPipeline`.
                             and_(
-                                RunModel.status == RunStatus.SUBMITTED,
+                                RunModel.status.in_(RUN_STATUSES_WITH_MIN_PROCESSING_INTERVAL),
                                 RunModel.last_processed_at <= now - self._min_processing_interval,
                             ),
                             and_(
-                                RunModel.status != RunStatus.SUBMITTED,
+                                RunModel.status.not_in(RUN_STATUSES_WITH_MIN_PROCESSING_INTERVAL),
                                 RunModel.last_processed_at
                                 <= now - self._min_processing_interval * 2,
                             ),
