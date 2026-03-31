@@ -258,6 +258,7 @@ def _deploy_instance(
             is_spot=is_spot,
             location=location,
             os_volume={"name": "OS volume", "size": disk_size},
+            wait_for_status=None,  # return asap
         )
     except APIException as e:
         # FIXME: Catch only no capacity errors
