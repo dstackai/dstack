@@ -3,14 +3,19 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Any, BinaryIO, Callable, Dict, Optional
+from typing import Annotated, Any, BinaryIO, Callable, Dict, Optional, cast
 
 import git
 import pydantic
 from pydantic import Field
 from typing_extensions import Literal
 
-from dstack._internal.core.errors import DstackError
+from dstack._internal.core.errors import (
+    RepoDetachedHeadError,
+    RepoError,
+    RepoGitError,
+    RepoInvalidGitRepositoryError,
+)
 from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256, slugify
@@ -18,10 +23,6 @@ from dstack._internal.utils.path import PathLike
 from dstack._internal.utils.ssh import get_host_config
 
 SCP_LOCATION_REGEX = re.compile(r"(?P<user>[^/]+)@(?P<host>[^/]+?):(?P<path>.+)", re.IGNORECASE)
-
-
-class RepoError(DstackError):
-    pass
 
 
 class RemoteRepoCredsConfig(CoreConfig):
@@ -53,7 +54,7 @@ class RemoteRepoInfo(
 class RemoteRunRepoData(RemoteRepoInfo):
     repo_branch: Optional[str] = None
     repo_hash: Optional[str] = None
-    repo_diff: Optional[str] = Field(None, exclude=True)
+    repo_diff: Annotated[Optional[str], Field(exclude=True)] = None
     repo_config_name: Optional[str] = None
     repo_config_email: Optional[str] = None
 
@@ -102,6 +103,7 @@ class RemoteRepo(Repo):
     """
 
     run_repo_data: RemoteRunRepoData
+    repo_url: str
 
     @staticmethod
     def from_dir(repo_dir: PathLike) -> "RemoteRepo":
@@ -143,45 +145,30 @@ class RemoteRepo(Repo):
         repo_id: Optional[str] = None,
         local_repo_dir: Optional[PathLike] = None,
         repo_url: Optional[str] = None,
-        repo_data: Optional[RemoteRunRepoData] = None,
         repo_branch: Optional[str] = None,
         repo_hash: Optional[str] = None,
     ):
-        self.repo_dir = local_repo_dir
-        self.repo_url = repo_url
-
-        if self.repo_dir is not None:
-            repo = git.Repo(self.repo_dir)
-            tracking_branch = repo.active_branch.tracking_branch()
-            if tracking_branch is None:
-                raise RepoError("No remote branch is configured")
-            self.repo_url = repo.remote(tracking_branch.remote_name).url
-            repo_data = RemoteRunRepoData.from_url(self.repo_url)
-            repo_data.repo_branch = tracking_branch.remote_head
-            repo_data.repo_hash = tracking_branch.commit.hexsha
-            repo_data.repo_config_name = repo.config_reader().get_value("user", "name", "") or None
-            repo_data.repo_config_email = (
-                repo.config_reader().get_value("user", "email", "") or None
-            )
-            repo_data.repo_diff = _repo_diff_verbose(repo, repo_data.repo_hash)
-        elif self.repo_url is not None:
-            repo_data = RemoteRunRepoData.from_url(self.repo_url)
-            if repo_branch is not None:
-                repo_data.repo_branch = repo_branch
-            if repo_hash is not None:
-                repo_data.repo_hash = repo_hash
-        elif repo_data is None:
-            raise RepoError("No remote repo data provided")
+        # _init_from_* methods must set repo_dir, repo_url, and run_repo_data
+        if local_repo_dir is not None:
+            try:
+                self._init_from_repo_dir(local_repo_dir)
+            except git.InvalidGitRepositoryError as e:
+                raise RepoInvalidGitRepositoryError() from e
+            except git.GitError as e:
+                raise RepoGitError() from e
+        elif repo_url is not None:
+            self._init_from_repo_url(repo_url, repo_branch, repo_hash)
+        else:
+            raise RepoError("Neither local repo dir nor repo URL provided")
 
         if repo_id is None:
             repo_id = slugify(
-                repo_data.repo_name,
+                self.run_repo_data.repo_name,
                 GitRepoURL.parse(
                     self.repo_url, get_ssh_config=get_host_config
                 ).get_unique_location(),
             )
         self.repo_id = repo_id
-        self.run_repo_data = repo_data
 
     def write_code_file(self, fp: BinaryIO) -> str:
         if self.run_repo_data.repo_diff is not None:
@@ -190,6 +177,42 @@ class RemoteRepo(Repo):
 
     def get_repo_info(self) -> RemoteRepoInfo:
         return RemoteRepoInfo(repo_name=self.run_repo_data.repo_name)
+
+    def _init_from_repo_dir(self, repo_dir: PathLike):
+        git_repo = git.Repo(repo_dir)
+        if git_repo.head.is_detached:
+            raise RepoDetachedHeadError()
+        tracking_branch = git_repo.active_branch.tracking_branch()
+        if tracking_branch is None:
+            raise RepoError("No remote branch is configured")
+
+        repo_url = git_repo.remote(tracking_branch.remote_name).url
+        repo_data = RemoteRunRepoData.from_url(repo_url)
+        repo_data.repo_branch = tracking_branch.remote_head
+        repo_data.repo_hash = tracking_branch.commit.hexsha
+        git_config = git_repo.config_reader()
+        if user_name := cast(str, git_config.get_value("user", "name", "")):
+            repo_data.repo_config_name = user_name
+        if user_email := cast(str, git_config.get_value("user", "email", "")):
+            repo_data.repo_config_email = user_email
+        repo_data.repo_diff = _repo_diff_verbose(git_repo, repo_data.repo_hash)
+
+        self.repo_dir = str(repo_dir)
+        self.repo_url = repo_url
+        self.run_repo_data = repo_data
+
+    def _init_from_repo_url(
+        self, repo_url: str, repo_branch: Optional[str], repo_hash: Optional[str]
+    ):
+        repo_data = RemoteRunRepoData.from_url(repo_url)
+        if repo_branch is not None:
+            repo_data.repo_branch = repo_branch
+        if repo_hash is not None:
+            repo_data.repo_hash = repo_hash
+
+        self.repo_dir = None
+        self.repo_url = repo_url
+        self.run_repo_data = repo_data
 
 
 class _DiffCollector:

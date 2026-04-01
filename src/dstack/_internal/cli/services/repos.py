@@ -1,10 +1,13 @@
 from pathlib import Path
 
-import git
-
 from dstack._internal.cli.services.configurators.base import ArgsParser
-from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.repos.remote import GitRepoURL, RemoteRepo, RepoError
+from dstack._internal.core.errors import (
+    CLIError,
+    RepoDetachedHeadError,
+    RepoError,
+    RepoInvalidGitRepositoryError,
+)
+from dstack._internal.core.models.repos.remote import GitRepoURL, RemoteRepo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.utils.path import PathLike
 from dstack.api._public import Client
@@ -42,14 +45,14 @@ def get_repo_from_dir(repo_dir: PathLike) -> RemoteRepo:
         raise CLIError(f"Path is not a directory: {repo_dir}")
     try:
         return RemoteRepo.from_dir(repo_dir)
-    except git.InvalidGitRepositoryError:
+    except RepoInvalidGitRepositoryError:
         raise CLIError(
             f"Git repo not found: {repo_dir}\n"
             "Use `files` to mount an arbitrary directory:"
             " https://dstack.ai/docs/concepts/tasks/#files"
         )
-    except git.GitError as e:
-        raise CLIError(f"{e.__class__.__name__}: {e}") from e
+    except RepoDetachedHeadError:
+        raise CLIError(f"Git repo in 'detached HEAD' state: {repo_dir}\nCheck out to a branch")
     except RepoError as e:
         raise CLIError(str(e)) from e
 
@@ -57,8 +60,6 @@ def get_repo_from_dir(repo_dir: PathLike) -> RemoteRepo:
 def get_repo_from_url(repo_url: str) -> RemoteRepo:
     try:
         return RemoteRepo.from_url(repo_url)
-    except git.GitError as e:
-        raise CLIError(f"{e.__class__.__name__}: {e}") from e
     except RepoError as e:
         raise CLIError(str(e)) from e
 

@@ -1,8 +1,11 @@
 from typing import Literal, Optional, Union, overload
 
-from git import InvalidGitRepositoryError
-
-from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
+from dstack._internal.core.errors import (
+    ConfigurationError,
+    RepoInvalidCredentialsError,
+    RepoInvalidGitRepositoryError,
+    ResourceNotExistsError,
+)
 from dstack._internal.core.models.repos import (
     LocalRepo,
     RemoteRepo,
@@ -11,10 +14,7 @@ from dstack._internal.core.models.repos import (
     RepoHead,
     RepoHeadWithCreds,
 )
-from dstack._internal.core.services.repos import (
-    InvalidRepoCredentialsError,
-    get_repo_creds_and_default_branch,
-)
+from dstack._internal.core.services.repos import get_repo_creds_and_default_branch
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack.api.server import APIClient
@@ -77,15 +77,14 @@ class RepoCollection:
                 " an arbitrary directory: https://dstack.ai/docs/concepts/tasks/#files"
             )
         if creds is None and isinstance(repo, RemoteRepo):
-            assert repo.repo_url is not None
             try:
                 creds, _ = get_repo_creds_and_default_branch(
                     repo_url=repo.repo_url,
                     identity_file=git_identity_file,
                     oauth_token=oauth_token,
                 )
-            except InvalidRepoCredentialsError as e:
-                raise ConfigurationError(*e.args)
+            except RepoInvalidCredentialsError:
+                raise ConfigurationError("No valid default Git credentials found")
         self._api_client.repos.init(self._project, repo.repo_id, repo.get_repo_info(), creds)
 
     def load(
@@ -129,7 +128,7 @@ class RepoCollection:
         logger.debug("Initializing repo")
         try:
             repo = RemoteRepo.from_dir(repo_dir)
-        except InvalidGitRepositoryError:
+        except RepoInvalidGitRepositoryError:
             raise ConfigurationError(
                 f"Git repo not found: {repo_dir}. Use `files` to mount an arbitrary"
                 " directory: https://dstack.ai/docs/concepts/tasks/#files"
