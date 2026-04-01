@@ -99,7 +99,7 @@ def run_model_has_router_replica_group(run_model: RunModel) -> bool:
     return run_spec_has_router_replica_group(run_spec)
 
 
-def _get_router_job(run_model: RunModel, router_group) -> JobModel | None:
+def _get_router_job(run_model: RunModel, router_group) -> Optional[JobModel]:
     group_name = router_group.name
     assert group_name is not None, "Replica group name is set by validation"
     router_jobs = [
