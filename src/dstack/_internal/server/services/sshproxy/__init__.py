@@ -10,7 +10,7 @@ def build_proxied_job_ssh_url_authority(job: JobModel) -> Optional[str]:
         return None
     assert settings.SSHPROXY_HOSTNAME is not None
     return build_ssh_url_authority(
-        username=_build_proxied_job_username(job),
+        username=build_proxied_job_upstream_id(job),
         hostname=settings.SSHPROXY_HOSTNAME,
         port=settings.SSHPROXY_PORT,
     )
@@ -21,12 +21,12 @@ def build_proxied_job_ssh_command(job: JobModel) -> Optional[list[str]]:
         return None
     assert settings.SSHPROXY_HOSTNAME is not None
     return build_ssh_command(
-        username=_build_proxied_job_username(job),
+        username=build_proxied_job_upstream_id(job),
         hostname=settings.SSHPROXY_HOSTNAME,
         port=settings.SSHPROXY_PORT,
     )
 
 
-def _build_proxied_job_username(job: JobModel) -> str:
+def build_proxied_job_upstream_id(job: JobModel) -> str:
     # Job's UUID in lowercase, without dashes
     return job.id.hex

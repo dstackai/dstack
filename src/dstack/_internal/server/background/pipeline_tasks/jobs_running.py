@@ -34,6 +34,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
+from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
@@ -578,12 +579,16 @@ async def _process_provisioning_status(
             fmt(context.job_model),
             context.job_submission.age,
         )
-        ssh_user = job_provisioning_data.username
-        assert context.run.run_spec.ssh_key_pub is not None
-        user_ssh_key = context.run.run_spec.ssh_key_pub.strip()
-        public_keys = [context.project.ssh_public_key.strip(), user_ssh_key]
+        public_keys = [context.project.ssh_public_key.strip()]
+        ssh_user: Optional[str] = None
+        user_ssh_key: Optional[str] = None
+        if not server_settings.SSHPROXY_ENFORCED:
+            ssh_user = job_provisioning_data.username
+            assert context.run.run_spec.ssh_key_pub is not None
+            user_ssh_key = context.run.run_spec.ssh_key_pub.strip()
+            public_keys.append(user_ssh_key)
         if job_provisioning_data.backend == BackendType.LOCAL:
-            user_ssh_key = ""
+            user_ssh_key = None
         success = await run_async(
             _process_provisioning_with_shim,
             server_ssh_private_keys,
@@ -1118,8 +1123,8 @@ def _process_provisioning_with_shim(
     volumes: list[Volume],
     registry_auth: Optional[RegistryAuth],
     public_keys: list[str],
-    ssh_user: str,
-    ssh_key: str,
+    ssh_user: Optional[str],
+    ssh_key: Optional[str],
 ) -> bool:
     job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
     shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
@@ -1181,7 +1186,7 @@ def _process_provisioning_with_shim(
             volume_mounts=volume_mounts,
             instance_mounts=instance_mounts,
             gpu_devices=gpu_devices,
-            host_ssh_user=ssh_user,
+            host_ssh_user=ssh_user or "",
             host_ssh_keys=[ssh_key] if ssh_key else [],
             container_ssh_keys=public_keys,
             instance_id=jpd.instance_id,
@@ -1196,8 +1201,8 @@ def _process_provisioning_with_shim(
             container_user=container_user,
             shm_size=job_spec.requirements.resources.shm_size,
             public_keys=public_keys,
-            ssh_user=ssh_user,
-            ssh_key=ssh_key,
+            ssh_user=ssh_user or "",
+            ssh_key=ssh_key or "",
             mounts=volume_mounts,
             volumes=volumes,
             instance_mounts=instance_mounts,

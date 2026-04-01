@@ -1189,12 +1189,15 @@ class TestGetRun:
             "proxied_ssh_command": ["ssh", f"{job.id.hex}@example.com", "-p", "2222"]
             if sshproxy
             else None,
+            "sshproxy_hostname": "example.com" if sshproxy else None,
+            "sshproxy_port": 2222 if sshproxy else None,
+            "sshproxy_upstream_id": job.id.hex if sshproxy else None,
         }
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_run_with_job_connection_info_task(
-        self, monkeypatch: pytest.MonkeyPatch, test_db, session: AsyncSession, client: AsyncClient
+    async def test_returns_run_with_job_connection_info_multi_replica_multi_node_task(
+        self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1242,6 +1245,9 @@ class TestGetRun:
             "attached_ide_url": None,
             "proxied_ide_url": None,
             "proxied_ssh_command": None,
+            "sshproxy_hostname": None,
+            "sshproxy_port": None,
+            "sshproxy_upstream_id": None,
         }
         assert jobs[0]["job_connection_info"] == {
             "attached_ssh_command": ["ssh", "test-task"],

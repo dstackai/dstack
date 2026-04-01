@@ -41,7 +41,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.logs import URLReplacer
-from dstack._internal.core.services.ssh.attach import SSHAttach
+from dstack._internal.core.services.ssh.attach import BaseSSHAttach, SSHAttach, SSHProxyAttach
 from dstack._internal.core.services.ssh.key_manager import UserSSHKeyManager
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.schemas.logs import PollLogsRequest
@@ -77,7 +77,7 @@ class Run(ABC):
         self._project = project
         self._run = run
         self._ports_lock: Optional[PortsLock] = ports_lock
-        self._ssh_attach: Optional[SSHAttach] = None
+        self._ssh_attach: Optional[BaseSSHAttach] = None
         if ssh_identity_file is not None:
             logger.warning(
                 "[code]ssh_identity_file[/code] in [code]Run[/code] is deprecated and ignored; will be removed"
@@ -347,37 +347,62 @@ class Run(ABC):
                     self._ports_lock.dict(),
                 )
 
-            container_ssh_port = DSTACK_RUNNER_SSH_PORT
-            runtime_data = latest_job_submission.job_runtime_data
-            if runtime_data is not None and runtime_data.ports is not None:
-                container_ssh_port = runtime_data.ports.get(container_ssh_port, container_ssh_port)
-
-            if runtime_data is not None and runtime_data.username is not None:
-                container_user = runtime_data.username
-            elif job.job_spec.user is not None and job.job_spec.user.username is not None:
-                container_user = job.job_spec.user.username
-            else:
-                container_user = "root"
-
             service_port = None
             if isinstance(self._run.run_spec.configuration, ServiceConfiguration):
                 service_port = get_service_port(job.job_spec, self._run.run_spec.configuration)
 
-            self._ssh_attach = SSHAttach(
-                hostname=provisioning_data.hostname,
-                ssh_port=provisioning_data.ssh_port,
-                container_ssh_port=container_ssh_port,
-                user=provisioning_data.username,
-                container_user=container_user,
-                id_rsa_path=ssh_identity_file,
-                ports_lock=self._ports_lock,
-                run_name=name,
-                dockerized=provisioning_data.dockerized,
-                ssh_proxy=provisioning_data.ssh_proxy,
-                service_port=service_port,
-                local_backend=provisioning_data.backend == BackendType.LOCAL,
-                bind_address=bind_address,
-            )
+            ssh_attach: BaseSSHAttach
+
+            if (jci := job.job_connection_info) is not None and jci.sshproxy_hostname is not None:
+                assert jci.sshproxy_upstream_id is not None
+                ssh_attach = SSHProxyAttach(
+                    hostname=jci.sshproxy_hostname,
+                    port=jci.sshproxy_port,
+                    upstream_id=jci.sshproxy_upstream_id,
+                    identity_path=ssh_identity_file,
+                    ports_lock=self._ports_lock,
+                    run_name=name,
+                    service_port=service_port,
+                    bind_address=bind_address,
+                )
+            else:
+                hostname = provisioning_data.hostname
+                assert hostname is not None
+                ssh_port = provisioning_data.ssh_port
+                assert ssh_port is not None
+
+                runtime_data = latest_job_submission.job_runtime_data
+
+                container_ssh_port = DSTACK_RUNNER_SSH_PORT
+                if runtime_data is not None and runtime_data.ports is not None:
+                    container_ssh_port = runtime_data.ports.get(
+                        container_ssh_port, container_ssh_port
+                    )
+
+                if runtime_data is not None and runtime_data.username is not None:
+                    container_user = runtime_data.username
+                elif job.job_spec.user is not None and job.job_spec.user.username is not None:
+                    container_user = job.job_spec.user.username
+                else:
+                    container_user = "root"
+
+                ssh_attach = SSHAttach(
+                    hostname=hostname,
+                    ssh_port=ssh_port,
+                    container_ssh_port=container_ssh_port,
+                    user=provisioning_data.username,
+                    container_user=container_user,
+                    identity_path=ssh_identity_file,
+                    ports_lock=self._ports_lock,
+                    run_name=name,
+                    dockerized=provisioning_data.dockerized,
+                    ssh_proxy=provisioning_data.ssh_proxy,
+                    service_port=service_port,
+                    local_backend=provisioning_data.backend == BackendType.LOCAL,
+                    bind_address=bind_address,
+                )
+
+            self._ssh_attach = ssh_attach
             if not ports_lock:
                 self._ssh_attach.attach()
             self._ports_lock = None

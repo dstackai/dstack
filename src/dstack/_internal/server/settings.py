@@ -111,6 +111,10 @@ SSHPROXY_HOSTNAME, SSHPROXY_PORT = environ.get_callback(
     "DSTACK_SERVER_SSHPROXY_ADDRESS", parse_hostname_port, default=(None, None)
 )
 SSHPROXY_ENABLED = SSHPROXY_API_TOKEN is not None and SSHPROXY_HOSTNAME is not None
+SSHPROXY_ENFORCED = os.getenv("DSTACK_SERVER_SSHPROXY_ENFORCED") is not None
+if SSHPROXY_ENFORCED and not SSHPROXY_ENABLED:
+    logger.warning("sshproxy is not enabled, ignoring DSTACK_SERVER_SSHPROXY_ENFORCED")
+    SSHPROXY_ENFORCED = False
 
 SERVER_KEEP_SHIM_TASKS = os.getenv("DSTACK_SERVER_KEEP_SHIM_TASKS") is not None
 
