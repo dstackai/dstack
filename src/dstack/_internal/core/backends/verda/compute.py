@@ -168,7 +168,11 @@ class VerdaCompute(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
         try:
-            self.client.instances.action(id_list=[instance_id], action="delete")
+            self.client.instances.action(
+                id_list=[instance_id],
+                action="delete",
+                delete_permanently=True,
+            )
         except APIException as e:
             if e.message in [
                 "Invalid instance id",
