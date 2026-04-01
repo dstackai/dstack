@@ -39,7 +39,6 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_service_router_worker_sync")),
-        sa.UniqueConstraint("run_id", name=op.f("uq_service_router_worker_sync_run_id")),
     )
     op.create_index(
         op.f("ix_service_router_worker_sync_pipeline_fetch_q"),
