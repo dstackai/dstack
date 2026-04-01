@@ -27,3 +27,4 @@ uv.lock
 
 profiling_results.html
 docs/docs/reference/api/rest/openapi.json
+docs/docs/reference/plugins/rest/rest_plugin_openapi.json
