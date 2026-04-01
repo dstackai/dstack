@@ -226,11 +226,11 @@ gcp = [
     "dstack[server]",
 ]
 datacrunch = [
-    "verda; python_version >= '3.10'",
+    "verda>=1.23.0; python_version >= '3.10'",
     "dstack[server]",
 ]
 verda = [
-    "verda; python_version >= '3.10'",
+    "verda>=1.23.0; python_version >= '3.10'",
     "dstack[server]",
 ]
 kubernetes = [
