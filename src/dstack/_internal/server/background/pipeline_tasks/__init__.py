@@ -16,6 +16,9 @@ from dstack._internal.server.background.pipeline_tasks.placement_groups import (
     PlacementGroupPipeline,
 )
 from dstack._internal.server.background.pipeline_tasks.runs import RunPipeline
+from dstack._internal.server.background.pipeline_tasks.service_router_worker_sync import (
+    ServiceRouterWorkerSyncPipeline,
+)
 from dstack._internal.server.background.pipeline_tasks.volumes import VolumePipeline
 from dstack._internal.utils.logging import get_logger
 
@@ -36,6 +39,7 @@ class PipelineManager:
             InstancePipeline(pipeline_hinter=self._hinter),
             PlacementGroupPipeline(pipeline_hinter=self._hinter),
             RunPipeline(pipeline_hinter=self._hinter),
+            ServiceRouterWorkerSyncPipeline(pipeline_hinter=self._hinter),
             VolumePipeline(pipeline_hinter=self._hinter),
         ]:
             self.register_pipeline(builtin_pipeline)

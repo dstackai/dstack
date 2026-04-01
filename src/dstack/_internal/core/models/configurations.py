@@ -801,6 +801,12 @@ class ReplicaGroup(CoreModel):
         CommandsList,
         Field(description="The shell commands to run for replicas in this group"),
     ] = []
+    router: Annotated[
+        Optional[AnyServiceRouterConfig],
+        Field(
+            description="When set, replicas in this group run the in-service HTTP router (e.g. SGLang).",
+        ),
+    ] = None
 
     @validator("name")
     def validate_name(cls, v: Optional[str]) -> Optional[str]:
@@ -1030,6 +1036,16 @@ class ServiceConfigurationParams(CoreModel):
                     "Either set `commands` in the replica group or set `image` at the service level."
                 )
 
+        return values
+
+    @root_validator()
+    def validate_at_most_one_router_replica_group(cls, values):
+        replicas = values.get("replicas")
+        if not isinstance(replicas, list):
+            return values
+        router_groups = [g for g in replicas if g.router is not None]
+        if len(router_groups) > 1:
+            raise ValueError("At most one replica group may specify `router`.")
         return values
 
 

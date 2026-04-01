@@ -151,7 +151,9 @@ async def get_service_replica_client(
             timeout=HTTP_TIMEOUT,
         )
     # Nginx not available, forward directly to the tunnel
-    replica = random.choice(service.replicas)
+    router_replicas = [r for r in service.replicas if r.is_router_replica]
+    replicas_to_use = router_replicas if router_replicas else service.replicas
+    replica = random.choice(replicas_to_use)
     connection = await service_conn_pool.get(replica.id)
     if connection is None:
         project = await repo.get_project(service.project_name)
