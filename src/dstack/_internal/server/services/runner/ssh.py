@@ -96,6 +96,7 @@ def runner_ssh_tunnel(
                         forwarded_sockets=ports_to_forwarded_sockets(tunnel_ports_map),
                         identity=identity,
                         ssh_proxies=ssh_proxies,
+                        batch_mode=True,
                     ):
                         return func(runner_ports_map, *args, **kwargs)
                 except SSHError:

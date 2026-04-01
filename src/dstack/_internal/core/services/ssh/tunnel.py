@@ -70,6 +70,7 @@ class SSHTunnel:
         ssh_config_path: Union[PathLike, Literal["none"]] = "none",
         port: Optional[int] = None,
         ssh_proxies: Iterable[tuple[SSHConnectionParams, Optional[FilePathOrContent]]] = (),
+        batch_mode: bool = False,
     ):
         """
         :param forwarded_sockets: Connections to the specified local sockets will be
@@ -79,6 +80,14 @@ class SSHTunnel:
         :param ssh_proxies: pairs of SSH connections params and optional identities,
             in order from outer to inner. If an identity is `None`, the `identity` param
             is used instead.
+        :param batch_mode: If enabled, "user interaction such as password prompts and host key
+            confirmation requests will be disabled", see `ssh_config(5)`, `BatchMode`.
+            Although this is probably the desired behavior in all use cases, the default value
+            is `False` for gradual adoption.
+            Note, this option is only applied to the `destination` and `ssh_proxies`. If you
+            configured `destination` with `ProxyJump` in the `ssh_config_path` config, the proxy
+            jump connection will ignore this option -- in that case, you should replace `ProxyJump`
+            with explicit `ProxyCommand=ssh [...] -o BatchMode=yes` in your config.
         """
         self.destination = destination
         self.forwarded_sockets = list(forwarded_sockets)
@@ -101,6 +110,7 @@ class SSHTunnel:
                     proxy_identity, f"proxy_identity_{proxy_index}"
                 )
             self.ssh_proxies.append((proxy_params, proxy_identity_path))
+        self.batch_mode = batch_mode
         self.log_path = normalize_path(os.path.join(temp_dir.name, "tunnel.log"))
         self.ssh_client_info = get_ssh_client_info()
         self.ssh_exec_path = str(self.ssh_client_info.path)
@@ -145,6 +155,14 @@ class SSHTunnel:
             command += ["-p", str(self.port)]
         for k, v in self.options.items():
             command += ["-o", f"{k}={v}"]
+        if self.batch_mode:
+            command += ["-o", "BatchMode=yes"]
+            if "serveraliveinterval" not in map(str.lower, self.options):
+                # Revert Debian-specific patch effect:
+                # > The default is 0, indicating that these messages will not be sent
+                # > to the server, or 300 if the BatchMode option is set (Debian-specific).
+                # https://salsa.debian.org/ssh-team/openssh/-/blob/d87b69641b533b892b87e2eea02dbee796682d64/debian/patches/keepalive-extensions.patch#L69-77
+                command += ["-o", "ServerAliveInterval=0"]
         if proxy_command := self._get_proxy_command():
             command += ["-o", proxy_command]
         for socket_pair in self.forwarded_sockets:
@@ -290,6 +308,14 @@ class SSHTunnel:
             "-o",
             "UserKnownHostsFile=/dev/null",
         ]
+        if self.batch_mode:
+            # ServerAliveInterval is explained in the open_command() comment
+            command += [
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ServerAliveInterval=0",
+            ]
         if prev_proxy_command is not None:
             command += ["-o", prev_proxy_command.replace("%", "%%")]
         command += [
