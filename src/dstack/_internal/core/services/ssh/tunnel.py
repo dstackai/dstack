@@ -93,9 +93,6 @@ class SSHTunnel:
         self.forwarded_sockets = list(forwarded_sockets)
         self.reverse_forwarded_sockets = list(reverse_forwarded_sockets)
         self.options = options
-        # A copy of options with names normalized to lowercase. Used only internally, the actual
-        # ssh command is built from user-provided options as is.
-        self.options_normalized = {k.lower(): v for k, v in options.items()}
         self.port = port
         self.ssh_config_path = normalize_path(ssh_config_path)
         temp_dir = tempfile.TemporaryDirectory()
@@ -160,7 +157,7 @@ class SSHTunnel:
             command += ["-o", f"{k}={v}"]
         if self.batch_mode:
             command += ["-o", "BatchMode=yes"]
-            if "serveraliveinterval" not in self.options_normalized:
+            if "serveraliveinterval" not in map(str.lower, self.options):
                 # Revert Debian-specific patch effect:
                 # > The default is 0, indicating that these messages will not be sent
                 # > to the server, or 300 if the BatchMode option is set (Debian-specific).
