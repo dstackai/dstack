@@ -453,6 +453,10 @@ class RunModel(PipelineModelMixin, BaseModel):
     )
     gateway: Mapped[Optional["GatewayModel"]] = relationship()
 
+    service_router_worker_sync: Mapped[Optional["ServiceRouterWorkerSyncModel"]] = relationship(
+        back_populates="run", uselist=False
+    )
+
     __table_args__ = (
         Index("ix_submitted_at_id", submitted_at.desc(), id),
         Index(
@@ -461,6 +465,31 @@ class RunModel(PipelineModelMixin, BaseModel):
             postgresql_where=status.not_in(RunStatus.finished_statuses()),
             sqlite_where=status.not_in(RunStatus.finished_statuses()),
         ),
+    )
+
+
+class ServiceRouterWorkerSyncModel(PipelineModelMixin, BaseModel):
+    """
+    Row processed by ServiceRouterWorkerSyncPipeline: sync router /workers with worker replicas.
+    At most one per run that uses replica-group routers.
+    """
+
+    __tablename__ = "service_router_worker_sync"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    run: Mapped["RunModel"] = relationship(back_populates="service_router_worker_sync")
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
+
+    __table_args__ = (
+        Index("ix_service_router_worker_sync_pipeline_fetch_q", last_processed_at.asc()),
     )
 
 

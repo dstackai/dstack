@@ -109,6 +109,13 @@ class ServerProxyRepo(BaseProxyRepo):
                 ssh_head_proxy = rci.ssh_proxy
                 ssh_head_proxy_private_key = get_or_error(rci.ssh_proxy_keys)[0].private
             job_spec = get_job_spec(job)
+            router_group = next(
+                (g for g in run_spec.configuration.replica_groups if g.router is not None),
+                None,
+            )
+            is_router_replica = (
+                router_group is not None and job_spec.replica_group == router_group.name
+            )
             replica = Replica(
                 id=job.id.hex,
                 app_port=get_service_port(job_spec, run_spec.configuration),
@@ -119,6 +126,7 @@ class ServerProxyRepo(BaseProxyRepo):
                 ssh_head_proxy=ssh_head_proxy,
                 ssh_head_proxy_private_key=ssh_head_proxy_private_key,
                 internal_ip=jpd.internal_ip,
+                is_router_replica=is_router_replica,
             )
             replicas.append(replica)
         return Service(

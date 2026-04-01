@@ -141,6 +141,7 @@ async def register_replica(
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
     internal_ip: Optional[str] = None,
+    is_router_replica: bool = False,
 ) -> None:
     replica = models.Replica(
         id=replica_id,
@@ -152,6 +153,7 @@ async def register_replica(
         ssh_head_proxy=ssh_head_proxy,
         ssh_head_proxy_private_key=ssh_head_proxy_private_key,
         internal_ip=internal_ip,
+        is_router_replica=is_router_replica,
     )
 
     async with lock:
@@ -291,6 +293,13 @@ async def apply_service(
             )
             for replica, conn in replica_conns.items()
         ]
+    router_replicas = [r for r in service.replicas if r.is_router_replica]
+    if router_replicas:
+        replica_configs_for_nginx = [c for c in replica_configs if c.id == router_replicas[0].id]
+        service_config = await get_nginx_service_config(service, replica_configs_for_nginx)
+        await nginx.register(service_config, (await repo.get_config()).acme_settings)
+        return replica_failures
+
     service_config = await get_nginx_service_config(service, replica_configs)
     await nginx.register(service_config, (await repo.get_config()).acme_settings)
     return replica_failures
