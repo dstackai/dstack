@@ -155,18 +155,16 @@ class VerdaCompute(
             try:
                 _delete_startup_script(self.client, startup_script_id)
             except Exception:
-                logger.warning(
+                logger.exception(
                     "Failed to cleanup startup script %s after provisioning failure.",
                     startup_script_id,
-                    exc_info=True,
                 )
             try:
                 _delete_ssh_keys(self.client, ssh_ids)
             except Exception:
-                logger.warning(
+                logger.exception(
                     "Failed to cleanup ssh keys %s after provisioning failure.",
                     ssh_ids,
-                    exc_info=True,
                 )
             raise
         return JobProvisioningData(
