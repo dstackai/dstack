@@ -192,6 +192,8 @@ BackendTuple = Tuple[BackendModel, Backend]
 
 _BACKENDS_CACHE_LOCKS: Dict[UUID, asyncio.Lock] = {}
 _BACKENDS_CACHE = TTLCache[UUID, Dict[BackendType, BackendTuple]](maxsize=1000, ttl=300)
+_INFLIGHT_OFFERS_TASKS_LOCK = asyncio.Lock()
+_INFLIGHT_OFFERS_TASKS: Dict[tuple[int, str], asyncio.Task] = {}
 
 
 def _get_project_cache_lock(project_id: UUID) -> asyncio.Lock:
@@ -362,7 +364,7 @@ async def get_backend_offers(
                 yield (backend, offer)
 
     logger.debug("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
-    tasks = [run_async(get_offers_tracked, backend, requirements) for backend in backends]
+    tasks = [_get_offers_tracked_singleflight(backend, requirements) for backend in backends]
     offers_by_backend = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
         if isinstance(result, BackendError):
@@ -385,6 +387,37 @@ async def get_backend_offers(
     return offers
 
 
+async def _get_offers_tracked_singleflight(
+    backend: Backend, requirements: Requirements
+) -> list[InstanceOfferWithAvailability]:
+    key = _get_offers_singleflight_key(backend, requirements)
+    created = False
+    async with _INFLIGHT_OFFERS_TASKS_LOCK:
+        task = _INFLIGHT_OFFERS_TASKS.get(key)
+        if task is None:
+            task = asyncio.create_task(run_async(get_offers_tracked, backend, requirements))
+            _INFLIGHT_OFFERS_TASKS[key] = task
+            task.add_done_callback(lambda t, key=key: _on_inflight_offers_task_done(key, t))
+            created = True
+    if not created:
+        logger.debug("Joining in-flight offers request for backend %s", backend.TYPE.value)
+    return await asyncio.shield(task)
+
+
+def _get_offers_singleflight_key(backend: Backend, requirements: Requirements) -> tuple[int, str]:
+    return id(backend), requirements.json()
+
+
+def _on_inflight_offers_task_done(key: tuple[int, str], task: asyncio.Task) -> None:
+    asyncio.create_task(_remove_inflight_offers_task(key, task))
+
+
+async def _remove_inflight_offers_task(key: tuple[int, str], task: asyncio.Task) -> None:
+    async with _INFLIGHT_OFFERS_TASKS_LOCK:
+        if _INFLIGHT_OFFERS_TASKS.get(key) is task:
+            _INFLIGHT_OFFERS_TASKS.pop(key, None)
+
+
 def check_backend_type_available(backend_type: BackendType):
     if backend_type not in list_available_backend_types():
         raise BackendNotAvailable(
@@ -396,9 +429,9 @@ def check_backend_type_available(backend_type: BackendType):
 
 def get_offers_tracked(
     backend: Backend, requirements: Requirements
-) -> Iterator[InstanceOfferWithAvailability]:
+) -> list[InstanceOfferWithAvailability]:
     start = time.time()
-    res = backend.compute().get_offers(requirements)
+    res = list(backend.compute().get_offers(requirements))
     duration = time.time() - start
     logger.debug("Got offers from %s in %.6fs", backend.TYPE.value, duration)
     return res
