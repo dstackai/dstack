@@ -108,7 +108,7 @@ class VerdaCompute(
                 ssh_ids.append(
                     _create_ssh_key(
                         client=self.client,
-                        name=f"dstack-{instance_name}-{idx}.key",
+                        name=f"{instance_name}-{idx}.key",
                         public_key=ssh_public_key,
                     )
                 )
