@@ -262,9 +262,7 @@ def _delete_ssh_keys(client: VerdaClient, ssh_key_ids: Optional[List[str]]) -> N
         _delete_ssh_key(client, ssh_key_id)
 
 
-def _delete_ssh_key(client: VerdaClient, ssh_key_id: Optional[str]) -> None:
-    if ssh_key_id is None:
-        return
+def _delete_ssh_key(client: VerdaClient, ssh_key_id: str) -> None:
     try:
         client.ssh_keys.delete_by_id(ssh_key_id)
     except APIException as e:
