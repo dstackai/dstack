@@ -299,7 +299,10 @@ class Fetcher(Generic[ItemT], ABC):
                         self._fetch_event.wait(),
                         timeout=self._next_fetch_delay(empty_fetch_count),
                     )
-                except TimeoutError:
+                except (
+                    asyncio.TimeoutError,  # < Python 3.11
+                    TimeoutError,  # >= Python 3.11
+                ):
                     pass
                 empty_fetch_count += 1
                 self._fetch_event.clear()
