@@ -3,13 +3,14 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Annotated, Any, BinaryIO, Callable, Dict, Optional, cast
+from typing import Annotated, Any, BinaryIO, Callable, Dict, Optional, Union, cast
 
 import git
 import pydantic
 from pydantic import Field
 from typing_extensions import Literal
 
+from dstack._internal.core.deprecated import Deprecated
 from dstack._internal.core.errors import (
     RepoDetachedHeadError,
     RepoError,
@@ -19,8 +20,11 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256, slugify
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack._internal.utils.ssh import get_host_config
+
+logger = get_logger(__name__)
 
 SCP_LOCATION_REGEX = re.compile(r"(?P<user>[^/]+)@(?P<host>[^/]+?):(?P<path>.+)", re.IGNORECASE)
 
@@ -147,7 +151,13 @@ class RemoteRepo(Repo):
         repo_url: Optional[str] = None,
         repo_branch: Optional[str] = None,
         repo_hash: Optional[str] = None,
+        repo_data: Union[Deprecated, RemoteRunRepoData, None] = Deprecated.PLACEHOLDER,
     ):
+        if repo_data is not Deprecated.PLACEHOLDER:
+            logger.warning(
+                "The repo_data argument is deprecated, ignored, and will be removed soon."
+                " As it was always ignored, it's safe to remove it."
+            )
         # _init_from_* methods must set repo_dir, repo_url, and run_repo_data
         if local_repo_dir is not None:
             try:
