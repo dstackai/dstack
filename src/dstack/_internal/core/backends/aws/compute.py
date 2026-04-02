@@ -119,7 +119,7 @@ class AWSCompute(
     def __init__(
         self,
         config: AWSConfig,
-        quotas_cache: Optional[AWSQuotasCache] = None,
+        quotas_cache: Optional[ComputeTTLCache] = None,
         zones_cache: Optional[ComputeCache] = None,
     ):
         super().__init__()
@@ -136,7 +136,7 @@ class AWSCompute(
         # with more aggressive/longer caches.
         self._offers_post_filter_cache = ComputeTTLCache(cache=TTLCache(maxsize=10, ttl=180))
         if quotas_cache is None:
-            quotas_cache = AWSQuotasCache(cache=TTLCache(maxsize=10, ttl=600))
+            quotas_cache = ComputeTTLCache(cache=TTLCache(maxsize=10, ttl=600))
         self._regions_to_quotas_cache = quotas_cache
         if zones_cache is None:
             zones_cache = ComputeCache(cache=Cache(maxsize=10))
@@ -154,10 +154,7 @@ class AWSCompute(
             extra_filter=_supported_instances,
         )
         regions = list(set(i.region for i in offers))
-        with self._regions_to_quotas_cache.execution_lock:
-            # Cache lock does not prevent concurrent execution.
-            # We use a separate lock to avoid requesting quotas in parallel and hitting rate limits.
-            regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
+        regions_to_quotas = self._get_regions_to_quotas(self.session, regions)
         regions_to_zones = self._get_regions_to_zones(self.session, regions)
 
         availability_offers = []

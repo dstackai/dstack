@@ -179,6 +179,7 @@ class ComputeWithAllOffersCached(ABC):
     def __init__(self) -> None:
         super().__init__()
         self._offers_cache_lock = threading.Lock()
+        self._offers_cache_execution_lock = threading.Lock()
         self._offers_cache = TTLCache(maxsize=1, ttl=180)
 
     @abstractmethod
@@ -206,7 +207,10 @@ class ComputeWithAllOffersCached(ABC):
         return None
 
     def get_offers(self, requirements: Requirements) -> Iterator[InstanceOfferWithAvailability]:
-        cached_offers = self._get_all_offers_with_availability_cached()
+        with self._offers_cache_execution_lock:
+            # Cache lock does not prevent concurrent execution.
+            # We use a separate lock to avoid requesting offers in parallel, re-doing the work and hitting rate limits.
+            cached_offers = self._get_all_offers_with_availability_cached()
         offers = self.__apply_modifiers(cached_offers, self.get_offers_modifiers(requirements))
         offers = filter_offers_by_requirements(offers, requirements)
         post_filter = self.get_offers_post_filter(requirements)
