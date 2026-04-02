@@ -1,5 +1,4 @@
 import argparse
-from typing import Any, Union
 
 from rich.table import Table
 
@@ -44,7 +43,7 @@ def print_imports_table(imports: list[Import]):
             else "-"
         )
 
-        row: dict[Union[str, int], Any] = {
+        row = {
             "NAME": name,
             "FLEETS": fleets,
         }
