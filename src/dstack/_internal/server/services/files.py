@@ -1,11 +1,12 @@
 import uuid
 from typing import Optional
 
+import sqlalchemy.exc
 from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.errors import ServerClientError, ServerError
 from dstack._internal.core.models.files import FileArchive
 from dstack._internal.server.models import FileArchiveModel, UserModel
 from dstack._internal.server.services.storage import get_default_storage
@@ -72,6 +73,7 @@ async def upload_archive(
     if archive_model is not None:
         logger.debug("File archive (user_id=%s, hash=%s) already uploaded", user.id, archive_hash)
         return archive_model_to_archive(archive_model)
+
     blob = await file.read()
     storage = get_default_storage()
     if storage is not None:
@@ -81,9 +83,30 @@ async def upload_archive(
         blob_hash=archive_hash,
         blob=blob if storage is None else None,
     )
-    session.add(archive_model)
+
+    conflict = False
+    try:
+        async with session.begin_nested():
+            session.add(archive_model)
+    except sqlalchemy.exc.IntegrityError as e:
+        # Concurrent API call just uploaded the same archive (TOC/TOU race condition),
+        # safe to ignore, but we need to refetch the archive from the DB to get its id
+        conflict = True
+        logger.debug("Conflict, rolling back: %s", e)
     await session.commit()
-    logger.debug("File archive (user_id=%s, hash=%s) has been uploaded", user.id, archive_hash)
+
+    if conflict:
+        archive_model = await get_archive_model_by_hash(
+            session=session,
+            user=user,
+            hash=archive_hash,
+        )
+        if archive_model is None:
+            raise ServerError("Failed to upload archive, unexpected conflict condition")
+        logger.debug("File archive (user_id=%s, hash=%s) already uploaded", user.id, archive_hash)
+    else:
+        logger.debug("File archive (user_id=%s, hash=%s) has been uploaded", user.id, archive_hash)
+
     return archive_model_to_archive(archive_model)
 
 
