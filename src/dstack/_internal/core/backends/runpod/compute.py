@@ -210,8 +210,10 @@ class RunpodCompute(
 
         instance_id = resp["id"]
 
-        # Keep the same post-create registry-auth flow for both GPU and CPU paths.
+        # Call edit_pod to pass container_registry_auth_id.
         # Expect a long time (~5m) for the pod to pick up the creds.
+        # TODO: remove editPod once Runpod's create mutations support docker's username/password
+        # (or a reliable containerRegistryAuthId at create time).
         if container_registry_auth_id is not None:
             instance_id = self.api_client.edit_pod(
                 pod_id=instance_id,
