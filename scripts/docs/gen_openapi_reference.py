@@ -3,8 +3,7 @@ Generates OpenAPI schema from dstack server app.
 """
 
 import json
-
-import mkdocs_gen_files
+from pathlib import Path
 
 from dstack._internal.server.main import app
 from dstack._internal.settings import DSTACK_VERSION
@@ -15,5 +14,8 @@ app.servers = [
     {"url": "https://sky.dstack.ai", "description": "Managed server"},
 ]
 app.version = DSTACK_VERSION or "0.0.0"
-with mkdocs_gen_files.open("docs/reference/api/rest/openapi.json", "w") as f:
-    json.dump(app.openapi(), f)
+output_path = Path("docs/docs/reference/api/rest/openapi.json")
+output_path.parent.mkdir(parents=True, exist_ok=True)
+new_content = json.dumps(app.openapi())
+if not output_path.exists() or output_path.read_text() != new_content:
+    output_path.write_text(new_content)
