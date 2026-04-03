@@ -207,7 +207,6 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                         JobModel.status.in_(
                             [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                         ),
-                        RunModel.status.not_in([RunStatus.TERMINATING]),
                         or_(
                             # Process provisioning and pulling jobs quicker for low-latency provisioning.
                             # Active jobs processing can be less frequent to minimize contention with `RunPipeline`.
@@ -223,10 +222,11 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                         ),
                         or_(
                             and_(
-                                # Do not try to lock jobs if the run is waiting for the lock,
+                                # Do not try to lock jobs if the run is waiting for the lock or terminating,
                                 # but allow retrying jobs whose own lock is stale because
                                 # the run pipeline cannot reclaim stale job locks.
                                 RunModel.lock_owner.is_(None),
+                                RunModel.status.not_in([RunStatus.TERMINATING]),
                                 JobModel.lock_expires_at.is_(None),
                             ),
                             JobModel.lock_expires_at < now,
