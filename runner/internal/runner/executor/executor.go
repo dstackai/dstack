@@ -295,7 +295,6 @@ func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
 	ex.secrets = body.Secrets
 	ex.repoCredentials = body.RepoCredentials
 	ex.jobLogs.SetQuota(body.LogQuotaHour)
-	ex.state = WaitCode
 }
 
 func (ex *RunExecutor) SetJobState(ctx context.Context, state schemas.JobState) {

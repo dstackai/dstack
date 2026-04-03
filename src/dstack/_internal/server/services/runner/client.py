@@ -50,6 +50,13 @@ logger = get_logger(__name__)
 
 
 class RunnerClient:
+    # `/api/upload_code` call is not required if there is no code
+    _OPTIONAL_CODE_UPLOAD_MIN_VERSION = (0, 20, 17)
+
+    _version_string: str
+    _version_tuple: Optional["_Version"]
+    _negotiated: bool = False
+
     def __init__(
         self,
         port: int,
@@ -59,13 +66,28 @@ class RunnerClient:
         self.hostname = hostname
         self.port = port
 
+    def get_version_string(self) -> str:
+        if not self._negotiated:
+            self._negotiate()
+        return self._version_string
+
+    def get_version_tuple(self) -> Optional["_Version"]:
+        if not self._negotiated:
+            self._negotiate()
+        return self._version_tuple
+
+    def is_code_upload_optional(self) -> bool:
+        version_tuple = self.get_version_tuple()
+        return version_tuple is None or version_tuple >= self._OPTIONAL_CODE_UPLOAD_MIN_VERSION
+
     def healthcheck(self) -> Optional[HealthcheckResponse]:
         try:
-            resp = requests.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
-            resp.raise_for_status()
-            return HealthcheckResponse.__response__.parse_obj(resp.json())
+            healthcheck_response = self._healthcheck()
         except requests.exceptions.RequestException:
             return None
+        if not self._negotiated:
+            self._negotiate(healthcheck_response)
+        return healthcheck_response
 
     def get_metrics(self) -> Optional[MetricsResponse]:
         resp = requests.get(self._url("/api/metrics"), timeout=REQUEST_TIMEOUT)
@@ -149,6 +171,20 @@ class RunnerClient:
 
     def _url(self, path: str) -> str:
         return f"{'https' if self.secure else 'http'}://{self.hostname}:{self.port}/{path.lstrip('/')}"
+
+    def _healthcheck(self) -> HealthcheckResponse:
+        resp = requests.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        return HealthcheckResponse.__response__.parse_obj(resp.json())
+
+    def _negotiate(self, healthcheck_response: Optional[HealthcheckResponse] = None) -> None:
+        if healthcheck_response is None:
+            healthcheck_response = self._healthcheck()
+        version_string = healthcheck_response.version
+        version_tuple = _parse_version(version_string)
+        self._version_string = version_string
+        self._version_tuple = version_tuple
+        self._negotiated = True
 
 
 class ShimError(DstackError):

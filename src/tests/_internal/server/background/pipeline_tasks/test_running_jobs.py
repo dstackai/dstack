@@ -55,6 +55,7 @@ from dstack._internal.server.services.runner.ssh import SSHTunnel
 from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.testing.common import (
     create_backend,
+    create_code,
     create_export,
     create_fleet,
     create_gateway,
@@ -494,13 +495,44 @@ class TestJobRunningWorker:
         assert job.lock_token is None
         assert job.lock_owner is None
 
+    @pytest.mark.parametrize(
+        ["has_repo_code", "runner_version", "upload_code_call_expected"],
+        [
+            pytest.param(False, "0.20.17", False, id="without-repo-code-new-runner"),
+            pytest.param(True, "0.20.17", True, id="with-repo-code-new-runner"),
+            pytest.param(False, "0.20.16", True, id="without-repo-code-old-runner"),
+            pytest.param(True, "0.20.16", True, id="with-repo-code-old-runner"),
+        ],
+    )
     async def test_runs_provisioning_job(
-        self, test_db, session: AsyncSession, worker: JobRunningWorker
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        runner_version: str,
+        has_repo_code: bool,
+        upload_code_call_expected: bool,
     ):
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
-        run = await create_run(session=session, project=project, repo=repo, user=user)
+        repo_code_hash: Optional[str] = None
+        if has_repo_code:
+            repo_code_hash = "blob_hash"
+            await create_code(session=session, repo=repo, blob_hash=repo_code_hash, blob=b"blob")
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            repo_code_hash=repo_code_hash,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_spec.run_name,
+            run_spec=run_spec,
+        )
         instance = await create_instance(
             session=session, project=project, status=InstanceStatus.BUSY
         )
@@ -518,23 +550,26 @@ class TestJobRunningWorker:
 
         with (
             patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
-            patch(
-                "dstack._internal.server.services.runner.client.RunnerClient"
-            ) as runner_client_cls,
+            patch.object(RunnerClient, "_healthcheck") as healthcheck_mock,
+            patch.object(RunnerClient, "submit_job") as submit_job_mock,
+            patch.object(RunnerClient, "upload_code") as upload_code_mock,
+            patch.object(RunnerClient, "run_job") as run_job_mock,
         ):
-            runner_client_mock = runner_client_cls.return_value
-            runner_client_mock.healthcheck.return_value = HealthcheckResponse(
-                service="dstack-runner", version="0.0.1.dev2"
+            healthcheck_mock.return_value = HealthcheckResponse(
+                service="dstack-runner", version=runner_version
             )
-            runner_client_mock.run_job.return_value = JobInfoResponse(
+            run_job_mock.return_value = JobInfoResponse(
                 working_dir="/dstack/run", username="dstack"
             )
             await _process_job(session, worker, job)
             assert ssh_tunnel_cls.call_count == 2
-            assert runner_client_mock.healthcheck.call_count == 2
-            runner_client_mock.submit_job.assert_called_once()
-            runner_client_mock.upload_code.assert_called_once()
-            runner_client_mock.run_job.assert_called_once()
+            assert healthcheck_mock.call_count == 2
+            submit_job_mock.assert_called_once()
+            if upload_code_call_expected:
+                upload_code_mock.assert_called_once()
+            else:
+                upload_code_mock.assert_not_called()
+            run_job_mock.assert_called_once()
 
         await session.refresh(job)
         assert job.status == JobStatus.RUNNING
@@ -730,7 +765,21 @@ class TestJobRunningWorker:
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
-        run = await create_run(session=session, project=project, repo=repo, user=user)
+        repo_code_hash = "blob_hash"
+        await create_code(session=session, repo=repo, blob_hash=repo_code_hash, blob=b"blob")
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            repo_code_hash=repo_code_hash,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_spec.run_name,
+            run_spec=run_spec,
+        )
         instance = await create_instance(
             session=session, project=project, status=InstanceStatus.BUSY
         )

@@ -23,6 +23,10 @@ class Repo(ABC):
     run_repo_data: "repos.AnyRunRepoData"
 
     @abstractmethod
+    def has_code_to_write(self) -> bool:
+        pass
+
+    @abstractmethod
     def write_code_file(self, fp: BinaryIO) -> str:
         pass
 
