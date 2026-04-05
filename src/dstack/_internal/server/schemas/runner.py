@@ -128,6 +128,7 @@ class HealthcheckResponse(CoreModel):
 
 class InstanceHealthResponse(CoreModel):
     dcgm: Optional[DCGMHealthResponse] = None
+    data_transfer_bytes: Optional[int] = None
 
 
 class ShutdownRequest(CoreModel):

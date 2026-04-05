@@ -47,6 +47,10 @@ func (s *ShimServer) InstanceHealthHandler(w http.ResponseWriter, r *http.Reques
 			response.DCGM = &dcgmHealth
 		}
 	}
+	if s.netMeter != nil {
+		b := s.netMeter.Bytes()
+		response.DataTransferBytes = &b
+	}
 
 	return &response, nil
 }

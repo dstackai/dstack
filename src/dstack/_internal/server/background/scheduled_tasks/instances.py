@@ -763,6 +763,8 @@ async def _check_instance(session: AsyncSession, instance: InstanceModel) -> Non
             response=instance_check.health_response.json(),
         )
         session.add(health_check_model)
+        if instance_check.health_response.data_transfer_bytes is not None:
+            instance.data_transfer_bytes = instance_check.health_response.data_transfer_bytes
 
     _set_health(session, instance, health_status)
     _set_unreachable(session, instance, unreachable=not instance_check.reachable)
@@ -1127,6 +1129,7 @@ async def _terminate(session: AsyncSession, instance: InstanceModel) -> None:
                 jpd.backend,
             )
         else:
+            await _capture_final_data_transfer_bytes(instance, jpd)
             logger.debug("Terminating runner instance %s", jpd.hostname)
             try:
                 await run_async(
@@ -1163,6 +1166,38 @@ async def _terminate(session: AsyncSession, instance: InstanceModel) -> None:
     instance.deleted_at = get_current_datetime()
     instance.finished_at = get_current_datetime()
     switch_instance_status(session, instance, InstanceStatus.TERMINATED)
+
+
+async def _capture_final_data_transfer_bytes(
+    instance: InstanceModel, jpd: JobProvisioningData
+) -> None:
+    """Best-effort final read of data_transfer_bytes before the instance is destroyed."""
+    try:
+        health_response = await run_async(
+            _read_instance_health,
+            get_instance_ssh_private_keys(instance),
+            jpd,
+            None,
+            instance=instance,
+        )
+        if (
+            health_response is not False
+            and health_response is not None
+            and health_response.data_transfer_bytes is not None
+        ):
+            instance.data_transfer_bytes = health_response.data_transfer_bytes
+    except Exception as exc:
+        logger.debug(
+            "Failed to capture final data_transfer_bytes for %s: %s",
+            instance.name,
+            exc,
+        )
+
+
+@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
+def _read_instance_health(ports, *, instance):
+    shim_client = runner_client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    return shim_client.get_instance_health()
 
 
 def _set_health(session: AsyncSession, instance: InstanceModel, health: HealthStatus) -> None:

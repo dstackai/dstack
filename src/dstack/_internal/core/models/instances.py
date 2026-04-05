@@ -356,3 +356,4 @@ class Instance(CoreModel):
     price: Optional[float] = None
     total_blocks: Optional[int] = None
     busy_blocks: int = 0
+    data_transfer_bytes: int = 0

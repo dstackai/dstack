@@ -1,6 +1,8 @@
+from dstack._internal.core.consts import DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import BackendError, NotYetTerminated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.server.background.pipeline_tasks.base import NOW_PLACEHOLDER
 from dstack._internal.server.background.pipeline_tasks.instances.common import (
     ProcessResult,
@@ -10,7 +12,12 @@ from dstack._internal.server.background.pipeline_tasks.instances.common import (
 )
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.services import backends as backends_services
-from dstack._internal.server.services.instances import get_instance_provisioning_data
+from dstack._internal.server.services.instances import (
+    get_instance_provisioning_data,
+    get_instance_ssh_private_keys,
+)
+from dstack._internal.server.services.runner import client as runner_client
+from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -39,6 +46,7 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
                 job_provisioning_data.backend,
             )
         else:
+            await _capture_final_data_transfer_bytes(instance_model, job_provisioning_data, result)
             logger.debug("Terminating runner instance %s", job_provisioning_data.hostname)
             try:
                 await run_async(
@@ -86,3 +94,37 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
         new_status=InstanceStatus.TERMINATED,
     )
     return result
+
+
+async def _capture_final_data_transfer_bytes(
+    instance_model: InstanceModel,
+    jpd: JobProvisioningData,
+    result: ProcessResult,
+) -> None:
+    """Best-effort final read of data_transfer_bytes before the instance is destroyed."""
+    try:
+        health_response = await run_async(
+            _read_instance_health,
+            get_instance_ssh_private_keys(instance_model),
+            jpd,
+            None,
+            instance=instance_model,
+        )
+        if (
+            health_response is not False
+            and health_response is not None
+            and health_response.data_transfer_bytes is not None
+        ):
+            result.instance_update_map["data_transfer_bytes"] = health_response.data_transfer_bytes
+    except Exception as exc:
+        logger.debug(
+            "Failed to capture final data_transfer_bytes for %s: %s",
+            instance_model.name,
+            exc,
+        )
+
+
+@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
+def _read_instance_health(ports, *, instance):
+    shim_client = runner_client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    return shim_client.get_instance_health()

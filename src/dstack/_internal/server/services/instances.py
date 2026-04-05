@@ -241,6 +241,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         finished_at=instance_model.finished_at,
         total_blocks=instance_model.total_blocks,
         busy_blocks=instance_model.busy_blocks,
+        data_transfer_bytes=instance_model.data_transfer_bytes or 0,
     )
 
     offer = get_instance_offer(instance_model)

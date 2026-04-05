@@ -52,6 +52,7 @@ class InstanceUpdateMap(ItemUpdateMap, total=False):
     job_provisioning_data: str
     total_blocks: int
     busy_blocks: int
+    data_transfer_bytes: int
     deleted: bool
     deleted_at: UpdateMapDateTime
 

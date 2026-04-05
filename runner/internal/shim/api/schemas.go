@@ -16,7 +16,8 @@ type ShutdownRequest struct {
 }
 
 type InstanceHealthResponse struct {
-	DCGM *dcgm.Health `json:"dcgm"`
+	DCGM              *dcgm.Health `json:"dcgm"`
+	DataTransferBytes *int64       `json:"data_transfer_bytes,omitempty"`
 }
 
 type TaskListResponse struct {

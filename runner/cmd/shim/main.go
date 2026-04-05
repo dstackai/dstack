@@ -22,6 +22,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/shim/api"
 	"github.com/dstackai/dstack/runner/internal/shim/components"
 	"github.com/dstackai/dstack/runner/internal/shim/dcgm"
+	"github.com/dstackai/dstack/runner/internal/shim/netmeter"
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.
@@ -270,11 +271,22 @@ func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error)
 		}
 	}
 
+	var nm *netmeter.NetMeter
+	nm = netmeter.New()
+	if err := nm.Start(ctx); err != nil {
+		log.Warning(ctx, "data transfer metering unavailable", "err", err)
+		nm = nil
+	} else {
+		log.Info(ctx, "data transfer metering started")
+		defer nm.Stop()
+	}
+
 	address := fmt.Sprintf("localhost:%d", args.Shim.HTTPPort)
 	shimServer := api.NewShimServer(
 		ctx, address, Version,
 		dockerRunner, dcgmExporter, dcgmWrapper,
 		runnerManager, shimManager,
+		nm,
 	)
 
 	if serviceMode {

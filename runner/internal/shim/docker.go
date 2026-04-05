@@ -380,6 +380,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		if err := d.tasks.Update(task); err != nil {
 			return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 		}
+
 		err = d.waitContainer(ctx, &task)
 	}
 	if err != nil {
@@ -1226,6 +1227,10 @@ func (c *CLIArgs) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {
 
 func (c *CLIArgs) DockerPorts() []int {
 	return []int{c.Runner.HTTPPort, c.Runner.SSHPort}
+}
+
+func (c *CLIArgs) RunnerHTTPPort() int {
+	return c.Runner.HTTPPort
 }
 
 func (c *CLIArgs) MakeRunnerDir(name string) (string, error) {
