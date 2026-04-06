@@ -12,7 +12,7 @@ PIPELINE_TASKS_PREFIX = "pipeline_tasks"
 
 
 def instrument_scheduled_task(f):
-    return instrument_named_task(f"{SCHEDULED_TASKS_PREFIX}.{f.__name__}")
+    return instrument_named_task(f"{SCHEDULED_TASKS_PREFIX}.{f.__name__}")(f)
 
 
 def instrument_pipeline_task(name: str):
