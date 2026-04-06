@@ -117,7 +117,7 @@ class PlacementGroupFetcher(Fetcher[PipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.PlacementGroupFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("PlacementGroupFetcher.fetch")
     async def fetch(self, limit: int) -> list[PipelineItem]:
         placement_group_lock, _ = get_locker(get_db().dialect_name).get_lockset(
             PlacementGroupModel.__tablename__
@@ -187,7 +187,7 @@ class PlacementGroupWorker(Worker[PipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.PlacementGroupWorker.process")
+    @sentry_utils.instrument_pipeline_task("PlacementGroupWorker.process")
     async def process(self, item: PipelineItem):
         async with get_session_ctx() as session:
             res = await session.execute(

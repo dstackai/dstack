@@ -152,7 +152,7 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.InstanceFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("InstanceFetcher.fetch")
     async def fetch(self, limit: int) -> list[InstancePipelineItem]:
         instance_lock, _ = get_locker(get_db().dialect_name).get_lockset(
             InstanceModel.__tablename__
@@ -267,7 +267,7 @@ class InstanceWorker(Worker[InstancePipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.InstanceWorker.process")
+    @sentry_utils.instrument_pipeline_task("InstanceWorker.process")
     async def process(self, item: InstancePipelineItem):
         process_context: Optional[_ProcessContext] = None
         if item.status == InstanceStatus.PENDING:
