@@ -129,7 +129,7 @@ class GatewayFetcher(Fetcher[GatewayPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.GatewayFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("GatewayFetcher.fetch")
     async def fetch(self, limit: int) -> list[GatewayPipelineItem]:
         gateway_lock, _ = get_locker(get_db().dialect_name).get_lockset(GatewayModel.__tablename__)
         async with gateway_lock:
@@ -207,7 +207,7 @@ class GatewayWorker(Worker[GatewayPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.GatewayWorker.process")
+    @sentry_utils.instrument_pipeline_task("GatewayWorker.process")
     async def process(self, item: GatewayPipelineItem):
         if item.to_be_deleted:
             await _process_to_be_deleted_item(item)

@@ -14,7 +14,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from packaging.version import Version
 from prometheus_client import Counter, Histogram
-from sentry_sdk.types import SamplingContext
 
 from dstack._internal import settings as core_settings
 from dstack._internal.cli.utils.common import console
@@ -115,7 +114,7 @@ async def lifespan(app: FastAPI):
             release=core_settings.DSTACK_VERSION,
             environment=settings.SERVER_ENVIRONMENT,
             enable_tracing=True,
-            traces_sampler=_sentry_traces_sampler,
+            traces_sampler=sentry_utils.sentry_traces_sampler,
             profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
             before_send=sentry_utils.AsyncioCancelledErrorFilterEventProcessor(),
         )
@@ -424,18 +423,6 @@ def _is_proxy_request(request: Request) -> bool:
 
 def _is_prometheus_request(request: Request) -> bool:
     return request.url.path.startswith("/metrics")
-
-
-def _sentry_traces_sampler(sampling_context: SamplingContext) -> float:
-    parent_sampling_decision = sampling_context["parent_sampled"]
-    if parent_sampling_decision is not None:
-        return float(parent_sampling_decision)
-    transaction_context = sampling_context["transaction_context"]
-    name = transaction_context.get("name")
-    if name is not None:
-        if name.startswith("background."):
-            return settings.SENTRY_TRACES_BACKGROUND_SAMPLE_RATE
-    return settings.SENTRY_TRACES_SAMPLE_RATE
 
 
 def _print_dstack_logo():

@@ -227,7 +227,7 @@ class JobSubmittedFetcher(Fetcher[JobSubmittedPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.JobSubmittedFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("JobSubmittedFetcher.fetch")
     async def fetch(self, limit: int) -> list[JobSubmittedPipelineItem]:
         now = get_current_datetime()
         if limit <= 0:
@@ -309,7 +309,7 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.JobSubmittedWorker.process")
+    @sentry_utils.instrument_pipeline_task("JobSubmittedWorker.process")
     async def process(self, item: JobSubmittedPipelineItem):
         context = await _load_process_context(item=item)
         if context is None:

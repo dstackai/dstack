@@ -160,7 +160,7 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.JobTerminatingFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("JobTerminatingFetcher.fetch")
     async def fetch(self, limit: int) -> list[JobTerminatingPipelineItem]:
         job_lock, _ = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
         async with job_lock:
@@ -243,7 +243,7 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.JobTerminatingWorker.process")
+    @sentry_utils.instrument_pipeline_task("JobTerminatingWorker.process")
     async def process(self, item: JobTerminatingPipelineItem):
         async with get_session_ctx() as session:
             job_model = await _refetch_locked_job(session=session, item=item)

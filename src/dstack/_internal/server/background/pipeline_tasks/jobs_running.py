@@ -194,7 +194,7 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.JobRunningFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("JobRunningFetcher.fetch")
     async def fetch(self, limit: int) -> list[JobRunningPipelineItem]:
         job_lock, _ = get_locker(get_db().dialect_name).get_lockset(JobModel.__tablename__)
         async with job_lock:
@@ -286,7 +286,7 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.JobRunningWorker.process")
+    @sentry_utils.instrument_pipeline_task("JobRunningWorker.process")
     async def process(self, item: JobRunningPipelineItem):
         context = await _load_process_context(item=item)
         if context is None:
