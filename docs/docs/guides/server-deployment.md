@@ -354,6 +354,22 @@ The bucket must be created beforehand. `dstack` won't try to create it.
     storage.objects.update
     ```
 
+## SSH proxy
+
+[`dstack-sshproxy`](https://github.com/dstackai/sshproxy) is an optional component that provides direct SSH access to workloads.
+
+Without SSH proxy, in order to connect to a job via SSH or use an IDE URL, the `dstack attach` CLI command must be used, which configures user's SSH client in a backend-specific way for each job.
+
+When SSH proxy is deployed, there is one well-known entry point – a proxy address – for all `dstack` jobs, which can be used for SSH access without any additional steps on the user's side (such as installing `dstack` and executing `dstack attach` each time). All the user has to do is to upload their public key to the `dstack` server once – there is a dedicated “SSH keys” tab on the user's page of the control plane UI.
+
+
+To deploy SSH proxy, see `dstack-sshproxy` [Deployment guide](https://github.com/dstackai/sshproxy/blob/main/DEPLOYMENT.md).
+
+To enable SSH proxy integration on the `dstack` server side, set the following environment variables:
+
+* `DSTACK_SSHPROXY_API_TOKEN` – a token used to authenticate SSH proxy API requests, must be the same value as when deploying `dstack-sshproxy`.
+* `DSTACK_SERVER_SSHPROXY_ADDRESS` – an address where SSH proxy is available to `dstack` users, in the `HOSTNAME[:PORT]` form, where `HOSTNAME` is a domain name or an IP address, and `PORT`, if not specified, defaults to 22.
+
 ## Encryption
 
 By default, `dstack` stores data in plaintext. To enforce encryption, you 
