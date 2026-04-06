@@ -1,36 +1,27 @@
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from datetime import timedelta
 from functools import partial
-from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from httpx import AsyncClient, AsyncHTTPTransport
 from sqlalchemy import select, update
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.runs import JobStatus, ProbeSpec
-from dstack._internal.core.services.ssh.tunnel import (
-    SSH_DEFAULT_OPTIONS,
-    IPSocket,
-    SocketPair,
-    UnixSocket,
-)
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProbeModel
+from dstack._internal.server.services.job_replica_http_client import (
+    SSH_CONNECT_TIMEOUT,
+    _get_service_replica_client,
+)
 from dstack._internal.server.services.jobs import get_job_spec
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.ssh import container_ssh_tunnel
-from dstack._internal.utils.common import get_current_datetime, get_or_error
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 BATCH_SIZE = 100
-SSH_CONNECT_TIMEOUT = timedelta(seconds=10)
 PROCESSING_OVERHEAD_TIMEOUT = timedelta(minutes=1)
 PROBES_SCHEDULER = AsyncIOScheduler()
 
@@ -141,28 +132,3 @@ def _get_probe_async_processing_timeout(probe_spec: ProbeSpec) -> timedelta:
         + SSH_CONNECT_TIMEOUT
         + PROCESSING_OVERHEAD_TIMEOUT  # slow db queries and other unforeseen conditions
     )
-
-
-@asynccontextmanager
-async def _get_service_replica_client(job: JobModel) -> AsyncGenerator[AsyncClient, None]:
-    options = {
-        **SSH_DEFAULT_OPTIONS,
-        "ConnectTimeout": str(int(SSH_CONNECT_TIMEOUT.total_seconds())),
-    }
-    job_spec = get_job_spec(job)
-    with TemporaryDirectory() as temp_dir:
-        app_socket_path = (Path(temp_dir) / "replica.sock").absolute()
-        async with container_ssh_tunnel(
-            job=job,
-            forwarded_sockets=[
-                SocketPair(
-                    remote=IPSocket("localhost", get_or_error(job_spec.service_port)),
-                    local=UnixSocket(app_socket_path),
-                ),
-            ],
-            options=options,
-        ):
-            async with AsyncClient(
-                transport=AsyncHTTPTransport(uds=str(app_socket_path))
-            ) as client:
-                yield client

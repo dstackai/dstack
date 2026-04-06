@@ -90,11 +90,17 @@ class GatewayClient:
         ssh_head_proxy_private_key: Optional[str],
     ):
         assert run.run_spec.configuration.type == "service"
+        config = run.run_spec.configuration
+        router_group = next((g for g in config.replica_groups if g.router is not None), None)
+        is_router_replica = (
+            router_group is not None and job_spec.replica_group == router_group.name
+        )
         payload = {
             "job_id": job_submission.id.hex,
             "app_port": get_service_port(job_spec, run.run_spec.configuration),
             "ssh_head_proxy": ssh_head_proxy.dict() if ssh_head_proxy is not None else None,
             "ssh_head_proxy_private_key": ssh_head_proxy_private_key,
+            "is_router_replica": is_router_replica,
         }
         jpd = job_submission.job_provisioning_data
         assert jpd is not None

@@ -30,6 +30,7 @@ class Replica(ImmutableModel):
     ssh_head_proxy: Optional[SSHConnectionParams] = None
     ssh_head_proxy_private_key: Optional[str] = None
     internal_ip: Optional[str] = None
+    is_router_replica: bool = False
 
 
 class IPAddressPartitioningKey(ImmutableModel):
