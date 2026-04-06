@@ -16,6 +16,7 @@ from websocket import WebSocketApp
 
 import dstack.api as api
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_RUNNER_SSH_PORT
+from dstack._internal.core.deprecated import Deprecated
 from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import (
@@ -49,7 +50,6 @@ from dstack._internal.utils.common import get_or_error, make_proxy_url
 from dstack._internal.utils.files import create_file_archive
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
-from dstack.api._public.common import Deprecated
 from dstack.api.server import APIClient
 
 logger = get_logger(__name__)

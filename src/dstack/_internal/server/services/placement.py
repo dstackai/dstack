@@ -3,7 +3,6 @@ from collections.abc import Iterable
 from typing import Optional
 from uuid import UUID
 
-from git import List
 from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,7 +65,7 @@ def get_placement_group_provisioning_data(
 async def get_fleet_placement_group_models(
     session: AsyncSession,
     fleet_id: Optional[UUID],
-) -> List[PlacementGroupModel]:
+) -> list[PlacementGroupModel]:
     if fleet_id is None:
         return []
     res = await session.execute(
@@ -138,7 +137,7 @@ def get_placement_group_model_for_job(
 
 async def find_or_create_suitable_placement_group(
     fleet_model: FleetModel,
-    placement_groups: List[PlacementGroupModel],
+    placement_groups: list[PlacementGroupModel],
     instance_offer: InstanceOffer,
     compute: ComputeWithPlacementGroupSupport,
 ) -> Optional[PlacementGroupModel]:
@@ -157,7 +156,7 @@ async def find_or_create_suitable_placement_group(
 
 
 def find_suitable_placement_group(
-    placement_groups: List[PlacementGroupModel],
+    placement_groups: list[PlacementGroupModel],
     instance_offer: InstanceOffer,
     compute: ComputeWithPlacementGroupSupport,
 ) -> Optional[PlacementGroupModel]:

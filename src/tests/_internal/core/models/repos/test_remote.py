@@ -1,6 +1,7 @@
 import pytest
 
-from dstack._internal.core.models.repos.remote import GitRepoURL, RepoError
+from dstack._internal.core.errors import RepoError
+from dstack._internal.core.models.repos.remote import GitRepoURL
 
 
 class TestGitRepoURL:
