@@ -48,7 +48,11 @@ from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeMountPoint
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
-from dstack._internal.server.services.docker import ImageConfig, get_image_config
+from dstack._internal.server.services.docker import (
+    ImageConfig,
+    apply_server_docker_defaults,
+    get_image_config,
+)
 from dstack._internal.utils import crypto
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
@@ -77,7 +81,7 @@ def get_default_python_verison() -> str:
 def get_default_image(nvcc: bool = False) -> str:
     """
     Note: May be overridden by dstack (e.g., EFA-enabled version for AWS EFA-capable instances).
-    See `dstack._internal.server.services.backends.provisioning.resolve_provisioning_image_name`
+    See `dstack._internal.server.services.backends.provisioning.resolve_provisioning_image`
     for details.
 
     Args:
@@ -140,9 +144,10 @@ class JobConfigurator(ABC):
                 )
             except InterpolatorError as e:
                 raise ServerClientError(e.args[0])
+        image_name, registry_auth = apply_server_docker_defaults(self._image_name(), registry_auth)
         image_config = await run_async(
             _get_image_config,
-            self._image_name(),
+            image_name,
             registry_auth,
         )
         self._image_config = image_config

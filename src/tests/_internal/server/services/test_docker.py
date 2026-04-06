@@ -1,8 +1,11 @@
 import pytest
 
+import dstack._internal.server.settings as server_settings
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.server.services.docker import (
     ImageConfigObject,
     ImageManifest,
+    apply_server_docker_defaults,
     is_valid_docker_volume_target,
 )
 
@@ -126,6 +129,111 @@ def test_parse_image_config_object_user_field_missing(sample_image_config_object
     del sample_image_config_object["config"]["User"]
     config_object = ImageConfigObject.__response__.parse_obj(sample_image_config_object)
     assert config_object.config.user is None
+
+
+@pytest.mark.parametrize(
+    (
+        "default_registry",
+        "default_username",
+        "default_password",
+        "image_name",
+        "input_auth",
+        "expected_image",
+        "expected_auth",
+    ),
+    [
+        pytest.param(
+            None,
+            None,
+            None,
+            "python:3.12",
+            None,
+            "python:3.12",
+            None,
+            id="no-defaults-configured",
+        ),
+        pytest.param(
+            "registry.example",
+            None,
+            None,
+            "python:3.12",
+            None,
+            "registry.example/python:3.12",
+            None,
+            id="registry-prepended-no-credentials",
+        ),
+        pytest.param(
+            "registry.example",
+            "user",
+            "pass",
+            "python:3.12",
+            None,
+            "registry.example/python:3.12",
+            RegistryAuth(username="user", password="pass"),
+            id="registry-prepended-and-credentials-injected",
+        ),
+        pytest.param(
+            "registry.example",
+            "user",
+            "pass",
+            "python:3.12",
+            RegistryAuth(username="run-user", password="run-pass"),
+            "registry.example/python:3.12",
+            RegistryAuth(username="run-user", password="run-pass"),
+            id="registry-prepended-run-auth-preserved",
+        ),
+        pytest.param(
+            None,
+            "user",
+            "pass",
+            "python:3.12",
+            None,
+            "python:3.12",
+            RegistryAuth(username="user", password="pass"),
+            id="credentials-injected-without-default-registry",
+        ),
+        pytest.param(
+            "registry.example",
+            "user",
+            "pass",
+            "ghcr.io/org/image:tag",
+            None,
+            "ghcr.io/org/image:tag",
+            None,
+            id="image-with-registry-unchanged",
+        ),
+        pytest.param(
+            None,
+            "user",
+            "pass",
+            "ghcr.io/org/image:tag",
+            None,
+            "ghcr.io/org/image:tag",
+            None,
+            id="credentials-not-injected-when-image-has-registry",
+        ),
+    ],
+)
+def test_apply_server_docker_defaults(
+    monkeypatch,
+    default_registry,
+    default_username,
+    default_password,
+    image_name,
+    input_auth,
+    expected_image,
+    expected_auth,
+):
+    monkeypatch.setattr(server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY", default_registry)
+    monkeypatch.setattr(
+        server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_USERNAME", default_username
+    )
+    monkeypatch.setattr(
+        server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_PASSWORD", default_password
+    )
+    result_image, result_auth = apply_server_docker_defaults(image_name, input_auth)
+    assert result_image == expected_image
+    assert result_auth == expected_auth
 
 
 class TestIsValidDockerVolumeTarget:

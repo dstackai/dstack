@@ -18,6 +18,7 @@ from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
     ProbeConfig,
     ServiceConfiguration,
+    TaskConfiguration,
 )
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
@@ -1527,3 +1528,54 @@ class TestProcessRunningJobs:
             ssh_head_proxy=None,
             ssh_head_proxy_private_key=None,
         )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_provisioning_shim_uses_server_default_registry(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+    ):
+        monkeypatch.setattr(server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY", "registry.example")
+        monkeypatch.setattr(
+            server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_USERNAME", "server-user"
+        )
+        monkeypatch.setattr(
+            server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_PASSWORD", "server-pass"
+        )
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="ubuntu"),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PROVISIONING,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+
+        await process_running_jobs()
+
+        shim_client_mock.submit_task.assert_called_once()
+        call_kwargs = shim_client_mock.submit_task.call_args[1]
+        assert call_kwargs["image_name"] == "registry.example/ubuntu"
+        assert call_kwargs["registry_username"] == "server-user"
+        assert call_kwargs["registry_password"] == "server-pass"

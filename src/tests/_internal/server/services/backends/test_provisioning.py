@@ -3,32 +3,14 @@ import pytest
 from dstack._internal import settings
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceType
-from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import JobProvisioningData, JobSpec, Requirements
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.server.services.backends.provisioning import (
-    resolve_provisioning_image_name,
+    resolve_provisioning_image,
 )
 from dstack._internal.server.testing.common import get_job_provisioning_data
 
 
 class TestResolveProvisioningImageName:
-    @staticmethod
-    def _create_job_spec(image_name: str) -> JobSpec:
-        return JobSpec(
-            job_num=0,
-            job_name="test-job",
-            app_specs=None,
-            commands=["echo hello"],
-            env={},
-            home_dir=None,
-            image_name=image_name,
-            max_duration=None,
-            registry_auth=None,
-            requirements=Requirements(resources=ResourcesSpec()),
-            retry=None,
-            working_dir=None,
-        )
-
     @staticmethod
     def _create_job_provisioning_data_with_instance_type(
         backend: BackendType,
@@ -42,19 +24,19 @@ class TestResolveProvisioningImageName:
         return job_provisioning_data
 
     @staticmethod
-    def _call_resolve_provisioning_image_name(
+    def _call_resolve_provisioning_image(
         image_name: str,
         backend: BackendType,
         instance_type: str,
     ) -> str:
-        job_spec = TestResolveProvisioningImageName._create_job_spec(image_name)
         job_provisioning_data = (
             TestResolveProvisioningImageName._create_job_provisioning_data_with_instance_type(
                 backend,
                 instance_type,
             )
         )
-        return resolve_provisioning_image_name(job_spec, job_provisioning_data)
+        image_name, _ = resolve_provisioning_image(image_name, None, job_provisioning_data)
+        return image_name
 
     @pytest.mark.parametrize(
         ("suffix", "instance_type"),
@@ -68,7 +50,7 @@ class TestResolveProvisioningImageName:
             f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
             f"-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
         )
-        result = self._call_resolve_provisioning_image_name(
+        result = self._call_resolve_provisioning_image(
             image_name,
             BackendType.AWS,
             instance_type,
@@ -96,7 +78,7 @@ class TestResolveProvisioningImageName:
             f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
             f"-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
         )
-        result = self._call_resolve_provisioning_image_name(
+        result = self._call_resolve_provisioning_image(
             image_name,
             BackendType.AWS,
             instance_type,
@@ -126,7 +108,7 @@ class TestResolveProvisioningImageName:
             f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
             f"-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
         )
-        result = self._call_resolve_provisioning_image_name(image_name, backend, instance_type)
+        result = self._call_resolve_provisioning_image(image_name, backend, instance_type)
         assert result == image_name
 
     @pytest.mark.parametrize("suffix", ["-base", "-devel"])
@@ -136,7 +118,7 @@ class TestResolveProvisioningImageName:
     )
     def test_no_patch_non_efa_aws_instances(self, instance_type: str, suffix: str) -> None:
         image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
-        result = self._call_resolve_provisioning_image_name(
+        result = self._call_resolve_provisioning_image(
             image_name,
             BackendType.AWS,
             instance_type,
@@ -160,9 +142,23 @@ class TestResolveProvisioningImageName:
         ],
     )
     def test_no_patch_other_images(self, instance_type: str, image_name: str) -> None:
-        result = self._call_resolve_provisioning_image_name(
+        result = self._call_resolve_provisioning_image(
             image_name,
             BackendType.AWS,
             instance_type,
         )
         assert result == image_name
+
+    @pytest.mark.parametrize("suffix", ["-base", "-devel"])
+    def test_patch_aws_efa_image_with_registry_prefix(self, suffix: str) -> None:
+        registry = "registry.example"
+        image_name = (
+            f"{registry}/{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+            f"-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        )
+        result = self._call_resolve_provisioning_image(image_name, BackendType.AWS, "p5.48xlarge")
+        expected = (
+            f"{registry}/{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}"
+            f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        )
+        assert result == expected

@@ -57,7 +57,7 @@ from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.backends.provisioning import (
     get_instance_specific_gpu_devices,
     get_instance_specific_mounts,
-    resolve_provisioning_image_name,
+    resolve_provisioning_image,
 )
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
@@ -750,6 +750,8 @@ def _process_provisioning_with_shim(
         logger.debug("%s: shim is not available yet", fmt(job_model))
         return False  # shim is not available yet
 
+    image_name, registry_auth = resolve_provisioning_image(job_spec.image_name, registry_auth, jpd)
+
     registry_username = ""
     registry_password = ""
     if registry_auth is not None:
@@ -790,7 +792,6 @@ def _process_provisioning_with_shim(
         cpu = None
         memory = None
         network_mode = NetworkMode.HOST
-    image_name = resolve_provisioning_image_name(job_spec, jpd)
     if shim_client.is_api_v2_supported():
         shim_client.submit_task(
             task_id=job_model.id,

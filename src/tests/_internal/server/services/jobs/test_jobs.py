@@ -2,6 +2,8 @@ from unittest.mock import patch
 
 import pytest
 
+import dstack._internal.server.settings as server_settings
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos.local import LocalRunRepoData
@@ -67,3 +69,33 @@ async def test_get_job_specs_from_run_spec_image_config_calls(
     ) as mock_get_image_config:
         await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
         assert mock_get_image_config.call_count == expected_calls
+
+
+@pytest.mark.asyncio
+async def test_get_image_config_uses_server_default_registry(monkeypatch) -> None:
+    monkeypatch.setattr(server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY", "registry.example")
+    monkeypatch.setattr(server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_USERNAME", "user")
+    monkeypatch.setattr(server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_PASSWORD", "pass")
+    run_spec = RunSpec(
+        run_name="test-run",
+        repo_data=LocalRunRepoData(repo_dir="/"),
+        configuration=TaskConfiguration(image="ubuntu"),
+        profile=Profile(name="default"),
+        ssh_key_pub="user_ssh_key",
+    )
+    fake_image_config = ImageConfig.parse_obj({"Entrypoint": ["/bin/bash"]})
+    with patch(
+        "dstack._internal.server.services.jobs.configurators.base._get_image_config",
+        return_value=fake_image_config,
+    ) as mock_get_image_config:
+        job_specs = await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        mock_get_image_config.assert_called_once_with(
+            "registry.example/ubuntu",
+            RegistryAuth(username="user", password="pass"),
+        )
+
+    assert len(job_specs) == 1
+    # NOTE: server defaults should not be set on the job spec,
+    # especially the credentials, so as not to leak them in the API.
+    assert job_specs[0].image_name == "ubuntu"
+    assert job_specs[0].registry_auth is None

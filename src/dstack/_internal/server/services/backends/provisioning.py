@@ -1,10 +1,13 @@
 import re
+from typing import Optional
 
 from dstack._internal import settings
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.runs import JobProvisioningData, JobSpec
+from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.server.schemas.runner import GPUDevice
+from dstack._internal.server.services.docker import apply_server_docker_defaults, parse_image_name
 
 _AWS_EFA_ENABLED_INSTANCE_TYPE_PATTERNS = [
     # TODO: p6-b200 isn't supported yet in gpuhunt
@@ -87,17 +90,18 @@ def get_instance_specific_gpu_devices(
     return gpu_devices
 
 
-def resolve_provisioning_image_name(
-    job_spec: JobSpec,
+def resolve_provisioning_image(
+    image_name: str,
+    registry_auth: Optional[RegistryAuth],
     job_provisioning_data: JobProvisioningData,
-) -> str:
-    image_name = job_spec.image_name
+) -> tuple[str, Optional[RegistryAuth]]:
+    image_name, registry_auth = apply_server_docker_defaults(image_name, registry_auth)
     if job_provisioning_data.backend == BackendType.AWS:
-        return _patch_base_image_for_aws_efa(
+        image_name = _patch_base_image_for_aws_efa(
             image_name,
             job_provisioning_data.instance_type.name,
         )
-    return image_name
+    return image_name, registry_auth
 
 
 def _patch_base_image_for_aws_efa(
@@ -111,7 +115,7 @@ def _patch_base_image_for_aws_efa(
     if not is_efa_enabled:
         return image_name
 
-    if not image_name.startswith(f"{settings.DSTACK_BASE_IMAGE}:"):
+    if parse_image_name(image_name).repo != settings.DSTACK_BASE_IMAGE:
         return image_name
 
     if image_name.endswith(f"-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
