@@ -135,6 +135,11 @@ To store the server state in Postgres, set the `DSTACK_DATABASE_URL` environment
 $ DSTACK_DATABASE_URL=postgresql+asyncpg://user:password@db-host:5432/dstack dstack server
 ```
 
+The minimum requirements for the DB instance are 2 CPU, 2GB of RAM, and at least 50 `max_connections` per server replica
+or a configured connection pooler to handle that many connections.
+If you're using a smaller DB instance, you may need to set lower `DSTACK_DB_POOL_SIZE` and `DSTACK_DB_MAX_OVERFLOW`, e.g.
+`DSTACK_DB_POOL_SIZE=10` and `DSTACK_DB_MAX_OVERFLOW=0`.
+
 ??? info "Migrate from SQLite to PostgreSQL"
     You can migrate the existing state from SQLite to PostgreSQL using `pgloader`:
 
@@ -456,26 +461,14 @@ Backward compatibility is maintained based on these principles:
 
 ## Server limits
 
-A single `dstack` server replica can support:
+A single `dstack` server replica can support at least
 
-* Up to 150 active runs.
-* Up to 150 active jobs.
-* Up to 150 active instances.
+* 1000 active instances
+* 1000 active runs
+* 1000 active jobs.
 
-Having more active resources will work but can affect server performance.
-If you hit these limits, consider using Postgres with multiple server replicas.
-You can also increase processing rates of a replica by setting the `DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR` environment variable.
-You should also increase `DSTACK_DB_POOL_SIZE` and `DSTACK_DB_MAX_OVERFLOW` proportionally.
-For example, to increase processing rates 4 times, set:
-
-```
-export DSTACK_SERVER_BACKGROUND_PROCESSING_FACTOR=4
-export DSTACK_DB_POOL_SIZE=80
-export DSTACK_DB_MAX_OVERFLOW=80
-```
-
-You have to ensure your Postgres installation supports that many connections by
-configuring [`max_connections`](https://www.postgresql.org/docs/current/runtime-config-connection.html#GUC-MAX-CONNECTIONS) and/or using connection pooler.
+If you hit server performance limits, try scale up server instances and/or configure Postgres with multiple server replicas.
+Also, please [submit a GitHub issue](https://github.com/dstackai/dstack/issues) describing your setup – we strive to improve `dstack` scalability and efficiency.
 
 ## Server upgrades
 
