@@ -38,11 +38,15 @@ func (s *Server) metricsGetHandler(w http.ResponseWriter, r *http.Request) (inte
 	return metrics, nil
 }
 
+// submitPostHandler must be called first
+// It's safe to call it more than once
 func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.executor.Lock()
 	defer s.executor.Unlock()
 	state := s.executor.GetRunnerState()
-	if state != executor.WaitSubmit {
+	if state == executor.WaitRun {
+		log.Warning(r.Context(), "Job already submitted, submitting again", "current_state", state)
+	} else if state != executor.WaitSubmit {
 		log.Warning(r.Context(), "Executor doesn't wait submit", "current_state", state)
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
@@ -52,20 +56,19 @@ func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (inte
 		log.Error(r.Context(), "Failed to decode submit body", "err", err)
 		return nil, err
 	}
-	// todo go-playground/validator
 
 	s.executor.SetJob(body)
-	s.jobBarrierCh <- nil // notify server that job submitted
+	s.executor.SetRunnerState(executor.WaitRun)
 
 	return nil, nil
 }
 
-// uploadArchivePostHandler may be called 0 or more times, and must be called after submitPostHandler
-// and before uploadCodePostHandler
+// If uploadArchivePostHandler is called, it must be called after submitPostHandler and before runPostHandler
+// It's safe to call it more than once with the same archive
 func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.executor.Lock()
 	defer s.executor.Unlock()
-	if s.executor.GetRunnerState() != executor.WaitCode {
+	if s.executor.GetRunnerState() != executor.WaitRun {
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
@@ -123,10 +126,12 @@ func (s *Server) uploadArchivePostHandler(w http.ResponseWriter, r *http.Request
 	return nil, nil
 }
 
+// If uploadCodePostHandler is called, it must be called after submitPostHandler and before runPostHandler
+// It's safe to call it more than once
 func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.executor.Lock()
 	defer s.executor.Unlock()
-	if s.executor.GetRunnerState() != executor.WaitCode {
+	if s.executor.GetRunnerState() != executor.WaitRun {
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
@@ -139,8 +144,6 @@ func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (
 		return nil, fmt.Errorf("copy request body: %w", err)
 	}
 
-	s.executor.SetRunnerState(executor.WaitRun)
-
 	return nil, nil
 }
 
@@ -151,6 +154,7 @@ func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 	s.executor.SetRunnerState(executor.ServeLogs)
+	s.jobBarrierCh <- nil // notify server that job started
 	s.executor.Unlock()
 
 	var runCtx context.Context

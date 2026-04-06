@@ -1173,17 +1173,17 @@ def _get_repo_code_hash(run: Run, job: Job) -> Optional[str]:
 
 async def _get_job_code(
     session: AsyncSession, project: ProjectModel, repo: RepoModel, code_hash: Optional[str]
-) -> bytes:
+) -> Optional[bytes]:
     if code_hash is None:
-        return b""
+        return None
     code_model = await get_code_model(session=session, repo=repo, code_hash=code_hash)
     if code_model is None:
-        return b""
+        return None
     if code_model.blob is not None:
         return code_model.blob
     storage = get_default_storage()
     if storage is None:
-        return b""
+        return None
     blob = await common_utils.run_async(
         storage.get_code,
         project.name,
@@ -1194,7 +1194,7 @@ async def _get_job_code(
         logger.error(
             "Failed to get repo code hash %s from storage for repo %s", code_hash, repo.name
         )
-        return b""
+        return None
     return blob
 
 
@@ -1243,7 +1243,7 @@ def _submit_job_to_runner(
     job_model: JobModel,
     job: Job,
     cluster_info: ClusterInfo,
-    code: bytes,
+    code: Optional[bytes],
     file_archives: Iterable[tuple[uuid.UUID, bytes]],
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
@@ -1285,11 +1285,15 @@ def _submit_job_to_runner(
         repo_credentials=repo_credentials,
         instance_env=instance_env,
     )
-    logger.debug("%s: uploading file archive(s)", fmt(job_model))
     for archive_id, archive in file_archives:
+        logger.debug("%s: uploading file archive: %s", fmt(job_model), archive_id)
         runner_client.upload_archive(archive_id, archive)
-    logger.debug("%s: uploading code", fmt(job_model))
-    runner_client.upload_code(code)
+    if code is None and not runner_client.is_code_upload_optional():
+        # Old runner, we must call `/api/upload_code` to proceed
+        code = b""
+    if code is not None:
+        logger.debug("%s: uploading code", fmt(job_model))
+        runner_client.upload_code(code)
     logger.debug("%s: starting job", fmt(job_model))
     job_info = runner_client.run_job()
     if job_info is not None:

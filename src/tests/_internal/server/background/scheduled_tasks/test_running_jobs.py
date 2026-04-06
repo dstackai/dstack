@@ -54,6 +54,7 @@ from dstack._internal.server.services.volumes import (
 )
 from dstack._internal.server.testing.common import (
     create_backend,
+    create_code,
     create_export,
     create_fleet,
     create_gateway,
@@ -156,10 +157,26 @@ class TestProcessRunningJobs:
         await session.refresh(job)
         assert job.status == JobStatus.PROVISIONING
 
+    @pytest.mark.parametrize(
+        ["has_repo_code", "old_runner", "upload_code_call_expected"],
+        [
+            pytest.param(False, False, False, id="without-repo-code-new-runner"),
+            pytest.param(True, False, True, id="with-repo-code-new-runner"),
+            pytest.param(False, True, True, id="without-repo-code-old-runner"),
+            pytest.param(True, True, True, id="with-repo-code-old-runner"),
+        ],
+    )
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_runs_provisioning_job(
-        self, test_db, session: AsyncSession, ssh_tunnel_mock: Mock, runner_client_mock: Mock
+        self,
+        test_db,
+        session: AsyncSession,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+        old_runner: bool,
+        has_repo_code: bool,
+        upload_code_call_expected: bool,
     ):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -167,11 +184,22 @@ class TestProcessRunningJobs:
             session=session,
             project_id=project.id,
         )
+        repo_code_hash: Optional[str] = None
+        if has_repo_code:
+            repo_code_hash = "blob_hash"
+            await create_code(session=session, repo=repo, blob_hash=repo_code_hash, blob=b"blob")
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            repo_code_hash=repo_code_hash,
+        )
         run = await create_run(
             session=session,
             project=project,
             repo=repo,
             user=user,
+            run_name=run_spec.run_name,
+            run_spec=run_spec,
         )
         instance = await create_instance(
             session=session,
@@ -191,11 +219,14 @@ class TestProcessRunningJobs:
         runner_client_mock.run_job.return_value = JobInfoResponse(
             working_dir="/dstack/run", username="dstack"
         )
+        runner_client_mock.is_code_upload_optional.return_value = not old_runner
         await process_running_jobs()
         ssh_tunnel_mock.assert_called()
         assert runner_client_mock.healthcheck.call_count == 2
-        runner_client_mock.submit_job.assert_called_once()
-        runner_client_mock.upload_code.assert_called_once()
+        if upload_code_call_expected:
+            runner_client_mock.upload_code.assert_called_once()
+        else:
+            runner_client_mock.upload_code.assert_not_called()
         runner_client_mock.run_job.assert_called_once()
         await session.refresh(job)
         assert job.status == JobStatus.RUNNING
@@ -490,11 +521,20 @@ class TestProcessRunningJobs:
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
+        repo_code_hash = "blob_hash"
+        await create_code(session=session, repo=repo, blob_hash=repo_code_hash, blob=b"blob")
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            repo_code_hash=repo_code_hash,
+        )
         run = await create_run(
             session=session,
             project=project,
             repo=repo,
             user=user,
+            run_name=run_spec.run_name,
+            run_spec=run_spec,
         )
         instance = await create_instance(
             session=session,

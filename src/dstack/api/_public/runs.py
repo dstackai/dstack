@@ -498,8 +498,8 @@ class RunCollection:
         """
         if repo is None:
             repo = VirtualRepo()
-            repo_code_hash = None
-        else:
+        repo_code_hash: Optional[str] = None
+        if repo.has_code_to_write():
             with _prepare_code_file(repo) as (_, repo_code_hash):
                 pass
 
@@ -571,9 +571,7 @@ class RunCollection:
 
         if repo is None:
             repo = VirtualRepo()
-        else:
-            # Do not upload the diff without a repo (a default virtual repo)
-            # since upload_code() requires a repo to be initialized.
+        if repo.has_code_to_write():
             with _prepare_code_file(repo) as (fp, repo_code_hash):
                 self._api_client.repos.upload_code(
                     project_name=self._project,
