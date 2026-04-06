@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional
 
 from rich.table import Table
 
@@ -75,7 +75,7 @@ def get_fleets_table(
         if verbose and config.placement and config.placement.value == "cluster":
             nodes = f"{nodes} (cluster)"
 
-        fleet_row: Dict[Union[str, int], Any] = {
+        fleet_row = {
             "NAME": name,
             "NODES": nodes,
             "RESOURCES": resources,
@@ -116,7 +116,7 @@ def get_fleets_table(
                     )
                 instance_price = _format_price(instance.price)
 
-            instance_row: Dict[Union[str, int], Any] = {
+            instance_row = {
                 "NAME": f"   instance={instance.instance_num}",
                 "NODES": "",
                 "RESOURCES": _format_instance_resources(instance),

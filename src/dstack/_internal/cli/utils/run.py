@@ -1,5 +1,5 @@
 import shutil
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from rich.markup import escape
 from rich.table import Table
@@ -398,7 +398,7 @@ def get_runs_table(
                     group_name = group.name
                     group_name_to_index[group_name] = idx
 
-        run_row: Dict[Union[str, int], Any] = {
+        run_row = {
             "NAME": _format_run_name(run, show_deployment_num),
             "SUBMITTED": format_date(run.submitted_at),
             "STATUS": _format_run_status(run),
@@ -431,7 +431,7 @@ def get_runs_table(
             if group_name_to_index:
                 group_index = group_name_to_index.get(job.job_spec.replica_group)
 
-            job_row: Dict[Union[str, int], Any] = {
+            job_row = {
                 "NAME": _format_job_name(
                     job,
                     latest_job_submission,
