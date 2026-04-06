@@ -20,6 +20,15 @@ from dstack._internal.core.backends.verda.compute import (
 from dstack._internal.core.errors import BackendError, NoCapacityError
 
 
+def _assert_terminate_call(action_mock: MagicMock):
+    action_mock.assert_called_once()
+    kwargs = action_mock.call_args.kwargs
+    assert kwargs["id_list"] == ["instance-id"]
+    assert kwargs["action"] == "delete"
+    if "delete_permanently" in kwargs:
+        assert kwargs["delete_permanently"] is True
+
+
 class TestCreateSSHKey:
     def test_creates_ssh_key(self):
         client = MagicMock()
@@ -291,10 +300,7 @@ class TestTerminateInstance:
 
         compute.terminate_instance("instance-id", "FIN-01", None)
 
-        compute.client.instances.action.assert_called_once_with(
-            id_list=["instance-id"],
-            action="delete",
-        )
+        _assert_terminate_call(compute.client.instances.action)
         compute.client.startup_scripts.delete_by_id.assert_not_called()
         compute.client.ssh_keys.delete_by_id.assert_not_called()
 
@@ -308,10 +314,7 @@ class TestTerminateInstance:
 
         compute.terminate_instance("instance-id", "FIN-01", backend_data)
 
-        compute.client.instances.action.assert_called_once_with(
-            id_list=["instance-id"],
-            action="delete",
-        )
+        _assert_terminate_call(compute.client.instances.action)
         compute.client.startup_scripts.delete_by_id.assert_called_once_with("script-id")
         assert compute.client.ssh_keys.delete_by_id.call_count == 2
 
@@ -343,10 +346,7 @@ class TestTerminateInstance:
 
         compute.terminate_instance("instance-id", "FIN-01", backend_data)
 
-        compute.client.instances.action.assert_called_once_with(
-            id_list=["instance-id"],
-            action="delete",
-        )
+        _assert_terminate_call(compute.client.instances.action)
         compute.client.ssh_keys.delete_by_id.assert_called_once_with("ssh-key-id-1")
 
     def test_terminate_instance_ignores_missing_startup_script_invalid_script_id(self):
@@ -363,10 +363,7 @@ class TestTerminateInstance:
 
         compute.terminate_instance("instance-id", "FIN-01", backend_data)
 
-        compute.client.instances.action.assert_called_once_with(
-            id_list=["instance-id"],
-            action="delete",
-        )
+        _assert_terminate_call(compute.client.instances.action)
         compute.client.ssh_keys.delete_by_id.assert_called_once_with("ssh-key-id-1")
 
     def test_terminate_instance_retries_on_script_delete_error(self):
@@ -399,10 +396,7 @@ class TestTerminateInstance:
 
         compute.terminate_instance("instance-id", "FIN-01", backend_data)
 
-        compute.client.instances.action.assert_called_once_with(
-            id_list=["instance-id"],
-            action="delete",
-        )
+        _assert_terminate_call(compute.client.instances.action)
         compute.client.startup_scripts.delete_by_id.assert_called_once_with("script-id")
         compute.client.ssh_keys.delete_by_id.assert_called_once_with("ssh-key-id-1")
 
