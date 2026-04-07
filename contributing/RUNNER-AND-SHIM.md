@@ -31,7 +31,7 @@ A container is started in either `host` or `bridge` network mode depending on th
 
 In `bridge` mode, container ports are mapped to ephemeral host ports. `dstack-shim` stores port mapping as a part of task's state. Currently, the default `bridge` network is used for all containers, but this could be changed in the future to improve container isolation.
 
-All communication between the `dstack` server and `dstack-shim` happens via REST API through an SSH tunnel. `dstack-shim` doesn't collect logs. Usually, it is run from a `cloud-init` user-data script.
+All communication between the `dstack` server and `dstack-shim` happens via HTTP API through an SSH tunnel. `dstack-shim` doesn't collect logs. Usually, it is run from a `cloud-init` user-data script.
 
 The entrypoint for the container:
 - Installs `openssh-server`
@@ -52,7 +52,7 @@ The entrypoint for the container:
   - Wait for the signal to terminate the commands
 - STEP 5: Wait until all logs are read by the server and the CLI. Or exit after a timeout
 
-All communication between the `dstack` server and `dstack-runner` happens via REST API through an SSH tunnel. `dstack-runner` collects the job logs and its own logs. Only the job logs are served via WebSocket.
+All communication between the `dstack` server and `dstack-runner` happens via HTTP API through an SSH tunnel. `dstack-runner` collects the job logs and its own logs. Only the job logs are served via WebSocket.
 
 ## SSH tunnels
 

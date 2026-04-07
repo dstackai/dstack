@@ -66,4 +66,4 @@ You can find the command on the project’s settings page:
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-projects-project-cli-v2.png" width="750px" />
 
 ??? info "API"
-    In addition to the UI, managing projects, users, and user permissions can also be done via the [REST API](../reference/api/rest/index.md).
+    In addition to the UI, managing projects, users, and user permissions can also be done via the [HTTP API](../reference/api/http/index.md).
