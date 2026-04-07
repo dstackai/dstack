@@ -8,6 +8,8 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import Database, override_db
 from dstack._internal.server.models import BaseModel
 
+_initialized_postgres_db_urls = set()
+
 
 @pytest.fixture(scope="session")
 def postgres_container():
@@ -39,11 +41,13 @@ async def test_db(request):
     override_db(db)
     if db_type == "sqlite":
         async with db.engine.begin() as conn:
-            await conn.run_sync(BaseModel.metadata.drop_all)
             await conn.run_sync(BaseModel.metadata.create_all)
+            # Relying on function-scoped engine for a clean DB
     else:
-        async with db.engine.begin() as conn:
-            await conn.run_sync(BaseModel.metadata.create_all)
+        if db_url not in _initialized_postgres_db_urls:
+            async with db.engine.begin() as conn:
+                await conn.run_sync(BaseModel.metadata.create_all)
+            _initialized_postgres_db_urls.add(db_url)
         await _truncate_postgres_db(db)
     yield db
     await db.engine.dispose()
