@@ -5,8 +5,7 @@ from dstack._internal.core.models.backends.base import BackendType
 
 def get_provisioning_timeout(backend_type: BackendType, instance_type_name: str) -> timedelta:
     """
-    This timeout is used in a few places, but roughly refers to the max time between
-    requesting instance creation and the instance becoming ready to accept jobs.
+    This timeout refers to the max time between requesting instance creation and the instance becoming ready to accept jobs.
     For container-based backends, this also includes the image pulling time.
     """
     if backend_type == BackendType.LAMBDA:

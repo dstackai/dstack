@@ -44,7 +44,6 @@ from dstack._internal.server.services.locking import (
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.projects import list_user_project_models
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
 
@@ -321,29 +320,6 @@ async def create_volume(
 async def delete_volumes(
     session: AsyncSession, project: ProjectModel, names: List[str], user: UserModel
 ):
-    # Keep both delete code paths while pipeline processing is behind a feature flag:
-    # - pipeline path marks volumes for async deletion by VolumePipeline
-    # - sync path deletes volume inline for non-pipeline processing
-    # TODO: Drop sync path after pipeline processing is enabled by default.
-    if FeatureFlags.PIPELINE_PROCESSING_ENABLED:
-        await _delete_volumes_pipeline(
-            session=session,
-            project=project,
-            names=names,
-            user=user,
-        )
-    else:
-        await _delete_volumes_sync(
-            session=session,
-            project=project,
-            names=names,
-            user=user,
-        )
-
-
-async def _delete_volumes_pipeline(
-    session: AsyncSession, project: ProjectModel, names: List[str], user: UserModel
-):
     res = await session.execute(
         select(VolumeModel).where(
             VolumeModel.project_id == project.id,
@@ -396,57 +372,6 @@ async def _delete_volumes_pipeline(
                     actor=events.UserActor.from_user(user),
                     targets=[events.Target.from_model(volume_model)],
                 )
-        await session.commit()
-
-
-async def _delete_volumes_sync(
-    session: AsyncSession, project: ProjectModel, names: List[str], user: UserModel
-):
-    res = await session.execute(
-        select(VolumeModel).where(
-            VolumeModel.project_id == project.id,
-            VolumeModel.name.in_(names),
-            VolumeModel.deleted == False,
-        )
-    )
-    volume_models = res.scalars().all()
-    volumes_ids = sorted([v.id for v in volume_models])
-    await session.commit()
-    logger.info("Deleting volumes: %s", [v.name for v in volume_models])
-    async with get_locker(get_db().dialect_name).lock_ctx(VolumeModel.__tablename__, volumes_ids):
-        # Refetch after lock
-        res = await session.execute(
-            select(VolumeModel)
-            .where(
-                VolumeModel.project_id == project.id,
-                VolumeModel.name.in_(names),
-                VolumeModel.deleted == False,
-            )
-            .options(selectinload(VolumeModel.user))
-            .options(selectinload(VolumeModel.attachments))
-            .execution_options(populate_existing=True)
-            .order_by(VolumeModel.id)  # take locks in order
-            .with_for_update(key_share=True)
-        )
-        volume_models = res.scalars().unique().all()
-        for volume_model in volume_models:
-            if len(volume_model.attachments) > 0:
-                raise ServerClientError(
-                    f"Failed to delete volume {volume_model.name}. Volume is in use."
-                )
-        for volume_model in volume_models:
-            try:
-                await _delete_volume(session=session, project=project, volume_model=volume_model)
-            except Exception:
-                logger.exception("Error when deleting volume %s", volume_model.name)
-            volume_model.deleted = True
-            volume_model.deleted_at = common.get_current_datetime()
-            events.emit(
-                session,
-                message="Volume deleted",
-                actor=events.UserActor.from_user(user),
-                targets=[events.Target.from_model(volume_model)],
-            )
         await session.commit()
 
 

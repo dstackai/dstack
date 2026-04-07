@@ -52,7 +52,6 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import events
 from dstack._internal.server.services.backends import (
     check_backend_type_available,
-    get_project_backend_by_type_or_error,
     get_project_backend_with_model_by_type_or_error,
 )
 from dstack._internal.server.services.gateways.connection import GatewayConnection
@@ -65,7 +64,6 @@ from dstack._internal.server.services.locking import (
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
@@ -303,32 +301,6 @@ async def delete_gateways(
     gateways_names: List[str],
     user: UserModel,
 ):
-    # Keep both delete code paths while pipeline processing is behind a feature flag:
-    # - pipeline path marks gateways for async deletion by GatewayPipeline
-    # - sync path deletes gateway resources inline for non-pipeline processing
-    # TODO: Drop sync path after pipeline processing is enabled by default.
-    if FeatureFlags.PIPELINE_PROCESSING_ENABLED:
-        await _delete_gateways_pipeline(
-            session=session,
-            project=project,
-            gateways_names=gateways_names,
-            user=user,
-        )
-    else:
-        await _delete_gateways_sync(
-            session=session,
-            project=project,
-            gateways_names=gateways_names,
-            user=user,
-        )
-
-
-async def _delete_gateways_pipeline(
-    session: AsyncSession,
-    project: ProjectModel,
-    gateways_names: List[str],
-    user: UserModel,
-):
     res = await session.execute(
         select(GatewayModel).where(
             GatewayModel.project_id == project.id,
@@ -379,80 +351,6 @@ async def _delete_gateways_pipeline(
                     actor=events.UserActor.from_user(user),
                     targets=[events.Target.from_model(gateway_model)],
                 )
-        await session.commit()
-
-
-async def _delete_gateways_sync(
-    session: AsyncSession,
-    project: ProjectModel,
-    gateways_names: List[str],
-    user: UserModel,
-):
-    res = await session.execute(
-        select(GatewayModel).where(
-            GatewayModel.project_id == project.id,
-            GatewayModel.name.in_(gateways_names),
-        )
-    )
-    gateway_models = res.scalars().all()
-    gateways_ids = sorted([g.id for g in gateway_models])
-    await session.commit()
-    logger.info("Deleting gateways: %s", [g.name for g in gateway_models])
-    async with get_locker(get_db().dialect_name).lock_ctx(
-        GatewayModel.__tablename__, gateways_ids
-    ):
-        # Refetch after lock
-        res = await session.execute(
-            select(GatewayModel)
-            .where(
-                GatewayModel.project_id == project.id,
-                GatewayModel.name.in_(gateways_names),
-            )
-            .options(joinedload(GatewayModel.gateway_compute))
-            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
-            .execution_options(populate_existing=True)
-            .order_by(GatewayModel.id)  # take locks in order
-            .with_for_update(key_share=True, of=GatewayModel)
-        )
-        gateway_models = res.scalars().all()
-        for gateway_model in gateway_models:
-            backend = await get_project_backend_by_type_or_error(
-                project=project, backend_type=gateway_model.backend.type
-            )
-            compute = backend.compute()
-            assert isinstance(compute, ComputeWithGatewaySupport)
-            gateway_compute_configuration = get_gateway_compute_configuration(gateway_model)
-            if (
-                gateway_model.gateway_compute is not None
-                and gateway_compute_configuration is not None
-            ):
-                logger.info("Deleting gateway compute for %s...", gateway_model.name)
-                try:
-                    await run_async(
-                        compute.terminate_gateway,
-                        gateway_model.gateway_compute.instance_id,
-                        gateway_compute_configuration,
-                        gateway_model.gateway_compute.backend_data,
-                    )
-                except Exception:
-                    logger.exception(
-                        "Error when deleting gateway compute for %s",
-                        gateway_model.name,
-                    )
-                    continue
-                logger.info("Deleted gateway compute for %s", gateway_model.name)
-            if gateway_model.gateway_compute is not None:
-                await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
-                gateway_model.gateway_compute.active = False
-                gateway_model.gateway_compute.deleted = True
-                session.add(gateway_model.gateway_compute)
-            await session.delete(gateway_model)
-            events.emit(
-                session,
-                "Gateway deleted",
-                actor=events.UserActor.from_user(user),
-                targets=[events.Target.from_model(gateway_model)],
-            )
         await session.commit()
 
 

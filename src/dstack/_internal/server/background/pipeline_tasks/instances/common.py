@@ -20,7 +20,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     ItemUpdateMap,
     UpdateMapDateTime,
 )
-from dstack._internal.server.background.scheduled_tasks.common import get_provisioning_timeout
+from dstack._internal.server.background.pipeline_tasks.common import get_provisioning_timeout
 from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
 from dstack._internal.server.services.fleets import get_fleet_spec
 from dstack._internal.utils.common import UNSET, Unset, get_current_datetime

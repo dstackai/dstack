@@ -1,30 +1,17 @@
 import asyncio
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, lazyload
 
-from dstack._internal.core.errors import BackendError, BackendNotAvailable, SSHError
-from dstack._internal.core.models.gateways import GatewayStatus
+from dstack._internal.core.errors import SSHError
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
-    BackendModel,
     GatewayComputeModel,
-    GatewayModel,
-    ProjectModel,
 )
-from dstack._internal.server.services import backends as backends_services
-from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
     GatewayConnection,
-    create_gateway_compute,
     gateway_connections_pool,
-    switch_gateway_status,
 )
-from dstack._internal.server.services.locking import advisory_lock_ctx, get_locker
-from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.utils import sentry_utils
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -33,46 +20,6 @@ logger = get_logger(__name__)
 async def process_gateways_connections():
     await _remove_inactive_connections()
     await _process_active_connections()
-
-
-# NOTE: This scheduled task is going to be deprecated in favor of `GatewayPipeline`.
-# If this logic changes before removal, keep `pipeline_tasks/gateways.py` in sync.
-@sentry_utils.instrument_scheduled_task
-async def process_gateways():
-    lock, lockset = get_locker(get_db().dialect_name).get_lockset(GatewayModel.__tablename__)
-    async with get_session_ctx() as session:
-        async with lock:
-            res = await session.execute(
-                select(GatewayModel)
-                .where(
-                    GatewayModel.lock_expires_at.is_(None),
-                    GatewayModel.status.in_([GatewayStatus.SUBMITTED, GatewayStatus.PROVISIONING]),
-                    GatewayModel.id.not_in(lockset),
-                )
-                .options(lazyload(GatewayModel.gateway_compute))
-                .order_by(GatewayModel.last_processed_at.asc())
-                .limit(1)
-                .with_for_update(skip_locked=True, key_share=True)
-            )
-            gateway_model = res.scalar()
-            if gateway_model is None:
-                return
-            lockset.add(gateway_model.id)
-        gateway_model_id = gateway_model.id
-        try:
-            initial_status = gateway_model.status
-            if initial_status == GatewayStatus.SUBMITTED:
-                await _process_submitted_gateway(session=session, gateway_model=gateway_model)
-            elif initial_status == GatewayStatus.PROVISIONING:
-                await _process_provisioning_gateway(session=session, gateway_model=gateway_model)
-            else:
-                logger.error(
-                    "%s: unexpected gateway status %r", fmt(gateway_model), initial_status.upper()
-                )
-            gateway_model.last_processed_at = get_current_datetime()
-            await session.commit()
-        finally:
-            lockset.difference_update([gateway_model_id])
 
 
 async def _remove_inactive_connections():
@@ -108,91 +55,3 @@ async def _process_connection(conn: GatewayConnection):
         return
 
     await conn.try_collect_stats()
-
-
-async def _process_submitted_gateway(session: AsyncSession, gateway_model: GatewayModel):
-    logger.info("%s: started gateway provisioning", fmt(gateway_model))
-    # Refetch to load related attributes.
-    res = await session.execute(
-        select(GatewayModel)
-        .where(GatewayModel.id == gateway_model.id)
-        .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
-        .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
-        .execution_options(populate_existing=True)
-    )
-    gateway_model = res.unique().scalar_one()
-    configuration = gateways_services.get_gateway_configuration(gateway_model)
-    try:
-        (
-            backend_model,
-            backend,
-        ) = await backends_services.get_project_backend_with_model_by_type_or_error(
-            project=gateway_model.project, backend_type=configuration.backend
-        )
-    except BackendNotAvailable:
-        gateway_model.status_message = "Backend not available"
-        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
-        return
-
-    try:
-        gateway_model.gateway_compute = await create_gateway_compute(
-            backend_compute=backend.compute(),
-            project_name=gateway_model.project.name,
-            configuration=configuration,
-            backend_id=backend_model.id,
-        )
-        session.add(gateway_model)
-        switch_gateway_status(session, gateway_model, GatewayStatus.PROVISIONING)
-    except BackendError as e:
-        status_message = f"Backend error: {repr(e)}"
-        if len(e.args) > 0:
-            status_message = str(e.args[0])
-        gateway_model.status_message = status_message
-        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
-    except Exception as e:
-        logger.exception("%s: got exception when creating gateway compute", fmt(gateway_model))
-        gateway_model.status_message = f"Unexpected error: {repr(e)}"
-        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
-
-
-async def _process_provisioning_gateway(
-    session: AsyncSession, gateway_model: GatewayModel
-) -> None:
-    # Refetch to load related attributes.
-    res = await session.execute(
-        select(GatewayModel)
-        .where(GatewayModel.id == gateway_model.id)
-        .options(joinedload(GatewayModel.gateway_compute))
-        .execution_options(populate_existing=True)
-    )
-    gateway_model = res.unique().scalar_one()
-
-    # Provisioning gateways must have compute.
-    assert gateway_model.gateway_compute is not None
-
-    # FIXME: problems caused by blocking on connect_to_gateway_with_retry and configure_gateway:
-    # - cannot delete the gateway before it is provisioned because the DB model is locked
-    # - connection retry counter is reset on server restart
-    # - only one server replica is processing the gateway
-    # Easy to fix by doing only one connection/configuration attempt per processing iteration. The
-    # main challenge is applying the same provisioning model to the dstack Sky gateway to avoid
-    # maintaining a different model for Sky.
-    connection = await gateways_services.connect_to_gateway_with_retry(
-        gateway_model.gateway_compute
-    )
-    if connection is None:
-        gateway_model.status_message = "Failed to connect to gateway"
-        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
-        gateway_model.gateway_compute.deleted = True
-        return
-    try:
-        await gateways_services.configure_gateway(connection)
-    except Exception:
-        logger.exception("%s: failed to configure gateway", fmt(gateway_model))
-        gateway_model.status_message = "Failed to configure gateway"
-        switch_gateway_status(session, gateway_model, GatewayStatus.FAILED)
-        await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
-        gateway_model.gateway_compute.active = False
-        return
-
-    switch_gateway_status(session, gateway_model, GatewayStatus.RUNNING)
