@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import uuid
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
@@ -85,6 +86,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import events
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
+from dstack._internal.server.services.docker import apply_server_docker_defaults
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
     generate_fleet_name,
@@ -1894,6 +1896,11 @@ async def _provision_new_capacity(
     volumes: Optional[list[list[Volume]]] = None,
     fleet_model: Optional[FleetModel] = None,
 ) -> Union[_FailedNewCapacityProvisioning, _ProvisionNewCapacityResult]:
+    jobs = copy.deepcopy(jobs)
+    for job in jobs:
+        job.job_spec.image_name, job.job_spec.registry_auth = apply_server_docker_defaults(
+            job.job_spec.image_name, job.job_spec.registry_auth
+        )
     job = jobs[0]
     if volumes is None:
         volumes = []

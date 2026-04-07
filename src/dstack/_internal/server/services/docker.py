@@ -14,6 +14,7 @@ from dstack._internal.core.models.common import (
     FrozenCoreModel,
     RegistryAuth,
 )
+from dstack._internal.server import settings as server_settings
 from dstack._internal.server.utils.common import join_byte_stream_checked
 
 DEFAULT_PLATFORM = "linux/amd64"
@@ -149,6 +150,26 @@ def is_host(s: str) -> bool:
     False
     """
     return s == "localhost" or ":" in s or "." in s
+
+
+def apply_server_docker_defaults(
+    image_name: str,
+    registry_auth: Optional[RegistryAuth],
+) -> tuple[str, Optional[RegistryAuth]]:
+    if parse_image_name(image_name).registry is not None:
+        return image_name, registry_auth
+    if server_settings.SERVER_DEFAULT_DOCKER_REGISTRY is not None:
+        image_name = f"{server_settings.SERVER_DEFAULT_DOCKER_REGISTRY}/{image_name}"
+    if (
+        registry_auth is None
+        and server_settings.SERVER_DEFAULT_DOCKER_REGISTRY_USERNAME is not None
+        and server_settings.SERVER_DEFAULT_DOCKER_REGISTRY_PASSWORD is not None
+    ):
+        registry_auth = RegistryAuth(
+            username=server_settings.SERVER_DEFAULT_DOCKER_REGISTRY_USERNAME,
+            password=server_settings.SERVER_DEFAULT_DOCKER_REGISTRY_PASSWORD,
+        )
+    return image_name, registry_auth
 
 
 DOCKER_TARGET_PATH_PATTERN = re.compile(r"^(/[^/\0]*)+/?$")

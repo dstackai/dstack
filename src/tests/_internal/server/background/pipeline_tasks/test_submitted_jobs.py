@@ -11,6 +11,7 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import InstanceStatus
@@ -23,6 +24,7 @@ from dstack._internal.core.models.volumes import (
     VolumeMountPoint,
     VolumeStatus,
 )
+from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
     JobSubmittedFetcher,
     JobSubmittedPipeline,
@@ -1560,6 +1562,129 @@ class TestJobSubmittedWorker:
         assert job.lock_owner is None
         assert job.lock_token is None
         assert job.lock_expires_at is None
+
+    async def test_run_job_uses_server_default_registry(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+    ):
+        monkeypatch.setattr(server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY", "registry.example")
+        monkeypatch.setattr(
+            server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_USERNAME", "server-user"
+        )
+        monkeypatch.setattr(
+            server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_PASSWORD", "server-pass"
+        )
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="ubuntu"),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run, instance_assigned=True)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
+                dockerized=False, backend=BackendType.RUNPOD
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        backend_mock.compute.return_value.run_job.assert_called_once()
+        submitted_job = backend_mock.compute.return_value.run_job.call_args[0][1]
+        assert submitted_job.job_spec.image_name == "registry.example/ubuntu"
+        assert submitted_job.job_spec.registry_auth == RegistryAuth(
+            username="server-user", password="server-pass"
+        )
+
+    async def test_run_jobs_uses_server_default_registry(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+    ):
+        monkeypatch.setattr(server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY", "registry.example")
+        monkeypatch.setattr(
+            server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_USERNAME", "server-user"
+        )
+        monkeypatch.setattr(
+            server_settings, "SERVER_DEFAULT_DOCKER_REGISTRY_PASSWORD", "server-pass"
+        )
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="ubuntu", nodes=2, commands=["echo"]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        job1 = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+            job_num=0,
+            waiting_master_job=False,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+            job_num=1,
+            waiting_master_job=True,
+        )
+
+        offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.run_jobs.return_value = get_compute_group_provisioning_data(
+                job_provisioning_datas=[
+                    get_job_provisioning_data(dockerized=False, backend=BackendType.RUNPOD),
+                    get_job_provisioning_data(dockerized=False, backend=BackendType.RUNPOD),
+                ]
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job1)
+
+        compute_mock.run_jobs.assert_called_once()
+        job_configurations = compute_mock.run_jobs.call_args[0][1]
+        for job_configuration in job_configurations:
+            assert job_configuration.job.job_spec.image_name == "registry.example/ubuntu"
+            assert job_configuration.job.job_spec.registry_auth == RegistryAuth(
+                username="server-user", password="server-pass"
+            )
 
 
 @pytest.mark.asyncio
