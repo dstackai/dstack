@@ -442,13 +442,25 @@ async def get_plan(
 
     offers = []
     if effective_spec.configuration.ssh_config is None:
-        offers_with_backends = await get_create_instance_offers(
-            project=project,
-            profile=effective_spec.merged_profile,
-            requirements=get_fleet_requirements(effective_spec),
-            fleet_spec=effective_spec,
-            blocks=effective_spec.configuration.blocks,
-        )
+        requirements = get_fleet_requirements(effective_spec)
+        if _is_elastic_cloud_fleet_spec(effective_spec):
+            offers_with_backends = await offers_services.get_offers_by_requirements(
+                project=project,
+                profile=effective_spec.merged_profile,
+                requirements=requirements,
+                multinode=(
+                    effective_spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+                ),
+                blocks=effective_spec.configuration.blocks,
+            )
+        else:
+            offers_with_backends = await get_create_instance_offers(
+                project=project,
+                profile=effective_spec.merged_profile,
+                requirements=requirements,
+                fleet_spec=effective_spec,
+                blocks=effective_spec.configuration.blocks,
+            )
         offers = [offer for _, offer in offers_with_backends]
 
     _remove_fleet_spec_sensitive_info(effective_spec)
@@ -466,6 +478,16 @@ async def get_plan(
         action=action,
     )
     return plan
+
+
+def _is_elastic_cloud_fleet_spec(fleet_spec: FleetSpec) -> bool:
+    nodes = fleet_spec.configuration.nodes
+    return (
+        fleet_spec.configuration.ssh_config is None
+        and nodes is not None
+        and nodes.min == 0
+        and nodes.target == 0
+    )
 
 
 async def get_create_instance_offers(

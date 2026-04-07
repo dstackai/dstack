@@ -14,6 +14,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
+    FleetNodesSpec,
     FleetStatus,
     InstanceGroupPlacement,
     SSHHostParams,
@@ -2027,6 +2028,78 @@ class TestGetPlan:
             "max_offer_price": 1.0,
             "action": "create",
         }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_offers_for_elastic_container_backend_fleet(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        offer = get_instance_offer_with_availability(
+            backend=BackendType.RUNPOD,
+            region="US-OR-1",
+            price=0.7185,
+        )
+        spec = get_fleet_spec(
+            conf=get_fleet_configuration(nodes=FleetNodesSpec(min=0, target=0, max=1))
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            response = await client.post(
+                f"/api/project/{project.name}/fleets/get_plan",
+                headers=get_auth_headers(user.token),
+                json={"spec": spec.dict()},
+            )
+            backend_mock.compute.return_value.get_offers.assert_called_once()
+
+        response_json = response.json()
+        assert response.status_code == 200, response_json
+        assert response_json["offers"] == [json.loads(offer.json())]
+        assert response_json["total_offers"] == 1
+        assert response_json["max_offer_price"] == offer.price
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_no_offers_for_non_elastic_container_backend_fleet(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        offer = get_instance_offer_with_availability(
+            backend=BackendType.RUNPOD,
+            region="US-OR-1",
+            price=0.7185,
+        )
+        spec = get_fleet_spec(
+            conf=get_fleet_configuration(nodes=FleetNodesSpec(min=0, target=1, max=1))
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            response = await client.post(
+                f"/api/project/{project.name}/fleets/get_plan",
+                headers=get_auth_headers(user.token),
+                json={"spec": spec.dict()},
+            )
+            backend_mock.compute.return_value.get_offers.assert_called_once()
+
+        response_json = response.json()
+        assert response.status_code == 200, response_json
+        assert response_json["offers"] == []
+        assert response_json["total_offers"] == 0
+        assert response_json["max_offer_price"] is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
