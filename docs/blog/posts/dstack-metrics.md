@@ -31,9 +31,9 @@ difference is that `dstack stats` includes GPU VRAM usage and GPU utilization pe
 Similar to `kubectl top`, if a run consists of multiple jobs (such as distributed training or an auto-scalable service),
 `dstack stats` will display metrics per job.
 
-!!! info "REST API"
+!!! info "HTTP API"
     In addition to the `dstack stats` CLI commands, metrics can be obtained via the
-    [`/api/project/{project_name}/metrics/job/{run_name}`](../../docs/reference/api/rest/#operations-tag-metrics) REST endpoint.
+    [`/api/project/{project_name}/metrics/job/{run_name}`](../../docs/reference/api/http/#operations-tag-metrics) HTTP endpoint.
 
 ## Why monitor GPU usage
 

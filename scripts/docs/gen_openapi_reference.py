@@ -14,7 +14,7 @@ app.servers = [
     {"url": "https://sky.dstack.ai", "description": "Managed server"},
 ]
 app.version = DSTACK_VERSION or "0.0.0"
-output_path = Path("docs/docs/reference/api/rest/openapi.json")
+output_path = Path("docs/docs/reference/api/http/openapi.json")
 output_path.parent.mkdir(parents=True, exist_ok=True)
 new_content = json.dumps(app.openapi())
 if not output_path.exists() or output_path.read_text() != new_content:
