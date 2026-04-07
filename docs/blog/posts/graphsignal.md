@@ -12,7 +12,7 @@ links:
 
 # How Graphsignal uses dstack for inference benchmarking
 
-In a recent engineering [blog post](https://graphsignal.com/blog/autodebug-telemetry-driven-inference-optimization-loop/), Graphsignal shared **autodebug**, an autonomous loop that deploys an inference service, benchmarks it, updates the deployment config, and redeploys it again. This case study looks at the team workflow behind that setup, and how `dstack` gives Graphsignal a common layer for GPU development, inference deployment, and benchmarking.
+In a recent engineering [blog post](https://graphsignal.com/blog/autodebug-telemetry-driven-inference-optimization-loop/), Graphsignal shared `autodebug`, an autonomous loop that deploys an inference service, benchmarks it, updates the deployment config, and redeploys it again. This case study looks at the team workflow behind that setup, and how `dstack` gives Graphsignal a common layer for GPU development, inference deployment, and benchmarking.
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-graphsignal.png" width="630" />
 
