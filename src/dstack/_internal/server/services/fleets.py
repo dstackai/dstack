@@ -961,12 +961,6 @@ def get_fleet_master_instance_provisioning_data(
                     instance_model.job_provisioning_data
                 )
 
-    # TODO: Drop the legacy instance-list fallback after scheduled tasks stop
-    # inferring cluster masters from loaded fleet instances.
-    for instance_model in fleet_model.instances:
-        if not instance_model.deleted and instance_model.job_provisioning_data is not None:
-            return JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
-
     return None
 
 

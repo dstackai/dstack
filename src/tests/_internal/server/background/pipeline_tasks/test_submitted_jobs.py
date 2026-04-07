@@ -31,6 +31,7 @@ from dstack._internal.server.background.pipeline_tasks.jobs_submitted import (
 )
 from dstack._internal.server.models import (
     ComputeGroupModel,
+    FleetModel,
     InstanceModel,
     JobModel,
     PlacementGroupModel,
@@ -431,7 +432,7 @@ class TestJobSubmittedWorker:
         fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
         fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
-        await create_instance(
+        instance = await create_instance(
             session=session,
             project=project,
             fleet=fleet,
@@ -439,6 +440,7 @@ class TestJobSubmittedWorker:
             backend=BackendType.AWS,
             job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
         )
+        fleet.current_master_instance_id = instance.id
         configuration = TaskConfiguration(image="debian", nodes=2)
         run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
         run = await create_run(
@@ -486,6 +488,57 @@ class TestJobSubmittedWorker:
         backend_mock.compute.return_value.run_job.assert_called_once()
         selected_offer = backend_mock.compute.return_value.run_job.call_args[0][2]
         assert selected_offer.region == "eu-west-1"
+
+    async def test_defers_new_capacity_provisioning_until_fleet_master_is_elected(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.BUSY,
+            backend=BackendType.AWS,
+            job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
+        )
+        configuration = TaskConfiguration(image="debian", nodes=2)
+        run_spec = get_run_spec(run_name="run", repo_id=repo.name, configuration=configuration)
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=True,
+            waiting_master_job=False,
+        )
+        previous_last_processed_at = job.last_processed_at
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            await _process_job(session=session, worker=worker, job_model=job)
+            m.assert_not_called()
+
+        await session.refresh(job)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is None
+        assert job.last_processed_at > previous_last_processed_at
+        assert job.lock_owner is None
+        assert job.lock_token is None
+        assert job.lock_expires_at is None
+        worker._pipeline_hinter.hint_fetch.assert_called_once_with(FleetModel.__name__)
 
     async def test_provisioning_non_master_job_ignores_cluster_master_fleet_lock(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
