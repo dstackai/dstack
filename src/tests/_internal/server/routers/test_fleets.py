@@ -59,10 +59,7 @@ pytestmark = pytest.mark.usefixtures("image_config_mock")
 
 class TestListFleets:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/fleets/list")
         assert response.status_code in [401, 403]
 
@@ -365,10 +362,7 @@ class TestListFleets:
 
 class TestListProjectFleets:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/project/main/fleets/list")
         assert response.status_code in [401, 403]
 
@@ -555,10 +549,7 @@ class TestListProjectFleets:
 
 class TestGetFleet:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/project/main/fleets/get")
         assert response.status_code in [401, 403]
 
@@ -913,10 +904,7 @@ class TestGetFleet:
 
 class TestApplyFleetPlan:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/project/main/fleets/apply")
         assert response.status_code in [401, 403]
 
@@ -1547,10 +1535,7 @@ class TestApplyFleetPlan:
 
 class TestDeleteFleets:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/project/main/fleets/delete")
         assert response.status_code in [401, 403]
 
@@ -1727,10 +1712,7 @@ class TestDeleteFleets:
 
 class TestDeleteFleetInstances:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/project/main/fleets/delete_instances")
         assert response.status_code in [401, 403]
 
@@ -1973,10 +1955,7 @@ class TestDeleteFleetInstances:
 
 class TestGetPlan:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(
-        self, test_db, session: AsyncSession, client: AsyncClient
-    ):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/project/main/fleets/get_plan")
         assert response.status_code in [401, 403]
 

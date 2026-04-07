@@ -26,8 +26,7 @@ from dstack._internal.server.testing.common import (
 
 class TestListUsers:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/users/list")
         assert response.status_code in [401, 403]
 
@@ -277,8 +276,7 @@ class TestListUsers:
 
 class TestGetMyUser:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/users/get_my_user")
         assert response.status_code in [401, 403]
 
@@ -355,8 +353,7 @@ class TestGetMyUser:
 
 class TestGetUser:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/users/get_user")
         assert response.status_code in [401, 403]
 
@@ -410,8 +407,7 @@ class TestGetUser:
 
 class TestCreateUser:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/users/create")
         assert response.status_code in [401, 403]
 
@@ -529,8 +525,7 @@ class TestCreateUser:
 
 class TestDeleteUsers:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/users/delete")
         assert response.status_code in [401, 403]
 
@@ -639,8 +634,7 @@ class TestDeleteUsers:
 
 class TestRefreshToken:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/users/refresh_token")
         assert response.status_code in [401, 403]
 
