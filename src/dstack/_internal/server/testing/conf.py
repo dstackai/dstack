@@ -37,12 +37,15 @@ async def test_db(request):
         raise ValueError(f"Unknown db_type {db_type}")
     db = Database(db_url, engine=engine)
     override_db(db)
-    async with db.engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.drop_all)
-        await conn.run_sync(BaseModel.metadata.create_all)
+    if db_type == "sqlite":
+        async with db.engine.begin() as conn:
+            await conn.run_sync(BaseModel.metadata.drop_all)
+            await conn.run_sync(BaseModel.metadata.create_all)
+    else:
+        async with db.engine.begin() as conn:
+            await conn.run_sync(BaseModel.metadata.create_all)
+        await _truncate_postgres_db(db)
     yield db
-    async with db.engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.drop_all)
     await db.engine.dispose()
 
 
@@ -51,3 +54,15 @@ async def session(test_db):
     db = test_db
     async with db.get_session() as session:
         yield session
+
+
+async def _truncate_postgres_db(db: Database):
+    preparer = db.engine.sync_engine.dialect.identifier_preparer
+    table_names = ", ".join(
+        preparer.format_table(table) for table in BaseModel.metadata.sorted_tables
+    )
+    if not table_names:
+        return
+    truncate_statement = f"TRUNCATE {table_names} RESTART IDENTITY CASCADE"
+    async with db.engine.begin() as conn:
+        await conn.exec_driver_sql(truncate_statement)
