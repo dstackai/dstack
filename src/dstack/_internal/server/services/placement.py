@@ -18,7 +18,7 @@ from dstack._internal.core.models.placement import (
     PlacementGroupProvisioningData,
     PlacementStrategy,
 )
-from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
+from dstack._internal.server.models import FleetModel, PlacementGroupModel
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -93,28 +93,6 @@ async def schedule_fleet_placement_groups_deletion(
         )
         .values(fleet_deleted=True)  # TODO: rename `fleet_deleted` -> `to_be_deleted`
     )
-
-
-def get_placement_group_model_for_instance(
-    placement_group_models: list[PlacementGroupModel],
-    instance_model: InstanceModel,
-    master_instance_model: InstanceModel,
-) -> Optional[PlacementGroupModel]:
-    placement_group_model = None
-    if instance_model.id != master_instance_model.id:
-        if placement_group_models:
-            placement_group_model = placement_group_models[0]
-        if len(placement_group_models) > 1:
-            logger.error(
-                (
-                    "Expected 0 or 1 placement groups associated with fleet %s, found %s."
-                    " An incorrect placement group might have been selected for instance %s"
-                ),
-                instance_model.fleet_id,
-                len(placement_group_models),
-                instance_model.name,
-            )
-    return placement_group_model
 
 
 def get_placement_group_model_for_job(

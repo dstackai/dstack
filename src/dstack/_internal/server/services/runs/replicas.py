@@ -1,4 +1,3 @@
-import json
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -61,14 +60,6 @@ def build_replica_lists(
     active_replicas.sort(key=lambda r: (r[1], -r[0], r[2]))
 
     return active_replicas, inactive_replicas
-
-
-def get_group_desired_replica_count(run_model: RunModel, group: ReplicaGroup) -> int:
-    assert group.name is not None, "Group name is always set"
-    desired_replica_counts = (
-        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
-    )
-    return desired_replica_counts.get(group.name, group.count.min or 0)
 
 
 def get_group_rollout_state(run_model: RunModel, group: ReplicaGroup) -> GroupRolloutState:

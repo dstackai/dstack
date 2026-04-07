@@ -580,6 +580,7 @@ async def submit_run(
         )
 
         if run_spec.configuration.type == "service":
+            # FIXME: Register services asynchronously in the background
             await services.register_service(session, run_model, run_spec)
             service_config = run_spec.configuration
 
