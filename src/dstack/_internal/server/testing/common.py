@@ -311,7 +311,7 @@ async def create_file_archive(
     session: AsyncSession,
     user_id: UUID,
     blob_hash: str = "blob_hash",
-    blob: bytes = b"blob_content",
+    blob: Optional[bytes] = b"blob_content",
 ) -> FileArchiveModel:
     archive = FileArchiveModel(
         user_id=user_id,

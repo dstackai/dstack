@@ -101,6 +101,47 @@ class RunpodApiClient:
         data = resp.json()["data"]
         return data["podRentInterruptable"] if bid_per_gpu else data["podFindAndDeployOnDemand"]
 
+    def create_cpu_pod(
+        self,
+        name: str,
+        image_name: str,
+        instance_id: str,
+        cloud_type: str,
+        deploy_cost: float,
+        start_ssh: bool = True,
+        data_center_id: Optional[str] = None,
+        container_disk_in_gb: Optional[int] = None,
+        docker_args: Optional[str] = None,
+        ports: Optional[str] = None,
+        volume_mount_path: Optional[str] = None,
+        env: Optional[Dict[str, Any]] = None,
+        template_id: Optional[str] = None,
+        network_volume_id: Optional[str] = None,
+        container_registry_auth_id: Optional[str] = None,
+    ) -> Dict:
+        resp = self._make_request(
+            {
+                "query": _generate_cpu_pod_deployment_mutation(
+                    name=name,
+                    image_name=image_name,
+                    instance_id=instance_id,
+                    cloud_type=cloud_type,
+                    deploy_cost=deploy_cost,
+                    start_ssh=start_ssh,
+                    data_center_id=data_center_id,
+                    container_disk_in_gb=container_disk_in_gb,
+                    docker_args=docker_args,
+                    ports=ports,
+                    volume_mount_path=volume_mount_path,
+                    env=env,
+                    template_id=template_id,
+                    network_volume_id=network_volume_id,
+                    container_registry_auth_id=container_registry_auth_id,
+                )
+            }
+        )
+        return resp.json()["data"]["deployCpuPod"]
+
     def edit_pod(
         self,
         pod_id: str,
@@ -484,6 +525,77 @@ def _generate_pod_deployment_mutation(
     return f"""
         mutation {{
           {pod_deploy}(
+            input: {{
+              {input_string}
+            }}
+          ) {{
+            id
+            lastStatusChange
+            imageName
+            machine {{
+              podHostId
+            }}
+          }}
+        }}
+        """
+
+
+def _generate_cpu_pod_deployment_mutation(
+    name: str,
+    image_name: str,
+    instance_id: str,
+    cloud_type: str,
+    deploy_cost: float,
+    start_ssh: bool = True,
+    data_center_id: Optional[str] = None,
+    container_disk_in_gb: Optional[int] = None,
+    docker_args: Optional[str] = None,
+    ports: Optional[str] = None,
+    volume_mount_path: Optional[str] = None,
+    env: Optional[Dict[str, Any]] = None,
+    template_id: Optional[str] = None,
+    network_volume_id: Optional[str] = None,
+    container_registry_auth_id: Optional[str] = None,
+) -> str:
+    """
+    Generates a mutation to deploy CPU pod.
+    """
+    input_fields = []
+    input_fields.append(f'name: "{name}"')
+    input_fields.append(f'imageName: "{image_name}"')
+    input_fields.append(f'instanceId: "{instance_id}"')
+    input_fields.append(f"cloudType: {cloud_type}")
+    input_fields.append(f"deployCost: {deploy_cost}")
+
+    if start_ssh:
+        input_fields.append("startSsh: true")
+    if data_center_id is not None:
+        input_fields.append(f'dataCenterId: "{data_center_id}"')
+    if container_disk_in_gb is not None:
+        input_fields.append(f"containerDiskInGb: {container_disk_in_gb}")
+    if docker_args is not None:
+        input_fields.append(f'dockerArgs: "{docker_args}"')
+    if ports is not None:
+        ports = ports.replace(" ", "")
+        input_fields.append(f'ports: "{ports}"')
+    if volume_mount_path is not None:
+        input_fields.append(f'volumeMountPath: "{volume_mount_path}"')
+    if env is not None:
+        env_string = ", ".join(
+            [f'{{ key: "{key}", value: "{value}" }}' for key, value in env.items()]
+        )
+        input_fields.append(f"env: [{env_string}]")
+    if template_id is not None:
+        input_fields.append(f'templateId: "{template_id}"')
+    if network_volume_id is not None:
+        input_fields.append(f'networkVolumeId: "{network_volume_id}"')
+    if container_registry_auth_id is not None:
+        input_fields.append(f'containerRegistryAuthId: "{container_registry_auth_id}"')
+
+    input_string = ", ".join(input_fields)
+    return f"""
+        mutation {{
+          deployCpuPod(
             input: {{
               {input_string}
             }}

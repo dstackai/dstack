@@ -17,31 +17,38 @@ A run can spawn one or multiple jobs, depending on the configuration. A task tha
 
 ## Run's Lifecycle
 
-- STEP 1: The user submits the run. `services.runs.submit_run` creates jobs with status `SUBMITTED`. Now the run has status `SUBMITTED`.
-- STEP 2: `background.tasks.process_runs` periodically pulls unfinished runs and processes them:
-	- If any job is `RUNNING`, the run becomes `RUNNING`.
-	- If any job is `PROVISIONING` or `PULLING`, the run becomes `PROVISIONING`.
-	- If any job fails and cannot be retried, the run becomes `TERMINATING`, and after processing, `FAILED`.
-	- If all jobs are `DONE`, the run becomes `TERMINATING`, and after processing, `DONE`.
-	- If any job fails, can be retried, and there is any other active job, the failed job will be resubmitted in-place.
-	- If any jobs in a replica fail and can be retried and there is other active replicas, the jobs of the failed replica are resubmitted in-place (without stopping other replicas). But if some jobs in a replica fail, then all the jobs in a replica are terminated and resubmitted. This include multi-node tasks that represent one replica with multiple jobs.
-	- If all jobs fail and can be resubmitted, the run becomes `PENDING`.
-- STEP 3: If the run is `TERMINATING`, the server makes all jobs `TERMINATING`. `background.tasks.process_runs` sets their status to `TERMINATING`, assigns `JobTerminationReason`, and sends a graceful stop command to `dstack-runner`. `process_terminating_jobs` then ensures that jobs are terminated assigns a finished status.
-- STEP 4: Once all jobs are finished, the run becomes `TERMINATED`, `DONE`, or `FAILED` based on `RunTerminationReason`.
-- STEP 0: If the run is `PENDING`, `background.tasks.process_runs` will resubmit jobs. The run becomes `SUBMITTED` again.
-
-> Use `switch_run_status()` for all status transitions. Do not set `RunModel.status` directly.
-
-> No one must assign the finished status to the run, except `services.runs.process_terminating_run`. To terminate the run, assign `TERMINATING` status and `RunTerminationReason`.
+- STEP 1: The user submits the run. `services.runs.submit_run` creates jobs with status `SUBMITTED`. The run starts in `SUBMITTED`.
+- STEP 2: `RunPipeline` continuously processes unfinished runs.
+  - For active runs, it derives the run status from the latest job states in priority order:
+    1. If any non-retryable failure is present, the run becomes `TERMINATING` with the relevant `RunTerminationReason`.
+    2. If `stop_criteria == MASTER_DONE` and the master job is done, the run becomes `TERMINATING` with `ALL_JOBS_DONE`.
+    3. Otherwise, if any job is `RUNNING`, the run becomes `RUNNING`.
+    4. Otherwise, if any job is `PROVISIONING` or `PULLING`, the run becomes `PROVISIONING`.
+    5. Otherwise, if jobs are still waiting for placement or provisioning, the run stays `SUBMITTED`.
+    6. Otherwise, if all contributing jobs are `DONE`, the run becomes `TERMINATING` with `ALL_JOBS_DONE`.
+    7. Otherwise, if no active replicas remain and the run should be retried, the run becomes `PENDING`.
+  - Retryable replica failures are handled before the final transition is applied:
+    - If a replica fails with a retryable reason while other replicas are still active, `RunPipeline` creates a new `SUBMITTED` submission for that replica and terminates the old jobs in that replica.
+    - If all remaining work is retryable, the run ends up in `PENDING`.
+- STEP 3: If the run is `PENDING`, `RunPipeline` processes it in the pending phase.
+  - For retrying runs, it waits for an exponential backoff before resubmitting.
+  - For scheduled runs, it waits until `next_triggered_at`.
+  - For scaled-to-zero services, it can keep the run in `PENDING` until autoscaling wants replicas again.
+  - Once the run is ready to continue, `RunPipeline` creates new `SUBMITTED` jobs and moves the run back to `SUBMITTED`.
+- STEP 4: If the run is `TERMINATING`, `RunPipeline` marks active jobs as `TERMINATING` and assigns the corresponding `JobTerminationReason`.
+- STEP 5: Once all jobs are finished, the terminating phase of `RunPipeline` either:
+  - assigns the final run status (`TERMINATED`, `DONE`, or `FAILED`), or
+  - for scheduled runs that were not stopped or aborted by the user, returns the run to `PENDING` and computes a new `next_triggered_at`.
 
 ### Services
 
-Services' lifecycle has some modifications:
+Services' run lifecycle has some modifications:
 
-- During STEP 1, the service is registered on the gateway. If the gateway is not accessible or the domain name is taken, the run submission fails.
-- During STEP 2, downscaled jobs are ignored.
-- During STEP 4, the service is unregistered on the gateway.
-- During STEP 0, the service can stay in `PENDING` status if it was downscaled to zero (WIP).
+- During STEP 1, the service itself is registered on the gateway or the in-server proxy. If the gateway is not accessible or the domain name is taken, submission fails.
+- During STEP 2, active run processing also computes desired replica counts from gateway stats and handles scale-up, scale-down, rolling deployment, and cleanup of removed replica groups.
+- During STEP 2, jobs already marked `SCALED_DOWN` do not contribute to the run status.
+- During STEP 3, a service can stay in `PENDING` when autoscaling currently wants zero replicas.
+- During STEP 5, the terminating phase of `RunPipeline` unregisters the service from the gateway.
 
 ### When can the job be retried?
 
@@ -54,29 +61,25 @@ Services' lifecycle has some modifications:
 ## Job's Lifecycle
 
 - STEP 1: A newly submitted job has status `SUBMITTED`. It is not assigned to any instance yet.
-- STEP 2: `background.tasks.process_submitted_jobs` tries to assign an existing instance or provision a new one.
-	- On success, the job becomes `PROVISIONING`.
-	- On failure, the job becomes `TERMINATING`, and after processing, `FAILED` because of `FAILED_TO_START_DUE_TO_NO_CAPACITY`.
-- STEP 3: `background.tasks.process_running_jobs` periodically pulls unfinished jobs and processes them.
-	- While `dstack-shim`/`dstack-runner` is not responding, the job stays `PROVISIONING`.
-	- Once `dstack-shim` (for VM-featured backends) becomes available, it submits the docker image name, and the job becomes `PULLING`.
-	- Once `dstack-runner` inside a docker container becomes available, it submits the code and the job spec, and the job becomes `RUNNING`.
-	- If `dstack-shim` or `dstack-runner` don't respond for a long time or fail to respond after successful connection and multiple retries, the job becomes `TERMINATING`, and after processing, `FAILED`.
-- STEP 4: `background.tasks.process_running_jobs` processes `RUNNING` jobs, pulling job logs, runner logs, and job status.
-	- If the pulled status is `DONE`, the job becomes `TERMINATING`, and after processing, `DONE`.
-	- Otherwise, the job becomes `TERMINATING`, and after processing, `FAILED`.
-- STEP 5: `background.tasks.process_terminating_jobs` processes `TERMINATING` jobs.
-	- If the job has `remove_at` in the future, nothing happens. This is to give the job some time for a graceful stop.
-	- Once `remove_at` is in the past, it stops the container via `dstack-shim`, detaches instance volumes, and releases the instance. The job becomes `TERMINATED`, `DONE`, `FAILED`, or `ABORTED` based on `JobTerminationReason`.
-	- If some volumes fail to detach, it keeps the job `TERMINATING` and checks volumes attachment status.
-
-> Use `switch_job_status()` for all status transitions. Do not set `JobModel.status` directly.
-
-> No one must assign the finished status to the job, except `services.jobs.process_terminating_job`. To terminate the job, assign `TERMINATING` status and `JobTerminationReason`.
+- STEP 2: `JobSubmittedPipeline` tries to assign an existing instance or provision new capacity.
+  - On success, the job becomes `PROVISIONING`.
+  - On failure, the job becomes `TERMINATING`. `JobTerminatingPipeline` later assigns the final failed status.
+- STEP 3: `JobRunningPipeline` processes `PROVISIONING`, `PULLING`, and `RUNNING` jobs.
+  - While `dstack-shim` / `dstack-runner` is not responding, the job stays `PROVISIONING`.
+  - Once `dstack-shim` (for VM-featured backends) becomes available, the pipeline submits the image and the job becomes `PULLING`.
+  - Once `dstack-runner` inside the container becomes available, the pipeline uploads the code and job spec, and the job becomes `RUNNING`.
+  - While the job is `RUNNING`, the pipeline keeps collecting logs and runner status.
+  - If startup, runner communication, or replica registration fails, the job becomes `TERMINATING`.
+- STEP 4: Once the job is actually ready, `JobRunningPipeline` initializes probes.
+- STEP 5: `JobTerminatingPipeline` processes `TERMINATING` jobs.
+  - If the job has `remove_at` in the future, it waits. This gives the job time for a graceful stop.
+  - Once `remove_at` is in the past, it stops the container, detaches volumes, unregisters service replicas if needed, and releases the instance assignment.
+  - If some volumes are not detached yet, the job stays `TERMINATING` and is retried.
+  - When cleanup is complete, the job becomes `TERMINATED`, `DONE`, `FAILED`, or `ABORTED` based on `JobTerminationReason`.
 
 ### Services' Jobs
 
 Services' jobs lifecycle has some modifications:
 
-- During STEP 3, once the job becomes `RUNNING`, it is registered on the gateway as a replica. If the gateway is not accessible, the job fails.
-- During STEP 5, the job is unregistered on the gateway (WIP).
+- During STEP 3, once the primary job of a replica is `RUNNING` and ready to receive traffic, `JobRunningPipeline` registers that replica on the gateway. If the gateway is not accessible, the job fails with a gateway-related termination reason.
+- During STEP 5, `JobTerminatingPipeline` unregisters the replica from receiving requests before the job is fully cleaned up.

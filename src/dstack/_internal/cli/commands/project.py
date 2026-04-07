@@ -1,6 +1,6 @@
 import argparse
 import sys
-from typing import Any, Optional, Union
+from typing import Optional
 
 import questionary
 from requests import HTTPError
@@ -191,7 +191,7 @@ class ProjectCommand(BaseCommand):
         for project_config in config_manager.list_project_configs():
             project_name = project_config.name
             is_default = project_name == default_project.name if default_project else False
-            row: dict[Union[str, int], Any] = {
+            row = {
                 "PROJECT": project_name,
                 "URL": project_config.url,
                 "DEFAULT": "✓" if is_default else "",

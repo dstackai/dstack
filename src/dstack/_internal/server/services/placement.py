@@ -3,7 +3,6 @@ from collections.abc import Iterable
 from typing import Optional
 from uuid import UUID
 
-from git import List
 from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +18,7 @@ from dstack._internal.core.models.placement import (
     PlacementGroupProvisioningData,
     PlacementStrategy,
 )
-from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
+from dstack._internal.server.models import FleetModel, PlacementGroupModel
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -66,7 +65,7 @@ def get_placement_group_provisioning_data(
 async def get_fleet_placement_group_models(
     session: AsyncSession,
     fleet_id: Optional[UUID],
-) -> List[PlacementGroupModel]:
+) -> list[PlacementGroupModel]:
     if fleet_id is None:
         return []
     res = await session.execute(
@@ -96,28 +95,6 @@ async def schedule_fleet_placement_groups_deletion(
     )
 
 
-def get_placement_group_model_for_instance(
-    placement_group_models: list[PlacementGroupModel],
-    instance_model: InstanceModel,
-    master_instance_model: InstanceModel,
-) -> Optional[PlacementGroupModel]:
-    placement_group_model = None
-    if instance_model.id != master_instance_model.id:
-        if placement_group_models:
-            placement_group_model = placement_group_models[0]
-        if len(placement_group_models) > 1:
-            logger.error(
-                (
-                    "Expected 0 or 1 placement groups associated with fleet %s, found %s."
-                    " An incorrect placement group might have been selected for instance %s"
-                ),
-                instance_model.fleet_id,
-                len(placement_group_models),
-                instance_model.name,
-            )
-    return placement_group_model
-
-
 def get_placement_group_model_for_job(
     placement_group_models: list[PlacementGroupModel],
     fleet_model: Optional[FleetModel],
@@ -138,7 +115,7 @@ def get_placement_group_model_for_job(
 
 async def find_or_create_suitable_placement_group(
     fleet_model: FleetModel,
-    placement_groups: List[PlacementGroupModel],
+    placement_groups: list[PlacementGroupModel],
     instance_offer: InstanceOffer,
     compute: ComputeWithPlacementGroupSupport,
 ) -> Optional[PlacementGroupModel]:
@@ -157,7 +134,7 @@ async def find_or_create_suitable_placement_group(
 
 
 def find_suitable_placement_group(
-    placement_groups: List[PlacementGroupModel],
+    placement_groups: list[PlacementGroupModel],
     instance_offer: InstanceOffer,
     compute: ComputeWithPlacementGroupSupport,
 ) -> Optional[PlacementGroupModel]:

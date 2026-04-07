@@ -162,3 +162,40 @@ class SSHPortInUseError(SSHError):
 
 class DockerRegistryError(DstackError):
     pass
+
+
+class RepoError(DstackError):
+    pass
+
+
+class RepoDetachedHeadError(RepoError):
+    pass
+
+
+class RepoInvalidCredentialsError(RepoError):
+    pass
+
+
+class RepoGitError(RepoError):
+    """
+    A wrapper for `git.exc.GitError` and its subclasses.
+
+    Should be raised with `from e` clause to indicate the underlying exception.
+    To build a message from the underlying exception, raise this exception without arguments.
+
+        try:
+            ...
+        except git.GitError as e:
+            raise RepoGitError() from e
+    """
+
+    def __str__(self) -> str:
+        if self.args or self.__cause__ is None:
+            return super().__str__()
+        return f"{self.__cause__.__class__.__name__}: {self.__cause__}"
+
+
+class RepoInvalidGitRepositoryError(RepoGitError):
+    """
+    `DstackError` counterpart for `git.exc.InvalidGitRepositoryError`.
+    """

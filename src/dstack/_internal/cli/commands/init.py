@@ -11,6 +11,8 @@ from dstack._internal.cli.services.repos import (
     register_init_repo_args,
 )
 from dstack._internal.cli.utils.common import console
+from dstack._internal.core.errors import CLIError, RepoInvalidCredentialsError
+from dstack._internal.core.services.repos import get_repo_creds_and_default_branch
 from dstack.api import Client
 
 
@@ -55,10 +57,19 @@ class InitCommand(BaseCommand):
             repo = get_repo_from_dir(repo_path)
         else:
             assert False, "should not reach here"
+
+        try:
+            repo_creds, _ = get_repo_creds_and_default_branch(
+                repo_url=repo.repo_url,
+                identity_file=args.git_identity_file,
+                oauth_token=args.gh_token,
+            )
+        except RepoInvalidCredentialsError:
+            raise CLIError(
+                "No valid default Git credentials found. Pass valid `--token` or `--git-identity`."
+            )
+
         api = Client.from_config(project_name=args.project)
-        api.repos.init(
-            repo=repo,
-            git_identity_file=args.git_identity_file,
-            oauth_token=args.gh_token,
-        )
+        api.repos.init(repo=repo, creds=repo_creds)
+
         console.print("OK")

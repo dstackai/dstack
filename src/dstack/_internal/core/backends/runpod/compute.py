@@ -88,7 +88,24 @@ class RunpodCompute(
         return offers
 
     def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
-        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
+        gpu_disk_modifier = get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)
+
+        def disk_modifier(
+            offer: InstanceOfferWithAvailability,
+        ) -> Optional[InstanceOfferWithAvailability]:
+            if len(offer.instance.resources.gpus) > 0:
+                return gpu_disk_modifier(offer)
+
+            # For Runpod CPU offers, gpuhunt disk is the per-flavor max.
+            # Choose requested disk within [1GB, max] or filter the offer out.
+            cpu_max_disk_size_gb = Memory(offer.instance.resources.disk.size_mib / 1024)
+            cpu_configurable_disk_size = Range[Memory](
+                min=Memory.parse("1GB"),
+                max=cpu_max_disk_size_gb,
+            )
+            return get_offers_disk_modifier(cpu_configurable_disk_size, requirements)(offer)
+
+        return [disk_modifier]
 
     def get_offers_post_filter(
         self, requirements: Requirements
@@ -140,46 +157,63 @@ class RunpodCompute(
             job.job_spec.registry_auth
         )
         gpu_count = len(instance_offer.instance.resources.gpus)
-        bid_per_gpu = None
-        if instance_offer.instance.resources.spot and gpu_count:
-            bid_per_gpu = instance_offer.price / gpu_count
-        if _is_secure_cloud(instance_offer.region):
-            cloud_type = "SECURE"
-            data_center_id = instance_offer.region
-            country_code = None
+        if gpu_count == 0:
+            if not _is_secure_cloud(instance_offer.region):
+                raise ComputeError("Runpod CPU offers are only supported in secure cloud regions")
+            resp = self.api_client.create_cpu_pod(
+                name=pod_name,
+                image_name=job.job_spec.image_name,
+                instance_id=instance_offer.instance.name,
+                cloud_type="SECURE",
+                deploy_cost=instance_offer.price,
+                data_center_id=instance_offer.region,
+                container_disk_in_gb=disk_size,
+                start_ssh=True,
+                docker_args=_get_docker_args(authorized_keys),
+                ports=f"{DSTACK_RUNNER_SSH_PORT}/tcp",
+                network_volume_id=network_volume_id,
+                volume_mount_path=volume_mount_path,
+                env={"RUNPOD_POD_USER": "0"},
+            )
         else:
-            cloud_type = "COMMUNITY"
-            data_center_id = None
-            country_code = instance_offer.region
+            bid_per_gpu = None
+            if instance_offer.instance.resources.spot:
+                bid_per_gpu = instance_offer.price / gpu_count
+            if _is_secure_cloud(instance_offer.region):
+                cloud_type = "SECURE"
+                data_center_id = instance_offer.region
+                country_code = None
+            else:
+                cloud_type = "COMMUNITY"
+                data_center_id = None
+                country_code = instance_offer.region
 
-        resp = self.api_client.create_pod(
-            name=pod_name,
-            image_name=job.job_spec.image_name,
-            gpu_type_id=instance_offer.instance.name,
-            cloud_type=cloud_type,
-            data_center_id=data_center_id,
-            country_code=country_code,
-            gpu_count=gpu_count,
-            container_disk_in_gb=disk_size,
-            min_vcpu_count=instance_offer.instance.resources.cpus,
-            min_memory_in_gb=memory_size,
-            support_public_ip=True,
-            docker_args=_get_docker_args(authorized_keys),
-            ports=f"{DSTACK_RUNNER_SSH_PORT}/tcp",
-            bid_per_gpu=bid_per_gpu,
-            network_volume_id=network_volume_id,
-            volume_mount_path=volume_mount_path,
-            env={"RUNPOD_POD_USER": "0"},
-        )
+            resp = self.api_client.create_pod(
+                name=pod_name,
+                image_name=job.job_spec.image_name,
+                gpu_type_id=instance_offer.instance.name,
+                cloud_type=cloud_type,
+                data_center_id=data_center_id,
+                country_code=country_code,
+                gpu_count=gpu_count,
+                container_disk_in_gb=disk_size,
+                min_vcpu_count=instance_offer.instance.resources.cpus,
+                min_memory_in_gb=memory_size,
+                support_public_ip=True,
+                docker_args=_get_docker_args(authorized_keys),
+                ports=f"{DSTACK_RUNNER_SSH_PORT}/tcp",
+                bid_per_gpu=bid_per_gpu,
+                network_volume_id=network_volume_id,
+                volume_mount_path=volume_mount_path,
+                env={"RUNPOD_POD_USER": "0"},
+            )
 
         instance_id = resp["id"]
 
         # Call edit_pod to pass container_registry_auth_id.
         # Expect a long time (~5m) for the pod to pick up the creds.
-        # TODO: remove editPod once createPod supports docker's username and password
-        # editPod is temporary solution to set container_registry_auth_id because createPod does not
-        # support it currently. This will be removed once createPod supports container_registry_auth_id
-        # or username and password
+        # TODO: remove editPod once Runpod's create mutations support docker's username/password
+        # (or a reliable containerRegistryAuthId at create time).
         if container_registry_auth_id is not None:
             instance_id = self.api_client.edit_pod(
                 pod_id=instance_id,

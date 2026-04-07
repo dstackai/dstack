@@ -1,4 +1,5 @@
 import json
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from httpx import AsyncClient
@@ -8,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import CodeModel, RepoCredsModel, RepoModel
 from dstack._internal.server.services.projects import add_project_member
+from dstack._internal.server.services.storage import BaseStorage
 from dstack._internal.server.testing.common import (
+    create_code,
     create_project,
     create_repo,
     create_repo_creds,
@@ -321,11 +324,26 @@ class TestDeleteRepos:
         assert repo is None
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+@pytest.mark.usefixtures("test_db")
 class TestUploadCode:
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.fixture
+    def default_storage_mock(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
+        storage_mock = Mock(spec_set=BaseStorage)
+        monkeypatch.setattr(
+            "dstack._internal.server.services.repos.get_default_storage", lambda: storage_mock
+        )
+        return storage_mock
+
+    @pytest.fixture
+    def no_default_storage(self, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(
+            "dstack._internal.server.services.repos.get_default_storage", lambda: None
+        )
+
     async def test_returns_403_if_not_project_member(
-        self, test_db, session: AsyncSession, client: AsyncClient
+        self, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -336,9 +354,8 @@ class TestUploadCode:
         )
         assert response.status_code == 403
 
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_uploads_code(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.usefixtures("no_default_storage")
+    async def test_uploads_code_to_db(self, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -354,14 +371,38 @@ class TestUploadCode:
         )
         assert response.status_code == 200, response.json()
         res = await session.execute(select(CodeModel))
-        code = res.scalar()
+        code = res.scalar_one()
         assert code.blob_hash == file[0]
         assert code.blob == file[1]
 
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_uploads_code_to_storage(
+        self, session: AsyncSession, client: AsyncClient, default_storage_mock: Mock
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        file = ("blob_hash", b"blob_content")
+        response = await client.post(
+            f"/api/project/{project.name}/repos/upload_code",
+            headers=get_auth_headers(user.token),
+            params={"repo_id": repo.name},
+            files={"file": file},
+        )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(CodeModel))
+        code = res.scalar_one()
+        assert code.blob_hash == file[0]
+        assert code.blob is None
+        default_storage_mock.upload_code.assert_called_once_with(
+            project.name, repo.name, file[0], file[1]
+        )
+
+    @pytest.mark.usefixtures("no_default_storage")
     async def test_uploads_same_code_for_different_repos(
-        self, test_db, session: AsyncSession, client: AsyncClient
+        self, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -388,3 +429,36 @@ class TestUploadCode:
         res = await session.execute(select(CodeModel))
         codes = res.scalars().all()
         assert len(codes) == 2
+
+    async def test_handles_race_condition(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        session: AsyncSession,
+        client: AsyncClient,
+        default_storage_mock: Mock,
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        file = ("blob_hash", b"blob_content")
+        code = await create_code(session=session, repo=repo, blob_hash=file[0], blob=file[1])
+        monkeypatch.setattr(
+            "dstack._internal.server.services.repos.get_code_model", AsyncMock(return_value=None)
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/repos/upload_code",
+            headers=get_auth_headers(user.token),
+            params={"repo_id": repo.name},
+            files={"file": file},
+        )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(CodeModel))
+        code = res.scalar_one()
+        assert code.blob_hash == file[0]
+        assert code.blob == file[1]
+        default_storage_mock.upload_code.assert_called_once_with(
+            project.name, repo.name, file[0], file[1]
+        )

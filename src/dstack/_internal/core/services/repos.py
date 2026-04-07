@@ -4,11 +4,11 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Optional
 
+import git
 import git.cmd
 import yaml
-from git.exc import GitCommandError
 
-from dstack._internal.core.errors import DstackError
+from dstack._internal.core.errors import RepoInvalidCredentialsError
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.repos.remote import GitRepoURL
 from dstack._internal.utils.logging import get_logger
@@ -21,10 +21,6 @@ gh_config_path = os.path.expanduser("~/.config/gh/hosts.yml")
 default_ssh_key = os.path.expanduser("~/.ssh/id_rsa")
 
 
-class InvalidRepoCredentialsError(DstackError):
-    pass
-
-
 def get_repo_creds_and_default_branch(
     repo_url: str,
     identity_file: Optional[PathLike] = None,
@@ -34,7 +30,7 @@ def get_repo_creds_and_default_branch(
     url = GitRepoURL.parse(repo_url, get_ssh_config=get_host_config)
 
     # no auth
-    with suppress(InvalidRepoCredentialsError):
+    with suppress(RepoInvalidCredentialsError):
         creds, default_branch = _get_repo_creds_and_default_branch_https(url)
         logger.debug(
             "Git repo %s is public. Using no auth. Default branch: %s", repo_url, default_branch
@@ -93,7 +89,7 @@ def get_repo_creds_and_default_branch(
     identities = get_host_config(url.original_host).get("identityfile")
     if identities:
         _identity_file = identities[0]
-        with suppress(InvalidRepoCredentialsError):
+        with suppress(RepoInvalidCredentialsError):
             _private_key = _read_private_key(_identity_file)
             creds, default_branch = _get_repo_creds_and_default_branch_ssh(
                 url, _identity_file, _private_key
@@ -112,7 +108,7 @@ def get_repo_creds_and_default_branch(
             gh_hosts = yaml.load(f, Loader=yaml.FullLoader)
         _oauth_token = gh_hosts.get(url.host, {}).get("oauth_token")
         if _oauth_token is not None:
-            with suppress(InvalidRepoCredentialsError):
+            with suppress(RepoInvalidCredentialsError):
                 creds, default_branch = _get_repo_creds_and_default_branch_https(url, _oauth_token)
                 masked_token = (
                     len(_oauth_token[:-4]) * "*" + _oauth_token[-4:]
@@ -130,7 +126,7 @@ def get_repo_creds_and_default_branch(
 
     # default user key
     if os.path.exists(default_ssh_key):
-        with suppress(InvalidRepoCredentialsError):
+        with suppress(RepoInvalidCredentialsError):
             _private_key = _read_private_key(default_ssh_key)
             creds, default_branch = _get_repo_creds_and_default_branch_ssh(
                 url, default_ssh_key, _private_key
@@ -143,9 +139,7 @@ def get_repo_creds_and_default_branch(
             )
             return creds, default_branch
 
-    raise InvalidRepoCredentialsError(
-        "No valid default Git credentials found. Pass valid `--token` or `--git-identity`."
-    )
+    raise RepoInvalidCredentialsError()
 
 
 def _get_repo_creds_and_default_branch_ssh(
@@ -155,9 +149,9 @@ def _get_repo_creds_and_default_branch_ssh(
     env = _make_git_env_for_creds_check(identity_file=identity_file)
     try:
         default_branch = _get_repo_default_branch(_url, env)
-    except GitCommandError as e:
+    except git.GitCommandError as e:
         message = f"Cannot access `{_url}` using the `{identity_file}` private SSH key"
-        raise InvalidRepoCredentialsError(message) from e
+        raise RepoInvalidCredentialsError(message) from e
     creds = RemoteRepoCreds(
         clone_url=_url,
         private_key=private_key,
@@ -173,12 +167,12 @@ def _get_repo_creds_and_default_branch_https(
     env = _make_git_env_for_creds_check()
     try:
         default_branch = _get_repo_default_branch(url.as_https(oauth_token), env)
-    except GitCommandError as e:
+    except git.GitCommandError as e:
         message = f"Cannot access `{_url}`"
         if oauth_token is not None:
             masked_token = len(oauth_token[:-4]) * "*" + oauth_token[-4:]
             message = f"{message} using the `{masked_token}` token"
-        raise InvalidRepoCredentialsError(message) from e
+        raise RepoInvalidCredentialsError(message) from e
     creds = RemoteRepoCreds(
         clone_url=_url,
         private_key=None,
@@ -224,11 +218,11 @@ def _get_repo_default_branch(url: str, env: dict[str, str]) -> Optional[str]:
 def _read_private_key(identity_file: PathLike) -> str:
     identity_file = Path(identity_file).expanduser().resolve()
     if not Path(identity_file).exists():
-        raise InvalidRepoCredentialsError(f"The `{identity_file}` private SSH key doesn't exist")
+        raise RepoInvalidCredentialsError(f"The `{identity_file}` private SSH key doesn't exist")
     if not os.access(identity_file, os.R_OK):
-        raise InvalidRepoCredentialsError(f"Cannot access the `{identity_file}` private SSH key")
+        raise RepoInvalidCredentialsError(f"Cannot access the `{identity_file}` private SSH key")
     if not try_ssh_key_passphrase(identity_file):
-        raise InvalidRepoCredentialsError(
+        raise RepoInvalidCredentialsError(
             f"Cannot use the `{identity_file}` private SSH key. "
             "Ensure that it is valid and passphrase-free"
         )

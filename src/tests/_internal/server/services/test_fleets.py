@@ -9,20 +9,26 @@ from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
+    FleetNodesSpec,
     FleetSpec,
+    InstanceGroupPlacement,
     SSHHostParams,
     SSHParams,
 )
 from dstack._internal.core.models.instances import RemoteConnectionInfo
 from dstack._internal.server.models import FleetModel, ProjectModel
 from dstack._internal.server.services.backends import get_project_backends
-from dstack._internal.server.services.fleets import get_plan
+from dstack._internal.server.services.fleets import (
+    get_fleet_master_instance_provisioning_data,
+    get_plan,
+)
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
     create_project,
     create_user,
     get_fleet_spec,
+    get_job_provisioning_data,
     get_ssh_key,
 )
 
@@ -171,3 +177,29 @@ class TestGetPlanSSHFleetHostsValidation:
             await get_plan(
                 session=session, project=project, user=user, spec=fleet_spec_without_name
             )
+
+
+class TestGetFleetMasterInstanceProvisioningData:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_none_without_current_master_instance(
+        self, test_db, session: AsyncSession
+    ) -> None:
+        project = await create_project(session=session)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=1, max=2)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
+        )
+
+        master_provisioning_data = get_fleet_master_instance_provisioning_data(
+            fleet_model=fleet,
+            fleet_spec=fleet_spec,
+        )
+
+        assert master_provisioning_data is None

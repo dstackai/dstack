@@ -2,18 +2,12 @@
 Application logic related to `type: service` runs.
 """
 
-import json
-import uuid
-from datetime import datetime
 from functools import partial
 from typing import Optional
 
 import httpx
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
-import dstack._internal.server.services.jobs as jobs_services
 from dstack._internal.core.errors import (
     GatewayError,
     ResourceNotExistsError,
@@ -21,22 +15,20 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.configurations import (
-    DEFAULT_REPLICA_GROUP_NAME,
     SERVICE_HTTPS_DEFAULT,
     ServiceConfiguration,
 )
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewayStatus
-from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.routers import (
     AnyServiceRouterConfig,
     RouterType,
     SGLangServiceRouterConfig,
 )
-from dstack._internal.core.models.runs import Run, RunSpec, ServiceModelSpec, ServiceSpec
+from dstack._internal.core.models.runs import RunSpec, ServiceModelSpec, ServiceSpec
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.proxy.gateway.const import SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE
 from dstack._internal.server import settings
-from dstack._internal.server.models import GatewayModel, JobModel, ProjectModel, RunModel
+from dstack._internal.server.models import GatewayModel, RunModel
 from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import (
     get_gateway_configuration,
@@ -45,46 +37,10 @@ from dstack._internal.server.services.gateways import (
     get_project_gateway_model_by_name,
 )
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.services.autoscalers import get_service_scaler
 from dstack._internal.server.services.services.options import get_service_options
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-def _gateway_has_sglang_router(config: GatewayConfiguration) -> bool:
-    return config.router is not None and config.router.type == RouterType.SGLANG.value
-
-
-def _build_service_router_config(
-    gateway_configuration: GatewayConfiguration,
-    service_configuration: ServiceConfiguration,
-) -> Optional[AnyServiceRouterConfig]:
-    """
-    Build router config from gateway (type, policy) + service (pd_disaggregation, policy override).
-    Service's policy overrides gateway's if present. Keeps backward compat: SGLang enabled
-    automatically when gateway has it configured.
-    """
-    if not _gateway_has_sglang_router(gateway_configuration):
-        return None
-
-    gateway_router = gateway_configuration.router
-    assert gateway_router is not None  # ensured by _gateway_has_sglang_router
-    router_type = gateway_router.type
-    policy = gateway_router.policy
-
-    service_router = service_configuration.router
-    if service_router is not None and isinstance(service_router, SGLangServiceRouterConfig):
-        policy = service_router.policy
-        pd_disaggregation = service_router.pd_disaggregation
-    else:
-        pd_disaggregation = False
-
-    return SGLangServiceRouterConfig(
-        type=router_type,
-        policy=policy,
-        pd_disaggregation=pd_disaggregation,
-    )
 
 
 async def register_service(session: AsyncSession, run_model: RunModel, run_spec: RunSpec):
@@ -191,7 +147,7 @@ async def _register_service_in_gateway(
         model_url = service_url + run_spec.configuration.model.prefix
     else:
         model_url = f"{gateway_protocol}://gateway.{wildcard_domain}"
-    service_spec = get_service_spec(
+    service_spec = _get_service_spec(
         configuration=run_spec.configuration,
         service_url=service_url,
         model_url=model_url,
@@ -294,14 +250,49 @@ def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> Servi
         model_url = service_url.rstrip("/") + run_spec.configuration.model.prefix
     else:
         model_url = f"/proxy/models/{run_model.project.name}/"
-    return get_service_spec(
+    return _get_service_spec(
         configuration=run_spec.configuration,
         service_url=service_url,
         model_url=model_url,
     )
 
 
-def get_service_spec(
+def _gateway_has_sglang_router(config: GatewayConfiguration) -> bool:
+    return config.router is not None and config.router.type == RouterType.SGLANG.value
+
+
+def _build_service_router_config(
+    gateway_configuration: GatewayConfiguration,
+    service_configuration: ServiceConfiguration,
+) -> Optional[AnyServiceRouterConfig]:
+    """
+    Build router config from gateway (type, policy) + service (pd_disaggregation, policy override).
+    Service's policy overrides gateway's if present. Keeps backward compat: SGLang enabled
+    automatically when gateway has it configured.
+    """
+    if not _gateway_has_sglang_router(gateway_configuration):
+        return None
+
+    gateway_router = gateway_configuration.router
+    assert gateway_router is not None  # ensured by _gateway_has_sglang_router
+    router_type = gateway_router.type
+    policy = gateway_router.policy
+
+    service_router = service_configuration.router
+    if service_router is not None and isinstance(service_router, SGLangServiceRouterConfig):
+        policy = service_router.policy
+        pd_disaggregation = service_router.pd_disaggregation
+    else:
+        pd_disaggregation = False
+
+    return SGLangServiceRouterConfig(
+        type=router_type,
+        policy=policy,
+        pd_disaggregation=pd_disaggregation,
+    )
+
+
+def _get_service_spec(
     configuration: ServiceConfiguration, service_url: str, model_url: str
 ) -> ServiceSpec:
     service_spec = ServiceSpec(url=service_url)
@@ -313,137 +304,6 @@ def get_service_spec(
         )
         service_spec.options = get_service_options(configuration)
     return service_spec
-
-
-async def register_replica(
-    session: AsyncSession,
-    gateway_id: Optional[uuid.UUID],
-    run: Run,
-    job_model: JobModel,
-    ssh_head_proxy: Optional[SSHConnectionParams],
-    ssh_head_proxy_private_key: Optional[str],
-):
-    gateway = None
-    if gateway_id is not None:
-        gateway, conn = await get_or_add_gateway_connection(session, gateway_id)
-        job_submission = jobs_services.job_model_to_job_submission(job_model)
-        assert job_model.instance is not None
-        instance_project_ssh_private_key = None
-        if job_model.project_id != job_model.instance.project_id:
-            instance_project_ssh_private_key = job_model.instance.project.ssh_private_key
-        try:
-            logger.debug("%s: registering replica for service %s", fmt(job_model), run.id.hex)
-            async with conn.client() as client:
-                await client.register_replica(
-                    run=run,
-                    job_spec=jobs_services.get_job_spec(job_model),
-                    job_submission=job_submission,
-                    instance_project_ssh_private_key=instance_project_ssh_private_key,
-                    ssh_head_proxy=ssh_head_proxy,
-                    ssh_head_proxy_private_key=ssh_head_proxy_private_key,
-                )
-        except (httpx.RequestError, SSHError) as e:
-            logger.debug("Gateway request failed", exc_info=True)
-            raise GatewayError(repr(e))
-        except GatewayError as e:
-            if "already exists in service" in e.msg:
-                # Pre-0.19.25 servers never mark the job as `registered`, so 0.19.25+ servers may
-                # attempt to register a replica that is already registered on the gateway.
-                logger.warning(
-                    (
-                        "%s: could not register replica in gateway: %s."
-                        " NOTE: if you just updated dstack from pre-0.19.25 to 0.19.25+,"
-                        " expect to see this warning once for every running service replica"
-                    ),
-                    fmt(job_model),
-                    e.msg,
-                )
-            else:
-                raise
-    job_model.registered = True
-    targets = [events.Target.from_model(job_model)]
-    if gateway is not None:
-        targets.append(events.Target.from_model(gateway))
-    events.emit(
-        session,
-        "Service replica registered to receive requests",
-        actor=events.SystemActor(),
-        targets=targets,
-    )
-
-
-async def unregister_service(session: AsyncSession, run_model: RunModel):
-    if run_model.gateway_id is None:  # in-server proxy
-        return
-    gateway, conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
-    res = await session.execute(
-        select(ProjectModel).where(ProjectModel.id == run_model.project_id)
-    )
-    project = res.scalar_one()
-    try:
-        logger.debug("%s: unregistering service", fmt(run_model))
-        async with conn.client() as client:
-            await client.unregister_service(
-                project=project.name,
-                run_name=run_model.run_name,
-            )
-        event_msg = "Service unregistered from gateway"
-    except GatewayError as e:
-        # ignore if service is not registered
-        logger.warning("%s: unregistering service: %s", fmt(run_model), e)
-        event_msg = f"Gateway error when unregistering service: {e}"
-    except (httpx.RequestError, SSHError) as e:
-        logger.debug("Gateway request failed", exc_info=True)
-        raise GatewayError(repr(e))
-    events.emit(
-        session,
-        event_msg,
-        actor=events.SystemActor(),
-        targets=[
-            events.Target.from_model(run_model),
-            events.Target.from_model(gateway),
-        ],
-    )
-
-
-async def unregister_replica(session: AsyncSession, job_model: JobModel):
-    if not job_model.registered:  # non-services and unregistered service replicas
-        return
-    res = await session.execute(
-        select(RunModel)
-        .where(RunModel.id == job_model.run_id)
-        .options(joinedload(RunModel.project))
-    )
-    run_model = res.unique().scalar_one()
-    gateway = None
-    if run_model.gateway_id is not None:
-        gateway, conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
-        try:
-            logger.debug(
-                "%s: unregistering replica from service %s", fmt(job_model), job_model.run_id.hex
-            )
-            async with conn.client() as client:
-                await client.unregister_replica(
-                    project=run_model.project.name,
-                    run_name=run_model.run_name,
-                    job_id=job_model.id,
-                )
-        except GatewayError as e:
-            # ignore if replica is not registered
-            logger.warning("%s: unregistering replica from service: %s", fmt(job_model), e)
-        except (httpx.RequestError, SSHError) as e:
-            logger.debug("Gateway request failed", exc_info=True)
-            raise GatewayError(repr(e))
-    job_model.registered = False
-    targets = [events.Target.from_model(job_model)]
-    if gateway is not None:
-        targets.append(events.Target.from_model(gateway))
-    events.emit(
-        session,
-        "Service replica unregistered from receiving requests",
-        actor=events.SystemActor(),
-        targets=targets,
-    )
 
 
 def _should_configure_service_https_on_gateway(
@@ -491,42 +351,3 @@ def _get_gateway_https(configuration: GatewayConfiguration) -> bool:
     if configuration.certificate is not None and configuration.certificate.type == "lets-encrypt":
         return True
     return False
-
-
-async def update_service_desired_replica_count(
-    session: AsyncSession,
-    run_model: RunModel,
-    configuration: ServiceConfiguration,
-    last_scaled_at: Optional[datetime],
-) -> None:
-    stats = None
-    if run_model.gateway_id is not None:
-        _, conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
-        stats = await conn.get_stats(run_model.project.name, run_model.run_name)
-    replica_groups = configuration.replica_groups
-    desired_replica_counts = {}
-    total = 0
-    prev_counts = (
-        json.loads(run_model.desired_replica_counts) if run_model.desired_replica_counts else {}
-    )
-    if (
-        prev_counts == {}
-        and len(replica_groups) == 1
-        and replica_groups[0].name == DEFAULT_REPLICA_GROUP_NAME
-    ):
-        # Special case to avoid dropping the replica count to group.count.min
-        # when a 0.20.7+ server first processes a service created by a pre-0.20.7 server.
-        # TODO: remove once most users upgrade to 0.20.7+.
-        prev_counts = {DEFAULT_REPLICA_GROUP_NAME: run_model.desired_replica_count}
-    for group in replica_groups:
-        scaler = get_service_scaler(group.count, group.scaling)
-        assert group.name is not None, "Group name is always set"
-        group_desired = scaler.get_desired_count(
-            current_desired_count=prev_counts.get(group.name, group.count.min or 0),
-            stats=stats,
-            last_scaled_at=last_scaled_at,
-        )
-        desired_replica_counts[group.name] = group_desired
-        total += group_desired
-    run_model.desired_replica_counts = json.dumps(desired_replica_counts)
-    run_model.desired_replica_count = total

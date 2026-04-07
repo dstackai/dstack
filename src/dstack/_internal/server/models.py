@@ -958,7 +958,7 @@ class JobMetricsPoint(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
 
-    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id"))
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id"), index=True)
     job: Mapped["JobModel"] = relationship()
 
     timestamp_micro: Mapped[int] = mapped_column(BigInteger)

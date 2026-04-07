@@ -227,7 +227,7 @@ class JobSubmittedFetcher(Fetcher[JobSubmittedPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.JobSubmittedFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("JobSubmittedFetcher.fetch")
     async def fetch(self, limit: int) -> list[JobSubmittedPipelineItem]:
         now = get_current_datetime()
         if limit <= 0:
@@ -309,7 +309,7 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.JobSubmittedWorker.process")
+    @sentry_utils.instrument_pipeline_task("JobSubmittedWorker.process")
     async def process(self, item: JobSubmittedPipelineItem):
         context = await _load_process_context(item=item)
         if context is None:
@@ -319,6 +319,10 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
         if context.job_model.instance_assigned:
             logger.debug("%s: provisioning has started", fmt(context.job_model))
             provisioning = await _process_provisioning(item=item, context=context)
+            _hint_pipelines_fetch(
+                pipeline_hinter=self._pipeline_hinter,
+                result=provisioning,
+            )
             await _apply_provisioning_result(
                 item=item,
                 provisioning=provisioning,
@@ -327,6 +331,10 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
 
         logger.debug("%s: assignment has started", fmt(context.job_model))
         assignment = await _process_assignment(context=context)
+        _hint_pipelines_fetch(
+            pipeline_hinter=self._pipeline_hinter,
+            result=assignment,
+        )
         await _apply_assignment_result(
             item=item,
             context=context,
@@ -365,6 +373,7 @@ class _DeferSubmittedJobResult:
     """The job is not ready yet, so apply should just mark it processed and unlock it."""
 
     log_message: str
+    hint_fleet_pipeline: bool = False
 
 
 @dataclass
@@ -1179,6 +1188,17 @@ async def _process_new_capacity_provisioning(
             job=context.job,
         )
     )
+    if (
+        is_master_job(context.job)
+        and fleet_model is not None
+        and _get_cluster_fleet_spec(fleet_model) is not None
+        and any(not instance.deleted for instance in fleet_model.instances)
+        and master_provisioning_data is None
+    ):
+        return _DeferSubmittedJobResult(
+            log_message="waiting for fleet master instance election",
+            hint_fleet_pipeline=True,
+        )
     provision_new_capacity_result = await _provision_new_capacity(
         project=context.project,
         fleet_model=fleet_model,
@@ -1832,6 +1852,17 @@ def _get_fleet_master_provisioning_data(
         fleet_model=fleet_model,
         fleet_spec=fleet_spec,
     )
+
+
+def _hint_pipelines_fetch(
+    pipeline_hinter: PipelineHinterProtocol,
+    result: Union[_AssignmentResult, _ProvisioningResult],
+) -> None:
+    if not isinstance(result, _DeferSubmittedJobResult):
+        return
+
+    if result.hint_fleet_pipeline:
+        pipeline_hinter.hint_fetch(FleetModel.__name__)
 
 
 def _select_jobs_to_provision(job: Job, replica_jobs: list[Job], job_model: JobModel) -> list[Job]:
