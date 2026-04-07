@@ -5,22 +5,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.backends.base.compute import ComputeWithVolumeSupport
-from dstack._internal.core.errors import BackendNotAvailable
 from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import ProjectModel, UserModel, VolumeModel
-from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.volumes import (
     get_volume_configuration,
-    volume_model_to_volume,
 )
 from dstack._internal.server.utils import sentry_utils
-from dstack._internal.settings import FeatureFlags
-from dstack._internal.utils import common
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -95,62 +89,11 @@ def _get_idle_time(volume: VolumeModel) -> datetime.timedelta:
 async def _delete_idle_volumes(session: AsyncSession, volumes: List[VolumeModel]):
     for volume_model in volumes:
         logger.info("Deleting idle volume %s", volume_model.name)
-        if FeatureFlags.PIPELINE_PROCESSING_ENABLED:
-            volume_model.to_be_deleted = True
-            events.emit(
-                session=session,
-                message="Volume marked for deletion due to exceeding auto_cleanup_duration",
-                actor=events.SystemActor(),
-                targets=[events.Target.from_model(volume_model)],
-            )
-        else:
-            try:
-                # Note: Multiple volumes are deleted in the same transaction,
-                # so long deletion of one volume may block processing other volumes.
-                await _delete_idle_volume(session, volume_model)
-            except Exception:
-                logger.exception("Error when deleting idle volume %s", volume_model.name)
-            volume_model.deleted = True
-            volume_model.deleted_at = get_current_datetime()
-            events.emit(
-                session=session,
-                message="Volume deleted due to exceeding auto_cleanup_duration",
-                actor=events.SystemActor(),
-                targets=[events.Target.from_model(volume_model)],
-            )
-
+        volume_model.to_be_deleted = True
+        events.emit(
+            session=session,
+            message="Volume marked for deletion due to exceeding auto_cleanup_duration",
+            actor=events.SystemActor(),
+            targets=[events.Target.from_model(volume_model)],
+        )
     await session.commit()
-
-
-async def _delete_idle_volume(session: AsyncSession, volume_model: VolumeModel):
-    volume = volume_model_to_volume(volume_model)
-
-    if volume.provisioning_data is None:
-        logger.error(
-            f"Failed to delete volume {volume_model.name}. volume.provisioning_data is None."
-        )
-        return
-
-    if volume.provisioning_data.backend is None:
-        logger.error(
-            f"Failed to delete volume {volume_model.name}. volume.provisioning_data.backend is None."
-        )
-        return
-
-    try:
-        backend = await backends_services.get_project_backend_by_type_or_error(
-            project=volume_model.project,
-            backend_type=volume.provisioning_data.backend,
-        )
-    except BackendNotAvailable:
-        logger.error(
-            f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
-        )
-        return
-
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithVolumeSupport)
-    await common.run_async(
-        compute.delete_volume,
-        volume=volume,
-    )

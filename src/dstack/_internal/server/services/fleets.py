@@ -842,7 +842,7 @@ async def delete_fleets(
             _terminate_fleet_instances(
                 session=session, fleet_model=fleet_model, instance_nums=instance_nums, actor=user
             )
-            # TERMINATING fleets are deleted by process_fleets after instances are terminated
+            # TERMINATING fleets are deleted by FleetPipeline after instances are terminated
             if instance_nums is None:
                 switch_fleet_status(
                     session,

@@ -48,7 +48,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     set_processed_update_map_fields,
     set_unlock_update_map_fields,
 )
-from dstack._internal.server.background.scheduled_tasks.common import get_provisioning_timeout
+from dstack._internal.server.background.pipeline_tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
