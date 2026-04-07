@@ -73,6 +73,10 @@ class LocalRepo(Repo):
         self.repo_id = repo_id
         self.run_repo_data = repo_data
 
+    def has_code_to_write(self) -> bool:
+        # LocalRepo is deprecated, no need for real implementation
+        return True
+
     def write_code_file(self, fp: BinaryIO) -> str:
         repo_path = Path(self.run_repo_data.repo_dir)
         with tarfile.TarFile(mode="w", fileobj=fp) as t:

@@ -68,6 +68,7 @@ from dstack._internal.core.models.profiles import (
     Profile,
     TerminationPolicy,
 )
+from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.resources import CPUSpec, Memory, ResourcesSpec
@@ -329,14 +330,16 @@ def get_run_spec(
     profile: Union[Profile, Callable[[], Profile], None] = lambda: Profile(name="default"),
     configuration: Optional[AnyRunConfiguration] = None,
     ssh_key_pub: Optional[str] = "user_ssh_key",
+    repo_data: AnyRunRepoData = LocalRunRepoData(repo_dir="/"),
+    repo_code_hash: Optional[str] = None,
 ) -> RunSpec:
     if callable(profile):
         profile = profile()
     return RunSpec(
         run_name=run_name,
         repo_id=repo_id,
-        repo_data=LocalRunRepoData(repo_dir="/"),
-        repo_code_hash=None,
+        repo_data=repo_data,
+        repo_code_hash=repo_code_hash,
         configuration_path=configuration_path,
         configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,

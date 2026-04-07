@@ -106,9 +106,8 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 			return fmt.Errorf("prepare git repo: %w", err)
 		}
 	case "local", "virtual":
-		log.Trace(ctx, "Extracting tar archive")
-		if err := ex.prepareArchive(ctx); err != nil {
-			return fmt.Errorf("prepare archive: %w", err)
+		if err := ex.extractCodeArchive(ctx); err != nil {
+			return fmt.Errorf("extract code archive: %w", err)
 		}
 	default:
 		return fmt.Errorf("unknown RepoType: %s", ex.getRepoData().RepoType)
@@ -164,26 +163,32 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 		return fmt.Errorf("set repo config: %w", err)
 	}
 
+	if ex.repoBlobPath == "" {
+		log.Trace(ctx, "No diff to apply")
+		return nil
+	}
 	log.Trace(ctx, "Applying diff")
 	repoDiff, err := os.ReadFile(ex.repoBlobPath)
 	if err != nil {
 		return fmt.Errorf("read repo diff: %w", err)
 	}
-	if len(repoDiff) > 0 {
-		if err := repo.ApplyDiff(ctx, ex.repoDir, string(repoDiff)); err != nil {
-			return fmt.Errorf("apply diff: %w", err)
-		}
+	if err := repo.ApplyDiff(ctx, ex.repoDir, string(repoDiff)); err != nil {
+		return fmt.Errorf("apply diff: %w", err)
 	}
 	return nil
 }
 
-func (ex *RunExecutor) prepareArchive(ctx context.Context) error {
+func (ex *RunExecutor) extractCodeArchive(ctx context.Context) error {
+	if ex.repoBlobPath == "" {
+		log.Trace(ctx, "No code archive to extract")
+		return nil
+	}
+	log.Trace(ctx, "Extracting code archive", "src", ex.repoBlobPath, "dst", ex.repoDir)
 	file, err := os.Open(ex.repoBlobPath)
 	if err != nil {
 		return fmt.Errorf("open code archive: %w", err)
 	}
 	defer func() { _ = file.Close() }()
-	log.Trace(ctx, "Extracting code archive", "src", ex.repoBlobPath, "dst", ex.repoDir)
 	if err := extract.Tar(ctx, file, ex.repoDir, nil); err != nil {
 		return fmt.Errorf("extract tar archive: %w", err)
 	}

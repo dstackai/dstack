@@ -9,12 +9,21 @@ import (
 )
 
 type Executor interface {
+	// It must be safe to call SetJob more than once
+	SetJob(job schemas.SubmitBody)
+	// It must be safe to call WriteFileArchive more than once with the same archive
+	WriteFileArchive(id string, src io.Reader) error
+	// It must be safe to call WriteRepoBlob more than once
+	WriteRepoBlob(src io.Reader) error
+	Run(ctx context.Context) error
+
 	GetHistory(timestamp int64) *schemas.PullResponse
 	GetJobWsLogsHistory() []schemas.LogEvent
+
 	GetRunnerState() string
+	SetRunnerState(state string)
+
 	GetJobInfo(ctx context.Context) (username string, workingDir string, err error)
-	Run(ctx context.Context) error
-	SetJob(job schemas.SubmitBody)
 	SetJobState(ctx context.Context, state schemas.JobState)
 	SetJobStateWithTerminationReason(
 		ctx context.Context,
@@ -22,9 +31,7 @@ type Executor interface {
 		terminationReason types.TerminationReason,
 		terminationMessage string,
 	)
-	SetRunnerState(state string)
-	WriteFileArchive(id string, src io.Reader) error
-	WriteRepoBlob(src io.Reader) error
+
 	Lock()
 	RLock()
 	RUnlock()

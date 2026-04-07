@@ -73,6 +73,9 @@ class VirtualRepo(Repo):
 
         self.files[resolve_relative_path(path).as_posix()] = content
 
+    def has_code_to_write(self) -> bool:
+        return len(self.files) > 0
+
     def write_code_file(self, fp: BinaryIO) -> str:
         with tarfile.TarFile(mode="w", fileobj=fp) as t:
             for path, content in sorted(self.files.items()):

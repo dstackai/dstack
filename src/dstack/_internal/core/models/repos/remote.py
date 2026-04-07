@@ -180,6 +180,13 @@ class RemoteRepo(Repo):
             )
         self.repo_id = repo_id
 
+    def has_code_to_write(self) -> bool:
+        # repo_diff is:
+        # * None for RemoteRepo.from_url()
+        # * an empty string for RemoteRepo.from_dir() if there are no changes ("clean" state)
+        # * a non-empty string for RemoteRepo.from_dir() if there are changes ("dirty" state)
+        return bool(self.run_repo_data.repo_diff)
+
     def write_code_file(self, fp: BinaryIO) -> str:
         if self.run_repo_data.repo_diff is not None:
             fp.write(self.run_repo_data.repo_diff.encode())

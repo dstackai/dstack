@@ -21,8 +21,8 @@ type Server struct {
 	pullDoneCh   chan interface{} // Closed then /api/pull gave everything
 	wsDoneCh     chan interface{} // Closed then /logs_ws gave everything
 
-	submitWaitDuration time.Duration
-	logsWaitDuration   time.Duration
+	startWaitDuration time.Duration
+	logsWaitDuration  time.Duration
 
 	executor  executor.Executor
 	cancelRun context.CancelFunc
@@ -51,8 +51,8 @@ func NewServer(ctx context.Context, address string, version string, ex executor.
 		pullDoneCh:   make(chan interface{}),
 		wsDoneCh:     make(chan interface{}),
 
-		submitWaitDuration: 5 * time.Minute,
-		logsWaitDuration:   5 * time.Minute,
+		startWaitDuration: 5 * time.Minute,
+		logsWaitDuration:  5 * time.Minute,
 
 		executor: ex,
 
@@ -82,7 +82,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	select {
 	case <-s.jobBarrierCh: // job started
-	case <-time.After(s.submitWaitDuration):
+	case <-time.After(s.startWaitDuration):
 		log.Error(ctx, "Job didn't start in time, shutting down")
 		return errors.New("no job submitted")
 	case <-ctx.Done():
