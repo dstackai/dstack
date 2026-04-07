@@ -109,7 +109,7 @@ Once installed, they let an agent work directly with `dstack` configs and CLI co
 
 Claude Code can use Graphsignal telemetry to decide what to change next, then use `dstack` to generate the updated service config and invoke the CLI on the team’s behalf.
 
-<img src="https://dstack.ai/static-assets/static-assets/images/graphsignal-debug-chat.png" width="630" />
+<img src="https://dstack.ai/static-assets/static-assets/images/graphsignal-debug-chat.png" width="750" />
 
 The point is not a single benchmark run, but a repeatable workflow in which deployment, measurement, and optimization stay inside the same system.
 
@@ -120,3 +120,8 @@ The point is not a single benchmark run, but a repeatable workflow in which depl
 Instead of treating performance testing as a separate script, the team can run it as a loop: benchmark a live endpoint, inspect logs and telemetry for the same time window, identify bottlenecks, update the `dstack` service config, redeploy, and run the next iteration.
 
 *Huge thanks to Dmitry Melikyan and Bogdan Sulima at Graphsignal for feedback and collaboration. For more details, see Graphsignal’s engineering post on [autodebug](https://graphsignal.com/blog/autodebug-telemetry-driven-inference-optimization-loop/).*
+
+!!! info "What's next?"
+    1. Follow the [`Installation`](../../docs/installation.md) and [`Quickstart`](../../docs/quickstart.md) guides
+    2. Explore [`dev environments`](../../docs/concepts/dev-environments.md), [`tasks`](../../docs/concepts/tasks.md), [`services`](../../docs/concepts/services.md), and [`fleets`](../../docs/concepts/fleets.md)
+    3. Use Graphsignal’s [`dstack` integration guide](https://graphsignal.com/docs/integrations/dstack/) to add profiling, tracing, and monitoring to a `dstack` inference service
