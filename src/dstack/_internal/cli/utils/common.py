@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional
 
 import requests
 from rich.console import Console
@@ -110,17 +110,11 @@ def confirm_ask(prompt, **kwargs) -> bool:
         raise SystemExit(1)
 
 
-def add_row_from_dict(table: Table, data: Dict[Union[str, int], Any], **kwargs):
-    """Maps dict keys to a table columns. `data` key is a column name or index. Missing keys are ignored."""
+def add_row_from_dict(table: Table, data: dict[str, Any], **kwargs):
+    """Maps dict keys to table columns. `data` key is the column name. Missing keys are ignored."""
     row = []
-    for i, col in enumerate(table.columns):
-        # TODO(egor-s): clear header style
-        if col.header in data:
-            row.append(data[col.header])
-        elif i in data:
-            row.append(data[i])
-        else:
-            row.append("")
+    for col in table.columns:
+        row.append(data.get(str(col.header), ""))
     table.add_row(*row, **kwargs)
 
 

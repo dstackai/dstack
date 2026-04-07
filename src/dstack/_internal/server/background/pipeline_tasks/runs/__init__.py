@@ -129,7 +129,7 @@ class RunFetcher(Fetcher[RunPipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.RunFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("RunFetcher.fetch")
     async def fetch(self, limit: int) -> list[RunPipelineItem]:
         if limit <= 0:
             return []
@@ -243,7 +243,7 @@ class RunWorker(Worker[RunPipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.RunWorker.process")
+    @sentry_utils.instrument_pipeline_task("RunWorker.process")
     async def process(self, item: RunPipelineItem):
         # Currently `dstack` supports runs with
         # * one multi-node replica (multi-node tasks)

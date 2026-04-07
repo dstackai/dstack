@@ -41,7 +41,6 @@ from dstack._internal.core.services.diff import format_diff_fields_for_event
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
-    InstanceModel,
     JobModel,
     ProbeModel,
     ProjectModel,
@@ -53,18 +52,14 @@ from dstack._internal.server.services import events, services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
-    delay_job_instance_termination,
     get_job_configured_volumes,
     get_job_connection_info,
     get_job_spec,
     get_jobs_from_run_spec,
     job_model_to_job_submission,
     remove_job_spec_sensitive_info,
-    stop_runner,
-    switch_job_status,
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
-from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.probes import is_probe_ready
@@ -573,7 +568,7 @@ async def submit_run(
             last_processed_at=submitted_at,
             priority=run_spec.configuration.priority,
             deployment_num=0,
-            desired_replica_count=1,  # a relevant value will be set in process_runs.py
+            desired_replica_count=1,  # a relevant value will be set in RunPipeline
             next_triggered_at=_get_next_triggered_at(run_spec),
         )
         session.add(run_model)
@@ -585,6 +580,7 @@ async def submit_run(
         )
 
         if run_spec.configuration.type == "service":
+            # FIXME: Register services asynchronously in the background
             await services.register_service(session, run_model, run_spec)
             service_config = run_spec.configuration
 
@@ -696,10 +692,6 @@ async def stop_runs(
     runs_names: List[str],
     abort: bool,
 ):
-    """
-    If abort is False, jobs receive a signal to stop and run status will be changed as a reaction to jobs status change.
-    If abort is True, run is marked as TERMINATED and process_runs will stop the jobs.
-    """
     res = await session.execute(
         select(RunModel).where(
             RunModel.project_id == project.id,
@@ -731,8 +723,7 @@ async def stop_runs(
                 session, run_model, RunStatus.TERMINATING, actor=events.UserActor.from_user(user)
             )
             run_model.last_processed_at = now
-            # The run will be terminated by process_runs.
-            # Terminating synchronously is problematic since it may take a long time.
+            # The run will be terminated by RunPipeline.
         await session.commit()
 
 
@@ -1048,58 +1039,6 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
     return job_submission.job_provisioning_data.price * duration_hours
 
 
-async def process_terminating_run(session: AsyncSession, run_model: RunModel):
-    """
-    Stops the jobs gracefully and marks them as TERMINATING.
-    Jobs then should be terminated by `process_terminating_jobs`.
-    When all jobs are terminated, assigns a finished status to the run.
-    Caller must acquire the lock on run.
-    """
-    assert run_model.termination_reason is not None
-    run = run_model_to_run(run_model, include_jobs=False)
-    job_termination_reason = run_model.termination_reason.to_job_termination_reason()
-
-    unfinished_jobs_count = 0
-    for job_model in run_model.jobs:
-        if job_model.status.is_finished():
-            continue
-        unfinished_jobs_count += 1
-        if job_model.status == JobStatus.TERMINATING:
-            continue
-
-        if job_model.status == JobStatus.RUNNING and job_termination_reason not in {
-            JobTerminationReason.ABORTED_BY_USER,
-            JobTerminationReason.DONE_BY_RUNNER,
-        }:
-            # Send a signal to stop the job gracefully
-            instance_model = await _load_job_instance_for_stop(
-                session=session, job_model=job_model
-            )
-            await stop_runner(job_model, common_utils.get_or_error(instance_model))
-            delay_job_instance_termination(job_model)
-        job_model.termination_reason = job_termination_reason
-        switch_job_status(session, job_model, JobStatus.TERMINATING)
-        job_model.last_processed_at = common_utils.get_current_datetime()
-
-    if unfinished_jobs_count == 0:
-        if run_model.service_spec is not None:
-            try:
-                await services.unregister_service(session, run_model)
-            except Exception as e:
-                logger.warning("%s: failed to unregister service: %s", fmt(run_model), repr(e))
-        if (
-            run.run_spec.merged_profile.schedule is not None
-            and run_model.termination_reason
-            not in [RunTerminationReason.ABORTED_BY_USER, RunTerminationReason.STOPPED_BY_USER]
-        ):
-            run_model.next_triggered_at = _get_next_triggered_at(run.run_spec)
-            switch_run_status(session, run_model, RunStatus.PENDING)
-            # Unassign run from fleet so that the new fleet can be chosen on the next submission
-            run_model.fleet = None
-        else:
-            switch_run_status(session, run_model, run_model.termination_reason.to_status())
-
-
 def is_job_ready(probes: Iterable[ProbeModel], probe_specs: Iterable[ProbeSpec]) -> bool:
     return all(is_probe_ready(probe, probe_spec) for probe, probe_spec in zip(probes, probe_specs))
 
@@ -1118,17 +1057,3 @@ def _get_next_triggered_at(run_spec: RunSpec) -> Optional[datetime]:
             )
         )
     return min(fire_times)
-
-
-async def _load_job_instance_for_stop(
-    session: AsyncSession,
-    job_model: JobModel,
-) -> Optional[InstanceModel]:
-    if job_model.instance_id is None:
-        return None
-    res = await session.execute(
-        select(InstanceModel)
-        .where(InstanceModel.id == job_model.instance_id)
-        .options(joinedload(InstanceModel.project))
-    )
-    return res.scalar_one_or_none()

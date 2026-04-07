@@ -26,5 +26,6 @@ uv.lock
 /src/dstack/_internal/server/statics
 
 profiling_results.html
+docs/docs/reference/api/http/openapi.json
 docs/docs/reference/api/rest/openapi.json
 docs/docs/reference/plugins/rest/rest_plugin_openapi.json

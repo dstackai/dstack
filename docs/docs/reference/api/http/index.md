@@ -1,8 +1,8 @@
 ---
-title: REST API
+title: HTTP API
 ---
 
-The REST API enables running tasks, services, and managing runs programmatically.
+The HTTP API enables running tasks, services, and managing runs programmatically.
 
 ## Usage example
 

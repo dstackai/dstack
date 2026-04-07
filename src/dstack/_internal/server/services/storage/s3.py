@@ -22,21 +22,21 @@ else:
 
         def upload_code(
             self,
-            project_id: str,
+            project_name: str,
             repo_id: str,
             code_hash: str,
             blob: bytes,
         ):
-            key = self._get_code_key(project_id, repo_id, code_hash)
+            key = self._get_code_key(project_name, repo_id, code_hash)
             self._upload(key, blob)
 
         def get_code(
             self,
-            project_id: str,
+            project_name: str,
             repo_id: str,
             code_hash: str,
         ) -> Optional[bytes]:
-            key = self._get_code_key(project_id, repo_id, code_hash)
+            key = self._get_code_key(project_name, repo_id, code_hash)
             return self._get(key)
 
         def upload_archive(

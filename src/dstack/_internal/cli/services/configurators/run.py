@@ -32,6 +32,7 @@ from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
 from dstack._internal.core.errors import (
     CLIError,
     ConfigurationError,
+    RepoInvalidCredentialsError,
     ResourceNotExistsError,
     ServerClientError,
 )
@@ -52,10 +53,7 @@ from dstack._internal.core.models.repos.remote import RemoteRepo, RemoteRepoCred
 from dstack._internal.core.models.resources import CPUSpec
 from dstack._internal.core.models.runs import JobStatus, JobSubmission, RunSpec, RunStatus
 from dstack._internal.core.services.diff import diff_models
-from dstack._internal.core.services.repos import (
-    InvalidRepoCredentialsError,
-    get_repo_creds_and_default_branch,
-)
+from dstack._internal.core.services.repos import get_repo_creds_and_default_branch
 from dstack._internal.core.services.ssh.ports import PortUsedError
 from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import local_time
@@ -554,8 +552,6 @@ class BaseRunConfigurator(
         else:
             assert False, "should not reach here"
 
-        assert repo.repo_url is not None
-
         if repo_head is not None and repo_head.repo_creds is not None:
             if git_identity_file is None and oauth_token is None:
                 git_private_key = repo_head.repo_creds.private_key
@@ -570,20 +566,17 @@ class BaseRunConfigurator(
                 private_key=git_private_key,
                 oauth_token=oauth_token,
             )
-        except InvalidRepoCredentialsError as e:
-            raise CLIError(*e.args) from e
+        except RepoInvalidCredentialsError:
+            raise CLIError(
+                "No valid default Git credentials found. Pass valid `--token` or `--git-identity`."
+            )
 
         repo.run_repo_data.repo_branch = repo_branch
         if repo_hash is not None:
             repo.run_repo_data.repo_hash = repo_hash
 
         if init:
-            self.api.repos.init(
-                repo=repo,
-                git_identity_file=git_identity_file,
-                oauth_token=oauth_token,
-                creds=repo_creds,
-            )
+            self.api.repos.init(repo=repo, creds=repo_creds)
 
         return repo
 

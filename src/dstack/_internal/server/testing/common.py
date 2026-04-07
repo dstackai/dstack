@@ -91,6 +91,7 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.server.models import (
     BackendModel,
+    CodeModel,
     ComputeGroupModel,
     DecryptedString,
     EventModel,
@@ -267,6 +268,22 @@ async def create_repo(
     return repo
 
 
+async def create_code(
+    session: AsyncSession,
+    repo: RepoModel,
+    blob_hash: str = "blob_hash",
+    blob: Optional[bytes] = b"blob_content",
+) -> CodeModel:
+    code = CodeModel(
+        repo_id=repo.id,
+        blob_hash=blob_hash,
+        blob=blob,
+    )
+    session.add(code)
+    await session.commit()
+    return code
+
+
 async def create_repo_creds(
     session: AsyncSession,
     repo_id: UUID,
@@ -293,7 +310,7 @@ async def create_file_archive(
     session: AsyncSession,
     user_id: UUID,
     blob_hash: str = "blob_hash",
-    blob: bytes = b"blob_content",
+    blob: Optional[bytes] = b"blob_content",
 ) -> FileArchiveModel:
     archive = FileArchiveModel(
         user_id=user_id,

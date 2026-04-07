@@ -304,7 +304,13 @@ async def upload_code(
             blob=None,
         )
         await run_async(storage.upload_code, project.name, repo.name, code.blob_hash, blob)
-    session.add(code)
+    try:
+        async with session.begin_nested():
+            session.add(code)
+    except sqlalchemy.exc.IntegrityError as e:
+        # Concurrent API call just uploaded the same code blob (TOC/TOU race condition),
+        # safe to ignore
+        logger.debug("Conflict, rolling back: %s", e)
     await session.commit()
 
 

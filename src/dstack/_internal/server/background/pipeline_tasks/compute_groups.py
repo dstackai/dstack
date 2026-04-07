@@ -120,7 +120,7 @@ class ComputeGroupFetcher(Fetcher[PipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.ComputeGroupFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("ComputeGroupFetcher.fetch")
     async def fetch(self, limit: int) -> list[PipelineItem]:
         compute_group_lock, _ = get_locker(get_db().dialect_name).get_lockset(
             ComputeGroupModel.__tablename__
@@ -188,7 +188,7 @@ class ComputeGroupWorker(Worker[PipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.ComputeGroupWorker.process")
+    @sentry_utils.instrument_pipeline_task("ComputeGroupWorker.process")
     async def process(self, item: PipelineItem):
         async with get_session_ctx() as session:
             res = await session.execute(

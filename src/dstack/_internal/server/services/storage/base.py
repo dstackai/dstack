@@ -6,7 +6,7 @@ class BaseStorage(ABC):
     @abstractmethod
     def upload_code(
         self,
-        project_id: str,
+        project_name: str,
         repo_id: str,
         code_hash: str,
         blob: bytes,
@@ -16,7 +16,7 @@ class BaseStorage(ABC):
     @abstractmethod
     def get_code(
         self,
-        project_id: str,
+        project_name: str,
         repo_id: str,
         code_hash: str,
     ) -> Optional[bytes]:
@@ -40,8 +40,8 @@ class BaseStorage(ABC):
         pass
 
     @staticmethod
-    def _get_code_key(project_id: str, repo_id: str, code_hash: str) -> str:
-        return f"data/projects/{project_id}/codes/{repo_id}/{code_hash}"
+    def _get_code_key(project_name: str, repo_id: str, code_hash: str) -> str:
+        return f"data/projects/{project_name}/codes/{repo_id}/{code_hash}"
 
     @staticmethod
     def _get_archive_key(user_id: str, archive_hash: str) -> str:

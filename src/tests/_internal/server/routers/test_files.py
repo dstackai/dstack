@@ -1,4 +1,4 @@
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from httpx import AsyncClient
@@ -141,6 +141,44 @@ class TestUploadArchive:
             select(FileArchiveModel).where(FileArchiveModel.user_id == user.id)
         )
         archive = res.scalar_one()
+        assert archive.blob_hash == self.file_hash
+        assert archive.blob is None
+        default_storage_mock.upload_archive.assert_called_once_with(
+            str(user.id), self.file_hash, self.file_content
+        )
+
+    async def test_handles_race_condition(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        session: AsyncSession,
+        client: AsyncClient,
+        default_storage_mock: Mock,
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        existing_archive = await create_file_archive(
+            session=session, user_id=user.id, blob_hash=self.file_hash, blob=None
+        )
+        monkeypatch.setattr(
+            "dstack._internal.server.services.files.get_archive_model_by_hash",
+            # first call checks if already uploaded (not yet)
+            # second call refetches after unique constraint violation
+            AsyncMock(side_effect=[None, existing_archive]),
+        )
+        response = await client.post(
+            "/api/files/upload_archive",
+            headers=get_auth_headers(user.token),
+            files={"file": self.file},
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "id": str(existing_archive.id),
+            "hash": self.file_hash,
+        }
+        res = await session.execute(
+            select(FileArchiveModel).where(FileArchiveModel.user_id == user.id)
+        )
+        archive = res.scalar_one()
+        assert archive.id == existing_archive.id
         assert archive.blob_hash == self.file_hash
         assert archive.blob is None
         default_storage_mock.upload_archive.assert_called_once_with(

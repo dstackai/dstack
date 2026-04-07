@@ -134,6 +134,7 @@ plugins:
         "examples/clusters/a4/index.md": "examples/clusters/gcp/index.md"
         "examples/clusters/efa/index.md": "examples/clusters/aws/index.md"
         "docs/guides/migration.md": "docs/guides/upgrade.md"
+        "docs/reference/api/rest/index.md": "docs/reference/api/http/index.md"
   - typeset
   - gen-files:
       # TODO: convert these to hooks (schema reference migrated)
@@ -276,7 +277,7 @@ nav:
               - dstack import: docs/reference/cli/dstack/import.md
           - API:
               - Python API: docs/reference/api/python/index.md
-              - REST API: docs/reference/api/rest/index.md
+              - HTTP API: docs/reference/api/http/index.md
           - Environment variables: docs/reference/environment-variables.md
           - .dstack/profiles.yml: docs/reference/profiles.yml.md
           - Plugins:

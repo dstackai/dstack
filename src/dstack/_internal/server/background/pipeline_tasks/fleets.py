@@ -134,7 +134,7 @@ class FleetFetcher(Fetcher[PipelineItem]):
             queue_check_delay=queue_check_delay,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.FleetFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("FleetFetcher.fetch")
     async def fetch(self, limit: int) -> list[PipelineItem]:
         fleet_lock, _ = get_locker(get_db().dialect_name).get_lockset(FleetModel.__tablename__)
         async with fleet_lock:
@@ -203,7 +203,7 @@ class FleetWorker(Worker[PipelineItem]):
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.FleetWorker.process")
+    @sentry_utils.instrument_pipeline_task("FleetWorker.process")
     async def process(self, item: PipelineItem):
         process_context = await _load_process_context(item)
         if process_context is None:

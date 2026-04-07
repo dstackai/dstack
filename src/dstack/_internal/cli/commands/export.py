@@ -1,5 +1,4 @@
 import argparse
-from typing import Any, Union
 
 from rich.table import Table
 
@@ -148,7 +147,7 @@ def print_exports_table(exports: list[Export]):
         )
         importers = ", ".join([i.project_name for i in export.imports]) if export.imports else "-"
 
-        row: dict[Union[str, int], Any] = {
+        row = {
             "NAME": export.name,
             "FLEETS": fleets,
             "IMPORTERS": importers,

@@ -27,7 +27,7 @@ Both Slurm and `dstack` follow a client-server architecture with a control plane
 |---|---------------|-------------------|
 | **Control plane** | `slurmctld` (controller) | `dstack-server` |
 | **State persistence** | `slurmdbd` (database) | `dstack-server` (SQLite/PostgreSQL) |
-| **REST API** | `slurmrestd` (REST API) | `dstack-server` (HTTP API) |
+| **API** | `slurmrestd` (REST API) | `dstack-server` (HTTP API) |
 | **Compute plane** | `slurmd` (compute agent) | `dstack-shim` (on VMs/hosts) and/or `dstack-runner` (inside containers) |
 | **Client** | CLI from login nodes | CLI from anywhere |
 | **High availability** | Active-passive failover (typically 2 controller nodes) | Horizontal scaling with multiple server replicas (requires PostgreSQL) |
