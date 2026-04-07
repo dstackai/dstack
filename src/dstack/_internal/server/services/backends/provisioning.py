@@ -9,6 +9,7 @@ from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.server.schemas.runner import GPUDevice
 from dstack._internal.server.services.docker import apply_server_docker_defaults, parse_image_name
 
+# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types
 _AWS_EFA_ENABLED_INSTANCE_TYPE_PATTERNS = [
     # TODO: p6-b200 isn't supported yet in gpuhunt
     r"^p6-b200\.(48xlarge)$",
@@ -17,6 +18,7 @@ _AWS_EFA_ENABLED_INSTANCE_TYPE_PATTERNS = [
     r"^p5en\.(48xlarge)$",
     r"^p4d\.(24xlarge)$",
     r"^p4de\.(24xlarge)$",
+    r"^g7e\.(8xlarge|12xlarge|24xlarge|48xlarge)$",
     r"^g6\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
     r"^g6e\.(8xlarge|12xlarge|16xlarge|24xlarge|48xlarge)$",
     r"^gr6\.8xlarge$",
