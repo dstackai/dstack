@@ -19,7 +19,7 @@ from dstack._internal.core.backends.base.offers import (
     get_offers_disk_modifier,
 )
 from dstack._internal.core.backends.verda.models import VerdaConfig
-from dstack._internal.core.errors import BackendError, NoCapacityError
+from dstack._internal.core.errors import BackendError, NoCapacityError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
@@ -213,7 +213,11 @@ class VerdaCompute(
         project_ssh_private_key: str,
     ):
         instance = _get_instance_by_id(self.client, provisioning_data.instance_id)
-        if instance is not None and instance.status == "running":
+        if instance is None:
+            raise ProvisioningError("Verda instance not found")
+        if instance.status not in ("ordered", "provisioning", "running"):
+            raise ProvisioningError(f"Unexpected Verda instance status: {instance.status!r}")
+        if instance.status == "running":
             provisioning_data.hostname = instance.ip
 
 
