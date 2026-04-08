@@ -8,6 +8,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import Database, override_db
 from dstack._internal.server.models import BaseModel
 
+# Remember initialized URLs to create metadata once per session.
 _initialized_postgres_db_urls = set()
 
 
@@ -17,6 +18,7 @@ def postgres_container():
         yield postgres.get_connection_url()
 
 
+# test_db is function-scoped since making it session-scoped did not bring much benefit.
 @pytest_asyncio.fixture
 async def test_db(request):
     db_type = getattr(request, "param", "sqlite")
