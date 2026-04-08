@@ -71,6 +71,7 @@ class TestResolveProvisioningImageName:
             "p4de.24xlarge",
             "g6.8xlarge",
             "g6e.8xlarge",
+            "g7e.8xlarge",
         ],
     )
     def test_patch_all_efa_instance_types(self, instance_type: str, suffix: str) -> None:
