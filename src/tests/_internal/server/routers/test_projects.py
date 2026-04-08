@@ -29,8 +29,7 @@ from dstack._internal.server.testing.common import (
 
 class TestListProjects:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/projects/list")
         assert response.status_code in [401, 403]
 
@@ -385,10 +384,7 @@ class TestListProjects:
 
 class TestListOnlyNoFleets:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_list_only_no_fleets_returns_40x_if_not_authenticated(
-        self, test_db, client: AsyncClient
-    ):
+    async def test_list_only_no_fleets_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/projects/list_only_no_fleets")
         assert response.status_code in [401, 403]
 
@@ -926,8 +922,7 @@ class TestListOnlyNoFleets:
 
 class TestCreateProject:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/projects/create")
         assert response.status_code in [401, 403]
 
@@ -1162,8 +1157,7 @@ class TestCreateProject:
 
 class TestDeleteProject:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/projects/delete")
         assert response.status_code in [401, 403]
 
@@ -1375,8 +1369,7 @@ class TestDeleteProject:
 
 class TestGetProject:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/projects/test_project/get")
         assert response.status_code in [401, 403]
 
@@ -1607,8 +1600,7 @@ class TestGetProject:
 
 class TestSetProjectMembers:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/projects/test_project/get")
         assert response.status_code in [401, 403]
 
@@ -1971,8 +1963,7 @@ class TestAddProjectMembers:
 
 class TestUpdateProjectVisibility:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
+    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/projects/test/update")
         assert response.status_code in [401, 403]
 

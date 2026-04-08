@@ -3,7 +3,11 @@ import os
 
 import pytest
 
-from dstack._internal.server.testing.conf import postgres_container, session, test_db  # noqa: F401
+from dstack._internal.server.testing.conf import (  # noqa: F401
+    postgres_container,
+    session,
+    test_db,
+)
 from dstack._internal.settings import FeatureFlags
 
 

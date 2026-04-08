@@ -18,13 +18,13 @@ from dstack._internal.server.testing.matchers import SomeUUID4Str
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-@pytest.mark.usefixtures("test_db")
 class TestListUserPublicKeys:
     async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/users/public_keys/list")
         assert response.status_code in [401, 403]
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     async def test_lists_own_public_keys(self, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         key = await create_user_public_key(
@@ -50,6 +50,8 @@ class TestListUserPublicKeys:
             }
         ]
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     async def test_does_not_list_other_users_keys(
         self, session: AsyncSession, client: AsyncClient
     ):
@@ -63,6 +65,8 @@ class TestListUserPublicKeys:
         assert response.status_code == 200
         assert response.json() == []
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     async def test_returns_keys_in_reverse_chronological_order(
         self, session: AsyncSession, client: AsyncClient
     ):
@@ -93,8 +97,6 @@ class TestListUserPublicKeys:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-@pytest.mark.usefixtures("test_db")
 class TestAddUserPublicKey:
     PUBLIC_KEY_NO_COMMENT = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA"
     PUBLIC_KEY = f"{PUBLIC_KEY_NO_COMMENT} test@example.com"
@@ -114,6 +116,8 @@ class TestAddUserPublicKey:
         )
         assert response.status_code in [401, 403]
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
     async def test_adds_valid_public_key(
         self,
@@ -137,6 +141,8 @@ class TestAddUserPublicKey:
         }
         validate_openssh_public_key_mock.assert_awaited_once_with(self.PUBLIC_KEY)
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     @pytest.mark.usefixtures("validate_openssh_public_key_mock")
     async def test_adds_key_with_custom_name(self, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
@@ -148,6 +154,8 @@ class TestAddUserPublicKey:
         assert response.status_code == 200
         assert response.json()["name"] == "my-laptop"
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     @pytest.mark.usefixtures("validate_openssh_public_key_mock")
     async def test_uses_md5_as_name_when_no_comment_and_no_name(
         self, session: AsyncSession, client: AsyncClient
@@ -161,6 +169,8 @@ class TestAddUserPublicKey:
         assert response.status_code == 200
         assert response.json()["name"] == "744e414c6ac55e3f15c1dd48229cbe74"
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     @pytest.mark.parametrize(
         "key",
         [
@@ -180,6 +190,8 @@ class TestAddUserPublicKey:
         assert response.status_code == 400
         assert "Invalid public key" in response.json()["detail"][0]["msg"]
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     async def test_returns_400_for_unsupported_key(
         self, session: AsyncSession, client: AsyncClient
     ):
@@ -192,6 +204,8 @@ class TestAddUserPublicKey:
         assert response.status_code == 400
         assert response.json()["detail"][0]["msg"] == "Unsupported key type: ssh-dss"
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     @pytest.mark.usefixtures("validate_openssh_public_key_mock")
     async def test_returns_400_resource_exists_for_duplicate_key(
         self, session: AsyncSession, client: AsyncClient
@@ -214,8 +228,6 @@ class TestAddUserPublicKey:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-@pytest.mark.usefixtures("test_db")
 class TestDeleteUserPublicKeys:
     async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post(
@@ -224,6 +236,8 @@ class TestDeleteUserPublicKeys:
         )
         assert response.status_code in [401, 403]
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     async def test_deletes_public_key(self, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         key = await create_user_public_key(session=session, user=user)
@@ -241,6 +255,8 @@ class TestDeleteUserPublicKeys:
         )
         assert res.scalars().all() == [other_key]
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     async def test_silently_ignores_nonexistent_ids(
         self, session: AsyncSession, client: AsyncClient
     ):
@@ -252,6 +268,8 @@ class TestDeleteUserPublicKeys:
         )
         assert response.status_code == 200
 
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db")
     async def test_does_not_delete_other_users_keys(
         self, session: AsyncSession, client: AsyncClient
     ):

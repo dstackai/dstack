@@ -10,7 +10,11 @@ from dstack._internal.server.services import encryption as encryption  # import 
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.docker import ImageConfig, ImageConfigObject
 from dstack._internal.server.services.logs.filelog import FileLogStorage
-from dstack._internal.server.testing.conf import postgres_container, session, test_db  # noqa: F401
+from dstack._internal.server.testing.conf import (  # noqa: F401
+    postgres_container,
+    session,
+    test_db,
+)
 
 
 @pytest.fixture
