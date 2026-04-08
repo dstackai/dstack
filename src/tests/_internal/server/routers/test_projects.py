@@ -384,10 +384,7 @@ class TestListProjects:
 
 class TestListOnlyNoFleets:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_list_only_no_fleets_returns_40x_if_not_authenticated(
-        self, test_db, client: AsyncClient
-    ):
+    async def test_list_only_no_fleets_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/projects/list_only_no_fleets")
         assert response.status_code in [401, 403]
 
