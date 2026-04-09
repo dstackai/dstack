@@ -10,7 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from dstack._internal.cli.utils.run import get_runs_table
+from dstack._internal.cli.utils.run import (
+    get_runs_table,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,

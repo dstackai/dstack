@@ -1,4 +1,5 @@
 import shutil
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from rich.markup import escape
@@ -47,6 +48,11 @@ from dstack._internal.utils.common import (
     pretty_date,
 )
 from dstack.api import Run
+
+
+class RunWaitStatus(str, Enum):
+    WAITING_FOR_REQUESTS = "waiting for requests"
+    WAITING_FOR_SCHEDULE = "waiting for schedule"
 
 
 def print_offers_json(run_plan: RunPlan, run_spec):
@@ -198,6 +204,40 @@ def print_run_plan(
         console.print()
     else:
         console.print(NO_FLEETS_WARNING if no_fleets else NO_OFFERS_WARNING)
+
+
+def get_run_wait_status(run: CoreRun) -> Optional[RunWaitStatus]:
+    # Only synthesize a CLI-specific waiting state when the server did not provide
+    # a more specific run-level message such as "retrying".
+    if run.status_message not in ("", run.status.value):
+        return None
+
+    if run.status == RunStatus.PENDING and run.next_triggered_at is not None:
+        return RunWaitStatus.WAITING_FOR_SCHEDULE
+
+    if _is_waiting_for_requests(run):
+        return RunWaitStatus.WAITING_FOR_REQUESTS
+
+    return None
+
+
+def _is_waiting_for_requests(run: CoreRun) -> bool:
+    if run.run_spec.configuration.type != "service":
+        return False
+    if run.service is None or run.next_triggered_at is not None:
+        return False
+    if run.status not in (RunStatus.SUBMITTED, RunStatus.PENDING):
+        return False
+    return not any(_is_job_active(job.job_submissions[-1].status) for job in run.jobs)
+
+
+def _is_job_active(status: JobStatus) -> bool:
+    return status in (
+        JobStatus.SUBMITTED,
+        JobStatus.PROVISIONING,
+        JobStatus.PULLING,
+        JobStatus.RUNNING,
+    )
 
 
 def _format_run_status(run) -> str:
