@@ -288,10 +288,11 @@ async def _should_retry_job(
     job_model: JobModel,
 ) -> Optional[timedelta]:
     """
-    Checks if the job should be retried.
-    Returns the current duration of retrying if retry is enabled.
-    Retrying duration is calculated as the time since `last_processed_at`
-    of the latest provisioned submission.
+    Checks if the job should be retried and returns the elapsed retry duration.
+
+    For `no-capacity`, retry is limited by the age of the current run. Once the
+    job has already provisioned, retry is limited by the time since the latest
+    provisioned submission for that job.
     """
     job_spec = get_job_spec(job_model)
     if job_spec.retry is None:
@@ -309,7 +310,13 @@ async def _should_retry_job(
         and last_provisioned is None
         and RetryEvent.NO_CAPACITY in job_spec.retry.on_events
     ):
-        return get_current_datetime() - run_model.submitted_at
+        retry_started_at = run_model.submitted_at
+        if run_model.next_triggered_at is not None:
+            # Scheduled runs keep `next_triggered_at` pointing to the current trigger time while
+            # retrying. Retryable failures go back to PENDING directly, and the terminating worker
+            # advances `next_triggered_at` only when the current execution is over.
+            retry_started_at = run_model.next_triggered_at
+        return get_current_datetime() - retry_started_at
 
     if (
         job_model.termination_reason is not None

@@ -29,6 +29,7 @@ class TerminatingRunUpdateMap(ItemUpdateMap, total=False):
     status: RunStatus
     next_triggered_at: Optional[datetime]
     fleet_id: Optional[uuid.UUID]
+    resubmission_attempt: int
 
 
 class TerminatingRunJobUpdateMap(ItemUpdateMap, total=False):
@@ -134,6 +135,7 @@ def _get_run_update_map(run_model: models.RunModel) -> TerminatingRunUpdateMap:
             status=RunStatus.PENDING,
             next_triggered_at=_get_next_triggered_at(run_spec),
             fleet_id=None,
+            resubmission_attempt=0,
         )
     return TerminatingRunUpdateMap(status=termination_reason.to_status())
 
