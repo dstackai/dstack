@@ -128,8 +128,12 @@ def _combine_spot_policy_optional(
 
 
 def _combine_idle_duration(value1: int, value2: int) -> int:
-    if value1 < 0 and value2 >= 0 or value2 < 0 and value1 >= 0:
-        raise CombineError(f"idle_duration values {value1} and {value2} cannot be combined")
+    if value1 < 0:
+        if value2 < 0:
+            return min(value1, value2)
+        return value2
+    if value2 < 0:
+        return value1
     return min(value1, value2)
 
 
