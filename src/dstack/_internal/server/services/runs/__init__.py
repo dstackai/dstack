@@ -521,6 +521,7 @@ async def apply_plan(
             deployment_num=new_deployment_num,
         )
     )
+    await ensure_service_router_worker_sync_row(session, current_resource_model, run_spec)
     events.emit(
         session,
         (

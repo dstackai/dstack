@@ -109,6 +109,9 @@ def _get_router_job(run_model: RunModel, router_group) -> Optional[JobModel]:
     ]
     if not router_jobs or not is_replica_registered(router_jobs):
         return None
+    # Router replica group is currently validated to have count=1, so we assume a single active
+    # router job here. When we support multiple router replicas for HA, this should be updated
+    # to handle syncing across all active router jobs.
     return router_jobs[0]
 
 

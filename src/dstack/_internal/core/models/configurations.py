@@ -1046,6 +1046,10 @@ class ServiceConfigurationParams(CoreModel):
         router_groups = [g for g in replicas if g.router is not None]
         if len(router_groups) > 1:
             raise ValueError("At most one replica group may specify `router`.")
+        if router_groups:
+            router_group = router_groups[0]
+            if router_group.count.min != 1 or router_group.count.max != 1:
+                raise ValueError("For now replica group with `router` must have `count: 1`.")
         return values
 
 

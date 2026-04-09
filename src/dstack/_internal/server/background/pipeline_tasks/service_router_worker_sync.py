@@ -4,10 +4,10 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Sequence
 
-from sqlalchemy import delete, or_, select, update
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy import delete, or_, select, true, update
+from sqlalchemy.orm import joinedload, load_only, selectinload
 
-from dstack._internal.core.models.runs import RunStatus
+from dstack._internal.core.models.runs import JobStatus, RunStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
@@ -25,6 +25,7 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
+    ProjectModel,
     RunModel,
     ServiceRouterWorkerSyncModel,
 )
@@ -105,7 +106,7 @@ class ServiceRouterWorkerSyncPipeline(Pipeline[ServiceRouterWorkerSyncPipelineIt
 
 
 class ServiceRouterWorkerSyncFetcher(Fetcher[ServiceRouterWorkerSyncPipelineItem]):
-    @sentry_utils.instrument_named_task("pipeline_tasks.ServiceRouterWorkerSyncFetcher.fetch")
+    @sentry_utils.instrument_pipeline_task("ServiceRouterWorkerSyncFetcher.fetch")
     async def fetch(self, limit: int) -> list[ServiceRouterWorkerSyncPipelineItem]:
         sync_lock, _ = get_locker(get_db().dialect_name).get_lockset(
             ServiceRouterWorkerSyncModel.__tablename__
@@ -183,7 +184,7 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
             pipeline_hinter=pipeline_hinter,
         )
 
-    @sentry_utils.instrument_named_task("pipeline_tasks.ServiceRouterWorkerSyncWorker.process")
+    @sentry_utils.instrument_pipeline_task("ServiceRouterWorkerSyncWorker.process")
     async def process(self, item: ServiceRouterWorkerSyncPipelineItem) -> None:
         async with get_session_ctx() as session:
             res = await session.execute(
@@ -199,10 +200,6 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                 log_lock_token_mismatch(logger, item)
                 return
             run_model = sync_row.run
-            if run_model is None:
-                await session.delete(sync_row)
-                await session.commit()
-                return
             if (
                 run_model.deleted
                 or run_model.status.is_finished()
@@ -218,11 +215,30 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                 select(RunModel)
                 .where(RunModel.id == item.run_id)
                 .options(
-                    selectinload(RunModel.project),
-                    selectinload(RunModel.jobs).selectinload(JobModel.project),
-                    selectinload(RunModel.jobs)
-                    .selectinload(JobModel.instance)
-                    .selectinload(InstanceModel.project),
+                    load_only(RunModel.id, RunModel.run_spec),
+                    selectinload(
+                        RunModel.jobs.and_(
+                            JobModel.status == JobStatus.RUNNING,
+                            JobModel.registered == true(),
+                        )
+                    )
+                    .load_only(
+                        JobModel.id,
+                        JobModel.status,
+                        JobModel.registered,
+                        JobModel.job_spec_data,
+                        JobModel.job_provisioning_data,
+                        JobModel.job_runtime_data,
+                    )
+                    .options(
+                        joinedload(JobModel.project).load_only(
+                            ProjectModel.id, ProjectModel.ssh_private_key
+                        ),
+                        joinedload(JobModel.instance)
+                        .load_only(InstanceModel.id, InstanceModel.remote_connection_info)
+                        .joinedload(InstanceModel.project)
+                        .load_only(ProjectModel.id, ProjectModel.ssh_private_key),
+                    ),
                 )
             )
             run_for_sync = res.unique().scalar_one_or_none()
