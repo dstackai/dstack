@@ -181,8 +181,9 @@ The agent controls the VM and starts Docker containers for users' jobs.
 Since `dstack` controls the entire VM, VM-based backends can support more features,
 such as blocks, instance volumes, privileged containers, and reusable instances.
 
-Note, all VM-based backend `Compute`s should sublass the `ComputeWithPrivilegedSupport` mixin,
-as the `dstack-shim` agent provides this functionality OOTB.
+Note, all VM-based backend `Compute`s should sublass the `ComputeWithPrivilegedSupport`
+and `ComputeWithInstanceVolumesSupport` mixins, as the `dstack-shim` agent
+provides these functionalities OOTB.
 
 To support a VM-based backend, `dstack` expects the following:
 

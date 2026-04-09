@@ -11,6 +11,7 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithPrivilegedSupport,
     get_shim_commands,
 )
@@ -39,6 +40,7 @@ class HotAisleCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithInstanceVolumesSupport,
     Compute,
 ):
     def __init__(self, config: HotAisleConfig):

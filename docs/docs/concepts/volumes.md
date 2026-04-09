@@ -262,7 +262,7 @@ Since persistence isn't guaranteed (instances may be interrupted or runs may occ
 volumes only for caching or with directories manually mounted to network storage.
 
 !!! info "Backends"
-    Instance volumes are currently supported for all backends except `runpod`, `vastai` and `kubernetes`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
+    Instance volumes are currently supported for all backends except `runpod` and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
 
 ??? info "Optional volumes"
     If the volume is not critical for your workload, you can mark it as `optional`.

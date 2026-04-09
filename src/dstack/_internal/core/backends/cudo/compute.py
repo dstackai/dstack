@@ -6,6 +6,7 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithCreateInstanceSupport,
     ComputeWithFilteredOffersCached,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
@@ -34,6 +35,7 @@ class CudoCompute(
     ComputeWithFilteredOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithInstanceVolumesSupport,
     Compute,
 ):
     def __init__(self, config: CudoConfig):

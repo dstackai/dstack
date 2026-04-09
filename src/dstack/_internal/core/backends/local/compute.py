@@ -4,6 +4,7 @@ from typing import List, Optional
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithCreateInstanceSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithPrivilegedSupport,
     ComputeWithVolumeSupport,
 )
@@ -33,6 +34,7 @@ logger = get_logger(__name__)
 class LocalCompute(
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithVolumeSupport,
     Compute,
 ):

@@ -8,6 +8,7 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivilegedSupport,
@@ -124,6 +125,7 @@ class CrusoeCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPlacementGroupSupport,
     Compute,

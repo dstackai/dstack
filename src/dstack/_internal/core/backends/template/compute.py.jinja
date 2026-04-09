@@ -10,6 +10,7 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithPlacementGroupSupport,
     ComputeWithPrivateGatewaySupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithReservationSupport,
     ComputeWithVolumeSupport,
 )
@@ -34,6 +35,7 @@ class {{ backend_name }}Compute(
     # ComputeWithAllOffersCached,
     # ComputeWithCreateInstanceSupport,
     # ComputeWithPrivilegedSupport,
+    # ComputeWithInstanceVolumesSupport,
     # ComputeWithMultinodeSupport,
     # ComputeWithReservationSupport,
     # ComputeWithPlacementGroupSupport,
