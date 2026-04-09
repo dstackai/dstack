@@ -221,6 +221,7 @@ class TestRunTerminatingWorker:
         await session.refresh(run)
         assert run.status == RunStatus.PENDING
         assert run.next_triggered_at == datetime(2023, 1, 2, 3, 15, tzinfo=timezone.utc)
+        assert run.resubmission_attempt == 0
         assert run.fleet_id is None
         assert run.lock_token is None
         assert run.lock_expires_at is None

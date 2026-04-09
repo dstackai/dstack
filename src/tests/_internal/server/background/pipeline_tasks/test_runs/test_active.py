@@ -17,6 +17,7 @@ from dstack._internal.core.models.profiles import (
     Profile,
     ProfileRetry,
     RetryEvent,
+    Schedule,
     StopCriteria,
 )
 from dstack._internal.core.models.resources import Range
@@ -294,6 +295,104 @@ class TestRunActiveWorker:
         assert healthy_job.status == JobStatus.RUNNING
         assert retried_job.status == JobStatus.SUBMITTED
         assert len(jobs) == 3
+
+    async def test_retries_scheduled_run_no_capacity_from_trigger_time(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(
+                name="default",
+                retry=ProfileRetry(duration=3600, on_events=[RetryEvent.NO_CAPACITY]),
+            ),
+            configuration=TaskConfiguration(
+                commands=["echo hello"],
+                schedule=Schedule(cron="15 * * * *"),
+            ),
+        )
+        trigger_time = get_current_datetime() - timedelta(minutes=5)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            status=RunStatus.SUBMITTED,
+            submitted_at=get_current_datetime() - timedelta(hours=2),
+            next_triggered_at=trigger_time,
+            resubmission_attempt=0,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+        )
+        lock_run(run)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.runs.active.get_current_datetime",
+            return_value=trigger_time + timedelta(minutes=10),
+        ):
+            await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.PENDING
+        assert run.resubmission_attempt == 1
+        assert run.lock_token is None
+
+    async def test_terminates_scheduled_run_when_no_capacity_retry_exceeded_from_trigger_time(
+        self, test_db, session: AsyncSession, worker: RunWorker
+    ) -> None:
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(
+                name="default",
+                retry=ProfileRetry(duration=600, on_events=[RetryEvent.NO_CAPACITY]),
+            ),
+            configuration=TaskConfiguration(
+                commands=["echo hello"],
+                schedule=Schedule(cron="15 * * * *"),
+            ),
+        )
+        trigger_time = get_current_datetime() - timedelta(minutes=20)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            status=RunStatus.SUBMITTED,
+            submitted_at=get_current_datetime() - timedelta(hours=2),
+            next_triggered_at=trigger_time,
+            resubmission_attempt=0,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            termination_reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+        )
+        lock_run(run)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.runs.active.get_current_datetime",
+            return_value=trigger_time + timedelta(minutes=20),
+        ):
+            await worker.process(run_to_pipeline_item(run))
+
+        await session.refresh(run)
+        assert run.status == RunStatus.TERMINATING
+        assert run.termination_reason == RunTerminationReason.RETRY_LIMIT_EXCEEDED
+        assert run.lock_token is None
 
     async def test_retrying_multinode_replica_terminates_active_sibling_jobs(
         self, test_db, session: AsyncSession, worker: RunWorker
