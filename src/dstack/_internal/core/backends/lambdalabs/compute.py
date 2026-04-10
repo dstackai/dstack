@@ -9,6 +9,7 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
@@ -33,6 +34,7 @@ class LambdaCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithInstanceVolumesSupport,
     Compute,
 ):
     def __init__(self, config: LambdaConfig):

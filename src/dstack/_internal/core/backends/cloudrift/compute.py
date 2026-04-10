@@ -4,6 +4,7 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithPrivilegedSupport,
     get_shim_commands,
 )
@@ -29,6 +30,7 @@ class CloudRiftCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithInstanceVolumesSupport,
     Compute,
 ):
     def __init__(self, config: CloudRiftConfig):

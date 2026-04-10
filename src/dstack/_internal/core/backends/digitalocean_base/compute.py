@@ -7,6 +7,7 @@ from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_user_data,
@@ -42,6 +43,7 @@ class BaseDigitalOceanCompute(
     ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithInstanceVolumesSupport,
     Compute,
 ):
     def __init__(self, config: BaseDigitalOceanConfig, api_url: str, type: BackendType):

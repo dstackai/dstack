@@ -7,7 +7,7 @@ import gpuhunt
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.compute import ComputeWithPlacementGroupSupport
 from dstack._internal.core.backends.features import (
-    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
+    BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT,
     BACKENDS_WITH_MULTINODE_SUPPORT,
     BACKENDS_WITH_PRIVILEGED_SUPPORT,
     BACKENDS_WITH_RESERVATION_SUPPORT,
@@ -70,8 +70,8 @@ async def get_offers_by_requirements(
 
     if instance_mounts:
         if backend_types is None:
-            backend_types = BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
-        backend_types = [b for b in backend_types if b in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]
+            backend_types = BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT]
 
     if profile.reservation is not None:
         if backend_types is None:

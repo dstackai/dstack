@@ -375,6 +375,15 @@ class ComputeWithPrivilegedSupport:
     pass
 
 
+class ComputeWithInstanceVolumesSupport:
+    """
+    Must be subclassed to support runs with `/host/path:/container/path` volumes.
+    All VM-based Computes (that is, Computes that use the shim) should subclass this mixin.
+    """
+
+    pass
+
+
 class ComputeWithMultinodeSupport:
     """
     Must be subclassed to support multinode tasks and cluster fleets.
@@ -668,7 +677,7 @@ def generate_unique_backend_name(
         # project_name is not guaranteed to be valid in all backends,
         # so we add it only if it passes the validation
         prefix = f"dstack-{project_name}-{resource_name}"
-    return _generate_unique_backend_name_with_prefix(
+    return generate_unique_name(
         prefix=prefix,
         max_length=max_length,
     )
@@ -676,23 +685,31 @@ def generate_unique_backend_name(
 
 def generate_unique_short_backend_name() -> str:
     """
-    Generates a unique 15-char resource name of the form "dstack-12345678".
+    Generates a unique 15-char resource name of the form "dstack-12345xyz".
     Can be used for resources that have a very small length limit like AWS LBs.
     """
-    return _generate_unique_backend_name_with_prefix("dstack")
+    return generate_unique_name(prefix="dstack")
 
 
-def _generate_unique_backend_name_with_prefix(
-    prefix: str,
+def generate_unique_name(
+    *,
+    prefix: Optional[str] = None,
+    suffix_length: Optional[int] = None,
     max_length: Optional[int] = None,
 ) -> str:
+    if suffix_length is None:
+        suffix_length = _CLOUD_RESOURCE_SUFFIX_LEN
     if max_length is not None:
-        prefix_len = max_length - _CLOUD_RESOURCE_SUFFIX_LEN - 1
-        prefix = prefix[:prefix_len]
+        assert max_length >= suffix_length
+        if prefix is not None:
+            prefix_len = max_length - suffix_length - 1
+            assert prefix_len > 0
+            prefix = prefix[:prefix_len]
     suffix = "".join(
-        random.choice(string.ascii_lowercase + string.digits)
-        for _ in range(_CLOUD_RESOURCE_SUFFIX_LEN)
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(suffix_length)
     )
+    if prefix is None:
+        return suffix
     return f"{prefix}-{suffix}"
 
 

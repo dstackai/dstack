@@ -14,10 +14,12 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeWithFilteredOffersCached,
     ComputeWithGatewaySupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name_for_job,
+    generate_unique_name,
     get_docker_commands,
     get_dstack_gateway_commands,
 )
@@ -68,7 +70,7 @@ from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec
 from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.volumes import InstanceMountPoint, Volume
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
@@ -97,6 +99,7 @@ class KubernetesBackendData(CoreModel):
 class KubernetesCompute(
     ComputeWithFilteredOffersCached,
     ComputeWithPrivilegedSupport,
+    ComputeWithInstanceVolumesSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
     Compute,
@@ -198,6 +201,30 @@ class KubernetesCompute(
                 client.V1VolumeMount(
                     name=shm_volume_name,
                     mount_path="/dev/shm",
+                )
+            )
+
+        mount_points = job.job_spec.volumes
+        if mount_points is None:
+            # Legacy JobSpec without volumes
+            mount_points = run.run_spec.configuration.volumes
+        for mount_point in mount_points:
+            assert isinstance(mount_point, InstanceMountPoint)
+            # "Must be a DNS_LABEL and unique within the pod"
+            volume_name = generate_unique_name(prefix="host-path", max_length=253)
+            volumes_.append(
+                client.V1Volume(
+                    name=volume_name,
+                    host_path=client.V1HostPathVolumeSource(
+                        path=mount_point.instance_path,
+                        type="DirectoryOrCreate",
+                    ),
+                ),
+            )
+            volume_mounts.append(
+                client.V1VolumeMount(
+                    name=volume_name,
+                    mount_path=mount_point.path,
                 )
             )
 
