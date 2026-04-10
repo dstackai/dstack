@@ -476,41 +476,6 @@ async def get_plan(
     return plan
 
 
-async def get_create_instance_offers(
-    project: ProjectModel,
-    profile: Profile,
-    requirements: Requirements,
-    placement_group: Optional[PlacementGroup] = None,
-    fleet_spec: Optional[FleetSpec] = None,
-    fleet_model: Optional[FleetModel] = None,
-    blocks: Union[int, Literal["auto"]] = 1,
-    exclude_not_available: bool = False,
-    master_job_provisioning_data: Optional[JobProvisioningData] = None,
-    infer_master_job_provisioning_data_from_fleet_instances: bool = True,
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
-    """
-    Return fleet offers restricted to backends that support `create_instance`.
-
-    This method is for create-instance provisioning semantics
-    (typically VM-based backends, not container-only backends).
-    """
-    return await get_fleet_offers(
-        project=project,
-        profile=profile,
-        requirements=requirements,
-        placement_group=placement_group,
-        fleet_spec=fleet_spec,
-        fleet_model=fleet_model,
-        blocks=blocks,
-        exclude_not_available=exclude_not_available,
-        master_job_provisioning_data=master_job_provisioning_data,
-        infer_master_job_provisioning_data_from_fleet_instances=(
-            infer_master_job_provisioning_data_from_fleet_instances
-        ),
-        include_only_create_instance_supported_backends=True,
-    )
-
-
 async def get_fleet_offers(
     project: ProjectModel,
     profile: Profile,
