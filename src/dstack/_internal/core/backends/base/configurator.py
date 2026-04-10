@@ -26,11 +26,13 @@ class BackendRecord(CoreModel):
     This model includes backend parameters to store in the DB.
     """
 
-    # `config` stores text-encoded non-sensitive backend config parameters (e.g. json)
     config: str
-    # `auth` stores text-encoded sensitive backend config parameters (e.g. json).
-    # Configurator should not encrypt/decrypt it. This is done by the caller.
+    """`config` stores text-encoded non-sensitive backend config parameters (e.g. json)
+    """
     auth: str
+    """`auth` stores text-encoded sensitive backend config parameters (e.g. json).
+    `Configurator` should not encrypt/decrypt it. This is done by the caller.
+    """
 
 
 class StoredBackendRecord(BackendRecord):
@@ -53,8 +55,8 @@ class Configurator(ABC, Generic[BackendConfigWithoutCredsT, BackendConfigWithCre
     """
 
     TYPE: ClassVar[BackendType]
-    # `BACKEND_CLASS` is used to introspect backend features without initializing it.
     BACKEND_CLASS: ClassVar[type[Backend]]
+    """`BACKEND_CLASS` is used to introspect backend features without initializing it."""
 
     @abstractmethod
     def validate_config(self, config: BackendConfigWithCredsT, default_creds_enabled: bool):

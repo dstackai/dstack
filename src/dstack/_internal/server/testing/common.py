@@ -223,6 +223,8 @@ async def create_backend(
     backend_type: BackendType = BackendType.AWS,
     config: Optional[Dict] = None,
     auth: Optional[Dict] = None,
+    source_config: Optional[Dict] = None,
+    source_auth: Optional[Dict] = None,
 ) -> BackendModel:
     if config is None:
         config = {
@@ -239,6 +241,10 @@ async def create_backend(
         type=backend_type,
         config=json.dumps(config),
         auth=DecryptedString(plaintext=json.dumps(auth)),
+        source_config=None if source_config is None else json.dumps(source_config),
+        source_auth=(
+            None if source_auth is None else DecryptedString(plaintext=json.dumps(source_auth))
+        ),
     )
     session.add(backend)
     await session.commit()
