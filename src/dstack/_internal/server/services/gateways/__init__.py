@@ -577,7 +577,7 @@ async def init_gateways(session: AsyncSession):
                 return_exceptions=True,
             ):
                 if isinstance(res, Exception):
-                    logger.error(
+                    logger.warning(
                         "Failed to update gateway %s: %s", gateway_compute.ip_address, res
                     )
                 elif isinstance(res, bool) and res:
@@ -590,7 +590,7 @@ async def init_gateways(session: AsyncSession):
             return_exceptions=True,
         ):
             if isinstance(error, Exception):
-                logger.error(
+                logger.warning(
                     "Failed to configure gateway %s: %r", gateway_compute.ip_address, error
                 )
 
