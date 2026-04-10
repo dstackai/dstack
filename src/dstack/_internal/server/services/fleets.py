@@ -443,24 +443,20 @@ async def get_plan(
     offers = []
     if effective_spec.configuration.ssh_config is None:
         requirements = get_fleet_requirements(effective_spec)
-        if _is_elastic_cloud_fleet_spec(effective_spec):
-            offers_with_backends = await offers_services.get_offers_by_requirements(
-                project=project,
-                profile=effective_spec.merged_profile,
-                requirements=requirements,
-                multinode=(
-                    effective_spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-                ),
-                blocks=effective_spec.configuration.blocks,
-            )
-        else:
-            offers_with_backends = await get_create_instance_offers(
-                project=project,
-                profile=effective_spec.merged_profile,
-                requirements=requirements,
-                fleet_spec=effective_spec,
-                blocks=effective_spec.configuration.blocks,
-            )
+        nodes = effective_spec.configuration.nodes
+        include_only_create_instance_supported_backends = True
+        if nodes is not None:
+            include_only_create_instance_supported_backends = nodes.target != 0
+        offers_with_backends = await get_fleet_offers(
+            project=project,
+            profile=effective_spec.merged_profile,
+            requirements=requirements,
+            fleet_spec=effective_spec,
+            blocks=effective_spec.configuration.blocks,
+            include_only_create_instance_supported_backends=(
+                include_only_create_instance_supported_backends
+            ),
+        )
         offers = [offer for _, offer in offers_with_backends]
 
     _remove_fleet_spec_sensitive_info(effective_spec)
@@ -480,16 +476,6 @@ async def get_plan(
     return plan
 
 
-def _is_elastic_cloud_fleet_spec(fleet_spec: FleetSpec) -> bool:
-    nodes = fleet_spec.configuration.nodes
-    return (
-        fleet_spec.configuration.ssh_config is None
-        and nodes is not None
-        and nodes.min == 0
-        and nodes.target == 0
-    )
-
-
 async def get_create_instance_offers(
     project: ProjectModel,
     profile: Profile,
@@ -502,6 +488,49 @@ async def get_create_instance_offers(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     infer_master_job_provisioning_data_from_fleet_instances: bool = True,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+    """
+    Return fleet offers restricted to backends that support `create_instance`.
+
+    This method is for create-instance provisioning semantics
+    (typically VM-based backends, not container-only backends).
+    """
+    return await get_fleet_offers(
+        project=project,
+        profile=profile,
+        requirements=requirements,
+        placement_group=placement_group,
+        fleet_spec=fleet_spec,
+        fleet_model=fleet_model,
+        blocks=blocks,
+        exclude_not_available=exclude_not_available,
+        master_job_provisioning_data=master_job_provisioning_data,
+        infer_master_job_provisioning_data_from_fleet_instances=(
+            infer_master_job_provisioning_data_from_fleet_instances
+        ),
+        include_only_create_instance_supported_backends=True,
+    )
+
+
+async def get_fleet_offers(
+    project: ProjectModel,
+    profile: Profile,
+    requirements: Requirements,
+    placement_group: Optional[PlacementGroup] = None,
+    fleet_spec: Optional[FleetSpec] = None,
+    fleet_model: Optional[FleetModel] = None,
+    blocks: Union[int, Literal["auto"]] = 1,
+    exclude_not_available: bool = False,
+    master_job_provisioning_data: Optional[JobProvisioningData] = None,
+    infer_master_job_provisioning_data_from_fleet_instances: bool = True,
+    include_only_create_instance_supported_backends: bool = True,
+) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+    """
+    Return offers for fleet planning and provisioning.
+
+    By default, restricts to backends that support `create_instance`.
+    Set `include_only_create_instance_supported_backends=False` to include
+    all matching backends.
+    """
     multinode = False
     if fleet_spec is not None:
         multinode = fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER
@@ -530,11 +559,12 @@ async def get_create_instance_offers(
         placement_group=placement_group,
         blocks=blocks,
     )
-    offers = [
-        (backend, offer)
-        for backend, offer in offers
-        if offer.backend in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
-    ]
+    if include_only_create_instance_supported_backends:
+        offers = [
+            (backend, offer)
+            for backend, offer in offers
+            if offer.backend in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+        ]
     return offers
 
 
