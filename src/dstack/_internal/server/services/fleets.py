@@ -442,12 +442,20 @@ async def get_plan(
 
     offers = []
     if effective_spec.configuration.ssh_config is None:
-        offers_with_backends = await get_create_instance_offers(
+        requirements = get_fleet_requirements(effective_spec)
+        nodes = effective_spec.configuration.nodes
+        include_only_create_instance_supported_backends = True
+        if nodes is not None:
+            include_only_create_instance_supported_backends = nodes.target != 0
+        offers_with_backends = await get_fleet_offers(
             project=project,
             profile=effective_spec.merged_profile,
-            requirements=get_fleet_requirements(effective_spec),
+            requirements=requirements,
             fleet_spec=effective_spec,
             blocks=effective_spec.configuration.blocks,
+            include_only_create_instance_supported_backends=(
+                include_only_create_instance_supported_backends
+            ),
         )
         offers = [offer for _, offer in offers_with_backends]
 
@@ -468,7 +476,7 @@ async def get_plan(
     return plan
 
 
-async def get_create_instance_offers(
+async def get_fleet_offers(
     project: ProjectModel,
     profile: Profile,
     requirements: Requirements,
@@ -479,7 +487,15 @@ async def get_create_instance_offers(
     exclude_not_available: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     infer_master_job_provisioning_data_from_fleet_instances: bool = True,
+    include_only_create_instance_supported_backends: bool = True,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+    """
+    Return offers for fleet planning and provisioning.
+
+    By default, restricts to backends that support `create_instance`.
+    Set `include_only_create_instance_supported_backends=False` to include
+    all matching backends.
+    """
     multinode = False
     if fleet_spec is not None:
         multinode = fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER
@@ -508,11 +524,12 @@ async def get_create_instance_offers(
         placement_group=placement_group,
         blocks=blocks,
     )
-    offers = [
-        (backend, offer)
-        for backend, offer in offers
-        if offer.backend in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
-    ]
+    if include_only_create_instance_supported_backends:
+        offers = [
+            (backend, offer)
+            for backend, offer in offers
+            if offer.backend in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+        ]
     return offers
 
 

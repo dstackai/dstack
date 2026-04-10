@@ -36,7 +36,7 @@ from dstack._internal.server.background.pipeline_tasks.instances.common import (
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import FleetModel, InstanceModel, PlacementGroupModel
-from dstack._internal.server.services.fleets import get_create_instance_offers, is_cloud_cluster
+from dstack._internal.server.services.fleets import get_fleet_offers, is_cloud_cluster
 from dstack._internal.server.services.instances import (
     get_instance_configuration,
     get_instance_profile,
@@ -101,7 +101,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         )
         master_job_provisioning_data = cluster_context.master_job_provisioning_data
 
-    offers = await get_create_instance_offers(
+    offers = await get_fleet_offers(
         project=instance_model.project,
         profile=profile,
         requirements=requirements,
@@ -111,6 +111,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         exclude_not_available=True,
         master_job_provisioning_data=master_job_provisioning_data,
         infer_master_job_provisioning_data_from_fleet_instances=False,
+        include_only_create_instance_supported_backends=True,
     )
 
     # Limit number of offers tried to prevent long-running processing in case all offers fail.
@@ -120,7 +121,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         compute = backend.compute()
         assert isinstance(compute, ComputeWithCreateInstanceSupport)
         if master_job_provisioning_data is not None:
-            # `get_create_instance_offers()` already restricts backend and region from the master.
+            # `get_fleet_offers()` already restricts backend and region from the master.
             # Availability zone still has to be narrowed per offer.
             instance_offer = get_instance_offer_with_restricted_az(
                 instance_offer=instance_offer,
