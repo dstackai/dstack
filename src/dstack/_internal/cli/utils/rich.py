@@ -140,7 +140,11 @@ class MultiItemStatus:
             transient=True,
         )
 
-    def update(self, *renderables: "RenderableType") -> None:
+    def update(
+        self, *renderables: "RenderableType", status: Optional["RenderableType"] = None
+    ) -> None:
+        if status is not None:
+            self._spinner.update(text=status)
         self._live.update(renderable=Group(self._spinner, *renderables))
 
     def __enter__(self) -> "MultiItemStatus":

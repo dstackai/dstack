@@ -28,7 +28,12 @@ from dstack._internal.cli.services.repos import (
 from dstack._internal.cli.services.resources import apply_resources_args, register_resources_args
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.rich import MultiItemStatus
-from dstack._internal.cli.utils.run import get_runs_table, print_run_plan
+from dstack._internal.cli.utils.run import (
+    RunWaitStatus,
+    get_run_wait_status,
+    get_runs_table,
+    print_run_plan,
+)
 from dstack._internal.core.errors import (
     CLIError,
     ConfigurationError,
@@ -192,10 +197,14 @@ class BaseRunConfigurator(
         try:
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
-                with MultiItemStatus(f"Launching [code]{run.name}[/]...", console=console) as live:
+                with MultiItemStatus(_get_apply_status(run), console=console) as live:
                     while not _is_ready_to_attach(run):
                         table = get_runs_table([run])
-                        live.update(table)
+                        live.update(
+                            table,
+                            *_get_apply_wait_renderables(run),
+                            status=_get_apply_status(run),
+                        )
                         time.sleep(5)
                         run.refresh()
 
@@ -793,12 +802,36 @@ def _detect_windsurf_version(exe: str = "windsurf") -> Optional[str]:
 def _print_service_urls(run: Run) -> None:
     if run._run.run_spec.configuration.type != RunConfigurationType.SERVICE.value:
         return
-    console.print(f"Service is published at:\n  [link={run.service_url}]{run.service_url}[/]")
+    console.print(_get_service_url_renderable(run))
     if model := run.service_model:
         console.print(
             f"Model [code]{model.name}[/] is published at:\n  [link={model.url}]{model.url}[/]"
         )
     console.print()
+
+
+def _get_apply_status(run: Run) -> str:
+    wait_status = get_run_wait_status(run._run)
+    if wait_status is None:
+        return f"Launching [code]{run.name}[/]..."
+    return f"[code]{run.name}[/] is {wait_status.value}..."
+
+
+def _get_apply_wait_renderables(run: Run) -> list[str]:
+    wait_status = get_run_wait_status(run._run)
+    if wait_status is RunWaitStatus.WAITING_FOR_REQUESTS and run._run.service is not None:
+        return [_get_service_url_renderable(run)]
+    if (
+        wait_status is RunWaitStatus.WAITING_FOR_SCHEDULE
+        and run._run.next_triggered_at is not None
+    ):
+        next_run = run._run.next_triggered_at.astimezone().strftime("%Y-%m-%d %H:%M %Z")
+        return [f"Next run: {next_run}"]
+    return []
+
+
+def _get_service_url_renderable(run: Run) -> str:
+    return f"Service is published at:\n  [link={run.service_url}]{run.service_url}[/]"
 
 
 def _print_dev_environment_connection_info(run: Run) -> None:
