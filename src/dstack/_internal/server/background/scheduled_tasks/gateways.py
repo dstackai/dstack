@@ -10,11 +10,17 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services.gateways import (
     GatewayConnection,
     gateway_connections_pool,
+    init_gateways,
 )
 from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+async def init_gateways_in_background():
+    async with get_session_ctx() as session:
+        await init_gateways(session=session)
 
 
 async def process_gateways_connections():

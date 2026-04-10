@@ -1,9 +1,11 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from dstack._internal.server import settings
 from dstack._internal.server.background.scheduled_tasks.events import delete_events
 from dstack._internal.server.background.scheduled_tasks.gateways import (
+    init_gateways_in_background,
     process_gateways_connections,
 )
 from dstack._internal.server.background.scheduled_tasks.idle_volumes import (
@@ -34,6 +36,8 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
     Start periodic tasks triggered by `apscheduler` at specific times/intervals.
     Suitable for tasks that run infrequently and don't need to lock rows for a long time.
     """
+    # DateTrigger() to init gateways immediately.
+    _scheduler.add_job(init_gateways_in_background, DateTrigger(), max_instances=1)
     _scheduler.add_job(process_probes, IntervalTrigger(seconds=3, jitter=1))
     _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
     _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
