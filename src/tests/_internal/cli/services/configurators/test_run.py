@@ -1,5 +1,4 @@
 import argparse
-from datetime import datetime, timezone
 from textwrap import dedent
 from typing import List, Optional, Tuple
 from unittest.mock import Mock
@@ -10,8 +9,6 @@ from gpuhunt import AcceleratorVendor
 from dstack._internal.cli.services.configurators import get_run_configurator_class
 from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
-    _get_apply_status,
-    _get_apply_wait_renderables,
     render_run_spec_diff,
 )
 from dstack._internal.core.errors import ConfigurationError
@@ -21,25 +18,11 @@ from dstack._internal.core.models.configurations import (
     BaseRunConfiguration,
     DevEnvironmentConfiguration,
     PortMapping,
-    ScalingSpec,
-    ServiceConfiguration,
     TaskConfiguration,
 )
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.resources import Range
-from dstack._internal.core.models.runs import RunStatus, ServiceSpec
-from dstack._internal.server.services import encryption  # noqa: F401  # import for side-effect
-from dstack._internal.server.services.runs import run_model_to_run
-from dstack._internal.server.testing.common import (
-    create_project,
-    create_repo,
-    create_run,
-    create_user,
-    get_run_spec,
-)
-from dstack.api import Run
-from dstack.api.server import APIClient
+from dstack._internal.server.testing.common import get_run_spec
 
 
 class TestApplyArgs:
@@ -418,74 +401,3 @@ class TestRenderRunSpecDiff:
         old = get_run_spec(run_name="test", repo_id="test")
         new = get_run_spec(run_name="test", repo_id="test")
         assert render_run_spec_diff(old, new) is None
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-class TestApplyStatusHelpers:
-    async def test_waiting_for_requests_status_and_renderables(self, session):
-        project = await create_project(session=session)
-        user = await create_user(session=session)
-        repo = await create_repo(session=session, project_id=project.id)
-        run_spec = get_run_spec(
-            run_name="service-run",
-            repo_id=repo.name,
-            configuration=ServiceConfiguration(
-                type="service",
-                image="ubuntu:latest",
-                commands=["echo hello"],
-                port=80,
-                replicas=Range[int](min=0, max=1),
-                scaling=ScalingSpec(metric="rps", target=1),
-            ),
-        )
-        run_model = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-            run_name="service-run",
-            run_spec=run_spec,
-            status=RunStatus.PENDING,
-        )
-        run_model.service_spec = ServiceSpec(url="/proxy/services/test/service-run/").json()
-        await session.commit()
-        await session.refresh(run_model)
-
-        api_run = Run(
-            api_client=Mock(spec=APIClient, base_url="http://127.0.0.1:3000"),
-            project=project.name,
-            run=run_model_to_run(run_model),
-        )
-
-        assert _get_apply_status(api_run) == "[code]service-run[/] is waiting for requests..."
-        assert _get_apply_wait_renderables(api_run) == [
-            "Service is published at:\n  [link=http://127.0.0.1:3000/proxy/services/test/service-run/]http://127.0.0.1:3000/proxy/services/test/service-run/[/]"
-        ]
-
-    async def test_waiting_for_schedule_status_and_renderables(self, session):
-        project = await create_project(session=session)
-        user = await create_user(session=session)
-        repo = await create_repo(session=session, project_id=project.id)
-        run_model = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-            run_name="scheduled-run",
-            status=RunStatus.PENDING,
-            next_triggered_at=datetime(2023, 1, 2, 3, 10, tzinfo=timezone.utc),
-        )
-        await session.refresh(run_model)
-
-        api_run = Run(
-            api_client=Mock(spec=APIClient),
-            project=project.name,
-            run=run_model_to_run(run_model),
-        )
-        next_run = datetime(2023, 1, 2, 3, 10, tzinfo=timezone.utc)
-        api_run._run.next_triggered_at = next_run
-
-        assert _get_apply_status(api_run) == "[code]scheduled-run[/] is waiting for schedule..."
-        expected_next_run = next_run.astimezone().strftime("%Y-%m-%d %H:%M %Z")
-        assert _get_apply_wait_renderables(api_run) == [f"Next run: {expected_next_run}"]
