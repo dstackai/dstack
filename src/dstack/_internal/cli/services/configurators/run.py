@@ -802,7 +802,7 @@ def _detect_windsurf_version(exe: str = "windsurf") -> Optional[str]:
 def _print_service_urls(run: Run) -> None:
     if run._run.run_spec.configuration.type != RunConfigurationType.SERVICE.value:
         return
-    console.print(f"Service is published at:\n  [link={run.service_url}]{run.service_url}[/]")
+    console.print(_get_service_url_renderable(run))
     if model := run.service_model:
         console.print(
             f"Model [code]{model.name}[/] is published at:\n  [link={model.url}]{model.url}[/]"
@@ -820,7 +820,7 @@ def _get_apply_status(run: Run) -> str:
 def _get_apply_wait_renderables(run: Run) -> list[str]:
     wait_status = get_run_wait_status(run._run)
     if wait_status is RunWaitStatus.WAITING_FOR_REQUESTS and run._run.service is not None:
-        return [f"Service URL: [link={run.service_url}]{run.service_url}[/]"]
+        return [_get_service_url_renderable(run)]
     if (
         wait_status is RunWaitStatus.WAITING_FOR_SCHEDULE
         and run._run.next_triggered_at is not None
@@ -828,6 +828,10 @@ def _get_apply_wait_renderables(run: Run) -> list[str]:
         next_run = run._run.next_triggered_at.astimezone().strftime("%Y-%m-%d %H:%M %Z")
         return [f"Next run: {next_run}"]
     return []
+
+
+def _get_service_url_renderable(run: Run) -> str:
+    return f"Service is published at:\n  [link={run.service_url}]{run.service_url}[/]"
 
 
 def _print_dev_environment_connection_info(run: Run) -> None:

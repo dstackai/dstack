@@ -460,7 +460,7 @@ class TestApplyStatusHelpers:
 
         assert _get_apply_status(api_run) == "[code]service-run[/] is waiting for requests..."
         assert _get_apply_wait_renderables(api_run) == [
-            "Service URL: [link=http://127.0.0.1:3000/proxy/services/test/service-run/]http://127.0.0.1:3000/proxy/services/test/service-run/[/]"
+            "Service is published at:\n  [link=http://127.0.0.1:3000/proxy/services/test/service-run/]http://127.0.0.1:3000/proxy/services/test/service-run/[/]"
         ]
 
     async def test_waiting_for_schedule_status_and_renderables(self, session):
