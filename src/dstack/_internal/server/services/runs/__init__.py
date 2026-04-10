@@ -107,17 +107,25 @@ async def ensure_service_router_worker_sync_row(
     if not run_spec_has_router_replica_group(run_spec):
         return
     res = await session.execute(
-        select(ServiceRouterWorkerSyncModel.id).where(
+        select(ServiceRouterWorkerSyncModel).where(
             ServiceRouterWorkerSyncModel.run_id == run_model.id
         )
     )
-    if res.scalar_one_or_none() is not None:
-        return
+    sync_row = res.scalar_one_or_none()
     now = common_utils.get_current_datetime()
+    if sync_row is not None:
+        if sync_row.deleted:
+            sync_row.deleted = False
+            sync_row.lock_expires_at = None
+            sync_row.lock_token = None
+            sync_row.lock_owner = None
+            sync_row.last_processed_at = now
+        return
     session.add(
         ServiceRouterWorkerSyncModel(
             id=uuid.uuid4(),
             run_id=run_model.id,
+            deleted=False,
             created_at=now,
             last_processed_at=now,
         )

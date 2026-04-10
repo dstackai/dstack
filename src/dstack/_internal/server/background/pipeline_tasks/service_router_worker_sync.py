@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Sequence
 
-from sqlalchemy import delete, or_, select, true, update
+from sqlalchemy import or_, select, true, update
 from sqlalchemy.orm import joinedload, load_only, selectinload
+from sqlalchemy.sql import false
 
 from dstack._internal.core.models.runs import JobStatus, RunStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
@@ -118,6 +119,7 @@ class ServiceRouterWorkerSyncFetcher(Fetcher[ServiceRouterWorkerSyncPipelineItem
                     select(ServiceRouterWorkerSyncModel)
                     .join(RunModel, RunModel.id == ServiceRouterWorkerSyncModel.run_id)
                     .where(
+                        ServiceRouterWorkerSyncModel.deleted == false(),
                         RunModel.status == RunStatus.RUNNING,
                         or_(
                             ServiceRouterWorkerSyncModel.last_processed_at
@@ -206,7 +208,10 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                 or run_model.status != RunStatus.RUNNING
                 or not run_model_has_router_replica_group(run_model)
             ):
-                await session.delete(sync_row)
+                sync_row.deleted = True
+                sync_row.lock_expires_at = None
+                sync_row.lock_token = None
+                sync_row.lock_owner = None
                 await session.commit()
                 return
 
@@ -246,9 +251,16 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
         if run_for_sync is None:
             async with get_session_ctx() as session:
                 await session.execute(
-                    delete(ServiceRouterWorkerSyncModel).where(
+                    update(ServiceRouterWorkerSyncModel)
+                    .where(
                         ServiceRouterWorkerSyncModel.id == item.id,
                         ServiceRouterWorkerSyncModel.lock_token == item.lock_token,
+                    )
+                    .values(
+                        deleted=True,
+                        lock_expires_at=None,
+                        lock_token=None,
+                        lock_owner=None,
                     )
                 )
                 await session.commit()

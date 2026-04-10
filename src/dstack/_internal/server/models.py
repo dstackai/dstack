@@ -483,13 +483,19 @@ class ServiceRouterWorkerSyncModel(PipelineModelMixin, BaseModel):
         ForeignKey("runs.id", ondelete="CASCADE"), unique=True, index=True
     )
     run: Mapped["RunModel"] = relationship(back_populates="service_router_worker_sync")
+    deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
     )
 
     __table_args__ = (
-        Index("ix_service_router_worker_sync_pipeline_fetch_q", last_processed_at.asc()),
+        Index(
+            "ix_service_router_worker_sync_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=deleted == false(),
+            sqlite_where=deleted == false(),
+        ),
     )
 
 
