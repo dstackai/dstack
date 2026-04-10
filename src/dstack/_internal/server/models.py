@@ -317,6 +317,16 @@ class BackendModel(BaseModel):
 
     config: Mapped[str] = mapped_column(String(20000))
     auth: Mapped[DecryptedString] = mapped_column(EncryptedString(20000))
+    source_config: Mapped[Optional[str]] = mapped_column(String(20000), nullable=True)
+    """`source_config` stores the original non-sensitive backend config from user input
+    before configurators materialize defaults or generated values.
+    """
+    source_auth: Mapped[Optional[DecryptedString]] = mapped_column(
+        EncryptedString(20000), nullable=True
+    )
+    """`source_auth` stores the original sensitive backend config from user input
+    before configurators materialize defaults or generated values.
+    """
 
     gateways: Mapped[List["GatewayModel"]] = relationship(back_populates="backend")
 

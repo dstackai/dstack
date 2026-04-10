@@ -142,6 +142,7 @@ class ServerConfigManager:
             backend_config = file_config_to_config(backend_file_config)
             backend_type = BackendType(backend_config.type)
             backends_to_delete.difference_update([backend_type])
+            backend_exists = any(backend_type == b.type for b in project.backends)
             try:
                 current_backend_config = await backends_services.get_backend_config(
                     project=project,
@@ -154,9 +155,15 @@ class ServerConfigManager:
                     backend_type.value,
                 )
                 continue
-            if backend_config == current_backend_config:
-                continue
-            backend_exists = any(backend_type == b.type for b in project.backends)
+            if current_backend_config is not None:
+                current_source_backend_config = await backends_services.get_source_backend_config(
+                    project=project,
+                    backend_type=backend_type,
+                )
+                # current_source_backend_config may be missing for old backend records
+                comparable_backend_config = current_source_backend_config or current_backend_config
+                if backend_config == comparable_backend_config:
+                    continue
             try:
                 # current_backend_config may be None if backend exists
                 # but it's config is invalid (e.g. cannot be decrypted).

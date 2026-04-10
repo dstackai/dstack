@@ -1,13 +1,16 @@
 import asyncio
 import heapq
+import json
 import time
 from collections.abc import Iterable, Iterator
 from typing import Callable, Coroutine, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from cachetools import TTLCache
+from pydantic import Field, ValidationError
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing_extensions import Annotated
 
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.backends.base.configurator import (
@@ -33,6 +36,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
@@ -44,6 +48,20 @@ from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class _BackendConfigWithCreds(CoreModel):
+    __root__: Annotated[AnyBackendConfigWithCreds, Field(..., discriminator="type")]
+
+
+def serialize_source_backend_config(
+    config: AnyBackendConfigWithCreds,
+) -> Tuple[str, Optional[str]]:
+    """Split user-intent backend config into non-sensitive and sensitive JSON blobs."""
+    source_config_dict = config.dict()
+    source_auth = source_config_dict.pop("creds", None)
+    source_auth_json = None if source_auth is None else json.dumps(source_auth)
+    return json.dumps(source_config_dict), source_auth_json
 
 
 async def create_backend(
@@ -89,6 +107,8 @@ async def update_backend(
         .values(
             config=backend.config,
             auth=backend.auth,
+            source_config=backend.source_config,
+            source_auth=backend.source_auth,
         )
     )
     return config
@@ -99,6 +119,9 @@ async def validate_and_create_backend_model(
     configurator: Configurator,
     config: AnyBackendConfigWithCreds,
 ) -> BackendModel:
+    # Configurators may mutate `config` while building the effective stored backend config,
+    # so capture the user-intent payload before validation/create_backend runs.
+    source_config, source_auth = serialize_source_backend_config(config)
     await run_async(
         configurator.validate_config, config, default_creds_enabled=settings.DEFAULT_CREDS_ENABLED
     )
@@ -112,6 +135,8 @@ async def validate_and_create_backend_model(
         type=configurator.TYPE,
         config=backend_record.config,
         auth=DecryptedString(plaintext=backend_record.auth),
+        source_config=source_config,
+        source_auth=None if source_auth is None else DecryptedString(plaintext=source_auth),
     )
 
 
@@ -134,6 +159,16 @@ async def get_backend_config(
     return None
 
 
+async def get_source_backend_config(
+    project: ProjectModel,
+    backend_type: BackendType,
+) -> Optional[AnyBackendConfigWithCreds]:
+    backend_model = await get_project_backend_model_by_type(project, backend_type)
+    if backend_model is None:
+        return None
+    return get_source_backend_config_from_backend_model(backend_model)
+
+
 def get_backend_config_with_creds_from_backend_model(
     configurator: Configurator,
     backend_model: BackendModel,
@@ -150,6 +185,48 @@ def get_backend_config_without_creds_from_backend_model(
     backend_record = get_stored_backend_record(backend_model)
     backend_config = configurator.get_backend_config_without_creds(backend_record)
     return backend_config
+
+
+def get_source_backend_config_from_backend_model(
+    backend_model: BackendModel,
+) -> Optional[AnyBackendConfigWithCreds]:
+    """Reconstruct user-intent backend config from `source_config`/`source_auth`."""
+
+    if backend_model.source_config is None:
+        return None
+    try:
+        source_config_dict = json.loads(backend_model.source_config)
+    except ValueError:
+        logger.warning(
+            "Failed to parse source config for %s backend. Falling back to stored config.",
+            backend_model.type.value,
+        )
+        return None
+    if backend_model.source_auth is not None:
+        if not backend_model.source_auth.decrypted:
+            logger.warning(
+                "Failed to decrypt source creds for %s backend. Falling back to stored config.",
+                backend_model.type.value,
+            )
+            return None
+        try:
+            source_config_dict["creds"] = json.loads(
+                backend_model.source_auth.get_plaintext_or_error()
+            )
+        except ValueError:
+            logger.warning(
+                "Failed to parse source creds for %s backend. Falling back to stored config.",
+                backend_model.type.value,
+            )
+            return None
+    try:
+        return _BackendConfigWithCreds.parse_obj(source_config_dict).__root__
+    except ValidationError:
+        logger.warning(
+            "Failed to validate source config for %s backend. Falling back to stored config.",
+            backend_model.type.value,
+        )
+        return None
 
 
 def get_stored_backend_record(backend_model: BackendModel) -> StoredBackendRecord:

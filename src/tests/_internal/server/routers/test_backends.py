@@ -150,7 +150,11 @@ class TestCreateBackend:
             )
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
-        assert len(res.scalars().all()) == 1
+        backend = res.scalars().one()
+        assert backend.source_config is not None
+        assert backend.source_auth is not None
+        assert json.loads(backend.source_config)["regions"] == ["us-west-1"]
+        assert json.loads(backend.source_auth.get_plaintext_or_error()) == body["creds"]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -615,6 +619,10 @@ class TestUpdateBackend:
         assert response.status_code == 200, response.json()
         await session.refresh(backend)
         assert json.loads(backend.config)["regions"] == ["us-east-1"]
+        assert backend.source_config is not None
+        assert backend.source_auth is not None
+        assert json.loads(backend.source_config)["regions"] == ["us-east-1"]
+        assert json.loads(backend.source_auth.get_plaintext_or_error()) == body["creds"]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -815,7 +823,7 @@ class TestGetConfigInfo:
             "iam_instance_profile": None,
             "tags": None,
             "os_images": None,
-            "creds": json.loads(backend.auth.plaintext),
+            "creds": json.loads(backend.auth.get_plaintext_or_error()),
         }
 
 
