@@ -293,13 +293,6 @@ async def apply_service(
             )
             for replica, conn in replica_conns.items()
         ]
-    router_replicas = [r for r in service.replicas if r.is_router_replica]
-    if router_replicas:
-        replica_configs_for_nginx = [c for c in replica_configs if c.id == router_replicas[0].id]
-        service_config = await get_nginx_service_config(service, replica_configs_for_nginx)
-        await nginx.register(service_config, (await repo.get_config()).acme_settings)
-        return replica_failures
-
     service_config = await get_nginx_service_config(service, replica_configs)
     await nginx.register(service_config, (await repo.get_config()).acme_settings)
     return replica_failures

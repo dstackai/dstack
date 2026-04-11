@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Sequence
 
-from sqlalchemy import or_, select, true, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only, selectinload
 from sqlalchemy.sql import false
 
@@ -224,7 +224,6 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                     selectinload(
                         RunModel.jobs.and_(
                             JobModel.status == JobStatus.RUNNING,
-                            JobModel.registered == true(),
                         )
                     )
                     .load_only(

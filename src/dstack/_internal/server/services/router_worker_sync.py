@@ -17,7 +17,6 @@ from dstack._internal.server.services.jobs import get_job_provisioning_data, get
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import run_spec_has_router_replica_group
 from dstack._internal.server.services.runs.replicas import (
-    is_replica_registered,
     job_belongs_to_group,
 )
 from dstack._internal.utils.logging import get_logger
@@ -107,7 +106,7 @@ def _get_router_job(run_model: RunModel, router_group) -> Optional[JobModel]:
         for j in run_model.jobs
         if job_belongs_to_group(j, group_name) and j.status == JobStatus.RUNNING
     ]
-    if not router_jobs or not is_replica_registered(router_jobs):
+    if not router_jobs:
         return None
     # Router replica group is currently validated to have count=1, so we assume a single active
     # router job here. When we support multiple router replicas for HA, this should be updated
@@ -296,8 +295,6 @@ async def _build_target_workers(
             if not job_belongs_to_group(job, group_name):
                 continue
             if job.status != JobStatus.RUNNING:
-                continue
-            if not is_replica_registered([job]):
                 continue
             jpd = get_job_provisioning_data(job)
             if jpd is None:
