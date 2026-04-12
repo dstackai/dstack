@@ -3,16 +3,16 @@ title: Examples
 description: Collection of examples for training, inference, and clusters
 #template: examples.html
 hide:
-   - navigation
-#   - toc
-   - footer
+#    - navigation
+   - toc
+#    - footer
 ---
 
-<style>
+<!-- <style>
 .md-main .md-main__inner.md-grid {
     flex-direction: row-reverse;
 }
-</style>
+</style> -->
 
 ## Single-node training
 
