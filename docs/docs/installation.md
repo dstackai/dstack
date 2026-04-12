@@ -177,6 +177,8 @@ Once the server is up, you can access it via the `dstack` CLI.
 
 ### Configure the project
 
+When the server is started, by default, it creates the `main` project and the `admin` user.
+
 To point the CLI to the `dstack` server, configure it
 with the server address, user token, and project name:
 
@@ -195,6 +197,12 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
+Later, you can create additional projects and users.
+
+### Use CLI or API
+
+Once the project is configured, you can use the `dstack` CLI or API.
+
 ## Install agent skills
 
 Install [`dstack` skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the CLI and edit configuration files.
@@ -206,6 +214,8 @@ $ npx skills add dstackai/dstack
 ```
 
 </div>
+
+### Use agents
 
 AI agents like Claude, Codex, and Cursor can now create and manage fleets and submit workloads on your behalf.
 
@@ -233,10 +243,9 @@ $
 
 </div>
 
-!!! info "Feedback"
-    We're actively improving Skills and would love your feedback in [GitHub issues](https://github.com/dstackai/dstack/issues).
+We're actively improving Skills and would love your feedback in [GitHub issues](https://github.com/dstackai/dstack/issues).
 
 !!! info "What's next?"
     1. See [Backends](concepts/backends.md)
     2. Follow [Quickstart](quickstart.md)
-    3. Check the [server deployment](guides/server-deployment.md) guide
+    3. Check the [Server deployment](guides/server-deployment.md) guide
