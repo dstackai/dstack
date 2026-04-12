@@ -219,17 +219,6 @@ hide:
         </p>
     </a>
 
-    <a href="/examples/accelerators/intel"
-       class="feature-cell sky">
-        <h3>
-            Intel Gaudi
-        </h3>
-
-        <p>
-            Deploy and fine-tune LLMs on Intel Gaudi
-        </p>
-    </a>
-
     <a href="/examples/accelerators/tenstorrent"
        class="feature-cell sky">
         <h3>

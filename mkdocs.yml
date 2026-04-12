@@ -310,7 +310,6 @@ nav:
       - Accelerators:
           - AMD: examples/accelerators/amd/index.md
           - TPU: examples/accelerators/tpu/index.md
-          - Intel Gaudi: examples/accelerators/intel/index.md
           - Tenstorrent: examples/accelerators/tenstorrent/index.md
       - Models:
           - Wan2.2: examples/models/wan22/index.md
