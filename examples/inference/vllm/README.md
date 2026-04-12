@@ -116,7 +116,7 @@ The source-code of this example can be found in
 ## What's next?
 
 1. Check [services](https://dstack.ai/docs/services)
-2. Browse the [Llama 3.1](https://dstack.ai/examples/llms/llama31/), [TGI](https://dstack.ai/examples/inference/tgi/)
-   and [NIM](https://dstack.ai/examples/inference/nim/) examples
+2. Browse the [Llama 3.1](https://dstack.ai/examples/llms/llama31/) and
+   [NIM](https://dstack.ai/examples/inference/nim/) examples
 3. See also [AMD](https://dstack.ai/examples/accelerators/amd/) and
    [TPU](https://dstack.ai/examples/accelerators/tpu/)

@@ -165,15 +165,6 @@ hide:
             Deploy Llama 3.1 with vLLM
         </p>
     </a>
-    <a href="/examples/inference/tgi" 
-       class="feature-cell">
-       <h3>
-           TGI
-       </h3>
-       <p>
-            Deploy Llama 4 with TGI
-        </p>
-    </a>
     <a href="/examples/inference/nim" 
        class="feature-cell">
        <h3>
