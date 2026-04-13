@@ -1995,6 +1995,105 @@ class TestJobRunningWorker:
             ssh_head_proxy_private_key=None,
         )
 
+    @pytest.mark.parametrize("job_status", [JobStatus.RUNNING, JobStatus.PULLING])
+    async def test_terminates_job_when_instance_access_revoked(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        job_status: JobStatus,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(session=session, name="exporter", owner=user)
+        importer_project = await create_project(session=session, name="importer", owner=user)
+        fleet = await create_fleet(session=session, project=exporter_project)
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            status=InstanceStatus.BUSY,
+            fleet=fleet,
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=job_status,
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        # No export created -> the import link no longer exists -> access revoked
+
+        await _process_job(session, worker, job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.INSTANCE_ACCESS_REVOKED
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == (
+            f"Job status changed {job_status.upper()} -> TERMINATING."
+            " Termination reason: INSTANCE_ACCESS_REVOKED"
+            " (The instance is no longer imported into the job's project)"
+        )
+
+    @pytest.mark.parametrize("job_status", [JobStatus.RUNNING, JobStatus.PULLING])
+    async def test_does_not_terminate_job_when_instance_access_is_valid(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        ssh_tunnel_mock: Mock,
+        runner_client_mock: Mock,
+        job_status: JobStatus,
+    ):
+        user = await create_user(session=session)
+        exporter_project = await create_project(session=session, name="exporter", owner=user)
+        importer_project = await create_project(session=session, name="importer", owner=user)
+        fleet = await create_fleet(session=session, project=exporter_project)
+        instance = await create_instance(
+            session=session,
+            project=exporter_project,
+            status=InstanceStatus.BUSY,
+            fleet=fleet,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=job_status,
+            job_provisioning_data=get_job_provisioning_data(dockerized=False),
+            instance=instance,
+            instance_assigned=True,
+        )
+        runner_client_mock.pull.return_value = PullResponse(
+            job_states=[], job_logs=[], runner_logs=[], last_updated=0
+        )
+
+        await _process_job(session, worker, job)
+
+        await session.refresh(job)
+        assert job.status == job_status
+        assert job.termination_reason is None
+
     async def test_apply_skips_probe_insert_when_lock_token_changes_after_processing(
         self,
         test_db,

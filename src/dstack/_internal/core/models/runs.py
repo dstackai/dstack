@@ -134,6 +134,7 @@ class JobTerminationReason(str, Enum):
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
     INSTANCE_UNREACHABLE = "instance_unreachable"
+    INSTANCE_ACCESS_REVOKED = "instance_access_revoked"
     WAITING_INSTANCE_LIMIT_EXCEEDED = "waiting_instance_limit_exceeded"
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
     TERMINATED_BY_USER = "terminated_by_user"
@@ -158,6 +159,7 @@ class JobTerminationReason(str, Enum):
             self.FAILED_TO_START_DUE_TO_NO_CAPACITY: JobStatus.FAILED,
             self.INTERRUPTED_BY_NO_CAPACITY: JobStatus.FAILED,
             self.INSTANCE_UNREACHABLE: JobStatus.FAILED,
+            self.INSTANCE_ACCESS_REVOKED: JobStatus.FAILED,
             self.WAITING_INSTANCE_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.WAITING_RUNNER_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.TERMINATED_BY_USER: JobStatus.TERMINATED,
@@ -196,6 +198,7 @@ class JobTerminationReason(str, Enum):
         # handled and shown in status_message.
         error_mapping = {
             JobTerminationReason.INSTANCE_UNREACHABLE: "instance unreachable",
+            JobTerminationReason.INSTANCE_ACCESS_REVOKED: "instance access revoked",
             JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED: "waiting instance limit exceeded",
             JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED: "waiting runner limit exceeded",
             JobTerminationReason.VOLUME_ERROR: "volume error",

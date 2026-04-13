@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Iterable, Literal, Optional, Sequence, Union
 
 import httpx
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
@@ -51,7 +51,9 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 from dstack._internal.server.background.pipeline_tasks.common import get_provisioning_timeout
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
+    ExportedFleetModel,
     FleetModel,
+    ImportModel,
     InstanceModel,
     JobModel,
     ProbeModel,
@@ -309,6 +311,7 @@ class _ProcessContext:
     job: Job
     job_submission: JobSubmission
     job_provisioning_data: Optional[JobProvisioningData]
+    instance_access_revoked: bool
     server_ssh_private_keys: Optional[tuple[str, Optional[str]]] = None
 
     @property
@@ -374,6 +377,7 @@ async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_Proce
             )
             run = run_model_to_run(run_model, include_sensitive=True)
             job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+        instance_access_revoked = await _is_instance_access_revoked(session, job_model)
         job_submission = job_model_to_job_submission(job_model)
         server_ssh_private_keys = get_instance_ssh_private_keys(get_or_error(job_model.instance))
         return _ProcessContext(
@@ -383,12 +387,24 @@ async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_Proce
             job=job,
             job_submission=job_submission,
             job_provisioning_data=job_submission.job_provisioning_data,
+            instance_access_revoked=instance_access_revoked,
             server_ssh_private_keys=server_ssh_private_keys,
         )
 
 
 async def _process_running_job(context: _ProcessContext) -> _ProcessResult:
     result = _ProcessResult()
+    if context.instance_access_revoked:
+        _terminate_job(
+            job_model=context.job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.INSTANCE_ACCESS_REVOKED,
+            termination_reason_message=(
+                "The instance is no longer imported into the job's project"
+            ),
+        )
+        return result
+
     if context.job_provisioning_data is None:
         logger.error("%s: job_provisioning_data of an active job is None", fmt(context.job_model))
         _terminate_job(
@@ -557,6 +573,22 @@ async def _fetch_run_model(
         )
     res = await session.execute(query)
     return res.unique().scalar_one()
+
+
+async def _is_instance_access_revoked(session: AsyncSession, job_model: JobModel) -> bool:
+    if job_model.instance is None or job_model.instance.project_id == job_model.project_id:
+        return False
+    return not (
+        await session.execute(
+            select(
+                exists().where(
+                    ImportModel.project_id == job_model.project_id,
+                    ImportModel.export_id == ExportedFleetModel.export_id,
+                    ExportedFleetModel.fleet_id == job_model.instance.fleet_id,
+                )
+            )
+        )
+    ).scalar()
 
 
 async def _process_provisioning_status(
