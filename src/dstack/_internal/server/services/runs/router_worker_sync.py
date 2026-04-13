@@ -176,20 +176,10 @@ async def _add_worker_to_router(
         return False
 
 
-async def _remove_worker_from_router(client: AsyncClient, worker_url: str) -> bool:
+async def _remove_worker_from_router_by_id(
+    client: AsyncClient, worker_id: str, *, worker_url: str
+) -> bool:
     try:
-        current = await _get_router_workers(client)
-        worker_id = None
-        for w in current:
-            u = w.get("url")
-            if u and isinstance(u, str) and u.rstrip("/") == worker_url.rstrip("/"):
-                wid = w.get("id")
-                if wid and isinstance(wid, str):
-                    worker_id = wid
-                    break
-        if not worker_id:
-            logger.error("No worker id found for url %s", worker_url)
-            return False
         body = await _request_json_limited(
             client,
             "DELETE",
@@ -212,10 +202,16 @@ async def _update_workers_in_router_replica(
 ) -> None:
     current = await _get_router_workers(client)
     current_urls: set[str] = set()
+    current_ids_by_norm_url: dict[str, str] = {}
     for w in current:
         u = w.get("url")
-        if isinstance(u, str) and u:
-            current_urls.add(_normalize_worker_url(u))
+        if not isinstance(u, str) or not u:
+            continue
+        norm_u = _normalize_worker_url(u)
+        current_urls.add(norm_u)
+        wid = w.get("id")
+        if isinstance(wid, str) and wid:
+            current_ids_by_norm_url[norm_u] = wid
     target_by_norm = {_normalize_worker_url(t["url"]): t for t in target_workers}
     target_urls = set(target_by_norm.keys())
     to_add = sorted(target_urls - current_urls)
@@ -231,7 +227,12 @@ async def _update_workers_in_router_replica(
         if not ok:
             logger.warning("Failed to add worker %s, continuing with others", tw["url"])
     for url in to_remove:
-        ok = await _remove_worker_from_router(client, url)
+        wid = current_ids_by_norm_url.get(url)
+        if not wid:
+            logger.error("No worker id found for url %s", url)
+            ok = False
+        else:
+            ok = await _remove_worker_from_router_by_id(client, wid, worker_url=url)
         if not ok:
             logger.warning("Failed to remove worker %s, continuing with others", url)
 
@@ -270,9 +271,9 @@ async def _get_worker_payload(job_model: JobModel, worker_url: str) -> _WorkerPa
                     "payload": {"url": worker_url, "worker_type": "regular"},
                 }
     except _ResponseTooLargeError:
-        logger.debug("server_info response too large for worker %s", worker_url)
+        logger.warning("server_info response too large for worker %s", worker_url)
     except Exception as e:
-        logger.debug("Could not fetch server_info for worker %s: %r", worker_url, e)
+        logger.exception("Could not fetch server_info for worker %s: %r", worker_url, e)
     return {"status": "not_ready", "payload": None}
 
 

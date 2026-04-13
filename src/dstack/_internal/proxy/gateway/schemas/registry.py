@@ -58,7 +58,6 @@ class RegisterReplicaRequest(BaseModel):
     ssh_head_proxy: Optional[SSHConnectionParams]
     ssh_head_proxy_private_key: Optional[str]
     internal_ip: Optional[str] = None
-    is_router_replica: bool = False
 
 
 class RegisterEntrypointRequest(BaseModel):

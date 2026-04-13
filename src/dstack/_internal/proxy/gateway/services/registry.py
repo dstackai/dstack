@@ -141,7 +141,6 @@ async def register_replica(
     nginx: Nginx,
     service_conn_pool: ServiceConnectionPool,
     internal_ip: Optional[str] = None,
-    is_router_replica: bool = False,
 ) -> None:
     replica = models.Replica(
         id=replica_id,
@@ -153,7 +152,6 @@ async def register_replica(
         ssh_head_proxy=ssh_head_proxy,
         ssh_head_proxy_private_key=ssh_head_proxy_private_key,
         internal_ip=internal_ip,
-        is_router_replica=is_router_replica,
     )
 
     async with lock:

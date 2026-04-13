@@ -6,7 +6,7 @@ from typing import Sequence
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import joinedload, load_only, selectinload
-from sqlalchemy.sql import false
+from sqlalchemy.sql import false, true
 
 from dstack._internal.core.models.runs import JobStatus, RunStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
@@ -120,7 +120,13 @@ class ServiceRouterWorkerSyncFetcher(Fetcher[ServiceRouterWorkerSyncPipelineItem
                     .join(RunModel, RunModel.id == ServiceRouterWorkerSyncModel.run_id)
                     .where(
                         ServiceRouterWorkerSyncModel.deleted == false(),
-                        RunModel.status == RunStatus.RUNNING,
+                        # Fetch RUNNING runs for normal processing, and finished/deleted runs so
+                        # the worker can mark their sync rows deleted.
+                        or_(
+                            RunModel.status == RunStatus.RUNNING,
+                            RunModel.status.in_(RunStatus.finished_statuses()),
+                            RunModel.deleted == true(),
+                        ),
                         or_(
                             ServiceRouterWorkerSyncModel.last_processed_at
                             <= now - self._min_processing_interval,
@@ -170,7 +176,7 @@ class ServiceRouterWorkerSyncFetcher(Fetcher[ServiceRouterWorkerSyncPipelineItem
 
 
 class _SyncRowUpdateMap(ItemUpdateMap, total=False):
-    pass
+    deleted: bool
 
 
 class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem]):
@@ -224,6 +230,7 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                     selectinload(
                         RunModel.jobs.and_(
                             JobModel.status == JobStatus.RUNNING,
+                            JobModel.registered == True,
                         )
                     )
                     .load_only(
@@ -248,20 +255,23 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
             run_for_sync = res.unique().scalar_one_or_none()
 
         if run_for_sync is None:
+            cleanup_update_map: _SyncRowUpdateMap = {"deleted": True}
+            set_processed_update_map_fields(cleanup_update_map)
+            set_unlock_update_map_fields(cleanup_update_map)
             async with get_session_ctx() as session:
-                await session.execute(
+                now = get_current_datetime()
+                resolve_now_placeholders(cleanup_update_map, now=now)
+                res2 = await session.execute(
                     update(ServiceRouterWorkerSyncModel)
                     .where(
                         ServiceRouterWorkerSyncModel.id == item.id,
                         ServiceRouterWorkerSyncModel.lock_token == item.lock_token,
                     )
-                    .values(
-                        deleted=True,
-                        lock_expires_at=None,
-                        lock_token=None,
-                        lock_owner=None,
-                    )
+                    .values(**cleanup_update_map)
+                    .returning(ServiceRouterWorkerSyncModel.id)
                 )
+                if not list(res2.scalars().all()):
+                    log_lock_token_changed_after_processing(logger, item)
                 await session.commit()
             return
 
