@@ -1219,8 +1219,11 @@ def _check_can_update_inner(current: M, new: M, updatable_fields: tuple[str, ...
     return diff
 
 
-@_check_can_update("configuration", "configuration_path")
+@_check_can_update("configuration", "configuration_path", "merged_profile")
 def _check_can_update_fleet_spec(current: FleetSpec, new: FleetSpec, diff: ModelDiff):
+    # Allow `merged_profile` only to absorb derived changes from supported configuration updates
+    # such as `configuration.reservation` and `configuration.tags`.
+    # Direct `profile` updates are still not in-place updatable.
     if "configuration" in diff:
         _check_can_update_fleet_configuration(current.configuration, new.configuration)
 
@@ -1235,7 +1238,9 @@ def _check_can_update_fleet_configuration(current: FleetConfiguration, new: Flee
         # TODO: Support best-effort `nodes.target` apply semantics:
         # create missing instances and terminate extra idle instances.
         # Current in-place update only persists `target`; FleetPipeline reconciles `min`/`max`.
-        _check_can_update_inner(current, new, ("nodes",))
+        #
+        # For `reservation` and `tags`, update affects only future provisioning.
+        _check_can_update_inner(current, new, ("nodes", "reservation", "tags"))
         return
 
     if new_ssh_config is None:
