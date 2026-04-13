@@ -1,7 +1,7 @@
 """Add service_router_worker_sync for router-worker reconcile pipeline.
 
 Revision ID: e7f4a91b2c3d
-Revises: ad8c50120507
+Revises: 1b9e2e7e7d35
 Create Date: 2026-03-29 12:00:00.000000+00:00
 
 """
@@ -13,7 +13,7 @@ from alembic import op
 import dstack._internal.server.models
 
 revision = "e7f4a91b2c3d"
-down_revision = "ad8c50120507"
+down_revision = "1b9e2e7e7d35"
 branch_labels = None
 depends_on = None
 
