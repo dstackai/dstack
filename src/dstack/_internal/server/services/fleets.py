@@ -1225,20 +1225,25 @@ def _check_can_update_fleet_spec(current: FleetSpec, new: FleetSpec, diff: Model
         _check_can_update_fleet_configuration(current.configuration, new.configuration)
 
 
-@_check_can_update("ssh_config")
-def _check_can_update_fleet_configuration(
-    current: FleetConfiguration, new: FleetConfiguration, diff: ModelDiff
-):
+def _check_can_update_fleet_configuration(current: FleetConfiguration, new: FleetConfiguration):
+    diff = diff_models(current, new)
+    current_ssh_config = current.ssh_config
+    new_ssh_config = new.ssh_config
+    if current_ssh_config is None:
+        if new_ssh_config is not None:
+            raise ServerClientError("Fleet type changed from Cloud to SSH, cannot update")
+        # TODO: Support best-effort `nodes.target` apply semantics:
+        # create missing instances and terminate extra idle instances.
+        # Current in-place update only persists `target`; FleetPipeline reconciles `min`/`max`.
+        _check_can_update_inner(current, new, ("nodes",))
+        return
+
+    if new_ssh_config is None:
+        raise ServerClientError("Fleet type changed from SSH to Cloud, cannot update")
+
+    _check_can_update_inner(current, new, ("ssh_config",))
     if "ssh_config" in diff:
-        current_ssh_config = current.ssh_config
-        new_ssh_config = new.ssh_config
-        if current_ssh_config is None:
-            if new_ssh_config is not None:
-                raise ServerClientError("Fleet type changed from Cloud to SSH, cannot update")
-        elif new_ssh_config is None:
-            raise ServerClientError("Fleet type changed from SSH to Cloud, cannot update")
-        else:
-            _check_can_update_ssh_config(current_ssh_config, new_ssh_config)
+        _check_can_update_ssh_config(current_ssh_config, new_ssh_config)
 
 
 @_check_can_update("hosts")

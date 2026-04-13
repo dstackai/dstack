@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
     FleetNodesSpec,
@@ -203,3 +204,53 @@ class TestGetFleetMasterInstanceProvisioningData:
         )
 
         assert master_provisioning_data is None
+
+
+class TestGetPlanCloudFleetUpdate:
+    @pytest.fixture
+    def get_project_backends_mock(self, monkeypatch: pytest.MonkeyPatch) -> list[Backend]:
+        mock = Mock(spec_set=get_project_backends, return_value=[])
+        monkeypatch.setattr("dstack._internal.server.services.backends.get_project_backends", mock)
+        return mock
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db", "get_project_backends_mock")
+    async def test_ok_nodes_update(self, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        current_spec = get_fleet_spec(
+            conf=FleetConfiguration(
+                name="my-fleet",
+                nodes=FleetNodesSpec(min=0, target=0, max=1),
+            )
+        )
+        await create_fleet(session=session, project=project, spec=current_spec)
+        new_spec = current_spec.copy(deep=True)
+        new_spec.configuration.nodes = FleetNodesSpec(min=0, target=1, max=1)
+
+        plan = await get_plan(session=session, project=project, user=user, spec=new_spec)
+
+        assert plan.current_resource is not None
+        assert plan.action == ApplyAction.UPDATE
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.usefixtures("test_db", "get_project_backends_mock")
+    async def test_placement_update_requires_recreate(self, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        current_spec = get_fleet_spec(
+            conf=FleetConfiguration(
+                name="my-fleet",
+                nodes=FleetNodesSpec(min=0, target=0, max=1),
+            )
+        )
+        await create_fleet(session=session, project=project, spec=current_spec)
+        new_spec = current_spec.copy(deep=True)
+        new_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+
+        plan = await get_plan(session=session, project=project, user=user, spec=new_spec)
+
+        assert plan.current_resource is not None
+        assert plan.action == ApplyAction.CREATE
