@@ -152,6 +152,8 @@ class BaseRunConfigurator(
                 confirm_message = "Stop and override the run?"
             elif not run_plan.current_resource.status.is_finished():
                 stop_run_name = run_plan.current_resource.run_spec.run_name
+                # TODO: Highlight only the fields that block in-place update instead of
+                # showing the full detected diff here.
                 console.print(
                     f"Active run [code]{conf.name}[/] already exists."
                     f" Detected changes that [error]cannot[/] be updated in-place:\n{diff}"
