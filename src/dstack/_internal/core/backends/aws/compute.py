@@ -89,6 +89,7 @@ class AWSGatewayBackendData(CoreModel):
     lb_arn: str
     tg_arn: str
     listener_arn: str
+    http_listener_arn: Optional[str] = None  # None for old gateways
 
 
 class AWSVolumeBackendData(CoreModel):
@@ -594,7 +595,7 @@ class AWSCompute(
         )
         logger.debug("Registered ALB target for gateway %s", configuration.instance_name)
 
-        logger.debug("Creating ALB Listener for gateway %s...", configuration.instance_name)
+        logger.debug("Creating HTTPS ALB listener for gateway %s...", configuration.instance_name)
         response = elb_client.create_listener(
             LoadBalancerArn=lb_arn,
             Protocol="HTTPS",
@@ -611,7 +612,26 @@ class AWSCompute(
             ],
         )
         listener_arn = response["Listeners"][0]["ListenerArn"]
-        logger.debug("Created ALB Listener for gateway %s", configuration.instance_name)
+        logger.debug("Created HTTPS ALB listener for gateway %s", configuration.instance_name)
+
+        logger.debug("Creating HTTP ALB listener for gateway %s...", configuration.instance_name)
+        response = elb_client.create_listener(
+            LoadBalancerArn=lb_arn,
+            Protocol="HTTP",
+            Port=80,
+            DefaultActions=[
+                {
+                    "Type": "redirect",
+                    "RedirectConfig": {
+                        "Protocol": "HTTPS",
+                        "Port": "443",
+                        "StatusCode": "HTTP_301",
+                    },
+                }
+            ],
+        )
+        http_listener_arn = response["Listeners"][0]["ListenerArn"]
+        logger.debug("Created HTTP ALB listener for gateway %s", configuration.instance_name)
 
         ip_address = _get_instance_ip(instance, configuration.public_ip)
         return GatewayProvisioningData(
@@ -623,6 +643,7 @@ class AWSCompute(
                 lb_arn=lb_arn,
                 tg_arn=tg_arn,
                 listener_arn=listener_arn,
+                http_listener_arn=http_listener_arn,
             ).json(),
         )
 
@@ -659,6 +680,8 @@ class AWSCompute(
         elb_client = self.session.client("elbv2", region_name=configuration.region)
 
         logger.debug("Deleting ALB resources for gateway %s...", configuration.instance_name)
+        if backend_data_parsed.http_listener_arn is not None:
+            elb_client.delete_listener(ListenerArn=backend_data_parsed.http_listener_arn)
         elb_client.delete_listener(ListenerArn=backend_data_parsed.listener_arn)
         elb_client.delete_target_group(TargetGroupArn=backend_data_parsed.tg_arn)
         elb_client.delete_load_balancer(LoadBalancerArn=backend_data_parsed.lb_arn)
