@@ -1219,26 +1219,36 @@ def _check_can_update_inner(current: M, new: M, updatable_fields: tuple[str, ...
     return diff
 
 
-@_check_can_update("configuration", "configuration_path")
+@_check_can_update("configuration", "configuration_path", "merged_profile")
 def _check_can_update_fleet_spec(current: FleetSpec, new: FleetSpec, diff: ModelDiff):
+    # Allow `merged_profile` only to absorb derived changes from supported configuration updates
+    # such as `configuration.reservation` and `configuration.tags`.
+    # Direct `profile` updates are still not in-place updatable.
     if "configuration" in diff:
         _check_can_update_fleet_configuration(current.configuration, new.configuration)
 
 
-@_check_can_update("ssh_config")
-def _check_can_update_fleet_configuration(
-    current: FleetConfiguration, new: FleetConfiguration, diff: ModelDiff
-):
+def _check_can_update_fleet_configuration(current: FleetConfiguration, new: FleetConfiguration):
+    diff = diff_models(current, new)
+    current_ssh_config = current.ssh_config
+    new_ssh_config = new.ssh_config
+    if current_ssh_config is None:
+        if new_ssh_config is not None:
+            raise ServerClientError("Fleet type changed from Cloud to SSH, cannot update")
+        # TODO: Support best-effort `nodes.target` apply semantics:
+        # create missing instances and terminate extra idle instances.
+        # Current in-place update only persists `target`; FleetPipeline reconciles `min`/`max`.
+        #
+        # For `reservation` and `tags`, update affects only future provisioning.
+        _check_can_update_inner(current, new, ("nodes", "reservation", "tags"))
+        return
+
+    if new_ssh_config is None:
+        raise ServerClientError("Fleet type changed from SSH to Cloud, cannot update")
+
+    _check_can_update_inner(current, new, ("ssh_config",))
     if "ssh_config" in diff:
-        current_ssh_config = current.ssh_config
-        new_ssh_config = new.ssh_config
-        if current_ssh_config is None:
-            if new_ssh_config is not None:
-                raise ServerClientError("Fleet type changed from Cloud to SSH, cannot update")
-        elif new_ssh_config is None:
-            raise ServerClientError("Fleet type changed from SSH to Cloud, cannot update")
-        else:
-            _check_can_update_ssh_config(current_ssh_config, new_ssh_config)
+        _check_can_update_ssh_config(current_ssh_config, new_ssh_config)
 
 
 @_check_can_update("hosts")
