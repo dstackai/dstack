@@ -32,7 +32,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
-from dstack._internal.server.services.router_worker_sync import (
+from dstack._internal.server.services.runs.router_worker_sync import (
     run_model_has_router_replica_group,
     sync_router_workers_for_run_model,
 )

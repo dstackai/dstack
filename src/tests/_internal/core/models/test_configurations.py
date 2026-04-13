@@ -11,6 +11,7 @@ from dstack._internal.core.models.configurations import (
     parse_run_configuration,
 )
 from dstack._internal.core.models.resources import Range
+from dstack._internal.core.models.routers import ReplicaGroupRouterConfig
 
 
 class TestParseConfiguration:
@@ -96,6 +97,28 @@ class TestParseConfiguration:
                     },
                 )
             )
+
+    def test_replica_group_router(self):
+        conf = {
+            "type": "service",
+            "port": 8000,
+            "replicas": [
+                {
+                    "name": "router",
+                    "count": 1,
+                    "commands": ["sglang serve"],
+                    "router": {"type": "sglang"},
+                },
+                {"name": "worker", "count": 2, "commands": ["worker"]},
+            ],
+        }
+        parsed = parse_run_configuration(conf)
+        assert isinstance(parsed, ServiceConfiguration)
+        assert parsed.replicas is not None
+        assert isinstance(parsed.replicas, list)
+        router_g = next(g for g in parsed.replicas if g.name == "router")
+        assert isinstance(router_g.router, ReplicaGroupRouterConfig)
+        assert router_g.router.type == "sglang"
 
     @pytest.mark.parametrize("shell", [None, "sh", "bash", "/usr/bin/zsh"])
     def test_shell_valid(self, shell: Optional[str]):

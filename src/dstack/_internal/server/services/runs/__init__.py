@@ -18,7 +18,6 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.common import ApplyAction
-from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.profiles import (
     RetryEvent,
 )
@@ -47,7 +46,6 @@ from dstack._internal.server.models import (
     ProjectModel,
     RepoModel,
     RunModel,
-    ServiceRouterWorkerSyncModel,
     UserModel,
 )
 from dstack._internal.server.services import events, services
@@ -71,6 +69,9 @@ from dstack._internal.server.services.resources import (
     set_resources_defaults,
 )
 from dstack._internal.server.services.runs.plan import get_job_plans
+from dstack._internal.server.services.runs.service_router_worker_sync import (
+    ensure_service_router_worker_sync_row,
+)
 from dstack._internal.server.services.runs.spec import (
     can_update_run_spec,
     check_can_update_run_spec,
@@ -88,48 +89,6 @@ JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
 }
-
-
-def run_spec_has_router_replica_group(run_spec: RunSpec) -> bool:
-    if run_spec.configuration.type != "service":
-        return False
-    cfg = run_spec.configuration
-    if not isinstance(cfg, ServiceConfiguration):
-        return False
-    return any(g.router is not None for g in cfg.replica_groups)
-
-
-async def ensure_service_router_worker_sync_row(
-    session: AsyncSession,
-    run_model: RunModel,
-    run_spec: RunSpec,
-) -> None:
-    if not run_spec_has_router_replica_group(run_spec):
-        return
-    res = await session.execute(
-        select(ServiceRouterWorkerSyncModel).where(
-            ServiceRouterWorkerSyncModel.run_id == run_model.id
-        )
-    )
-    sync_row = res.scalar_one_or_none()
-    now = common_utils.get_current_datetime()
-    if sync_row is not None:
-        if sync_row.deleted:
-            sync_row.deleted = False
-            sync_row.lock_expires_at = None
-            sync_row.lock_token = None
-            sync_row.lock_owner = None
-            sync_row.last_processed_at = now
-        return
-    session.add(
-        ServiceRouterWorkerSyncModel(
-            id=uuid.uuid4(),
-            run_id=run_model.id,
-            deleted=False,
-            created_at=now,
-            last_processed_at=now,
-        )
-    )
 
 
 def switch_run_status(

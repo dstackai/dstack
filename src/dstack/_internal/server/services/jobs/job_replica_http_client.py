@@ -23,7 +23,7 @@ SSH_CONNECT_TIMEOUT = timedelta(seconds=10)
 
 
 @asynccontextmanager
-async def _get_service_replica_client(
+async def get_service_replica_client(
     job: JobModel,
 ) -> AsyncGenerator[AsyncClient, None]:
     options = {

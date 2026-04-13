@@ -28,7 +28,7 @@ from dstack._internal.core.models.profiles import (
     parse_off_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
-from dstack._internal.core.models.routers import AnyServiceRouterConfig
+from dstack._internal.core.models.routers import AnyServiceRouterConfig, ReplicaGroupRouterConfig
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
@@ -802,7 +802,7 @@ class ReplicaGroup(CoreModel):
         Field(description="The shell commands to run for replicas in this group"),
     ] = []
     router: Annotated[
-        Optional[AnyServiceRouterConfig],
+        Optional[ReplicaGroupRouterConfig],
         Field(
             description="When set, replicas in this group run the in-service HTTP router (e.g. SGLang).",
         ),

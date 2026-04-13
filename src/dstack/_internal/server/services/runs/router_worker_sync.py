@@ -7,19 +7,19 @@ from urllib.parse import urlsplit, urlunsplit
 from httpx import AsyncClient, Response
 from typing_extensions import NotRequired
 
+from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.runs import JobStatus, RunSpec, get_service_port
 from dstack._internal.server.models import JobModel, RunModel
-from dstack._internal.server.services.job_replica_http_client import (
-    _get_service_replica_client,
-)
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_spec
-from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.services.runs import run_spec_has_router_replica_group
-from dstack._internal.server.services.runs.replicas import (
-    job_belongs_to_group,
+from dstack._internal.server.services.jobs.job_replica_http_client import (
+    get_service_replica_client,
 )
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.utils.logging import get_logger
+
+from .replicas import job_belongs_to_group
+from .service_router_worker_sync import run_spec_has_router_replica_group
 
 logger = get_logger(__name__)
 
@@ -238,7 +238,7 @@ async def _update_workers_in_router_replica(
 
 async def _get_worker_payload(job_model: JobModel, worker_url: str) -> _WorkerPayloadResult:
     try:
-        async with _get_service_replica_client(job_model) as client:
+        async with get_service_replica_client(job_model) as client:
             data = await _request_json_limited(
                 client,
                 "GET",
@@ -335,9 +335,9 @@ async def sync_router_workers_for_run_model(run_model: RunModel) -> None:
     if router_job is None:
         return
     try:
-        async with _get_service_replica_client(router_job) as client:
+        async with get_service_replica_client(router_job) as client:
             await _update_workers_in_router_replica(client, target_workers)
-    except Exception as e:
+    except SSHError as e:
         logger.warning(
             "%s: failed to sync workers with router: %r",
             fmt(router_job),
