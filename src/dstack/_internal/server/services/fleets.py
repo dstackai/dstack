@@ -1127,9 +1127,8 @@ async def _update_fleet(
     _check_can_update_fleet_spec(fleet_sensitive.spec, spec)
 
     fleet_model.spec = spec.json()
-    # Reset consolidation timer so that the next pipeline pass picks up the spec change.
+    # Reset consolidation attempt so the next pipeline pass picks up the spec change promptly.
     fleet_model.consolidation_attempt = 0
-    fleet_model.last_consolidated_at = None
 
     if (
         fleet_sensitive.spec.configuration.ssh_config is not None

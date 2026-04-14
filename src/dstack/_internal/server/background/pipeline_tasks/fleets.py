@@ -315,6 +315,7 @@ async def _refetch_locked_fleet_for_lock_decision(
                 FleetModel.consolidation_attempt,
                 FleetModel.last_consolidated_at,
                 FleetModel.last_processed_at,
+                FleetModel.created_at,
             )
         )
         .execution_options(populate_existing=True)
@@ -569,7 +570,7 @@ def _consolidate_fleet_state_with_spec(
 
 def _is_fleet_ready_for_consolidation(fleet_model: FleetModel) -> bool:
     consolidation_retry_delay = _get_consolidation_retry_delay(fleet_model.consolidation_attempt)
-    last_consolidated_at = fleet_model.last_consolidated_at or fleet_model.last_processed_at
+    last_consolidated_at = fleet_model.last_consolidated_at or fleet_model.created_at
     duration_since_last_consolidation = get_current_datetime() - last_consolidated_at
     return duration_since_last_consolidation >= consolidation_retry_delay
 
@@ -598,11 +599,7 @@ def _terminate_instances_not_matching_fleet_spec(
 ) -> dict[uuid.UUID, _InstanceUpdateMap]:
     updates: dict[uuid.UUID, _InstanceUpdateMap] = {}
     for instance in instances:
-        if instance.status in (InstanceStatus.TERMINATING, InstanceStatus.TERMINATED):
-            continue
-        if instance.deleted:
-            continue
-        if instance.status == InstanceStatus.BUSY:
+        if not _can_terminate_spec_mismatched_instance(instance):
             continue
         if not _instance_matches_fleet_spec(instance, fleet_spec):
             updates[instance.id] = {
@@ -611,6 +608,14 @@ def _terminate_instances_not_matching_fleet_spec(
                 "termination_reason_message": "Instance does not match updated fleet spec",
             }
     return updates
+
+
+def _can_terminate_spec_mismatched_instance(instance: InstanceModel) -> bool:
+    if instance.deleted:
+        return False
+    # Pending instances have not selected an offer yet, so InstancePipeline will provision them
+    # using the current fleet spec. Recycle only instances already tied to the old spec.
+    return instance.status in (InstanceStatus.IDLE, InstanceStatus.PROVISIONING)
 
 
 def _instance_matches_fleet_spec(instance: InstanceModel, fleet_spec: FleetSpec) -> bool:
