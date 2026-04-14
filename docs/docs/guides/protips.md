@@ -458,6 +458,9 @@ Getting offers...
 
 </div>
 
+By default, `dstack offer` ignores fleet configurations and shows all available offers that match the request.
+To inspect offers available through a specific fleet, pass `--fleet NAME`.
+
 ??? info "Grouping offers"
     Use `--group-by` to aggregate offers. Accepted values: `gpu`, `backend`, `region`, and `count`.
 

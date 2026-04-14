@@ -517,6 +517,20 @@ Fleet my-gcp-fleet deleted
 Alternatively, you can delete a fleet by passing the fleet name  to `dstack fleet delete`.
 To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 
+### List offers
+
+To inspect offers available through a fleet, pass `--fleet` to `dstack offer`.
+
+<div class="termy">
+
+```shell
+$ dstack offer --gpu H100 --fleet my-fleet
+```
+
+</div>
+
+Use `--group-by gpu,backend` to aggregate offers.
+
 !!! info "What's next?"
     1. Check [dev environments](dev-environments.md), [tasks](tasks.md), and
     [services](services.md)

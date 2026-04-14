@@ -4,9 +4,6 @@ Displays available offers (hardware configurations) from configured backends or 
 
 The output shows backend, region, instance type, resources, spot availability, and pricing.
 
-!!! info "Experimental"
-    `dstack offer` command is currently an experimental feature. Backward compatibility is not guaranteed across releases.
-
 ## Usage
 
 This command accepts most of the same arguments as [`dstack apply`](apply.md).
@@ -20,9 +17,28 @@ $ dstack offer --help
 
 </div>
 
+## Fleet offers
+
+By default, `dstack offer` ignores fleet configurations and shows all available offers that match the request.
+
+Use `--fleet` to inspect offers available through specific fleets. With one `--fleet`,
+`dstack offer` shows offers available through that fleet. With multiple `--fleet`, it
+combines offers available through the selected fleets.
+
+<div class="termy">
+
+```shell
+$ dstack offer --gpu H100 --fleet my-fleet
+```
+
+</div>
+
+The same fleet filtering applies to `--group-by` output, e.g. `--group-by gpu,backend`
+or `--group-by gpu,backend,region`.
+
 ## Examples
 
-### Filtering offers
+### Filtering offers { #list-gpu-offers }
 
 The `--gpu` flag accepts the same specification format as the `gpu` property in [`dev environment`](../../../concepts/dev-environments.md), [`task`](../../../concepts/tasks.md), 
 [`service`](../../../concepts/services.md), and [`fleet`](../../../concepts/fleets.md) configurations.
