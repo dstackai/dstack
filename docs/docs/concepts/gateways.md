@@ -95,7 +95,11 @@ router:
 
 If you configure the `sglang` router, [services](../concepts/services.md) can run either [standard SGLang workers](../../examples/inference/sglang/index.md) or [Prefill-Decode workers](../../examples/inference/sglang/index.md#pd-disaggregation) (aka PD disaggregation).
 
-> Note, if you want to run services with PD disaggregation, the gateway must currently run in the same cluster as the service.
+!!! note "PD disaggregation"
+    To run services with PD disaggregation see [SGLang PD disaggregation](https://dstack.ai/examples/inference/sglang/#pd-disaggregation).
+
+!!! note "Deprecation"
+    Configuring the SGLang router in a gateway will be deprecated in a future release.
 
 ??? info "Policy"
     The `policy` property allows you to configure the routing policy:

@@ -28,7 +28,7 @@ For inference, `dstack` provides a [services](../../docs/concepts/services.md) a
 
 ## Services
 
-With `dstack` `0.20.10`, you can define a service with separate replica groups for Prefill and Decode workers and enable PD disaggregation directly in the `router` configuration.
+With `dstack` `0.20.17`, you can define a service with separate replica groups for Router, Prefill and Decode workers and run PD disaggregated Inference.
 
 <div editor-title="glm45air.dstack.yml">
 
@@ -43,6 +43,21 @@ env:
 image: lmsysorg/sglang:latest
 
 replicas:
+  - count: 1
+    # For now replica group with router must have count: 1
+    commands:
+      - pip install sglang_router
+      - |
+          python -m sglang_router.launch_router \
+            --host 0.0.0.0 \
+            --port 8000 \
+            --pd-disaggregation \
+            --prefill-policy cache_aware
+    router:
+      type: sglang
+    resources:
+      cpu: 4
+
   - count: 1..4
     scaling:
       metric: rps
@@ -52,7 +67,7 @@ replicas:
           python -m sglang.launch_server \
             --model-path $MODEL_ID \
             --disaggregation-mode prefill \
-            --disaggregation-transfer-backend mooncake \
+            --disaggregation-transfer-backend nixl \
             --host 0.0.0.0 \
             --port 8000 \
             --disaggregation-bootstrap-port 8998
@@ -68,7 +83,7 @@ replicas:
           python -m sglang.launch_server \
             --model-path $MODEL_ID \
             --disaggregation-mode decode \
-            --disaggregation-transfer-backend mooncake \
+            --disaggregation-transfer-backend nixl \
             --host 0.0.0.0 \
             --port 8000
     resources:
@@ -79,12 +94,8 @@ model: zai-org/GLM-4.5-Air-FP8
 
 probes:
   - type: http
-    url: /health_generate
+    url: /health
     interval: 15s
-
-router:
-  type: sglang
-  pd_disaggregation: true
 ```
 
 </div>
@@ -100,32 +111,32 @@ $ dstack apply -f glm45air.dstack.yml
 
 </div>
 
-### Gateway
+### SSH fleet
 
-Just like `dstack` relies on the SGLang router for cache-aware routing, Prefill–Decode disaggregation also requires a [gateway](../../docs/concepts/gateways.md#sglang) configured with the SGLang router.
+Create an [SSH fleet](https://dstack.ai/docs/concepts/fleets/#apply-a-configuration) that includes one CPU host for the router and one or more GPU hosts for the workers. Make sure the CPU and GPU hosts are in the same network.
 
-<div editor-title="gateway-sglang.dstack.yml">
+<div editor-title="pd-fleet.dstack.yml">
 
 ```yaml
-type: gateway
-name: inference-gateway
+type: fleet
+name: pd-disagg
 
-backends: [kubernetes]
-region: any
+placement: cluster
 
-domain: example.com
-
-router:
-  type: sglang
-  policy: cache_aware
+ssh_config:
+  user: ubuntu
+  identity_file: ~/.ssh/id_rsa
+  hosts:
+    - 89.169.108.16   # CPU Host (router)
+    - 89.169.123.100  # GPU Host (prefill/decode workers)
+    - 89.169.110.65   # GPU Host (prefill/decode workers)
 ```
 
 </div>
 
 ## Limitations
-
-* Because the SGLang router requires all workers to be on the same network, and `dstack` currently runs the router inside the gateway, the gateway and the service must be running in the same cluster.
-* Prefill–Decode disaggregation is currently available with the SGLang backend (vLLM support is coming).
+* The router replica group is currently limited to `count: 1` (no HA yet). Support for multiple router replicas for HA is planned.
+* Prefill–Decode disaggregation is currently available with the SGLang backend (Nvidia-dynamo and vLLM support is coming).
 * Autoscaling supports RPS as the metric for now; TTFT and ITL metrics are planned next.
 
 With native support for inference and now Prefill–Decode disaggregation, `dstack` makes it easier to run high-throughput, low-latency model serving across GPU clouds, and Kubernetes or bare-metal clusters.

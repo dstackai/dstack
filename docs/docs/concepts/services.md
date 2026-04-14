@@ -107,7 +107,6 @@ If [authorization](#authorization) is not disabled, the service endpoint require
 Here are cases where a service may need a [gateway](gateways.md):
 
 * To use [auto-scaling](#replicas-and-scaling) or [rate limits](#rate-limits)
-* To enable a support custom router, e.g. such as the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#)
 * To enable HTTPS for the endpoint and map it to your domain
 * If your service requires WebSockets
 * If your service cannot work with a [path prefix](#path-prefix)
@@ -234,7 +233,7 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 ### PD disaggregation
 
-If you create a gateway with the [`sglang` router](gateways.md#sglang), you can run SGLang with [Prefill-Decode disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html). See the [corresponding example](../../examples/inference/sglang/index.md#pd-disaggregation).
+You can run SGLang with [Prefill-Decode disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html). See the [corresponding example](../../examples/inference/sglang/index.md#pd-disaggregation).
 
 ### Authorization
 
