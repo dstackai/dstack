@@ -1126,8 +1126,9 @@ async def _update_fleet(
 
     _check_can_update_fleet_spec(fleet_sensitive.spec, spec)
 
-    spec_json = spec.json()
-    fleet_model.spec = spec_json
+    fleet_model.spec = spec.json()
+    # Reset consolidation attempt so the next pipeline pass picks up the spec change promptly.
+    fleet_model.consolidation_attempt = 0
 
     if (
         fleet_sensitive.spec.configuration.ssh_config is not None
@@ -1240,7 +1241,22 @@ def _check_can_update_fleet_configuration(current: FleetConfiguration, new: Flee
         # Current in-place update only persists `target`; FleetPipeline reconciles `min`/`max`.
         #
         # For `reservation` and `tags`, update affects only future provisioning.
-        _check_can_update_inner(current, new, ("nodes", "reservation", "tags"))
+        _check_can_update_inner(
+            current,
+            new,
+            (
+                "nodes",
+                "reservation",
+                "tags",
+                "resources",
+                "backends",
+                "regions",
+                "availability_zones",
+                "instance_types",
+                "spot_policy",
+                "max_price",
+            ),
+        )
         return
 
     if new_ssh_config is None:
