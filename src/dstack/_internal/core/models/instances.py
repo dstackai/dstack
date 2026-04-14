@@ -14,7 +14,7 @@ from dstack._internal.core.models.common import (
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.volumes import Volume
-from dstack._internal.utils.common import pretty_resources
+from dstack._internal.utils.common import format_mib_as_gb, pretty_resources
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -135,7 +135,7 @@ class Resources(CoreModel):
                 "gpu_count": len(gpus),
             }
             if gpu.memory_mib > 0:
-                gpu_resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
+                gpu_resources["gpu_memory"] = format_mib_as_gb(gpu.memory_mib)
             output = pretty_resources(**gpu_resources)
             if include_spot and spot:
                 output += " (spot)"
@@ -146,15 +146,15 @@ class Resources(CoreModel):
             resources["cpus"] = cpus
             resources["cpu_arch"] = cpu_arch
         if memory_mib > 0:
-            resources["memory"] = f"{memory_mib / 1024:.0f}GB"
+            resources["memory"] = format_mib_as_gb(memory_mib)
         if disk_size_mib > 0:
-            resources["disk_size"] = f"{disk_size_mib / 1024:.0f}GB"
+            resources["disk_size"] = format_mib_as_gb(disk_size_mib)
         if gpus:
             gpu = gpus[0]
             resources["gpu_name"] = gpu.name
             resources["gpu_count"] = len(gpus)
             if gpu.memory_mib > 0:
-                resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
+                resources["gpu_memory"] = format_mib_as_gb(gpu.memory_mib)
         output = pretty_resources(**resources)
         if include_spot and spot:
             output += " (spot)"

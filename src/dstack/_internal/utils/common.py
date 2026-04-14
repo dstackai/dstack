@@ -112,6 +112,11 @@ def pretty_date(time: datetime) -> str:
     return str(years) + " years ago"
 
 
+def format_mib_as_gb(mib: int) -> str:
+    """Format a MiB value as a human-readable GB string, e.g. 512 → '0.5GB', 8192 → '8GB'."""
+    return f"{round(mib / 1024, 1):g}GB"
+
+
 def pretty_resources(
     *,
     cpu_arch: Optional[Any] = None,
