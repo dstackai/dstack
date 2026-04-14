@@ -248,7 +248,7 @@ class InstanceGroupParams(CoreModel):
     resources: Annotated[
         Optional[ResourcesSpec],
         Field(description="The resources requirements"),
-    ] = ResourcesSpec()
+    ] = None
 
     blocks: Annotated[
         Union[Literal["auto"], int],

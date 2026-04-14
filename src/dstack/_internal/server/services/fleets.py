@@ -937,8 +937,11 @@ def is_cloud_cluster(fleet_model: FleetModel) -> bool:
 
 def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
     profile = fleet_spec.merged_profile
+    resources = fleet_spec.configuration.resources
+    if resources is None:
+        resources = ResourcesSpec.unconstrained()
     requirements = Requirements(
-        resources=fleet_spec.configuration.resources or ResourcesSpec(),
+        resources=resources,
         max_price=profile.max_price,
         spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
         reservation=fleet_spec.configuration.reservation,
