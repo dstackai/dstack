@@ -36,8 +36,9 @@ def _get_offer(index: int) -> InstanceOfferWithAvailability:
 
 def _get_run_plan(*, offers: list[InstanceOfferWithAvailability], total_offers: int) -> RunPlan:
     run_spec = get_run_spec(repo_id="test-repo")
-    # Keep this helper's asyncio state isolated. `asyncio.run()` clears the current event loop
-    # on Python 3.9/3.10, which can break later tests that still expect one to exist.
+    # Keep this helper's asyncio state isolated. `asyncio.run()` clears the current event loop,
+    # which breaks later Python 3.9 tests that still construct asyncio primitives via
+    # `get_event_loop()` on the main thread.
     loop = asyncio.new_event_loop()
     try:
         job = loop.run_until_complete(
