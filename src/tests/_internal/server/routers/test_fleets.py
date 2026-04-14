@@ -2278,6 +2278,35 @@ class TestGetPlan:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_update_plan_for_existing_cloud_fleet_provisioning_fields_update(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        current_spec = get_fleet_spec(
+            conf=get_fleet_configuration(nodes=FleetNodesSpec(min=0, target=0, max=1))
+        )
+        spec = current_spec.copy(deep=True)
+        spec.configuration.backends = [BackendType.AWS]
+        spec.configuration.regions = ["us-east-1"]
+        fleet = await create_fleet(session=session, project=project, spec=current_spec)
+
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/get_plan",
+            headers=get_auth_headers(user.token),
+            json={"spec": spec.dict()},
+        )
+
+        response_json = response.json()
+        assert response.status_code == 200, response_json
+        assert response_json["current_resource"]["id"] == str(fleet.id)
+        assert response_json["action"] == "update"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_create_plan_for_existing_fleet(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

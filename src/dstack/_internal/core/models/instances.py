@@ -273,6 +273,7 @@ class InstanceTerminationReason(str, Enum):
     NO_OFFERS = "no_offers"
     MASTER_FAILED = "master_failed"
     MAX_INSTANCES_LIMIT = "max_instances_limit"
+    FLEET_SPEC_MISMATCH = "fleet_spec_mismatch"
     NO_BALANCE = "no_balance"
     """`NO_BALANCE` is used in dstack Sky."""
 
