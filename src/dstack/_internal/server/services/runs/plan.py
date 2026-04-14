@@ -791,11 +791,11 @@ async def _get_offers_in_run_candidate_fleets(
             )
         )
     instance_offers.sort(key=lambda offer: offer[1].price or 0)
-    # TODO: Keep this uncapped for now. `dstack offer --fleet ...` is expected to return the
-    # exact `total_offers`, so capping backend offers per selected fleet here would make that
-    # total approximate. We already deduplicate identical backend offers while merging selected
-    # fleets via `_get_backend_offer_identity()`. Revisit adding a cap only if this path causes
-    # real performance or memory problems.
+    # TODO: Intentionally pass `max_offers_per_fleet=None` here. `dstack offer --fleet ...`
+    # is expected to return the exact `total_offers`, so capping backend offers per selected
+    # fleet would make that total approximate. We already deduplicate identical backend offers
+    # while merging selected fleets via `_get_backend_offer_identity()`. Revisit adding a cap
+    # only if this path causes real performance or memory problems.
     backend_offers = await get_backend_offers_in_run_candidate_fleets(
         session=session,
         project=project,
