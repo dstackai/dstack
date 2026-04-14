@@ -120,14 +120,23 @@ async def get_job_plans(
                 exclude_not_available=False,
             )
             if _should_force_non_fleet_offers(run_spec):
-                instance_offers, backend_offers = await _get_dstack_offer_offers(
-                    session=session,
-                    project=project,
-                    profile=profile,
-                    run_spec=run_spec,
-                    job=jobs[0],
-                    volumes=volumes,
-                )
+                if profile.fleets is None:
+                    instance_offers, backend_offers = await _get_non_fleet_offers(
+                        session=session,
+                        project=project,
+                        profile=profile,
+                        run_spec=run_spec,
+                        job=jobs[0],
+                        volumes=volumes,
+                    )
+                else:
+                    instance_offers, backend_offers = await _get_offers_in_run_candidate_fleets(
+                        session=session,
+                        project=project,
+                        run_spec=run_spec,
+                        job=jobs[0],
+                        volumes=volumes,
+                    )
             elif (
                 FeatureFlags.AUTOCREATED_FLEETS_ENABLED
                 and profile.fleets is None
@@ -183,14 +192,23 @@ async def get_job_plans(
             exclude_not_available=False,
         )
         if _should_force_non_fleet_offers(run_spec):
-            instance_offers, backend_offers = await _get_dstack_offer_offers(
-                session=session,
-                project=project,
-                profile=profile,
-                run_spec=run_spec,
-                job=jobs[0],
-                volumes=volumes,
-            )
+            if profile.fleets is None:
+                instance_offers, backend_offers = await _get_non_fleet_offers(
+                    session=session,
+                    project=project,
+                    profile=profile,
+                    run_spec=run_spec,
+                    job=jobs[0],
+                    volumes=volumes,
+                )
+            else:
+                instance_offers, backend_offers = await _get_offers_in_run_candidate_fleets(
+                    session=session,
+                    project=project,
+                    run_spec=run_spec,
+                    job=jobs[0],
+                    volumes=volumes,
+                )
         elif (
             FeatureFlags.AUTOCREATED_FLEETS_ENABLED
             and profile.fleets is None
@@ -692,35 +710,6 @@ async def _get_non_fleet_offers(
     return instance_offers, backend_offers
 
 
-async def _get_dstack_offer_offers(
-    session: AsyncSession,
-    project: ProjectModel,
-    profile: Profile,
-    run_spec: RunSpec,
-    job: Job,
-    volumes: list[list[Volume]],
-) -> tuple[
-    list[tuple[InstanceModel, InstanceOfferWithAvailability]],
-    list[tuple[Backend, InstanceOfferWithAvailability]],
-]:
-    if profile.fleets is None:
-        return await _get_non_fleet_offers(
-            session=session,
-            project=project,
-            profile=profile,
-            run_spec=run_spec,
-            job=job,
-            volumes=volumes,
-        )
-    return await _get_run_candidate_fleet_offers(
-        session=session,
-        project=project,
-        run_spec=run_spec,
-        job=job,
-        volumes=volumes,
-    )
-
-
 async def get_backend_offers_in_run_candidate_fleets(
     session: AsyncSession,
     project: ProjectModel,
@@ -729,6 +718,15 @@ async def get_backend_offers_in_run_candidate_fleets(
     volumes: Optional[list[list[Volume]]],
     max_offers_per_fleet: Optional[int] = None,
 ) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
+    """
+    Returns backend offers in the run's candidate fleets.
+
+    Candidate fleets are resolved from `run_spec.merged_profile.fleets`. For each selected
+    fleet, the fleet spec is combined with the run's profile and requirements before requesting
+    backend offers. With one selected fleet, this yields the same backend offers that would be
+    considered if that fleet were the chosen candidate. With multiple selected fleets, the
+    per-fleet backend offers are merged instead of choosing a single best fleet.
+    """
     candidate_fleet_models = await _select_candidate_fleet_models(
         session=session,
         project=project,
@@ -751,7 +749,7 @@ async def get_backend_offers_in_run_candidate_fleets(
     return backend_offers
 
 
-async def _get_run_candidate_fleet_offers(
+async def _get_offers_in_run_candidate_fleets(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
@@ -761,6 +759,13 @@ async def _get_run_candidate_fleet_offers(
     list[tuple[InstanceModel, InstanceOfferWithAvailability]],
     list[tuple[Backend, InstanceOfferWithAvailability]],
 ]:
+    """
+    Returns existing-instance and backend offers across the run's candidate fleets.
+
+    This is used by `dstack offer` when fleets are explicitly selected. Unlike normal apply
+    planning, it does not choose a single best fleet. Instead, it gathers the offers that would
+    be considered in each selected fleet and merges them into a single result set.
+    """
     candidate_fleet_models = await _select_candidate_fleet_models(
         session=session,
         project=project,
