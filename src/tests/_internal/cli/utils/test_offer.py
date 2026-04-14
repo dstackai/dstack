@@ -36,7 +36,13 @@ def _get_offer(index: int) -> InstanceOfferWithAvailability:
 
 def _get_run_plan(*, offers: list[InstanceOfferWithAvailability], total_offers: int) -> RunPlan:
     run_spec = get_run_spec(repo_id="test-repo")
-    job = asyncio.run(get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0))[0]
+    loop = asyncio.new_event_loop()
+    try:
+        job = loop.run_until_complete(
+            get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        )[0]
+    finally:
+        loop.close()
     return RunPlan(
         project_name="test-project",
         user="test-user",
