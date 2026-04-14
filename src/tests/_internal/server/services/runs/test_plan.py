@@ -1,3 +1,4 @@
+import copy
 from unittest.mock import AsyncMock
 
 import pytest
@@ -5,8 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
+from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.server.services.jobs import get_jobs_from_run_spec
-from dstack._internal.server.services.runs.plan import _get_backend_offers_in_fleet
+from dstack._internal.server.services.runs.plan import (
+    _freeze_offer_identity_value,
+    _get_backend_offer_identity,
+    _get_backend_offers_in_fleet,
+)
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
@@ -20,6 +26,44 @@ from dstack._internal.server.testing.common import (
 )
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
+
+
+class TestFreezeOfferIdentityValue:
+    def test_normalizes_nested_mappings_and_sets(self) -> None:
+        first = {
+            "b": [1, {"y": InstanceAvailability.IDLE, "x": {3, 2}}],
+            "a": ("z", None),
+        }
+        second = {
+            "a": ("z", None),
+            "b": [1, {"x": {2, 3}, "y": InstanceAvailability.IDLE}],
+        }
+
+        frozen_first = _freeze_offer_identity_value(first)
+        frozen_second = _freeze_offer_identity_value(second)
+
+        assert frozen_first == frozen_second
+        assert hash(frozen_first) == hash(frozen_second)
+
+    def test_get_backend_offer_identity_uses_full_offer_payload(self) -> None:
+        offer = get_instance_offer_with_availability(availability=InstanceAvailability.UNKNOWN)
+        offer.backend_data = {
+            "region_hint": {"b": 2, "a": 1},
+            "azs": ["us-east-1b", "us-east-1a"],
+        }
+        same_offer = copy.deepcopy(offer)
+        same_offer.backend_data = {
+            "azs": ["us-east-1b", "us-east-1a"],
+            "region_hint": {"a": 1, "b": 2},
+        }
+        different_offer = copy.deepcopy(offer)
+        different_offer.backend_data = {
+            "azs": ["us-east-1b", "us-east-1a"],
+            "region_hint": {"a": 3, "b": 2},
+        }
+
+        assert _get_backend_offer_identity(offer) == _get_backend_offer_identity(same_offer)
+        assert _get_backend_offer_identity(offer) != _get_backend_offer_identity(different_offer)
 
 
 class TestGetBackendOffersInFleet:

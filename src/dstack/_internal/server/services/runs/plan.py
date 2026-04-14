@@ -1,4 +1,6 @@
 import math
+from collections.abc import Hashable, Mapping
+from enum import Enum
 from typing import Optional, Union
 
 from sqlalchemy import and_, exists, not_, or_, select
@@ -719,13 +721,11 @@ async def get_backend_offers_in_run_candidate_fleets(
     max_offers_per_fleet: Optional[int] = None,
 ) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
     """
-    Returns backend offers in the run's candidate fleets.
+    Returns backend offers across the run's selected candidate fleets.
 
-    Candidate fleets are resolved from `run_spec.merged_profile.fleets`. For each selected
-    fleet, the fleet spec is combined with the run's profile and requirements before requesting
-    backend offers. With one selected fleet, this yields the same backend offers that would be
-    considered if that fleet were the chosen candidate. With multiple selected fleets, the
-    per-fleet backend offers are merged instead of choosing a single best fleet.
+    Used by `dstack offer --fleet ...` and `dstack offer --group-by ... --fleet ...`.
+    It resolves the selected fleets from `run_spec`, requests backend offers in each fleet,
+    merges them, and deduplicates identical backend offers across fleets.
     """
     candidate_fleet_models = await _select_candidate_fleet_models(
         session=session,
@@ -733,18 +733,24 @@ async def get_backend_offers_in_run_candidate_fleets(
         run_model=None,
         run_spec=run_spec,
     )
-    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]] = []
+    deduplicated_backend_offers: dict[
+        Hashable,
+        tuple[Backend, InstanceOfferWithAvailability],
+    ] = {}
     for candidate_fleet_model in candidate_fleet_models:
-        backend_offers.extend(
-            await _get_backend_offers_in_fleet(
-                project=project,
-                fleet_model=candidate_fleet_model,
-                run_spec=run_spec,
-                job=job,
-                volumes=volumes,
-                max_offers=max_offers_per_fleet,
+        for backend, offer in await _get_backend_offers_in_fleet(
+            project=project,
+            fleet_model=candidate_fleet_model,
+            run_spec=run_spec,
+            job=job,
+            volumes=volumes,
+            max_offers=max_offers_per_fleet,
+        ):
+            deduplicated_backend_offers.setdefault(
+                _get_backend_offer_identity(offer),
+                (backend, offer),
             )
-        )
+    backend_offers = list(deduplicated_backend_offers.values())
     backend_offers.sort(key=lambda offer: offer[1].price)
     return backend_offers
 
@@ -762,9 +768,10 @@ async def _get_offers_in_run_candidate_fleets(
     """
     Returns existing-instance and backend offers across the run's candidate fleets.
 
-    This is used by `dstack offer` when fleets are explicitly selected. Unlike normal apply
-    planning, it does not choose a single best fleet. Instead, it gathers the offers that would
-    be considered in each selected fleet and merges them into a single result set.
+    Used by plain/json `dstack offer --fleet ...`. Unlike normal `dstack apply`, it does not
+    choose a single best fleet. Instead, it gathers existing-instance and backend offers from
+    each selected fleet, keeps existing instances as separate reusable options, and deduplicates
+    identical backend offers across fleets.
     """
     candidate_fleet_models = await _select_candidate_fleet_models(
         session=session,
@@ -793,6 +800,42 @@ async def _get_offers_in_run_candidate_fleets(
         max_offers_per_fleet=None,
     )
     return instance_offers, backend_offers
+
+
+def _get_backend_offer_identity(offer: InstanceOfferWithAvailability) -> Hashable:
+    """
+    Returns a hashable identity for a backend offer using the full offer payload.
+
+    Needed to deduplicate identical backend offers when merging offers from multiple fleets for
+    `dstack offer --fleet ...`.
+    """
+    return _freeze_offer_identity_value(offer.dict())
+
+
+def _freeze_offer_identity_value(value: object) -> Hashable:
+    """Converts nested offer payload values into a deterministic hashable form."""
+    if isinstance(value, Mapping):
+        return tuple(
+            sorted(
+                (
+                    (
+                        _freeze_offer_identity_value(key),
+                        _freeze_offer_identity_value(nested_value),
+                    )
+                    for key, nested_value in value.items()
+                ),
+                key=repr,
+            )
+        )
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_offer_identity_value(item) for item in value)
+    if isinstance(value, (set, frozenset)):
+        return tuple(sorted((_freeze_offer_identity_value(item) for item in value), key=repr))
+    if not isinstance(value, Hashable):
+        raise TypeError(f"Unsupported backend offer identity value: {type(value)!r}")
+    return value
 
 
 def _get_job_plan(
