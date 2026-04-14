@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.instances import (
     Gpu,
     InstanceAvailability,
@@ -14,14 +15,17 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_fleet,
     create_project,
     create_repo,
     create_user,
     get_auth_headers,
+    get_fleet_spec,
     get_run_spec,
 )
 
@@ -148,6 +152,70 @@ class TestListGpus:
         assert "gpus" in response_data
         assert isinstance(response_data["gpus"], list)
         assert len(response_data["gpus"]) >= 1
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_gpus_by_multiple_specified_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user, project, repo, _ = await gpu_test_setup(session)
+        await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(profile=Profile(backends=[BackendType.AWS])),
+            name="aws-fleet",
+        )
+        await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(profile=Profile(backends=[BackendType.RUNPOD])),
+            name="runpod-fleet",
+        )
+        await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(profile=Profile(backends=[BackendType.VASTAI])),
+            name="vastai-fleet",
+        )
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                user="root",
+                fleets=["aws-fleet", "runpod-fleet"],
+            ),
+        )
+
+        offers_by_backend = {
+            BackendType.AWS: [create_gpu_offer(BackendType.AWS, "T4", 16384, 0.50)],
+            BackendType.RUNPOD: [
+                create_gpu_offer(
+                    BackendType.RUNPOD,
+                    "RTX4090",
+                    24576,
+                    0.35,
+                    region="us-east-1",
+                )
+            ],
+            BackendType.VASTAI: [create_gpu_offer(BackendType.VASTAI, "A100", 81920, 1.20)],
+        }
+        mocked_backends = create_mock_backends_with_offers(offers_by_backend)
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = mocked_backends
+            response = await call_gpus_api(
+                client,
+                project.name,
+                user.token,
+                run_spec,
+                group_by=["backend"],
+            )
+
+        assert response.status_code == 200
+        response_data = response.json()
+        assert {gpu["backend"] for gpu in response_data["gpus"]} == {"aws", "runpod"}
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

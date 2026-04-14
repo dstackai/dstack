@@ -459,7 +459,7 @@ dstack stop my-run-name --abort
 
 ### List offers
 
-Offers represent available instance configurations available for provisioning across backends. `dstack offer` lists offers regardless of configured fleets.
+Offers represent available instance configurations available for provisioning across backends. By default, `dstack offer` lists offers ignoring fleet filters, while `--fleet` limits the results to the selected fleet(s).
 
 ```bash
 # Filter by specific backend
@@ -473,6 +473,9 @@ dstack offer --gpu 24GB..80GB
 
 # Combine filters
 dstack offer --backend aws --gpu A100:80GB
+
+# Limit to a specific fleet
+dstack offer --fleet my-fleet
 
 # JSON output (for troubleshooting/scripting)
 dstack offer --json

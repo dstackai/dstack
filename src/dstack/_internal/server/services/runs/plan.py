@@ -119,13 +119,23 @@ async def get_job_plans(
                 volumes=volumes,
                 exclude_not_available=False,
             )
-            if _should_force_non_fleet_offers(run_spec) or (
+            if _should_force_non_fleet_offers(run_spec):
+                instance_offers, backend_offers = await _get_dstack_offer_offers(
+                    session=session,
+                    project=project,
+                    profile=profile,
+                    run_spec=run_spec,
+                    job=jobs[0],
+                    volumes=volumes,
+                )
+            elif (
                 FeatureFlags.AUTOCREATED_FLEETS_ENABLED
                 and profile.fleets is None
                 and fleet_model is None
             ):
-                # Keep the old behavior returning all offers irrespective of fleets.
-                # Needed for supporting offers with autocreated fleets flow (and for `dstack offer`).
+                # Keep the old behavior returning all offers irrespective of fleets
+                # when no fleets are explicitly specified. Needed for supporting
+                # offers with autocreated fleets flow.
                 instance_offers, backend_offers = await _get_non_fleet_offers(
                     session=session,
                     project=project,
@@ -172,13 +182,23 @@ async def get_job_plans(
             volumes=volumes,
             exclude_not_available=False,
         )
-        if _should_force_non_fleet_offers(run_spec) or (
+        if _should_force_non_fleet_offers(run_spec):
+            instance_offers, backend_offers = await _get_dstack_offer_offers(
+                session=session,
+                project=project,
+                profile=profile,
+                run_spec=run_spec,
+                job=jobs[0],
+                volumes=volumes,
+            )
+        elif (
             FeatureFlags.AUTOCREATED_FLEETS_ENABLED
             and profile.fleets is None
             and fleet_model is None
         ):
-            # Keep the old behavior returning all offers irrespective of fleets.
-            # Needed for supporting offers with autocreated fleets flow (and for `dstack offer`).
+            # Keep the old behavior returning all offers irrespective of fleets
+            # when no fleets are explicitly specified. Needed for supporting
+            # offers with autocreated fleets flow.
             instance_offers, backend_offers = await _get_non_fleet_offers(
                 session=session,
                 project=project,
@@ -668,6 +688,104 @@ async def _get_non_fleet_offers(
         volumes=volumes,
         privileged=job.job_spec.privileged,
         instance_mounts=check_run_spec_requires_instance_mounts(run_spec),
+    )
+    return instance_offers, backend_offers
+
+
+async def _get_dstack_offer_offers(
+    session: AsyncSession,
+    project: ProjectModel,
+    profile: Profile,
+    run_spec: RunSpec,
+    job: Job,
+    volumes: list[list[Volume]],
+) -> tuple[
+    list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+    list[tuple[Backend, InstanceOfferWithAvailability]],
+]:
+    if profile.fleets is None:
+        return await _get_non_fleet_offers(
+            session=session,
+            project=project,
+            profile=profile,
+            run_spec=run_spec,
+            job=job,
+            volumes=volumes,
+        )
+    return await _get_run_candidate_fleet_offers(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+        job=job,
+        volumes=volumes,
+    )
+
+
+async def get_backend_offers_in_run_candidate_fleets(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+    job: Job,
+    volumes: Optional[list[list[Volume]]],
+    max_offers_per_fleet: Optional[int] = None,
+) -> list[tuple[Backend, InstanceOfferWithAvailability]]:
+    candidate_fleet_models = await _select_candidate_fleet_models(
+        session=session,
+        project=project,
+        run_model=None,
+        run_spec=run_spec,
+    )
+    backend_offers: list[tuple[Backend, InstanceOfferWithAvailability]] = []
+    for candidate_fleet_model in candidate_fleet_models:
+        backend_offers.extend(
+            await _get_backend_offers_in_fleet(
+                project=project,
+                fleet_model=candidate_fleet_model,
+                run_spec=run_spec,
+                job=job,
+                volumes=volumes,
+                max_offers=max_offers_per_fleet,
+            )
+        )
+    backend_offers.sort(key=lambda offer: offer[1].price)
+    return backend_offers
+
+
+async def _get_run_candidate_fleet_offers(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+    job: Job,
+    volumes: list[list[Volume]],
+) -> tuple[
+    list[tuple[InstanceModel, InstanceOfferWithAvailability]],
+    list[tuple[Backend, InstanceOfferWithAvailability]],
+]:
+    candidate_fleet_models = await _select_candidate_fleet_models(
+        session=session,
+        project=project,
+        run_model=None,
+        run_spec=run_spec,
+    )
+    instance_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
+    for candidate_fleet_model in candidate_fleet_models:
+        instance_offers.extend(
+            get_instance_offers_in_fleet(
+                fleet_model=candidate_fleet_model,
+                run_spec=run_spec,
+                job=job,
+                volumes=volumes,
+                exclude_not_available=False,
+            )
+        )
+    instance_offers.sort(key=lambda offer: offer[1].price or 0)
+    backend_offers = await get_backend_offers_in_run_candidate_fleets(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+        job=job,
+        volumes=volumes,
+        max_offers_per_fleet=None,
     )
     return instance_offers, backend_offers
 
