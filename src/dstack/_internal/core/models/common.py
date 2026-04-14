@@ -160,12 +160,17 @@ class EntityReference(CoreModel):
     def parse(cls, v: Union[str, "EntityReference"]) -> "EntityReference":
         if isinstance(v, EntityReference):
             return v
+        invalid_ref_error = ValueError(
+            "Invalid entity reference. Only `<name>` or `<project>/<name>` formats are allowed"
+        )
         parts = v.split("/")
+        if any(len(part) == 0 for part in parts):
+            raise invalid_ref_error
         if len(parts) == 1:
             return cls(project=None, name=parts[0])
         if len(parts) == 2:
             return cls(project=parts[0], name=parts[1])
-        raise ValueError("Invalid entity reference. Only `<project>/<name>` format is allowed")
+        raise invalid_ref_error
 
     def format(self) -> str:
         if self.project is None:
