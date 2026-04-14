@@ -214,10 +214,19 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                 or run_model.status != RunStatus.RUNNING
                 or not run_model_has_router_replica_group(run_model)
             ):
-                sync_row.deleted = True
-                sync_row.lock_expires_at = None
-                sync_row.lock_token = None
-                sync_row.lock_owner = None
+                early_cleanup_update_map: _SyncRowUpdateMap = {"deleted": True}
+                set_processed_update_map_fields(early_cleanup_update_map)
+                set_unlock_update_map_fields(early_cleanup_update_map)
+                now = get_current_datetime()
+                resolve_now_placeholders(early_cleanup_update_map, now=now)
+                await session.execute(
+                    update(ServiceRouterWorkerSyncModel)
+                    .where(
+                        ServiceRouterWorkerSyncModel.id == item.id,
+                        ServiceRouterWorkerSyncModel.lock_token == item.lock_token,
+                    )
+                    .values(**early_cleanup_update_map)
+                )
                 await session.commit()
                 return
 

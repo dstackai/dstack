@@ -8,7 +8,7 @@ from httpx import AsyncClient, Response
 from typing_extensions import NotRequired
 
 from dstack._internal.core.errors import SSHError
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import ReplicaGroup, ServiceConfiguration
 from dstack._internal.core.models.runs import JobStatus, RunSpec, get_service_port
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_spec
@@ -98,7 +98,7 @@ def run_model_has_router_replica_group(run_model: RunModel) -> bool:
     return run_spec_has_router_replica_group(run_spec)
 
 
-def _get_router_job(run_model: RunModel, router_group) -> Optional[JobModel]:
+def _get_router_job(run_model: RunModel, router_group: ReplicaGroup) -> Optional[JobModel]:
     group_name = router_group.name
     assert group_name is not None, "Replica group name is set by validation"
     router_jobs = [
@@ -280,7 +280,7 @@ async def _get_worker_payload(job_model: JobModel, worker_url: str) -> _WorkerPa
 async def _build_target_workers(
     run_model: RunModel,
     run_spec: RunSpec,
-    replica_groups: List,
+    replica_groups: list[ReplicaGroup],
 ) -> List[_TargetWorker]:
     payloads: List[_TargetWorker] = []
     config = run_spec.configuration

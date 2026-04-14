@@ -110,7 +110,11 @@ class Nginx:
             if conf.https:
                 await run_async(self.run_certbot, conf.domain, acme)
 
-            if isinstance(conf, ServiceConfig) and conf.router:
+            if (
+                isinstance(conf, ServiceConfig)
+                and conf.router
+                and getattr(conf.router, "managed_by", "gateway") == "gateway"
+            ):
                 if conf.router.type == RouterType.SGLANG:
                     # Check if router already exists for this domain
                     if conf.domain in self._domain_to_router:

@@ -1052,6 +1052,23 @@ class ServiceConfigurationParams(CoreModel):
                 raise ValueError("For now replica group with `router` must have `count: 1`.")
         return values
 
+    @root_validator()
+    def validate_replica_group_router_mutex(cls, values):
+        """
+        When a replica group sets `router:`, service-level `router` must be omitted.
+        (Gateway-level SGLang is rejected at service registration when a gateway is selected.)
+        """
+        replicas = values.get("replicas")
+        if not isinstance(replicas, list):
+            return values
+        if not any(g.router is not None for g in replicas):
+            return values
+        if values.get("router") is not None:
+            raise ValueError(
+                "Service-Level router configuration is not allowed together with replica-group `router`."
+            )
+        return values
+
 
 class ServiceConfigurationConfig(
     ProfileParamsConfig,

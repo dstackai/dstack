@@ -102,6 +102,14 @@ async def _register_service_in_gateway(
 
     gateway_configuration = get_gateway_configuration(gateway)
 
+    has_replica_group_router = any(
+        g.router is not None for g in run_spec.configuration.replica_groups
+    )
+    if has_replica_group_router and _gateway_has_sglang_router(gateway_configuration):
+        raise ServerClientError(
+            "A replica-group `router:` cannot be used with a gateway that has router configuration."
+        )
+
     # Check: service specifies SGLang router but gateway does not have it
     service_router = run_spec.configuration.router
     service_wants_sglang = service_router is not None and isinstance(
@@ -266,12 +274,24 @@ def _build_service_router_config(
     service_configuration: ServiceConfiguration,
 ) -> Optional[AnyServiceRouterConfig]:
     """
-    Build router config from gateway (type, policy) + service (pd_disaggregation, policy override).
-    Service's policy overrides gateway's if present. Keeps backward compat: SGLang enabled
-    automatically when gateway has it configured.
+    Router metadata to store on the gateway proxy for this service (`service.router`).
+
+    A replica-group `router:` does **not** depend on the gateway having its own global SGLang
+    router block—the router runs on service replicas. When the gateway has no global SGLang
+    config but a replica group does declare `router:`, we still return a default
+    `SGLangServiceRouterConfig` so nginx/proxy code can treat the service as SGLang and apply path
+    rules. When the gateway *does* have global SGLang, we merge gateway policy with service-level
+    `configuration.router` overrides as before.
     """
+    has_replica_group_router = any(
+        g.router is not None for g in service_configuration.replica_groups
+    )
     if not _gateway_has_sglang_router(gateway_configuration):
-        return None
+        if not has_replica_group_router:
+            return None
+        # In later releases we will deprecate service-level and gateway-level router
+        # configuration and return `ReplicaGroupRouterConfig` here instead.
+        return SGLangServiceRouterConfig(managed_by="service")
 
     gateway_router = gateway_configuration.router
     assert gateway_router is not None  # ensured by _gateway_has_sglang_router
@@ -287,6 +307,7 @@ def _build_service_router_config(
 
     return SGLangServiceRouterConfig(
         type=router_type,
+        managed_by="gateway",
         policy=policy,
         pd_disaggregation=pd_disaggregation,
     )

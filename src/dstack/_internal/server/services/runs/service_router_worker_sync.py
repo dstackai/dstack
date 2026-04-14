@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.utils.common as common_utils
@@ -36,11 +36,21 @@ async def ensure_service_router_worker_sync_row(
     now = common_utils.get_current_datetime()
     if sync_row is not None:
         if sync_row.deleted:
-            sync_row.deleted = False
-            sync_row.lock_expires_at = None
-            sync_row.lock_token = None
-            sync_row.lock_owner = None
-            sync_row.last_processed_at = now
+            # If the router replica group is reintroduced (e.g. via re-apply), reactivate the
+            # existing sync row so the background pipeline resumes syncing router workers.
+            # Do not import pipeline_tasks.base here: loading that package runs
+            # pipeline_tasks/__init__.py -> jobs_running -> runs and causes a circular import.
+            await session.execute(
+                update(ServiceRouterWorkerSyncModel)
+                .where(ServiceRouterWorkerSyncModel.id == sync_row.id)
+                .values(
+                    deleted=False,
+                    last_processed_at=now,
+                    lock_expires_at=None,
+                    lock_token=None,
+                    lock_owner=None,
+                )
+            )
         return
     session.add(
         ServiceRouterWorkerSyncModel(
