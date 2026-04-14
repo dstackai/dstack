@@ -605,7 +605,7 @@ def _terminate_instances_not_matching_fleet_spec(
             updates[instance.id] = {
                 "status": InstanceStatus.TERMINATING,
                 "termination_reason": InstanceTerminationReason.FLEET_SPEC_MISMATCH,
-                "termination_reason_message": "Instance does not match updated fleet spec",
+                "termination_reason_message": "Instance does not match fleet spec",
             }
     return updates
 
