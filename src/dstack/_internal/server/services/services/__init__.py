@@ -180,6 +180,7 @@ async def _register_service_in_gateway(
                 options=service_spec.options,
                 rate_limits=run_spec.configuration.rate_limits,
                 ssh_private_key=run_model.project.ssh_private_key,
+                has_router_replica=has_replica_group_router,
                 router=router,
             )
             try:
@@ -291,7 +292,7 @@ def _build_service_router_config(
             return None
         # In later releases we will deprecate service-level and gateway-level router
         # configuration and return `ReplicaGroupRouterConfig` here instead.
-        return SGLangServiceRouterConfig(managed_by="service")
+        return SGLangServiceRouterConfig()
 
     gateway_router = gateway_configuration.router
     assert gateway_router is not None  # ensured by _gateway_has_sglang_router
@@ -307,7 +308,6 @@ def _build_service_router_config(
 
     return SGLangServiceRouterConfig(
         type=router_type,
-        managed_by="gateway",
         policy=policy,
         pd_disaggregation=pd_disaggregation,
     )

@@ -74,6 +74,7 @@ class ServiceConfig(SiteConfig):
     limit_req_zones: list[LimitReqZoneConfig]
     locations: list[LocationConfig]
     replicas: list[ReplicaConfig]
+    has_router_replica: bool = False
     router: Optional[AnyServiceRouterConfig] = None
     router_port: Optional[int] = None
     cors_enabled: bool = False
@@ -110,11 +111,7 @@ class Nginx:
             if conf.https:
                 await run_async(self.run_certbot, conf.domain, acme)
 
-            if (
-                isinstance(conf, ServiceConfig)
-                and conf.router
-                and getattr(conf.router, "managed_by", "gateway") == "gateway"
-            ):
+            if isinstance(conf, ServiceConfig) and conf.router and not conf.has_router_replica:
                 if conf.router.type == RouterType.SGLANG:
                     # Check if router already exists for this domain
                     if conf.domain in self._domain_to_router:

@@ -31,16 +31,6 @@ class SGLangGatewayRouterConfig(CoreModel):
 
 class SGLangServiceRouterConfig(CoreModel):
     type: Annotated[Literal["sglang"], Field(description="The router type")] = "sglang"
-    managed_by: Annotated[
-        Literal["gateway", "service"],
-        Field(
-            description=(
-                "Where the router process is managed. "
-                "`gateway`: the gateway runs and manages the router process. "
-                "`service`: the router runs inside the service (replica-group `router:`)."
-            )
-        ),
-    ] = "gateway"
     policy: Annotated[
         Literal["random", "round_robin", "cache_aware", "power_of_two"],
         Field(

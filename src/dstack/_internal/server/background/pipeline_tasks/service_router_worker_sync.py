@@ -219,15 +219,9 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                 set_unlock_update_map_fields(early_cleanup_update_map)
                 now = get_current_datetime()
                 resolve_now_placeholders(early_cleanup_update_map, now=now)
-                await session.execute(
-                    update(ServiceRouterWorkerSyncModel)
-                    .where(
-                        ServiceRouterWorkerSyncModel.id == item.id,
-                        ServiceRouterWorkerSyncModel.lock_token == item.lock_token,
-                    )
-                    .values(**early_cleanup_update_map)
+                await _update_sync_row_or_log_lock_token_changed(
+                    session, item, early_cleanup_update_map
                 )
-                await session.commit()
                 return
 
         async with get_session_ctx() as session:
@@ -270,18 +264,7 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
             async with get_session_ctx() as session:
                 now = get_current_datetime()
                 resolve_now_placeholders(cleanup_update_map, now=now)
-                res2 = await session.execute(
-                    update(ServiceRouterWorkerSyncModel)
-                    .where(
-                        ServiceRouterWorkerSyncModel.id == item.id,
-                        ServiceRouterWorkerSyncModel.lock_token == item.lock_token,
-                    )
-                    .values(**cleanup_update_map)
-                    .returning(ServiceRouterWorkerSyncModel.id)
-                )
-                if not list(res2.scalars().all()):
-                    log_lock_token_changed_after_processing(logger, item)
-                await session.commit()
+                await _update_sync_row_or_log_lock_token_changed(session, item, cleanup_update_map)
             return
 
         await sync_router_workers_for_run_model(run_for_sync)
@@ -292,14 +275,23 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
         async with get_session_ctx() as session:
             now = get_current_datetime()
             resolve_now_placeholders(update_map, now=now)
-            res2 = await session.execute(
-                update(ServiceRouterWorkerSyncModel)
-                .where(
-                    ServiceRouterWorkerSyncModel.id == item.id,
-                    ServiceRouterWorkerSyncModel.lock_token == item.lock_token,
-                )
-                .values(**update_map)
-                .returning(ServiceRouterWorkerSyncModel.id)
-            )
-            if not list(res2.scalars().all()):
-                log_lock_token_changed_after_processing(logger, item)
+            await _update_sync_row_or_log_lock_token_changed(session, item, update_map)
+
+
+async def _update_sync_row_or_log_lock_token_changed(
+    session,
+    item: PipelineItem,
+    update_map: ItemUpdateMap,
+) -> None:
+    res = await session.execute(
+        update(ServiceRouterWorkerSyncModel)
+        .where(
+            ServiceRouterWorkerSyncModel.id == item.id,
+            ServiceRouterWorkerSyncModel.lock_token == item.lock_token,
+        )
+        .values(**update_map)
+        .returning(ServiceRouterWorkerSyncModel.id)
+    )
+    if not list(res.scalars().all()):
+        log_lock_token_changed_after_processing(logger, item)
+    await session.commit()

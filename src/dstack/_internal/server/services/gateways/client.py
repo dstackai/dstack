@@ -46,6 +46,7 @@ class GatewayClient:
         options: dict,
         rate_limits: list[RateLimit],
         ssh_private_key: str,
+        has_router_replica: bool = False,
         router: Optional[AnyServiceRouterConfig] = None,
     ):
         if "openai" in options:
@@ -61,6 +62,7 @@ class GatewayClient:
             "options": options,
             "rate_limits": [limit.dict() for limit in rate_limits],
             "ssh_private_key": ssh_private_key,
+            "has_router_replica": has_router_replica,
             "router": router.dict() if router is not None else None,
         }
         resp = await self._client.post(

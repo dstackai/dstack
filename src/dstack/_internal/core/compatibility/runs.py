@@ -96,14 +96,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         router = run_spec.configuration.router
         if router is None:
             configuration_excludes["router"] = True
-        elif isinstance(router, SGLangServiceRouterConfig):
-            router_excludes: IncludeExcludeDictType = {}
-            if router.pd_disaggregation is False:
-                router_excludes["pd_disaggregation"] = True
-            if router.managed_by == "gateway":
-                router_excludes["managed_by"] = True
-            if router_excludes:
-                configuration_excludes["router"] = router_excludes
+        elif isinstance(router, SGLangServiceRouterConfig) and router.pd_disaggregation is False:
+            configuration_excludes["router"] = {"pd_disaggregation": True}
         if run_spec.configuration.https is None:
             configuration_excludes["https"] = True
 

@@ -6,6 +6,7 @@ from fastapi import status
 from starlette.requests import ClientDisconnect
 
 from dstack._internal.core.models.routers import RouterType
+from dstack._internal.proxy.lib.const import SGLANG_WHITELISTED_PATHS
 from dstack._internal.proxy.lib.deps import ProxyAuthContext
 from dstack._internal.proxy.lib.errors import ProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
@@ -42,8 +43,8 @@ async def proxy(
 
     if service.router is not None and service.router.type == RouterType.SGLANG:
         path_for_match = path if path.startswith("/") else f"/{path}"
-        if not _is_whitelisted_path(path_for_match, _SGLANG_WHITELISTED_PATHS):
-            raise ProxyError("Path is not allowed for this service", status.HTTP_404_NOT_FOUND)
+        if not _is_whitelisted_path(path_for_match, SGLANG_WHITELISTED_PATHS):
+            raise ProxyError("Path is not allowed for this service", status.HTTP_403_FORBIDDEN)
 
     client = await get_service_replica_client(service, repo, service_conn_pool)
 
@@ -72,13 +73,6 @@ async def proxy(
         status_code=upstream_response.status_code,
         headers=upstream_response.headers,
     )
-
-
-_SGLANG_WHITELISTED_PATHS = (
-    "/generate",
-    "/v1/",
-    "/chat/completions",
-)
 
 
 def _is_whitelisted_path(path: str, whitelisted_paths: tuple[str, ...]) -> bool:
