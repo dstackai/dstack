@@ -35,6 +35,7 @@ from dstack._internal.core.models.volumes import (
     AnyVolumeConfiguration,
     BaseVolumeConfiguration,
     MountPoint,
+    VolumeConfiguration,
     parse_mount_point,
     parse_volume_configuration,
 )
@@ -1163,7 +1164,12 @@ def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
     return parse_volume_configuration(data)
 
 
-AnyDstackConfiguration = AnyApplyConfiguration
+AnyDstackConfiguration = Union[
+    AnyRunConfiguration,
+    FleetConfiguration,
+    GatewayConfiguration,
+    VolumeConfiguration,
+]
 
 
 class DstackConfiguration(CoreModel):
