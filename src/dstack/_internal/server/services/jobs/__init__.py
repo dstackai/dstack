@@ -447,18 +447,12 @@ def check_can_attach_job_volumes(volumes: List[List[Volume]]):
     """
     if len(volumes) == 0:
         return
-    expected_backends = {v.configuration.backend for v in volumes[0]}
-    expected_regions = {v.configuration.region for v in volumes[0]}
+    expected_locations = {(v.get_backend(), v.get_region().lower()) for v in volumes[0]}
     for mount_point_volumes in volumes:
-        backends = {v.configuration.backend for v in mount_point_volumes}
-        regions = {v.configuration.region for v in mount_point_volumes}
-        if backends != expected_backends:
+        locations = {(v.get_backend(), v.get_region().lower()) for v in mount_point_volumes}
+        if locations != expected_locations:
             raise ServerClientError(
-                "Volumes from different backends specified for different mount points"
-            )
-        if regions != expected_regions:
-            raise ServerClientError(
-                "Volumes from different regions specified for different mount points"
+                "Volumes from different locations specified for different mount points"
             )
         for volume in mount_point_volumes:
             if volume.status != VolumeStatus.ACTIVE:
@@ -557,16 +551,14 @@ def _get_job_mount_point_attached_volume(
     """
     for volume in volumes:
         if (
-            volume.configuration.backend != job_provisioning_data.get_base_backend()
-            or volume.configuration.region.lower() != job_provisioning_data.region.lower()
+            volume.get_backend() != job_provisioning_data.get_base_backend()
+            or volume.get_region().lower() != job_provisioning_data.region.lower()
         ):
             continue
         if (
-            volume.provisioning_data is not None
-            and volume.provisioning_data.availability_zone is not None
+            (volume_availability_zone := volume.get_availability_zone()) is not None
             and job_provisioning_data.availability_zone is not None
-            and volume.provisioning_data.availability_zone.lower()
-            != job_provisioning_data.availability_zone.lower()
+            and volume_availability_zone.lower() != job_provisioning_data.availability_zone.lower()
         ):
             continue
         return volume

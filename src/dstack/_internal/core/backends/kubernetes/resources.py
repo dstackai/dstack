@@ -1,4 +1,5 @@
 import dataclasses
+import re
 from collections.abc import Mapping
 from decimal import Decimal
 from enum import Enum
@@ -30,7 +31,18 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-DUMMY_REGION = "-"
+# https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+OBJECT_NAME_MAX_LENGTH = 253
+
+# https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
+LABEL_KEY_PREFIX_MAX_LENGTH = 253
+LABEL_KEY_PREFIX_REGEX = re.compile(
+    r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$"
+)
+LABEL_KEY_NAME_MAX_LENGTH = 63
+LABEL_KEY_NAME_REGEX = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?$")
+LABEL_VALUE_MAX_LENGTH = 63
+LABEL_VALUE_REGEX = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?)?$")
 
 NVIDIA_GPU_RESOURCE = "nvidia.com/gpu"
 NVIDIA_GPU_NODE_TAINT = NVIDIA_GPU_RESOURCE
@@ -118,6 +130,53 @@ class KubernetesResources:
         for field, qty in dataclasses.asdict(other).items():
             dct[field] -= qty
         return type(self)(**dct)
+
+
+def filter_invalid_labels(labels: dict[str, str]) -> dict[str, str]:
+    filtered_labels: dict[str, str] = {}
+    for k, v in labels.items():
+        try:
+            validate_label_key(k)
+            validate_label_value(v)
+        except ValueError as e:
+            logger.warning("Skipping invalid label %s=%s: %s", k, v, e)
+            continue
+        filtered_labels[k] = v
+    return filtered_labels
+
+
+def validate_label_key(key: str) -> None:
+    parts = key.split("/")
+    if len(parts) > 2:
+        raise ValueError("Too many segments")
+    name: str
+    if len(parts) == 2:
+        prefix, name = parts
+        if not prefix:
+            raise ValueError("Empty prefix")
+        if len(prefix) > LABEL_KEY_PREFIX_MAX_LENGTH:
+            raise ValueError("Prefix too long")
+        if LABEL_KEY_PREFIX_REGEX.fullmatch(prefix) is None:
+            raise ValueError("Invalid prefix")
+    else:
+        name = parts[0]
+    if not name:
+        raise ValueError("Empty name")
+    if len(name) > LABEL_KEY_NAME_MAX_LENGTH:
+        raise ValueError("Name too long")
+    if LABEL_KEY_NAME_REGEX.fullmatch(name) is None:
+        raise ValueError("Invalid name")
+
+
+def validate_label_value(value: str) -> None:
+    if len(value) > LABEL_VALUE_MAX_LENGTH:
+        raise ValueError("Value too long")
+    if LABEL_VALUE_REGEX.fullmatch(value) is None:
+        raise ValueError("Invalid value")
+
+
+def format_dstack_label_key(name: str) -> str:
+    return f"k8s.dstack.ai/{name}"
 
 
 parse_quantity = cast(
@@ -306,7 +365,7 @@ def _get_instance_offer_from_node(
             ),
         ),
         price=0,
-        region=DUMMY_REGION,
+        region="",
         availability=InstanceAvailability.AVAILABLE,
         instance_runtime=InstanceRuntime.RUNNER,
     )

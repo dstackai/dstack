@@ -3,6 +3,7 @@ import shlex
 import subprocess
 import tempfile
 import time
+from decimal import Decimal
 from enum import Enum
 from typing import List, Optional
 
@@ -17,11 +18,14 @@ from dstack._internal.core.backends.base.compute import (
     ComputeWithInstanceVolumesSupport,
     ComputeWithMultinodeSupport,
     ComputeWithPrivilegedSupport,
+    ComputeWithVolumeSupport,
     generate_unique_gateway_instance_name,
     generate_unique_instance_name_for_job,
     generate_unique_name,
+    generate_unique_volume_name,
     get_docker_commands,
     get_dstack_gateway_commands,
+    merge_tags,
 )
 from dstack._internal.core.backends.kubernetes.models import (
     KubernetesConfig,
@@ -32,13 +36,15 @@ from dstack._internal.core.backends.kubernetes.resources import (
     AMD_GPU_NAME_TO_DEVICE_IDS,
     AMD_GPU_NODE_TAINT,
     AMD_GPU_RESOURCE,
-    DUMMY_REGION,
     NVIDIA_GPU_NAME_TO_GPU_INFO,
     NVIDIA_GPU_NODE_TAINT,
     NVIDIA_GPU_PRODUCT_LABEL,
     NVIDIA_GPU_RESOURCE,
+    OBJECT_NAME_MAX_LENGTH,
     PodPhase,
     TaintEffect,
+    filter_invalid_labels,
+    format_dstack_label_key,
     format_memory,
     get_amd_gpu_from_node_labels,
     get_gpu_request_from_gpu_spec,
@@ -49,6 +55,7 @@ from dstack._internal.core.backends.kubernetes.resources import (
     get_nvidia_gpu_from_node_labels,
     is_hard_taint,
     is_taint_tolerated,
+    parse_quantity,
 )
 from dstack._internal.core.backends.kubernetes.utils import (
     call_api_method,
@@ -56,6 +63,7 @@ from dstack._internal.core.backends.kubernetes.utils import (
 )
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError, ProvisioningError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
@@ -70,7 +78,13 @@ from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec
 from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import InstanceMountPoint, Volume
+from dstack._internal.core.models.volumes import (
+    InstanceMountPoint,
+    KubernetesVolumeConfiguration,
+    Volume,
+    VolumeMountPoint,
+    VolumeProvisioningData,
+)
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
@@ -100,6 +114,7 @@ class KubernetesCompute(
     ComputeWithFilteredOffersCached,
     ComputeWithPrivilegedSupport,
     ComputeWithInstanceVolumesSupport,
+    ComputeWithVolumeSupport,
     ComputeWithGatewaySupport,
     ComputeWithMultinodeSupport,
     Compute,
@@ -204,27 +219,60 @@ class KubernetesCompute(
                 )
             )
 
+        volume_name_path_map: dict[str, str] = {}
         mount_points = job.job_spec.volumes
         if mount_points is None:
             # Legacy JobSpec without volumes
             mount_points = run.run_spec.configuration.volumes
         for mount_point in mount_points:
-            assert isinstance(mount_point, InstanceMountPoint)
-            # "Must be a DNS_LABEL and unique within the pod"
-            volume_name = generate_unique_name(prefix="host-path", max_length=253)
+            if isinstance(mount_point, VolumeMountPoint):
+                if isinstance(mount_point.name, str):
+                    volume_names = [mount_point.name]
+                else:
+                    volume_names = mount_point.name
+                for volume_name in volume_names:
+                    volume_name_path_map[volume_name] = mount_point.path
+            elif isinstance(mount_point, InstanceMountPoint):
+                # "Must be a DNS_LABEL and unique within the pod"
+                volume_name = generate_unique_name(
+                    prefix="host-path", max_length=OBJECT_NAME_MAX_LENGTH
+                )
+                volumes_.append(
+                    client.V1Volume(
+                        name=volume_name,
+                        host_path=client.V1HostPathVolumeSource(
+                            path=mount_point.instance_path,
+                            type="DirectoryOrCreate",
+                        ),
+                    ),
+                )
+                volume_mounts.append(
+                    client.V1VolumeMount(
+                        name=volume_name,
+                        mount_path=mount_point.path,
+                    )
+                )
+            else:
+                assert False, f"unexpected mount point: {mount_point!r}"
+        for volume in volumes:
+            pvc_name = volume.volume_id
+            assert pvc_name is not None, f"missing PVC name: {volume!r}"
+            mount_path = volume_name_path_map.get(volume.name)
+            assert mount_path is not None, f"missing mount path: {volume!r}"
+            volume_name = generate_unique_name(prefix="pvc", max_length=OBJECT_NAME_MAX_LENGTH)
             volumes_.append(
                 client.V1Volume(
                     name=volume_name,
-                    host_path=client.V1HostPathVolumeSource(
-                        path=mount_point.instance_path,
-                        type="DirectoryOrCreate",
+                    persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                        claim_name=pvc_name,
+                        read_only=False,
                     ),
                 ),
             )
             volume_mounts.append(
                 client.V1VolumeMount(
                     name=volume_name,
-                    mount_path=mount_point.path,
+                    mount_path=mount_path,
                 )
             )
 
@@ -481,9 +529,8 @@ class KubernetesCompute(
             namespace=self.config.namespace,
             service_name=_get_pod_service_name(instance_name),
         )
-        region = DUMMY_REGION
         if address is None:
-            self.terminate_instance(instance_name, region=region)
+            self.terminate_instance(instance_name, region="")
             raise ComputeError(
                 "Failed to get gateway hostname. "
                 "Ensure the Kubernetes cluster supports Load Balancer services."
@@ -491,7 +538,7 @@ class KubernetesCompute(
         return GatewayProvisioningData(
             instance_id=instance_name,
             ip_address=address,
-            region=region,
+            region="",
         )
 
     def terminate_gateway(
@@ -505,6 +552,102 @@ class KubernetesCompute(
             region=configuration.region,
             backend_data=backend_data,
         )
+
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        assert isinstance(volume.configuration, KubernetesVolumeConfiguration)
+        pvc_name = volume.configuration.claim_name
+        assert pvc_name is not None
+
+        pvc = call_api_method(
+            self.api.read_namespaced_persistent_volume_claim,
+            expected=404,
+            namespace=self.config.namespace,
+            name=pvc_name,
+        )
+        if pvc is None:
+            raise ComputeError(f"PersistentVolumeClaim {pvc_name} not found")
+
+        capacity_bytes: Optional[Decimal] = None
+        if pvc.status is not None:
+            actual_capacity_qty = (pvc.status.capacity or {}).get("storage")
+            if actual_capacity_qty is not None:
+                capacity_bytes = parse_quantity(actual_capacity_qty)
+        if capacity_bytes is None and pvc.spec is not None and pvc.spec.resources is not None:
+            requested_capacity_qty = (pvc.spec.resources.requests or {}).get("storage")
+            if requested_capacity_qty is not None:
+                capacity_bytes = parse_quantity(requested_capacity_qty)
+        if capacity_bytes is None:
+            raise ComputeError(f"Failed to detect PersistentVolumeClaim {pvc_name} capacity")
+
+        return VolumeProvisioningData(
+            backend=BackendType.KUBERNETES,
+            volume_id=pvc_name,
+            size_gb=int(capacity_bytes // 2**30),
+            attachable=False,
+            detachable=False,
+        )
+
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        assert isinstance(volume.configuration, KubernetesVolumeConfiguration)
+        assert volume.configuration.size is not None
+
+        labels = {
+            format_dstack_label_key("owner"): "dstack",
+            format_dstack_label_key("project"): volume.project_name,
+            format_dstack_label_key("name"): volume.name,
+            format_dstack_label_key("user"): volume.user,
+        }
+        labels = merge_tags(
+            base_tags=labels,
+            resource_tags=volume.configuration.tags,
+        )
+        labels = filter_invalid_labels(labels)
+
+        pvc_name = generate_unique_volume_name(volume, max_length=OBJECT_NAME_MAX_LENGTH)
+        pvc = client.V1PersistentVolumeClaim(
+            metadata=client.V1ObjectMeta(
+                name=pvc_name,
+                labels=labels,
+            ),
+            spec=client.V1PersistentVolumeClaimSpec(
+                access_modes=volume.configuration.access_modes,
+                storage_class_name=volume.configuration.storage_class_name,
+                resources=client.V1VolumeResourceRequirements(
+                    requests={
+                        "storage": format_memory(volume.configuration.size),
+                    },
+                ),
+            ),
+        )
+        self.api.create_namespaced_persistent_volume_claim(
+            namespace=self.config.namespace,
+            body=pvc,
+        )
+        logger.debug("Created PVC %s for volume %s", pvc_name, volume.name)
+
+        return VolumeProvisioningData(
+            backend=BackendType.KUBERNETES,
+            volume_id=pvc_name,
+            size_gb=volume.configuration.size_gb,
+            attachable=False,
+            detachable=False,
+        )
+
+    def delete_volume(self, volume: Volume):
+        assert isinstance(volume.configuration, KubernetesVolumeConfiguration)
+        pvc_name = volume.volume_id
+        assert pvc_name is not None
+
+        pvc = call_api_method(
+            self.api.delete_namespaced_persistent_volume_claim,
+            expected=404,
+            namespace=self.config.namespace,
+            name=pvc_name,
+        )
+        if pvc is None:
+            logger.debug("PVC %s for volume %s not found", pvc_name, volume.name)
+        else:
+            logger.debug("Deleted PVC %s for volume %s", pvc_name, volume.name)
 
 
 def _get_pod_spec_parameters_for_gpu(

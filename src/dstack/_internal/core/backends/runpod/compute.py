@@ -39,7 +39,11 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
+from dstack._internal.core.models.volumes import (
+    RunpodVolumeConfiguration,
+    Volume,
+    VolumeProvisioningData,
+)
 from dstack._internal.utils.common import get_current_datetime, get_or_error
 from dstack._internal.utils.logging import get_logger
 
@@ -389,6 +393,7 @@ class RunpodCompute(
                 provisioning_data.ssh_port = port["publicPort"]
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        assert isinstance(volume.configuration, RunpodVolumeConfiguration)
         volume_data = self.api_client.get_network_volume(
             volume_id=get_or_error(volume.configuration.volume_id)
         )
@@ -405,6 +410,7 @@ class RunpodCompute(
         )
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        assert isinstance(volume.configuration, RunpodVolumeConfiguration)
         volume_name = generate_unique_volume_name(volume, max_length=MAX_RESOURCE_NAME_LEN)
         size_gb = volume.configuration.size_gb
         # Runpod regions must be uppercase.

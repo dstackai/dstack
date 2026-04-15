@@ -2,11 +2,12 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import Field, validator
+from pydantic import Field, ValidationError, validator
 from typing_extensions import Annotated, Self
 
+from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.profiles import parse_idle_duration
@@ -32,21 +33,18 @@ class VolumeStatus(str, Enum):
         return [cls.FAILED]
 
 
-class VolumeConfiguration(CoreModel):
+class BaseVolumeConfiguration(CoreModel):
     type: Literal["volume"] = "volume"
+    backend: Any
+    """`backend` is used as a tagged union discriminator. Subclasses must override its type
+    with `Literal[BackendType.<BACKEND>]` annotation. Annotated as `Any` since `BackendType`
+    triggers type checker error:
+    > Variable is mutable so its type is invariant
+    """
     name: Annotated[Optional[str], Field(description="The volume name")] = None
-    backend: Annotated[BackendType, Field(description="The volume backend")]
-    region: Annotated[str, Field(description="The volume region")]
-    availability_zone: Annotated[
-        Optional[str], Field(description="The volume availability zone")
-    ] = None
     size: Annotated[
         Optional[Memory],
         Field(description="The volume size. Must be specified when creating new volumes"),
-    ] = None
-    volume_id: Annotated[
-        Optional[str],
-        Field(description="The volume ID. Must be specified when registering external volumes"),
     ] = None
     auto_cleanup_duration: Annotated[
         Optional[Union[str, int]],
@@ -54,7 +52,7 @@ class VolumeConfiguration(CoreModel):
             description=(
                 "Time to wait after volume is no longer used by any job before deleting it. "
                 "Defaults to keep the volume indefinitely. "
-                "Use the value 'off' or -1 to disable auto-cleanup."
+                "Use the value `off` or `-1` to disable auto-cleanup"
             )
         ),
     ] = None
@@ -75,12 +73,125 @@ class VolumeConfiguration(CoreModel):
     )(parse_idle_duration)
 
     @property
+    def external_volume_id(self) -> Optional[str]:
+        """
+        Returns the value of a configuration field denoting a user-provided volume identifier
+        when an existing volume is registered rather than a new one being created.
+        """
+        return None
+
+    @property
+    def is_external(self) -> bool:
+        return self.external_volume_id is not None
+
+    @property
     def size_gb(self) -> int:
         return int(get_or_error(self.size))
 
 
+class VolumeConfigurationWithRegion(BaseVolumeConfiguration):
+    region: Annotated[str, Field(description="The volume region")]
+
+
+class VolumeConfigurationWithAvailibilityZone(VolumeConfigurationWithRegion):
+    availability_zone: Annotated[
+        Optional[str], Field(description="The volume availability zone")
+    ] = None
+
+
+class VolumeConfigurationWithVolumeID(BaseVolumeConfiguration):
+    volume_id: Annotated[
+        Optional[str],
+        Field(description="The volume ID. Must be specified when registering external volumes"),
+    ] = None
+
+    @property
+    def external_volume_id(self) -> Optional[str]:
+        return self.volume_id
+
+
+class AWSVolumeConfiguration(
+    VolumeConfigurationWithAvailibilityZone, VolumeConfigurationWithVolumeID
+):
+    backend: Annotated[Literal[BackendType.AWS], Field(description="The volume backend")] = (
+        BackendType.AWS
+    )
+
+
+class GCPVolumeConfiguration(
+    VolumeConfigurationWithAvailibilityZone, VolumeConfigurationWithVolumeID
+):
+    backend: Annotated[Literal[BackendType.GCP], Field(description="The volume backend")] = (
+        BackendType.GCP
+    )
+
+
+class RunpodVolumeConfiguration(VolumeConfigurationWithRegion, VolumeConfigurationWithVolumeID):
+    backend: Annotated[Literal[BackendType.RUNPOD], Field(description="The volume backend")] = (
+        BackendType.RUNPOD
+    )
+    availability_zone: Annotated[Optional[str], Field(exclude=True)] = None
+    """Runpod doesn't have AZs but we accept this field for compatibility with older clients."""
+
+
+class KubernetesVolumeConfiguration(BaseVolumeConfiguration):
+    backend: Annotated[
+        Literal[BackendType.KUBERNETES], Field(description="The volume backend")
+    ] = BackendType.KUBERNETES
+    size: Annotated[
+        Optional[Memory],
+        Field(
+            description=(
+                "The requested volume size. Must be specified when creating new PVCs."
+                " Ignored if `claim_name` is set"
+            )
+        ),
+    ] = None
+    """`size` is overridden to provide Kubernetes-specific description.
+    The signature is the same as in the base class."""
+    claim_name: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The `PersistentVolumeClaim` name. Must be specified when registering"
+                " the existing PVC instead of creating a new one"
+            )
+        ),
+    ] = None
+    storage_class_name: Annotated[
+        Optional[str], Field(description="The `StorageClass` name. Ignored if `claim_name` is set")
+    ] = None
+    access_modes: Annotated[
+        list[str],
+        Field(description="A list of accepted access modes. Ignored if `claim_name` is set"),
+    ] = ["ReadWriteOnce"]
+
+    @property
+    def external_volume_id(self) -> Optional[str]:
+        return self.claim_name
+
+
+AnyVolumeConfiguration = Union[
+    AWSVolumeConfiguration,
+    GCPVolumeConfiguration,
+    RunpodVolumeConfiguration,
+    KubernetesVolumeConfiguration,
+]
+
+
+class VolumeConfiguration(CoreModel):
+    __root__: Annotated[AnyVolumeConfiguration, Field(discriminator="backend")]
+
+
+def parse_volume_configuration(data: dict) -> AnyVolumeConfiguration:
+    try:
+        return VolumeConfiguration.parse_obj(data).__root__
+    except ValidationError as e:
+        raise ConfigurationError(e)
+
+
 class VolumeSpec(CoreModel):
-    configuration: VolumeConfiguration
+    configuration: Annotated[AnyVolumeConfiguration, Field(discriminator="backend")]
     configuration_path: Optional[str] = None
 
 
@@ -119,7 +230,7 @@ class Volume(CoreModel):
     name: str
     user: str
     project_name: str
-    configuration: VolumeConfiguration
+    configuration: Annotated[AnyVolumeConfiguration, Field(discriminator="backend")]
     external: bool
     created_at: datetime
     last_processed_at: datetime
@@ -144,6 +255,28 @@ class Volume(CoreModel):
                     return attachment.attachment_data
         # volume was attached before attachments were introduced
         return self.attachment_data
+
+    def get_backend(self) -> BackendType:
+        return self.configuration.backend
+
+    def get_region(self) -> str:
+        """
+        Returns the volume region or an empty string if the volume (that is, its backend)
+        has no such thing as a "region".
+        """
+        if isinstance(self.configuration, VolumeConfigurationWithRegion):
+            return self.configuration.region
+        return ""
+
+    def get_availability_zone(self) -> Optional[str]:
+        """
+        Returns the volume availability zone or `None` if:
+        * the volume (that is, its backend) has no such thing as an "availability zone"
+        * `VolumeProvisioningData` is not set for some reason
+        """
+        if self.provisioning_data is None:
+            return None
+        return self.provisioning_data.availability_zone
 
 
 class VolumePlan(CoreModel):

@@ -16,6 +16,7 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.profiles import parse_duration
 from dstack._internal.core.models.volumes import (
+    AnyVolumeConfiguration,
     Volume,
     VolumeAttachment,
     VolumeAttachmentData,
@@ -259,7 +260,7 @@ async def create_volume(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
-    configuration: VolumeConfiguration,
+    configuration: AnyVolumeConfiguration,
     pipeline_hinter: PipelineHinterProtocol,
 ) -> Volume:
     spec = await apply_plugin_policies(
@@ -399,7 +400,7 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         project_name=volume_model.project.name,
         user=volume_model.user.name,
         configuration=configuration,
-        external=configuration.volume_id is not None,
+        external=configuration.is_external,
         created_at=volume_model.created_at,
         last_processed_at=volume_model.last_processed_at,
         status=volume_model.status,
@@ -416,8 +417,8 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
     return volume
 
 
-def get_volume_configuration(volume_model: VolumeModel) -> VolumeConfiguration:
-    return VolumeConfiguration.__response__.parse_raw(volume_model.configuration)
+def get_volume_configuration(volume_model: VolumeModel) -> AnyVolumeConfiguration:
+    return VolumeConfiguration.__response__.parse_raw(volume_model.configuration).__root__
 
 
 def get_volume_provisioning_data(volume_model: VolumeModel) -> Optional[VolumeProvisioningData]:
@@ -467,9 +468,9 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
             return name
 
 
-def _validate_volume_configuration(configuration: VolumeConfiguration):
-    if configuration.volume_id is None and configuration.size is None:
-        raise ServerClientError("Volume must specify either volume_id or size")
+def _validate_volume_configuration(configuration: AnyVolumeConfiguration):
+    if configuration.external_volume_id is None and configuration.size is None:
+        raise ServerClientError("Volume must specify either existing identifier or size")
     backends_services.check_backend_type_available(configuration.backend)
     if configuration.backend not in BACKENDS_WITH_VOLUMES_SUPPORT:
         raise ServerClientError(
@@ -479,7 +480,7 @@ def _validate_volume_configuration(configuration: VolumeConfiguration):
     if configuration.name is not None:
         validate_dstack_resource_name(configuration.name)
 
-    if configuration.volume_id is not None and configuration.auto_cleanup_duration is not None:
+    if configuration.is_external and configuration.auto_cleanup_duration is not None:
         if (
             isinstance(configuration.auto_cleanup_duration, int)
             and configuration.auto_cleanup_duration > 0
@@ -488,7 +489,7 @@ def _validate_volume_configuration(configuration: VolumeConfiguration):
             and configuration.auto_cleanup_duration not in ("off", "-1")
         ):
             raise ServerClientError(
-                "External volumes (with volume_id) do not support auto_cleanup_duration. "
+                "External volumes do not support auto_cleanup_duration. "
                 "Auto-cleanup only works for volumes created and managed by dstack."
             )
 
@@ -546,6 +547,6 @@ def _get_volume_cost(volume: Volume) -> float:
     )
 
 
-def _get_autocleanup_enabled(configuration: VolumeConfiguration) -> bool:
+def _get_autocleanup_enabled(configuration: AnyVolumeConfiguration) -> bool:
     auto_cleanup_duration = parse_duration(configuration.auto_cleanup_duration)
     return auto_cleanup_duration is not None and auto_cleanup_duration > 0

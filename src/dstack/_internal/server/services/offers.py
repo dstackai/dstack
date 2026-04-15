@@ -1,5 +1,5 @@
 import itertools
-from collections.abc import Iterable, Iterator
+from collections.abc import Container, Iterable, Iterator
 from typing import List, Literal, Optional, Tuple, Union
 
 import gpuhunt
@@ -42,21 +42,15 @@ async def get_offers_by_requirements(
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
-    backend_types = profile.backends
-    regions = profile.regions
-    availability_zones = profile.availability_zones
-    instance_types = profile.instance_types
+    backend_types: Optional[list[BackendType]] = profile.backends
+    regions: Optional[list[str]] = profile.regions
+    availability_zones: Optional[list[str]] = profile.availability_zones
+    instance_types: Optional[list[str]] = profile.instance_types
+    # (BackendType, region.lower() | "")
+    volumes_locations: Optional[set[tuple[BackendType, str]]] = None
 
     if volumes:
-        mount_point_volumes = volumes[0]
-        volumes_backend_types = [v.configuration.backend for v in mount_point_volumes]
-        if backend_types is None:
-            backend_types = volumes_backend_types
-        backend_types = [b for b in backend_types if b in volumes_backend_types]
-        volumes_regions = [v.configuration.region for v in mount_point_volumes]
-        if regions is None:
-            regions = volumes_regions
-        regions = [r for r in regions if r in volumes_regions]
+        volumes_locations = {(v.get_backend(), v.get_region().lower()) for v in volumes[0]}
 
     if multinode:
         if backend_types is None:
@@ -107,6 +101,7 @@ async def get_offers_by_requirements(
         availability_zones=availability_zones,
         instance_types=instance_types,
         placement_group=placement_group,
+        volumes_locations=volumes_locations,
     )
 
     if blocks != 1:
@@ -192,6 +187,7 @@ def _filter_offers(
     availability_zones: Optional[List[str]] = None,
     instance_types: Optional[List[str]] = None,
     placement_group: Optional[PlacementGroup] = None,
+    volumes_locations: Optional[Container[tuple[BackendType, str]]] = None,
 ) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
     Yields filtered offers. May return modified offers to match the filters.
@@ -224,6 +220,13 @@ def _filter_offers(
             if not new_offer.availability_zones:
                 continue
             offer = new_offer
+        # Offer is futher filtered against volumes AZs in Compute implementation, see
+        # ComputeWithCreateInstanceSupport._restrict_instance_offer_az_to_volumes_az()
+        if (
+            volumes_locations is not None
+            and (offer.backend, offer.region.lower()) not in volumes_locations
+        ):
+            continue
         yield (b, offer)
 
 

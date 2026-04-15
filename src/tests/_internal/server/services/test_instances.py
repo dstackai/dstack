@@ -26,8 +26,10 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_kubernetes_volume_configuration,
     get_volume,
     get_volume_configuration,
+    get_volume_provisioning_data,
     list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -159,6 +161,77 @@ class TestFilterInstances:
             ],
         )
         assert res == [runpod_instance2]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_volume_instances_with_az(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        aws_instance_1 = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.AWS,
+            region="us-1",
+            availability_zone="us-1a",
+        )
+        aws_instance_2 = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.AWS,
+            region="us-1",
+            availability_zone="us-1b",
+        )
+        gcp_instance = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.GCP,
+            region="us-1",
+            availability_zone="us-1b",
+        )
+        instances = [aws_instance_1, aws_instance_2, gcp_instance]
+        volume = get_volume(
+            configuration=get_volume_configuration(backend=BackendType.AWS, region="us-1"),
+            provisioning_data=get_volume_provisioning_data(
+                backend=BackendType.AWS, availability_zone="us-1b"
+            ),
+        )
+        res = instances_services.filter_instances(
+            instances=instances,
+            profile=Profile(name="test"),
+            volumes=[[volume]],
+        )
+        assert res == [aws_instance_2]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_volume_instances_without_region(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        aws_instance = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.AWS,
+        )
+        # Kubernetes does not support "create instance" feature, but for the sake of this test
+        # it does not matter
+        kubernetes_instance = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.KUBERNETES,
+        )
+        instances = [aws_instance, kubernetes_instance]
+        volume = get_volume(
+            configuration=get_kubernetes_volume_configuration(),
+            provisioning_data=get_volume_provisioning_data(
+                backend=BackendType.KUBERNETES, availability_zone=None
+            ),
+        )
+        res = instances_services.filter_instances(
+            instances=instances,
+            profile=Profile(name="test"),
+            volumes=[[volume]],
+        )
+        assert res == [kubernetes_instance]
 
 
 @pytest.mark.asyncio

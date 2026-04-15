@@ -406,23 +406,25 @@ def filter_instances(
     volumes: Optional[List[List[Volume]]] = None,
     shared: bool = False,
 ) -> List[InstanceModel]:
-    backend_types = profile.backends
-    regions = profile.regions
-    zones = profile.availability_zones
+    backend_types: Optional[list[BackendType]] = profile.backends
+    regions: Optional[list[str]] = profile.regions
+    zones: Optional[list[str]] = profile.availability_zones
+    # (BackendType, region.lower() | "", availability_zone.lower() | None)
+    volumes_locations: Optional[set[tuple[BackendType, str, Optional[str]]]] = None
 
     if volumes:
-        mount_point_volumes = volumes[0]
-        backend_types = [v.configuration.backend for v in mount_point_volumes]
-        regions = [v.configuration.region for v in mount_point_volumes]
-        volume_zones = [
-            v.provisioning_data.availability_zone
-            for v in mount_point_volumes
-            if v.provisioning_data is not None
-            and v.provisioning_data.availability_zone is not None
-        ]
-        if zones is None:
-            zones = volume_zones
-        zones = [z for z in zones if z in volume_zones]
+        volumes_locations = set()
+        for volume in volumes[0]:
+            volume_backend = volume.get_backend()
+            volume_region = volume.get_region().lower()
+            # If the volume has an AZ, it's added twice -- with and without an AZ.
+            # When the instance location is checked against the available volumes locations (see
+            # below) the instance with an AZ matches only the volume with the same AZ, while
+            # the instance without an AZ matches any volume with the same region regardless of AZs.
+            # This reflects the logic used before this stricter volumes_locations check was added.
+            volumes_locations.add((volume_backend, volume_region, None))
+            if (volume_zone := volume.get_availability_zone()) is not None:
+                volumes_locations.add((volume_backend, volume_region, volume_zone.lower()))
 
     if multinode:
         if backend_types is None:
@@ -465,6 +467,17 @@ def filter_instances(
             requirements=requirements,
         ):
             continue
+        if volumes_locations is not None:
+            jpd = get_instance_provisioning_data(instance)
+            # instance_matches_constraints() also skips filtering if JPD is not set
+            if jpd is not None:
+                instance_backend = jpd.get_base_backend()
+                instance_region = jpd.region.lower()
+                instance_zone = jpd.availability_zone
+                if instance_zone is not None:
+                    instance_zone = instance_zone.lower()
+                if (instance_backend, instance_region, instance_zone) not in volumes_locations:
+                    continue
         filtered_instances.append(instance)
     return filtered_instances
 

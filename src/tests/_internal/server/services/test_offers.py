@@ -9,6 +9,7 @@ from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.testing.common import (
     get_instance_offer_with_availability,
+    get_kubernetes_volume_configuration,
     get_volume,
     get_volume_configuration,
 )
@@ -98,6 +99,35 @@ class TestGetOffersByRequirements:
             )
             m.assert_awaited_once()
             assert res == [(runpod_backend_mock, runpod_offer2)]
+
+    @pytest.mark.asyncio
+    async def test_returns_volume_offers_without_region(self):
+        profile = Profile(name="test")
+        requirements = Requirements(resources=ResourcesSpec())
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            aws_backend_mock = Mock()
+            aws_backend_mock.TYPE = BackendType.AWS
+            aws_offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+            aws_backend_mock.compute.return_value.get_offers.return_value = [aws_offer]
+            kubernetes_backend_mock = Mock()
+            kubernetes_backend_mock.TYPE = BackendType.KUBERNETES
+            kubernetes_offer = get_instance_offer_with_availability(
+                backend=BackendType.KUBERNETES,
+                region="",
+                availability_zones=None,
+            )
+            kubernetes_backend_mock.compute.return_value.get_offers.return_value = [
+                kubernetes_offer
+            ]
+            m.return_value = [aws_backend_mock, kubernetes_backend_mock]
+            res = await get_offers_by_requirements(
+                project=Mock(),
+                profile=profile,
+                requirements=requirements,
+                volumes=[[get_volume(configuration=get_kubernetes_volume_configuration())]],
+            )
+            m.assert_awaited_once()
+            assert res == [(kubernetes_backend_mock, kubernetes_offer)]
 
     @pytest.mark.asyncio
     async def test_returns_az_offers(self):

@@ -1,5 +1,5 @@
 from dstack._internal.core.models.common import IncludeExcludeDictType
-from dstack._internal.core.models.volumes import VolumeConfiguration, VolumeSpec
+from dstack._internal.core.models.volumes import AnyVolumeConfiguration, VolumeSpec
 
 
 def get_volume_spec_excludes(volume_spec: VolumeSpec) -> IncludeExcludeDictType:
@@ -13,7 +13,7 @@ def get_volume_spec_excludes(volume_spec: VolumeSpec) -> IncludeExcludeDictType:
     return spec_excludes
 
 
-def get_create_volume_excludes(configuration: VolumeConfiguration) -> IncludeExcludeDictType:
+def get_create_volume_excludes(configuration: AnyVolumeConfiguration) -> IncludeExcludeDictType:
     """
     Returns an exclude mapping to exclude certain fields from the create volume request.
     Use this method to exclude new fields when they are not set to keep
@@ -25,7 +25,7 @@ def get_create_volume_excludes(configuration: VolumeConfiguration) -> IncludeExc
 
 
 def _get_volume_configuration_excludes(
-    configuration: VolumeConfiguration,
+    configuration: AnyVolumeConfiguration,
 ) -> IncludeExcludeDictType:
     configuration_excludes: IncludeExcludeDictType = {}
 
