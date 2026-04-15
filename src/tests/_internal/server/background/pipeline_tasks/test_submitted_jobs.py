@@ -1269,6 +1269,24 @@ class TestJobSubmittedWorker:
         assert job.termination_reason_message is not None
         assert "No matching fleet found" in job.termination_reason_message
 
+    async def test_terminates_legacy_autocreated_job_with_no_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        # Simulate legacy in-flight state: instance_assigned=True but no fleet
+        job = await create_job(session=session, run=run, instance_assigned=True)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message is not None
+        assert "No matching fleet found" in job.termination_reason_message
+
     async def test_resets_lock_for_retry_when_existing_instance_offer_cannot_be_locked(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):

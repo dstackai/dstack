@@ -1158,6 +1158,16 @@ async def _process_new_capacity_provisioning(
     preconditions: _ProcessedPreconditions,
 ) -> _ProvisioningResult:
     fleet_model = context.fleet_model
+    if fleet_model is None:
+        # Legacy in-flight job from autocreated fleets path (instance_assigned=True, no fleet).
+        # Autocreated fleets are no longer supported; terminate the job.
+        return _TerminateSubmittedJobResult(
+            reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            message=(
+                "No matching fleet found. Possible reasons: "
+                "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
+            ),
+        )
     locked_fleet_id = None
     if _should_refresh_related_cluster_master_fleet(context=context):
         assert fleet_model is not None

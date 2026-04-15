@@ -719,18 +719,17 @@ def _should_delete_fleet(fleet_model: FleetModel) -> bool:
     if is_fleet_in_use(fleet_model) or not is_fleet_empty(fleet_model):
         return False
 
-    # TODO: Drop non-terminating fleets auto-deletion after existing autocreated fleets no longer supported.
     fleet_spec = get_fleet_spec(fleet_model)
-    if (
-        fleet_model.status != FleetStatus.TERMINATING
-        and fleet_spec.configuration.nodes is not None
-        and fleet_spec.configuration.nodes.min == 0
-    ):
-        # Empty fleets that allow 0 nodes should not be auto-deleted
-        return False
+    if fleet_model.status == FleetStatus.TERMINATING:
+        logger.info("Automatic cleanup of terminating empty fleet %s", fleet_model.name)
+        return True
 
-    logger.info("Automatic cleanup of an empty fleet %s", fleet_model.name)
-    return True
+    # TODO: Drop autocreated fleet auto-deletion after existing autocreated fleets no longer supported.
+    if fleet_spec.autocreated:
+        logger.info("Automatic cleanup of empty autocreated fleet %s", fleet_model.name)
+        return True
+
+    return False
 
 
 def _build_instance_update_rows(
