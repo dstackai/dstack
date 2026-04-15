@@ -77,6 +77,7 @@ async def can_terminate_fleet_instances_on_idle_duration(
     fleet_model: FleetModel,
 ) -> bool:
     fleet_spec = get_fleet_spec(fleet_model)
+    # TODO: Drop fleet_spec.autocreated check after existing autocreated fleets no longer supported
     if fleet_spec.configuration.nodes is None or fleet_spec.autocreated:
         return True
     res = await session.execute(

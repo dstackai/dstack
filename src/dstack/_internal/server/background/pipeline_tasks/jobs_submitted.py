@@ -27,10 +27,7 @@ from dstack._internal.core.models.compute_groups import (
     ComputeGroupStatus,
 )
 from dstack._internal.core.models.fleets import (
-    FleetConfiguration,
-    FleetNodesSpec,
     FleetSpec,
-    FleetStatus,
     InstanceGroupPlacement,
 )
 from dstack._internal.core.models.instances import (
@@ -89,7 +86,6 @@ from dstack._internal.server.services.backends import get_project_backend_by_typ
 from dstack._internal.server.services.docker import apply_server_docker_defaults
 from dstack._internal.server.services.fleets import (
     check_can_create_new_cloud_instance_in_fleet,
-    generate_fleet_name,
     get_fleet_master_instance_provisioning_data,
     get_fleet_spec,
     get_next_instance_num,
@@ -136,11 +132,9 @@ from dstack._internal.server.services.runs.plan import (
 )
 from dstack._internal.server.services.runs.spec import (
     check_run_spec_requires_instance_mounts,
-    get_nodes_required_num,
 )
 from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.utils import sentry_utils
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -463,7 +457,6 @@ class _NewCapacityProvisioning:
     provisioning_data: Union[JobProvisioningData, ComputeGroupProvisioningData]
     offer: InstanceOfferWithAvailability
     effective_profile: Profile
-    created_fleet_model: Optional[FleetModel]
     placement_group_cleanup: Optional[_PlacementGroupCleanup]
     volume_attachment_result: Optional[_VolumeAttachmentResult]
     locked_fleet_id: Optional[uuid.UUID]
@@ -866,21 +859,16 @@ async def _apply_no_fleet_selection(
         )
         return
 
-    if not FeatureFlags.AUTOCREATED_FLEETS_ENABLED:
-        logger.debug("%s: no fleet found", fmt(job_model))
-        await _terminate_submitted_job(
-            session=session,
-            job_model=job_model,
-            reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
-            message=(
-                "No matching fleet found. Possible reasons: "
-                "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
-            ),
-        )
-        return
-
-    job_model.instance_assigned = True
-    await _mark_job_processed(session=session, job_model=job_model)
+    logger.debug("%s: no fleet found", fmt(job_model))
+    await _terminate_submitted_job(
+        session=session,
+        job_model=job_model,
+        reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+        message=(
+            "No matching fleet found. Possible reasons: "
+            "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
+        ),
+    )
 
 
 async def _lock_assignment_fleet_for_existing_instance_assignment(
@@ -1220,14 +1208,6 @@ async def _process_new_capacity_provisioning(
             placement_group_cleanup=provision_new_capacity_result.placement_group_cleanup,
         )
 
-    created_fleet_model = None
-    if context.fleet_model is None:
-        # TODO: Drop once autocreated fleets are dropped.
-        created_fleet_model = await _create_fleet_model_for_job(
-            project=context.project,
-            run=context.run,
-        )
-
     volume_attachment_result = None
     # TODO: Volume attachment for compute groups is not yet supported since
     # currently supported compute groups don't require explicit volume attachment.
@@ -1244,7 +1224,6 @@ async def _process_new_capacity_provisioning(
         provisioning_data=provision_new_capacity_result.provisioning_data,
         offer=provision_new_capacity_result.offer,
         effective_profile=provision_new_capacity_result.effective_profile,
-        created_fleet_model=created_fleet_model,
         placement_group_cleanup=provision_new_capacity_result.placement_group_cleanup,
         volume_attachment_result=volume_attachment_result,
         locked_fleet_id=locked_fleet_id,
@@ -1259,23 +1238,6 @@ async def _apply_new_capacity_provisioning(
 ) -> None:
     fresh_context = await _load_submitted_job_context(session=session, job_model=job_model)
     fleet_model = fresh_context.fleet_model
-    if provisioning.created_fleet_model is not None:
-        fleet_model = provisioning.created_fleet_model
-        # Replace the project loaded in the processing session with the one
-        # bound to this apply session to avoid a duplicate-identity conflict.
-        fleet_model.project = fresh_context.project
-        session.add(fleet_model)
-        fresh_context.job_model.fleet = fleet_model
-        events.emit(
-            session,
-            f"Fleet created for job. Fleet status: {fleet_model.status.upper()}",
-            actor=events.SystemActor(),
-            targets=[
-                events.Target.from_model(fleet_model),
-                events.Target.from_model(fresh_context.job_model),
-            ],
-        )
-
     assert fleet_model is not None
     await _persist_placement_group_cleanup(
         session=session,
@@ -2163,42 +2125,6 @@ def _get_effective_profile_and_requirements(
         return None
     # TODO: Respect fleet provisioning properties such as tags.
     return effective_profile, requirements
-
-
-async def _create_fleet_model_for_job(
-    project: ProjectModel,
-    run: Run,
-) -> FleetModel:
-    placement = InstanceGroupPlacement.ANY
-    if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
-        placement = InstanceGroupPlacement.CLUSTER
-    nodes = get_nodes_required_num(run.run_spec)
-    async with get_session_ctx() as session:
-        # Duplicate fleet names are possible because of the missing fleet lock.
-        # Unfixed since autocreated are to be dropped anyway.
-        fleet_name = await generate_fleet_name(session=session, project=project)
-    spec = FleetSpec(
-        configuration=FleetConfiguration(
-            name=fleet_name,
-            placement=placement,
-            reservation=run.run_spec.configuration.reservation,
-            nodes=FleetNodesSpec(
-                min=nodes,
-                target=nodes,
-                max=None,
-            ),
-        ),
-        profile=run.run_spec.merged_profile,
-        autocreated=True,
-    )
-    return FleetModel(
-        id=uuid.uuid4(),
-        name=fleet_name,
-        project=project,
-        status=FleetStatus.ACTIVE,
-        spec=spec.json(),
-        instances=[],
-    )
 
 
 def _get_offer_volumes(

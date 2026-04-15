@@ -354,6 +354,7 @@ def _get_fleet_spec_if_ready_for_consolidation(fleet_model: FleetModel) -> Optio
     if fleet_model.status == FleetStatus.TERMINATING:
         return None
     consolidation_fleet_spec = get_fleet_spec(fleet_model)
+    # TODO: Drop fleet_spec.autocreated check after existing autocreated fleets no longer supported
     if (
         consolidation_fleet_spec.configuration.nodes is None
         or consolidation_fleet_spec.autocreated
@@ -718,7 +719,7 @@ def _should_delete_fleet(fleet_model: FleetModel) -> bool:
     if is_fleet_in_use(fleet_model) or not is_fleet_empty(fleet_model):
         return False
 
-    # TODO: Drop non-terminating fleets auto-deletion after dropping fleets auto-creation.
+    # TODO: Drop non-terminating fleets auto-deletion after existing autocreated fleets no longer supported.
     fleet_spec = get_fleet_spec(fleet_model)
     if (
         fleet_model.status != FleetStatus.TERMINATING

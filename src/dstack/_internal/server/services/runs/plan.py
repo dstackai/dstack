@@ -61,7 +61,6 @@ from dstack._internal.server.services.runs.spec import (
     get_nodes_required_num,
 )
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
@@ -139,22 +138,6 @@ async def get_job_plans(
                         job=jobs[0],
                         volumes=volumes,
                     )
-            elif (
-                FeatureFlags.AUTOCREATED_FLEETS_ENABLED
-                and profile.fleets is None
-                and fleet_model is None
-            ):
-                # Keep the old behavior returning all offers irrespective of fleets
-                # when no fleets are explicitly specified. Needed for supporting
-                # offers with autocreated fleets flow.
-                instance_offers, backend_offers = await _get_non_fleet_offers(
-                    session=session,
-                    project=project,
-                    profile=profile,
-                    run_spec=run_spec,
-                    job=jobs[0],
-                    volumes=volumes,
-                )
 
             for job in jobs:
                 job_plan = _get_job_plan(
@@ -211,22 +194,6 @@ async def get_job_plans(
                     job=jobs[0],
                     volumes=volumes,
                 )
-        elif (
-            FeatureFlags.AUTOCREATED_FLEETS_ENABLED
-            and profile.fleets is None
-            and fleet_model is None
-        ):
-            # Keep the old behavior returning all offers irrespective of fleets
-            # when no fleets are explicitly specified. Needed for supporting
-            # offers with autocreated fleets flow.
-            instance_offers, backend_offers = await _get_non_fleet_offers(
-                session=session,
-                project=project,
-                profile=profile,
-                run_spec=run_spec,
-                job=jobs[0],
-                volumes=volumes,
-            )
 
         for job in jobs:
             job_plan = _get_job_plan(
@@ -459,17 +426,6 @@ async def find_optimal_fleet_with_offers(
         )
 
     if len(candidate_fleets_with_offers) == 0:
-        return None, [], []
-
-    if (
-        FeatureFlags.AUTOCREATED_FLEETS_ENABLED
-        and run_spec.merged_profile.fleets is None
-        and all(t[3] == 0 and t[4] == 0 for t in candidate_fleets_with_offers)
-    ):
-        # If fleets are not specified and no fleets have available pool
-        # or backend offers, create a new fleet.
-        # This is for compatibility with non-fleet-first UX when runs created new fleets
-        # if there are no instances to reuse.
         return None, [], []
 
     candidate_fleets_with_offers.sort(key=lambda t: t[-1])

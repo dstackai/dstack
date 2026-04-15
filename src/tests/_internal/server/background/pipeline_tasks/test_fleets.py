@@ -894,8 +894,6 @@ class TestFleetWorker:
         self, test_db, session: AsyncSession, worker: FleetWorker
     ):
         project = await create_project(session)
-        spec = get_fleet_spec()
-        spec.autocreated = False
         fleet = await create_fleet(
             session=session,
             project=project,

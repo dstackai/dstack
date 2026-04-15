@@ -85,7 +85,6 @@ declare interface IProfileRequest {
 }
 
 declare interface IFleetSpec {
-    autocreated?: boolean;
     configuration: IFleetConfigurationRequest;
     configuration_path?: string;
     profile: IProfileRequest;
