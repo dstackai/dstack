@@ -1854,6 +1854,283 @@ class TestGetRunPlan:
         assert response_json["project_name"] == "importer"
         assert len(response_json["job_plans"][0]["offers"]) == 0
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_offer_cli_returns_offers_from_all_specified_fleets(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+
+        fleet_a = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="fleet-a")),
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet_a,
+            backend=BackendType.REMOTE,
+            price=1.0,
+        )
+        fleet_b = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="fleet-b")),
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet_b,
+            backend=BackendType.REMOTE,
+            price=2.0,
+        )
+        fleet_c = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="fleet-c")),
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet_c,
+            backend=BackendType.REMOTE,
+            price=3.0,
+        )
+
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                user="root",
+                fleets=["fleet-a", "fleet-b"],
+            ),
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get_plan",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec.dict()},
+        )
+
+        assert response.status_code == 200, response.json()
+        offers = response.json()["job_plans"][0]["offers"]
+        assert len(offers) == 2
+        assert [offer["price"] for offer in offers] == [1.0, 2.0]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_offer_cli_deduplicates_identical_backend_offers_across_specified_fleets(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        await create_fleet(
+            session=session,
+            project=project,
+            name="fleet-a",
+            spec=get_fleet_spec(profile=Profile(backends=[BackendType.AWS])),
+        )
+        await create_fleet(
+            session=session,
+            project=project,
+            name="fleet-b",
+            spec=get_fleet_spec(profile=Profile(backends=[BackendType.AWS])),
+        )
+
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                user="root",
+                fleets=["fleet-a", "fleet-b"],
+            ),
+        )
+        body = {"run_spec": run_spec.dict()}
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock_aws = Mock()
+            backend_mock_aws.TYPE = BackendType.AWS
+            backend_mock_aws.compute.return_value.get_offers.return_value = [
+                InstanceOfferWithAvailability(
+                    backend=BackendType.AWS,
+                    instance=InstanceType(
+                        name="instance-aws",
+                        resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
+                    ),
+                    region="us",
+                    price=1.0,
+                    backend_data={"provider_data": {"zone": "us-a"}, "labels": ["gpu"]},
+                    availability=InstanceAvailability.AVAILABLE,
+                    availability_zones=["us-a"],
+                )
+            ]
+            m.return_value = [backend_mock_aws]
+
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        job_plan = response.json()["job_plans"][0]
+        assert job_plan["total_offers"] == 1
+        assert len(job_plan["offers"]) == 1
+        assert job_plan["offers"][0]["price"] == 1.0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_offer_cli_keeps_identical_existing_instances_from_specified_fleets(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+
+        fleet_a = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="fleet-a")),
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet_a,
+            backend=BackendType.REMOTE,
+            price=1.0,
+        )
+        fleet_b = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(get_ssh_fleet_configuration(name="fleet-b")),
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet_b,
+            backend=BackendType.REMOTE,
+            price=1.0,
+        )
+
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                user="root",
+                fleets=["fleet-a", "fleet-b"],
+            ),
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get_plan",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec.dict()},
+        )
+
+        assert response.status_code == 200, response.json()
+        job_plan = response.json()["job_plans"][0]
+        assert job_plan["total_offers"] == 2
+        assert len(job_plan["offers"]) == 2
+        assert [offer["price"] for offer in job_plan["offers"]] == [1.0, 1.0]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_offer_cli_without_fleet_keeps_global_offers(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                user="root",
+            ),
+        )
+        body = {"run_spec": run_spec.dict()}
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock_aws = Mock()
+            backend_mock_aws.TYPE = BackendType.AWS
+            backend_mock_aws.compute.return_value.get_offers.return_value = [
+                InstanceOfferWithAvailability(
+                    backend=BackendType.AWS,
+                    instance=InstanceType(
+                        name="instance-aws",
+                        resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
+                    ),
+                    region="us",
+                    price=1.0,
+                    availability=InstanceAvailability.AVAILABLE,
+                )
+            ]
+            backend_mock_runpod = Mock()
+            backend_mock_runpod.TYPE = BackendType.RUNPOD
+            backend_mock_runpod.compute.return_value.get_offers.return_value = [
+                InstanceOfferWithAvailability(
+                    backend=BackendType.RUNPOD,
+                    instance=InstanceType(
+                        name="instance-runpod",
+                        resources=Resources(cpus=2, memory_mib=8192, spot=False, gpus=[]),
+                    ),
+                    region="us",
+                    price=2.0,
+                    availability=InstanceAvailability.AVAILABLE,
+                )
+            ]
+            m.return_value = [backend_mock_aws, backend_mock_runpod]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        offers = response.json()["job_plans"][0]["offers"]
+        assert [offer["backend"] for offer in offers] == ["aws", "runpod"]
+
     @pytest.mark.parametrize(
         ("client_version", "expected_availability"),
         [

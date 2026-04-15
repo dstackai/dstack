@@ -70,7 +70,7 @@ def register_profile_args(parser: argparse.ArgumentParser):
         action="append",
         metavar="NAME",
         dest="fleets",
-        help="Consider only instances from the specified fleet(s) for reuse",
+        help="Consider only the specified fleet(s)",
     )
     fleets_group_exc = fleets_group.add_mutually_exclusive_group()
     fleets_group_exc.add_argument(

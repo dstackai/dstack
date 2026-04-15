@@ -1,5 +1,7 @@
 from typing import Dict, List, Literal, Optional, Tuple
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from dstack._internal.core.backends.base.backend import Backend
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
@@ -10,17 +12,22 @@ from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import Requirements, RunSpec, get_policy_map
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.schemas.gpus import ListGpusResponse
+from dstack._internal.server.services.jobs import get_jobs_from_run_spec
 from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.runs.plan import (
+    get_backend_offers_in_run_candidate_fleets,
+)
 from dstack._internal.utils.common import get_or_error
 
 
 async def list_gpus_grouped(
+    session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
     group_by: Optional[List[Literal["backend", "region", "count"]]] = None,
 ) -> ListGpusResponse:
     """Retrieves available GPU specifications based on a run spec, with optional grouping."""
-    offers = await _get_gpu_offers(project=project, run_spec=run_spec)
+    offers = await _get_gpu_offers(session=session, project=project, run_spec=run_spec)
     backend_gpus = _process_offers_into_backend_gpus(offers)
     group_by_set = set(group_by) if group_by else set()
     if "region" in group_by_set and "backend" not in group_by_set:
@@ -47,10 +54,24 @@ async def list_gpus_grouped(
 
 
 async def _get_gpu_offers(
-    project: ProjectModel, run_spec: RunSpec
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     """Fetches all available instance offers that match the run spec's GPU requirements."""
     profile = run_spec.merged_profile
+    if profile.fleets is not None:
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        if len(jobs) == 0:
+            return []
+        return await get_backend_offers_in_run_candidate_fleets(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job=jobs[0],
+            volumes=None,
+            max_offers_per_fleet=None,
+        )
     requirements = Requirements(
         resources=run_spec.configuration.resources,
         max_price=profile.max_price,

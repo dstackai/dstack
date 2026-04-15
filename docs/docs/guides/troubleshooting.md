@@ -54,7 +54,15 @@ If you run `dstack apply` and don't see any instance offers, it means that
 `dstack` could not find instances that match the requirements in your configuration.
 Below are some of the reasons why this might happen.
 
-> Feel free to use `dstack offer` to view available offers.
+Feel free to use `dstack offer` to inspect available offers:
+
+```shell
+# All matching offers, ignoring fleet configurations
+$ dstack offer --gpu H100
+
+# Offers available through a specific fleet
+$ dstack offer --gpu H100 --fleet my-fleet
+```
 
 #### Cause 1: No backends
 
