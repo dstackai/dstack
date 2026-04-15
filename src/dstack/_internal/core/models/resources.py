@@ -394,6 +394,16 @@ class ResourcesSpec(generate_dual_core_model(ResourcesSpecConfig)):
     """`gpu` is optional for backward compatibility."""
     disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
 
+    @classmethod
+    def unconstrained(cls) -> "ResourcesSpec":
+        """ResourcesSpec with no meaningful minimum constraints."""
+        return cls(
+            cpu=CPUSpec(count=Range[int](min=1, max=None)),
+            memory=Range[Memory](min=Memory.parse("0"), max=None),
+            gpu=DEFAULT_GPU_SPEC,
+            disk=None,
+        )
+
     def pretty_format(self) -> str:
         # TODO: Remove in 0.20. Use self.cpu directly
         cpu = parse_obj_as(CPUSpec, self.cpu)

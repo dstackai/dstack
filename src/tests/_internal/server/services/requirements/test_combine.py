@@ -164,6 +164,29 @@ class TestCombineFleetAndRunRequirements:
             == expected_requirements
         )
 
+    def test_unconstrained_fleet_resources_pass_through_run_requirements(self):
+        unconstrained_fleet = Requirements(
+            resources=ResourcesSpec.unconstrained(),
+        )
+        run = Requirements(
+            resources=ResourcesSpec(
+                cpu=CPUSpec(count=Range(min=2, max=None)),
+                memory=Range(min=Memory.parse("2GB"), max=None),
+                gpu=GPUSpec(count=Range(min=1, max=None)),
+                disk=DiskSpec(size=Range(min=Memory.parse("50GB"), max=None)),
+            ),
+        )
+        result = combine_fleet_and_run_requirements(unconstrained_fleet, run)
+        assert result is not None
+        combined_cpu = result.resources.cpu
+        assert isinstance(combined_cpu, CPUSpec)
+        assert combined_cpu.count.min == 2
+        assert result.resources.memory.min == Memory.parse("2GB")
+        assert result.resources.gpu is not None
+        assert result.resources.gpu.count.min == 1
+        assert result.resources.disk is not None
+        assert result.resources.disk.size.min == Memory.parse("50GB")
+
 
 class TestIntersectLists:
     def test_both_none_returns_none(self):
