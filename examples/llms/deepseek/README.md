@@ -78,95 +78,6 @@ Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B` usin
 
 Note, when using `Deepseek-R1-Distill-Llama-70B` with `vLLM` with a 192GB GPU, we must limit the context size to 126432 tokens to fit the memory.
 
-### Intel Gaudi
-
-Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-70B`
-using [TGI on Gaudi](https://github.com/huggingface/tgi-gaudi)
-and [vLLM](https://github.com/HabanaAI/vllm-fork) (Gaudi fork) with Intel Gaudi 2.
-
-> Both [TGI on Gaudi](https://github.com/huggingface/tgi-gaudi)
-> and [vLLM](https://github.com/HabanaAI/vllm-fork) do not support `Deepseek-V2-Lite`.
-> See [this](https://github.com/huggingface/tgi-gaudi/issues/271)
-> and [this](https://github.com/HabanaAI/vllm-fork/issues/809#issuecomment-2652454824) issues.
-
-=== "TGI"
-
-    <div editor-title="examples/llms/deepseek/tgi/intel/.dstack.yml">
-    ```yaml
-    type: service
-
-    name: tgi
-
-    image: ghcr.io/huggingface/tgi-gaudi:2.3.1
-
-    auth: false
-    port: 8000
-
-    model: DeepSeek-R1-Distill-Llama-70B
-
-    env:
-      - HF_TOKEN
-      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-      - PORT=8000
-      - OMPI_MCA_btl_vader_single_copy_mechanism=none
-      - TEXT_GENERATION_SERVER_IGNORE_EOS_TOKEN=true
-      - PT_HPU_ENABLE_LAZY_COLLECTIVES=true
-      - MAX_TOTAL_TOKENS=2048
-      - BATCH_BUCKET_SIZE=256
-      - PREFILL_BATCH_BUCKET_SIZE=4
-      - PAD_SEQUENCE_TO_MULTIPLE_OF=64
-      - ENABLE_HPU_GRAPH=true
-      - LIMIT_HPU_GRAPH=true
-      - USE_FLASH_ATTENTION=true
-      - FLASH_ATTENTION_RECOMPUTE=true
-
-    commands:
-      - text-generation-launcher
-          --sharded true
-          --num-shard 8
-          --max-input-length 1024
-          --max-total-tokens 2048
-          --max-batch-prefill-tokens 4096
-          --max-batch-total-tokens 524288
-          --max-waiting-tokens 7
-          --waiting-served-ratio 1.2
-          --max-concurrent-requests 512
-
-    resources:
-      gpu: Gaudi2:8
-    ```
-    </div>
-
-=== "vLLM"
-
-    <div editor-title="examples/llms/deepseek/vllm/intel/.dstack.yml">
-    ```yaml
-    type: service
-    name: deepseek-r1-gaudi
-
-    image: vault.habana.ai/gaudi-docker/1.19.0/ubuntu22.04/habanalabs/pytorch-installer-2.5.1:latest
-
-
-    env:
-      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-      - HABANA_VISIBLE_DEVICES=all
-      - OMPI_MCA_btl_vader_single_copy_mechanism=none
-
-    commands:
-      - git clone https://github.com/HabanaAI/vllm-fork.git
-      - cd vllm-fork
-      - git checkout habana_main
-      - pip install -r requirements-hpu.txt
-      - python setup.py develop
-      - vllm serve $MODEL_ID
-        --tensor-parallel-size 8
-        --trust-remote-code
-        --download-dir /data
-
-    port: 8000
-    ```
-    </div>
-
 ### NVIDIA
 
 Here's an example of a service that deploys `Deepseek-R1-Distill-Llama-8B`
@@ -241,7 +152,7 @@ Approximate memory requirements for loading the model (excluding context and CUD
 | `DeepSeek-R1-Distill-Qwen`  | **7B**   | 16GB   | 8GB    | 4GB    |
 
 For example, the FP8 version of Deepseek-R1 671B fits on a single node of MI300X with eight 192GB GPUs, a single node of
-H200 with eight 141GB GPUs, or a single node of Intel Gaudi2 with eight 96GB GPUs.
+H200 with eight 141GB GPUs.
 
 ### Applying the configuration
 
@@ -399,65 +310,6 @@ Here are the examples of LoRA fine-tuning of `Deepseek-V2-Lite` and GRPO fine-tu
     </div>
 
 Note, the `GRPO` fine-tuning of `DeepSeek-R1-Distill-Qwen-1.5B` consumes up to 135GB of VRAM.
-
-### Intel Gaudi
-
-Here is an example of LoRA fine-tuning of `DeepSeek-R1-Distill-Qwen-7B` on Intel Gaudi 2 GPUs using
-HuggingFace's [Optimum for Intel Gaudi](https://github.com/huggingface/optimum-habana)
-and [DeepSpeed](https://github.com/deepspeedai/DeepSpeed). Both also support `LoRA`
-fine-tuning of `Deepseek-V2-Lite` with same configuration as below.
-
-=== "LoRA"
-
-    <div editor-title="examples/llms/deepseek/trl/intel/.dstack.yml">
-    ```yaml
-    type: task
-    name: trl-train
-
-    image: vault.habana.ai/gaudi-docker/1.18.0/ubuntu22.04/habanalabs/pytorch-installer-2.4.0
-
-    env:
-      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
-      - WANDB_API_KEY
-      - WANDB_PROJECT
-    commands:
-      - pip install --upgrade-strategy eager optimum[habana]
-      - pip install git+https://github.com/HabanaAI/DeepSpeed.git@1.19.0
-      - git clone https://github.com/huggingface/optimum-habana.git
-      - cd optimum-habana/examples/trl
-      - pip install -r requirements.txt
-      - pip install wandb
-      - DEEPSPEED_HPU_ZERO3_SYNC_MARK_STEP_REQUIRED=1 python ../gaudi_spawn.py --world_size 8 --use_deepspeed sft.py
-        --model_name_or_path $MODEL_ID
-        --dataset_name "lvwerra/stack-exchange-paired"
-        --deepspeed ../language-modeling/llama2_ds_zero3_config.json
-        --output_dir="./sft"
-        --do_train
-        --max_steps=500
-        --logging_steps=10
-        --save_steps=100
-        --per_device_train_batch_size=1
-        --per_device_eval_batch_size=1
-        --gradient_accumulation_steps=2
-        --learning_rate=1e-4
-        --lr_scheduler_type="cosine"
-        --warmup_steps=100
-        --weight_decay=0.05
-        --optim="paged_adamw_32bit"
-        --lora_target_modules "q_proj" "v_proj"
-        --bf16
-        --remove_unused_columns=False
-        --run_name="sft_deepseek_70"
-        --report_to="wandb"
-        --use_habana
-        --use_lazy_mode
-
-    resources:
-      gpu: gaudi2:8
-    ```
-
-    </div>
-
 
 ### NVIDIA
 

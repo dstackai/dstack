@@ -15,6 +15,8 @@ log = logging.getLogger("mkdocs")
 WELL_KNOWN_SKILLS_DIR = ".well-known/skills"
 SKILL_PATH = ("skills", "dstack", "SKILL.md")
 DISABLE_EXAMPLES_ENV = "DSTACK_DOCS_DISABLE_EXAMPLES"
+DISABLE_LLM_TXT_ENV = "DSTACK_DOCS_DISABLE_LLM_TXT"
+DISABLE_YAML_SCHEMAS_ENV = "DSTACK_DOCS_DISABLE_YAML_SCHEMAS"
 SCHEMA_REFERENCE_PREFIX = "docs/reference/"
 
 
@@ -35,6 +37,8 @@ def _get_schema_expanded_content(rel_path, config, src_path=None):
     """Return expanded markdown for reference/**/*.md that contain #SCHEMA#, else None.
     If src_path is given (e.g. from on_post_build loop), read from it; else build path from config.
     """
+    if os.environ.get(DISABLE_YAML_SCHEMAS_ENV):
+        return None
     if not rel_path.startswith(SCHEMA_REFERENCE_PREFIX) or not rel_path.endswith(".md"):
         log.debug(f"Skipping {rel_path}: not in {SCHEMA_REFERENCE_PREFIX} or not .md")
         return None
@@ -86,6 +90,16 @@ def on_page_read_source(page, config):
     if content is not None:
         return content
     return None
+
+
+def on_config(config):
+    if os.environ.get(DISABLE_EXAMPLES_ENV):
+        log.warning("Examples documentation is disabled")
+    if os.environ.get(DISABLE_YAML_SCHEMAS_ENV):
+        log.warning("YAML schema reference generation is disabled")
+    if os.environ.get(DISABLE_LLM_TXT_ENV):
+        log.warning("llms.txt generation is disabled")
+    return config
 
 
 def on_page_context(context, page, config, nav):
@@ -204,6 +218,9 @@ def _write_well_known_skills(config, site_dir):
 
 def _generate_llms_files(config, site_dir):
     """Generate llms.txt and llms-full.txt using external script."""
+    if os.environ.get(DISABLE_LLM_TXT_ENV):
+        return
+
     repo_root = os.path.dirname(config["config_file_path"])
 
     # Import and run the generator

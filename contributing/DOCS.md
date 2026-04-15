@@ -52,6 +52,19 @@ uv run mkdocs build -s
 
 The documentation uses a custom build system with MkDocs hooks to generate various files dynamically.
 
+### Disable flags
+
+Use these in `.envrc` to disable expensive docs regeneration, especially during `mkdocs serve` auto-reload. Set any of them to disable the corresponding artifact.
+
+```shell
+export DSTACK_DOCS_DISABLE_EXAMPLES=1
+export DSTACK_DOCS_DISABLE_LLM_TXT=1
+export DSTACK_DOCS_DISABLE_CLI_REFERENCE=1
+export DSTACK_DOCS_DISABLE_YAML_SCHEMAS=1
+export DSTACK_DOCS_DISABLE_OPENAPI_REFERENCE=1
+export DSTACK_DOCS_DISABLE_REST_PLUGIN_SPEC_REFERENCE=1
+```
+
 ### Build hooks
 
 The build process is customized via hooks in `scripts/docs/hooks.py`:

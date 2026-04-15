@@ -4,11 +4,16 @@ Generates OpenAPI schema from an example REST plugin.
 
 import json
 import logging
+import os
 from pathlib import Path
 
 from dstack._internal.settings import DSTACK_VERSION
 
 logger = logging.getLogger("mkdocs.plugins.dstack.rest_plugin_schema")
+disable_env = "DSTACK_DOCS_DISABLE_REST_PLUGIN_SPEC_REFERENCE"
+if os.environ.get(disable_env):
+    logger.warning("REST plugin spec reference generation is disabled")
+    exit(0)
 
 try:
     from example_plugin_server.main import app

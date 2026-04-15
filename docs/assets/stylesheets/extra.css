@@ -1615,7 +1615,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 .md-typeset.md-banner__inner a {
     color: var(--md-default-bg-color);
     /* border-bottom: 1.5px dotted; */
-    font-weight: 500;
+    /* font-weight: 500; */
+    font-size: 0.75rem;
 }
 
 .md-typeset.md-banner__inner .md-banner__button svg {

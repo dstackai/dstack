@@ -1093,6 +1093,5 @@ The rolling deployment stops when all replicas are updated or when a new deploym
     1. Read about [dev environments](dev-environments.md) and [tasks](tasks.md)
     2. Learn how to manage [fleets](fleets.md)
     3. See how to set up [gateways](gateways.md)
-    4. Check the [TGI](../../examples/inference/tgi/index.md),
-       [vLLM](../../examples/inference/vllm/index.md), and 
+    4. Check the [vLLM](../../examples/inference/vllm/index.md) and
        [NIM](../../examples/inference/nim/index.md) examples

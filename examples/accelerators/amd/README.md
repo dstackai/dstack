@@ -1,6 +1,6 @@
 ---
 title: AMD
-description: Deploying and fine-tuning models on AMD MI300X GPUs using TGI, vLLM, and Axolotl
+description: Deploying and fine-tuning models on AMD MI300X GPUs using vLLM, TRL, and Axolotl
 ---
 
 # AMD
@@ -11,41 +11,8 @@ with on-prem AMD GPUs or configuring a backend that offers AMD GPUs such as the 
 
 ## Deployment
 
-Most serving frameworks including vLLM and TGI have AMD support. Here's an example of a [service](https://dstack.ai/docs/services) that deploys
-Llama 3.1 70B in FP16 using [TGI](https://huggingface.co/docs/text-generation-inference/en/installation_amd) and [vLLM](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html).
-
-=== "TGI"
-
-    <div editor-title="examples/inference/tgi/amd/.dstack.yml">
-
-    ```yaml
-    type: service
-    name: amd-service-tgi
-
-    # Using the official TGI's ROCm Docker image
-    image: ghcr.io/huggingface/text-generation-inference:sha-a379d55-rocm
-
-    env:
-      - HF_TOKEN
-      - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
-      - TRUST_REMOTE_CODE=true
-      - ROCM_USE_FLASH_ATTN_V2_TRITON=true
-    commands:
-      - text-generation-launcher --port 8000
-    port: 8000
-    # Register the model
-    model: meta-llama/Meta-Llama-3.1-70B-Instruct
-
-    # Uncomment to leverage spot instances
-    #spot_policy: auto
-
-    resources:
-      gpu: MI300X
-      disk: 150GB
-    ```
-
-    </div>
-
+vLLM supports AMD GPUs. Here's an example of a [service](https://dstack.ai/docs/services) that deploys
+Llama 3.1 70B in FP16 using [vLLM](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html).
 
 === "vLLM"
 
@@ -97,6 +64,7 @@ Llama 3.1 70B in FP16 using [TGI](https://huggingface.co/docs/text-generation-in
       gpu: MI300X
       disk: 200GB
     ```
+
     </div>
 
     Note, maximum size of vLLM’s `KV cache` is 126192, consequently we must set `MAX_MODEL_LEN` to 126192. Adding `/opt/conda/envs/py_3.10/bin` to PATH ensures we use the Python 3.10 environment necessary for the pre-built binaries compiled specifically for this version.
@@ -244,15 +212,13 @@ $ dstack apply -f examples/inference/vllm/amd/.dstack.yml
 ## Source code
 
 The source-code of this example can be found in
-[`examples/inference/tgi/amd`](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi/amd),
 [`examples/inference/vllm/amd`](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd),
 [`examples/single-node-training/axolotl/amd`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/amd) and
 [`examples/single-node-training/trl/amd`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl/amd)
 
 ## What's next?
 
-1. Browse [TGI](https://rocm.docs.amd.com/en/latest/how-to/rocm-for-ai/deploy-your-model.html#serving-using-hugging-face-tgi),
-   [vLLM](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html#build-from-source-rocm),
+1. Browse [vLLM](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html#build-from-source-rocm),
    [Axolotl](https://github.com/ROCm/rocm-blogs/tree/release/blogs/artificial-intelligence/axolotl),
    [TRL](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/fine-tuning-and-inference.html) and
    [ROCm Bitsandbytes](https://github.com/ROCm/bitsandbytes)

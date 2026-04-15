@@ -105,7 +105,6 @@ plugins:
         "docs/examples/accelerators/amd/index.md": "examples/accelerators/amd/index.md"
         "docs/examples/deployment/nim/index.md": "examples/inference/nim/index.md"
         "docs/examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
-        "docs/examples/deployment/tgi/index.md": "examples/inference/tgi/index.md"
         "backends.md": "docs/concepts/backends.md"
         "blog/monitoring-gpu-usage.md": "blog/posts/dstack-metrics.md"
         "blog/inactive-dev-environments-auto-shutdown.md": "blog/posts/inactivity-duration.md"
@@ -122,7 +121,6 @@ plugins:
         "examples/distributed-training/rccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
         "examples/deployment/nim/index.md": "examples/inference/nim/index.md"
         "examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
-        "examples/deployment/tgi/index.md": "examples/inference/tgi/index.md"
         "examples/deployment/sglang/index.md": "examples/inference/sglang/index.md"
         "examples/deployment/trtllm/index.md": "examples/inference/trtllm/index.md"
         "examples/fine-tuning/trl/index.md": "examples/single-node-training/trl/index.md"
@@ -304,13 +302,11 @@ nav:
       - Inference:
           - SGLang: examples/inference/sglang/index.md
           - vLLM: examples/inference/vllm/index.md
-          - TGI: examples/inference/tgi/index.md
           - NIM: examples/inference/nim/index.md
           - TensorRT-LLM: examples/inference/trtllm/index.md
       - Accelerators:
           - AMD: examples/accelerators/amd/index.md
           - TPU: examples/accelerators/tpu/index.md
-          - Intel Gaudi: examples/accelerators/intel/index.md
           - Tenstorrent: examples/accelerators/tenstorrent/index.md
       - Models:
           - Wan2.2: examples/models/wan22/index.md

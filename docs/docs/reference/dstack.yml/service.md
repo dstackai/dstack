@@ -20,51 +20,6 @@ The `service` configuration type allows running [services](../../concepts/servic
           type:
             required: true
 
-=== "TGI"
-
-    > TGI provides an OpenAI-compatible API starting with version 1.4.0,
-    so models served by TGI can be defined with `format: openai` too.
-
-    #SCHEMA# dstack.api.TGIChatModel
-        overrides:
-          show_root_heading: false
-          type:
-            required: true
-
-    ??? info "Chat template"
-
-        By default, `dstack` loads the [chat template](https://huggingface.co/docs/transformers/main/en/chat_templating)
-        from the model's repository. If it is not present there, manual configuration is required.
-
-        ```yaml
-        type: service
-
-        image: ghcr.io/huggingface/text-generation-inference:latest
-        env:
-          - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ
-        commands:
-          - text-generation-launcher --port 8000 --trust-remote-code --quantize gptq
-        port: 8000
-
-        resources:
-          gpu: 80GB
-
-        # Enable the OpenAI-compatible endpoint
-        model:
-          type: chat
-          name: TheBloke/Llama-2-13B-chat-GPTQ
-          format: tgi
-          chat_template: "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ '<s>[INST] ' + content.strip() + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content.strip() + ' </s>' }}{% endif %}{% endfor %}"
-          eos_token: "</s>"
-        ```
-
-        Please note that model mapping is an experimental feature with the following limitations:
-
-        1. Doesn't work if your `chat_template` uses `bos_token`. As a workaround, replace `bos_token` inside `chat_template` with the token content itself.
-        2. Doesn't work if `eos_token` is defined in the model repository as a dictionary. As a workaround, set `eos_token` manually, as shown in the example above (see Chat template).
-
-        If you encounter any ofther issues, please make sure to file a
-        [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 ### `scaling`
 

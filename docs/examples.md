@@ -3,16 +3,16 @@ title: Examples
 description: Collection of examples for training, inference, and clusters
 #template: examples.html
 hide:
-   - navigation
-#   - toc
-   - footer
+#    - navigation
+   - toc
+#    - footer
 ---
 
-<style>
+<!-- <style>
 .md-main .md-main__inner.md-grid {
     flex-direction: row-reverse;
 }
-</style>
+</style> -->
 
 ## Single-node training
 
@@ -165,15 +165,6 @@ hide:
             Deploy Llama 3.1 with vLLM
         </p>
     </a>
-    <a href="/examples/inference/tgi" 
-       class="feature-cell">
-       <h3>
-           TGI
-       </h3>
-       <p>
-            Deploy Llama 4 with TGI
-        </p>
-    </a>
     <a href="/examples/inference/nim" 
        class="feature-cell">
        <h3>
@@ -216,17 +207,6 @@ hide:
 
         <p>
             Deploy and fine-tune LLMs on TPU
-        </p>
-    </a>
-
-    <a href="/examples/accelerators/intel"
-       class="feature-cell sky">
-        <h3>
-            Intel Gaudi
-        </h3>
-
-        <p>
-            Deploy and fine-tune LLMs on Intel Gaudi
         </p>
     </a>
 

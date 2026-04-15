@@ -16,11 +16,11 @@ It streamlines development, training, and inference, and is compatible with any 
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11.svg" />
 
-#### 1. Set up the server
+### Set up the server
 
 > Before using `dstack`, ensure you've [installed](installation.md) the server, or signed up for [dstack Sky](https://sky.dstack.ai).
 
-#### 2. Define configurations
+### Define configurations
 
 `dstack` supports the following configurations:
    
@@ -32,7 +32,7 @@ It streamlines development, training, and inference, and is compatible with any 
 
 Configuration can be defined as YAML files within your repo.
 
-#### 3. Apply configurations
+### Apply configurations
 
 Apply the configuration either via the `dstack apply` CLI command (or through a programmatic API.)
 
