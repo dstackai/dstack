@@ -21,6 +21,13 @@ export const tokensToSearchParams = <RequestParamsKeys extends string>(
 
 export type RequestParam = string | { min: number } | { max: number };
 
+export const getNamePatternFilterRequestParams = (filteringText: string, limit: number) => {
+    return {
+        ...(filteringText ? { name_pattern: filteringText } : {}),
+        limit,
+    };
+};
+
 const convertTokenValueToRequestParam = (token: PropertyFilterProps.Query['tokens'][number]): RequestParam => {
     const { value, operator } = token;
 
