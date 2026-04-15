@@ -77,6 +77,7 @@ type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange
     disabled?: boolean;
     onChangeProjectName?: (value: string) => void;
     onChangeBackendFilter?: (backends: string[]) => void;
+    onChangeFleetFilter?: (fleets: string[]) => void;
 };
 
 export const OfferList: React.FC<OfferListProps> = ({
@@ -85,6 +86,7 @@ export const OfferList: React.FC<OfferListProps> = ({
     disabled,
     onChangeProjectName,
     onChangeBackendFilter,
+    onChangeFleetFilter,
     permanentFilters,
     defaultFilters,
     ...props
@@ -138,6 +140,14 @@ export const OfferList: React.FC<OfferListProps> = ({
             : [];
         onChangeBackendFilter?.(backendValues);
     }, [filteringRequestParams.backend]);
+
+    useEffect(() => {
+        const fleet = filteringRequestParams.fleet;
+        const fleetValues = fleet
+            ? (Array.isArray(fleet) ? fleet : [fleet]).filter((value): value is string => typeof value === 'string')
+            : [];
+        onChangeFleetFilter?.(fleetValues);
+    }, [filteringRequestParams.fleet]);
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,

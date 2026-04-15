@@ -68,6 +68,7 @@ export const Launch: React.FC = () => {
     const [selectedOffers, setSelectedOffers] = useState<IGpu[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<ITemplate | undefined>();
     const [selectedBackends, setSelectedBackends] = useState<string[]>([]);
+    const [selectedFleets, setSelectedFleets] = useState<string[]>([]);
     const { projectOptions, isLoadingProjectOptions } = useProjectFilter({ localStorePrefix: 'run-env-list-projects' });
 
     const [applyRun, { isLoading: isApplying }] = useApplyRunMutation();
@@ -263,6 +264,7 @@ export const Launch: React.FC = () => {
         envParam,
         hasResourcesParam,
         backends: selectedBackends,
+        fleets: selectedFleets,
     });
 
     useEffect(() => {
@@ -371,9 +373,11 @@ export const Launch: React.FC = () => {
                                 selectionType="single"
                                 disabled={!formValues.gpu_enabled}
                                 withSearchParams={false}
+                                showFleetFilter
                                 selectedItems={selectedOffers}
                                 onSelectionChange={onChangeOffer}
                                 onChangeBackendFilter={setSelectedBackends}
+                                onChangeFleetFilter={setSelectedFleets}
                                 permanentFilters={{ project_name: formValues.project ?? '' }}
                                 defaultFilters={defaultOfferFilters}
                                 header={
