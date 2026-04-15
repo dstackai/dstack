@@ -245,6 +245,7 @@ class _ProcessResult:
     fleet_update_map: _FleetUpdateMap = field(default_factory=_FleetUpdateMap)
     instance_id_to_update_map: dict[uuid.UUID, _InstanceUpdateMap] = field(default_factory=dict)
     new_instance_creates: list["_NewInstanceCreate"] = field(default_factory=list)
+    consolidation_limit_reached: bool = False
 
 
 class _NewInstanceCreate(TypedDict):
@@ -357,6 +358,8 @@ def _get_fleet_spec_if_ready_for_consolidation(fleet_model: FleetModel) -> Optio
         consolidation_fleet_spec.configuration.nodes is None
         or consolidation_fleet_spec.autocreated
     ):
+        return None
+    if fleet_model.consolidation_attempt >= _MAX_CONSOLIDATION_ATTEMPTS:
         return None
     if not _is_fleet_ready_for_consolidation(fleet_model):
         return None
@@ -502,6 +505,16 @@ async def _apply_process_result(
                 "status_message", context.fleet_model.status_message
             ),
         )
+        if result.consolidation_limit_reached:
+            events.emit(
+                session=session,
+                message=(
+                    f"Fleet consolidation stopped after {_MAX_CONSOLIDATION_ATTEMPTS} attempts."
+                    " Update the fleet to resume"
+                ),
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(context.fleet_model)],
+            )
 
 
 async def _process_fleet(
@@ -560,7 +573,10 @@ def _consolidate_fleet_state_with_spec(
         result.instance_id_to_update_map.update(maintain_nodes_result.instance_id_to_update_map)
         result.new_instance_creates = maintain_nodes_result.new_instance_creates
     if len(spec_mismatch_updates) > 0 or maintain_nodes_result.changes_required:
-        result.fleet_update_map["consolidation_attempt"] = fleet_model.consolidation_attempt + 1
+        new_attempt = fleet_model.consolidation_attempt + 1
+        result.fleet_update_map["consolidation_attempt"] = new_attempt
+        if new_attempt >= _MAX_CONSOLIDATION_ATTEMPTS:
+            result.consolidation_limit_reached = True
     else:
         # The fleet is consolidated with respect to spec and nodes min/max.
         result.fleet_update_map["consolidation_attempt"] = 0
@@ -574,6 +590,8 @@ def _is_fleet_ready_for_consolidation(fleet_model: FleetModel) -> bool:
     duration_since_last_consolidation = get_current_datetime() - last_consolidated_at
     return duration_since_last_consolidation >= consolidation_retry_delay
 
+
+_MAX_CONSOLIDATION_ATTEMPTS = 15
 
 # We use exponentially increasing consolidation retry delays so that
 # consolidation does not happen too often. In particular, this prevents

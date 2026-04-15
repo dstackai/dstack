@@ -23,7 +23,7 @@ from dstack._internal.server.background.pipeline_tasks.fleets import (
     FleetPipeline,
     FleetWorker,
 )
-from dstack._internal.server.models import FleetModel, InstanceModel
+from dstack._internal.server.models import EventModel, EventTargetModel, FleetModel, InstanceModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_fleet,
@@ -1409,3 +1409,148 @@ class TestFleetWorker:
         await session.refresh(instance)
         assert instance.status == InstanceStatus.IDLE
         assert fleet.consolidation_attempt == 0
+
+    async def test_consolidation_stops_at_max_attempts(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=2, target=2, max=2)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+        )
+        fleet.consolidation_attempt = fleets_pipeline._MAX_CONSOLIDATION_ATTEMPTS
+        fleet.last_consolidated_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        instances = (
+            (
+                await session.execute(
+                    select(InstanceModel).where(
+                        InstanceModel.fleet_id == fleet.id,
+                        InstanceModel.deleted == False,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(instances) == 1
+        assert fleet.consolidation_attempt == fleets_pipeline._MAX_CONSOLIDATION_ATTEMPTS
+        assert not fleet.deleted
+
+    async def test_consolidation_emits_event_on_reaching_limit(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=2, target=2, max=2)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+        )
+        fleet.consolidation_attempt = fleets_pipeline._MAX_CONSOLIDATION_ATTEMPTS - 1
+        fleet.last_consolidated_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        instances = (
+            (
+                await session.execute(
+                    select(InstanceModel).where(
+                        InstanceModel.fleet_id == fleet.id,
+                        InstanceModel.deleted == False,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        # Last allowed consolidation still creates the missing instance
+        assert len(instances) == 2
+        assert fleet.consolidation_attempt == fleets_pipeline._MAX_CONSOLIDATION_ATTEMPTS
+        # Verify the consolidation-stopped event was emitted
+        event_models = (
+            (
+                await session.execute(
+                    select(EventModel)
+                    .join(EventTargetModel)
+                    .where(EventTargetModel.entity_id == fleet.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        consolidation_stopped_events = [
+            e for e in event_models if "consolidation stopped" in e.message
+        ]
+        assert len(consolidation_stopped_events) == 1
+
+    async def test_consolidation_resumes_after_attempt_reset(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        spec = get_fleet_spec()
+        spec.configuration.nodes = FleetNodesSpec(min=2, target=2, max=2)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=spec,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+        )
+        # Simulate in-place update resetting the attempt counter
+        fleet.consolidation_attempt = 0
+        fleet.last_consolidated_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        instances = (
+            (
+                await session.execute(
+                    select(InstanceModel).where(
+                        InstanceModel.fleet_id == fleet.id,
+                        InstanceModel.deleted == False,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(instances) == 2
+        assert fleet.consolidation_attempt == 1
