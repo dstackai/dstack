@@ -5,7 +5,13 @@ import { ToggleProps } from '@cloudscape-design/components';
 import type { PropertyFilterProps } from 'components';
 
 import { useLocalStorageState } from 'hooks';
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
+import {
+    EMPTY_QUERY,
+    getNamePatternFilterRequestParams,
+    requestParamsToTokens,
+    tokensToRequestParams,
+    tokensToSearchParams,
+} from 'libs/filters';
 import { useLazyGetProjectsQuery } from 'services/project';
 
 type RequestParamsKeys = keyof Pick<TInstanceListRequestParams, 'only_active' | 'project_names' | 'fleet_ids'>;
@@ -85,16 +91,10 @@ export const useFilters = () => {
     const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
         setDynamicFilteringOptions([]);
 
-        console.log({ filteringProperty, filteringText });
-
-        if (!filteringText.length) {
-            return Promise.resolve();
-        }
-
         setFilteringStatusType('loading');
 
         if (filteringProperty?.key === filterKeys.PROJECT_NAMES) {
-            await getProjects({ name_pattern: filteringText, limit })
+            await getProjects(getNamePatternFilterRequestParams(filteringText, limit))
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ project_name }) => ({

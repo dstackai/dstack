@@ -5,7 +5,13 @@ import { ToggleProps } from '@cloudscape-design/components';
 import type { PropertyFilterProps } from 'components';
 
 import { useLocalStorageState } from 'hooks';
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
+import {
+    EMPTY_QUERY,
+    getTokenAwareNamePatternFilterRequestParams,
+    requestParamsToTokens,
+    tokensToRequestParams,
+    tokensToSearchParams,
+} from 'libs/filters';
 import { useLazyGetProjectsQuery } from 'services/project';
 import { useLazyGetUserListQuery } from 'services/user';
 
@@ -86,14 +92,17 @@ export const useFilters = () => {
     const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
         setFilteringOptions([]);
 
-        if (!filteringText.length) {
-            return Promise.resolve();
-        }
-
         setFilteringStatusType('loading');
 
         if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
-            await getProjects({ name_pattern: filteringText, limit })
+            await getProjects(
+                getTokenAwareNamePatternFilterRequestParams({
+                    filteringText,
+                    limit,
+                    propertyKey: filterKeys.PROJECT_NAME,
+                    tokens: propertyFilterQuery.tokens,
+                }),
+            )
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ project_name }) => ({
@@ -105,7 +114,14 @@ export const useFilters = () => {
         }
 
         if (filteringProperty?.key === filterKeys.USER_NAME) {
-            await getUsers({ name_pattern: filteringText, limit })
+            await getUsers(
+                getTokenAwareNamePatternFilterRequestParams({
+                    filteringText,
+                    limit,
+                    propertyKey: filterKeys.USER_NAME,
+                    tokens: propertyFilterQuery.tokens,
+                }),
+            )
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ username }) => ({

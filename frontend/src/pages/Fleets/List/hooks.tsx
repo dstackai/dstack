@@ -9,7 +9,13 @@ import { Button, ListEmptyMessage, NavigateLink, StatusIndicator, TableProps } f
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useLocalStorageState } from 'hooks';
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
+import {
+    EMPTY_QUERY,
+    getNamePatternFilterRequestParams,
+    requestParamsToTokens,
+    tokensToRequestParams,
+    tokensToSearchParams,
+} from 'libs/filters';
 import {
     formatFleetBackend,
     formatFleetResources,
@@ -190,14 +196,10 @@ export const useFilters = () => {
     const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
         setDynamicFilteringOptions([]);
 
-        if (!filteringText.length) {
-            return Promise.resolve();
-        }
-
         setFilteringStatusType('loading');
 
         if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
-            await getProjects({ name_pattern: filteringText, limit })
+            await getProjects(getNamePatternFilterRequestParams(filteringText, limit))
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ project_name }) => ({

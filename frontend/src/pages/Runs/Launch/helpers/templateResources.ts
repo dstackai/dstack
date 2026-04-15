@@ -8,6 +8,7 @@ type TGpuFilterDefaults = {
 
 type TOfferFilterDefaults = TGpuFilterDefaults & {
     backend?: string | string[];
+    fleet?: string | string[];
     spot_policy?: string;
 };
 
@@ -106,12 +107,20 @@ export const getTemplateOfferDefaultFilters = (template?: ITemplate): TOfferFilt
         configuration.backends.every((backend) => typeof backend === 'string')
             ? (configuration.backends as string[])
             : undefined;
+    const fleets =
+        configuration &&
+        typeof configuration === 'object' &&
+        Array.isArray(configuration.fleets) &&
+        configuration.fleets.every((fleet) => typeof fleet === 'string')
+            ? (configuration.fleets as string[])
+            : undefined;
 
     if (typeof gpu === 'number') {
         return {
             ...(gpu > 0 ? { gpu_count: String(gpu) } : {}),
             ...(spotPolicy ? { spot_policy: spotPolicy } : {}),
             ...(backends?.length ? { backend: backends } : {}),
+            ...(fleets?.length ? { fleet: fleets } : {}),
         };
     }
 
@@ -131,6 +140,7 @@ export const getTemplateOfferDefaultFilters = (template?: ITemplate): TOfferFilt
             ...(gpuNames && gpuNames.length > 1 ? { gpu_name: gpuNames } : {}),
             ...(spotPolicy ? { spot_policy: spotPolicy } : {}),
             ...(backends?.length ? { backend: backends } : {}),
+            ...(fleets?.length ? { fleet: fleets } : {}),
         };
     }
 
@@ -158,5 +168,6 @@ export const getTemplateOfferDefaultFilters = (template?: ITemplate): TOfferFilt
         ...(gpuMemory ? { gpu_memory: gpuMemory } : {}),
         ...(spotPolicy ? { spot_policy: spotPolicy } : {}),
         ...(backends?.length ? { backend: backends } : {}),
+        ...(fleets?.length ? { fleet: fleets } : {}),
     };
 };

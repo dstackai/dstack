@@ -17,5 +17,7 @@ export const ListPage: React.FC = () => {
         },
     ]);
 
-    return <OfferList variant="full-page" header={<Header variant="awsui-h1-sticky">{t('offer.title')}</Header>} />;
+    return (
+        <OfferList variant="full-page" showFleetFilter header={<Header variant="awsui-h1-sticky">{t('offer.title')}</Header>} />
+    );
 };

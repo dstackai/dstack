@@ -11,9 +11,17 @@ export type UseGenerateYamlArgs = {
     envParam?: TTemplateParam;
     hasResourcesParam?: boolean;
     backends?: string[];
+    fleets?: string[];
 };
 
-export const useGenerateYaml = ({ formValues, configuration, envParam, hasResourcesParam, backends }: UseGenerateYamlArgs) => {
+export const useGenerateYaml = ({
+    formValues,
+    configuration,
+    envParam,
+    hasResourcesParam,
+    backends,
+    fleets,
+}: UseGenerateYamlArgs) => {
     return useMemo(() => {
         const { name, ide, image, python, offer, repo_url, repo_path, working_dir, password, gpu_enabled } = formValues;
         const gpuEnabled = gpu_enabled === true;
@@ -54,6 +62,7 @@ export const useGenerateYaml = ({ formValues, configuration, envParam, hasResour
                           },
 
                           ...(backends && backends.length > 0 ? { backends } : {}),
+                          ...(fleets && fleets.length > 0 ? { fleets } : {}),
                           ...(offer.spot.length === 1 ? { spot_policy: offer.spot[0] } : {}),
                           ...(offer.spot.length > 1 ? { spot_policy: 'auto' } : {}),
                       }
@@ -85,5 +94,5 @@ export const useGenerateYaml = ({ formValues, configuration, envParam, hasResour
             },
             { lineWidth: -1 },
         );
-    }, [formValues, configuration, envParam, hasResourcesParam, backends]);
+    }, [formValues, configuration, envParam, hasResourcesParam, backends, fleets]);
 };

@@ -40,6 +40,14 @@ export const getPropertyFilterOptions = (gpus: IGpu[]) => {
     };
 };
 
+export const getFleetFilterValue = (fleet: IFleet, selectedProjectName?: string) => {
+    if (selectedProjectName && fleet.project_name === selectedProjectName) {
+        return fleet.name;
+    }
+
+    return `${fleet.project_name}/${fleet.name}`;
+};
+
 export const round = (number: number) => Math.round(number * 100) / 100;
 
 export const renderRange = (range: { min?: number; max?: number }) => {

@@ -44,6 +44,7 @@ declare interface ITaskConfigurationQueryParams {
     files?: Array<unknown>;
     setup?: string[];
     backends?: TBackendType[];
+    fleets?: string[];
     regions?: string[];
     availability_zones?: string[];
     instance_types?: string[];

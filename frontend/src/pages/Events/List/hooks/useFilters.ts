@@ -4,7 +4,13 @@ import { omit } from 'lodash';
 
 import type { PropertyFilterProps } from 'components';
 
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
+import {
+    EMPTY_QUERY,
+    getNamePatternFilterRequestParams,
+    requestParamsToTokens,
+    tokensToRequestParams,
+    tokensToSearchParams,
+} from 'libs/filters';
 import { useLazyGetProjectsQuery } from 'services/project';
 import { useLazyGetUserListQuery } from 'services/user';
 
@@ -340,14 +346,10 @@ export const useFilters = ({
     const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
         setDynamicFilteringOptions([]);
 
-        if (!filteringText.length) {
-            return Promise.resolve();
-        }
-
         setFilteringStatusType('loading');
 
         if (filteringProperty?.key === filterKeys.TARGET_PROJECTS || filteringProperty?.key === filterKeys.WITHIN_PROJECTS) {
-            await getProjects({ name_pattern: filteringText, limit })
+            await getProjects(getNamePatternFilterRequestParams(filteringText, limit))
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ project_name, project_id }) => ({
@@ -361,7 +363,7 @@ export const useFilters = ({
         }
 
         if (filteringProperty?.key === filterKeys.TARGET_USERS || filteringProperty?.key === filterKeys.ACTORS) {
-            await getUsers({ name_pattern: filteringText, limit })
+            await getUsers(getNamePatternFilterRequestParams(filteringText, limit))
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ username, id }) => ({

@@ -16,6 +16,7 @@ const getRequestParams = ({
     project_name,
     gpu_name,
     backend,
+    fleet,
     gpu_count,
     gpu_memory,
     spot_policy,
@@ -24,6 +25,7 @@ const getRequestParams = ({
     project_name: string;
     gpu_name?: string[];
     backend?: string[];
+    fleet?: string[];
     gpu_count?: string;
     gpu_memory?: string;
     spot_policy?: TSpot;
@@ -59,6 +61,7 @@ const getRequestParams = ({
                 files: [],
                 setup: [],
                 ...(backend?.length ? { backends: backend as TBackendType[] } : {}),
+                ...(fleet?.length ? { fleets: fleet } : {}),
             },
             profile: { name: 'default', default: false },
             ssh_key_pub: '(dummy)',
@@ -70,16 +73,20 @@ type OfferListProps = Pick<CardsProps, 'variant' | 'header' | 'onSelectionChange
     permanentFilters?: UseFiltersArgs['permanentFilters'];
     defaultFilters?: UseFiltersArgs['defaultFilters'];
     withSearchParams?: boolean;
+    showFleetFilter?: boolean;
     disabled?: boolean;
     onChangeProjectName?: (value: string) => void;
     onChangeBackendFilter?: (backends: string[]) => void;
+    onChangeFleetFilter?: (fleets: string[]) => void;
 };
 
 export const OfferList: React.FC<OfferListProps> = ({
     withSearchParams,
+    showFleetFilter,
     disabled,
     onChangeProjectName,
     onChangeBackendFilter,
+    onChangeFleetFilter,
     permanentFilters,
     defaultFilters,
     ...props
@@ -108,7 +115,7 @@ export const OfferList: React.FC<OfferListProps> = ({
         onChangeGroupBy,
         filteringStatusType,
         handleLoadItems,
-    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams, permanentFilters, defaultFilters });
+    } = useFilters({ gpus: data?.gpus ?? [], withSearchParams, showFleetFilter, permanentFilters, defaultFilters });
 
     useEffect(() => {
         setRequestParams(
@@ -133,6 +140,14 @@ export const OfferList: React.FC<OfferListProps> = ({
             : [];
         onChangeBackendFilter?.(backendValues);
     }, [filteringRequestParams.backend]);
+
+    useEffect(() => {
+        const fleet = filteringRequestParams.fleet;
+        const fleetValues = fleet
+            ? (Array.isArray(fleet) ? fleet : [fleet]).filter((value): value is string => typeof value === 'string')
+            : [];
+        onChangeFleetFilter?.(fleetValues);
+    }, [filteringRequestParams.fleet]);
 
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
         clearFilter,

@@ -10,7 +10,13 @@ import { Button, ListEmptyMessage, NavigateLink, StatusIndicator } from 'compone
 import { DATE_TIME_FORMAT } from 'consts';
 import { useLocalStorageState, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
-import { EMPTY_QUERY, requestParamsToTokens, tokensToRequestParams, tokensToSearchParams } from 'libs/filters';
+import {
+    EMPTY_QUERY,
+    getNamePatternFilterRequestParams,
+    requestParamsToTokens,
+    tokensToRequestParams,
+    tokensToSearchParams,
+} from 'libs/filters';
 import { getStatusIconType } from 'libs/volumes';
 import { ROUTES } from 'routes';
 import { useLazyGetProjectsQuery } from 'services/project';
@@ -188,14 +194,10 @@ export const useFilters = () => {
     const handleLoadItems: PropertyFilterProps['onLoadItems'] = async ({ detail: { filteringProperty, filteringText } }) => {
         setDynamicFilteringOptions([]);
 
-        if (!filteringText.length) {
-            return Promise.resolve();
-        }
-
         setFilteringStatusType('loading');
 
         if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
-            await getProjects({ name_pattern: filteringText, limit })
+            await getProjects(getNamePatternFilterRequestParams(filteringText, limit))
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ project_name }) => ({

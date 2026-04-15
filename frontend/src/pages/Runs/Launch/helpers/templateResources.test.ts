@@ -60,4 +60,19 @@ describe('templateResources', () => {
             spot_policy: 'auto',
         });
     });
+
+    test('adds fleet defaults', () => {
+        const template = makeTemplate({
+            type: 'task',
+            resources: {
+                gpu: 'H100:1',
+            },
+            fleets: ['team-a', 'other-project/team-b'],
+        });
+
+        expect(getTemplateOfferDefaultFilters(template)).toMatchObject({
+            gpu_name: 'H100',
+            fleet: ['team-a', 'other-project/team-b'],
+        });
+    });
 });
