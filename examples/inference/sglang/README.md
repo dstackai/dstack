@@ -108,8 +108,8 @@ curl http://127.0.0.1:3000/proxy/services/main/deepseek-r1/v1/chat/completions \
 ```
 </div>
 
-!!! info "Router policy"
-    If you'd like to use a custom routing policy, create a gateway with `router` set to `sglang`. Check out [gateways](https://dstack.ai/docs/concepts/gateways#router) for more details.
+!!! info "Run router and workers separately"
+    To run the SGLang router and workers separately, use replica groups (router as a CPU replica group, workers as GPU replica groups). See [PD disaggregation](#pd-disaggregation).
 
 > If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://deepseek-r1.<gateway domain>/`.
 
@@ -117,7 +117,7 @@ curl http://127.0.0.1:3000/proxy/services/main/deepseek-r1/v1/chat/completions \
 
 ### PD disaggregation
 
-If you create a gateway with the [`sglang` router](https://dstack.ai/docs/concepts/gateways/#sglang), you can run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html).
+To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html), run the **router as a replica** on a CPU-only host, while running **prefill/decode workers** as replicas on GPU hosts.
 
 <div editor-title="examples/inference/sglang/pd.dstack.yml">
 
@@ -131,6 +131,21 @@ env:
   - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
 replicas:
+  - count: 1
+    # For now replica group with router must have count: 1
+    commands:
+      - pip install sglang_router
+      - |
+        python -m sglang_router.launch_router \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --pd-disaggregation \
+          --prefill-policy cache_aware
+    router:
+      type: sglang
+    resources:
+      cpu: 4
+
   - count: 1..4
     scaling:
       metric: rps
@@ -140,7 +155,7 @@ replicas:
         python -m sglang.launch_server \
           --model-path $MODEL_ID \
           --disaggregation-mode prefill \
-          --disaggregation-transfer-backend mooncake \
+          --disaggregation-transfer-backend nixl \
           --host 0.0.0.0 \
           --port 8000 \
           --disaggregation-bootstrap-port 8998
@@ -156,7 +171,7 @@ replicas:
         python -m sglang.launch_server \
           --model-path $MODEL_ID \
           --disaggregation-mode decode \
-          --disaggregation-transfer-backend mooncake \
+          --disaggregation-transfer-backend nixl \
           --host 0.0.0.0 \
           --port 8000
     resources:
@@ -165,44 +180,26 @@ replicas:
 port: 8000
 model: zai-org/GLM-4.5-Air-FP8
 
-# Custom probe is required for PD disaggregation
+# Custom probe is required for PD disaggregation.
 probes:
   - type: http
-    url: /health_generate
+    url: /health
     interval: 15s
-
-router:
-  type: sglang
-  pd_disaggregation: true
 ```
 
 </div>
 
 Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
 
-#### Gateway
+#### Fleet
 
-Note, running services with PD disaggregation currently requires the gateway to run in the same cluster as the service.
+Create a [fleet](https://dstack.ai/docs/concepts/fleets/) that can provision both a CPU node (for the router replica group) and GPU nodes (for the prefill/decode replica groups).
+You can create an SSH fleet, elastic Cloud fleet (nodes: 0..) or kubernetes cluster. Just don't specify any resource constraints in the fleet, and dstack will automatically provision the correct instances (both CPU and GPU, in the same fleet) based on the resources specified in replicas in the run configuration.
 
-For example, if you run services on the `kubernetes` backend, make sure to also create the gateway in the same backend:
+The only requirement is that the router and worker replicas run in the same network. In practice, this typically means using a single fleet where the backend and region are the same or using `placement: cluster` if the backend supports it.
 
-<div editor-title="gateway.dstack.yml">
-
-```yaml
-type: gateway
-name: gateway-name
-
-backend: kubernetes
-region: any
-
-domain: example.com
-router:
-  type: sglang
-```
-
-</div>
-
-<!-- TODO: Gateway creation using fleets is coming to simplify this. -->
+!!! note "Gateway-based routing (deprecated)"
+    If you create a gateway with the [`sglang` router](https://dstack.ai/docs/concepts/gateways/#sglang), you can also run SGLang with PD disaggregation. This method is deprecated and will be disallowed in a future release in favor of running the router as a replica.
 
 ## Source code
 

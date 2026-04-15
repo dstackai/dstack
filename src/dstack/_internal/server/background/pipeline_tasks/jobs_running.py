@@ -14,7 +14,10 @@ from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HT
 from dstack._internal.core.errors import GatewayError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth
-from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.configurations import (
+    DevEnvironmentConfiguration,
+    ServiceConfiguration,
+)
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.instances import InstanceStatus, SSHConnectionParams
 from dstack._internal.core.models.metrics import Metric
@@ -1023,6 +1026,22 @@ async def _register_service_replica(
     if context.run_model.gateway_id is None:
         return None
 
+    job_spec = JobSpec.__response__.parse_raw(context.job_model.job_spec_data)
+
+    # For router-based services (e.g. PD disaggregation), only router replicas should be
+    # registered with the gateway. Worker replicas are discovered by the router-worker
+    # sync pipeline and should not be routed to directly by the gateway.
+    config = context.run.run_spec.configuration
+    assert isinstance(config, ServiceConfiguration)
+    router_group = next((g for g in config.replica_groups if g.router is not None), None)
+    is_router_replica = router_group is not None and job_spec.replica_group == router_group.name
+    if router_group is not None and not is_router_replica:
+        logger.debug(
+            "%s: skipping gateway replica registration (non-router replica)",
+            fmt(context.job_model),
+        )
+        return None
+
     async with get_session_ctx() as session:
         gateway_model, conn = await get_or_add_gateway_connection(
             session, context.run_model.gateway_id
@@ -1043,7 +1062,7 @@ async def _register_service_replica(
         async with conn.client() as gateway_client:
             await gateway_client.register_replica(
                 run=context.run,
-                job_spec=JobSpec.__response__.parse_raw(context.job_model.job_spec_data),
+                job_spec=job_spec,
                 job_submission=job_submission,
                 instance_project_ssh_private_key=instance_project_ssh_private_key,
                 ssh_head_proxy=ssh_head_proxy,

@@ -101,6 +101,10 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
         if run_spec.configuration.https is None:
             configuration_excludes["https"] = True
 
+        replicas = run_spec.configuration.replicas
+        if isinstance(replicas, list) and all(g.router is None for g in replicas):
+            configuration_excludes["replicas"] = {"__all__": {"router": True}}
+
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
     if profile_excludes:

@@ -43,5 +43,12 @@ class SGLangServiceRouterConfig(CoreModel):
     ] = False
 
 
+class ReplicaGroupRouterConfig(CoreModel):
+    type: Annotated[
+        Literal["sglang"],
+        Field(description="The router implementation for this replica group."),
+    ] = "sglang"
+
+
 AnyServiceRouterConfig = SGLangServiceRouterConfig
 AnyGatewayRouterConfig = SGLangGatewayRouterConfig

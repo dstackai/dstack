@@ -69,6 +69,9 @@ from dstack._internal.server.services.resources import (
     set_resources_defaults,
 )
 from dstack._internal.server.services.runs.plan import get_job_plans
+from dstack._internal.server.services.runs.service_router_worker_sync import (
+    ensure_service_router_worker_sync_row,
+)
 from dstack._internal.server.services.runs.spec import (
     can_update_run_spec,
     check_can_update_run_spec,
@@ -485,6 +488,7 @@ async def apply_plan(
             deployment_num=new_deployment_num,
         )
     )
+    await ensure_service_router_worker_sync_row(session, current_resource_model, run_spec)
     events.emit(
         session,
         (
@@ -617,6 +621,7 @@ async def submit_run(
                             ],
                         )
                     global_replica_num += 1
+            await ensure_service_router_worker_sync_row(session, run_model, run_spec)
         else:
             for replica_num in range(initial_replicas):
                 jobs = await get_jobs_from_run_spec(

@@ -71,6 +71,12 @@ class ServerProxyRepo(BaseProxyRepo):
         run_spec = get_run_spec(run)
         if not isinstance(run_spec.configuration, ServiceConfiguration):
             return None
+        router_group = next(
+            (g for g in run_spec.configuration.replica_groups if g.router is not None),
+            None,
+        )
+        has_router_replica = router_group is not None
+        router = run_spec.configuration.router
         replicas = []
         for job in jobs:
             jpd: JobProvisioningData = JobProvisioningData.__response__.parse_raw(
@@ -109,6 +115,10 @@ class ServerProxyRepo(BaseProxyRepo):
                 ssh_head_proxy = rci.ssh_proxy
                 ssh_head_proxy_private_key = get_or_error(rci.ssh_proxy_keys)[0].private
             job_spec = get_job_spec(job)
+            if router_group is not None and job_spec.replica_group != router_group.name:
+                # Strict router-only: when a router is configured, the proxy should only be aware
+                # of router replicas.
+                continue
             replica = Replica(
                 id=job.id.hex,
                 app_port=get_service_port(job_spec, run_spec.configuration),
@@ -130,6 +140,8 @@ class ServerProxyRepo(BaseProxyRepo):
             client_max_body_size=DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
             strip_prefix=run_spec.configuration.strip_prefix,
             replicas=tuple(replicas),
+            has_router_replica=has_router_replica,
+            router=router,
         )
 
     async def list_models(self, project_name: str) -> List[ChatModel]:

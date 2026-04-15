@@ -1,3 +1,6 @@
+# DEPRECATED: Gateway-based PD disaggregation config.
+# Use `pd.dstack.yml` instead (router runs as a replica).
+
 type: service
 name: prefill-decode
 image: lmsysorg/sglang:latest
@@ -7,21 +10,6 @@ env:
   - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
 replicas:
-  - count: 1
-    # For now replica group with router must have count: 1
-    commands:
-      - pip install sglang_router
-      - |
-          python -m sglang_router.launch_router \
-            --host 0.0.0.0 \
-            --port 8000 \
-            --pd-disaggregation \
-            --prefill-policy cache_aware
-    router:
-      type: sglang
-    resources:
-      cpu: 4
-
   - count: 1..4
     scaling:
       metric: rps
@@ -31,12 +19,12 @@ replicas:
           python -m sglang.launch_server \
             --model-path $MODEL_ID \
             --disaggregation-mode prefill \
-            --disaggregation-transfer-backend nixl \
+            --disaggregation-transfer-backend mooncake \
             --host 0.0.0.0 \
             --port 8000 \
             --disaggregation-bootstrap-port 8998
     resources:
-      gpu: H200
+      gpu: 1
 
   - count: 1..8
     scaling:
@@ -47,16 +35,20 @@ replicas:
           python -m sglang.launch_server \
             --model-path $MODEL_ID \
             --disaggregation-mode decode \
-            --disaggregation-transfer-backend nixl \
+            --disaggregation-transfer-backend mooncake \
             --host 0.0.0.0 \
             --port 8000
     resources:
-      gpu: H200
+      gpu: 1
 
 port: 8000
 model: zai-org/GLM-4.5-Air-FP8
 
 probes:
   - type: http
-    url: /health
+    url: /health_generate
     interval: 15s
+
+router:
+  type: sglang
+  pd_disaggregation: true

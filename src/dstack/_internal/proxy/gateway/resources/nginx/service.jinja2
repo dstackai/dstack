@@ -47,8 +47,8 @@ server {
     }
     {% endfor %}
 
-    {# For SGLang router: block all requests except whitelisted locations added dynamically above #}
-    {% if router is not none and router.type == "sglang" %}
+    {# For router services: block all requests except whitelisted locations added dynamically above #}
+    {% if has_router_replica or (router is not none and router.type == "sglang") %}
     location / {
         return 403;
     }

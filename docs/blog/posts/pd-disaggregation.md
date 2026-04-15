@@ -26,6 +26,9 @@ For inference, `dstack` provides a [services](../../docs/concepts/services.md) a
 
 > If you’re new to Prefill–Decode disaggregation, see the official [SGLang docs](https://docs.sglang.io/advanced_features/pd_disaggregation.html).
 
+!!! note "Deprecation notice"
+    Configuring the SGLang router in a gateway is deprecated and will be disallowed in a future release. To run router and workers as separate replica groups, see [SGLang PD disaggregation (router as replica group)](https://dstack.ai/examples/inference/sglang/#pd-disaggregation).
+
 ## Services
 
 With `dstack` `0.20.10`, you can define a service with separate replica groups for Prefill and Decode workers and enable PD disaggregation directly in the `router` configuration.
@@ -123,10 +126,9 @@ router:
 </div>
 
 ## Limitations
-
 * Because the SGLang router requires all workers to be on the same network, and `dstack` currently runs the router inside the gateway, the gateway and the service must be running in the same cluster.
-* Prefill–Decode disaggregation is currently available with the SGLang backend (vLLM support is coming).
 * Autoscaling supports RPS as the metric for now; TTFT and ITL metrics are planned next.
+* Prefill–Decode disaggregation is currently available with the SGLang backend (vLLM support is coming).
 
 With native support for inference and now Prefill–Decode disaggregation, `dstack` makes it easier to run high-throughput, low-latency model serving across GPU clouds, and Kubernetes or bare-metal clusters.
 

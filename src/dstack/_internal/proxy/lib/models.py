@@ -61,6 +61,7 @@ class Service(ImmutableModel):
     client_max_body_size: int  # only enforced on gateways
     strip_prefix: bool = True  # only used in-server
     replicas: tuple[Replica, ...]
+    has_router_replica: bool = False
     router: Optional[AnyServiceRouterConfig] = None
     cors_enabled: bool = False  # only used on gateways; enabled for openai-format models
 

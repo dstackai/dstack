@@ -5,6 +5,8 @@ import httpx
 from fastapi import status
 from starlette.requests import ClientDisconnect
 
+from dstack._internal.core.models.routers import RouterType
+from dstack._internal.proxy.lib.const import SGLANG_WHITELISTED_PATHS
 from dstack._internal.proxy.lib.deps import ProxyAuthContext
 from dstack._internal.proxy.lib.errors import ProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
@@ -36,10 +38,17 @@ async def proxy(
     if service.auth:
         await auth.enforce()
 
-    client = await get_service_replica_client(service, repo, service_conn_pool)
-
     if not service.strip_prefix:
         path = concat_url_path(request.scope.get("root_path", "/"), request.url.path)
+
+    if (
+        service.router is not None and service.router.type == RouterType.SGLANG
+    ) or service.has_router_replica:
+        path_for_match = path if path.startswith("/") else f"/{path}"
+        if not _is_whitelisted_path(path_for_match, SGLANG_WHITELISTED_PATHS):
+            raise ProxyError("Path is not allowed for this service", status.HTTP_403_FORBIDDEN)
+
+    client = await get_service_replica_client(service, repo, service_conn_pool)
 
     try:
         upstream_request = await build_upstream_request(request, path, client)
@@ -66,6 +75,16 @@ async def proxy(
         status_code=upstream_response.status_code,
         headers=upstream_response.headers,
     )
+
+
+def _is_whitelisted_path(path: str, whitelisted_paths: tuple[str, ...]) -> bool:
+    for allowed in whitelisted_paths:
+        if allowed.endswith("/"):
+            if path.startswith(allowed):
+                return True
+        elif path == allowed:
+            return True
+    return False
 
 
 async def stream_response(response: httpx.Response) -> AsyncGenerator[bytes, None]:

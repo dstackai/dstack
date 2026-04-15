@@ -102,6 +102,14 @@ async def _register_service_in_gateway(
 
     gateway_configuration = get_gateway_configuration(gateway)
 
+    has_replica_group_router = any(
+        g.router is not None for g in run_spec.configuration.replica_groups
+    )
+    if has_replica_group_router and _gateway_has_sglang_router(gateway_configuration):
+        raise ServerClientError(
+            "A replica-group `router:` cannot be used with a gateway that has router configuration."
+        )
+
     # Check: service specifies SGLang router but gateway does not have it
     service_router = run_spec.configuration.router
     service_wants_sglang = service_router is not None and isinstance(
@@ -172,6 +180,7 @@ async def _register_service_in_gateway(
                 options=service_spec.options,
                 rate_limits=run_spec.configuration.rate_limits,
                 ssh_private_key=run_model.project.ssh_private_key,
+                has_router_replica=has_replica_group_router,
                 router=router,
             )
             try:

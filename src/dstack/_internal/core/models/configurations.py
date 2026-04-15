@@ -28,7 +28,7 @@ from dstack._internal.core.models.profiles import (
     parse_off_duration,
 )
 from dstack._internal.core.models.resources import Range, ResourcesSpec
-from dstack._internal.core.models.routers import AnyServiceRouterConfig
+from dstack._internal.core.models.routers import AnyServiceRouterConfig, ReplicaGroupRouterConfig
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
@@ -801,6 +801,12 @@ class ReplicaGroup(CoreModel):
         CommandsList,
         Field(description="The shell commands to run for replicas in this group"),
     ] = []
+    router: Annotated[
+        Optional[ReplicaGroupRouterConfig],
+        Field(
+            description="When set, replicas in this group run the in-service HTTP router (e.g. SGLang).",
+        ),
+    ] = None
 
     @validator("name")
     def validate_name(cls, v: Optional[str]) -> Optional[str]:
@@ -1030,6 +1036,37 @@ class ServiceConfigurationParams(CoreModel):
                     "Either set `commands` in the replica group or set `image` at the service level."
                 )
 
+        return values
+
+    @root_validator()
+    def validate_at_most_one_router_replica_group(cls, values):
+        replicas = values.get("replicas")
+        if not isinstance(replicas, list):
+            return values
+        router_groups = [g for g in replicas if g.router is not None]
+        if len(router_groups) > 1:
+            raise ValueError("At most one replica group may specify `router`.")
+        if router_groups:
+            router_group = router_groups[0]
+            if router_group.count.min != 1 or router_group.count.max != 1:
+                raise ValueError("For now replica group with `router` must have `count: 1`.")
+        return values
+
+    @root_validator()
+    def validate_replica_group_router_mutex(cls, values):
+        """
+        When a replica group sets `router:`, service-level `router` must be omitted.
+        (Gateway-level SGLang is rejected at service registration when a gateway is selected.)
+        """
+        replicas = values.get("replicas")
+        if not isinstance(replicas, list):
+            return values
+        if not any(g.router is not None for g in replicas):
+            return values
+        if values.get("router") is not None:
+            raise ValueError(
+                "Service-Level router configuration is not allowed together with replica-group `router`."
+            )
         return values
 
 
