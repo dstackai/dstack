@@ -371,7 +371,11 @@ class FleetSpec(generate_dual_core_model(FleetSpecConfig)):
     configuration: FleetConfiguration
     configuration_path: Optional[str] = None
     profile: Profile
+    # TODO: Drop `autocreated` once last client sending it (0.20.16)
+    # and existing autocreated fleets no longer supported.
     autocreated: bool = False
+    """Deprecated. Kept for deserialization of old client requests and existing DB records.
+    """
     # TODO: make `merged_profile` a computed field after migrating to Pydantic v2.
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
     """`merged_profile` stores profile parameters merged from `profile` and `configuration`.

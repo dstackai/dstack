@@ -46,12 +46,7 @@ def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeDic
     configuration_excludes: IncludeExcludeDictType = {}
     profile_excludes: IncludeExcludeSetType = set()
 
-    # Add excludes like this:
-    #
-    # if fleet_spec.configuration.tags is None:
-    #     configuration_excludes["tags"] = True
-    # if fleet_spec.profile.tags is None:
-    #     profile_excludes.add("tags")
+    spec_excludes["autocreated"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

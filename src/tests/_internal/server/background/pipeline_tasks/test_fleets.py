@@ -894,8 +894,6 @@ class TestFleetWorker:
         self, test_db, session: AsyncSession, worker: FleetWorker
     ):
         project = await create_project(session)
-        spec = get_fleet_spec()
-        spec.autocreated = False
         fleet = await create_fleet(
             session=session,
             project=project,
@@ -910,6 +908,24 @@ class TestFleetWorker:
 
         await session.refresh(fleet)
         assert fleet.deleted
+
+    async def test_does_not_delete_empty_active_user_fleet(
+        self, test_db, session: AsyncSession, worker: FleetWorker
+    ):
+        project = await create_project(session)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+        )
+
+        fleet.lock_token = uuid.uuid4()
+        fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_fleet_to_pipeline_item(fleet))
+
+        await session.refresh(fleet)
+        assert not fleet.deleted
 
     async def test_does_not_delete_fleet_with_active_run(
         self, test_db, session: AsyncSession, worker: FleetWorker

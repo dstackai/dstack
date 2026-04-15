@@ -61,7 +61,6 @@ from dstack._internal.server.testing.common import (
     get_ssh_fleet_configuration,
     get_volume_provisioning_data,
 )
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime
 
 pytestmark = pytest.mark.usefixtures("image_config_mock")
@@ -1253,7 +1252,7 @@ class TestJobSubmittedWorker:
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         assert job.termination_reason_message == "Failed to use specified fleets"
 
-    async def test_terminates_job_when_no_matching_fleet_and_autocreated_disabled(
+    async def test_terminates_job_when_no_matching_fleet(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
         project = await create_project(session=session)
@@ -1270,30 +1269,23 @@ class TestJobSubmittedWorker:
         assert job.termination_reason_message is not None
         assert "No matching fleet found" in job.termination_reason_message
 
-    async def test_marks_job_assigned_without_fleet_when_autocreated_enabled(
-        self,
-        test_db,
-        session: AsyncSession,
-        worker: JobSubmittedWorker,
-        monkeypatch: pytest.MonkeyPatch,
+    async def test_terminates_legacy_autocreated_job_with_no_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
-        monkeypatch.setattr(FeatureFlags, "AUTOCREATED_FLEETS_ENABLED", True)
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
         run = await create_run(session=session, project=project, repo=repo, user=user)
-        job = await create_job(session=session, run=run)
+        # Simulate legacy in-flight state: instance_assigned=True but no fleet
+        job = await create_job(session=session, run=run, instance_assigned=True)
 
         await _process_job(session=session, worker=worker, job_model=job)
 
         await session.refresh(job)
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
-        assert job.fleet_id is None
-        assert job.instance_id is None
-        assert job.lock_owner is None
-        assert job.lock_token is None
-        assert job.lock_expires_at is None
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message is not None
+        assert "No matching fleet found" in job.termination_reason_message
 
     async def test_resets_lock_for_retry_when_existing_instance_offer_cannot_be_locked(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
@@ -1518,50 +1510,6 @@ class TestJobSubmittedWorker:
         assert volume.lock_token is None
         assert volume.lock_expires_at is None
         backend_mock.compute.return_value.attach_volume.assert_called_once()
-
-    async def test_provisions_new_capacity_with_autocreated_fleet(
-        self,
-        test_db,
-        session: AsyncSession,
-        worker: JobSubmittedWorker,
-        monkeypatch: pytest.MonkeyPatch,
-    ):
-        monkeypatch.setattr(FeatureFlags, "AUTOCREATED_FLEETS_ENABLED", True)
-        project = await create_project(session=session)
-        user = await create_user(session=session)
-        repo = await create_repo(session=session, project_id=project.id)
-        run = await create_run(session=session, project=project, repo=repo, user=user)
-        job = await create_job(session=session, run=run)
-
-        # First pass: no fleet found, mark instance_assigned=True with no fleet
-        await _process_job(session=session, worker=worker, job_model=job)
-
-        job = await _get_job(session, job.id)
-        assert job.status == JobStatus.SUBMITTED
-        assert job.instance_assigned
-        assert job.fleet_id is None
-
-        # Second pass: provision new capacity and autocreate fleet
-        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
-        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
-            backend_mock = Mock()
-            m.return_value = [backend_mock]
-            backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers.return_value = [offer]
-            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
-                dockerized=True,
-                backend=BackendType.AWS,
-            )
-
-            await _process_job(session=session, worker=worker, job_model=job)
-
-        job = await _get_job(session, job.id)
-        assert job.status == JobStatus.PROVISIONING
-        assert job.instance is not None
-        assert job.fleet_id is not None
-        assert job.lock_owner is None
-        assert job.lock_token is None
-        assert job.lock_expires_at is None
 
     async def test_run_job_uses_server_default_registry(
         self,
