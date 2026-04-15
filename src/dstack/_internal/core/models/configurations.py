@@ -1127,7 +1127,7 @@ AnyApplyConfiguration = Union[
 class BaseApplyConfiguration(CoreModel):
     """
     `BaseApplyConfiguration` parses the configuration based on the `type` discriminator field,
-    but futher dispatching (reparsing) may be required if there is another discriminator field,
+    but further dispatching (reparsing) may be required if there is another discriminator field,
     e.g., `BaseVolumeConfiguration` should be parsed again to get a backend-specific configuration
     based on the `backend` discriminator field.
 
@@ -1140,7 +1140,7 @@ class BaseApplyConfiguration(CoreModel):
             AnyRunConfiguration,
             FleetConfiguration,
             GatewayConfiguration,
-            # Base configurations (futher parsing required to get a concrete AnyApplyConfiguration)
+            # Base configurations (further parsing required to get a concrete AnyApplyConfiguration)
             BaseVolumeConfiguration,
         ],
         Field(discriminator="type"),
@@ -1159,7 +1159,7 @@ def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
             return conf
     except ValidationError as e:
         raise ConfigurationError(e)
-    # Otherwise, delegate futher parsing to more specific parser
+    # Otherwise, delegate further parsing to more specific parser
     return parse_volume_configuration(data)
 
 
