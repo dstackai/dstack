@@ -25,7 +25,7 @@ def upgrade() -> None:
         "service_router_worker_sync",
         sa.Column("id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
         sa.Column("run_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
-        sa.Column("deleted", sa.Boolean(), server_default=sa.text("0"), nullable=False),
+        sa.Column("deleted", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("created_at", dstack._internal.server.models.NaiveDateTime(), nullable=False),
         sa.Column(
             "last_processed_at", dstack._internal.server.models.NaiveDateTime(), nullable=False
