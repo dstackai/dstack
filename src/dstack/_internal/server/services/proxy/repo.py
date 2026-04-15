@@ -75,6 +75,7 @@ class ServerProxyRepo(BaseProxyRepo):
             (g for g in run_spec.configuration.replica_groups if g.router is not None),
             None,
         )
+        has_router_replica = router_group is not None
         router = run_spec.configuration.router
         replicas = []
         for job in jobs:
@@ -139,6 +140,7 @@ class ServerProxyRepo(BaseProxyRepo):
             client_max_body_size=DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
             strip_prefix=run_spec.configuration.strip_prefix,
             replicas=tuple(replicas),
+            has_router_replica=has_router_replica,
             router=router,
         )
 

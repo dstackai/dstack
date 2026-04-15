@@ -56,10 +56,6 @@ replicas:
 port: 8000
 model: zai-org/GLM-4.5-Air-FP8
 
-# SSH fleet containing both router (CPU) and workers (GPU).
-# Router and workers must be in the same fleet (same network).
-fleets: [pd-disagg]
-
 probes:
   - type: http
     url: /health

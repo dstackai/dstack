@@ -26,9 +26,12 @@ For inference, `dstack` provides a [services](../../docs/concepts/services.md) a
 
 > If you’re new to Prefill–Decode disaggregation, see the official [SGLang docs](https://docs.sglang.io/advanced_features/pd_disaggregation.html).
 
+!!! note "Deprecation notice"
+    Configuring the SGLang router in a gateway is deprecated and will be disallowed in a future release. To run router and workers as separate replica groups, see [SGLang PD disaggregation (router as replica group)](https://dstack.ai/examples/inference/sglang/#pd-disaggregation).
+
 ## Services
 
-With `dstack` `0.20.17`, you can define a service with separate replica groups for Router, Prefill and Decode workers and run PD disaggregated Inference.
+With `dstack` `0.20.10`, you can define a service with separate replica groups for Prefill and Decode workers and enable PD disaggregation directly in the `router` configuration.
 
 <div editor-title="glm45air.dstack.yml">
 
@@ -43,21 +46,6 @@ env:
 image: lmsysorg/sglang:latest
 
 replicas:
-  - count: 1
-    # For now replica group with router must have count: 1
-    commands:
-      - pip install sglang_router
-      - |
-          python -m sglang_router.launch_router \
-            --host 0.0.0.0 \
-            --port 8000 \
-            --pd-disaggregation \
-            --prefill-policy cache_aware
-    router:
-      type: sglang
-    resources:
-      cpu: 4
-
   - count: 1..4
     scaling:
       metric: rps
@@ -67,7 +55,7 @@ replicas:
           python -m sglang.launch_server \
             --model-path $MODEL_ID \
             --disaggregation-mode prefill \
-            --disaggregation-transfer-backend nixl \
+            --disaggregation-transfer-backend mooncake \
             --host 0.0.0.0 \
             --port 8000 \
             --disaggregation-bootstrap-port 8998
@@ -83,7 +71,7 @@ replicas:
           python -m sglang.launch_server \
             --model-path $MODEL_ID \
             --disaggregation-mode decode \
-            --disaggregation-transfer-backend nixl \
+            --disaggregation-transfer-backend mooncake \
             --host 0.0.0.0 \
             --port 8000
     resources:
@@ -94,8 +82,12 @@ model: zai-org/GLM-4.5-Air-FP8
 
 probes:
   - type: http
-    url: /health
+    url: /health_generate
     interval: 15s
+
+router:
+  type: sglang
+  pd_disaggregation: true
 ```
 
 </div>
@@ -111,33 +103,32 @@ $ dstack apply -f glm45air.dstack.yml
 
 </div>
 
-### SSH fleet
+### Gateway
 
-Create an [SSH fleet](https://dstack.ai/docs/concepts/fleets/#apply-a-configuration) that includes one CPU host for the router and one or more GPU hosts for the workers. Make sure the CPU and GPU hosts are in the same network.
+Just like `dstack` relies on the SGLang router for cache-aware routing, Prefill–Decode disaggregation also requires a [gateway](../../docs/concepts/gateways.md#sglang) configured with the SGLang router.
 
-<div editor-title="pd-fleet.dstack.yml">
+<div editor-title="gateway-sglang.dstack.yml">
 
 ```yaml
-type: fleet
-name: pd-disagg
+type: gateway
+name: inference-gateway
 
-placement: cluster
+backends: [kubernetes]
+region: any
 
-ssh_config:
-  user: ubuntu
-  identity_file: ~/.ssh/id_rsa
-  hosts:
-    - 89.169.108.16   # CPU Host (router)
-    - 89.169.123.100  # GPU Host (prefill/decode workers)
-    - 89.169.110.65   # GPU Host (prefill/decode workers)
+domain: example.com
+
+router:
+  type: sglang
+  policy: cache_aware
 ```
 
 </div>
 
 ## Limitations
-* The router replica group is currently limited to `count: 1` (no HA yet). Support for multiple router replicas for HA is planned.
-* Prefill–Decode disaggregation is currently available with the SGLang backend (Nvidia-dynamo and vLLM support is coming).
+* Because the SGLang router requires all workers to be on the same network, and `dstack` currently runs the router inside the gateway, the gateway and the service must be running in the same cluster.
 * Autoscaling supports RPS as the metric for now; TTFT and ITL metrics are planned next.
+* Prefill–Decode disaggregation is currently available with the SGLang backend (vLLM support is coming).
 
 With native support for inference and now Prefill–Decode disaggregation, `dstack` makes it easier to run high-throughput, low-latency model serving across GPU clouds, and Kubernetes or bare-metal clusters.
 

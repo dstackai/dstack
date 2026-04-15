@@ -342,7 +342,9 @@ async def get_nginx_service_config(
 ) -> ServiceConfig:
     limit_req_zones: list[LimitReqZoneConfig] = []
     locations: list[LocationConfig] = []
-    is_sglang = service.router and service.router.type == RouterType.SGLANG
+    is_sglang = (
+        service.router is not None and service.router.type == RouterType.SGLANG
+    ) or service.has_router_replica
     sglang_limits: dict[str, LimitReqConfig] = {}
     sglang_prefix_lengths: dict[str, int] = {}  # Track prefix lengths for most-specific selection
 

@@ -199,6 +199,21 @@ def _check_can_update_configuration(
         raise ServerClientError(
             f"Configuration type changed from {current.type} to {new.type}, cannot update"
         )
+
+    if isinstance(current, ServiceConfiguration) and isinstance(new, ServiceConfiguration):
+        current_router_group = next(
+            (g for g in current.replica_groups if g.router is not None), None
+        )
+        new_router_group = next((g for g in new.replica_groups if g.router is not None), None)
+        current_router_group_name = (
+            current_router_group.name if current_router_group is not None else None
+        )
+        new_router_group_name = new_router_group.name if new_router_group is not None else None
+        if current_router_group_name != new_router_group_name:
+            raise ServerClientError(
+                "Cannot update router replica groups in-place (adding/removing `router` or changing "
+                "which replica group is the router is not supported). Stop the run and apply again."
+            )
     updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
         new.type, []
     )

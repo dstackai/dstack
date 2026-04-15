@@ -275,24 +275,12 @@ def _build_service_router_config(
     service_configuration: ServiceConfiguration,
 ) -> Optional[AnyServiceRouterConfig]:
     """
-    Router metadata to store on the gateway proxy for this service (`service.router`).
-
-    A replica-group `router:` does **not** depend on the gateway having its own global SGLang
-    router block—the router runs on service replicas. When the gateway has no global SGLang
-    config but a replica group does declare `router:`, we still return a default
-    `SGLangServiceRouterConfig` so nginx/proxy code can treat the service as SGLang and apply path
-    rules. When the gateway *does* have global SGLang, we merge gateway policy with service-level
-    `configuration.router` overrides as before.
+    Build router config from gateway (type, policy) + service (pd_disaggregation, policy override).
+    Service's policy overrides gateway's if present. Keeps backward compat: SGLang enabled
+    automatically when gateway has it configured.
     """
-    has_replica_group_router = any(
-        g.router is not None for g in service_configuration.replica_groups
-    )
     if not _gateway_has_sglang_router(gateway_configuration):
-        if not has_replica_group_router:
-            return None
-        # In later releases we will deprecate service-level and gateway-level router
-        # configuration and return `ReplicaGroupRouterConfig` here instead.
-        return SGLangServiceRouterConfig()
+        return None
 
     gateway_router = gateway_configuration.router
     assert gateway_router is not None  # ensured by _gateway_has_sglang_router

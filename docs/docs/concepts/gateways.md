@@ -99,7 +99,7 @@ If you configure the `sglang` router, [services](../concepts/services.md) can ru
     To run services with PD disaggregation see [SGLang PD disaggregation](https://dstack.ai/examples/inference/sglang/#pd-disaggregation).
 
 !!! note "Deprecation"
-    Configuring the SGLang router in a gateway will be deprecated in a future release.
+    Configuring the SGLang router in a gateway is deprecated and will be disallowed in a future release.
 
 ??? info "Policy"
     The `policy` property allows you to configure the routing policy:

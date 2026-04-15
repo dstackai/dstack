@@ -179,8 +179,6 @@ replicas:
 
 port: 8000
 model: zai-org/GLM-4.5-Air-FP8
-# SSH fleet containing both router (CPU) and workers (GPU).
-fleets: [pd-disagg]
 
 # Custom probe is required for PD disaggregation.
 probes:
@@ -193,31 +191,15 @@ probes:
 
 Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
 
-#### SSH fleet
+#### Fleet
 
-Create an [SSH fleet](https://dstack.ai/docs/concepts/fleets/#apply-a-configuration) that includes one CPU host for the router and one or more GPU hosts for the workers. Make sure the CPU and GPU hosts are in the same network.
+Create a [fleet](https://dstack.ai/docs/concepts/fleets/) that can provision both a CPU node (for the router replica group) and GPU nodes (for the prefill/decode replica groups).
+You can create an SSH fleet, elastic Cloud fleet (nodes: 0..) or kubernetes cluster. Just don't specify any resource constraints in the fleet, and dstack will automatically provision the correct instances (both CPU and GPU, in the same fleet) based on the resources specified in replicas in the run configuration.
 
-<div editor-title="pd-fleet.dstack.yml">
-
-```yaml
-type: fleet
-name: pd-disagg
-
-placement: cluster
-
-ssh_config:
-  user: ubuntu
-  identity_file: ~/.ssh/id_rsa
-  hosts:
-    - 89.169.108.16   # CPU Host (router)
-    - 89.169.123.100  # GPU Host (prefill/decode workers)
-    - 89.169.110.65   # GPU Host (prefill/decode workers)
-```
-
-</div>
+The only requirement is that the router and worker replicas run in the same network. In practice, this typically means using a single fleet where the backend and region are the same or using `placement: cluster` if the backend supports it.
 
 !!! note "Gateway-based routing (deprecated)"
-    If you create a gateway with the [`sglang` router](https://dstack.ai/docs/concepts/gateways/#sglang), you can also run SGLang with PD disaggregation. This method will be deprecated in the future in favor of running the router as a replica.
+    If you create a gateway with the [`sglang` router](https://dstack.ai/docs/concepts/gateways/#sglang), you can also run SGLang with PD disaggregation. This method is deprecated and will be disallowed in a future release in favor of running the router as a replica.
 
 ## Source code
 
