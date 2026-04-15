@@ -18,6 +18,9 @@ from dstack._internal.server.background.scheduled_tasks.metrics import (
     collect_metrics,
     delete_metrics,
 )
+from dstack._internal.server.background.scheduled_tasks.offers_catalog import (
+    preload_offers_catalog,
+)
 from dstack._internal.server.background.scheduled_tasks.probes import process_probes
 from dstack._internal.server.background.scheduled_tasks.prometheus_metrics import (
     collect_prometheus_metrics,
@@ -36,8 +39,9 @@ def start_scheduled_tasks() -> AsyncIOScheduler:
     Start periodic tasks triggered by `apscheduler` at specific times/intervals.
     Suitable for tasks that run infrequently and don't need to lock rows for a long time.
     """
-    # DateTrigger() to init gateways immediately.
+    # DateTrigger() to run one-time init tasks immediately.
     _scheduler.add_job(init_gateways_in_background, DateTrigger(), max_instances=1)
+    _scheduler.add_job(preload_offers_catalog, DateTrigger(), max_instances=1)
     _scheduler.add_job(process_probes, IntervalTrigger(seconds=3, jitter=1))
     _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
     _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
