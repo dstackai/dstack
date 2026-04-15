@@ -28,6 +28,24 @@ export const getNamePatternFilterRequestParams = (filteringText: string, limit: 
     };
 };
 
+export const getTokenAwareNamePatternFilterRequestParams = <PropertyKey extends string>({
+    filteringText,
+    limit,
+    propertyKey,
+    tokens,
+}: {
+    filteringText: string;
+    limit: number;
+    propertyKey: PropertyKey;
+    tokens: PropertyFilterProps.Query['tokens'];
+}) => {
+    const matchingExistingToken = tokens.some((token) => {
+        return token.propertyKey === propertyKey && typeof token.value === 'string' && token.value === filteringText;
+    });
+
+    return getNamePatternFilterRequestParams(matchingExistingToken ? '' : filteringText, limit);
+};
+
 const convertTokenValueToRequestParam = (token: PropertyFilterProps.Query['tokens'][number]): RequestParam => {
     const { value, operator } = token;
 

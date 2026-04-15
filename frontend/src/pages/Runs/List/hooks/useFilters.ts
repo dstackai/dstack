@@ -7,7 +7,7 @@ import type { PropertyFilterProps } from 'components';
 import { useLocalStorageState } from 'hooks';
 import {
     EMPTY_QUERY,
-    getNamePatternFilterRequestParams,
+    getTokenAwareNamePatternFilterRequestParams,
     requestParamsToTokens,
     tokensToRequestParams,
     tokensToSearchParams,
@@ -95,7 +95,14 @@ export const useFilters = () => {
         setFilteringStatusType('loading');
 
         if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
-            await getProjects(getNamePatternFilterRequestParams(filteringText, limit))
+            await getProjects(
+                getTokenAwareNamePatternFilterRequestParams({
+                    filteringText,
+                    limit,
+                    propertyKey: filterKeys.PROJECT_NAME,
+                    tokens: propertyFilterQuery.tokens,
+                }),
+            )
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ project_name }) => ({
@@ -107,7 +114,14 @@ export const useFilters = () => {
         }
 
         if (filteringProperty?.key === filterKeys.USER_NAME) {
-            await getUsers(getNamePatternFilterRequestParams(filteringText, limit))
+            await getUsers(
+                getTokenAwareNamePatternFilterRequestParams({
+                    filteringText,
+                    limit,
+                    propertyKey: filterKeys.USER_NAME,
+                    tokens: propertyFilterQuery.tokens,
+                }),
+            )
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ username }) => ({

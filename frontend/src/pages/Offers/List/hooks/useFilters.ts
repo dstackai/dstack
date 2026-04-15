@@ -5,7 +5,7 @@ import type { MultiselectProps, PropertyFilterProps } from 'components';
 
 import {
     EMPTY_QUERY,
-    getNamePatternFilterRequestParams,
+    getTokenAwareNamePatternFilterRequestParams,
     requestParamsToArray,
     requestParamsToTokens,
     tokensToRequestParams,
@@ -306,7 +306,14 @@ export const useFilters = ({
         setFilteringStatusType('loading');
 
         if (filteringProperty?.key === filterKeys.PROJECT_NAME) {
-            await getProjects(getNamePatternFilterRequestParams(filteringText, limit))
+            await getProjects(
+                getTokenAwareNamePatternFilterRequestParams({
+                    filteringText,
+                    limit,
+                    propertyKey: filterKeys.PROJECT_NAME,
+                    tokens: propertyFilterQuery.tokens,
+                }),
+            )
                 .unwrap()
                 .then(({ data }) =>
                     data.map(({ project_name }) => ({
