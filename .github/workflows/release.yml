@@ -38,7 +38,7 @@ jobs:
     with:
       version: ${{ needs.compute-version.outputs.version }}
       staging: false
-      go-integration-tests: true
+      go-integration-tests: false
 
   upload-pre-pypi-artifacts:
     needs: [compute-version, build-artifacts]
@@ -66,7 +66,7 @@ jobs:
           path: dist
       - name: Upload Python package to PyPI
         run: |
-          uv publish --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}   
+          uv publish --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }}
 
   upload-post-pypi-artifacts:
     needs: [compute-version, pypi-upload]
