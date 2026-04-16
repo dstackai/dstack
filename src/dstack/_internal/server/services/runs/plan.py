@@ -81,6 +81,19 @@ async def get_job_plans(
     run_spec: RunSpec,
     max_offers: Optional[int],
 ) -> list[JobPlan]:
+    """
+    Returns job plans for the given run spec.
+
+    Normal run planning (`dstack apply`) selects the best fleet candidate for each planned job
+    and builds offers from that path. Plain/json `dstack offer` uses the same `/runs/get_plan`
+    API, but its synthetic run spec is detected by `_should_select_best_fleet_candidate()`.
+    In that case, planning skips best-fleet-candidate selection and collects offers directly:
+    global offers when no fleets are specified, or offers from the selected fleets when
+    `--fleet` is used.
+
+    Services are planned per replica group. Other run types are planned once and then expanded
+    into per-job `JobPlan` results.
+    """
     run_name = run_spec.run_name
     if run_spec.run_name is None:
         # Set/unset dummy run name to generate job names for run plan.
@@ -120,7 +133,7 @@ async def get_job_plans(
                 volumes=volumes,
                 exclude_not_available=False,
             )
-            if _should_force_non_fleet_offers(run_spec):
+            if not _should_select_best_fleet_candidate(run_spec):
                 if profile.fleets is None:
                     instance_offers, backend_offers = await _get_non_fleet_offers(
                         session=session,
@@ -160,23 +173,7 @@ async def get_job_plans(
             run_spec=run_spec,
             job_num=0,
         )
-        candidate_fleet_models = await _select_candidate_fleet_models(
-            session=session,
-            project=project,
-            run_model=None,
-            run_spec=run_spec,
-        )
-        fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
-            project=project,
-            fleet_models=candidate_fleet_models,
-            run_model=None,
-            run_spec=run_spec,
-            job=jobs[0],
-            master_job_provisioning_data=None,
-            volumes=volumes,
-            exclude_not_available=False,
-        )
-        if _should_force_non_fleet_offers(run_spec):
+        if not _should_select_best_fleet_candidate(run_spec):
             if profile.fleets is None:
                 instance_offers, backend_offers = await _get_non_fleet_offers(
                     session=session,
@@ -194,6 +191,23 @@ async def get_job_plans(
                     job=jobs[0],
                     volumes=volumes,
                 )
+        else:
+            candidate_fleet_models = await _select_candidate_fleet_models(
+                session=session,
+                project=project,
+                run_model=None,
+                run_spec=run_spec,
+            )
+            fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
+                project=project,
+                fleet_models=candidate_fleet_models,
+                run_model=None,
+                run_spec=run_spec,
+                job=jobs[0],
+                master_job_provisioning_data=None,
+                volumes=volumes,
+                exclude_not_available=False,
+            )
 
         for job in jobs:
             job_plan = _get_job_plan(
@@ -820,11 +834,24 @@ def _get_job_plan(
     )
 
 
-def _should_force_non_fleet_offers(run_spec: RunSpec) -> bool:
-    # A hack to force non-fleet offers for `dstack offer` command that uses
-    # get run plan API to show offers and the only way to distinguish it is commands.
-    # Assuming real runs will not use such commands.
-    return run_spec.configuration.type == "task" and run_spec.configuration.commands == [":"]
+def _should_select_best_fleet_candidate(run_spec: RunSpec) -> bool:
+    """
+    Returns ``True`` for normal run planning and ``False`` for plain/json `dstack offer`.
+
+    Both `dstack apply` and plain/json `dstack offer` call `/runs/get_plan`. The current
+    way to recognize plain/json `dstack offer` is the synthetic task spec that the CLI
+    sends with `type == "task"` and `commands == [":"]`.
+    TODO: Replace this command-shape hack with an explicit request/API signal for
+    plain/json `dstack offer`.
+
+    When this function returns ``False``, the planner skips best-fleet-candidate selection
+    and goes directly to the special `dstack offer` collection path:
+    global offers when no fleets are specified, or offers from the selected fleets when
+    `--fleet` is used.
+
+    A real task with `commands == [":"]` would also match this special `dstack offer` path.
+    """
+    return not (run_spec.configuration.type == "task" and run_spec.configuration.commands == [":"])
 
 
 def _get_offers_from_instances(

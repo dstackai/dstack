@@ -67,6 +67,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
     get_fleet_spec,
+    get_instance_offer_with_availability,
     get_job_provisioning_data,
     get_job_runtime_data,
     get_run_spec,
@@ -2130,6 +2131,196 @@ class TestGetRunPlan:
         assert response.status_code == 200, response.json()
         offers = response.json()["job_plans"][0]["offers"]
         assert [offer["backend"] for offer in offers] == ["aws", "runpod"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_offer_without_fleets_uses_global_offer_collection(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                user="root",
+            ),
+        )
+        global_offer = get_instance_offer_with_availability(price=1.0)
+        with (
+            patch(
+                "dstack._internal.server.services.runs.plan._get_non_fleet_offers",
+                new=AsyncMock(return_value=([(Mock(), global_offer)], [])),
+            ) as get_non_fleet_offers_mock,
+            patch(
+                "dstack._internal.server.services.runs.plan._get_offers_in_run_candidate_fleets",
+                new=AsyncMock(
+                    side_effect=AssertionError(
+                        "_get_offers_in_run_candidate_fleets should not be called"
+                    )
+                ),
+            ) as get_offers_in_run_candidate_fleets_mock,
+            patch(
+                "dstack._internal.server.services.runs.plan.find_optimal_fleet_with_offers",
+                new=AsyncMock(
+                    side_effect=AssertionError(
+                        "find_optimal_fleet_with_offers should not be called"
+                    )
+                ),
+            ) as find_optimal_fleet_with_offers_mock,
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json={"run_spec": run_spec.dict()},
+            )
+
+        assert response.status_code == 200, response.json()
+        get_non_fleet_offers_mock.assert_awaited_once()
+        get_offers_in_run_candidate_fleets_mock.assert_not_called()
+        find_optimal_fleet_with_offers_mock.assert_not_called()
+        job_plan = response.json()["job_plans"][0]
+        assert job_plan["total_offers"] == 1
+        assert job_plan["offers"][0]["price"] == 1.0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_offer_with_fleets_uses_selected_fleet_offer_collection(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        selected_fleets = ["fleet-a", "fleet-b"]
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(name="default", fleets=selected_fleets),
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                user="root",
+                fleets=selected_fleets,
+            ),
+        )
+        fleet_offer = get_instance_offer_with_availability(price=2.0)
+        with (
+            patch(
+                "dstack._internal.server.services.runs.plan._get_non_fleet_offers",
+                new=AsyncMock(
+                    side_effect=AssertionError("_get_non_fleet_offers should not be called")
+                ),
+            ) as get_non_fleet_offers_mock,
+            patch(
+                "dstack._internal.server.services.runs.plan._get_offers_in_run_candidate_fleets",
+                new=AsyncMock(return_value=([(Mock(), fleet_offer)], [])),
+            ) as get_offers_in_run_candidate_fleets_mock,
+            patch(
+                "dstack._internal.server.services.runs.plan.find_optimal_fleet_with_offers",
+                new=AsyncMock(
+                    side_effect=AssertionError(
+                        "find_optimal_fleet_with_offers should not be called"
+                    )
+                ),
+            ) as find_optimal_fleet_with_offers_mock,
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json={"run_spec": run_spec.dict()},
+            )
+
+        assert response.status_code == 200, response.json()
+        get_non_fleet_offers_mock.assert_not_called()
+        get_offers_in_run_candidate_fleets_mock.assert_awaited_once()
+        find_optimal_fleet_with_offers_mock.assert_not_called()
+        job_plan = response.json()["job_plans"][0]
+        assert job_plan["total_offers"] == 1
+        assert job_plan["offers"][0]["price"] == 2.0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_regular_run_plan_uses_best_fleet_candidate_selection(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=["echo ok"],
+                image="scratch",
+                user="root",
+            ),
+        )
+        chosen_fleet_offer = get_instance_offer_with_availability(price=3.0)
+        with (
+            patch(
+                "dstack._internal.server.services.runs.plan._select_candidate_fleet_models",
+                new=AsyncMock(return_value=[Mock()]),
+            ) as select_candidate_fleet_models_mock,
+            patch(
+                "dstack._internal.server.services.runs.plan.find_optimal_fleet_with_offers",
+                new=AsyncMock(return_value=(Mock(), [(Mock(), chosen_fleet_offer)], [])),
+            ) as find_optimal_fleet_with_offers_mock,
+            patch(
+                "dstack._internal.server.services.runs.plan._get_non_fleet_offers",
+                new=AsyncMock(
+                    side_effect=AssertionError("_get_non_fleet_offers should not be called")
+                ),
+            ) as get_non_fleet_offers_mock,
+            patch(
+                "dstack._internal.server.services.runs.plan._get_offers_in_run_candidate_fleets",
+                new=AsyncMock(
+                    side_effect=AssertionError(
+                        "_get_offers_in_run_candidate_fleets should not be called"
+                    )
+                ),
+            ) as get_offers_in_run_candidate_fleets_mock,
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json={"run_spec": run_spec.dict()},
+            )
+
+        assert response.status_code == 200, response.json()
+        select_candidate_fleet_models_mock.assert_awaited_once()
+        find_optimal_fleet_with_offers_mock.assert_awaited_once()
+        get_non_fleet_offers_mock.assert_not_called()
+        get_offers_in_run_candidate_fleets_mock.assert_not_called()
+        job_plan = response.json()["job_plans"][0]
+        assert job_plan["total_offers"] == 1
+        assert job_plan["offers"][0]["price"] == 3.0
 
     @pytest.mark.parametrize(
         ("client_version", "expected_availability"),
