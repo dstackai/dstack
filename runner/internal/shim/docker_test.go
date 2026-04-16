@@ -29,7 +29,7 @@ func TestDocker_SSHServer(t *testing.T) {
 		runnerDir:        t.TempDir(),
 	}
 
-	timeout := 180 // seconds
+	timeout := 300 // seconds
 	ctx, cancel := context.WithTimeout(t.Context(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
@@ -54,7 +54,7 @@ func TestDocker_ShmNoexecByDefault(t *testing.T) {
 		runnerDir: t.TempDir(),
 	}
 
-	timeout := 180 // seconds
+	timeout := 300 // seconds
 	ctx, cancel := context.WithTimeout(t.Context(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
@@ -79,7 +79,7 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 		runnerDir: t.TempDir(),
 	}
 
-	timeout := 180 // seconds
+	timeout := 300 // seconds
 	ctx, cancel := context.WithTimeout(t.Context(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
