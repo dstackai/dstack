@@ -155,3 +155,112 @@ func createTaskConfig(t *testing.T) TaskConfig {
 		ImageName: "ubuntu",
 	}
 }
+
+func pullMsg(id, status string, current, total uint64) PullMessage {
+	m := PullMessage{Id: id, Status: status}
+	m.ProgressDetail.Current = current
+	m.ProgressDetail.Total = total
+	return m
+}
+
+func TestPullTracker_Empty(t *testing.T) {
+	tracker := newPullTracker()
+	assert.Nil(t, tracker.Progress())
+}
+
+func TestPullTracker_AlreadyExists(t *testing.T) {
+	tracker := newPullTracker()
+	tracker.Update(PullMessage{Id: "3.11", Status: "Pulling from library/python"})
+	for _, id := range []string{"aaa", "bbb", "ccc"} {
+		tracker.Update(PullMessage{Id: id, Status: "Already exists"})
+	}
+	tracker.Update(PullMessage{Status: "Digest: sha256:***"})
+	tracker.Update(PullMessage{Status: "Status: Image is up to date for python:3.11"})
+	p := tracker.Progress()
+	require.NotNil(t, p)
+	assert.Equal(t, uint64(0), p.DownloadedBytes)
+	assert.Equal(t, uint64(0), p.ExtractedBytes)
+	assert.Equal(t, uint64(0), p.TotalBytes)
+	assert.True(t, p.IsTotalBytesFinal)
+}
+
+func TestPullTracker_FullPull(t *testing.T) {
+	const sizeA, sizeB uint64 = 111, 222
+
+	tracker := newPullTracker()
+	tracker.Update(PullMessage{Id: "3.11", Status: "Pulling from library/python"})
+	tracker.Update(PullMessage{Id: "aaa", Status: "Pulling fs layer"})
+	tracker.Update(PullMessage{Id: "bbb", Status: "Pulling fs layer"})
+	tracker.Update(PullMessage{Id: "aaa", Status: "Waiting"})
+	tracker.Update(PullMessage{Id: "bbb", Status: "Waiting"})
+
+	// Layers announced but sizes unknown yet
+	p := tracker.Progress()
+	require.NotNil(t, p)
+	assert.Equal(t, uint64(0), p.DownloadedBytes)
+	assert.Equal(t, uint64(0), p.ExtractedBytes)
+	assert.Equal(t, uint64(0), p.TotalBytes)
+	assert.False(t, p.IsTotalBytesFinal)
+
+	// Both layers start downloading - sizes now known
+	tracker.Update(pullMsg("aaa", "Downloading", 100, sizeA))
+	tracker.Update(pullMsg("bbb", "Downloading", 200, sizeB))
+
+	p = tracker.Progress()
+	assert.Equal(t, uint64(300), p.DownloadedBytes)
+	assert.Equal(t, uint64(0), p.ExtractedBytes)
+	assert.Equal(t, sizeA+sizeB, p.TotalBytes)
+	assert.True(t, p.IsTotalBytesFinal)
+
+	// Downloads complete
+	tracker.Update(pullMsg("aaa", "Downloading", sizeA, sizeA))
+	tracker.Update(PullMessage{Id: "aaa", Status: "Download complete"})
+	tracker.Update(pullMsg("bbb", "Downloading", sizeB, sizeB))
+	tracker.Update(PullMessage{Id: "bbb", Status: "Download complete"})
+
+	p = tracker.Progress()
+	assert.Equal(t, sizeA+sizeB, p.DownloadedBytes)
+	assert.Equal(t, uint64(0), p.ExtractedBytes)
+	assert.Equal(t, sizeA+sizeB, p.TotalBytes)
+	assert.True(t, p.IsTotalBytesFinal)
+
+	// Both layers start extracting
+	tracker.Update(pullMsg("aaa", "Extracting", 100, sizeA))
+	tracker.Update(pullMsg("bbb", "Extracting", 200, sizeB))
+
+	p = tracker.Progress()
+	assert.Equal(t, sizeA+sizeB, p.DownloadedBytes)
+	assert.Equal(t, uint64(300), p.ExtractedBytes)
+	assert.Equal(t, sizeA+sizeB, p.TotalBytes)
+	assert.True(t, p.IsTotalBytesFinal)
+
+	// Extractions complete
+	tracker.Update(pullMsg("aaa", "Extracting", sizeA, sizeA))
+	tracker.Update(PullMessage{Id: "aaa", Status: "Pull complete"})
+	tracker.Update(pullMsg("bbb", "Extracting", sizeB, sizeB))
+	tracker.Update(PullMessage{Id: "bbb", Status: "Pull complete"})
+	tracker.Update(PullMessage{Status: "Digest: sha256:***"})
+	tracker.Update(PullMessage{Status: "Status: Downloaded newer image for python:3.11"})
+
+	p = tracker.Progress()
+	assert.Equal(t, sizeA+sizeB, p.DownloadedBytes)
+	assert.Equal(t, sizeA+sizeB, p.ExtractedBytes)
+	assert.Equal(t, sizeA+sizeB, p.TotalBytes)
+	assert.True(t, p.IsTotalBytesFinal)
+}
+
+func TestPullTracker_MixedLayerStatuses(t *testing.T) {
+	tracker := newPullTracker()
+
+	tracker.Update(PullMessage{Id: "layer-exists", Status: "Already exists"})
+	tracker.Update(pullMsg("layer-downloading", "Downloading", 50, 100))
+	tracker.Update(pullMsg("layer-extracting", "Extracting", 100, 200))
+	tracker.Update(PullMessage{Id: "layer-waiting", Status: "Waiting"})
+
+	p := tracker.Progress()
+	require.NotNil(t, p)
+	assert.Equal(t, uint64(50+200), p.DownloadedBytes)
+	assert.Equal(t, uint64(100), p.ExtractedBytes)
+	assert.Equal(t, uint64(100+200), p.TotalBytes)
+	assert.False(t, p.IsTotalBytesFinal) // layer-waiting size unknown
+}

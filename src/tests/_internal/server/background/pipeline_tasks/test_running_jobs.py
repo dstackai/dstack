@@ -26,6 +26,7 @@ from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import StartupOrder, UtilizationPolicy
 from dstack._internal.core.models.runs import (
+    ImagePullProgress,
     JobRuntimeData,
     JobStatus,
     JobTerminationReason,
@@ -114,6 +115,7 @@ def ssh_tunnel_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
 def shim_client_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
     mock = Mock(spec_set=ShimClient)
     mock.healthcheck.return_value = HealthcheckResponse(service="dstack-shim", version="latest")
+    mock.get_task.return_value.image_pull_progress = None
     monkeypatch.setattr(
         "dstack._internal.server.services.runner.client.ShimClient", Mock(return_value=mock)
     )
@@ -1087,6 +1089,42 @@ class TestJobRunningWorker:
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.INSTANCE_UNREACHABLE
         assert job.remove_at is None
+
+    async def test_pulling_shim_stores_pull_progress(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobRunningWorker,
+        ssh_tunnel_mock: Mock,
+        shim_client_mock: Mock,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        instance = await create_instance(
+            session=session, project=project, status=InstanceStatus.BUSY
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.PULLING,
+            submitted_at=get_current_datetime(),
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
+            instance=instance,
+            instance_assigned=True,
+        )
+        progress = ImagePullProgress(
+            downloaded_bytes=512, extracted_bytes=0, total_bytes=1024, is_total_bytes_final=True
+        )
+        shim_client_mock.get_task.return_value.status = TaskStatus.PULLING
+        shim_client_mock.get_task.return_value.image_pull_progress = progress
+
+        await _process_job(session, worker, job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.PULLING
+        assert job.image_pull_progress == progress.json()
 
     async def test_provisioning_shim_force_stop_if_already_running_api_v1(
         self,

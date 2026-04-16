@@ -18,6 +18,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RunConfigurationType
 from dstack._internal.core.models.runs import (
+    ImagePullProgress,
     Job,
     JobConnectionInfo,
     JobProvisioningData,
@@ -261,6 +262,7 @@ def job_model_to_job_submission(
         job_runtime_data=get_job_runtime_data(job_model),
         error=error,
         probes=probes,
+        image_pull_progress=_get_image_pull_progress(job_model),
     )
 
 
@@ -274,6 +276,12 @@ def get_job_runtime_data(job_model: JobModel) -> Optional[JobRuntimeData]:
     if job_model.job_runtime_data is None:
         return None
     return JobRuntimeData.__response__.parse_raw(job_model.job_runtime_data)
+
+
+def _get_image_pull_progress(job_model: JobModel) -> Optional[ImagePullProgress]:
+    if job_model.image_pull_progress is None:
+        return None
+    return ImagePullProgress.__response__.parse_raw(job_model.image_pull_progress)
 
 
 def get_job_spec(job_model: JobModel) -> JobSpec:

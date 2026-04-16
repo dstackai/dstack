@@ -108,12 +108,20 @@ type TaskListItem struct {
 	Status TaskStatus `json:"status"`
 }
 
+type ImagePullProgress struct {
+	DownloadedBytes   uint64 `json:"downloaded_bytes"`
+	ExtractedBytes    uint64 `json:"extracted_bytes"`
+	TotalBytes        uint64 `json:"total_bytes"`
+	IsTotalBytesFinal bool   `json:"is_total_bytes_final"`
+}
+
 type TaskInfo struct {
 	ID                 string
 	Status             TaskStatus
 	TerminationReason  string
 	TerminationMessage string
 	Ports              []PortMapping
+	ImagePullProgress  *ImagePullProgress
 	ContainerName      string
 	ContainerID        string
 	GpuIDs             []string

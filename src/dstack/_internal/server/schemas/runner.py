@@ -9,6 +9,7 @@ from dstack._internal.core.models.common import CoreModel, NetworkMode
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
+    ImagePullProgress,
     JobSpec,
     JobStatus,
     JobSubmission,
@@ -223,6 +224,7 @@ class TaskInfoResponse(CoreModel):
     """`ports` uses a default value for backward compatibility with 0.18.34.
     It can be removed after a few releases.
     """
+    image_pull_progress: Optional[ImagePullProgress] = None
 
 
 class TaskSubmitRequest(CoreModel):
