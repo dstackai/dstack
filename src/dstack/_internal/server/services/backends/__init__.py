@@ -279,6 +279,7 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
     async with _get_project_cache_lock(project.id):
         key = project.id
         project_backends = _BACKENDS_CACHE.get(key, {})
+        to_init: List[Tuple[BackendModel, Configurator, StoredBackendRecord]] = []
         for backend_model in project.backends:
             cached_backend = project_backends.get(backend_model.type)
             if (
@@ -300,22 +301,55 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
                     backend_model.type.value,
                 )
                 continue
-            try:
-                backend_record = get_stored_backend_record(backend_model)
-                backend = await run_async(configurator.get_backend, backend_record)
-            except (BackendInvalidCredentialsError, BackendAuthError):
-                logger.warning(
-                    "Credentials for %s backend are invalid. Backend will be ignored.",
-                    backend_model.type.value,
-                )
-                continue
-            project_backends[backend_model.type] = (backend_model, backend)
+            backend_record = get_stored_backend_record(backend_model)
+            to_init.append((backend_model, configurator, backend_record))
+
+        if to_init:
+            t0 = time.time()
+            tasks = [
+                _get_backend_tracked(configurator, backend_record)
+                for _, configurator, backend_record in to_init
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            initialized_results = []
+            for (backend_model, _, _), result in zip(to_init, results):
+                if isinstance(result, BaseException):
+                    if isinstance(result, (BackendInvalidCredentialsError, BackendAuthError)):
+                        logger.warning(
+                            "Credentials for %s backend are invalid. Backend will be ignored.",
+                            backend_model.type.value,
+                        )
+                    else:
+                        logger.error(
+                            "Failed to initialize %s backend. Backend will be ignored.",
+                            backend_model.type.value,
+                            exc_info=result,
+                        )
+                else:
+                    backend, duration = result
+                    project_backends[backend_model.type] = (backend_model, backend)
+                    initialized_results.append(f"{backend_model.type.value}={duration:.1f}s")
+            logger.debug(
+                "Initialized %d backends in %.1fs: %s",
+                len(initialized_results),
+                time.time() - t0,
+                ", ".join(initialized_results),
+            )
+
         # `__setitem__()` will also expire the cache.
         # Note that there is no global cache lock so a race condition is possible:
         # one coroutine updates/re-assigns backends expired by another coroutine.
         # This is ok since the only effect is that project's cache gets restored.
         _BACKENDS_CACHE[key] = project_backends
     return list(project_backends.values())
+
+
+async def _get_backend_tracked(
+    configurator: Configurator, backend_record: StoredBackendRecord
+) -> Tuple[Backend, float]:
+    t = time.time()
+    backend = await run_async(configurator.get_backend, backend_record)
+    return backend, time.time() - t
 
 
 _get_project_backend_with_model_by_type = None
