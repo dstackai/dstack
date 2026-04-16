@@ -5,7 +5,7 @@ description: Managing ingress traffic and endpoints for services
 
 # Gateways
 
-Gateways manage ingress traffic for running [services](services.md), handle auto-scaling and rate limits, enable HTTPS, and allow you to configure a custom domain. They also support custom routers, such as the [SGLang Model Gateway](https://docs.sglang.ai/advanced_features/router.html#).
+Gateways manage ingress traffic for running [services](services.md), handle auto-scaling and rate limits, enable HTTPS, and allow you to configure a custom domain.
 
 <!-- > If you're using [dstack Sky](https://sky.dstack.ai),
 > the gateway is already set up for you. -->
@@ -67,6 +67,10 @@ You can create gateways with the `aws`, `azure`, `gcp`, or `kubernetes` backends
 
 ### Router
 
+> In previous releases, `dstack` allowed configuring `router` the gateway, which was required for PD disaggregation. Since 0.20.17, the `router` configuration has moved to [services](services.md#pd-disaggregation), and the gateway no longer needs to configure router.
+
+<!-- ### Router
+
 By default, the gateway uses its own load balancer to route traffic between replicas. However, you can delegate this responsibility to a specific router by setting the `router` property. Currently, the only supported external router is `sglang`.
 
 #### SGLang
@@ -107,9 +111,7 @@ If you configure the `sglang` router, [services](../concepts/services.md) can ru
     * `cache_aware` &mdash; Default policy; combines cache locality with load balancing, falling back to shortest queue. 
     * `power_of_two` &mdash; Samples two workers and picks the lighter one.                                               
     * `random` &mdash; Uniform random selection.                                                                    
-    * `round_robin` &mdash; Cycles through workers in order.                                                             
-
-
+    * `round_robin` &mdash; Cycles through workers in order.                                                              -->
 
 ### Certificate
 

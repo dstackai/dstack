@@ -10,7 +10,7 @@ description: Introduction to dstack and how it works
 It streamlines development, training, and inference, and is compatible with any hardware, open-source tools, and frameworks.
 
 !!! info "Accelerators"
-    `dstack` supports `NVIDIA`, `AMD`, `TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
+    `dstack` supports `NVIDIA`, `AMD`, `TPU`, and `Tenstorrent` accelerators out of the box.
 
 ## How does it work?
 

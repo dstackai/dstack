@@ -20,16 +20,15 @@ It streamlines development, training, and inference, and is compatible with any 
 
 #### Accelerators
 
-`dstack` supports `NVIDIA`, `AMD`, `Google TPU`, `Intel Gaudi`, and `Tenstorrent` accelerators out of the box.
+`dstack` supports `NVIDIA`, `AMD`, `Google TPU`, and `Tenstorrent` accelerators out of the box.
 
 ## Latest news ✨
+- [2026/04] [dstack 0.20.17: PD disaggregation, Kubernetes volumes](https://github.com/dstackai/dstack/releases/tag/0.20.17)
+- [2026/04] [dstack 0.20.16: Performance, SSH proxy](https://github.com/dstackai/dstack/releases/tag/0.20.16)
+- [2026/03] [dstack 0.20.13: Exports, Templates](https://github.com/dstackai/dstack/releases/tag/0.20.13)
+- [2026/02] [dstack 0.20.12: Crusoe](https://github.com/dstackai/dstack/releases/tag/0.20.12)
+- [2026/02] [dstack 0.20.8: Skills](https://github.com/dstackai/dstack/releases/tag/0.20.8)
 - [2025/12] [dstack 0.20.0: Fleet-first UX, Events, and more](https://github.com/dstackai/dstack/releases/tag/0.20.0)
-- [2025/11] [dstack 0.19.38: Routers, SGLang Model Gateway integration](https://github.com/dstackai/dstack/releases/tag/0.19.38)
-- [2025/10] [dstack 0.19.31: Kubernetes, GCP A4 spot](https://github.com/dstackai/dstack/releases/tag/0.19.31)
-- [2025/08] [dstack 0.19.26: Repos](https://github.com/dstackai/dstack/releases/tag/0.19.26)
-- [2025/08] [dstack 0.19.22: Service probes, GPU health-checks, Tenstorrent Galaxy](https://github.com/dstackai/dstack/releases/tag/0.19.22)
-- [2025/07] [dstack 0.19.21: Scheduled tasks](https://github.com/dstackai/dstack/releases/tag/0.19.21)
-- [2025/07] [dstack 0.19.17: Secrets, Files, Rolling deployment](https://github.com/dstackai/dstack/releases/tag/0.19.17)
 
 ## How does it work?
 

@@ -233,7 +233,86 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 ### PD disaggregation
 
-You can run SGLang with [Prefill-Decode disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html). See the [corresponding example](../../examples/inference/sglang/index.md#pd-disaggregation).
+Since 0.20.17, `dstack` supports serving a model using PD disaggregation. To use it, configure three replica groups: one for a router (for example, [SGLang Model Gateway](https://docs.sglang.io/advanced_features/sgl_model_gateway.html)), one for prefill workers, and one for decode workers.
+
+> Currently, Prefill-Decode disaggregation is supported only for SGLang.
+
+Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
+
+<div editor-title="examples/inference/sglang/pd.dstack.yml">
+
+```yaml
+type: service
+name: prefill-decode
+image: lmsysorg/sglang:latest
+
+env:
+  - HF_TOKEN
+  - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+
+replicas:
+  - count: 1
+    # For now replica group with router must have count: 1
+    commands:
+      - pip install sglang_router
+      - |
+        python -m sglang_router.launch_router \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --pd-disaggregation \
+          --prefill-policy cache_aware
+    router:
+      type: sglang
+    resources:
+      cpu: 4
+
+  - count: 1..4
+    scaling:
+      metric: rps
+      target: 3
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --disaggregation-mode prefill \
+          --disaggregation-transfer-backend nixl \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --disaggregation-bootstrap-port 8998
+    resources:
+      gpu: H200
+
+  - count: 1..8
+    scaling:
+      metric: rps
+      target: 2
+    commands:
+      - |
+        python -m sglang.launch_server \
+          --model-path $MODEL_ID \
+          --disaggregation-mode decode \
+          --disaggregation-transfer-backend nixl \
+          --host 0.0.0.0 \
+          --port 8000
+    resources:
+      gpu: H200
+
+port: 8000
+model: zai-org/GLM-4.5-Air-FP8
+
+# Custom probe is required for PD disaggregation.
+probes:
+  - type: http
+    url: /health
+    interval: 15s
+```
+
+</div>
+
+!!! info "Cluster"
+    PD disaggregation requires the service to run in a fleet with `placement` set to `cluster`, because the replicas require an interconnect between instances.
+
+    While the prefill and decode replicas run on GPUs, the router replica requires a CPU instance in the same cluster.
 
 ### Authorization
 

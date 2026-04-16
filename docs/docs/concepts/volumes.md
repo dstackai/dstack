@@ -16,7 +16,7 @@ Useful as a cache for cloud fleets or for persistent storage with SSH fleets.
 
 ## Network volumes
 
-Network volumes are currently supported for the `aws`, `gcp`, and `runpod` backends.
+> Network volumes are currently supported for the `aws`, `gcp`, `runpod`, and `kubernetes` backends.
 
 ### Apply a configuration
 
@@ -42,6 +42,28 @@ size: 100GB
 
 If you use this configuration, `dstack` will create a new volume based on the specified options.
 
+??? info "Kubernetes"
+    With the `kubernetes` backend, you don't have to specify `region`, but you can optionally specify  `storage_class_name` and/or `access_modes`:
+
+    <div editor-title="volume.dstack.yml"> 
+
+    ```yaml
+    type: volume
+    backend: kubernetes
+    name: my-volume
+
+    size: 100GB
+    ```
+
+    </div>
+
+    This automatically creates a `PersistentVolumeClaim` and associates it with the volume.
+
+    If you don't specify `storage_class_name`, the decision is delegated to the `DefaultStorageClass` admission controller, if enabled.
+    
+    If you don't specify `access_modes`, it defaults to `[ReadWriteOnce]`. To attach volumes to multiple runs at the same time, set it to `[ReadWriteMany]` or `[ReadWriteMany, ReadOnlyMany]`.
+
+
 To create, update, or register the volume, pass the volume configuration to `dstack apply`:
 
 <div class="termy">
@@ -62,32 +84,47 @@ Once created, the volume can be attached to dev environments, tasks, and service
 
 > When creating a new network volume, `dstack` automatically creates an `ext4` filesystem on it.
 
-??? info "Register existing volumes"
-    If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
-    specify its ID via [`volume_id`](../reference/dstack.yml/volume.md#volume_id). In this case, `dstack` will register the specified volume so that you can use it with dev environments, tasks, and services.
+#### Register existing volumes
+
+If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
+specify its ID via [`volume_id`](../reference/dstack.yml/volume.md#volume_id). In this case, `dstack` will register the specified volume so that you can use it with dev environments, tasks, and services.
+
+<div editor-title="volume.dstack.yml"> 
+
+```yaml
+type: volume
+# The name of the volume
+name: my-volume
+
+# Volumes are bound to a specific backend and region
+backend: aws
+region: eu-central-1
+
+# The ID of the volume in AWS
+volume_id: vol1235
+```
+
+</div>
+
+If you register an existing volume, you must ensure the volume already has a filesystem.
+
+??? info "Kubernetes"
+
+    With the `kubernetes` backend, to reuse an existing `PersistentVolumeClaim`, specify its name in `claim_name`:
 
     <div editor-title="volume.dstack.yml"> 
 
     ```yaml
     type: volume
-    # The name of the volume
+    backend: kubernetes
     name: my-volume
-    
-    # Volumes are bound to a specific backend and region
-    backend: aws
-    region: eu-central-1
-    
-    # The ID of the volume in AWS
-    volume_id: vol1235
+
+    claim_name: existing-pvc
     ```
-    
+
     </div>
 
-    !!! info "Filesystem"
-        If you register an existing volume, you must ensure the volume already has a filesystem.
-
-!!! info "Reference"
-    For all volume configuration options, refer to the [reference](../reference/dstack.yml/volume.md).
+For all volume configuration options, refer to the [reference](../reference/dstack.yml/volume.md).
 
 ### Attach a volume { #attach-network-volume }
 
@@ -232,6 +269,8 @@ If you've registered an existing volume, it will be de-registered with `dstack` 
 Instance volumes allow mapping any directory on the instance where the run is executed to any path inside the container.
 This means that the data in instance volumes is persisted only if the run is executed on the same instance.
 
+> Instance volumes are currently supported for all backends except `runpod` and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
+
 ### Attach a volume
 
 A run can configure any number of instance volumes. To attach an instance volume,
@@ -260,9 +299,6 @@ volumes:
 
 Since persistence isn't guaranteed (instances may be interrupted or runs may occur on different instances), use instance
 volumes only for caching or with directories manually mounted to network storage.
-
-!!! info "Backends"
-    Instance volumes are currently supported for all backends except `runpod` and `vastai`, and can also be used with [SSH fleets](fleets.md#ssh-fleets).
 
 ??? info "Optional volumes"
     If the volume is not critical for your workload, you can mark it as `optional`.

@@ -108,16 +108,13 @@ curl http://127.0.0.1:3000/proxy/services/main/deepseek-r1/v1/chat/completions \
 ```
 </div>
 
-!!! info "Run router and workers separately"
-    To run the SGLang router and workers separately, use replica groups (router as a CPU replica group, workers as GPU replica groups). See [PD disaggregation](#pd-disaggregation).
-
 > If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://deepseek-r1.<gateway domain>/`.
 
 ## Configuration options
 
 ### PD disaggregation
 
-To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html), run the **router as a replica** on a CPU-only host, while running **prefill/decode workers** as replicas on GPU hosts.
+To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html), use replicas groups: one for a router (for example, [SGLang Model Gateway](https://docs.sglang.io/advanced_features/sgl_model_gateway.html)), one for prefill workers, and one for decode workers.
 
 <div editor-title="examples/inference/sglang/pd.dstack.yml">
 
@@ -191,15 +188,10 @@ probes:
 
 Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
 
-#### Fleet
+!!! info "Cluster"
+    PD disaggregation requires the service to run in a fleet with `placement` set to `cluster`, because the replicas require an interconnect between instances.
 
-Create a [fleet](https://dstack.ai/docs/concepts/fleets/) that can provision both a CPU node (for the router replica group) and GPU nodes (for the prefill/decode replica groups).
-You can create an SSH fleet, elastic Cloud fleet (nodes: 0..) or kubernetes cluster. Just don't specify any resource constraints in the fleet, and dstack will automatically provision the correct instances (both CPU and GPU, in the same fleet) based on the resources specified in replicas in the run configuration.
-
-The only requirement is that the router and worker replicas run in the same network. In practice, this typically means using a single fleet where the backend and region are the same or using `placement: cluster` if the backend supports it.
-
-!!! note "Gateway-based routing (deprecated)"
-    If you create a gateway with the [`sglang` router](https://dstack.ai/docs/concepts/gateways/#sglang), you can also run SGLang with PD disaggregation. This method is deprecated and will be disallowed in a future release in favor of running the router as a replica.
+    While the prefill and decode replicas run on GPUs, the router replica requires a CPU instance in the same cluster.
 
 ## Source code
 
