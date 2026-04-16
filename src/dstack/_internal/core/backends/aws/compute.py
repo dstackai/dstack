@@ -1129,23 +1129,31 @@ def _get_vpc_id_subnets_ids_by_vpc_name_or_error(
     )
 
 
+_ON_DEMAND_QUOTA_CODES = {
+    "L-1216C47A": "Standard/OnDemand",
+    "L-417A185B": "P/OnDemand",
+    "L-DB2E81BA": "G/OnDemand",
+}
+
+
 def _get_regions_to_quotas(
     session: boto3.Session, regions: List[str]
 ) -> Dict[str, Dict[str, int]]:
-    def get_region_quotas(client: botocore.client.BaseClient) -> Dict[str, int]:
+    def get_region_quotas(region_name: str, client: botocore.client.BaseClient) -> Dict[str, int]:
         region_quotas = {}
-        try:
-            for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):
-                for q in page["Quotas"]:
-                    if "On-Demand" in q["QuotaName"]:
-                        region_quotas[q["UsageMetric"]["MetricDimensions"]["Class"]] = q["Value"]
-        except botocore.exceptions.ClientError as e:
-            if len(e.args) > 0 and "TooManyRequestsException" in e.args[0]:
-                logger.warning(
-                    "Failed to get quotas due to rate limits. Quotas won't be accounted for."
-                )
-            else:
-                logger.exception(e)
+        for quota_code, quota_class in _ON_DEMAND_QUOTA_CODES.items():
+            try:
+                resp = client.get_service_quota(ServiceCode="ec2", QuotaCode=quota_code)
+                region_quotas[quota_class] = resp["Quota"]["Value"]
+            except botocore.exceptions.ClientError as e:
+                if "TooManyRequestsException" in str(e):
+                    logger.warning(
+                        "Failed to get quota %s in %s due to rate limits",
+                        quota_code,
+                        region_name,
+                    )
+                else:
+                    logger.exception(e)
         return region_quotas
 
     regions_to_quotas = {}
@@ -1153,7 +1161,7 @@ def _get_regions_to_quotas(
         future_to_region = {}
         for region in regions:
             future = executor.submit(
-                get_region_quotas, session.client("service-quotas", region_name=region)
+                get_region_quotas, region, session.client("service-quotas", region_name=region)
             )
             future_to_region[future] = region
         for future in as_completed(future_to_region):
