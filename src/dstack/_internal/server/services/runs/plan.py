@@ -85,11 +85,11 @@ async def get_job_plans(
     Returns job plans for the given run spec.
 
     Normal run planning (`dstack apply`) selects the best fleet candidate for each planned job
-    and builds offers from that path. Plain/json `dstack offer` uses the same `/runs/get_plan`
-    API, but its synthetic run spec is detected by `_should_select_best_fleet_candidate()`.
-    In that case, planning skips best-fleet-candidate selection and collects offers directly:
-    global offers when no fleets are specified, or offers from the selected fleets when
-    `--fleet` is used.
+    and builds offers from that path. `dstack offer` without `--group-by` uses the same
+    `/runs/get_plan` API, but its synthetic run spec is detected by
+    `_should_select_best_fleet_candidate()`. In that case, planning skips
+    best-fleet-candidate selection and collects offers directly: global offers when no fleets
+    are specified, or offers from the selected fleets when `--fleet` is used.
 
     Services are planned per replica group. Other run types are planned once and then expanded
     into per-job `JobPlan` results.
@@ -738,10 +738,10 @@ async def _get_offers_in_run_candidate_fleets(
     """
     Returns existing-instance and backend offers across the run's candidate fleets.
 
-    Used by plain/json `dstack offer --fleet ...`. Unlike normal `dstack apply`, it does not
-    choose a single best fleet. Instead, it gathers existing-instance and backend offers from
-    each selected fleet, keeps existing instances as separate reusable options, and deduplicates
-    identical backend offers across fleets.
+    Used by `dstack offer --fleet ...` without `--group-by`. Unlike normal `dstack apply`, it
+    does not choose a single best fleet. Instead, it gathers existing-instance and backend
+    offers from each selected fleet, keeps existing instances as separate reusable options, and
+    deduplicates identical backend offers across fleets.
     """
     candidate_fleet_models = await _select_candidate_fleet_models(
         session=session,
@@ -836,13 +836,14 @@ def _get_job_plan(
 
 def _should_select_best_fleet_candidate(run_spec: RunSpec) -> bool:
     """
-    Returns ``True`` for normal run planning and ``False`` for plain/json `dstack offer`.
+    Returns ``True`` for normal run planning and ``False`` for `dstack offer` without
+    `--group-by`.
 
-    Both `dstack apply` and plain/json `dstack offer` call `/runs/get_plan`. The current
-    way to recognize plain/json `dstack offer` is the synthetic task spec that the CLI
-    sends with `type == "task"` and `commands == [":"]`.
+    Both `dstack apply` and `dstack offer` without `--group-by` call `/runs/get_plan`. The
+    current way to recognize `dstack offer` without `--group-by` is the synthetic task spec
+    that the CLI sends with `type == "task"` and `commands == [":"]`.
     TODO: Replace this command-shape hack with an explicit request/API signal for
-    plain/json `dstack offer`.
+    `dstack offer` without `--group-by`.
 
     When this function returns ``False``, the planner skips best-fleet-candidate selection
     and goes directly to the special `dstack offer` collection path:
