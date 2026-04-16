@@ -29,16 +29,17 @@ def get_volumes_table(
         table.add_column("ERROR")
 
     for volume in volumes:
-        backend = f"{volume.configuration.backend.value} ({volume.configuration.region})"
-        region = volume.configuration.region
+        backend = volume.get_backend().value
+        region = volume.get_region()
         if verbose:
-            backend = volume.configuration.backend.value
-            if (
-                verbose
-                and volume.provisioning_data is not None
-                and volume.provisioning_data.availability_zone is not None
-            ):
-                region += f" ({volume.provisioning_data.availability_zone})"
+            # In verbose mode, BACKEND displays `backend` only, and REGION displays nothing or
+            # `region` or `region (az)`
+            if availability_zone := volume.get_availability_zone():
+                region = f"{region} ({availability_zone})"
+        elif region:
+            # In non-verbose mode, BACKEND displays `backend` or `backend (region)`, and REGION
+            # is hidden
+            backend = f"{backend} ({region})"
         attached = "-"
         if volume.attachments is not None:
             attached = ", ".join(

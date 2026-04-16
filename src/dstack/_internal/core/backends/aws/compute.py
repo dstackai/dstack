@@ -72,6 +72,7 @@ from dstack._internal.core.models.placement import (
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import (
+    AWSVolumeConfiguration,
     Volume,
     VolumeAttachmentData,
     VolumeProvisioningData,
@@ -688,6 +689,7 @@ class AWSCompute(
         logger.debug("Deleted ALB resources for gateway %s", configuration.instance_name)
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        assert isinstance(volume.configuration, AWSVolumeConfiguration)
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         logger.debug("Requesting EBS volume %s", volume.configuration.volume_id)
@@ -715,6 +717,7 @@ class AWSCompute(
         )
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        assert isinstance(volume.configuration, AWSVolumeConfiguration)
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         volume_name = generate_unique_volume_name(volume)
@@ -773,6 +776,7 @@ class AWSCompute(
         )
 
     def delete_volume(self, volume: Volume):
+        assert isinstance(volume.configuration, AWSVolumeConfiguration)
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         logger.debug("Deleting EBS volume %s", volume.configuration.name)
@@ -788,6 +792,7 @@ class AWSCompute(
     def attach_volume(
         self, volume: Volume, provisioning_data: JobProvisioningData
     ) -> VolumeAttachmentData:
+        assert isinstance(volume.configuration, AWSVolumeConfiguration)
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         instance_id = provisioning_data.instance_id
@@ -826,6 +831,7 @@ class AWSCompute(
     def detach_volume(
         self, volume: Volume, provisioning_data: JobProvisioningData, force: bool = False
     ):
+        assert isinstance(volume.configuration, AWSVolumeConfiguration)
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         instance_id = provisioning_data.instance_id
@@ -848,6 +854,7 @@ class AWSCompute(
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
 
     def is_volume_detached(self, volume: Volume, provisioning_data: JobProvisioningData) -> bool:
+        assert isinstance(volume.configuration, AWSVolumeConfiguration)
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         instance_id = provisioning_data.instance_id

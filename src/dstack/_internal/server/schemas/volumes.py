@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from uuid import UUID
 
 from pydantic import Field
 
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.volumes import VolumeConfiguration
+from dstack._internal.core.models.volumes import AnyVolumeConfiguration
 
 
 class ListVolumesRequest(CoreModel):
@@ -22,7 +22,7 @@ class GetVolumeRequest(CoreModel):
 
 
 class CreateVolumeRequest(CoreModel):
-    configuration: VolumeConfiguration
+    configuration: Annotated[AnyVolumeConfiguration, Field(discriminator="backend")]
 
 
 class DeleteVolumesRequest(CoreModel):

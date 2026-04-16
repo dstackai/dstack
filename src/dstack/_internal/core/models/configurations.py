@@ -31,7 +31,14 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.routers import AnyServiceRouterConfig, ReplicaGroupRouterConfig
 from dstack._internal.core.models.services import AnyModel, OpenAIChatModel
 from dstack._internal.core.models.unix import UnixUser
-from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
+from dstack._internal.core.models.volumes import (
+    AnyVolumeConfiguration,
+    BaseVolumeConfiguration,
+    MountPoint,
+    VolumeConfiguration,
+    parse_mount_point,
+    parse_volume_configuration,
+)
 from dstack._internal.core.services import is_valid_replica_group_name
 from dstack._internal.utils.common import has_duplicates, list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
@@ -1151,26 +1158,55 @@ AnyApplyConfiguration = Union[
     AnyRunConfiguration,
     FleetConfiguration,
     GatewayConfiguration,
-    VolumeConfiguration,
+    AnyVolumeConfiguration,
 ]
 
 
-class ApplyConfiguration(CoreModel):
+class BaseApplyConfiguration(CoreModel):
+    """
+    `BaseApplyConfiguration` parses the configuration based on the `type` discriminator field,
+    but further dispatching (reparsing) may be required if there is another discriminator field,
+    e.g., `BaseVolumeConfiguration` should be parsed again to get a backend-specific configuration
+    based on the `backend` discriminator field.
+
+    Don't use this model directly, use `parse_apply_configuration()` instead.
+    """
+
     __root__: Annotated[
-        AnyApplyConfiguration,
+        Union[
+            # Final configurations
+            AnyRunConfiguration,
+            FleetConfiguration,
+            GatewayConfiguration,
+            # Base configurations (further parsing required to get a concrete AnyApplyConfiguration)
+            BaseVolumeConfiguration,
+        ],
         Field(discriminator="type"),
     ]
 
 
 def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
     try:
-        conf = ApplyConfiguration.parse_obj(data).__root__
+        # First-pass parsing ignoring extra fields, to get the base (or final) configuration
+        conf = BaseApplyConfiguration.__response__.parse_obj(data).__root__
+        if not isinstance(conf, BaseVolumeConfiguration):
+            # If it's a final configuration (currently, any configuration other than
+            # BaseVolumeConfiguration), parse again rejecting extra fields
+            # for validation purposes only and return the final configuration
+            _ = BaseApplyConfiguration.parse_obj(data).__root__
+            return conf
     except ValidationError as e:
         raise ConfigurationError(e)
-    return conf
+    # Otherwise, delegate further parsing to more specific parser
+    return parse_volume_configuration(data)
 
 
-AnyDstackConfiguration = AnyApplyConfiguration
+AnyDstackConfiguration = Union[
+    AnyRunConfiguration,
+    FleetConfiguration,
+    GatewayConfiguration,
+    VolumeConfiguration,
+]
 
 
 class DstackConfiguration(CoreModel):

@@ -328,7 +328,7 @@ async def _process_submitted_volume(volume_model: VolumeModel) -> _ProcessResult
     compute = backend.compute()
     assert isinstance(compute, ComputeWithVolumeSupport)
     try:
-        if volume.configuration.volume_id is not None:
+        if volume.configuration.is_external:
             logger.info("Registering external volume %s", volume_model.name)
             vpd = await run_async(
                 compute.register_volume,

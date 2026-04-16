@@ -3,7 +3,7 @@ from typing import List
 from pydantic import parse_obj_as
 
 from dstack._internal.core.compatibility.volumes import get_create_volume_excludes
-from dstack._internal.core.models.volumes import Volume, VolumeConfiguration
+from dstack._internal.core.models.volumes import AnyVolumeConfiguration, Volume
 from dstack._internal.server.schemas.volumes import (
     CreateVolumeRequest,
     DeleteVolumesRequest,
@@ -25,7 +25,7 @@ class VolumesAPIClient(APIClientGroup):
     def create(
         self,
         project_name: str,
-        configuration: VolumeConfiguration,
+        configuration: AnyVolumeConfiguration,
     ) -> Volume:
         body = CreateVolumeRequest(configuration=configuration)
         resp = self._request(

@@ -8,6 +8,7 @@ import logging
 import re
 from enum import Enum
 from fnmatch import fnmatch
+from typing import Optional
 
 import mkdocs_gen_files
 import yaml
@@ -85,7 +86,7 @@ def get_friendly_type(annotation: Type) -> str:
 
     # Handle Literal — list values
     if get_origin(annotation) is Literal:
-        values = get_args(annotation)
+        values = [v.value if isinstance(v, Enum) else v for v in get_args(annotation)]
         return " | ".join(f'"{v}"' for v in values)
 
     # Handle list
@@ -207,11 +208,12 @@ def _enrich_type_from_schema(friendly_type: str, prop_schema: Dict[str, Any]) ->
 def generate_schema_reference(
     model_path: str,
     *,
-    overrides: Dict[str, Dict[str, Any]] = None,
+    overrides: Optional[dict[str, dict[str, Any]]] = None,
     prefix: str = "",
 ) -> str:
     module, model_name = model_path.rsplit(".", maxsplit=1)
     cls = getattr(importlib.import_module(module), model_name)
+    assert issubclass(cls, BaseModel)
     rows = []
     if (
         not overrides

@@ -5,7 +5,7 @@ from freezegun import freeze_time
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.volumes import VolumeConfiguration, VolumeStatus
+from dstack._internal.core.models.volumes import AWSVolumeConfiguration, VolumeStatus
 from dstack._internal.server.services.volumes import (
     _get_volume_cost,
     _validate_volume_configuration,
@@ -19,7 +19,7 @@ from dstack._internal.server.testing.common import (
 class TestValidateVolumeConfiguration:
     def test_external_volume_with_auto_cleanup_duration_raises_error(self):
         """External volumes (with volume_id) should not allow auto_cleanup_duration"""
-        config = VolumeConfiguration(
+        config = AWSVolumeConfiguration(
             backend=BackendType.AWS,
             region="us-east-1",
             volume_id="vol-123456",
@@ -32,7 +32,7 @@ class TestValidateVolumeConfiguration:
 
     def test_external_volume_with_auto_cleanup_duration_int_raises_error(self):
         """External volumes with integer auto_cleanup_duration should also raise error"""
-        config = VolumeConfiguration(
+        config = AWSVolumeConfiguration(
             backend=BackendType.AWS,
             region="us-east-1",
             volume_id="vol-123456",
@@ -45,13 +45,13 @@ class TestValidateVolumeConfiguration:
 
     def test_external_volume_with_auto_cleanup_disabled_succeeds(self):
         """External volumes with auto_cleanup_duration='off' or -1 should be allowed"""
-        config1 = VolumeConfiguration(
+        config1 = AWSVolumeConfiguration(
             backend=BackendType.AWS,
             region="us-east-1",
             volume_id="vol-123456",
             auto_cleanup_duration="off",
         )
-        config2 = VolumeConfiguration(
+        config2 = AWSVolumeConfiguration(
             backend=BackendType.AWS,
             region="us-east-1",
             volume_id="vol-123456",
@@ -63,7 +63,7 @@ class TestValidateVolumeConfiguration:
 
     def test_external_volume_without_auto_cleanup_succeeds(self):
         """External volumes without auto_cleanup_duration should be allowed"""
-        config = VolumeConfiguration(
+        config = AWSVolumeConfiguration(
             backend=BackendType.AWS, region="us-east-1", volume_id="vol-123456"
         )
         # Should not raise any errors
@@ -71,7 +71,7 @@ class TestValidateVolumeConfiguration:
 
     def test_new_volume_with_auto_cleanup_duration_succeeds(self):
         """New volumes (without volume_id) with auto_cleanup_duration should be allowed"""
-        config = VolumeConfiguration(
+        config = AWSVolumeConfiguration(
             backend=BackendType.AWS, region="us-east-1", size=100, auto_cleanup_duration="1h"
         )
         # Should not raise any errors

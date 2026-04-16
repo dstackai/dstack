@@ -1510,8 +1510,8 @@ async def _process_volume_attachments(
                 ):
                     raise ServerClientError("Cannot attach a volume locked for processing")
                 if (
-                    job_provisioning_data.get_base_backend() != volume.configuration.backend
-                    or job_provisioning_data.region.lower() != volume.configuration.region.lower()
+                    job_provisioning_data.get_base_backend() != volume.get_backend()
+                    or job_provisioning_data.region.lower() != volume.get_region().lower()
                 ):
                     continue
                 if volume.provisioning_data is None or not volume.provisioning_data.attachable:
@@ -2153,8 +2153,8 @@ def _get_offer_mount_point_volume(
 ) -> Volume:
     for volume in volumes:
         if (
-            volume.configuration.backend != offer.backend
-            or volume.configuration.region.lower() != offer.region.lower()
+            volume.get_backend() != offer.backend
+            or volume.get_region().lower() != offer.region.lower()
         ):
             continue
         return volume

@@ -71,6 +71,7 @@ from dstack._internal.core.models.placement import PlacementGroup, PlacementGrou
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.volumes import (
+    GCPVolumeConfiguration,
     Volume,
     VolumeAttachmentData,
     VolumeProvisioningData,
@@ -645,6 +646,7 @@ class GCPCompute(
         )
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        assert isinstance(volume.configuration, GCPVolumeConfiguration)
         logger.debug("Requesting persistent disk %s", volume.configuration.volume_id)
         zones = gcp_resources.get_availability_zones(
             regions_client=self.regions_client,
@@ -676,6 +678,7 @@ class GCPCompute(
         raise ComputeError(f"Persistent disk {volume.configuration.volume_id} not found")
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        assert isinstance(volume.configuration, GCPVolumeConfiguration)
         zones = gcp_resources.get_availability_zones(
             regions_client=self.regions_client,
             project_id=self.config.project_id,

@@ -186,9 +186,12 @@ def print_run_plan(
         instance = offer.instance.name
         if offer.total_blocks > 1:
             instance += f" ({offer.blocks}/{offer.total_blocks})"
+        offer_backend = offer.backend.replace("remote", "ssh")
+        if offer.region:
+            offer_backend = f"{offer_backend} ({offer.region})"
         offers.add_row(
             f"{i}",
-            offer.backend.replace("remote", "ssh") + " (" + offer.region + ")",
+            offer_backend,
             r.pretty_format(include_spot=True),
             instance,
             f"${offer.price:.4f}".rstrip("0").rstrip("."),
@@ -394,6 +397,8 @@ def _format_backend(backend_type: BackendType, region: str) -> str:
     backend_str = backend_type.value
     if backend_type == BackendType.REMOTE:
         backend_str = "ssh"
+    if not region:
+        return backend_str
     return f"{backend_str} ({region})"
 
 

@@ -14,8 +14,9 @@ from dstack._internal.cli.utils.volume import get_volumes_table
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.volumes import (
+    AnyVolumeConfiguration,
     Volume,
-    VolumeConfiguration,
+    VolumeConfigurationWithRegion,
     VolumePlan,
     VolumeSpec,
     VolumeStatus,
@@ -24,12 +25,12 @@ from dstack._internal.utils.common import local_time
 from dstack.api._public import Client
 
 
-class VolumeConfigurator(BaseApplyConfigurator[VolumeConfiguration]):
+class VolumeConfigurator(BaseApplyConfigurator[AnyVolumeConfiguration]):
     TYPE = ApplyConfigurationType.VOLUME
 
     def apply_configuration(
         self,
-        conf: VolumeConfiguration,
+        conf: AnyVolumeConfiguration,
         configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
@@ -129,7 +130,7 @@ class VolumeConfigurator(BaseApplyConfigurator[VolumeConfiguration]):
 
     def delete_configuration(
         self,
-        conf: VolumeConfiguration,
+        conf: AnyVolumeConfiguration,
         configuration_path: str,
         command_args: argparse.Namespace,
     ):
@@ -165,7 +166,7 @@ class VolumeConfigurator(BaseApplyConfigurator[VolumeConfiguration]):
             help="The volume name",
         )
 
-    def apply_args(self, conf: VolumeConfiguration, args: argparse.Namespace):
+    def apply_args(self, conf: AnyVolumeConfiguration, args: argparse.Namespace):
         if args.name:
             conf.name = args.name
 
@@ -206,12 +207,13 @@ def _print_plan_header(plan: VolumePlan):
     size = "-"
     if plan.spec.configuration.size is not None:
         size = str(plan.spec.configuration.size)
-    if plan.spec.configuration.volume_id is not None:
+    if plan.spec.configuration.is_external:
         volume_type = "external"
 
     configuration_table.add_row(th("Volume type"), volume_type)
     configuration_table.add_row(th("Backend"), plan.spec.configuration.backend.value)
-    configuration_table.add_row(th("Region"), plan.spec.configuration.region)
+    if isinstance(plan.spec.configuration, VolumeConfigurationWithRegion):
+        configuration_table.add_row(th("Region"), plan.spec.configuration.region)
     configuration_table.add_row(th("Size"), size)
 
     console.print(configuration_table)
