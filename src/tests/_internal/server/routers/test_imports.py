@@ -2,9 +2,11 @@ from typing import Optional
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.server.models import ExportModel, ImportModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_export,
@@ -21,6 +23,119 @@ pytestmark = [
     pytest.mark.usefixtures("test_db"),
     pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True),
 ]
+
+
+class TestDeleteImport:
+    async def test_returns_403_if_not_authenticated(self, client: AsyncClient):
+        response = await client.post(
+            "/api/project/TestProject/imports/delete",
+            json={"export_name": "test-export", "export_project_name": "ExporterProject"},
+        )
+        assert response.status_code in [401, 403]
+
+    async def test_returns_403_if_not_admin(self, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        exporter_project = await create_project(
+            session=session, name="ExporterProject", owner=user
+        )
+        importer_project = await create_project(
+            session=session, name="ImporterProject", owner=user
+        )
+        # The user is admin of the exporter project, but not of the importer
+        await add_project_member(
+            session=session, project=exporter_project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.USER
+        )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/imports/delete",
+            headers=get_auth_headers(user.token),
+            json={"export_name": "test-export", "export_project_name": "ExporterProject"},
+        )
+        assert response.status_code == 403
+
+    async def test_deletes_import(self, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        importer_project = await create_project(
+            session=session, name="ImporterProject", owner=user
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.ADMIN
+        )
+        exporter_project = await create_project(session=session, name="ExporterProject")
+        fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            name="fleet1",
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+            name="test-export",
+        )
+
+        response = await client.post(
+            f"/api/project/{importer_project.name}/imports/delete",
+            headers=get_auth_headers(user.token),
+            json={
+                "export_name": "test-export",
+                "export_project_name": "ExPoRtErPrOjEcT",  # case-insensitive
+            },
+        )
+        assert response.status_code == 200
+
+        res = await session.execute(select(func.count()).select_from(ImportModel))
+        assert res.scalar_one() == 0
+        res = await session.execute(select(func.count()).select_from(ExportModel))
+        assert res.scalar_one() == 1
+
+    async def test_returns_400_for_nonexistent_import(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        importer_project = await create_project(
+            session=session, name="ImporterProject", owner=user
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        exporter_project = await create_project(
+            session=session, name="ExporterProject", owner=user
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="test-export",
+        )
+
+        async def assert_not_found(export_project_name, export_name):
+            response = await client.post(
+                f"/api/project/{importer_project.name}/imports/delete",
+                headers=get_auth_headers(user.token),
+                json={"export_name": export_name, "export_project_name": export_project_name},
+            )
+            assert response.status_code == 400
+            assert response.json()["detail"][0]["code"] == "resource_not_exists"
+            # The error should be the same regardless of what wasn't found
+            # (the exporter, the export, or the import),
+            # so that users cannot infer the existence of exports they are not given access to.
+            assert response.json()["detail"][0]["msg"] == (
+                f"Import '{export_project_name}/{export_name}' not found in project 'ImporterProject'"
+            )
+
+        # Exporter not found
+        await assert_not_found(export_project_name="WrongProject", export_name="test-export")
+        # Export not found
+        await assert_not_found(export_project_name="ExporterProject", export_name="wrong-export")
+        # Import not found
+        await assert_not_found(export_project_name="ExporterProject", export_name="test-export")
 
 
 class TestListImports:

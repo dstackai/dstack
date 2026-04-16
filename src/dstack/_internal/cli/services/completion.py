@@ -85,6 +85,14 @@ class ExportNameCompleter(BaseAPINameCompleter):
         return [r.name for r in api.client.exports.list(api.project)]
 
 
+class ImportNameCompleter(BaseAPINameCompleter):
+    def fetch_resource_names(self, api: Client) -> Iterable[str]:
+        return [
+            f"{imp.export.project_name}/{imp.export.name}"
+            for imp in api.client.imports.list(api.project)
+        ]
+
+
 class ProjectNameCompleter(BaseCompleter):
     """
     Completer for local project names.

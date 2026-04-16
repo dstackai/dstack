@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.imports import Import
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
-from dstack._internal.server.security.permissions import ProjectMember
+from dstack._internal.server.schemas.imports import DeleteImportRequest
+from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
 from dstack._internal.server.services import imports as imports_services
 from dstack._internal.server.utils.routers import get_base_api_additional_responses
 
@@ -15,6 +16,21 @@ project_router = APIRouter(
     tags=["imports"],
     responses=get_base_api_additional_responses(),
 )
+
+
+@project_router.post("/delete")
+async def delete_import(
+    body: DeleteImportRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectAdmin())],
+):
+    _, project = user_project
+    await imports_services.delete_import(
+        session=session,
+        project=project,
+        export_name=body.export_name,
+        export_project_name=body.export_project_name,
+    )
 
 
 @project_router.post("/list", response_model=list[Import])

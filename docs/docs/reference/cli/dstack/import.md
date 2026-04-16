@@ -17,3 +17,18 @@ $ dstack import list --help
 ```
 
 </div>
+
+## dstack import delete
+
+The `dstack import delete` command deletes the specified import. This makes the imported resources unavailable in your project, while they still exist in the host project.
+
+##### Usage
+
+<div class="termy">
+
+```shell
+$ dstack import delete --help
+#GENERATE#
+```
+
+</div>
