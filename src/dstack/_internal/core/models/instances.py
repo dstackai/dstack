@@ -63,31 +63,6 @@ class Resources(CoreModel):
         str,
         Field(description="Deprecated: generated client-side. Will be removed in 0.21."),
     ] = ""
-    """`description` is deprecated because it is now generated client-side."""
-
-    @root_validator
-    def _description(cls, values) -> Dict:
-        try:
-            description = values["description"]
-            if not description:
-                cpus = values["cpus"]
-                memory_mib = values["memory_mib"]
-                gpus = values["gpus"]
-                disk_size_mib = values["disk"].size_mib
-                spot = values["spot"]
-                cpu_arch = values["cpu_arch"]
-                values["description"] = Resources._pretty_format(
-                    cpus=cpus,
-                    cpu_arch=cpu_arch,
-                    memory_mib=memory_mib,
-                    disk_size_mib=disk_size_mib,
-                    gpus=gpus,
-                    spot=spot,
-                    include_spot=True,
-                )
-        except KeyError:
-            return values
-        return values
 
     def pretty_format(self, include_spot: bool = False, gpu_only: bool = False) -> str:
         return Resources._pretty_format(
@@ -99,20 +74,6 @@ class Resources(CoreModel):
             self.spot,
             include_spot,
             gpu_only,
-        )
-
-    def update_description(self):
-        """
-        Call to update `description` after patching other properties.
-        """
-        self.description = Resources._pretty_format(
-            cpus=self.cpus,
-            cpu_arch=self.cpu_arch,
-            memory_mib=self.memory_mib,
-            disk_size_mib=self.disk.size_mib,
-            gpus=self.gpus,
-            spot=self.spot,
-            include_spot=True,
         )
 
     @staticmethod

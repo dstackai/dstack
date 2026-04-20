@@ -78,6 +78,8 @@ def catalog_item_to_offer(
     requirements: Optional[Requirements],
     configurable_disk_size: Range[Memory],
 ) -> Optional[InstanceOffer]:
+    # Gpu() keeps validation for vendor normalization.
+    # The rest use construct() to skip redundant validation — data comes from already validated CatalogItem.
     gpus = []
     if item.gpu_count > 0:
         gpu = Gpu(
@@ -93,17 +95,17 @@ def catalog_item_to_offer(
     )
     if disk_size_mib is None:
         return None
-    resources = Resources(
+    resources = Resources.construct(
         cpu_arch=item.cpu_arch,
         cpus=item.cpu,
         memory_mib=round(item.memory * 1024),
         gpus=gpus,
         spot=item.spot,
-        disk=Disk(size_mib=disk_size_mib),
+        disk=Disk.construct(size_mib=disk_size_mib),
     )
-    return InstanceOffer(
+    return InstanceOffer.construct(
         backend=backend,
-        instance=InstanceType(
+        instance=InstanceType.construct(
             name=item.instance_name,
             resources=resources,
         ),
@@ -236,7 +238,6 @@ def get_offers_disk_modifier(
         offer_copy.instance.resources.disk = Disk(
             size_mib=get_or_error(disk_size_range.min) * 1024
         )
-        offer_copy.instance.resources.update_description()
         return offer_copy
 
     return modifier
