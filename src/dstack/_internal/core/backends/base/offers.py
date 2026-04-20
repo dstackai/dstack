@@ -38,7 +38,14 @@ def get_catalog_offers(
     configurable_disk_size: Range[Memory] = Range[Memory](min=Memory.parse("1GB"), max=None),
     extra_filter: Optional[Callable[[InstanceOffer], bool]] = None,
     catalog: Optional[gpuhunt.Catalog] = None,
+    catalog_item_filter: Optional[Callable[[gpuhunt.CatalogItem], bool]] = None,
 ) -> List[InstanceOffer]:
+    """
+    Args:
+        catalog_item_filter: applied to raw catalog items before the conversion to
+        `InstanceOffer` models. Use it for filtering that can be done on raw catalog fields
+        to avoid expensive model construction for items that will be discarded.
+    """
     provider = backend.value
     if backend == BackendType.DATACRUNCH:
         provider = BackendType.VERDA.value  # Backward compatibility
@@ -53,6 +60,8 @@ def get_catalog_offers(
     catalog = catalog if catalog is not None else gpuhunt.default_catalog()
     for item in catalog.query(**asdict(q)):
         if locations is not None and item.location not in locations:
+            continue
+        if catalog_item_filter is not None and not catalog_item_filter(item):
             continue
         offer = catalog_item_to_offer(backend, item, requirements, configurable_disk_size)
         if offer is None:
