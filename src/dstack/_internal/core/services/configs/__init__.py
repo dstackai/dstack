@@ -100,7 +100,8 @@ def update_default_project(project_name: str, url: str, token: str, yes: bool, n
                 default_project is None
                 or yes
                 or confirm_ask(
-                    f"Update the [code]{project_name}[/] project in [code]{config_dir}[/]?"
+                    f"Update the [code]{project_name}[/] project in [code]{config_dir}[/]?",
+                    default=False,
                 )
             )
             if not no
