@@ -12,18 +12,26 @@ To run containers with `dstack`, you can use your own Docker image (or the defau
 directly with Docker. However, some existing code may require direct use of Docker or Docker Compose. That's why,
 in our latest release, we've added this option.
 
-<div editor-title="examples/misc/docker-compose/task.dstack.yml"> 
-    
-```yaml 
+<div editor-title="task.dstack.yml">
+
+```yaml
 type: task
-name: chat-ui-task
+name: compose-task
 
 image: dstackai/dind
 privileged: true
 
-working_dir: examples/misc/docker-compose
 commands:
   - start-dockerd
+  - |
+    cat > compose.yaml <<'EOF'
+    services:
+      web:
+        image: python:3.11-slim
+        command: python -m http.server 9000
+        ports:
+          - "9000:9000"
+    EOF
   - docker compose up
 ports: [9000]
 
@@ -37,7 +45,7 @@ resources:
 
 ## How it works
 
-To use Docker or Docker Compose with your `dstack` configuration, set `image` to `dstackai/dind`, `privileged` to 
+To use Docker or Docker Compose with your `dstack` configuration, set `image` to `dstackai/dind`, `privileged` to
 `true`, and add the `start-dockerd` command. After this command, you can use Docker or Docker Compose directly.
 
 
@@ -45,7 +53,7 @@ For dev environments, add `start-dockerd` as the first command
 in the `init` property.
 
 ??? info "Dev environment"
-    <div editor-title="examples/misc/docker-compose/.dstack.yml">
+    <div editor-title=".dstack.yml">
 
     ```yaml
     type: dev-environment
@@ -59,7 +67,7 @@ in the `init` property.
       - start-dockerd
 
     resources:
-    gpu: 16GB..24GB
+      gpu: 16GB..24GB
     ```
 
     </div>
@@ -71,15 +79,15 @@ With this setup, you don’t have to worry about configuration—both Docker and
 support GPU usage.
 
 !!! info "Backends"
-    Note that the `privileged` option is only supported by VM-based backends. This does not include `runpod`, `vastai`, 
+    Note that the `privileged` option is only supported by VM-based backends. This does not include `runpod`, `vastai`,
     and `kubernetes`. All other backends support it.
 
 ## When using it
 
 ### docker compose
 
-One of the obvious use cases for this feature is when you need to use Docker Compose. 
-For example, the Hugging Face Chat UI requires a MongoDB database, so using Docker Compose to run it is 
+One of the obvious use cases for this feature is when you need to use Docker Compose.
+For example, the Hugging Face Chat UI requires a MongoDB database, so using Docker Compose to run it is
 the easiest way:
 
 <img src="https://dstack.ai/static-assets/static-assets/images/dstack-docker-compose-terminal.png" width="750"/>
@@ -92,14 +100,10 @@ Another use case for this feature is when you need to build a custom Docker imag
 
 Last but not least, you can, of course, use the `docker run` command, for example, if your existing code requires it.
 
-## Examples
-
-A few examples of using this feature can be found in [`examples/misc/docker-compose`](https://github.com/dstackai/dstack/blob/master/examples/misc/docker-compose).
-
 ## Feedback
 
 If you find something not working as intended, please be sure to report it to
-our [bug tracker](https://github.com/dstackai/dstack/issues){:target="_ blank"}. 
-Your feedback and feature requests are also very welcome on both 
+our [bug tracker](https://github.com/dstackai/dstack/issues){:target="_ blank"}.
+Your feedback and feature requests are also very welcome on both
 [Discord](https://discord.gg/u8SmfwPpMd) and the
 [issue tracker](https://github.com/dstackai/dstack/issues).

@@ -1,11 +1,11 @@
 ---
 title: NVIDIA NIM
-description: Deploying DeepSeek-R1-Distill-Llama-8B using NVIDIA NIM
+description: Deploying Nemotron-3-Super-120B-A12B using NVIDIA NIM
 ---
 
 # NVIDIA NIM
 
-This example shows how to deploy DeepSeek-R1-Distill-Llama-8B using [NVIDIA NIM](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html) and `dstack`.
+This example shows how to deploy Nemotron-3-Super-120B-A12B using [NVIDIA NIM](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html) and `dstack`.
 
 ??? info "Prerequisites"
     Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
@@ -21,60 +21,46 @@ This example shows how to deploy DeepSeek-R1-Distill-Llama-8B using [NVIDIA NIM]
 
 ## Deployment
 
-Here's an example of a service that deploys DeepSeek-R1-Distill-Llama-8B using NIM.
+Here's an example of a service that deploys Nemotron-3-Super-120B-A12B using NIM.
 
-<div editor-title="examples/inference/nim/.dstack.yml">
+<div editor-title="nemotron120.dstack.yml">
 
 ```yaml
 type: service
-name: serve-distill-deepseek
+name: nemotron120
 
-image: nvcr.io/nim/deepseek-ai/deepseek-r1-distill-llama-8b
+image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:1.8.0
 env:
   - NGC_API_KEY
-  - NIM_MAX_MODEL_LEN=4096
 registry_auth:
   username: $oauthtoken
   password: ${{ env.NGC_API_KEY }}
 port: 8000
-# Register the model
-model: deepseek-ai/deepseek-r1-distill-llama-8b
-
-# Uncomment to leverage spot instances
-#spot_policy: auto
-
-# Cache downloaded models
+model: nvidia/nemotron-3-super-120b-a12b
 volumes:
   - instance_path: /root/.cache/nim
     path: /opt/nim/.cache
     optional: true
 
 resources:
-  gpu: A100:40GB
-  # Uncomment if using multiple GPUs
-  #shm_size: 16GB
+  cpu: x86:96..
+  memory: 512GB..
+  shm_size: 16GB
+  disk: 500GB..
+  gpu: H100:80GB:8
 ```
 </div>
 
 ### Running a configuration
 
-To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
+Save the configuration above as `nemotron120.dstack.yml`, then use the
+[`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
 ```shell
 $ NGC_API_KEY=...
-$ dstack apply -f examples/inference/nim/.dstack.yml
-
- #  BACKEND  REGION    RESOURCES                  SPOT  PRICE
- 1  vultr    ewr       6xCPU, 60GB, 1xA100 (40GB) no    $1.199
- 2  vultr    ewr       6xCPU, 60GB, 1xA100 (40GB) no    $1.199
- 3  vultr    nrt       6xCPU, 60GB, 1xA100 (40GB) no    $1.199
-
-Submit the run serve-distill-deepseek? [y/n]: y
-
-Provisioning...
----> 100%
+$ dstack apply -f nemotron120.dstack.yml
 ```
 </div>
 
@@ -83,12 +69,12 @@ If no gateway is created, the service endpoint will be available at `<dstack ser
 <div class="termy">
 
 ```shell
-$ curl http://127.0.0.1:3000/proxy/services/main/serve-distill-deepseek/v1/chat/completions \
+$ curl http://127.0.0.1:3000/proxy/services/main/nemotron120/v1/chat/completions \
     -X POST \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -H 'Content-Type: application/json' \
     -d '{
-      "model": "meta/llama3-8b-instruct",
+      "model": "nvidia/nemotron-3-super-120b-a12b",
       "messages": [
         {
           "role": "system",
@@ -105,14 +91,9 @@ $ curl http://127.0.0.1:3000/proxy/services/main/serve-distill-deepseek/v1/chat/
 
 </div>
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the service endpoint will be available at `https://serve-distill-deepseek.<gateway domain>/`.
-
-## Source code
-
-The source-code of this example can be found in
-[`examples/inference/nim`](https://github.com/dstackai/dstack/blob/master/examples/inference/nim).
+When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the service endpoint will be available at `https://nemotron120.<gateway domain>/`.
 
 ## What's next?
 
 1. Check [services](https://dstack.ai/docs/services)
-2. Browse the [DeepSeek AI NIM](https://build.nvidia.com/deepseek-ai)
+2. Browse the [Nemotron-3-Super-120B-A12B model page](https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b)

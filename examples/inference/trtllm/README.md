@@ -360,11 +360,6 @@ $ curl http://127.0.0.1:3000/proxy/services/main/serve-distill/v1/chat/completio
 
 When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the service endpoint will be available at `https://serve-distill.<gateway domain>/`.
 
-## Source code
-
-The source-code of this example can be found in
-[`examples/inference/trtllm`](https://github.com/dstackai/dstack/blob/master/examples/inference/trtllm).
-
 ## What's next?
 
 1. Check [services](https://dstack.ai/docs/services)

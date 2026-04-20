@@ -16,7 +16,7 @@ Llama 3.1 70B in FP16 using [vLLM](https://docs.vllm.ai/en/latest/getting_starte
 
 === "vLLM"
 
-    <div editor-title="examples/inference/vllm/amd/.dstack.yml">
+    <div editor-title="service.dstack.yml">
 
     ```yaml
     type: service
@@ -69,9 +69,7 @@ Llama 3.1 70B in FP16 using [vLLM](https://docs.vllm.ai/en/latest/getting_starte
 
     Note, maximum size of vLLM’s `KV cache` is 126192, consequently we must set `MAX_MODEL_LEN` to 126192. Adding `/opt/conda/envs/py_3.10/bin` to PATH ensures we use the Python 3.10 environment necessary for the pre-built binaries compiled specifically for this version.
 
-    > To speed up the `vLLM-ROCm` installation, we use a pre-built binary from S3.
-    > You can find the task to build and upload the binary in
-    > [`examples/inference/vllm/amd/`](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd/).
+    > To speed up the `vLLM-ROCm` installation, this example uses a pre-built binary from S3.
 
 !!! info "Docker image"
     If you want to use AMD, specifying `image` is currently required. This must be an image that includes
@@ -87,7 +85,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     and the [`mlabonne/guanaco-llama2-1k`](https://huggingface.co/datasets/mlabonne/guanaco-llama2-1k)
     dataset.
 
-    <div editor-title="examples/single-node-training/trl/amd/.dstack.yml">
+    <div editor-title="train.dstack.yml">
 
     ```yaml
     type: task
@@ -133,7 +131,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     and the [tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)
     dataset.
 
-    <div editor-title="examples/single-node-training/axolotl/amd/.dstack.yml">
+    <div editor-title="train.dstack.yml">
 
     ```yaml
     type: task
@@ -187,13 +185,12 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
 
     Note, to support ROCm, we need to checkout to commit `d4f6c65`. This commit eliminates the need to manually modify the Axolotl source code to make xformers compatible with ROCm, as described in the [xformers workaround](https://docs.axolotl.ai/docs/amd_hpc.html#apply-xformers-workaround). This installation approach is also followed for building Axolotl ROCm docker image. [(See Dockerfile)](https://github.com/ROCm/rocm-blogs/blob/release/blogs/artificial-intelligence/axolotl/src/Dockerfile.rocm).
 
-    > To speed up installation of `flash-attention` and `xformers `, we use pre-built binaries uploaded to S3.
-    > You can find the tasks that build and upload the binaries
-    > in [`examples/single-node-training/axolotl/amd/`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/amd/).
+    > To speed up installation of `flash-attention` and `xformers`, we use pre-built binaries uploaded to S3.
 
 ## Running a configuration
 
-Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
+Once a configuration is ready, save it to a `.dstack.yml` file, then run
+`dstack apply -f <configuration file>`, and `dstack` will automatically provision the
 cloud resources and run the configuration.
 
 <div class="termy">
@@ -204,17 +201,10 @@ $ WANDB_API_KEY=...
 $ WANDB_PROJECT=...
 $ WANDB_NAME=axolotl-amd-llama31-train
 $ HUB_MODEL_ID=...
-$ dstack apply -f examples/inference/vllm/amd/.dstack.yml
+$ dstack apply -f service.dstack.yml
 ```
 
 </div>
-
-## Source code
-
-The source-code of this example can be found in
-[`examples/inference/vllm/amd`](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/amd),
-[`examples/single-node-training/axolotl/amd`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl/amd) and
-[`examples/single-node-training/trl/amd`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl/amd)
 
 ## What's next?
 

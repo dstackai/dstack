@@ -98,10 +98,10 @@ plugins:
         "docs/tasks.md": "docs/concepts/tasks.md"
         "docs/services.md": "docs/concepts/services.md"
         "docs/fleets.md": "docs/concepts/fleets.md"
-        "docs/examples/llms/llama31.md": "examples/llms/llama/index.md"
-        "docs/examples/llms/llama32.md": "examples/llms/llama/index.md"
-        "examples/llms/llama31/index.md": "examples/llms/llama/index.md"
-        "examples/llms/llama32/index.md": "examples/llms/llama/index.md"
+        "docs/examples/llms/llama31.md": "examples/inference/vllm/index.md"
+        "docs/examples/llms/llama32.md": "examples/inference/vllm/index.md"
+        "examples/llms/llama31/index.md": "examples/inference/vllm/index.md"
+        "examples/llms/llama32/index.md": "examples/inference/vllm/index.md"
         "docs/examples/accelerators/amd/index.md": "examples/accelerators/amd/index.md"
         "docs/examples/deployment/nim/index.md": "examples/inference/nim/index.md"
         "docs/examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
@@ -308,8 +308,6 @@ nav:
           - AMD: examples/accelerators/amd/index.md
           - TPU: examples/accelerators/tpu/index.md
           - Tenstorrent: examples/accelerators/tenstorrent/index.md
-      - Models:
-          - Wan2.2: examples/models/wan22/index.md
   - Blog:
       - blog/index.md
   - Case studies: blog/case-studies.md

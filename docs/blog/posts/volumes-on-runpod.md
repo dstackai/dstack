@@ -20,7 +20,7 @@ deploying a model on Runpod.
 
 Suppose you want to deploy Llama 3.1 on Runpod as a [service](../../docs/concepts/services.md):
 
-<div editor-title="examples/llms/llama31/tgi/service.dstack.yml">
+<div editor-title="service.dstack.yml">
 
 ```yaml
 type: service
@@ -63,7 +63,7 @@ Great news: Runpod supports network volumes, which we can use for caching models
 
 With `dstack`, you can create a Runpod volume using the following configuration:
 
-<div editor-title="examples/mist/volumes/runpod.dstack.yml">
+<div editor-title="runpod-volume.dstack.yml">
 
 ```yaml
 type: volume
@@ -83,7 +83,7 @@ Go ahead and create it via `dstack apply`:
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/mist/volumes/runpod.dstack.yml
+$ dstack apply -f runpod-volume.dstack.yml
 ```
 
 </div>
@@ -91,7 +91,7 @@ $ dstack apply -f examples/mist/volumes/runpod.dstack.yml
 Once the volume is created, attach it to your service by updating the configuration file and mapping the 
 volume name to the `/data` path.
 
-<div editor-title="examples/llms/llama31/tgi/service.dstack.yml">
+<div editor-title="service.dstack.yml">
 
 ```yaml
 type: service

@@ -1,84 +1,121 @@
 ---
 title: SGLang
-description: Deploying DeepSeek-R1-Distill-Llama models using SGLang on NVIDIA and AMD GPUs
+description: Deploying Qwen3.5-397B-A17B-FP8 using SGLang on NVIDIA and AMD GPUs
 ---
 
 # SGLang
 
-This example shows how to deploy DeepSeek-R1-Distill-Llama 8B and 70B using [SGLang](https://github.com/sgl-project/sglang) and `dstack`.
+This example shows how to deploy `Qwen/Qwen3.5-397B-A17B-FP8` using
+[SGLang](https://github.com/sgl-project/sglang) and `dstack`.
 
 ## Apply a configuration
 
-Here's an example of a service that deploys DeepSeek-R1-Distill-Llama 8B and 70B using SGLang.
+Here's an example of a service that deploys
+`Qwen/Qwen3.5-397B-A17B-FP8` using SGLang.
 
 === "NVIDIA"
 
-    <div editor-title="examples/inference/sglang/nvidia/.dstack.yml">
+    <div editor-title="qwen397.dstack.yml">
 
     ```yaml
     type: service
-    name: deepseek-r1
+    name: qwen397
 
-    image: lmsysorg/sglang:latest
-    env:
-      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+    image: lmsysorg/sglang:dev
 
     commands:
-      - python3 -m sglang.launch_server
-         --model-path $MODEL_ID
-         --port 8000
-         --trust-remote-code
+      - |
+        sglang serve \
+          --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
+          --port 30000 \
+          --tp 8 \
+          --reasoning-parser qwen3 \
+          --tool-call-parser qwen3_coder \
+          --enable-flashinfer-allreduce-fusion \
+          --mem-fraction-static 0.8
 
-    port: 8000
-    model: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+    port: 30000
+    model: Qwen/Qwen3.5-397B-A17B-FP8
+
+    volumes:
+      - instance_path: /root/.cache
+        path: /root/.cache
+        optional: true
 
     resources:
-       gpu: 24GB
+      cpu: x86:96..
+      memory: 512GB..
+      shm_size: 16GB
+      disk: 500GB..
+      gpu: H100:80GB:8
     ```
     </div>
 
 === "AMD"
 
-    <div editor-title="examples/inference/sglang/amd/.dstack.yml">
+    <div editor-title="qwen397.dstack.yml">
 
     ```yaml
     type: service
-    name: deepseek-r1
+    name: qwen397
 
-    image: lmsysorg/sglang:v0.4.1.post4-rocm620
+    image: lmsysorg/sglang:v0.5.10.post1-rocm720-mi30x
+
     env:
-      - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+      - HIP_FORCE_DEV_KERNARG=1
+      - SGLANG_ALLOW_OVERWRITE_LONGER_CONTEXT_LEN=1
+      - SGLANG_DISABLE_CUDNN_CHECK=1
+      - SGLANG_INT4_WEIGHT=0
+      - SGLANG_MOE_PADDING=1
+      - SGLANG_ROCM_DISABLE_LINEARQUANT=0
+      - SGLANG_ROCM_FUSED_DECODE_MLA=1
+      - SGLANG_SET_CPU_AFFINITY=1
+      - SGLANG_USE_AITER=1
+      - SGLANG_USE_ROCM700A=1
 
     commands:
-      - python3 -m sglang.launch_server
-         --model-path $MODEL_ID
-         --port 8000
-         --trust-remote-code
+      - |
+        sglang serve \
+          --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
+          --tp 4 \
+          --reasoning-parser qwen3 \
+          --tool-call-parser qwen3_coder \
+          --mem-fraction-static 0.8 \
+          --context-length 262144 \
+          --attention-backend triton \
+          --disable-cuda-graph \
+          --fp8-gemm-backend aiter \
+          --port 30000
 
-    port: 8000
-    model: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+    port: 30000
+    model: Qwen/Qwen3.5-397B-A17B-FP8
+
+    volumes:
+      - instance_path: /root/.cache
+        path: /root/.cache
+        optional: true
 
     resources:
-      gpu: MI300x
-      disk: 300GB
+      cpu: x86:52..
+      memory: 700GB..
+      shm_size: 16GB
+      disk: 600GB..
+      gpu: MI300X:192GB:4
     ```
     </div>
 
-To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
+The AMD example uses the exact validated MI300X configuration for this model,
+including the ROCm/AITER settings required for stable FP8 serving.
+
+Save one of the configurations above as `qwen397.dstack.yml`, then use the
+[`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/llms/deepseek/sglang/amd/.dstack.yml
-
- #  BACKEND  REGION     RESOURCES                         SPOT  PRICE
- 1  runpod   EU-RO-1   24xCPU, 283GB, 1xMI300X (192GB)    no    $2.49
-
-Submit the run deepseek-r1? [y/n]: y
-
-Provisioning...
----> 100%
+$ dstack apply -f qwen397.dstack.yml
 ```
+
 </div>
 
 If no gateway is created, the service endpoint will be available at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
@@ -86,29 +123,26 @@ If no gateway is created, the service endpoint will be available at `<dstack ser
 <div class="termy">
 
 ```shell
-curl http://127.0.0.1:3000/proxy/services/main/deepseek-r1/v1/chat/completions \
+curl http://127.0.0.1:3000/proxy/services/main/qwen397/v1/chat/completions \
     -X POST \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -H 'Content-Type: application/json' \
     -d '{
-      "model": "deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
+      "model": "Qwen/Qwen3.5-397B-A17B-FP8",
       "messages": [
         {
-          "role": "system",
-          "content": "You are a helpful assistant."
-        },
-        {
           "role": "user",
-          "content": "What is Deep Learning?"
+          "content": "A bat and a ball cost $1.10 total. The bat costs $1.00 more than the ball. How much does the ball cost? Answer with just the dollar amount."
         }
       ],
-      "stream": true,
-      "max_tokens": 512
+      "chat_template_kwargs": {"enable_thinking": true},
+      "separate_reasoning": true,
+      "max_tokens": 1024
     }'
 ```
 </div>
 
-> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://deepseek-r1.<gateway domain>/`.
+> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://qwen397.<gateway domain>/`.
 
 ## Configuration options
 
@@ -116,75 +150,77 @@ curl http://127.0.0.1:3000/proxy/services/main/deepseek-r1/v1/chat/completions \
 
 To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html), use replicas groups: one for a router (for example, [SGLang Model Gateway](https://docs.sglang.io/advanced_features/sgl_model_gateway.html)), one for prefill workers, and one for decode workers.
 
-<div editor-title="examples/inference/sglang/pd.dstack.yml">
+=== "NVIDIA"
 
-```yaml
-type: service
-name: prefill-decode
-image: lmsysorg/sglang:latest
+    <div editor-title="pd.dstack.yml">
 
-env:
-  - HF_TOKEN
-  - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+    ```yaml
+    type: service
+    name: prefill-decode
+    image: lmsysorg/sglang:latest
 
-replicas:
-  - count: 1
-    # For now replica group with router must have count: 1
-    commands:
-      - pip install sglang_router
-      - |
-        python -m sglang_router.launch_router \
-          --host 0.0.0.0 \
-          --port 8000 \
-          --pd-disaggregation \
-          --prefill-policy cache_aware
-    router:
-      type: sglang
-    resources:
-      cpu: 4
+    env:
+      - HF_TOKEN
+      - MODEL_ID=zai-org/GLM-4.5-Air-FP8
 
-  - count: 1..4
-    scaling:
-      metric: rps
-      target: 3
-    commands:
-      - |
-        python -m sglang.launch_server \
-          --model-path $MODEL_ID \
-          --disaggregation-mode prefill \
-          --disaggregation-transfer-backend nixl \
-          --host 0.0.0.0 \
-          --port 8000 \
-          --disaggregation-bootstrap-port 8998
-    resources:
-      gpu: H200
+    replicas:
+      - count: 1
+        # For now replica group with router must have count: 1
+        commands:
+          - pip install sglang_router
+          - |
+            python -m sglang_router.launch_router \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --pd-disaggregation \
+              --prefill-policy cache_aware
+        router:
+          type: sglang
+        resources:
+          cpu: 4
 
-  - count: 1..8
-    scaling:
-      metric: rps
-      target: 2
-    commands:
-      - |
-        python -m sglang.launch_server \
-          --model-path $MODEL_ID \
-          --disaggregation-mode decode \
-          --disaggregation-transfer-backend nixl \
-          --host 0.0.0.0 \
-          --port 8000
-    resources:
-      gpu: H200
+      - count: 1..4
+        scaling:
+          metric: rps
+          target: 3
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --disaggregation-mode prefill \
+              --disaggregation-transfer-backend nixl \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --disaggregation-bootstrap-port 8998
+        resources:
+          gpu: H200
 
-port: 8000
-model: zai-org/GLM-4.5-Air-FP8
+      - count: 1..8
+        scaling:
+          metric: rps
+          target: 2
+        commands:
+          - |
+            python -m sglang.launch_server \
+              --model-path $MODEL_ID \
+              --disaggregation-mode decode \
+              --disaggregation-transfer-backend nixl \
+              --host 0.0.0.0 \
+              --port 8000
+        resources:
+          gpu: H200
 
-# Custom probe is required for PD disaggregation.
-probes:
-  - type: http
-    url: /health
-    interval: 15s
-```
+    port: 8000
+    model: zai-org/GLM-4.5-Air-FP8
 
-</div>
+    # Custom probe is required for PD disaggregation.
+    probes:
+      - type: http
+        url: /health
+        interval: 15s
+    ```
+
+    </div>
 
 Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
 
@@ -193,12 +229,7 @@ Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics 
 
     While the prefill and decode replicas run on GPUs, the router replica requires a CPU instance in the same cluster.
 
-## Source code
-
-The source-code of these examples can be found in
-[`examples/llms/deepseek/sglang`](https://github.com/dstackai/dstack/blob/master/examples/llms/deepseek/sglang) and [`examples/inference/sglang`](https://github.com/dstackai/dstack/blob/master/examples/inference/sglang).
-
 ## What's next?
 
 1. Read about [services](https://dstack.ai/docs/concepts/services) and [gateways](https://dstack.ai/docs/concepts/gateways)
-2. Browse the [SgLang DeepSeek Usage](https://docs.sglang.ai/references/deepseek.html), [Supercharge DeepSeek-R1 Inference on AMD Instinct MI300X](https://rocm.blogs.amd.com/artificial-intelligence/DeepSeekR1-Part2/README.html)
+2. Browse the [Qwen 3.5 SGLang cookbook](https://cookbook.sglang.io/autoregressive/Qwen/Qwen3.5) and the [SGLang server arguments reference](https://docs.sglang.ai/advanced_features/server_arguments.html)

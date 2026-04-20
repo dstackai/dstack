@@ -29,7 +29,7 @@ and [vLLM](https://github.com/vllm-project/vllm).
 
 === "Optimum TPU"
 
-    <div editor-title="examples/inference/tgi/tpu/.dstack.yml">
+    <div editor-title="service-optimum-tpu.dstack.yml">
 
     ```yaml
     type: service
@@ -61,7 +61,7 @@ and [vLLM](https://github.com/vllm-project/vllm).
         the official Docker image can be used.
 
 === "vLLM"
-    <div editor-title="examples/inference/vllm/tpu/.dstack.yml">
+    <div editor-title="service-vllm-tpu.dstack.yml">
 
     ```yaml
     type: service
@@ -183,13 +183,6 @@ Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each co
 |-----------------|--------------|---------------------------------------------------------------------------------------------------|
 | **TRL**         | bfloat16     | To fine-tune using TRL, Optimum TPU is recommended. TRL doesn't support Llama 3.1 out of the box. |
 | **Pytorch XLA** | bfloat16     |                                                                                                   |
-
-## Source code
-
-The source-code of this example can be found in
-[`examples/inference/tgi/tpu`](https://github.com/dstackai/dstack/blob/master/examples/inference/tgi/tpu),
-[`examples/inference/vllm/tpu`](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm/tpu),
-and [`examples/single-node-training/optimum-tpu`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl).
 
 ## What's next?
 

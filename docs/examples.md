@@ -221,34 +221,3 @@ hide:
         </p>
     </a>
 </div>
-
-## Models
-
-<div class="tx-landing__highlights_grid">
-    <a href="/examples/models/wan22"
-       class="feature-cell sky">
-        <h3>
-            Wan2.2
-        </h3>
-
-        <p>
-            Use Wan2.2 to generate videos from text
-        </p>
-    </a>
-</div>
-
-
-<!-- ## Misc
-
-<div class="tx-landing__highlights_grid">
-    <a href="/examples/misc/docker-compose"
-       class="feature-cell sky">
-        <h3>
-            Docker Compose
-        </h3>
-
-        <p>
-            Use Docker and Docker Compose inside runs
-        </p>
-    </a>
-</div> -->

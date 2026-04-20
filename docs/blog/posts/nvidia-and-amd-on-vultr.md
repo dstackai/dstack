@@ -67,8 +67,6 @@ projects:
 
 For more details, refer to [Installation](../../docs/installation.md).
 
-> Interested in fine-tuning or deploying DeepSeek on Vultr? Check out the corresponding [example](../../examples/llms/deepseek/index.md).
-
 !!! info "What's next?"
     1. Refer to [Quickstart](../../docs/quickstart.md)
     2. Sign up with [Vultr](https://www.vultr.com/)
