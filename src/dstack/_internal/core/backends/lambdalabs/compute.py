@@ -130,9 +130,7 @@ class LambdaCompute(
             availability = InstanceAvailability.NOT_AVAILABLE
             if offer.region in instance_availability.get(offer.instance.name, []):
                 availability = InstanceAvailability.AVAILABLE
-            availability_offers.append(
-                InstanceOfferWithAvailability(**offer.dict(), availability=availability)
-            )
+            availability_offers.append(offer.with_availability(availability=availability))
         return availability_offers
 
 

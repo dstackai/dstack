@@ -232,6 +232,12 @@ class InstanceOffer(CoreModel):
     price: float
     backend_data: dict[str, Any] = {}
 
+    def with_availability(self, **kwargs) -> "InstanceOfferWithAvailability":
+        """Convert to InstanceOfferWithAvailability without re-serializing/re-validating fields.
+        The result shares nested objects with self. This is generally safe because callers
+        discard the original InstanceOffer after conversion."""
+        return InstanceOfferWithAvailability.construct(**self.__dict__, **kwargs)
+
 
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability

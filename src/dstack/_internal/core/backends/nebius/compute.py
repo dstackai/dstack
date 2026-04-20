@@ -128,11 +128,7 @@ class NebiusCompute(
             extra_filter=_supported_instances,
         )
         return [
-            InstanceOfferWithAvailability(
-                **offer.dict(),
-                availability=InstanceAvailability.UNKNOWN,
-            )
-            for offer in offers
+            offer.with_availability(availability=InstanceAvailability.UNKNOWN) for offer in offers
         ]
 
     def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:

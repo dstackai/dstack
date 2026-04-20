@@ -160,8 +160,7 @@ class GCPCompute(
             if _has_gpu_quota(quotas[region], offer.instance.resources):
                 availability = InstanceAvailability.UNKNOWN
             # todo quotas: cpu, memory, global gpu, tpu
-            offer_with_availability = InstanceOfferWithAvailability(
-                **offer.dict(),
+            offer_with_availability = offer.with_availability(
                 availability=availability,
                 availability_zones=zones_by_key.get(key, []),
             )

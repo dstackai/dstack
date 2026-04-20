@@ -162,12 +162,7 @@ class CrusoeCompute(
                         else InstanceAvailability.NO_QUOTA
                     )
                     break
-            result.append(
-                InstanceOfferWithAvailability(
-                    **offer.dict(),
-                    availability=availability,
-                )
-            )
+            result.append(offer.with_availability(availability=availability))
         return result
 
     def _get_quota_map(self) -> dict[str, int]:

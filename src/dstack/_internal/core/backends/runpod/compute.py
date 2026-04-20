@@ -84,9 +84,7 @@ class RunpodCompute(
             extra_filter=lambda o: _is_secure_cloud(o.region) or self.config.allow_community_cloud,
         )
         offers = [
-            InstanceOfferWithAvailability(
-                **offer.dict(), availability=InstanceAvailability.AVAILABLE
-            )
+            offer.with_availability(availability=InstanceAvailability.AVAILABLE)
             for offer in offers
         ]
         return offers

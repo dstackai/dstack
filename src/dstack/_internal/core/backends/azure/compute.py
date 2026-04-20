@@ -473,9 +473,7 @@ def _get_offers_with_availability(
         availability = InstanceAvailability.NO_QUOTA
         if (offer.instance.name, offer.region) in has_quota:
             availability = InstanceAvailability.UNKNOWN
-        offers_with_availability.append(
-            InstanceOfferWithAvailability(**offer.dict(), availability=availability)
-        )
+        offers_with_availability.append(offer.with_availability(availability=availability))
 
     return offers_with_availability
 
