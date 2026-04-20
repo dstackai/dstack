@@ -63,10 +63,7 @@ class BaseDigitalOceanCompute(
             catalog=self.catalog,
         )
         return [
-            InstanceOfferWithAvailability(
-                **offer.dict(),
-                availability=InstanceAvailability.AVAILABLE,
-            )
+            offer.with_availability(availability=InstanceAvailability.AVAILABLE)
             for offer in offers
         ]
 

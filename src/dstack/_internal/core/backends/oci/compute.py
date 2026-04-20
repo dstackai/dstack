@@ -92,8 +92,7 @@ class OCICompute(
             else:
                 availability = InstanceAvailability.NO_QUOTA
             offers_with_availability.append(
-                InstanceOfferWithAvailability(
-                    **offer.dict(),
+                offer.with_availability(
                     availability=availability,
                     availability_zones=shapes_availability[offer.region].get(
                         offer.instance.name, []

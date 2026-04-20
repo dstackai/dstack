@@ -67,8 +67,7 @@ class VastAICompute(
             catalog=self.catalog,
         )
         offers = [
-            InstanceOfferWithAvailability(
-                **offer.dict(),
+            offer.with_availability(
                 availability=InstanceAvailability.AVAILABLE,
                 instance_runtime=InstanceRuntime.RUNNER,
             )

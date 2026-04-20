@@ -52,9 +52,7 @@ class CudoCompute(
             requirements=requirements,
         )
         offers = [
-            InstanceOfferWithAvailability(
-                **offer.dict(), availability=InstanceAvailability.AVAILABLE
-            )
+            offer.with_availability(availability=InstanceAvailability.AVAILABLE)
             for offer in offers
             # in-hyderabad-1 is known to have provisioning issues
             if offer.region not in ["in-hyderabad-1"]

@@ -63,9 +63,7 @@ class CloudRiftCompute(
         for offer in offers:
             key = (offer.instance.name, offer.region)
             availability = region_availabilities.get(key, InstanceAvailability.NOT_AVAILABLE)
-            availability_offers.append(
-                InstanceOfferWithAvailability(**offer.dict(), availability=availability)
-            )
+            availability_offers.append(offer.with_availability(availability=availability))
 
         return availability_offers
 

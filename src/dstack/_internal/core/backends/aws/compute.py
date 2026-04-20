@@ -168,8 +168,7 @@ class AWSCompute(
             if quota is not None and not quota:
                 availability = InstanceAvailability.NO_QUOTA
             availability_offers.append(
-                InstanceOfferWithAvailability(
-                    **offer.dict(),
+                offer.with_availability(
                     availability=availability,
                     availability_zones=regions_to_zones[offer.region],
                 )
