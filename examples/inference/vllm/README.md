@@ -21,18 +21,13 @@ Here's an example of a service that deploys
     type: service
     name: qwen397
 
-    image: vllm/vllm-openai
+    image: vllm/vllm-openai:v0.19.1
 
     commands:
       - |
-        uv pip install --system -U vllm --torch-backend=auto \
-          --extra-index-url https://wheels.vllm.ai/nightly
-        uv pip install --system -U --pre flashinfer-jit-cache \
-          --index-url https://flashinfer.ai/whl/nightly/cu129
-        export VLLM_DEEP_GEMM_WARMUP=relax
         vllm serve Qwen/Qwen3.5-397B-A17B-FP8 \
           --port 8000 \
-          --tensor-parallel-size 8 \
+          --tensor-parallel-size $DSTACK_GPUS_NUM \
           --max-model-len 262144 \
           --reasoning-parser qwen3 \
           --language-model-only

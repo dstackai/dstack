@@ -21,14 +21,14 @@ Here's an example of a service that deploys
     type: service
     name: qwen397
 
-    image: lmsysorg/sglang:dev
+    image: lmsysorg/sglang:v0.5.10.post1
 
     commands:
       - |
         sglang serve \
           --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
           --port 30000 \
-          --tp 8 \
+          --tp $DSTACK_GPUS_NUM \
           --reasoning-parser qwen3 \
           --tool-call-parser qwen3_coder \
           --enable-flashinfer-allreduce-fusion \
@@ -77,7 +77,7 @@ Here's an example of a service that deploys
       - |
         sglang serve \
           --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
-          --tp 4 \
+          --tp $DSTACK_GPUS_NUM \
           --reasoning-parser qwen3 \
           --tool-call-parser qwen3_coder \
           --mem-fraction-static 0.8 \
@@ -157,7 +157,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
     ```yaml
     type: service
     name: prefill-decode
-    image: lmsysorg/sglang:latest
+    image: lmsysorg/sglang:v0.5.10.post1
 
     env:
       - HF_TOKEN

@@ -23,14 +23,14 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
     type: service
     name: qwen397
 
-    image: lmsysorg/sglang:dev
+    image: lmsysorg/sglang:v0.5.10.post1
 
     commands:
       - |
         sglang serve \
           --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
           --port 30000 \
-          --tp 8 \
+          --tp $DSTACK_GPUS_NUM \
           --reasoning-parser qwen3 \
           --tool-call-parser qwen3_coder \
           --enable-flashinfer-allreduce-fusion \
@@ -81,7 +81,7 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
       - |
         sglang serve \
           --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
-          --tp 4 \
+          --tp $DSTACK_GPUS_NUM \
           --reasoning-parser qwen3 \
           --tool-call-parser qwen3_coder \
           --mem-fraction-static 0.8 \
@@ -211,14 +211,14 @@ You can configure the number of replicas as well as the auto-scaling rules.
     type: service
     name: qwen397-service
 
-    image: lmsysorg/sglang:dev
+    image: lmsysorg/sglang:v0.5.10.post1
 
     commands:
       - |
         sglang serve \
           --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
           --port 30000 \
-          --tp 8 \
+          --tp $DSTACK_GPUS_NUM \
           --reasoning-parser qwen3 \
           --tool-call-parser qwen3_coder \
           --enable-flashinfer-allreduce-fusion \
@@ -274,7 +274,7 @@ You can configure the number of replicas as well as the auto-scaling rules.
       - |
         sglang serve \
           --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
-          --tp 4 \
+          --tp $DSTACK_GPUS_NUM \
           --reasoning-parser qwen3 \
           --tool-call-parser qwen3_coder \
           --mem-fraction-static 0.8 \
@@ -328,7 +328,7 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
     type: service
     name: llama-8b-service
 
-    image: lmsysorg/sglang:latest
+    image: lmsysorg/sglang:v0.5.10.post1
     env:
       - MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
 
@@ -382,7 +382,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
     ```yaml
     type: service
     name: prefill-decode
-    image: lmsysorg/sglang:latest
+    image: lmsysorg/sglang:v0.5.10.post1
 
     env:
       - HF_TOKEN
