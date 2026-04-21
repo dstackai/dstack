@@ -180,7 +180,7 @@ hide:
            TensorRT-LLM
        </h3>
        <p>
-            Deploy DeepSeek models with TensorRT-LLM
+            Deploy Qwen3 with TensorRT-LLM
         </p>
     </a>
 </div>
