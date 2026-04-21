@@ -1709,7 +1709,7 @@ class TestSetProjectMembers:
                 "project_role": ProjectRole.USER,
                 "permissions": {
                     "can_manage_ssh_fleets": True,
-                    "can_manage_secrets": False,
+                    "can_manage_secrets": True,
                 },
             },
         ]
