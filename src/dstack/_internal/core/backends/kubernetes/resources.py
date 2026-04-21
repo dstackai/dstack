@@ -207,13 +207,14 @@ def get_node_labels(node: V1Node) -> dict[str, str]:
 
 
 def is_hard_taint(taint: V1Taint) -> bool:
-    if taint.effect == TaintEffect.PREFER_NO_SCHEDULE:
-        return False
-    if taint.effect not in TaintEffect:
+    try:
+        taint_effect = TaintEffect(taint.effect)
+    except ValueError:
         logger.warning(
             "Unexpected taint %s=%s effect: %s", taint.key, taint.value or "", taint.effect
         )
-    return True
+        return True
+    return taint_effect is not TaintEffect.PREFER_NO_SCHEDULE
 
 
 def is_taint_tolerated(taint: V1Taint) -> bool:
