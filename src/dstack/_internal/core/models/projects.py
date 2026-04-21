@@ -10,6 +10,7 @@ from dstack._internal.core.models.users import ProjectRole, User
 
 class MemberPermissions(CoreModel):
     can_manage_ssh_fleets: bool
+    can_manage_secrets: bool
 
 
 class Member(CoreModel):

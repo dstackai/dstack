@@ -716,8 +716,17 @@ def get_member_permissions(member_model: MemberModel) -> MemberPermissions:
             and member_model.project_role != ProjectRole.ADMIN
         ):
             can_manage_ssh_fleets = False
+    can_manage_secrets = (
+        user_model.global_role == GlobalRole.ADMIN
+        or member_model.project_role == ProjectRole.ADMIN
+        or (
+            member_model.project_role == ProjectRole.MANAGER
+            and default_permissions.allow_managers_manage_secrets
+        )
+    )
     return MemberPermissions(
         can_manage_ssh_fleets=can_manage_ssh_fleets,
+        can_manage_secrets=can_manage_secrets,
     )
 
 

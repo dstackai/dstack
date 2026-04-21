@@ -9,15 +9,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import (
+    ForbiddenError,
     ResourceExistsError,
     ResourceNotExistsError,
     ServerClientError,
 )
 from dstack._internal.core.models.secrets import Secret
+from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import DecryptedString, ProjectModel, SecretModel, UserModel
 from dstack._internal.server.services import events
 from dstack._internal.server.services.locking import get_locker
+from dstack._internal.server.services.projects import get_member, get_member_permissions
 
 _SECRET_NAME_REGEX = "^[A-Za-z0-9-_]{1,200}$"
 _SECRET_VALUE_MAX_LENGTH = 5000
@@ -26,7 +29,9 @@ _SECRET_VALUE_MAX_LENGTH = 5000
 async def list_secrets(
     session: AsyncSession,
     project: ProjectModel,
+    user: UserModel,
 ) -> List[Secret]:
+    _check_can_manage_secrets(user=user, project=project)
     secret_models = await list_project_secret_models(session=session, project=project)
     return [secret_model_to_secret(s, include_value=False) for s in secret_models]
 
@@ -43,7 +48,9 @@ async def get_secret(
     session: AsyncSession,
     project: ProjectModel,
     name: str,
+    user: UserModel,
 ) -> Optional[Secret]:
+    _check_can_manage_secrets(user=user, project=project)
     secret_model = await get_project_secret_model_by_name(
         session=session,
         project=project,
@@ -61,6 +68,7 @@ async def create_or_update_secret(
     value: str,
     user: UserModel,
 ) -> Secret:
+    _check_can_manage_secrets(user=user, project=project)
     _validate_secret(name=name, value=value)
     try:
         secret_model = await create_secret(
@@ -87,6 +95,7 @@ async def delete_secrets(
     names: List[str],
     user: UserModel,
 ):
+    _check_can_manage_secrets(user=user, project=project)
     async with get_project_secret_models_by_name_for_update(
         session=session, project=project, names=names
     ) as secret_models:
@@ -243,3 +252,15 @@ def _validate_secret_name(name: str):
 def _validate_secret_value(value: str):
     if len(value) > _SECRET_VALUE_MAX_LENGTH:
         raise ServerClientError(f"Secret value length must not exceed {_SECRET_VALUE_MAX_LENGTH}")
+
+
+def _check_can_manage_secrets(user: UserModel, project: ProjectModel):
+    if user.global_role == GlobalRole.ADMIN:
+        return
+    member = get_member(user=user, project=project)
+    if member is None:
+        raise ForbiddenError()
+    permissions = get_member_permissions(member)
+    if permissions.can_manage_secrets:
+        return
+    raise ForbiddenError()
