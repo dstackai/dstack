@@ -10,7 +10,9 @@ from dstack._internal.core.models.users import ProjectRole, User
 
 class MemberPermissions(CoreModel):
     can_manage_ssh_fleets: bool
-    can_manage_secrets: bool
+    can_manage_secrets: bool = False
+    """Default is for client-side compatibility with older servers.
+    Always explicitly set on the server."""
 
 
 class Member(CoreModel):
