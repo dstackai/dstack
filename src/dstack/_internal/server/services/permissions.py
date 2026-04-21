@@ -23,6 +23,12 @@ class DefaultPermissions(CoreModel):
             )
         ),
     ] = True
+    allow_managers_manage_secrets: Annotated[
+        bool,
+        Field(
+            description=("This flag controls whether project managers can manage project secrets")
+        ),
+    ] = False
 
 
 _default_permissions = DefaultPermissions()

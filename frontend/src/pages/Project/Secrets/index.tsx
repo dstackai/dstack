@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button, ButtonWithConfirmation, Header, ListEmptyMessage, Modal, Pagination, SpaceBetween, Table } from 'components';
 
-import { useAppSelector, useCollection, useNotifications, usePermissionGuard } from 'hooks';
+import { useAppSelector, useCollection, useNotifications } from 'hooks';
 import { getServerError } from 'libs';
 import {
     useDeleteSecretsMutation,
@@ -11,11 +11,11 @@ import {
     useLazyGetSecretQuery,
     useUpdateSecretMutation,
 } from 'services/secrets';
-import { GlobalUserRole, ProjectUserRole } from 'types';
+import { GlobalUserRole } from 'types';
 
 import { selectUserData } from 'App/slice';
 
-import { getProjectRoleByUserName } from '../utils';
+import { getMemberCanManageSecrets } from '../utils';
 import { SecretForm } from './Form';
 
 import { IProps, TFormValues } from './types';
@@ -30,11 +30,8 @@ export const ProjectSecrets: React.FC<IProps> = ({ project, loading }) => {
     const projectName = project?.project_name ?? '';
     const [pushNotification] = useNotifications();
 
-    const [hasPermissionForSecretsManaging] = usePermissionGuard({
-        allowedProjectRoles: [ProjectUserRole.ADMIN],
-        allowedGlobalRoles: [GlobalUserRole.ADMIN],
-        projectRole: project ? (getProjectRoleByUserName(project, userName) ?? undefined) : undefined,
-    });
+    const hasPermissionForSecretsManaging =
+        userData?.global_role === GlobalUserRole.ADMIN || (project ? getMemberCanManageSecrets(project, userName) : false);
 
     const { data, isLoading, isFetching } = useGetAllSecretsQuery(
         { project_name: projectName },

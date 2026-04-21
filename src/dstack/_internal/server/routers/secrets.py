@@ -12,7 +12,7 @@ from dstack._internal.server.schemas.secrets import (
     DeleteSecretsRequest,
     GetSecretRequest,
 )
-from dstack._internal.server.security.permissions import ProjectAdmin
+from dstack._internal.server.security.permissions import ProjectManager
 from dstack._internal.server.services import secrets as secrets_services
 from dstack._internal.server.utils.routers import CustomORJSONResponse
 
@@ -25,13 +25,14 @@ router = APIRouter(
 @router.post("/list", response_model=List[Secret])
 async def list_secrets(
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
 ):
-    _, project = user_project
+    user, project = user_project
     return CustomORJSONResponse(
         await secrets_services.list_secrets(
             session=session,
             project=project,
+            user=user,
         )
     )
 
@@ -40,13 +41,14 @@ async def list_secrets(
 async def get_secret(
     body: GetSecretRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
 ):
-    _, project = user_project
+    user, project = user_project
     secret = await secrets_services.get_secret(
         session=session,
         project=project,
         name=body.name,
+        user=user,
     )
     if secret is None:
         raise ResourceNotExistsError()
@@ -57,7 +59,7 @@ async def get_secret(
 async def create_or_update_secret(
     body: CreateOrUpdateSecretRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
 ):
     user, project = user_project
     return CustomORJSONResponse(
@@ -75,7 +77,7 @@ async def create_or_update_secret(
 async def delete_secrets(
     body: DeleteSecretsRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
 ):
     user, project = user_project
     await secrets_services.delete_secrets(
