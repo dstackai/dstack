@@ -1633,7 +1633,38 @@ class TestDeleteFleets:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_400_when_fleets_in_use(
+    async def test_returns_400_when_fleet_in_use(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=project)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/delete",
+            headers=get_auth_headers(user.token),
+            json={"names": [fleet.name]},
+        )
+        assert response.status_code == 400
+        await session.refresh(fleet)
+        assert not fleet.deleted
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_when_fleet_instance_in_use(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
@@ -1800,10 +1831,34 @@ class TestDeleteFleetInstances:
             session=session,
             project=project,
             instance_num=2,
+            status=InstanceStatus.IDLE,
+        )
+        instance3 = await create_instance(
+            session=session,
+            project=project,
+            instance_num=3,
+            status=InstanceStatus.BUSY,
         )
         fleet.instances.append(instance1)
         fleet.instances.append(instance2)
-        await session.commit()
+        fleet.instances.append(instance3)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        # Run assigned to instance 3. Should not interfere with deleting instance 1.
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            instance=instance3,
+        )
         response = await client.post(
             f"/api/project/{project.name}/fleets/delete_instances",
             headers=get_auth_headers(user.token),

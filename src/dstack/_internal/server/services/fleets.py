@@ -919,7 +919,9 @@ def is_fleet_in_use(fleet_model: FleetModel, instance_nums: Optional[List[int]] 
     if instance_nums is not None:
         selected_instance_in_use = [i for i in instances_in_use if i.instance_num in instance_nums]
     active_runs = [r for r in fleet_model.runs if not r.status.is_finished()]
-    return len(selected_instance_in_use) > 0 or len(instances_in_use) == 0 and len(active_runs) > 0
+    return len(selected_instance_in_use) > 0 or (
+        instance_nums is None and len(instances_in_use) == 0 and len(active_runs) > 0
+    )
 
 
 def is_fleet_empty(fleet_model: FleetModel) -> bool:
