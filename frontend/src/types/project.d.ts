@@ -33,9 +33,15 @@ declare interface IProject {
     templates_repo?: string | null;
 }
 
+declare interface IProjectMemberPermissions {
+    can_manage_ssh_fleets: boolean;
+    can_manage_secrets: boolean;
+}
+
 declare interface IProjectMember {
     project_role: TProjectRole;
     user: IUser | { username: string };
+    permissions?: IProjectMemberPermissions;
 }
 
 declare type TSetProjectMembersParams = {
