@@ -79,19 +79,19 @@ $ curl http://127.0.0.1:3000/proxy/services/main/qwen235/v1/chat/completions \
       "messages": [
         {
           "role": "user",
-          "content": "Write a short Python function to check if a number is prime."
+          "content": "A bat and a ball cost $1.10 total. The bat costs $1.00 more than the ball. How much does the ball cost?"
         }
       ],
-      "chat_template_kwargs": {"enable_thinking": false},
-      "max_tokens": 512
+      "chat_template_kwargs": {"enable_thinking": true},
+      "max_tokens": 1024,
+      "temperature": 0.0
     }'
 ```
 
 </div>
 
-> To enable Qwen3 reasoning, set `chat_template_kwargs` to
-> `{"enable_thinking": true}`. With current TensorRT-LLM releases, reasoning is
-> returned inline in `message.content` rather than a separate field.
+> With current TensorRT-LLM releases, Qwen3 reasoning is returned inline in
+> `message.content` rather than a separate field.
 
 When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the service endpoint will be available at `https://qwen235.<gateway domain>/`.
 
