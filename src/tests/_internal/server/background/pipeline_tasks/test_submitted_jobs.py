@@ -439,6 +439,102 @@ class TestJobSubmittedWorker:
         )
         assert len(res.scalars().all()) == 1
 
+    async def test_multinode_master_reuses_placeholder_when_provisioning_falls_back_to_run_job(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run_spec = get_run_spec(
+            run_name="run",
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="debian", nodes=2),
+        )
+        run = await create_run(
+            session=session,
+            run_name="run",
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+            fleet=fleet,
+        )
+        master_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            waiting_master_job=False,
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            waiting_master_job=True,
+        )
+
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.run_job.return_value = get_job_provisioning_data(
+                dockerized=True,
+                backend=BackendType.AWS,
+            )
+
+            await _process_job(session=session, worker=worker, job_model=master_job)
+
+            master_job = await _get_job(session, master_job.id)
+            worker_job = await _get_job(session, worker_job.id)
+            assert master_job.status == JobStatus.SUBMITTED
+            assert master_job.instance_assigned
+            assert master_job.instance is not None
+            placeholder_id = master_job.instance.id
+            assert master_job.instance.status == InstanceStatus.PENDING
+            assert master_job.used_instance_id == placeholder_id
+            assert master_job.fleet_id == fleet.id
+            assert worker_job.waiting_master_job
+            compute_mock.run_job.assert_not_called()
+            compute_mock.run_jobs.assert_not_called()
+
+            competing_instance = await create_instance(
+                session=session,
+                project=project,
+                fleet=fleet,
+                status=InstanceStatus.BUSY,
+                backend=BackendType.AWS,
+                job_provisioning_data=get_job_provisioning_data(backend=BackendType.AWS),
+            )
+
+            await _process_job(session=session, worker=worker, job_model=master_job)
+
+        master_job = await _get_job(session, master_job.id)
+        worker_job = await _get_job(session, worker_job.id)
+        assert master_job.status == JobStatus.PROVISIONING
+        assert master_job.instance is not None
+        assert master_job.instance.id == placeholder_id
+        assert master_job.instance.status == InstanceStatus.PROVISIONING
+        assert master_job.used_instance_id == placeholder_id
+        assert worker_job.waiting_master_job is False
+        compute_mock.run_job.assert_called_once()
+        compute_mock.run_jobs.assert_not_called()
+        res = await session.execute(
+            select(InstanceModel).where(
+                InstanceModel.fleet_id == fleet.id,
+                InstanceModel.deleted == False,
+            )
+        )
+        assert {instance.id for instance in res.scalars().all()} == {
+            placeholder_id,
+            competing_instance.id,
+        }
+
     async def test_provisioning_master_job_respects_cluster_placement_in_non_empty_fleet(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):

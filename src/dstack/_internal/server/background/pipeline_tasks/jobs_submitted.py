@@ -86,7 +86,6 @@ from dstack._internal.server.services.backends import get_project_backend_by_typ
 from dstack._internal.server.services.docker import apply_server_docker_defaults
 from dstack._internal.server.services.fleets import (
     can_create_new_cloud_instance_in_fleet,
-    check_can_create_new_cloud_instance_in_fleet,
     get_fleet_master_instance_provisioning_data,
     get_fleet_spec,
     get_next_instance_num,
@@ -561,49 +560,50 @@ async def _apply_assignment_result(
             return
 
         if isinstance(assignment, _NewCapacityAssignment):
-            # For single-instance jobs, create a placeholder instance under fleet lock
-            # so that instance_num is unique and nodes.max is enforced as a hard limit.
-            # Compute groups still use the old path (placeholder created after provisioning).
-            if len(context.jobs_to_provision) == 1:
-                async with AsyncExitStack() as exit_stack:
-                    fleet_model = await _lock_fleet_for_placeholder(
-                        exit_stack=exit_stack,
-                        session=session,
-                        fleet_id=assignment.fleet_id,
+            # Always reserve one placeholder instance under fleet lock for the current
+            # submitted job. This keeps instance_num unique and makes nodes.max a hard
+            # limit for the single-instance provisioning path, including multinode
+            # masters that later fall back to run_job(). Compute groups still use the
+            # old partial path: one placeholder does not reserve the full group.
+            async with AsyncExitStack() as exit_stack:
+                fleet_model = await _lock_fleet_for_placeholder(
+                    exit_stack=exit_stack,
+                    session=session,
+                    fleet_id=assignment.fleet_id,
+                )
+                if fleet_model is None:
+                    logger.debug(
+                        "%s: failed to lock fleet for placeholder creation",
+                        fmt(context.job_model),
                     )
-                    if fleet_model is None:
-                        logger.debug(
-                            "%s: failed to lock fleet for placeholder creation",
-                            fmt(context.job_model),
-                        )
-                        await _reset_job_lock_for_retry(session=session, item=item)
-                        return
-                    fleet_spec = get_fleet_spec(fleet_model)
-                    if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec):
-                        logger.debug(
-                            "%s: fleet %s is full, retrying assignment",
-                            fmt(context.job_model),
-                            fleet_model.name,
-                        )
-                        await _reset_job_lock_for_retry(session=session, item=item)
-                        return
-                    instance_model = _create_placeholder_instance(
-                        fleet_model=fleet_model,
-                        project=context.project,
-                        job_model=job_model,
+                    await _reset_job_lock_for_retry(session=session, item=item)
+                    return
+                fleet_spec = get_fleet_spec(fleet_model)
+                if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec):
+                    logger.debug(
+                        "%s: fleet %s is full, retrying assignment",
+                        fmt(context.job_model),
+                        fleet_model.name,
                     )
-                    session.add(instance_model)
-                    job_model.instance = instance_model
-                    job_model.used_instance_id = instance_model.id
-                    events.emit(
-                        session,
-                        f"Instance created for job. Instance status: {instance_model.status.upper()}",
-                        actor=events.SystemActor(),
-                        targets=[
-                            events.Target.from_model(instance_model),
-                            events.Target.from_model(job_model),
-                        ],
-                    )
+                    await _reset_job_lock_for_retry(session=session, item=item)
+                    return
+                instance_model = _create_placeholder_instance(
+                    fleet_model=fleet_model,
+                    project=context.project,
+                    job_model=job_model,
+                )
+                session.add(instance_model)
+                job_model.instance = instance_model
+                job_model.used_instance_id = instance_model.id
+                events.emit(
+                    session,
+                    f"Instance created for job. Instance status: {instance_model.status.upper()}",
+                    actor=events.SystemActor(),
+                    targets=[
+                        events.Target.from_model(instance_model),
+                        events.Target.from_model(job_model),
+                    ],
+                )
             job_model.fleet_id = assignment.fleet_id
             job_model.instance_assigned = True
             await _mark_job_processed(session=session, job_model=job_model)
@@ -1036,6 +1036,12 @@ def _is_placeholder_instance(instance: InstanceModel) -> bool:
     return instance.status == InstanceStatus.PENDING and instance.provisioning_job_id is not None
 
 
+def _get_non_placeholder_fleet_instances(fleet_model: FleetModel) -> list[InstanceModel]:
+    return [
+        instance for instance in fleet_model.instances if not _is_placeholder_instance(instance)
+    ]
+
+
 def _get_placeholder_instance_ids(context: _SubmittedJobContext) -> list[uuid.UUID]:
     instance = context.job_model.instance
     if instance is not None and instance.provisioning_job_id is not None:
@@ -1350,7 +1356,9 @@ async def _process_new_capacity_provisioning(
         is_master_job(context.job)
         and fleet_model is not None
         and _get_cluster_fleet_spec(fleet_model) is not None
-        and any(not instance.deleted for instance in fleet_model.instances)
+        # Wait only for a real in-flight/provisioned instance that can anchor
+        # cluster placement. Placeholder reservations never become fleet masters.
+        and _get_non_placeholder_fleet_instances(fleet_model)
         and master_provisioning_data is None
     ):
         return _DeferSubmittedJobResult(
@@ -1995,7 +2003,9 @@ async def _resolve_related_cluster_master_fleet(
             fleet_model = res.unique().scalar_one_or_none()
             if fleet_model is None:
                 return None
-            if len(fleet_model.instances) != 0:
+            # Placeholder reservations should not make an empty cluster fleet look
+            # non-empty; only real instances mean placement is already anchored.
+            if _get_non_placeholder_fleet_instances(fleet_model):
                 return _ResolvedRelatedClusterMasterFleet(
                     fleet_model=fleet_model,
                     locked_fleet_id=None,
@@ -2107,6 +2117,10 @@ async def _provision_new_capacity(
     job = jobs[0]
     if volumes is None:
         volumes = []
+    # New-capacity provisioning is reached only for fleet-backed jobs. During
+    # the transition, legacy in-flight jobs may still have no attached
+    # instance; otherwise any attached instance here is expected to be the
+    # placeholder created during assignment.
     effective_profile_and_requirements = _get_effective_profile_and_requirements(
         job_model=job_model,
         run=run,
@@ -2163,7 +2177,10 @@ async def _provision_new_capacity(
             )
         if (
             fleet_model is not None
-            and len(fleet_model.instances) == 0
+            # The first real instance in an empty cluster fleet is responsible
+            # for creating/selecting the placement group. A placeholder alone
+            # must not suppress that path.
+            and not _get_non_placeholder_fleet_instances(fleet_model)
             and is_cloud_cluster(fleet_model)
             and offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
@@ -2294,7 +2311,13 @@ def _build_placement_group_cleanup(
     selected_placement_group_id: Optional[uuid.UUID],
     new_placement_group_models: list[PlacementGroupModel],
 ) -> Optional[_PlacementGroupCleanup]:
-    if fleet_model is None or len(fleet_model.instances) != 0 or offers_tried == 0:
+    if (
+        fleet_model is None
+        # Treat placeholder-only fleets as empty so a failed first-instance attempt
+        # still cleans up placement groups created for that attempt.
+        or _get_non_placeholder_fleet_instances(fleet_model)
+        or offers_tried == 0
+    ):
         return None
     return _PlacementGroupCleanup(
         fleet_id=fleet_model.id,
@@ -2355,8 +2378,6 @@ def _get_effective_profile_and_requirements(
 
     fleet_spec = get_fleet_spec(fleet_model)
     try:
-        if job_model.instance is None or not _is_placeholder_instance(job_model.instance):
-            check_can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec)
         effective_profile, requirements = get_run_profile_and_requirements_in_fleet(
             job=job,
             run_spec=run.run_spec,
