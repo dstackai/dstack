@@ -1334,7 +1334,6 @@ async def _process_new_capacity_provisioning(
         )
     locked_fleet_id = None
     if _should_refresh_related_cluster_master_fleet(context=context):
-        assert fleet_model is not None
         related_cluster_master_fleet = await _resolve_related_cluster_master_fleet(
             item=item,
             fleet_id=fleet_model.id,
@@ -1354,7 +1353,6 @@ async def _process_new_capacity_provisioning(
     )
     if (
         is_master_job(context.job)
-        and fleet_model is not None
         and _get_cluster_fleet_spec(fleet_model) is not None
         # Wait only for a real in-flight/provisioned instance that can anchor
         # cluster placement. Placeholder reservations never become fleet masters.
@@ -2100,6 +2098,7 @@ def _release_replica_jobs_from_master_wait(
 
 async def _provision_new_capacity(
     project: ProjectModel,
+    fleet_model: FleetModel,
     job_model: JobModel,
     run: Run,
     jobs: list[Job],
@@ -2107,7 +2106,6 @@ async def _provision_new_capacity(
     project_ssh_private_key: str,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[list[list[Volume]]] = None,
-    fleet_model: Optional[FleetModel] = None,
 ) -> Union[_FailedNewCapacityProvisioning, _ProvisionNewCapacityResult]:
     jobs = copy.deepcopy(jobs)
     for job in jobs:
@@ -2131,9 +2129,7 @@ async def _provision_new_capacity(
         return _FailedNewCapacityProvisioning(placement_group_cleanup=None)
     profile, requirements = effective_profile_and_requirements
 
-    placement_group_models = await _load_fleet_placement_group_models(
-        fleet_id=fleet_model.id if fleet_model else None,
-    )
+    placement_group_models = await _load_fleet_placement_group_models(fleet_model.id)
     new_placement_group_models: list[PlacementGroupModel] = []
     known_placement_group_ids = {
         placement_group_model.id for placement_group_model in placement_group_models
@@ -2176,11 +2172,10 @@ async def _provision_new_capacity(
                 master_job_provisioning_data=master_job_provisioning_data,
             )
         if (
-            fleet_model is not None
             # The first real instance in an empty cluster fleet is responsible
             # for creating/selecting the placement group. A placeholder alone
             # must not suppress that path.
-            and not _get_non_placeholder_fleet_instances(fleet_model)
+            not _get_non_placeholder_fleet_instances(fleet_model)
             and is_cloud_cluster(fleet_model)
             and offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
@@ -2279,12 +2274,7 @@ async def _provision_new_capacity(
     )
 
 
-async def _load_fleet_placement_group_models(
-    fleet_id: Optional[uuid.UUID],
-) -> list["PlacementGroupModel"]:
-    if fleet_id is None:
-        return []
-
+async def _load_fleet_placement_group_models(fleet_id: uuid.UUID) -> list["PlacementGroupModel"]:
     async with get_session_ctx() as session:
         res = await session.execute(
             select(PlacementGroupModel)
@@ -2306,18 +2296,14 @@ async def _load_fleet_placement_group_models(
 
 
 def _build_placement_group_cleanup(
-    fleet_model: Optional[FleetModel],
+    fleet_model: FleetModel,
     offers_tried: int,
     selected_placement_group_id: Optional[uuid.UUID],
     new_placement_group_models: list[PlacementGroupModel],
 ) -> Optional[_PlacementGroupCleanup]:
-    if (
-        fleet_model is None
-        # Treat placeholder-only fleets as empty so a failed first-instance attempt
-        # still cleans up placement groups created for that attempt.
-        or _get_non_placeholder_fleet_instances(fleet_model)
-        or offers_tried == 0
-    ):
+    # Treat placeholder-only fleets as empty so a failed first-instance attempt
+    # still cleans up placement groups created for that attempt.
+    if _get_non_placeholder_fleet_instances(fleet_model) or offers_tried == 0:
         return None
     return _PlacementGroupCleanup(
         fleet_id=fleet_model.id,
@@ -2369,13 +2355,8 @@ def _get_effective_profile_and_requirements(
     job_model: JobModel,
     run: Run,
     job: Job,
-    fleet_model: Optional[FleetModel],
+    fleet_model: FleetModel,
 ) -> Optional[tuple[Profile, Requirements]]:
-    effective_profile = run.run_spec.merged_profile
-    requirements = job.job_spec.requirements
-    if fleet_model is None:
-        return effective_profile, requirements
-
     fleet_spec = get_fleet_spec(fleet_model)
     try:
         effective_profile, requirements = get_run_profile_and_requirements_in_fleet(
