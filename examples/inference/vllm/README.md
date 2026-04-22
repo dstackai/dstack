@@ -88,8 +88,8 @@ curl http://127.0.0.1:3000/proxy/services/main/qwen397/v1/chat/completions \
 
 </div>
 
-> With current `vLLM` releases, Qwen reasoning is returned under
-> `message.reasoning`.
+> Qwen reasoning output depends on the backend. In `vLLM`, it is returned
+> under `message.reasoning`.
 
 > If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://qwen397.<gateway domain>/`.
 

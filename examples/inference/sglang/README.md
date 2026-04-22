@@ -142,6 +142,10 @@ curl http://127.0.0.1:3000/proxy/services/main/qwen397/v1/chat/completions \
 ```
 </div>
 
+> Qwen reasoning output depends on the backend. In `SGLang`, set
+> `separate_reasoning` to `true` to return reasoning separately from the final
+> answer.
+
 > If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://qwen397.<gateway domain>/`.
 
 ## Configuration options
