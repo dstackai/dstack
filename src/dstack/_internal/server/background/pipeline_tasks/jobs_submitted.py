@@ -593,6 +593,7 @@ async def _apply_assignment_result(
                         job_model=job_model,
                     )
                     session.add(instance_model)
+                    job_model.instance = instance_model
                     job_model.used_instance_id = instance_model.id
                     events.emit(
                         session,
@@ -2354,7 +2355,8 @@ def _get_effective_profile_and_requirements(
 
     fleet_spec = get_fleet_spec(fleet_model)
     try:
-        check_can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec)
+        if job_model.instance is None or not _is_placeholder_instance(job_model.instance):
+            check_can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec)
         effective_profile, requirements = get_run_profile_and_requirements_in_fleet(
             job=job,
             run_spec=run.run_spec,

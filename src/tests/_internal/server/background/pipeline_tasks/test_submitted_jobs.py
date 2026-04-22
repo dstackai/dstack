@@ -394,30 +394,10 @@ class TestJobSubmittedWorker:
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
         fleet_spec = get_fleet_spec()
-        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
-        run = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-            fleet=fleet,
-        )
-        # Simulate the placeholder instance created during assignment
-        placeholder = await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet,
-            status=InstanceStatus.PENDING,
-            offer=None,
-            job_provisioning_data=None,
-            backend=BackendType.AWS,
-        )
-        job = await create_job(
-            session=session, run=run, instance=placeholder, instance_assigned=True
-        )
-        placeholder.provisioning_job_id = job.id
-        await session.commit()
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        job = await create_job(session=session, run=run)
 
         offer = get_instance_offer_with_availability(backend=BackendType.AWS)
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
@@ -432,14 +412,32 @@ class TestJobSubmittedWorker:
 
             await _process_job(session=session, worker=worker, job_model=job)
 
+            job = await _get_job(session, job.id)
+            assert job.status == JobStatus.SUBMITTED
+            assert job.instance_assigned
+            assert job.instance is not None
+            placeholder_id = job.instance.id
+            assert job.used_instance_id == placeholder_id
+            assert job.instance.status == InstanceStatus.PENDING
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
         job = await _get_job(session, job.id)
         assert job.status == JobStatus.PROVISIONING
-        assert job.used_instance_id == placeholder.id
-        await session.refresh(placeholder)
-        assert placeholder.status == InstanceStatus.PROVISIONING
-        assert placeholder.fleet_id == fleet.id
-        assert placeholder.offer is not None
-        assert placeholder.provisioning_job_id == job.id  # never cleared
+        assert job.instance is not None
+        assert job.instance.id == placeholder_id
+        assert job.used_instance_id == placeholder_id
+        assert job.instance.status == InstanceStatus.PROVISIONING
+        assert job.instance.fleet_id == fleet.id
+        assert job.instance.offer is not None
+        assert job.instance.provisioning_job_id == job.id  # never cleared
+        res = await session.execute(
+            select(InstanceModel).where(
+                InstanceModel.fleet_id == fleet.id,
+                InstanceModel.deleted == False,
+            )
+        )
+        assert len(res.scalars().all()) == 1
 
     async def test_provisioning_master_job_respects_cluster_placement_in_non_empty_fleet(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
