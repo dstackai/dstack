@@ -17,7 +17,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ApplyAction, CoreModel
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.services import backends as backends_services
@@ -168,17 +168,17 @@ class ServerConfigManager:
             # but it's config is invalid (e.g. cannot be decrypted).
             # Update backend in this case.
             if current_backend_config is None and not backend_exists:
-                apply_action = ApplyAction.CREATE
+                apply_action = "create"
                 apply_func = backends_services.create_backend
             else:
-                apply_action = ApplyAction.UPDATE
+                apply_action = "update"
                 apply_func = backends_services.update_backend
             try:
                 await apply_func(session=session, project=project, config=backend_config)
             except Exception as e:
                 logger.warning(
                     "Failed to %s backend %s in project %s: %s",
-                    apply_action.value,
+                    apply_action,
                     backend_config.type,
                     project.name,
                     e,
