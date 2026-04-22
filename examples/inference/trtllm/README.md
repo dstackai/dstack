@@ -90,9 +90,6 @@ $ curl http://127.0.0.1:3000/proxy/services/main/qwen235/v1/chat/completions \
 
 </div>
 
-> Qwen reasoning output depends on the backend. In TensorRT-LLM, it is
-> returned inline in `message.content`.
-
 When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the service endpoint will be available at `https://qwen235.<gateway domain>/`.
 
 ## What's next?

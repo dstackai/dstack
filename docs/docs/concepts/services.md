@@ -154,6 +154,10 @@ $ curl http://localhost:3000/proxy/services/main/qwen397/v1/chat/completions \
 
 </div>
 
+`dstack` forwards the service response as returned by the serving framework.
+Core OpenAI-style fields are consistent, but framework-specific fields such as
+reasoning or tool-call metadata may differ across backends.
+
 If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
 
 ## Configuration options
