@@ -1136,6 +1136,64 @@ class TestJobSubmittedWorker:
         assert job.status == JobStatus.SUBMITTED
         assert not job.instance_assigned
         assert job.instance is None
+        # No placeholder must be committed when the fleet is full.
+        res = await session.execute(
+            select(InstanceModel).where(
+                InstanceModel.fleet_id == fleet.id,
+                InstanceModel.deleted == False,
+            )
+        )
+        assert len(res.scalars().all()) == 1
+
+    async def test_cleans_up_placeholder_on_failed_new_capacity_provisioning(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+        )
+        placeholder = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.PENDING,
+            offer=None,
+            job_provisioning_data=None,
+            backend=BackendType.AWS,
+        )
+        job = await create_job(
+            session=session, run=run, instance=placeholder, instance_assigned=True
+        )
+        placeholder.provisioning_job_id = job.id
+        await session.commit()
+
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            compute_mock = Mock(spec=ComputeMockSpec)
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value = compute_mock
+            m.return_value = [backend_mock]
+            compute_mock.get_offers.return_value = [offer]
+            compute_mock.run_job.side_effect = BackendError("boom")
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        await session.refresh(placeholder)
+        assert placeholder.deleted
+        assert placeholder.status == InstanceStatus.TERMINATED
 
     async def test_provisions_compute_group(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
