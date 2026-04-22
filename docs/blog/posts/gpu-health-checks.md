@@ -68,6 +68,6 @@ If you have experience with GPU reliability or ideas for automated recovery, joi
 
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)
-    2. Explore the [clusters](../../docs/guides/clusters.md) guide
+    2. Explore the [clusters](../../examples.md#clusters) examples
     3. Learn more about [metrics](../../docs/concepts/metrics.md)
     4. Join [Discord](https://discord.gg/u8SmfwPpMd)
