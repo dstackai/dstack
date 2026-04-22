@@ -562,6 +562,7 @@ def get_dev_env_run_dict(
                         "job_provisioning_data": None,
                         "job_runtime_data": None,
                         "probes": [],
+                        "image_pull_progress": None,
                     }
                 ],
                 "job_connection_info": None,
@@ -584,6 +585,7 @@ def get_dev_env_run_dict(
             "job_provisioning_data": None,
             "job_runtime_data": None,
             "probes": [],
+            "image_pull_progress": None,
         },
         "cost": 0.0,
         "service": None,
@@ -728,6 +730,7 @@ class TestListRuns:
                                 "job_provisioning_data": None,
                                 "job_runtime_data": None,
                                 "probes": [],
+                                "image_pull_progress": None,
                             }
                         ],
                         "job_connection_info": None,
@@ -750,6 +753,7 @@ class TestListRuns:
                     "job_provisioning_data": None,
                     "job_runtime_data": None,
                     "probes": [],
+                    "image_pull_progress": None,
                 },
                 "cost": 0,
                 "service": None,
@@ -919,6 +923,7 @@ class TestListRuns:
                                 "job_provisioning_data": None,
                                 "job_runtime_data": None,
                                 "probes": [],
+                                "image_pull_progress": None,
                             }
                         ],
                         "job_connection_info": None,
@@ -941,6 +946,7 @@ class TestListRuns:
                     "job_provisioning_data": None,
                     "job_runtime_data": None,
                     "probes": [],
+                    "image_pull_progress": None,
                 },
                 "cost": 0,
                 "service": None,

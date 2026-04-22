@@ -147,6 +147,9 @@ def get_job_submission_excludes(job_submissions: list[JobSubmission]) -> Include
             jrd_excludes["working_dir"] = True
         submission_excludes["job_runtime_data"] = jrd_excludes
 
+    if all(s.image_pull_progress is None for s in job_submissions):
+        submission_excludes["image_pull_progress"] = True
+
     return submission_excludes
 
 

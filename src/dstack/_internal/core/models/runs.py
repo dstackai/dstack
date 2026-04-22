@@ -399,6 +399,19 @@ class Probe(CoreModel):
     success_streak: int
 
 
+class ImagePullProgress(CoreModel):
+    downloaded_bytes: int
+    extracted_bytes: int
+    total_bytes: int
+    """An estimate of the number of bytes to be downloaded and extracted during this pull.
+    Does not include cached layers that existed on the instance before the pull.
+    """
+    is_total_bytes_final: bool
+    """Whether `total_bytes` is believed to be the correct final value.
+    If `False`, then `total_bytes` is a lower estimate.
+    """
+
+
 class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
@@ -421,6 +434,7 @@ class JobSubmission(CoreModel):
     job_runtime_data: Optional[JobRuntimeData] = None
     error: Optional[str] = None
     probes: list[Probe] = []
+    image_pull_progress: Optional[ImagePullProgress] = None
 
     @property
     def age(self) -> timedelta:

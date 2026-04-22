@@ -578,6 +578,7 @@ class JobModel(PipelineModelMixin, BaseModel):
     for example to provision instances for all jobs when processing master. If not set, all jobs
     should be processed only one-by-one.
     """
+    image_pull_progress: Mapped[Optional[str]] = mapped_column(Text)
 
     __table_args__ = (
         Index(
