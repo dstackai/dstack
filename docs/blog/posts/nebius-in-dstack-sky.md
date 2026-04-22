@@ -104,7 +104,7 @@ $ dstack apply -f my-cluster.dstack.yml
 Once the fleet is ready, you can run [distributed tasks](../../docs/concepts/tasks.md#distributed-tasks). 
 `dstack` automatically configures drivers, networking, and fast GPU-to-GPU interconnect.
 
-To learn more, see the [clusters](../../docs/guides/clusters.md) guide.
+To learn more, see the [clusters](../../examples/clusters/nebius/index.md) guide.
 
 With Nebius joining `dstack` Sky, users can now run on-demand and spot GPUs and clusters directly through the marketplace—gaining access to the same production grade infrastrucure Nebius customers use for frontier-scale training, without needing a separate Nebius account. 
 
@@ -124,4 +124,4 @@ Our goal is to give teams maximum flexibility while removing the complexity of m
     4. Explore [dev environments](../../docs/concepts/dev-environments.md), 
         [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
         and [fleets](../../docs/concepts/fleets.md)
-    5. Reaad the the [clusters](../../docs/guides/clusters.md) guide
+    5. Read the [clusters](../../examples/clusters/nebius/index.md) guide

@@ -311,5 +311,5 @@ Support for AMD GPUs is coming soon — our team is actively working on it right
     2. Explore [dev environments](../../docs/concepts/dev-environments.md), 
         [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
         and [fleets](../../docs/concepts/fleets.md)
-    3. Read the the [clusters](../../docs/guides/clusters.md) guide
+    3. Browse the [clusters](../../examples.md#clusters) examples
     4. Join [Discord](https://discord.gg/u8SmfwPpMd)
