@@ -11,6 +11,10 @@ from dstack._internal.cli.utils.common import (
     console,
 )
 from dstack._internal.core.errors import CLIError
+from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class PsCommand(APIBaseCommand):
@@ -64,6 +68,23 @@ class PsCommand(APIBaseCommand):
             raise CLIError("JSON output is not supported together with --watch")
 
         runs = self.api.runs.list(all=args.all, limit=args.last)
+        deprecated_router_runs = [
+            run._run.run_spec.run_name
+            for run in runs
+            if not run.status.is_finished()
+            and isinstance(run._run.run_spec.configuration, ServiceConfiguration)
+            and run._run.run_spec.configuration.router is not None
+            and run._run.run_spec.run_name is not None
+        ]
+        if deprecated_router_runs and args.format != "json":
+            logger.warning(
+                "Specifying `router` in service configurations is deprecated"
+                " and will be disallowed in a future release."
+                " Please migrate to replica-based routers:"
+                " https://dstack.ai/docs/concepts/services/#pd-disaggregation"
+                " (affected runs: %s)",
+                ", ".join(deprecated_router_runs),
+            )
         if not args.watch:
             if args.format == "json":
                 run_utils.print_runs_json(self.api.project, runs)

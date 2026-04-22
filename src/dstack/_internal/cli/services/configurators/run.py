@@ -101,6 +101,14 @@ class BaseRunConfigurator(
         if conf.working_dir is not None and not is_absolute_posix_path(conf.working_dir):
             raise ConfigurationError("working_dir must be absolute")
 
+        if isinstance(conf, ServiceConfiguration) and conf.router is not None:
+            logger.warning(
+                "Specifying `router` in service configurations is deprecated"
+                " and will be disallowed in a future release."
+                " Please migrate to replica-based routers:"
+                " https://dstack.ai/docs/concepts/services/#pd-disaggregation"
+            )
+
         repo = self.get_repo(conf, configuration_path, configurator_args)
         if repo is None:
             repo = init_default_virtual_repo(api=self.api)
