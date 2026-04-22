@@ -823,6 +823,13 @@ class InstanceModel(PipelineModelMixin, BaseModel):
 
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
 
+    provisioning_job_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUIDType(binary=False), default=None
+    )
+    """When set, records the job that triggered this instance's creation.
+    A PENDING instance with this field set is a placeholder managed by
+    `JobSubmittedPipeline` and is not touched by `InstancePipeline`.
+    """
     remote_connection_info: Mapped[Optional[str]] = mapped_column(Text)
 
     total_blocks: Mapped[Optional[int]] = mapped_column(Integer)

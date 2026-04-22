@@ -1440,6 +1440,8 @@ def _terminate_fleet_instances(
     for instance in fleet_model.instances:
         if instance_nums is not None and instance.instance_num not in instance_nums:
             continue
+        if instance.status == InstanceStatus.PENDING and instance.provisioning_job_id is not None:
+            raise ServerClientError("Failed to delete instance while the job is provisioning.")
         if instance.status == InstanceStatus.TERMINATED:
             instance.deleted = True
         else:

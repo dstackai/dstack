@@ -2,7 +2,7 @@ import asyncio
 import copy
 import uuid
 from contextlib import AsyncExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Optional, Sequence, Union
 
@@ -85,6 +85,7 @@ from dstack._internal.server.services import events
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.docker import apply_server_docker_defaults
 from dstack._internal.server.services.fleets import (
+    can_create_new_cloud_instance_in_fleet,
     check_can_create_new_cloud_instance_in_fleet,
     get_fleet_master_instance_provisioning_data,
     get_fleet_spec,
@@ -392,6 +393,7 @@ class _TerminateSubmittedJobResult:
     message: Optional[str] = None
     locked_fleet_id: Optional[uuid.UUID] = None
     placement_group_cleanup: Optional[_PlacementGroupCleanup] = None
+    placeholder_instance_ids: list[uuid.UUID] = field(default_factory=list)
 
 
 @dataclass
@@ -559,6 +561,48 @@ async def _apply_assignment_result(
             return
 
         if isinstance(assignment, _NewCapacityAssignment):
+            # For single-instance jobs, create a placeholder instance under fleet lock
+            # so that instance_num is unique and nodes.max is enforced as a hard limit.
+            # Compute groups still use the old path (placeholder created after provisioning).
+            if len(context.jobs_to_provision) == 1:
+                async with AsyncExitStack() as exit_stack:
+                    fleet_model = await _lock_fleet_for_placeholder(
+                        exit_stack=exit_stack,
+                        session=session,
+                        fleet_id=assignment.fleet_id,
+                    )
+                    if fleet_model is None:
+                        logger.debug(
+                            "%s: failed to lock fleet for placeholder creation",
+                            fmt(context.job_model),
+                        )
+                        await _reset_job_lock_for_retry(session=session, item=item)
+                        return
+                    fleet_spec = get_fleet_spec(fleet_model)
+                    if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec):
+                        logger.debug(
+                            "%s: fleet %s is full, retrying assignment",
+                            fmt(context.job_model),
+                            fleet_model.name,
+                        )
+                        await _reset_job_lock_for_retry(session=session, item=item)
+                        return
+                    instance_model = _create_placeholder_instance(
+                        fleet_model=fleet_model,
+                        project=context.project,
+                        job_model=job_model,
+                    )
+                    session.add(instance_model)
+                    job_model.used_instance_id = instance_model.id
+                    events.emit(
+                        session,
+                        f"Instance created for job. Instance status: {instance_model.status.upper()}",
+                        actor=events.SystemActor(),
+                        targets=[
+                            events.Target.from_model(instance_model),
+                            events.Target.from_model(job_model),
+                        ],
+                    )
             job_model.fleet_id = assignment.fleet_id
             job_model.instance_assigned = True
             await _mark_job_processed(session=session, job_model=job_model)
@@ -922,6 +966,104 @@ async def _lock_assignment_fleet_for_existing_instance_assignment(
     return fleets_with_locked_instances[0]
 
 
+async def _lock_fleet_for_placeholder(
+    exit_stack: AsyncExitStack,
+    session: AsyncSession,
+    fleet_id: uuid.UUID,
+) -> Optional[FleetModel]:
+    """Lock a fleet and load its non-deleted instances for placeholder creation.
+
+    Returns the fleet model with instances loaded, or None if the fleet
+    cannot be locked (e.g. it is gone, deleted, or already locked by another pipeline).
+    """
+    res = await session.execute(
+        select(FleetModel)
+        .where(
+            FleetModel.id == fleet_id,
+            FleetModel.deleted == False,
+        )
+        .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .execution_options(populate_existing=True)
+        .with_for_update(skip_locked=True, key_share=True)
+    )
+    fleet_model = res.scalars().unique().one_or_none()
+    if fleet_model is None:
+        return None
+
+    if not is_db_sqlite():
+        return fleet_model
+
+    await sqlite_commit(session)
+    await exit_stack.enter_async_context(
+        get_locker(get_db().dialect_name).lock_ctx(FleetModel.__tablename__, [fleet_id])
+    )
+    # Re-query under in-memory lock to see committed changes.
+    res = await session.execute(
+        select(FleetModel)
+        .where(
+            FleetModel.id == fleet_id,
+            FleetModel.deleted == False,
+        )
+        .options(selectinload(FleetModel.instances.and_(InstanceModel.deleted == False)))
+        .execution_options(populate_existing=True)
+    )
+    return res.scalars().unique().one_or_none()
+
+
+def _create_placeholder_instance(
+    fleet_model: FleetModel,
+    project: ProjectModel,
+    job_model: JobModel,
+) -> InstanceModel:
+    taken_instance_nums = {i.instance_num for i in fleet_model.instances}
+    instance_num = get_next_instance_num(taken_instance_nums)
+    return InstanceModel(
+        id=uuid.uuid4(),
+        name=f"{fleet_model.name}-{instance_num}",
+        instance_num=instance_num,
+        project=project,
+        fleet=fleet_model,
+        status=InstanceStatus.PENDING,
+        unreachable=False,
+        provisioning_job_id=job_model.id,
+    )
+
+
+def _is_placeholder_instance(instance: InstanceModel) -> bool:
+    """A PENDING instance with provisioning_job_id set is a placeholder
+    created during assignment, waiting for cloud provisioning."""
+    return instance.status == InstanceStatus.PENDING and instance.provisioning_job_id is not None
+
+
+def _get_placeholder_instance_ids(context: _SubmittedJobContext) -> list[uuid.UUID]:
+    instance = context.job_model.instance
+    if instance is not None and instance.provisioning_job_id is not None:
+        return [instance.id]
+    return []
+
+
+async def _cleanup_placeholder_instances(
+    session: AsyncSession,
+    instance_ids: list[uuid.UUID],
+) -> None:
+    if not instance_ids:
+        return
+    now = get_current_datetime()
+    await session.execute(
+        update(InstanceModel)
+        .where(
+            InstanceModel.id.in_(instance_ids),
+            InstanceModel.provisioning_job_id.is_not(None),
+        )
+        .values(
+            deleted=True,
+            deleted_at=now,
+            finished_at=now,
+            status=InstanceStatus.TERMINATED,
+        )
+    )
+
+
 def _get_current_reusable_instance_offers(
     context: _SubmittedJobContext,
     assignment: _ExistingInstanceAssignment,
@@ -1000,6 +1142,13 @@ async def _process_provisioning(
         return preconditions
 
     if context.job_model.instance is not None:
+        if _is_placeholder_instance(context.job_model.instance):
+            # Placeholder instance created during assignment — proceed to cloud provisioning.
+            return await _process_new_capacity_provisioning(
+                item=item,
+                context=context,
+                preconditions=preconditions,
+            )
         return await _process_existing_instance_provisioning(
             item=item,
             context=context,
@@ -1044,6 +1193,10 @@ async def _apply_provisioning_result(
                 item=item,
                 fleet_id=_get_locked_fleet_id_from_provisioning(provisioning),
             )
+            await _cleanup_placeholder_instances(
+                session=session,
+                instance_ids=_get_placeholder_instance_ids_from_provisioning(provisioning),
+            )
             log_lock_token_changed_after_processing(logger, item)
             return
 
@@ -1071,6 +1224,10 @@ async def _apply_provisioning_result(
                 session=session,
                 item=item,
                 fleet_id=provisioning.locked_fleet_id,
+            )
+            await _cleanup_placeholder_instances(
+                session=session,
+                instance_ids=provisioning.placeholder_instance_ids,
             )
             await _terminate_submitted_job(
                 session=session,
@@ -1216,6 +1373,7 @@ async def _process_new_capacity_provisioning(
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
             locked_fleet_id=locked_fleet_id,
             placement_group_cleanup=provision_new_capacity_result.placement_group_cleanup,
+            placeholder_instance_ids=_get_placeholder_instance_ids(context),
         )
 
     volume_attachment_result = None
@@ -1315,7 +1473,7 @@ async def _materialize_newly_provisioned_capacity(
     if compute_group_model is not None:
         session.add(compute_group_model)
 
-    instance_models = await _create_instance_models_for_provisioned_jobs(
+    instance_models = await _promote_or_create_instance_models_for_provisioned_jobs(
         session=session,
         context=context,
         fleet_model=fleet_model,
@@ -1355,7 +1513,7 @@ def _resolve_provisioned_jobs_and_data(
     return [context.job], [provisioning_data], None
 
 
-async def _create_instance_models_for_provisioned_jobs(
+async def _promote_or_create_instance_models_for_provisioned_jobs(
     session: AsyncSession,
     context: _SubmittedJobContext,
     fleet_model: FleetModel,
@@ -1367,9 +1525,9 @@ async def _create_instance_models_for_provisioned_jobs(
 ) -> list[InstanceModel]:
     provisioned_job_models = _get_job_models_for_jobs(context.run_model.jobs, provisioned_jobs)
     instance_models: list[InstanceModel] = []
-    # FIXME: Fleet is not locked here, which may lead to duplicate `instance_num`.
-    # This likely needs a separate reservation step so instance rows are created
-    # before provisioning and `instance_num` is allocated under fleet serialization.
+    # FIXME: For compute groups, the fleet is not locked here, which may lead to
+    # duplicate `instance_num`. Single-instance jobs use placeholder instances
+    # created under fleet lock during assignment, so they are not affected.
     taken_instance_nums = await _get_taken_instance_nums(session, fleet_model)
     for provisioned_job_model, job_provisioning_data in zip(
         provisioned_job_models, job_provisioning_datas
@@ -1377,23 +1535,42 @@ async def _create_instance_models_for_provisioned_jobs(
         provisioned_job_model.fleet_id = fleet_model.id
         provisioned_job_model.job_provisioning_data = job_provisioning_data.json()
         switch_job_status(session, provisioned_job_model, JobStatus.PROVISIONING)
-        instance_num = get_next_instance_num(taken_instance_nums)
-        instance_model = _create_instance_model_for_job(
-            project=context.project,
-            fleet_model=fleet_model,
-            compute_group_model=compute_group_model,
-            job_model=provisioned_job_model,
-            job_provisioning_data=job_provisioning_data,
-            offer=offer,
-            instance_num=instance_num,
-            profile=effective_profile,
-        )
+
+        # If a placeholder instance was created during assignment, promote it
+        # with the actual provisioning data. Otherwise create a new instance
+        # (compute group path that has not been migrated to placeholders yet).
+        # Safe to update the placeholder without FOR UPDATE: the instance pipeline
+        # skips placeholders (fetcher filter), fleet consolidation does not modify
+        # them, and the API refuses to delete them while the job is provisioning.
+        instance_model = provisioned_job_model.instance
+        if instance_model is not None and instance_model.provisioning_job_id is not None:
+            _promote_placeholder_instance(
+                instance_model=instance_model,
+                compute_group_model=compute_group_model,
+                job_provisioning_data=job_provisioning_data,
+                offer=offer,
+                profile=effective_profile,
+            )
+        else:
+            instance_num = get_next_instance_num(taken_instance_nums)
+            instance_model = _create_instance_model_for_job(
+                project=context.project,
+                fleet_model=fleet_model,
+                compute_group_model=compute_group_model,
+                job_model=provisioned_job_model,
+                job_provisioning_data=job_provisioning_data,
+                offer=offer,
+                instance_num=instance_num,
+                profile=effective_profile,
+            )
+            taken_instance_nums.add(instance_num)
+            session.add(instance_model)
+            provisioned_job_model.used_instance_id = instance_model.id
+
         instance_models.append(instance_model)
-        taken_instance_nums.add(instance_num)
         provisioned_job_model.job_runtime_data = _prepare_job_runtime_data(
             offer, context.multinode
         ).json()
-        session.add(instance_model)
         events.emit(
             session,
             f"Instance created for job. Instance status: {instance_model.status.upper()}",
@@ -1403,7 +1580,6 @@ async def _create_instance_models_for_provisioned_jobs(
                 events.Target.from_model(provisioned_job_model),
             ],
         )
-        provisioned_job_model.used_instance_id = instance_model.id
         provisioned_job_model.last_processed_at = get_current_datetime()
     return instance_models
 
@@ -1458,6 +1634,36 @@ def _create_instance_model_for_job(
         total_blocks=1,
         busy_blocks=1,
     )
+
+
+def _promote_placeholder_instance(
+    instance_model: InstanceModel,
+    compute_group_model: Optional[ComputeGroupModel],
+    job_provisioning_data: JobProvisioningData,
+    offer: InstanceOfferWithAvailability,
+    profile: Profile,
+) -> None:
+    """Promote a placeholder instance to a real provisioning instance
+    by filling in the fields that were unknown at placeholder creation time."""
+    if not job_provisioning_data.dockerized:
+        termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+        termination_idle_time = 0
+    else:
+        termination_policy, termination_idle_time = get_termination(
+            profile, DEFAULT_RUN_TERMINATION_IDLE_TIME
+        )
+    instance_model.status = InstanceStatus.PROVISIONING
+    instance_model.started_at = get_current_datetime()
+    instance_model.compute_group = compute_group_model
+    instance_model.job_provisioning_data = job_provisioning_data.json()
+    instance_model.offer = offer.json()
+    instance_model.backend = offer.backend
+    instance_model.price = offer.price
+    instance_model.region = offer.region
+    instance_model.termination_policy = termination_policy
+    instance_model.termination_idle_time = termination_idle_time
+    instance_model.total_blocks = 1
+    instance_model.busy_blocks = 1
 
 
 async def _process_volume_attachments(
@@ -1669,6 +1875,14 @@ def _get_locked_fleet_id_from_provisioning(
         return provisioning.locked_fleet_id
 
     return None
+
+
+def _get_placeholder_instance_ids_from_provisioning(
+    provisioning: _ProvisioningResult,
+) -> list[uuid.UUID]:
+    if isinstance(provisioning, _TerminateSubmittedJobResult):
+        return provisioning.placeholder_instance_ids
+    return []
 
 
 def _get_related_volume_lock_owner(job_id: uuid.UUID) -> str:

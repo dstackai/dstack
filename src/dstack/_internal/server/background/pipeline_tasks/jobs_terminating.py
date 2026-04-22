@@ -617,6 +617,20 @@ async def _process_terminating_job(
         result.job_update_map["status"] = _get_job_termination_status(job_model)
         return result
 
+    # Placeholder instance (PENDING + provisioning_job_id set) has no VM.
+    # Just mark it for deletion and finish the job.
+    if (
+        instance_model.status == InstanceStatus.PENDING
+        and instance_model.provisioning_job_id is not None
+    ):
+        instance_update_map = get_or_error(result.instance_update_map)
+        instance_update_map["status"] = InstanceStatus.TERMINATING
+        instance_update_map["termination_reason"] = InstanceTerminationReason.JOB_FINISHED
+        result.job_update_map["instance_id"] = None
+        await _unregister_replica_and_update_result(result=result, job_model=job_model)
+        result.job_update_map["status"] = _get_job_termination_status(job_model)
+        return result
+
     if job_model.graceful_termination_attempts == 0 and job_model.remove_at is None:
         result.job_update_map = await _stop_job_gracefully(job_model, instance_model)
         return result
