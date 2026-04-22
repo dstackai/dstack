@@ -464,7 +464,7 @@ There are two ways to configure GCP: using a service account or using the defaul
     </div>
 
     ??? info "User interface"
-        If you are configuring the `gcp` backend on the [project settigns page](projects.md#backends), 
+        If you are configuring the `gcp` backend on the [project settings page](projects.md#backends),
         specify the contents of the JSON file in `data`:
 
         <div editor-title="~/.dstack/server/config.yml">
@@ -699,7 +699,7 @@ projects:
     ```
 
 ??? info "User interface"
-    If you are configuring the `nebius` backend on the [project settigns page](projects.md#backends), 
+    If you are configuring the `nebius` backend on the [project settings page](projects.md#backends),
     specify the contents of the private key file in `private_key_content`:
 
     <div editor-title="~/.dstack/server/config.yml">
@@ -1048,8 +1048,10 @@ projects:
 - name: main
   backends:
   - type: kubernetes
+
     kubeconfig:
       filename: ~/.kube/config
+
     proxy_jump:
       hostname: 204.12.171.137
       port: 32000
@@ -1057,7 +1059,7 @@ projects:
 
 </div>
 
-??? info "Proxy jump"
+!!! info "Proxy jump"
     To allow the `dstack` server and CLI to access runs via SSH, `dstack` requires a node that acts as a jump host to proxy SSH traffic into containers.  
 
     To configure this node, specify `hostname` and `port` under the `proxy_jump` property:  
@@ -1067,6 +1069,46 @@ projects:
 
     No additional setup is required — `dstack` configures and manages the proxy automatically.
 
+??? info "User interface"
+    If you are configuring the `kubernetes` backend on the [project settings page](projects.md#backends),
+    specify the contents of the `kubeconfig` file in `data`:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    type: kubernetes
+    
+    kubeconfig:
+      data: |
+        apiVersion: v1
+        kind: Config
+        current-context: kubernetes-admin@gpu-cluster
+
+        clusters:
+        - name: gpu-cluster
+          cluster:
+            server: https://gpu-cluster.internal.example.com:6443
+            certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t...LS0tLQo=
+
+        users:
+        - name: kubernetes-admin
+          user:
+            client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t...LS0tLQo=
+            client-key-data: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0t...LS0tLQo=
+
+        contexts:
+        - name: kubernetes-admin@gpu-cluster
+          context:
+            cluster: gpu-cluster
+            user: kubernetes-admin
+    
+    proxy_jump:
+      hostname: 204.12.171.137
+      port: 32000
+    ```
+
+    </div>
+    
 ??? info "Required operators"
     === "NVIDIA"
         For `dstack` to correctly detect GPUs in your Kubernetes cluster, the cluster must have the
