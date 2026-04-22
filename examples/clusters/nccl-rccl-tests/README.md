@@ -115,7 +115,6 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
         kernel driver `bnxt_re`. To ensure this compatibility, we mount `libbnxt_re-rdmav34.so` from the host and preload it 
         using `LD_PRELOAD` when running MPI.
 
-
 !!! info "Privileged"
     In some cases, the backend (e.g., `kubernetes`) may require `privileged: true` to access the high-speed interconnect (e.g., InfiniBand).
 
@@ -137,11 +136,6 @@ Submit the run nccl-tests? [y/n]: y
 ```
 
 </div>
-
-## Source code
-
-The source-code of this example can be found in 
-[`examples/clusters/nccl-rccl-tests`](https://github.com/dstackai/dstack/blob/master/examples/clusters/nccl-rccl-tests).
 
 ## What's next?
 

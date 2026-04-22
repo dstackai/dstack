@@ -121,7 +121,7 @@ utilization_policy:
 Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g., to run or build Docker images, or use Docker Compose.
 
 === "Dev environment"
-    <div editor-title="examples/misc/docker-compose/.dstack.yml">
+    <div editor-title=".dstack.yml">
 
     ```yaml
     type: dev-environment
@@ -137,7 +137,7 @@ Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g.,
     </div>
 
 === "Task"
-    <div editor-title="examples/misc/dind/task.dstack.yml">
+    <div editor-title=".dstack.yml">
 
     ```yaml
     type: task
@@ -187,8 +187,6 @@ Set `docker` to `true` to enable the `docker` CLI in your dev environment, e.g.,
                 path: /var/lib/docker
                 optional: true
         ```
-
-See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/examples/misc/docker-compose).
 
 ## Fleets
 

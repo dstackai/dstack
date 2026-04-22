@@ -1,82 +1,68 @@
 ---
 title: vLLM
-description: Deploying Llama 3.1 8B using vLLM with OpenAI-compatible API
+description: Deploying Qwen3.5-397B-A17B-FP8 using vLLM on NVIDIA GPUs
 ---
 
 # vLLM
 
-This example shows how to deploy Llama 3.1 8B with `dstack` using [vLLM](https://docs.vllm.ai/en/latest/).
+This example shows how to deploy `Qwen/Qwen3.5-397B-A17B-FP8` using
+[vLLM](https://docs.vllm.ai/en/latest/) and `dstack`.
 
-??? info "Prerequisites"
-    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo with examples.
+## Apply a configuration
 
-    <div class="termy">
- 
-    ```shell
-    $ git clone https://github.com/dstackai/dstack
-    $ cd dstack
+Here's an example of a service that deploys
+`Qwen/Qwen3.5-397B-A17B-FP8` using vLLM.
+
+=== "NVIDIA"
+
+    <div editor-title="qwen397.dstack.yml">
+
+    ```yaml
+    type: service
+    name: qwen397
+
+    image: vllm/vllm-openai:v0.19.1
+
+    commands:
+      - |
+        vllm serve Qwen/Qwen3.5-397B-A17B-FP8 \
+          --port 8000 \
+          --tensor-parallel-size $DSTACK_GPUS_NUM \
+          --max-model-len 262144 \
+          --reasoning-parser qwen3 \
+          --language-model-only
+
+    port: 8000
+    model: Qwen/Qwen3.5-397B-A17B-FP8
+
+    volumes:
+      - instance_path: /root/.cache
+        path: /root/.cache
+        optional: true
+
+    resources:
+      cpu: x86:96..
+      memory: 512GB..
+      shm_size: 16GB
+      disk: 500GB..
+      gpu: H100:80GB:8
     ```
- 
+
     </div>
 
-## Deployment
+The NVIDIA example serves `Qwen/Qwen3.5-397B-A17B-FP8` on `8x H100` GPUs using
+vLLM with tensor parallelism enabled. It uses `--language-model-only` because
+`Qwen/Qwen3.5-397B-A17B-FP8` is a text-only model.
 
-Here's an example of a service that deploys Llama 3.1 8B using vLLM.
-
-<div editor-title="examples/inference/vllm/.dstack.yml">
-
-```yaml
-type: service
-name: llama31
-
-python: "3.11"
-env:
-  - HF_TOKEN
-  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
-  - MAX_MODEL_LEN=4096
-commands:
-  - pip install vllm
-  - vllm serve $MODEL_ID
-    --max-model-len $MAX_MODEL_LEN
-    --tensor-parallel-size $DSTACK_GPUS_NUM
-port: 8000
-# Register the model
-model: meta-llama/Meta-Llama-3.1-8B-Instruct
-
-# Uncomment to leverage spot instances
-#spot_policy: auto
-
-# Uncomment to cache downloaded models
-#volumes:
-#  - /root/.cache/huggingface/hub:/root/.cache/huggingface/hub
-
-resources:
-  gpu: 24GB
-  # Uncomment if using multiple GPUs
-  #shm_size: 24GB
-```
-
-</div>
-
-### Running a configuration
-
-To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
+Save the configuration above as `qwen397.dstack.yml`, then use the
+[`dstack apply`](https://dstack.ai/docs/reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
 ```shell
-$ dstack apply -f examples/inference/vllm/.dstack.yml
-
- #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
- 1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB    yes   $0.12
- 2  runpod   EU-SE-1   18xCPU, 100GB, A5000:24GB    yes   $0.12
- 3  gcp      us-west4  27xCPU, 150GB, A5000:24GB:2  yes   $0.23
-
-Submit a new run? [y/n]: y
-
-Provisioning...
----> 100%
+$ dstack apply -f qwen397.dstack.yml
 ```
+
 </div>
 
 If no gateway is created, the service endpoint will be available at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
@@ -84,39 +70,27 @@ If no gateway is created, the service endpoint will be available at `<dstack ser
 <div class="termy">
 
 ```shell
-$ curl http://127.0.0.1:3000/proxy/services/main/llama31/v1/chat/completions \
+curl http://127.0.0.1:3000/proxy/services/main/qwen397/v1/chat/completions \
     -X POST \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -H 'Content-Type: application/json' \
     -d '{
-      "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      "model": "Qwen/Qwen3.5-397B-A17B-FP8",
       "messages": [
         {
-          "role": "system",
-          "content": "You are a helpful assistant."
-        },
-        {
           "role": "user",
-          "content": "What is Deep Learning?"
+          "content": "A bat and a ball cost $1.10 total. The bat costs $1.00 more than the ball. How much does the ball cost?"
         }
       ],
-      "max_tokens": 128
+      "max_tokens": 1024
     }'
 ```
 
 </div>
 
-When a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured, the service endpoint will be available at `https://llama31.<gateway domain>/`.
-
-## Source code
-
-The source-code of this example can be found in
-[`examples/inference/vllm`](https://github.com/dstackai/dstack/blob/master/examples/inference/vllm).
+> If a [gateway](https://dstack.ai/docs/concepts/gateways/) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://qwen397.<gateway domain>/`.
 
 ## What's next?
 
-1. Check [services](https://dstack.ai/docs/services)
-2. Browse the [Llama 3.1](https://dstack.ai/examples/llms/llama31/) and
-   [NIM](https://dstack.ai/examples/inference/nim/) examples
-3. See also [AMD](https://dstack.ai/examples/accelerators/amd/) and
-   [TPU](https://dstack.ai/examples/accelerators/tpu/)
+1. Read about [services](https://dstack.ai/docs/concepts/services) and [gateways](https://dstack.ai/docs/concepts/gateways)
+2. Browse the [SGLang](https://dstack.ai/examples/inference/sglang/) and [NIM](https://dstack.ai/examples/inference/nim/) examples

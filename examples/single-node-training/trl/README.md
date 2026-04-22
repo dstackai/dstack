@@ -108,11 +108,6 @@ Provisioning...
 
 </div>
 
-## Source code
-
-The source-code of this example can be found in 
-[`examples/llms/llama31`](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31) and [`examples/single-node-training/trl`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/trl).
-
 ## What's next?
 
 1. Browse the [TRL distributed training](https://dstack.ai/docs/examples/distributed-training/trl) example

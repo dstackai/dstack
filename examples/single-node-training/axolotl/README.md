@@ -92,11 +92,6 @@ Provisioning...
 
 </div>
 
-## Source code
-
-The source-code of this example can be found in
-[`examples/single-node-training/axolotl`](https://github.com/dstackai/dstack/blob/master/examples/single-node-training/axolotl) and [`examples/distributed-training/axolotl`](https://github.com/dstackai/dstack/blob/master/examples/distributed-training/axolotl).
-
 ## What's next?
 
 1. Browse the [Axolotl distributed training](https://dstack.ai/docs/examples/distributed-training/axolotl) example
