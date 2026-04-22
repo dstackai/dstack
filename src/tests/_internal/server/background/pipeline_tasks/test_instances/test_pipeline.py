@@ -112,6 +112,28 @@ class TestInstanceFetcher:
         locked.lock_token = uuid.uuid4()
         locked.lock_owner = "OtherPipeline"
 
+        # Placeholder instance managed by JobSubmittedPipeline — should be skipped
+        placeholder = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            name="placeholder",
+            last_processed_at=stale + dt.timedelta(seconds=3),
+            provisioning_job_id=uuid.uuid4(),
+            offer=None,
+            job_provisioning_data=None,
+        )
+
+        # Promoted placeholder (PROVISIONING + provisioning_job_id) — should be fetched
+        promoted = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PROVISIONING,
+            name="promoted",
+            last_processed_at=stale + dt.timedelta(seconds=4),
+            provisioning_job_id=uuid.uuid4(),
+        )
+
         await session.commit()
 
         items = await fetcher.fetch(limit=10)
@@ -122,14 +144,9 @@ class TestInstanceFetcher:
             busy.id,
             idle.id,
             terminating.id,
+            promoted.id,
         }
-        assert {item.status for item in items} == {
-            InstanceStatus.PENDING,
-            InstanceStatus.PROVISIONING,
-            InstanceStatus.BUSY,
-            InstanceStatus.IDLE,
-            InstanceStatus.TERMINATING,
-        }
+        assert placeholder.id not in {item.id for item in items}
 
         for instance in [
             pending,

@@ -1529,6 +1529,7 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
     # duplicate `instance_num`. Single-instance jobs use placeholder instances
     # created under fleet lock during assignment, so they are not affected.
     taken_instance_nums = await _get_taken_instance_nums(session, fleet_model)
+
     for provisioned_job_model, job_provisioning_data in zip(
         provisioned_job_models, job_provisioning_datas
     ):
@@ -1536,14 +1537,13 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
         provisioned_job_model.job_provisioning_data = job_provisioning_data.json()
         switch_job_status(session, provisioned_job_model, JobStatus.PROVISIONING)
 
-        # If a placeholder instance was created during assignment, promote it
-        # with the actual provisioning data. Otherwise create a new instance
-        # (compute group path that has not been migrated to placeholders yet).
+        # If a placeholder instance exists, promote it instead of creating a new one.
         # Safe to update the placeholder without FOR UPDATE: the instance pipeline
         # skips placeholders (fetcher filter), fleet consolidation does not modify
         # them, and the API refuses to delete them while the job is provisioning.
-        instance_model = provisioned_job_model.instance
-        if instance_model is not None and instance_model.provisioning_job_id is not None:
+        placeholder_instance = _get_job_placeholder_instance(context, provisioned_job_model)
+        if placeholder_instance is not None:
+            instance_model = placeholder_instance
             _promote_placeholder_instance(
                 instance_model=instance_model,
                 compute_group_model=compute_group_model,
@@ -1592,6 +1592,22 @@ async def _get_taken_instance_nums(session: AsyncSession, fleet_model: FleetMode
         )
     )
     return set(res.scalars().all())
+
+
+def _get_job_placeholder_instance(
+    context: _SubmittedJobContext,
+    job_model: JobModel,
+) -> Optional[InstanceModel]:
+    """Return the placeholder instance for a job, or None.
+    Only context.job_model has the instance relationship eagerly loaded,
+    so we match by id and return its instance.
+    """
+    if job_model.id != context.job_model.id:
+        return None
+    instance = context.job_model.instance
+    if instance is not None and instance.provisioning_job_id is not None:
+        return instance
+    return None
 
 
 def _create_instance_model_for_job(
