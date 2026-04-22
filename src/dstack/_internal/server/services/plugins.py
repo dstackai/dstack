@@ -1,8 +1,7 @@
 import itertools
 from importlib import import_module
+from importlib.metadata import entry_points
 from typing import Dict
-
-from backports.entry_points_selectable import entry_points  # backport for Python 3.9
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.utils.common import run_async
@@ -60,7 +59,7 @@ def load_plugins(enabled_plugins: list[str]):
     _PLUGINS.clear()
     entrypoints: dict[str, PluginEntrypoint] = {}
     plugins_to_load = enabled_plugins.copy()
-    for entrypoint in entry_points(group="dstack.plugins"):  # type: ignore[call-arg]
+    for entrypoint in entry_points(group="dstack.plugins"):
         if entrypoint.name not in enabled_plugins:
             logger.info(
                 ("Found not enabled plugin %s. Plugin will not be loaded."),

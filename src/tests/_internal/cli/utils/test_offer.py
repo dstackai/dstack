@@ -1,4 +1,4 @@
-import asyncio
+import pytest
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.cli.utils.run import print_run_plan
@@ -34,18 +34,11 @@ def _get_offer(index: int) -> InstanceOfferWithAvailability:
     )
 
 
-def _get_run_plan(*, offers: list[InstanceOfferWithAvailability], total_offers: int) -> RunPlan:
+async def _get_run_plan(
+    *, offers: list[InstanceOfferWithAvailability], total_offers: int
+) -> RunPlan:
     run_spec = get_run_spec(repo_id="test-repo")
-    # Keep this helper's asyncio state isolated. `asyncio.run()` clears the current event loop,
-    # which breaks later Python 3.9 tests that still construct asyncio primitives via
-    # `get_event_loop()` on the main thread.
-    loop = asyncio.new_event_loop()
-    try:
-        job = loop.run_until_complete(
-            get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
-        )[0]
-    finally:
-        loop.close()
+    job = (await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0))[0]
     return RunPlan(
         project_name="test-project",
         user="test-user",
@@ -64,8 +57,9 @@ def _get_run_plan(*, offers: list[InstanceOfferWithAvailability], total_offers: 
 
 
 class TestPrintRunPlanOfferHint:
-    def test_prints_hint_before_short_offer_table(self):
-        run_plan = _get_run_plan(offers=[_get_offer(1), _get_offer(2)], total_offers=2)
+    @pytest.mark.asyncio
+    async def test_prints_hint_before_short_offer_table(self):
+        run_plan = await _get_run_plan(offers=[_get_offer(1), _get_offer(2)], total_offers=2)
 
         with console.capture() as capture:
             print_run_plan(
@@ -78,9 +72,10 @@ class TestPrintRunPlanOfferHint:
         assert " ".join(_OFFER_FLEET_HINT.split()) in " ".join(output.split())
         assert output.index(_OFFER_FLEET_HINT_START) < output.index("1  aws (us-east-1)")
 
-    def test_prints_hint_after_truncated_offer_table(self):
+    @pytest.mark.asyncio
+    async def test_prints_hint_after_truncated_offer_table(self):
         offers = [_get_offer(index) for index in range(1, 4)]
-        run_plan = _get_run_plan(offers=offers, total_offers=10)
+        run_plan = await _get_run_plan(offers=offers, total_offers=10)
 
         with console.capture() as capture:
             print_run_plan(

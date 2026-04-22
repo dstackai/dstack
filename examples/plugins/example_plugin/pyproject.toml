@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Victor Skvortsov", email = "victor@dstack.ai" }
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = []
 
 [build-system]

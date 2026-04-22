@@ -741,9 +741,6 @@ projects:
 
     </div>
 
-!!! info "Python version"
-    Nebius is only supported if `dstack server` is running on Python 3.10 or higher.
-
 
 ### Crusoe
 

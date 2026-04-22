@@ -1,5 +1,4 @@
 import json
-import sys
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -89,17 +88,17 @@ class TestListBackendTypes:
             "cloudrift",
             "crusoe",
             "cudo",
-            *(["datacrunch"] if sys.version_info >= (3, 10) else []),
+            "datacrunch",
             "digitalocean",
             "gcp",
             "hotaisle",
             "kubernetes",
             "lambda",
-            *(["nebius"] if sys.version_info >= (3, 10) else []),
+            "nebius",
             "oci",
             "runpod",
             "vastai",
-            *(["verda"] if sys.version_info >= (3, 10) else []),
+            "verda",
             "vultr",
         ]
 
@@ -221,7 +220,6 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(sys.version_info < (3, 10), reason="Nebius requires Python 3.10")
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     class TestNebius:
         @pytest.fixture(autouse=True)
