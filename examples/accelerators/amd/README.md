@@ -98,10 +98,11 @@ Here are examples of a [service](https://dstack.ai/docs/services) that deploy
 
 To request multiple GPUs, specify the quantity after the GPU name, separated by a colon, e.g., `MI300X:4`.
 
-If you're using multiple AMD nodes, validate cluster networking with the
-[NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/) example.
-
 ## Fine-tuning
+
+If you're planning multi-node AMD training, validate cluster networking first
+with the [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/)
+example.
 
 === "TRL"
 
@@ -234,8 +235,9 @@ $ dstack apply -f <configuration file>
    [Axolotl](https://github.com/ROCm/rocm-blogs/tree/release/blogs/artificial-intelligence/axolotl),
    [TRL](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/fine-tuning-and-inference.html),
    and [ROCm Bitsandbytes](https://github.com/ROCm/bitsandbytes)
-2. Run [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/)
-   to validate multi-node AMD cluster networking.
+2. For multi-node training, run
+   [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/)
+   to validate AMD cluster networking.
 3. Check [dev environments](https://dstack.ai/docs/dev-environments),
    [tasks](https://dstack.ai/docs/tasks), and
    [services](https://dstack.ai/docs/services).
