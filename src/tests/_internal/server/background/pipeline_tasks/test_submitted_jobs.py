@@ -1239,7 +1239,7 @@ class TestJobSubmittedWorker:
         )
         assert len(res.scalars().all()) == 1
 
-    async def test_cleans_up_placeholder_on_failed_new_capacity_provisioning(
+    async def test_leaves_placeholder_for_terminating_pipeline_on_failed_new_capacity_provisioning(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
         project = await create_project(session=session)
@@ -1286,8 +1286,8 @@ class TestJobSubmittedWorker:
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         await session.refresh(placeholder)
-        assert placeholder.deleted
-        assert placeholder.status == InstanceStatus.TERMINATED
+        assert not placeholder.deleted
+        assert placeholder.status == InstanceStatus.PENDING
 
     async def test_provisions_compute_group(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker

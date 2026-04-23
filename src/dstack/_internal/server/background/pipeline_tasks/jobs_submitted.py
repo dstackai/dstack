@@ -2,7 +2,7 @@ import asyncio
 import copy
 import uuid
 from contextlib import AsyncExitStack
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, Sequence, Union
 
@@ -392,7 +392,6 @@ class _TerminateSubmittedJobResult:
     message: Optional[str] = None
     locked_fleet_id: Optional[uuid.UUID] = None
     placement_group_cleanup: Optional[_PlacementGroupCleanup] = None
-    placeholder_instance_ids: list[uuid.UUID] = field(default_factory=list)
 
 
 @dataclass
@@ -1042,32 +1041,6 @@ def _get_non_placeholder_fleet_instances(fleet_model: FleetModel) -> list[Instan
     ]
 
 
-def _get_placeholder_instance_ids(context: _SubmittedJobContext) -> list[uuid.UUID]:
-    instance = context.job_model.instance
-    if instance is not None and _is_placeholder_instance(instance):
-        return [instance.id]
-    return []
-
-
-async def _cleanup_placeholder_instances(
-    session: AsyncSession,
-    instance_ids: list[uuid.UUID],
-) -> None:
-    if not instance_ids:
-        return
-    now = get_current_datetime()
-    await session.execute(
-        update(InstanceModel)
-        .where(InstanceModel.id.in_(instance_ids))
-        .values(
-            deleted=True,
-            deleted_at=now,
-            finished_at=now,
-            status=InstanceStatus.TERMINATED,
-        )
-    )
-
-
 def _get_current_reusable_instance_offers(
     context: _SubmittedJobContext,
     assignment: _ExistingInstanceAssignment,
@@ -1225,10 +1198,8 @@ async def _apply_provisioning_result(
                 item=item,
                 fleet_id=provisioning.locked_fleet_id,
             )
-            await _cleanup_placeholder_instances(
-                session=session,
-                instance_ids=provisioning.placeholder_instance_ids,
-            )
+            # Keep the placeholder live here: JobTerminatingPipeline will unassign it
+            # from the job, and InstancePipeline will finish deleting it.
             await _terminate_submitted_job(
                 session=session,
                 job_model=job_model,
@@ -1373,7 +1344,6 @@ async def _process_new_capacity_provisioning(
             reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
             locked_fleet_id=locked_fleet_id,
             placement_group_cleanup=provision_new_capacity_result.placement_group_cleanup,
-            placeholder_instance_ids=_get_placeholder_instance_ids(context),
         )
 
     volume_attachment_result = None
@@ -1538,9 +1508,7 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
         switch_job_status(session, provisioned_job_model, JobStatus.PROVISIONING)
 
         # If a placeholder instance exists, promote it instead of creating a new one.
-        # Safe to update the placeholder without FOR UPDATE: the instance pipeline
-        # skips placeholders (fetcher filter), fleet consolidation does not modify
-        # them, and the API refuses to delete them while the job is provisioning.
+        # Safe to update the placeholder without locking: nobody else should update the placeholder.
         placeholder_instance = _get_job_placeholder_instance(context, provisioned_job_model)
         if placeholder_instance is not None:
             instance_model = placeholder_instance
