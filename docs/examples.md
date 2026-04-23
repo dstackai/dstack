@@ -1,6 +1,6 @@
 ---
 title: Examples
-description: Collection of examples for training, inference, and clusters
+description: Collection of examples for models, training, inference, and clusters
 #template: examples.html
 hide:
 #    - navigation
@@ -140,6 +140,21 @@ hide:
 
         <p>
             Run multi-node NCCL tests with MPI
+        </p>
+    </a>
+</div>
+
+## Models
+
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/models/qwen36"
+       class="feature-cell">
+        <h3>
+            Qwen 3.6
+        </h3>
+
+        <p>
+            Deploy Qwen3.6-27B with SGLang on NVIDIA or AMD
         </p>
     </a>
 </div>

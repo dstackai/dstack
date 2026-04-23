@@ -100,8 +100,10 @@ plugins:
         "docs/fleets.md": "docs/concepts/fleets.md"
         "docs/examples/llms/llama31.md": "examples/inference/vllm/index.md"
         "docs/examples/llms/llama32.md": "examples/inference/vllm/index.md"
+        "docs/examples/llms/qwen36.md": "examples/models/qwen36/index.md"
         "examples/llms/llama31/index.md": "examples/inference/vllm/index.md"
         "examples/llms/llama32/index.md": "examples/inference/vllm/index.md"
+        "examples/llms/qwen36/index.md": "examples/models/qwen36/index.md"
         "docs/examples/accelerators/amd/index.md": "examples/accelerators/amd/index.md"
         "docs/examples/deployment/nim/index.md": "examples/inference/nim/index.md"
         "docs/examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
@@ -285,6 +287,8 @@ nav:
           - skill.md: https://dstack.ai/skill.md
   - Examples:
       - examples.md
+      - Models:
+          - Qwen 3.6: examples/models/qwen36/index.md
       - Single-node training:
           - TRL: examples/single-node-training/trl/index.md
           - Axolotl: examples/single-node-training/axolotl/index.md
