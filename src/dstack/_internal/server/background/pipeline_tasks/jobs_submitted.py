@@ -603,9 +603,9 @@ async def _apply_assignment_result(
                         events.Target.from_model(job_model),
                     ],
                 )
-            job_model.fleet_id = assignment.fleet_id
-            job_model.instance_assigned = True
-            await _mark_job_processed(session=session, job_model=job_model)
+                job_model.fleet_id = assignment.fleet_id
+                job_model.instance_assigned = True
+                await _mark_job_processed(session=session, job_model=job_model)
             return
 
         async with AsyncExitStack() as exit_stack:
@@ -1318,8 +1318,7 @@ async def _process_new_capacity_provisioning(
     if (
         is_master_job(context.job)
         and _get_cluster_fleet_spec(fleet_model) is not None
-        # Wait only for a real in-flight/provisioned instance that can anchor
-        # cluster placement. Placeholder reservations never become fleet masters.
+        # Placeholder reservations never become fleet masters.
         and _get_non_placeholder_fleet_instances(fleet_model)
         and master_provisioning_data is None
     ):
