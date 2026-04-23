@@ -54,6 +54,7 @@ from dstack._internal.server.services.gateways import get_or_add_gateway_connect
 from dstack._internal.server.services.instances import (
     emit_instance_status_change_event,
     get_instance_ssh_private_keys,
+    is_placeholder_instance,
 )
 from dstack._internal.server.services.jobs import (
     emit_job_status_change_event,
@@ -617,12 +618,9 @@ async def _process_terminating_job(
         result.job_update_map["status"] = _get_job_termination_status(job_model)
         return result
 
-    if (
-        instance_model.status == InstanceStatus.PENDING
-        and instance_model.provisioning_job_id is not None
-    ):
-        # Placeholder instance (PENDING with provisioning_job_id) has no VM and no
-        # provisioning data. Skip graceful stop, container stop, and volume detach.
+    if is_placeholder_instance(instance_model):
+        # Placeholder has no VM and no provisioning data. Skip graceful stop,
+        # container stop, and volume detach.
         instance_update_map = get_or_error(result.instance_update_map)
         instance_update_map["status"] = InstanceStatus.TERMINATING
         instance_update_map["termination_reason"] = InstanceTerminationReason.JOB_FINISHED

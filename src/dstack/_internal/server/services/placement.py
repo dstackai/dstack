@@ -19,6 +19,7 @@ from dstack._internal.core.models.placement import (
     PlacementStrategy,
 )
 from dstack._internal.server.models import FleetModel, PlacementGroupModel
+from dstack._internal.server.services.instances import is_placeholder_instance
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -103,11 +104,15 @@ def get_placement_group_model_for_job(
     Returns any fleet placement group for jobs that provision
     in non-empty fleets and `None` for empty fleets.
     This is so that only the first job creates placement groups.
+    Placeholder reservations are excluded: a placeholder-only fleet is treated
+    as empty here so offer selection is not pinned to a stale PG's region.
     """
     placement_group_model = None
     active_instances = []
     if fleet_model is not None:
-        active_instances = [i for i in fleet_model.instances if not i.deleted]
+        active_instances = [
+            i for i in fleet_model.instances if not i.deleted and not is_placeholder_instance(i)
+        ]
     if len(active_instances) > 0 and len(placement_group_models) > 0:
         placement_group_model = placement_group_models[0]
     return placement_group_model

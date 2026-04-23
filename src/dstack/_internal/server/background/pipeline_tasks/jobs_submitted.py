@@ -92,9 +92,11 @@ from dstack._internal.server.services.fleets import (
     is_cloud_cluster,
 )
 from dstack._internal.server.services.instances import (
+    filter_non_placeholder_instances,
     format_instance_blocks_for_event,
     get_instance_offer,
     get_instance_provisioning_data,
+    is_placeholder_instance,
     switch_instance_status,
 )
 from dstack._internal.server.services.jobs import (
@@ -1029,18 +1031,6 @@ def _create_placeholder_instance(
     )
 
 
-def _is_placeholder_instance(instance: InstanceModel) -> bool:
-    """A PENDING instance with provisioning_job_id set is a placeholder
-    created during assignment, waiting for cloud provisioning."""
-    return instance.status == InstanceStatus.PENDING and instance.provisioning_job_id is not None
-
-
-def _get_non_placeholder_fleet_instances(fleet_model: FleetModel) -> list[InstanceModel]:
-    return [
-        instance for instance in fleet_model.instances if not _is_placeholder_instance(instance)
-    ]
-
-
 def _get_current_reusable_instance_offers(
     context: _SubmittedJobContext,
     assignment: _ExistingInstanceAssignment,
@@ -1119,7 +1109,7 @@ async def _process_provisioning(
         return preconditions
 
     if context.job_model.instance is not None:
-        if _is_placeholder_instance(context.job_model.instance):
+        if is_placeholder_instance(context.job_model.instance):
             # Placeholder instance created during assignment — proceed to cloud provisioning.
             return await _process_new_capacity_provisioning(
                 item=item,
@@ -1319,7 +1309,7 @@ async def _process_new_capacity_provisioning(
         is_master_job(context.job)
         and _get_cluster_fleet_spec(fleet_model) is not None
         # Placeholder reservations never become fleet masters.
-        and _get_non_placeholder_fleet_instances(fleet_model)
+        and filter_non_placeholder_instances(fleet_model.instances)
         and master_provisioning_data is None
     ):
         return _DeferSubmittedJobResult(
@@ -1540,7 +1530,7 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
         ).json()
         events.emit(
             session,
-            f"Instance created for job. Instance status: {instance_model.status.upper()}",
+            f"Instance provisioned for job. Instance status: {instance_model.status.upper()}",
             actor=events.SystemActor(),
             targets=[
                 events.Target.from_model(instance_model),
@@ -1572,7 +1562,7 @@ def _get_job_placeholder_instance(
     if job_model.id != context.job_model.id:
         return None
     instance = context.job_model.instance
-    if instance is not None and _is_placeholder_instance(instance):
+    if instance is not None and is_placeholder_instance(instance):
         return instance
     return None
 
@@ -1955,7 +1945,7 @@ async def _resolve_related_cluster_master_fleet(
                 return None
             # Placeholder reservations should not make an empty cluster fleet look
             # non-empty; only real instances mean placement is already anchored.
-            if _get_non_placeholder_fleet_instances(fleet_model):
+            if filter_non_placeholder_instances(fleet_model.instances):
                 return _ResolvedRelatedClusterMasterFleet(
                     fleet_model=fleet_model,
                     locked_fleet_id=None,
@@ -2127,7 +2117,7 @@ async def _provision_new_capacity(
             # The first real instance in an empty cluster fleet is responsible
             # for creating/selecting the placement group. A placeholder alone
             # must not suppress that path.
-            not _get_non_placeholder_fleet_instances(fleet_model)
+            not filter_non_placeholder_instances(fleet_model.instances)
             and is_cloud_cluster(fleet_model)
             and offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
             and isinstance(compute, ComputeWithPlacementGroupSupport)
@@ -2255,7 +2245,7 @@ def _build_placement_group_cleanup(
 ) -> Optional[_PlacementGroupCleanup]:
     # Treat placeholder-only fleets as empty so a failed first-instance attempt
     # still cleans up placement groups created for that attempt.
-    if _get_non_placeholder_fleet_instances(fleet_model) or offers_tried == 0:
+    if filter_non_placeholder_instances(fleet_model.instances) or offers_tried == 0:
         return None
     return _PlacementGroupCleanup(
         fleet_id=fleet_model.id,

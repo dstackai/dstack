@@ -43,6 +43,7 @@ from dstack._internal.server.services.instances import (
     get_instance_offer,
     get_pool_instances,
     get_shared_instances_with_offers,
+    is_placeholder_instance,
 )
 from dstack._internal.server.services.jobs import (
     get_instances_ids_with_detaching_volumes,
@@ -572,12 +573,7 @@ def _get_occupied_instances(instance_models: list[InstanceModel]) -> list[Instan
     # A placeholder has busy_blocks == 0 but reserves a `nodes.max` slot
     # (unlike an IDLE instance, which can be reused by this run), so count
     # it here the same as a busy instance.
-    return [
-        i
-        for i in instance_models
-        if i.busy_blocks > 0
-        or (i.status == InstanceStatus.PENDING and i.provisioning_job_id is not None)
-    ]
+    return [i for i in instance_models if i.busy_blocks > 0 or is_placeholder_instance(i)]
 
 
 async def _get_backend_offers_in_fleet(

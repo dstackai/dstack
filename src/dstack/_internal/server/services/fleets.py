@@ -69,6 +69,7 @@ from dstack._internal.server.services import instances as instances_services
 from dstack._internal.server.services import offers as offers_services
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
+    is_placeholder_instance,
     list_active_remote_instances,
     switch_instance_status,
 )
@@ -1440,7 +1441,7 @@ def _terminate_fleet_instances(
     for instance in fleet_model.instances:
         if instance_nums is not None and instance.instance_num not in instance_nums:
             continue
-        if instance.status == InstanceStatus.PENDING and instance.provisioning_job_id is not None:
+        if is_placeholder_instance(instance):
             raise ServerClientError("Failed to delete instance while the job is provisioning.")
         if instance.status == InstanceStatus.TERMINATED:
             instance.deleted = True
