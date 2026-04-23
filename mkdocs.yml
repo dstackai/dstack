@@ -287,8 +287,6 @@ nav:
           - skill.md: https://dstack.ai/skill.md
   - Examples:
       - examples.md
-      - Models:
-          - Qwen 3.6: examples/models/qwen36/index.md
       - Single-node training:
           - TRL: examples/single-node-training/trl/index.md
           - Axolotl: examples/single-node-training/axolotl/index.md
@@ -312,6 +310,8 @@ nav:
           - AMD: examples/accelerators/amd/index.md
           - TPU: examples/accelerators/tpu/index.md
           - Tenstorrent: examples/accelerators/tenstorrent/index.md
+      - Models:
+          - Qwen 3.6: examples/models/qwen36/index.md
   - Blog:
       - blog/index.md
   - Case studies: blog/case-studies.md

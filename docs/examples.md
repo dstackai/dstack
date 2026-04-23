@@ -144,21 +144,6 @@ hide:
     </a>
 </div>
 
-## Models
-
-<div class="tx-landing__highlights_grid">
-    <a href="/examples/models/qwen36"
-       class="feature-cell">
-        <h3>
-            Qwen 3.6
-        </h3>
-
-        <p>
-            Deploy Qwen3.6-27B with SGLang on NVIDIA or AMD
-        </p>
-    </a>
-</div>
-
 ## Inference
 
 <div class="tx-landing__highlights_grid">
@@ -196,6 +181,21 @@ hide:
        </h3>
        <p>
             Deploy Qwen3 with TensorRT-LLM
+        </p>
+    </a>
+</div>
+
+## Models
+
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/models/qwen36"
+       class="feature-cell">
+        <h3>
+            Qwen 3.6
+        </h3>
+
+        <p>
+            Deploy Qwen3.6-27B with SGLang on NVIDIA or AMD
         </p>
     </a>
 </div>
