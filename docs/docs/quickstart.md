@@ -219,27 +219,26 @@ description: Quick guide to creating fleets and submitting runs
 
     ```yaml
     type: service
-    name: llama31-service
-    
-    # If `image` is not specified, dstack uses its default image
-    python: "3.11"
-    #image: dstackai/base:py3.13-0.7-cuda-12.1
-    
-    # Required environment variables
-    env:
-      - HF_TOKEN
+    name: qwen36-service
+
+    image: lmsysorg/sglang:v0.5.10.post1
+
     commands:
-      - pip install vllm
-      - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
-    # Expose the vllm server port
-    port: 8000
+      - |
+        sglang serve \
+          --model-path Qwen/Qwen3.6-27B \
+          --host 0.0.0.0 \
+          --port 30000 \
+          --reasoning-parser qwen3
+    # Expose the SGLang server port
+    port: 30000
 
     # Specify a name if it's an OpenAI-compatible model
-    model: meta-llama/Meta-Llama-3.1-8B-Instruct
-    
+    model: Qwen/Qwen3.6-27B
+
     # Required resources
     resources:
-      gpu: 24GB
+      gpu: H100
     ```
 
     </div>
@@ -249,22 +248,20 @@ description: Quick guide to creating fleets and submitting runs
     <div class="termy">
 
     ```shell
-    $ HF_TOKEN=...
     $ dstack apply -f service.dstack.yml
-    
-     #  BACKEND  REGION     INSTANCE       RESOURCES                    SPOT  PRICE
-     1  aws      us-west-2  g5.4xlarge     16xCPU, 64GB, 1xA10G (24GB)  yes   $0.22
-     2  aws      us-east-2  g6.xlarge      4xCPU, 16GB, 1xL4 (24GB)     yes   $0.27
-     3  gcp      us-west1   g2-standard-4  4xCPU, 16GB, 1xL4 (24GB)     yes   $0.27
-     
-    Submit the run llama31-service? [y/n]: y
-    
-    Provisioning `llama31-service`...
+
+     #  BACKEND  REGION     INSTANCE              RESOURCES                          SPOT  PRICE
+     1  nebius   eu-north1  gpu-h100-sxm          16xCPU, 250GB, 1xH100 (80GB)      no    $2.95
+     2  runpod   US-CA-2    NVIDIA H100 80GB HBM3 64xCPU, 1004GB, 1xH100 (80GB)     no    $2.99
+
+    Submit the run qwen36-service? [y/n]: y
+
+    Provisioning `qwen36-service`...
     ---> 100%
 
     Service is published at: 
-      http://localhost:3000/proxy/services/main/llama31-service/
-    Model meta-llama/Meta-Llama-3.1-8B-Instruct is published at:
+      http://localhost:3000/proxy/services/main/qwen36-service/
+    Model Qwen/Qwen3.6-27B is published at:
       http://localhost:3000/proxy/models/main/
     ```
     
