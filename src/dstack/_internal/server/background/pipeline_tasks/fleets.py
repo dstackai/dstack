@@ -935,8 +935,15 @@ def _select_current_master_instance_id(
             return instance_model.id
 
     # Prefer existing surviving instances over freshly planned replacements to
-    # avoid election churn during min-nodes backfill.
+    # avoid election churn during min-nodes backfill. Skip placeholder instances
+    # (PENDING + provisioning_job_id) — they have no JPD and cannot anchor cluster
+    # placement, so electing one just defers the real master decision.
     for instance_model in surviving_instance_models:
+        if (
+            instance_model.status == InstanceStatus.PENDING
+            and instance_model.provisioning_job_id is not None
+        ):
+            continue
         if (
             _get_effective_instance_status(
                 instance_model,
