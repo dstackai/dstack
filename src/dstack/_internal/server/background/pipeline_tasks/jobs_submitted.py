@@ -1592,7 +1592,10 @@ async def _lock_related_volume_models(
                 .options(joinedload(VolumeModel.project))
                 .options(joinedload(VolumeModel.user).load_only(UserModel.name))
                 .options(
-                    joinedload(VolumeModel.attachments).joinedload(VolumeAttachmentModel.instance)
+                    joinedload(VolumeModel.attachments)
+                    .joinedload(VolumeAttachmentModel.instance)
+                    .joinedload(InstanceModel.fleet)
+                    .load_only(FleetModel.name)
                 )
                 .with_for_update(skip_locked=True, key_share=True, of=VolumeModel)
             )
