@@ -1,6 +1,6 @@
 ---
 title: AMD
-description: Deploying and fine-tuning models on AMD MI300X GPUs using vLLM, TRL, and Axolotl
+description: Deploying and fine-tuning models on AMD MI300X GPUs using SGLang, vLLM, TRL, and Axolotl
 ---
 
 # AMD
@@ -11,8 +11,49 @@ with on-prem AMD GPUs or configuring a backend that offers AMD GPUs such as the 
 
 ## Deployment
 
-vLLM supports AMD GPUs. Here's an example of a [service](https://dstack.ai/docs/services) that deploys
-Llama 3.1 70B in FP16 using [vLLM](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html).
+Here are examples of a [service](https://dstack.ai/docs/services) that deploy
+`Qwen/Qwen3.6-27B` on AMD MI300X GPUs using
+[SGLang](https://github.com/sgl-project/sglang) and
+[vLLM](https://docs.vllm.ai/en/latest/).
+
+=== "SGLang"
+
+    <div editor-title="service.dstack.yml">
+
+    ```yaml
+    type: service
+    name: qwen36-service-sglang-amd
+
+    image: lmsysorg/sglang:v0.5.10-rocm720-mi30x
+
+    commands:
+      - |
+        sglang serve \
+          --model-path Qwen/Qwen3.6-27B \
+          --host 0.0.0.0 \
+          --port 30000 \
+          --tp $DSTACK_GPUS_NUM \
+          --reasoning-parser qwen3 \
+          --mem-fraction-static 0.8 \
+          --context-length 262144
+
+    port: 30000
+    model: Qwen/Qwen3.6-27B
+
+    volumes:
+      - instance_path: /root/.cache
+        path: /root/.cache
+        optional: true
+
+    resources:
+      cpu: 52..
+      memory: 896GB..
+      shm_size: 16GB
+      disk: 450GB..
+      gpu: MI300X:4
+    ```
+
+    </div>
 
 === "vLLM"
 
@@ -20,62 +61,45 @@ Llama 3.1 70B in FP16 using [vLLM](https://docs.vllm.ai/en/latest/getting_starte
 
     ```yaml
     type: service
-    name: llama31-service-vllm-amd
+    name: qwen36-service-vllm-amd
 
-    # Using Runpod's ROCm Docker image
-    image: runpod/pytorch:2.4.0-py3.10-rocm6.1.0-ubuntu22.04
-    # Required environment variables
-    env:
-      - HF_TOKEN
-      - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
-      - MAX_MODEL_LEN=126192
-    # Commands of the task
+    image: vllm/vllm-openai-rocm:v0.19.1
+
     commands:
-      - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
-      - wget https://github.com/ROCm/hipBLAS/archive/refs/tags/rocm-6.1.0.zip
-      - unzip rocm-6.1.0.zip
-      - cd hipBLAS-rocm-6.1.0
-      - python rmake.py
-      - cd ..
-      - git clone https://github.com/vllm-project/vllm.git
-      - cd vllm
-      - pip install triton
-      - pip uninstall torch -y
-      - pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.1
-      - pip install /opt/rocm/share/amd_smi
-      - pip install --upgrade numba scipy huggingface-hub[cli]
-      - pip install "numpy<2"
-      - pip install -r requirements-rocm.txt
-      - wget -N https://github.com/ROCm/vllm/raw/fa78403/rocm_patch/libamdhip64.so.6 -P /opt/rocm/lib
-      - rm -f "$(python3 -c 'import torch; print(torch.__path__[0])')"/lib/libamdhip64.so*
-      - export PYTORCH_ROCM_ARCH="gfx90a;gfx942"
-      - wget https://dstack-binaries.s3.amazonaws.com/vllm-0.6.0%2Brocm614-cp310-cp310-linux_x86_64.whl
-      - pip install vllm-0.6.0+rocm614-cp310-cp310-linux_x86_64.whl
-      - vllm serve $MODEL_ID --max-model-len $MAX_MODEL_LEN --port 8000
-    # Service port
-    port: 8000
-    # Register the model
-    model: meta-llama/Meta-Llama-3.1-70B-Instruct
+      - |
+        vllm serve Qwen/Qwen3.6-27B \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --tensor-parallel-size $DSTACK_GPUS_NUM \
+          --max-model-len 262144 \
+          --reasoning-parser qwen3
 
-    # Uncomment to leverage spot instances
-    #spot_policy: auto
+    port: 8000
+    model: Qwen/Qwen3.6-27B
+
+    volumes:
+      - instance_path: /root/.cache
+        path: /root/.cache
+        optional: true
 
     resources:
-      gpu: MI300X
-      disk: 200GB
+      cpu: 52..
+      memory: 896GB..
+      shm_size: 16GB
+      disk: 450GB..
+      gpu: MI300X:4
     ```
 
     </div>
 
-    Note, maximum size of vLLM’s `KV cache` is 126192, consequently we must set `MAX_MODEL_LEN` to 126192. Adding `/opt/conda/envs/py_3.10/bin` to PATH ensures we use the Python 3.10 environment necessary for the pre-built binaries compiled specifically for this version.
-
-    > To speed up the `vLLM-ROCm` installation, this example uses a pre-built binary from S3.
-
 !!! info "Docker image"
-    If you want to use AMD, specifying `image` is currently required. This must be an image that includes
-    ROCm drivers.
+    AMD deployments require specifying an image that already includes ROCm
+    drivers. The SGLang and vLLM examples above use pinned ROCm images.
 
 To request multiple GPUs, specify the quantity after the GPU name, separated by a colon, e.g., `MI300X:4`.
+
+If you're using multiple AMD nodes, validate cluster networking with the
+[NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/) example.
 
 ## Fine-tuning
 
@@ -189,28 +213,29 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
 
 ## Running a configuration
 
-Once a configuration is ready, save it to a `.dstack.yml` file, then run
-`dstack apply -f <configuration file>`, and `dstack` will automatically provision the
-cloud resources and run the configuration.
+Once a configuration is ready, save it to a `.dstack.yml` file. If your
+configuration references environment variables such as `HF_TOKEN` or
+`WANDB_API_KEY`, export them first. Then run
+`dstack apply -f <configuration file>`, and `dstack` will automatically
+provision the cloud resources and run the configuration.
 
 <div class="termy">
 
 ```shell
-$ HF_TOKEN=...
-$ WANDB_API_KEY=...
-$ WANDB_PROJECT=...
-$ WANDB_NAME=axolotl-amd-llama31-train
-$ HUB_MODEL_ID=...
-$ dstack apply -f service.dstack.yml
+$ dstack apply -f <configuration file>
 ```
 
 </div>
 
 ## What's next?
 
-1. Browse [vLLM](https://docs.vllm.ai/en/latest/getting_started/amd-installation.html#build-from-source-rocm),
+1. Browse the dedicated [SGLang](https://dstack.ai/examples/inference/sglang/)
+   and [vLLM](https://dstack.ai/examples/inference/vllm/) examples, plus
    [Axolotl](https://github.com/ROCm/rocm-blogs/tree/release/blogs/artificial-intelligence/axolotl),
-   [TRL](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/fine-tuning-and-inference.html) and
-   [ROCm Bitsandbytes](https://github.com/ROCm/bitsandbytes)
-2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), and
+   [TRL](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/fine-tuning-and-inference.html),
+   and [ROCm Bitsandbytes](https://github.com/ROCm/bitsandbytes)
+2. Run [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/)
+   to validate multi-node AMD cluster networking.
+3. Check [dev environments](https://dstack.ai/docs/dev-environments),
+   [tasks](https://dstack.ai/docs/tasks), and
    [services](https://dstack.ai/docs/services).
