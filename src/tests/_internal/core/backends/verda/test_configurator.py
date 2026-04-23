@@ -1,10 +1,4 @@
-import sys
 from unittest.mock import patch
-
-import pytest
-
-if sys.version_info < (3, 10):
-    pytest.skip("Verda requires Python 3.10", allow_module_level=True)
 
 from dstack._internal.core.backends.verda.configurator import (
     VerdaConfigurator,

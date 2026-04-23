@@ -1,10 +1,8 @@
 import json
-import sys
 from pathlib import Path
 from textwrap import dedent
 from unittest.mock import patch
 
-import pytest
 import yaml
 
 from dstack._internal.core.backends.kubernetes.backend import KubernetesBackend
@@ -57,7 +55,6 @@ class TestCrusoeBackendConfig:
         assert backend_cfg.creds.secret_key == "test-secret-key"
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="Nebius requires Python 3.10")
 class TestNebiusBackendConfig:
     def test_with_filename(self, tmp_path: Path):
         creds_json = {

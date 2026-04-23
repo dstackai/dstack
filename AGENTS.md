@@ -15,7 +15,7 @@
 - Frontend: from `frontend/` run `npm install`, `npm run build`, then copy `frontend/build` into `src/dstack/_internal/server/statics/`; for dev, `npm run start` with API on port 8000.
 
 ## Coding Style & Naming Conventions
-- Python targets 3.9+ with 4-space indentation and max line length of 99 (see `ruff.toml`; `E501` is ignored but keep lines readable).
+- Python targets 3.10+ with 4-space indentation and max line length of 99 (see `pyproject.toml`; `E501` is ignored but keep lines readable).
 - Imports are sorted via Ruff’s isort settings (`dstack` treated as first-party).
 - Keep primary/public functions before local helper functions in a module section.
 - Roughly keep function definitions in the order they are referenced within a file so call flow stays easy to follow.
