@@ -153,7 +153,7 @@ hide:
            SGLang
        </h3>
        <p>
-           Deploy DeepSeek distilled models with SGLang
+           Deploy Qwen3.6-27B with SGLang
       </p>
     </a>
     <a href="/examples/inference/vllm" 
@@ -162,7 +162,7 @@ hide:
            vLLM
        </h3>
        <p>
-            Deploy Llama 3.1 with vLLM
+            Deploy Qwen3.6-27B with vLLM
         </p>
     </a>
     <a href="/examples/inference/nim" 
