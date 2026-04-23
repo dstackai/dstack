@@ -100,7 +100,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
 
 ## Fine-tuning
 
-If you're planning multi-node AMD training, validate cluster networking first
+> If you're planning multi-node AMD training, validate cluster networking first
 with the [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/)
 example.
 
