@@ -164,20 +164,25 @@ class ServerConfigManager:
                 comparable_backend_config = current_source_backend_config or current_backend_config
                 if backend_config == comparable_backend_config:
                     continue
+            # current_backend_config may be None if backend exists
+            # but it's config is invalid (e.g. cannot be decrypted).
+            # Update backend in this case.
+            if current_backend_config is None and not backend_exists:
+                apply_action = "create"
+                apply_func = backends_services.create_backend
+            else:
+                apply_action = "update"
+                apply_func = backends_services.update_backend
             try:
-                # current_backend_config may be None if backend exists
-                # but it's config is invalid (e.g. cannot be decrypted).
-                # Update backend in this case.
-                if current_backend_config is None and not backend_exists:
-                    await backends_services.create_backend(
-                        session=session, project=project, config=backend_config
-                    )
-                else:
-                    await backends_services.update_backend(
-                        session=session, project=project, config=backend_config
-                    )
+                await apply_func(session=session, project=project, config=backend_config)
             except Exception as e:
-                logger.warning("Failed to configure backend %s: %s", backend_config.type, e)
+                logger.warning(
+                    "Failed to %s backend %s in project %s: %s",
+                    apply_action,
+                    backend_config.type,
+                    project.name,
+                    e,
+                )
         await delete_backends_safe(
             session=session,
             project=project,
