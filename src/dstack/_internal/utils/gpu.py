@@ -20,6 +20,7 @@ def convert_nvidia_gpu_name(name: str) -> str:
         return name.replace(" ", "")
 
     name = name.replace(" Ti", "Ti")
+    name = re.sub(r"(?i) ?SUPER", "SUPER", name)
     name = name.replace(" NVL", "NVL")
     name = name.replace(" Ada Generation", "Ada")
     name = name.replace("RTX ", "RTX")
