@@ -552,8 +552,8 @@ def _run_can_fit_into_fleet(
         and fleet_spec.configuration.blocks == 1
         and fleet_spec.configuration.nodes.max is not None
     ):
-        busy_instances = [i for i in fleet_model.instances if i.busy_blocks > 0]
-        fleet_available_capacity = fleet_spec.configuration.nodes.max - len(busy_instances)
+        occupied_instances = _get_occupied_instances(fleet_model.instances)
+        fleet_available_capacity = fleet_spec.configuration.nodes.max - len(occupied_instances)
         if fleet_available_capacity < nodes_required_num:
             return False
     elif fleet_spec.configuration.ssh_config is not None:
@@ -566,6 +566,18 @@ def _run_can_fit_into_fleet(
         if total_idle_blocks < nodes_required_num:
             return False
     return True
+
+
+def _get_occupied_instances(instance_models: list[InstanceModel]) -> list[InstanceModel]:
+    # A placeholder has busy_blocks == 0 but reserves a `nodes.max` slot
+    # (unlike an IDLE instance, which can be reused by this run), so count
+    # it here the same as a busy instance.
+    return [
+        i
+        for i in instance_models
+        if i.busy_blocks > 0
+        or (i.status == InstanceStatus.PENDING and i.provisioning_job_id is not None)
+    ]
 
 
 async def _get_backend_offers_in_fleet(
