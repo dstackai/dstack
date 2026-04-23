@@ -238,7 +238,6 @@ description: Quick guide to creating fleets and submitting runs
 
     # Required resources
     resources:
-      shm_size: 16GB
       gpu: H100
     ```
 
