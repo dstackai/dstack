@@ -1044,7 +1044,7 @@ def _get_non_placeholder_fleet_instances(fleet_model: FleetModel) -> list[Instan
 
 def _get_placeholder_instance_ids(context: _SubmittedJobContext) -> list[uuid.UUID]:
     instance = context.job_model.instance
-    if instance is not None and instance.provisioning_job_id is not None:
+    if instance is not None and _is_placeholder_instance(instance):
         return [instance.id]
     return []
 
@@ -1058,10 +1058,7 @@ async def _cleanup_placeholder_instances(
     now = get_current_datetime()
     await session.execute(
         update(InstanceModel)
-        .where(
-            InstanceModel.id.in_(instance_ids),
-            InstanceModel.provisioning_job_id.is_not(None),
-        )
+        .where(InstanceModel.id.in_(instance_ids))
         .values(
             deleted=True,
             deleted_at=now,
@@ -1199,10 +1196,6 @@ async def _apply_provisioning_result(
                 session=session,
                 item=item,
                 fleet_id=_get_locked_fleet_id_from_provisioning(provisioning),
-            )
-            await _cleanup_placeholder_instances(
-                session=session,
-                instance_ids=_get_placeholder_instance_ids_from_provisioning(provisioning),
             )
             log_lock_token_changed_after_processing(logger, item)
             return
@@ -1612,7 +1605,7 @@ def _get_job_placeholder_instance(
     if job_model.id != context.job_model.id:
         return None
     instance = context.job_model.instance
-    if instance is not None and instance.provisioning_job_id is not None:
+    if instance is not None and _is_placeholder_instance(instance):
         return instance
     return None
 
@@ -1898,14 +1891,6 @@ def _get_locked_fleet_id_from_provisioning(
         return provisioning.locked_fleet_id
 
     return None
-
-
-def _get_placeholder_instance_ids_from_provisioning(
-    provisioning: _ProvisioningResult,
-) -> list[uuid.UUID]:
-    if isinstance(provisioning, _TerminateSubmittedJobResult):
-        return provisioning.placeholder_instance_ids
-    return []
 
 
 def _get_related_volume_lock_owner(job_id: uuid.UUID) -> str:
