@@ -166,5 +166,3 @@ curl http://127.0.0.1:3000/proxy/services/main/qwen36/v1/chat/completions \
    and [vLLM](https://dstack.ai/examples/inference/vllm/) examples
 5. Check the [AMD](https://dstack.ai/examples/accelerators/amd/) example for
    more AMD deployment and training configurations
-6. Run [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/)
-   if you're validating multi-node cluster networking
