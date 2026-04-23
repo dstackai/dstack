@@ -521,6 +521,7 @@ gcloud projects list --format="json(projectId)"
     compute.instances.setTags
     compute.networks.get
     compute.networks.updatePolicy
+    compute.projects.get
     compute.regions.get
     compute.regions.list
     compute.reservations.list
