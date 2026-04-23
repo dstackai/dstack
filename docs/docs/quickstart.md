@@ -221,17 +221,17 @@ description: Quick guide to creating fleets and submitting runs
     type: service
     name: qwen36-service
 
-    image: vllm/vllm-openai:v0.19.1
+    image: lmsysorg/sglang:v0.5.10.post1
 
     commands:
       - |
-        vllm serve Qwen/Qwen3.6-27B \
+        sglang serve \
+          --model-path Qwen/Qwen3.6-27B \
           --host 0.0.0.0 \
-          --port 8000 \
-          --max-model-len 32768 \
+          --port 30000 \
           --reasoning-parser qwen3
-    # Expose the vLLM server port
-    port: 8000
+    # Expose the SGLang server port
+    port: 30000
 
     # Specify a name if it's an OpenAI-compatible model
     model: Qwen/Qwen3.6-27B
