@@ -159,10 +159,12 @@ curl http://127.0.0.1:3000/proxy/services/main/qwen36/v1/chat/completions \
 
 ## What's next?
 
-1. Browse the dedicated [SGLang](https://dstack.ai/examples/inference/sglang/)
+1. Read the [Qwen/Qwen3.6-27B model card](https://huggingface.co/Qwen/Qwen3.6-27B)
+2. Read the [Qwen 3.6 SGLang cookbook](https://docs.sglang.io/cookbook/autoregressive/Qwen/Qwen3.6)
+3. Read the [Qwen 3.5 & 3.6 vLLM recipe](https://docs.vllm.ai/projects/recipes/en/latest/Qwen/Qwen3.5.html)
+4. Browse the dedicated [SGLang](https://dstack.ai/examples/inference/sglang/)
    and [vLLM](https://dstack.ai/examples/inference/vllm/) examples
-2. Check the [AMD](https://dstack.ai/examples/accelerators/amd/) example for
+5. Check the [AMD](https://dstack.ai/examples/accelerators/amd/) example for
    more AMD deployment and training configurations
-3. Run [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/)
+6. Run [NCCL/RCCL tests](https://dstack.ai/examples/clusters/nccl-rccl-tests/)
    if you're validating multi-node cluster networking
-4. Read the [Qwen 3.6 SGLang cookbook](https://docs.sglang.io/cookbook/autoregressive/Qwen/Qwen3.6)
