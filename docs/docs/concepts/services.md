@@ -373,6 +373,8 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 ### PD disaggregation
 
+<!-- NOTE: this section is referenced from the CLI, keep the URL unchanged -->
+
 Since 0.20.17, `dstack` supports serving a model using PD disaggregation. To use it, configure three replica groups: one for a router (for example, [SGLang Model Gateway](https://docs.sglang.io/advanced_features/sgl_model_gateway.html)), one for prefill workers, and one for decode workers.
 
 > Currently, Prefill-Decode disaggregation is supported only for SGLang.

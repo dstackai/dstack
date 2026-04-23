@@ -22,7 +22,10 @@ from dstack._internal.core.models.gateways import (
 )
 from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.common import local_time
+from dstack._internal.utils.logging import get_logger
 from dstack.api._public import Client
+
+logger = get_logger(__name__)
 
 
 class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
@@ -40,6 +43,13 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
             configuration=conf,
             configuration_path=configuration_path,
         )
+        if spec.configuration.router is not None:
+            logger.warning(
+                "Specifying `router` in gateway configurations is deprecated"
+                " and will be disallowed in a future release."
+                " Please migrate to replica-based routers:"
+                " https://dstack.ai/docs/concepts/services/#pd-disaggregation"
+            )
         with console.status("Getting apply plan..."):
             plan = _get_plan(api=self.api, spec=spec)
         _print_plan_header(plan)
