@@ -25,6 +25,7 @@ from dstack._internal.core.models.profiles import StartupOrder
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
+    ImagePullProgress,
     Job,
     JobProvisioningData,
     JobRuntimeData,
@@ -337,6 +338,7 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
     inactivity_secs: Optional[int]
     exit_status: Optional[int]
     registered: bool
+    image_pull_progress: Optional[str]
 
 
 @dataclass
@@ -729,6 +731,9 @@ async def _process_pulling_status(
     if shim_state is not False:
         if shim_state.job_runtime_data is not None:
             _set_job_runtime_data(result, shim_state.job_runtime_data)
+
+        if shim_state.image_pull_progress is not None:
+            result.job_update_map["image_pull_progress"] = shim_state.image_pull_progress.json()
 
         if shim_state.state == _ShimPullingState.WAITING:
             _reset_disconnected_at(context.job_model, result)
@@ -1288,6 +1293,7 @@ class _SyncShimPullingStateResult:
     termination_reason: Optional[JobTerminationReason] = None
     termination_reason_message: Optional[str] = None
     job_runtime_data: Optional[JobRuntimeData] = None
+    image_pull_progress: Optional[ImagePullProgress] = None
 
 
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
@@ -1305,8 +1311,12 @@ def _sync_shim_pulling_state(
     jrd: Optional[JobRuntimeData] = None,
 ) -> Union[_SyncShimPullingStateResult, Literal[False]]:
     shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    image_pull_progress: Optional[ImagePullProgress] = None
     if shim_client.is_api_v2_supported():
         task = shim_client.get_task(job_model.id)
+        if task.image_pull_progress is not None:
+            image_pull_progress = task.image_pull_progress
+
         if task.status == TaskStatus.TERMINATED:
             logger.warning(
                 "shim failed to execute job %s: %s (%s)",
@@ -1319,14 +1329,21 @@ def _sync_shim_pulling_state(
                 state=_ShimPullingState.FAILED,
                 termination_reason=JobTerminationReason(task.termination_reason.lower()),
                 termination_reason_message=task.termination_message,
+                image_pull_progress=image_pull_progress,
             )
 
         if task.status != TaskStatus.RUNNING:
-            return _SyncShimPullingStateResult(state=_ShimPullingState.WAITING)
+            return _SyncShimPullingStateResult(
+                state=_ShimPullingState.WAITING,
+                image_pull_progress=image_pull_progress,
+            )
 
         if jrd is not None:
             if task.ports is None:
-                return _SyncShimPullingStateResult(state=_ShimPullingState.WAITING)
+                return _SyncShimPullingStateResult(
+                    state=_ShimPullingState.WAITING,
+                    image_pull_progress=image_pull_progress,
+                )
             jrd = jrd.copy(update={"ports": {pm.container: pm.host for pm in task.ports}})
     else:
         shim_status = shim_client.pull()
@@ -1346,14 +1363,19 @@ def _sync_shim_pulling_state(
                 state=_ShimPullingState.FAILED,
                 termination_reason=JobTerminationReason(shim_status.result.reason.lower()),
                 termination_reason_message=shim_status.result.reason_message,
+                image_pull_progress=image_pull_progress,
             )
 
         if shim_status.state in ("pulling", "creating"):
-            return _SyncShimPullingStateResult(state=_ShimPullingState.WAITING)
+            return _SyncShimPullingStateResult(
+                state=_ShimPullingState.WAITING,
+                image_pull_progress=image_pull_progress,
+            )
 
     return _SyncShimPullingStateResult(
         state=_ShimPullingState.READY,
         job_runtime_data=jrd,
+        image_pull_progress=image_pull_progress,
     )
 
 

@@ -1,6 +1,6 @@
 ---
 title: Examples
-description: Collection of examples for training, inference, and clusters
+description: Collection of examples for models, training, inference, and clusters
 #template: examples.html
 hide:
 #    - navigation
@@ -153,7 +153,7 @@ hide:
            SGLang
        </h3>
        <p>
-           Deploy DeepSeek distilled models with SGLang
+           Deploy Qwen3.6-27B with SGLang
       </p>
     </a>
     <a href="/examples/inference/vllm" 
@@ -162,7 +162,7 @@ hide:
            vLLM
        </h3>
        <p>
-            Deploy Llama 3.1 with vLLM
+            Deploy Qwen3.6-27B with vLLM
         </p>
     </a>
     <a href="/examples/inference/nim" 
@@ -181,6 +181,21 @@ hide:
        </h3>
        <p>
             Deploy Qwen3 with TensorRT-LLM
+        </p>
+    </a>
+</div>
+
+## Models
+
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/models/qwen36"
+       class="feature-cell">
+        <h3>
+            Qwen 3.6
+        </h3>
+
+        <p>
+            Deploy Qwen3.6-27B with SGLang on NVIDIA or AMD
         </p>
     </a>
 </div>

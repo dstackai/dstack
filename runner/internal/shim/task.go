@@ -42,6 +42,8 @@ type Task struct {
 	ports         []PortMapping
 	runnerDir     string // path on host mapped to consts.RunnerDir in container
 
+	pullTracker *PullTracker
+
 	mu *sync.Mutex
 }
 
@@ -128,6 +130,7 @@ func NewTask(id string, status TaskStatus, containerName string, containerID str
 		runnerDir:     runnerDir,
 		gpuIDs:        gpuIDs,
 		ports:         ports,
+		pullTracker:   newPullTracker(),
 		mu:            &sync.Mutex{},
 	}
 }
@@ -138,6 +141,7 @@ func NewTaskFromConfig(cfg TaskConfig) Task {
 		Status:        TaskStatusPending,
 		config:        cfg,
 		containerName: generateUniqueName(cfg.Name, cfg.ID),
+		pullTracker:   newPullTracker(),
 		mu:            &sync.Mutex{},
 	}
 }

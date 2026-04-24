@@ -53,5 +53,5 @@ def validate_credentials(credentials: Credentials, project_id: str):
         client.get(project=project_id)
     except google.api_core.exceptions.NotFound:
         raise BackendAuthError(f"project_id {project_id} not found")
-    except Exception:
-        raise BackendAuthError("Insufficient permissions")
+    except Exception as e:
+        raise BackendAuthError(f"Insufficient permissions: {e}")

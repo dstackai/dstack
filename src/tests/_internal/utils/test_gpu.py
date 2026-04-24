@@ -22,6 +22,8 @@ class TestConvertGpuName:
             ("NVIDIA H100 NVL", "H100NVL"),
             ("NVIDIA H100 80GB HBM3", "H100"),
             ("Tesla T4", "T4"),
+            ("NVIDIA GeForce RTX 2070 Super", "RTX2070SUPER"),
+            ("NVIDIA GeForce RTX 4070 Ti SUPER", "RTX4070TiSUPER"),
         ],
     )
     def test_convert_nvidia_gpu_name(self, test_input, expected):

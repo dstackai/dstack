@@ -21,23 +21,23 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
 
     ```yaml
     type: service
-    name: qwen397
+    name: qwen36
 
     image: lmsysorg/sglang:v0.5.10.post1
 
     commands:
       - |
         sglang serve \
-          --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
+          --model-path Qwen/Qwen3.6-27B \
+          --host 0.0.0.0 \
           --port 30000 \
           --tp $DSTACK_GPUS_NUM \
-          --reasoning-parser qwen3 \
-          --tool-call-parser qwen3_coder \
-          --enable-flashinfer-allreduce-fusion \
-          --mem-fraction-static 0.8
+          --mem-fraction-static 0.8 \
+          --context-length 262144 \
+          --reasoning-parser qwen3
 
     port: 30000
-    model: Qwen/Qwen3.5-397B-A17B-FP8
+    model: Qwen/Qwen3.6-27B
 
     volumes:
       # Optional instance volume for model and runtime caches
@@ -46,11 +46,8 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
         optional: true
 
     resources:
-      cpu: x86:96..
-      memory: 512GB..
       shm_size: 16GB
-      disk: 500GB..
-      gpu: H100:80GB:8
+      gpu: H100:4
     ```
 
     </div>
@@ -61,38 +58,23 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
 
     ```yaml
     type: service
-    name: qwen397
+    name: qwen36
 
-    image: lmsysorg/sglang:v0.5.10.post1-rocm720-mi30x
-
-    env:
-      - HIP_FORCE_DEV_KERNARG=1
-      - SGLANG_ALLOW_OVERWRITE_LONGER_CONTEXT_LEN=1
-      - SGLANG_DISABLE_CUDNN_CHECK=1
-      - SGLANG_INT4_WEIGHT=0
-      - SGLANG_MOE_PADDING=1
-      - SGLANG_ROCM_DISABLE_LINEARQUANT=0
-      - SGLANG_ROCM_FUSED_DECODE_MLA=1
-      - SGLANG_SET_CPU_AFFINITY=1
-      - SGLANG_USE_AITER=1
-      - SGLANG_USE_ROCM700A=1
+    image: lmsysorg/sglang:v0.5.10-rocm720-mi30x
 
     commands:
       - |
         sglang serve \
-          --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
+          --model-path Qwen/Qwen3.6-27B \
+          --host 0.0.0.0 \
+          --port 30000 \
           --tp $DSTACK_GPUS_NUM \
-          --reasoning-parser qwen3 \
-          --tool-call-parser qwen3_coder \
           --mem-fraction-static 0.8 \
           --context-length 262144 \
-          --attention-backend triton \
-          --disable-cuda-graph \
-          --fp8-gemm-backend aiter \
-          --port 30000
+          --reasoning-parser qwen3
 
     port: 30000
-    model: Qwen/Qwen3.5-397B-A17B-FP8
+    model: Qwen/Qwen3.6-27B
 
     volumes:
       # Optional instance volume for model and runtime caches
@@ -101,14 +83,17 @@ The filename must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml`
         optional: true
 
     resources:
-      cpu: x86:52..
-      memory: 700GB..
+      cpu: 52..
+      memory: 896GB..
       shm_size: 16GB
-      disk: 600GB..
-      gpu: MI300X:192GB:4
+      disk: 450GB..
+      gpu: MI300X:4
     ```
 
     </div>
+
+The first startup on MI300X can take longer while SGLang compiles ROCm
+kernels.
 
 To run a service, pass the configuration to [`dstack apply`](../reference/cli/dstack/apply.md):
 
@@ -117,14 +102,14 @@ To run a service, pass the configuration to [`dstack apply`](../reference/cli/ds
 ```shell
 $ dstack apply -f .dstack.yml
 
-Submit the run qwen397? [y/n]: y
+Submit the run qwen36? [y/n]: y
 
 Provisioning...
 ---> 100%
 
 Service is published at:
-  http://localhost:3000/proxy/services/main/qwen397/
-Model Qwen/Qwen3.5-397B-A17B-FP8 is published at:
+  http://localhost:3000/proxy/services/main/qwen36/
+Model Qwen/Qwen3.6-27B is published at:
   http://localhost:3000/proxy/models/main/
 ```
 
@@ -138,11 +123,11 @@ If you do not have a [gateway](gateways.md) created, the service endpoint will b
 <div class="termy">
 
 ```shell
-$ curl http://localhost:3000/proxy/services/main/qwen397/v1/chat/completions \
+$ curl http://localhost:3000/proxy/services/main/qwen36/v1/chat/completions \
     -H 'Content-Type: application/json' \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -d '{
-        "model": "Qwen/Qwen3.5-397B-A17B-FP8",
+        "model": "Qwen/Qwen3.6-27B",
         "messages": [
             {
                 "role": "user",
@@ -213,23 +198,23 @@ You can configure the number of replicas as well as the auto-scaling rules.
 
     ```yaml
     type: service
-    name: qwen397-service
+    name: qwen36-service
 
     image: lmsysorg/sglang:v0.5.10.post1
 
     commands:
       - |
         sglang serve \
-          --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
+          --model-path Qwen/Qwen3.6-27B \
+          --host 0.0.0.0 \
           --port 30000 \
           --tp $DSTACK_GPUS_NUM \
           --reasoning-parser qwen3 \
-          --tool-call-parser qwen3_coder \
-          --enable-flashinfer-allreduce-fusion \
-          --mem-fraction-static 0.8
+          --mem-fraction-static 0.8 \
+          --context-length 262144
 
     port: 30000
-    model: Qwen/Qwen3.5-397B-A17B-FP8
+    model: Qwen/Qwen3.6-27B
 
     volumes:
       # Optional instance volume for model and runtime caches
@@ -238,11 +223,8 @@ You can configure the number of replicas as well as the auto-scaling rules.
         optional: true
 
     resources:
-      cpu: x86:96..
-      memory: 512GB..
       shm_size: 16GB
-      disk: 500GB..
-      gpu: H100:80GB:8
+      gpu: H100:4
 
     replicas: 1..2
     scaling:
@@ -258,38 +240,23 @@ You can configure the number of replicas as well as the auto-scaling rules.
 
     ```yaml
     type: service
-    name: qwen397-service
+    name: qwen36-service
 
-    image: lmsysorg/sglang:v0.5.10.post1-rocm720-mi30x
-
-    env:
-      - HIP_FORCE_DEV_KERNARG=1
-      - SGLANG_ALLOW_OVERWRITE_LONGER_CONTEXT_LEN=1
-      - SGLANG_DISABLE_CUDNN_CHECK=1
-      - SGLANG_INT4_WEIGHT=0
-      - SGLANG_MOE_PADDING=1
-      - SGLANG_ROCM_DISABLE_LINEARQUANT=0
-      - SGLANG_ROCM_FUSED_DECODE_MLA=1
-      - SGLANG_SET_CPU_AFFINITY=1
-      - SGLANG_USE_AITER=1
-      - SGLANG_USE_ROCM700A=1
+    image: lmsysorg/sglang:v0.5.10-rocm720-mi30x
 
     commands:
       - |
         sglang serve \
-          --model-path Qwen/Qwen3.5-397B-A17B-FP8 \
+          --model-path Qwen/Qwen3.6-27B \
+          --host 0.0.0.0 \
+          --port 30000 \
           --tp $DSTACK_GPUS_NUM \
           --reasoning-parser qwen3 \
-          --tool-call-parser qwen3_coder \
           --mem-fraction-static 0.8 \
-          --context-length 262144 \
-          --attention-backend triton \
-          --disable-cuda-graph \
-          --fp8-gemm-backend aiter \
-          --port 30000
+          --context-length 262144
 
     port: 30000
-    model: Qwen/Qwen3.5-397B-A17B-FP8
+    model: Qwen/Qwen3.6-27B
 
     volumes:
       # Optional instance volume for model and runtime caches
@@ -298,11 +265,11 @@ You can configure the number of replicas as well as the auto-scaling rules.
         optional: true
 
     resources:
-      cpu: x86:52..
-      memory: 700GB..
+      cpu: 52..
+      memory: 896GB..
       shm_size: 16GB
-      disk: 600GB..
-      gpu: MI300X:192GB:4
+      disk: 450GB..
+      gpu: MI300X:4
 
     replicas: 1..2
     scaling:
@@ -372,6 +339,8 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
     > Properties such as `regions`, `port`, `image`, `env` and some other cannot be configured per replica group. This support is coming soon.
 
 ### PD disaggregation
+
+<!-- NOTE: this section is referenced from the CLI, keep the URL unchanged -->
 
 Since 0.20.17, `dstack` supports serving a model using PD disaggregation. To use it, configure three replica groups: one for a router (for example, [SGLang Model Gateway](https://docs.sglang.io/advanced_features/sgl_model_gateway.html)), one for prefill workers, and one for decode workers.
 

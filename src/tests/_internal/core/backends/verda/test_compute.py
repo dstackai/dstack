@@ -1,12 +1,7 @@
-import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-if sys.version_info < (3, 10):
-    pytest.skip("Verda requires Python 3.10", allow_module_level=True)
-
 from verda.exceptions import APIException
 
 from dstack._internal.core.backends.verda.compute import (

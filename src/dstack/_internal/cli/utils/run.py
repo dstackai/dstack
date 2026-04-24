@@ -27,6 +27,7 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
+    ImagePullProgress,
     Job,
     JobStatus,
     JobSubmission,
@@ -316,10 +317,30 @@ def _format_job_submission_status(job_submission: JobSubmission, verbose: bool) 
         color = color_map.get(job_status, "white")
     status_style = f"bold {color}" if not job_status.is_finished() else color
     formatted_status_message = f"[{status_style}]{status_message}[/]"
+    if job_status == JobStatus.PULLING and job_submission.image_pull_progress is not None:
+        formatted_status_message += (
+            f" [secondary]{_format_pull_progress(job_submission.image_pull_progress)}[/]"
+        )
     if verbose and job_submission.inactivity_secs:
         inactive_for = format_duration_multiunit(job_submission.inactivity_secs)
         formatted_status_message += f" (inactive for {inactive_for})"
     return formatted_status_message
+
+
+def _format_pull_progress(progress: ImagePullProgress) -> str:
+    if progress.total_bytes >= 2**30:  # 1GB
+        unit = "GB"
+
+        def f(x: int) -> str:
+            return f"{x / 2**30:.2f}"
+    else:
+        unit = "MB"
+
+        def f(x: int) -> str:
+            return f"{x / 2**20:.0f}"
+
+    total_sign = "≥" if not progress.is_total_bytes_final else ""
+    return f"{f(progress.extracted_bytes)}/{f(progress.downloaded_bytes)}/{total_sign}{f(progress.total_bytes)}{unit}"
 
 
 def _get_show_deployment_replica_job(run: CoreRun, verbose: bool) -> tuple[bool, bool, bool]:
@@ -434,7 +455,7 @@ def get_runs_table(
     else:
         table.add_column("GPU", ratio=2)
     table.add_column("PRICE", style="grey58", ratio=1)
-    table.add_column("STATUS", no_wrap=True, ratio=1)
+    table.add_column("STATUS", ratio=1)
     if verbose or any(
         run._run.is_deployment_in_progress()
         and any(job.job_submissions[-1].probes for job in run._run.jobs)

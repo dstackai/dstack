@@ -16,6 +16,7 @@ import (
 	rt "runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
@@ -49,6 +50,86 @@ const (
 	LabelKeyTaskID = LabelKeyPrefix + "task-id"
 	LabelValueTrue = "true"
 )
+
+// dockerd reports pulling progress as a stream of JSON Lines. The format of records is not documented in the API documentation,
+// although it's occasionally mentioned, e.g., https://docs.docker.com/reference/api/engine/version-history/#v148-api-changes
+// https://github.com/moby/moby/blob/e77ff99ede5ee5952b3a9227863552ae6e5b6fb1/pkg/jsonmessage/jsonmessage.go#L144
+// All fields are optional.
+type PullMessage struct {
+	Id             string `json:"id"` // layer id
+	Status         string `json:"status"`
+	ProgressDetail struct {
+		Current uint64 `json:"current"` // bytes
+		Total   uint64 `json:"total"`   // bytes
+	} `json:"progressDetail"`
+	ErrorDetail struct {
+		Message string `json:"message"`
+	} `json:"errorDetail"`
+}
+
+type layerProgress struct {
+	Status          string
+	DownloadedBytes uint64
+	ExtractedBytes  uint64
+	TotalBytes      uint64
+}
+
+type PullTracker struct {
+	mu     sync.RWMutex
+	layers map[string]layerProgress
+}
+
+func newPullTracker() *PullTracker {
+	return &PullTracker{layers: make(map[string]layerProgress)}
+}
+
+func (t *PullTracker) Update(msg PullMessage) {
+	if msg.Id == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	layer := t.layers[msg.Id]
+	switch msg.Status {
+	case "Pulling fs layer", "Waiting", "Verifying Checksum", "Already exists":
+		// no bytes to update, just track status
+	case "Downloading":
+		layer.DownloadedBytes = msg.ProgressDetail.Current
+		layer.TotalBytes = msg.ProgressDetail.Total
+	case "Download complete":
+		layer.DownloadedBytes = layer.TotalBytes
+	case "Extracting":
+		layer.ExtractedBytes = msg.ProgressDetail.Current
+		layer.DownloadedBytes = msg.ProgressDetail.Total
+		layer.TotalBytes = msg.ProgressDetail.Total
+	case "Pull complete":
+		layer.ExtractedBytes = layer.TotalBytes
+		layer.DownloadedBytes = layer.TotalBytes
+	default:
+		// Non-layer events, such as {"status":"Pulling from library/python","id":"3.11"}
+		return
+	}
+	layer.Status = msg.Status
+	t.layers[msg.Id] = layer
+}
+
+func (t *PullTracker) Progress() *ImagePullProgress {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	if len(t.layers) == 0 {
+		return nil
+	}
+	p := ImagePullProgress{IsTotalBytesFinal: true}
+	for _, l := range t.layers {
+		if l.TotalBytes == 0 && l.Status != "Already exists" && l.Status != "Pull complete" {
+			p.IsTotalBytesFinal = false
+		}
+		p.DownloadedBytes += l.DownloadedBytes
+		p.ExtractedBytes += l.ExtractedBytes
+		p.TotalBytes += l.TotalBytes
+	}
+	return &p
+}
 
 type DockerRunner struct {
 	client       *docker.Client
@@ -239,6 +320,7 @@ func (d *DockerRunner) TaskInfo(taskID string) TaskInfo {
 		ContainerName:      task.containerName,
 		ContainerID:        task.containerID,
 		GpuIDs:             task.gpuIDs,
+		ImagePullProgress:  task.pullTracker.Progress(),
 	}
 }
 
@@ -350,7 +432,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	// Although it's called "runner dir", we also use it for shim task-related data.
 	// Maybe we should rename it to "task dir" (including the `/root/.dstack/runners` dir on the host).
 	pullLogPath := filepath.Join(runnerDir, "pull.log")
-	if err = pullImage(pullCtx, d.client, cfg, pullLogPath); err != nil {
+	if err = pullImage(pullCtx, d.client, cfg, pullLogPath, task.pullTracker); err != nil {
 		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
 		log.Error(ctx, errMessage)
 		task.SetStatusTerminated(string(types.TerminationReasonCreatingContainerError), errMessage)
@@ -670,7 +752,7 @@ func mountDisk(ctx context.Context, deviceName, mountPoint string, fsRootPerms o
 	return nil
 }
 
-func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConfig, logPath string) error {
+func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConfig, logPath string, tracker *PullTracker) error {
 	if !strings.Contains(taskConfig.ImageName, ":") {
 		taskConfig.ImageName += ":latest"
 	}
@@ -710,26 +792,6 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 
 	teeReader := io.TeeReader(reader, logFile)
 
-	current := make(map[string]uint)
-	total := make(map[string]uint)
-
-	// dockerd reports pulling progress as a stream of JSON Lines. The format of records is not documented in the API documentation,
-	// although it's occasionally mentioned, e.g., https://docs.docker.com/reference/api/engine/version-history/#v148-api-changes
-
-	// https://github.com/moby/moby/blob/e77ff99ede5ee5952b3a9227863552ae6e5b6fb1/pkg/jsonmessage/jsonmessage.go#L144
-	// All fields are optional
-	type PullMessage struct {
-		Id             string `json:"id"` // layer id
-		Status         string `json:"status"`
-		ProgressDetail struct {
-			Current uint `json:"current"` // bytes
-			Total   uint `json:"total"`   // bytes
-		} `json:"progressDetail"`
-		ErrorDetail struct {
-			Message string `json:"message"`
-		} `json:"errorDetail"`
-	}
-
 	var pullCompleted bool
 	pullErrors := make([]string, 0)
 
@@ -740,13 +802,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 		if err := json.Unmarshal(line, &pullMessage); err != nil {
 			continue
 		}
-		if pullMessage.Status == "Downloading" {
-			current[pullMessage.Id] = pullMessage.ProgressDetail.Current
-			total[pullMessage.Id] = pullMessage.ProgressDetail.Total
-		}
-		if pullMessage.Status == "Download complete" {
-			current[pullMessage.Id] = total[pullMessage.Id]
-		}
+		tracker.Update(pullMessage)
 		if pullMessage.ErrorDetail.Message != "" {
 			log.Error(ctx, "error pulling image", "name", taskConfig.ImageName, "err", pullMessage.ErrorDetail.Message)
 			pullErrors = append(pullErrors, pullMessage.ErrorDetail.Message)
@@ -764,13 +820,10 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	}
 
 	duration := time.Since(startTime)
-	var currentBytes uint
-	var totalBytes uint
-	for _, v := range current {
-		currentBytes += v
-	}
-	for _, v := range total {
-		totalBytes += v
+	p := tracker.Progress()
+	var currentBytes, totalBytes uint64
+	if p != nil {
+		currentBytes, totalBytes = p.DownloadedBytes, p.TotalBytes
 	}
 	speed := bytesize.New(float64(currentBytes) / duration.Seconds())
 

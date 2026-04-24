@@ -3,7 +3,7 @@ name = "dstack"
 dynamic = ["version", "readme"]
 authors = [{ name = "Andrey Cheptsov", email = "andrey@dstack.ai" }]
 description = "dstack is an open-source orchestration engine for running AI workloads on any cloud or on-premises."
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -32,7 +32,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.20",
+    "gpuhunt==0.1.21",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "orjson",
@@ -82,7 +82,7 @@ ignore-case = true
 dstack-plugin-server = { path = "examples/plugins/example_plugin_server", editable = true }
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 99
 
 [tool.ruff.lint]
@@ -198,7 +198,6 @@ server = [
     "python-json-logger>=3.1.0",
     "prometheus-client",
     "grpcio>=1.50",
-    "backports.entry-points-selectable",
 ]
 aws = [
     "boto3>=1.38.13",
@@ -226,11 +225,11 @@ gcp = [
     "dstack[server]",
 ]
 datacrunch = [
-    "verda>=1.23.0; python_version >= '3.10'",
+    "verda>=1.23.0",
     "dstack[server]",
 ]
 verda = [
-    "verda>=1.23.0; python_version >= '3.10'",
+    "verda>=1.23.0",
     "dstack[server]",
 ]
 kubernetes = [
@@ -251,7 +250,7 @@ oci = [
     "dstack[server]",
 ]
 nebius = [
-    "nebius>=0.3.4,<0.4; python_version >= '3.10'",
+    "nebius>=0.3.4,<0.4",
     "dstack[server]",
 ]
 fluentbit = [
