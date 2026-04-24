@@ -1,8 +1,8 @@
 """Add InstanceModel.provisioning_job_id for placeholder instances
 
-Revision ID: 13ae4ee1df6a
-Revises: 94fcd7e38b7e
-Create Date: 2026-04-23 09:07:24.552837+00:00
+Revision ID: 82b671d9c5ab
+Revises: f48b23790053
+Create Date: 2026-04-24 05:42:14.856254+00:00
 
 """
 
@@ -11,8 +11,8 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "13ae4ee1df6a"
-down_revision = "94fcd7e38b7e"
+revision = "82b671d9c5ab"
+down_revision = "f48b23790053"
 branch_labels = None
 depends_on = None
 
