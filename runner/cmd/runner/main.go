@@ -35,18 +35,18 @@ func mainInner() int {
 	var httpPort int
 	var sshPort int
 	var sshAuthorizedKeys []string
-	var logLevel int
+	var sshLogLevel string
+	var logLevel string
 
 	cmd := &cli.Command{
 		Name:    "dstack-runner",
 		Usage:   "configure and start dstack-runner",
 		Version: Version,
 		Flags: []cli.Flag{
-			&cli.IntFlag{
+			&cli.StringFlag{
 				Name:        "log-level",
-				Value:       2,
-				DefaultText: "4 (Info)",
-				Usage:       "log verbosity level: 2 (Error), 3 (Warning), 4 (Info), 5 (Debug), 6 (Trace)",
+				Value:       "info",
+				Usage:       "log verbosity level: fatal, error, warning, info, debug, trace",
 				Destination: &logLevel,
 			},
 		},
@@ -86,6 +86,12 @@ func mainInner() int {
 						Usage:       "dstack server or user authorized key. May be specified multiple times",
 						Destination: &sshAuthorizedKeys,
 					},
+					&cli.StringFlag{
+						Name:        "ssh-log-level",
+						Value:       "INFO",
+						Usage:       "ssh LogLevel, see sshd_config(5)",
+						Destination: &sshLogLevel,
+					},
 					// --home-dir is not used since 0.20.4, but the flag was retained as no-op
 					// for compatibility with pre-0.20.4 shims; remove the flag eventually
 					&cli.StringFlag{
@@ -94,7 +100,11 @@ func mainInner() int {
 					},
 				},
 				Action: func(ctx context.Context, cmd *cli.Command) error {
-					return start(ctx, logLevel, tempDir, httpAddress, httpPort, sshPort, sshAuthorizedKeys)
+					logLvl, err := log.ParseLevel(logLevel)
+					if err != nil {
+						return err
+					}
+					return start(ctx, logLvl, tempDir, httpAddress, httpPort, sshPort, sshAuthorizedKeys, sshLogLevel)
 				},
 			},
 		},
@@ -115,7 +125,7 @@ func start(
 	ctx context.Context,
 	logLevel int, tempDir string,
 	httpAddress string, httpPort int,
-	sshPort int, sshAuthorizedKeys []string,
+	sshPort int, sshAuthorizedKeys []string, sshLogLevel string,
 ) error {
 	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return fmt.Errorf("create temp directory: %w", err)
@@ -184,7 +194,7 @@ func start(
 	}
 
 	sshd := ssh.NewSshd("/usr/sbin/sshd")
-	if err := sshd.Prepare(ctx, dstackSshDir, sshPort, "INFO"); err != nil {
+	if err := sshd.Prepare(ctx, dstackSshDir, sshPort, sshLogLevel); err != nil {
 		return fmt.Errorf("prepare sshd: %w", err)
 	}
 	if err := sshd.AddAuthorizedKeys(ctx, sshAuthorizedKeys...); err != nil {

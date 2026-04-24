@@ -18,15 +18,16 @@ type CLIArgs struct {
 		HTTPPort   int
 		HomeDir    string
 		BinaryPath string
-		LogLevel   int
+		LogLevel   string
 	}
 
 	Runner struct {
 		HTTPPort    int
 		SSHPort     int
+		SSHLogLevel string
 		DownloadURL string
 		BinaryPath  string
-		LogLevel    int
+		LogLevel    string
 	}
 
 	DCGMExporter struct {

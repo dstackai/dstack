@@ -1247,7 +1247,7 @@ func (c *CLIArgs) DockerShellCommands(authorizedKeys []string, runnerHttpAddress
 	commands := getSSHShellCommands()
 	runnerCommand := []string{
 		consts.RunnerBinaryPath,
-		"--log-level", strconv.Itoa(c.Runner.LogLevel),
+		"--log-level", c.Runner.LogLevel,
 		"start",
 		"--temp-dir", consts.RunnerTempDir,
 		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
@@ -1258,6 +1258,9 @@ func (c *CLIArgs) DockerShellCommands(authorizedKeys []string, runnerHttpAddress
 	}
 	for _, key := range authorizedKeys {
 		runnerCommand = append(runnerCommand, "--ssh-authorized-key", fmt.Sprintf("'%s'", key))
+	}
+	if c.Runner.SSHLogLevel != "" {
+		runnerCommand = append(runnerCommand, "--ssh-log-level", c.Runner.SSHLogLevel)
 	}
 	return append(commands, strings.Join(runnerCommand, " "))
 }
