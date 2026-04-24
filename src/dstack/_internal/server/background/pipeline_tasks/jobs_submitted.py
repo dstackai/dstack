@@ -246,6 +246,7 @@ class JobSubmittedFetcher(Fetcher[JobSubmittedPipelineItem]):
                             RunModel.fleet_id.is_not(None),
                         ),
                         or_(
+                            JobModel.skip_min_processing_interval == True,
                             JobModel.last_processed_at <= now - self._min_processing_interval,
                             JobModel.last_processed_at == JobModel.submitted_at,
                         ),
@@ -268,6 +269,7 @@ class JobSubmittedFetcher(Fetcher[JobSubmittedPipelineItem]):
                             JobModel.id,
                             JobModel.lock_token,
                             JobModel.lock_expires_at,
+                            JobModel.skip_min_processing_interval,
                         )
                     )
                 )
@@ -280,6 +282,7 @@ class JobSubmittedFetcher(Fetcher[JobSubmittedPipelineItem]):
                     job_model.lock_expires_at = lock_expires_at
                     job_model.lock_token = lock_token
                     job_model.lock_owner = JobSubmittedPipeline.__name__
+                    job_model.skip_min_processing_interval = False
                     items.append(
                         JobSubmittedPipelineItem(
                             __tablename__=JobModel.__tablename__,
@@ -607,6 +610,7 @@ async def _apply_assignment_result(
                 )
                 job_model.fleet_id = assignment.fleet_id
                 job_model.instance_assigned = True
+                job_model.skip_min_processing_interval = True
                 await _mark_job_processed(session=session, job_model=job_model)
             return
 
@@ -1059,6 +1063,7 @@ def _assign_instance_to_job(
     job_model.used_instance_id = instance_model.id
     job_model.job_provisioning_data = instance_model.job_provisioning_data
     job_model.job_runtime_data = _prepare_job_runtime_data(offer, multinode).json()
+    job_model.skip_min_processing_interval = True
 
     switch_instance_status(session, instance_model, InstanceStatus.BUSY)
     instance_model.busy_blocks += offer.blocks
@@ -1254,6 +1259,8 @@ async def _apply_existing_instance_provisioning(
         instance_model=instance_model,
         volume_attachment_result=provisioning.volume_attachment_result,
     )
+    if context.job_model.status == JobStatus.PROVISIONING:
+        context.job_model.skip_min_processing_interval = True
     _release_replica_jobs_from_master_wait(
         job_model=context.job_model,
         replica_job_models=_get_job_models_by_ids(
@@ -1495,6 +1502,7 @@ async def _promote_or_create_instance_models_for_provisioned_jobs(
         provisioned_job_model.fleet_id = fleet_model.id
         provisioned_job_model.job_provisioning_data = job_provisioning_data.json()
         switch_job_status(session, provisioned_job_model, JobStatus.PROVISIONING)
+        provisioned_job_model.skip_min_processing_interval = True
 
         # If a placeholder instance exists, promote it instead of creating a new one.
         # Safe to update the placeholder without locking: nobody else should update the placeholder.

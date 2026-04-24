@@ -526,6 +526,9 @@ class JobModel(PipelineModelMixin, BaseModel):
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    skip_min_processing_interval: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     status: Mapped[JobStatus] = mapped_column(EnumAsString(JobStatus, 100), index=True)
     """`status` must be changed only via `switch_job_status()`."""
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
