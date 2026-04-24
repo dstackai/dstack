@@ -61,7 +61,9 @@ Services' run lifecycle has some modifications:
 ## Job's Lifecycle
 
 - STEP 1: A newly submitted job has status `SUBMITTED`. It is not assigned to any instance yet.
-- STEP 2: `JobSubmittedPipeline` tries to assign an existing instance or provision new capacity.
+- STEP 2: `JobSubmittedPipeline` assigns the job in two phases:
+  - Assignment: claim an existing instance or reserve a *placeholder* `InstanceModel`. Placeholders are `PENDING` instances that reserve an `instance_num` and a `nodes.max` slot. `InstancePipeline` ignores them.
+  - Provisioning: reuse the existing instance, or cloud-provision and promote the placeholder to `PROVISIONING`.
   - On success, the job becomes `PROVISIONING`.
   - On failure, the job becomes `TERMINATING`. `JobTerminatingPipeline` later assigns the final failed status.
 - STEP 3: `JobRunningPipeline` processes `PROVISIONING`, `PULLING`, and `RUNNING` jobs.

@@ -49,7 +49,10 @@ from dstack._internal.server.services.fleets import (
     is_fleet_empty,
     is_fleet_in_use,
 )
-from dstack._internal.server.services.instances import instance_matches_constraints
+from dstack._internal.server.services.instances import (
+    instance_matches_constraints,
+    is_placeholder_instance,
+)
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.utils import sentry_utils
@@ -935,8 +938,12 @@ def _select_current_master_instance_id(
             return instance_model.id
 
     # Prefer existing surviving instances over freshly planned replacements to
-    # avoid election churn during min-nodes backfill.
+    # avoid election churn during min-nodes backfill. Skip placeholders —
+    # they have no JPD and cannot anchor cluster placement, so electing one
+    # just defers the real master decision.
     for instance_model in surviving_instance_models:
+        if is_placeholder_instance(instance_model):
+            continue
         if (
             _get_effective_instance_status(
                 instance_model,

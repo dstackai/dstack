@@ -328,6 +328,24 @@ def is_ssh_instance(instance_model: InstanceModel) -> bool:
     return instance_model.remote_connection_info is not None
 
 
+def is_placeholder_instance(instance_model: InstanceModel) -> bool:
+    """A PENDING instance with `provisioning_job_id` set is a placeholder
+    reserved by `JobSubmittedPipeline` during assignment and awaiting cloud
+    provisioning. It reserves an `instance_num` and a `nodes.max` slot but
+    has no backend, offer, or provisioning data until it is promoted.
+    `InstancePipeline` ignores placeholders; only `JobSubmittedPipeline` and
+    `JobTerminatingPipeline` act on them.
+    """
+    return (
+        instance_model.status == InstanceStatus.PENDING
+        and instance_model.provisioning_job_id is not None
+    )
+
+
+def filter_non_placeholder_instances(instance_models: list[InstanceModel]) -> list[InstanceModel]:
+    return [i for i in instance_models if not is_placeholder_instance(i)]
+
+
 def get_instance_remote_connection_info(
     instance_model: InstanceModel,
 ) -> Optional[RemoteConnectionInfo]:

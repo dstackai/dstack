@@ -810,6 +810,7 @@ async def create_instance(
     volumes: Optional[List[VolumeModel]] = None,
     price: float = 1.0,
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    provisioning_job_id: Optional[UUID] = None,
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -871,6 +872,7 @@ async def create_instance(
         volume_attachments=volume_attachments,
         total_blocks=total_blocks,
         busy_blocks=busy_blocks,
+        provisioning_job_id=provisioning_job_id,
     )
     if job:
         im.jobs.append(job)

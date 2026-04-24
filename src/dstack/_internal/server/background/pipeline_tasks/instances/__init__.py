@@ -179,6 +179,13 @@ class InstanceFetcher(Fetcher[InstancePipelineItem]):
                                 InstanceModel.compute_group_id.is_not(None),
                             )
                         ),
+                        # Skip placeholder instances managed by JobSubmittedPipeline.
+                        not_(
+                            and_(
+                                InstanceModel.status == InstanceStatus.PENDING,
+                                InstanceModel.provisioning_job_id.is_not(None),
+                            )
+                        ),
                         InstanceModel.deleted == False,
                         or_(
                             # Process fast-moving instances (pending, provisioning, terminating)

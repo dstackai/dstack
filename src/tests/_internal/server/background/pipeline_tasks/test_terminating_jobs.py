@@ -758,6 +758,40 @@ class TestJobTerminatingWorker:
         assert job.lock_token is None
         assert job.lock_expires_at is None
 
+    async def test_terminates_job_with_placeholder_instance(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        placeholder = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.PENDING,
+            provisioning_job_id=uuid.uuid4(),
+            offer=None,
+            job_provisioning_data=None,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+            instance=placeholder,
+        )
+        _lock_job(job)
+        await session.commit()
+
+        # No mocks needed — placeholder has no VM, no SSH, no container
+        await worker.process(_job_to_pipeline_item(job))
+
+        await session.refresh(job)
+        await session.refresh(placeholder)
+        assert job.status == JobStatus.TERMINATED
+        assert job.instance_id is None
+        assert placeholder.status == InstanceStatus.TERMINATING
+
     async def test_retries_detaching_when_used_instance_is_missing(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker
     ):

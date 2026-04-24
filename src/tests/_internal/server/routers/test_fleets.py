@@ -2071,6 +2071,35 @@ class TestDeleteFleetInstances:
         )
         assert response.status_code == 403
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_rejects_deleting_placeholder_instance(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet = await create_fleet(session=session, project=project)
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            instance_num=0,
+            status=InstanceStatus.PENDING,
+            provisioning_job_id=uuid4(),
+            offer=None,
+            job_provisioning_data=None,
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/delete_instances",
+            headers=get_auth_headers(user.token),
+            json={"name": fleet.name, "instance_nums": [0]},
+        )
+        assert response.status_code == 400
+        assert "provisioning" in response.text
+
 
 class TestGetPlan:
     @pytest.mark.asyncio
