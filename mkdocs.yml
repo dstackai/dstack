@@ -306,12 +306,13 @@ nav:
           - vLLM: examples/inference/vllm/index.md
           - NIM: examples/inference/nim/index.md
           - TensorRT-LLM: examples/inference/trtllm/index.md
+      - Models:
+          - DeepSeek V4: examples/models/deepseek-v4/index.md
+          - Qwen 3.6: examples/models/qwen36/index.md
       - Accelerators:
           - AMD: examples/accelerators/amd/index.md
           - TPU: examples/accelerators/tpu/index.md
           - Tenstorrent: examples/accelerators/tenstorrent/index.md
-      - Models:
-          - Qwen 3.6: examples/models/qwen36/index.md
   - Blog:
       - blog/index.md
   - Case studies: blog/case-studies.md
