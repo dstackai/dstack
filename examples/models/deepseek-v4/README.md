@@ -47,6 +47,11 @@ commands:
 port: 30000
 model: deepseek-ai/DeepSeek-V4-Pro
 
+volumes:
+  - instance_path: /root/.cache
+    path: /root/.cache
+    optional: true
+
 resources:
   gpu: B200:8
   shm_size: 32GB
@@ -137,12 +142,10 @@ This returns both:
 
 ## Deployment notes
 
-- Use `lmsysorg/sglang:deepseek-v4-blackwell` for `B200:8`.
 - The first startup can take several minutes while the model loads and SGLang
-  finishes CUDA graph capture.
-- On container backends such as Vast.ai, avoid `instance_path` cache volumes in
-  this service config.
-- The endpoint is OpenAI-compatible and served on port `30000`.
+  finishes initialization.
+- The optional `/root/.cache` instance volume helps reuse the model cache on
+  backends that support instance volumes.
 
 ## What's next?
 
