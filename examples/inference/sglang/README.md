@@ -8,6 +8,9 @@ description: Deploying Qwen3.6-27B using SGLang on NVIDIA and AMD GPUs
 This example shows how to deploy `Qwen/Qwen3.6-27B` using
 [SGLang](https://github.com/sgl-project/sglang) and `dstack`.
 
+> For a `DeepSeek-V4-Pro` deployment on `B200:8`, see the
+[DeepSeek V4](../../models/deepseek-v4/index.md) model page.
+
 ## Apply a configuration
 
 Here's an example of a service that deploys

@@ -188,6 +188,17 @@ hide:
 ## Models
 
 <div class="tx-landing__highlights_grid">
+    <a href="/examples/models/deepseek-v4"
+       class="feature-cell">
+        <h3>
+            DeepSeek V4
+        </h3>
+
+        <p>
+            Deploy DeepSeek V4 with SGLang on B200:8
+        </p>
+    </a>
+
     <a href="/examples/models/qwen36"
        class="feature-cell">
         <h3>
