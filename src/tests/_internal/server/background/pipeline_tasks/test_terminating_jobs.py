@@ -129,6 +129,14 @@ class TestJobTerminatingFetcher:
             submitted_at=stale - timedelta(minutes=2),
             last_processed_at=now,
         )
+        recent_skip = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            submitted_at=stale - timedelta(minutes=2),
+            last_processed_at=now,
+        )
+        recent_skip.skip_min_processing_interval = True
 
         locked = await create_job(
             session=session,
@@ -159,11 +167,13 @@ class TestJobTerminatingFetcher:
             terminating.id,
             past_remove_at.id,
             expired_same_owner.id,
+            recent_skip.id,
         ]
         assert {(item.id, item.volumes_detached_at) for item in items} == {
             (terminating.id, None),
             (past_remove_at.id, past_remove_at.volumes_detached_at),
             (expired_same_owner.id, None),
+            (recent_skip.id, None),
         }
 
         for job in [
@@ -172,15 +182,17 @@ class TestJobTerminatingFetcher:
             future_remove_at,
             non_terminating,
             recent,
+            recent_skip,
             locked,
             expired_same_owner,
         ]:
             await session.refresh(job)
 
-        fetched_jobs = [terminating, past_remove_at, expired_same_owner]
+        fetched_jobs = [terminating, past_remove_at, expired_same_owner, recent_skip]
         assert all(job.lock_owner == JobTerminatingPipeline.__name__ for job in fetched_jobs)
         assert all(job.lock_expires_at is not None for job in fetched_jobs)
         assert all(job.lock_token is not None for job in fetched_jobs)
+        assert all(not job.skip_min_processing_interval for job in fetched_jobs)
         assert len({job.lock_token for job in fetched_jobs}) == 1
 
         assert future_remove_at.lock_owner is None

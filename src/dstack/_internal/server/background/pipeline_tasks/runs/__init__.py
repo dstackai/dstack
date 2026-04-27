@@ -268,6 +268,7 @@ class RunWorker(Worker[RunPipelineItem]):
             return
         if item.status == RunStatus.TERMINATING:
             await _process_terminating_item(item)
+            self._pipeline_hinter.hint_fetch(JobModel.__name__)
             return
 
         logger.error("Skipping run %s with unexpected status %s", item.id, item.status)

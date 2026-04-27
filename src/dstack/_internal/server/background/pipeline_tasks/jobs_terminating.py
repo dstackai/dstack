@@ -186,6 +186,7 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                                 <= now - self._min_processing_interval * 2,
                                 JobModel.volumes_detached_at.is_not(None),
                             ),
+                            JobModel.skip_min_processing_interval == True,
                         ),
                         or_(
                             JobModel.lock_expires_at.is_(None),
@@ -205,6 +206,7 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                             JobModel.lock_token,
                             JobModel.lock_expires_at,
                             JobModel.volumes_detached_at,
+                            JobModel.skip_min_processing_interval,
                         )
                     )
                 )
@@ -217,6 +219,7 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                     job_model.lock_expires_at = lock_expires_at
                     job_model.lock_token = lock_token
                     job_model.lock_owner = JobTerminatingPipeline.__name__
+                    job_model.skip_min_processing_interval = False
                     items.append(
                         JobTerminatingPipelineItem(
                             __tablename__=JobModel.__tablename__,
