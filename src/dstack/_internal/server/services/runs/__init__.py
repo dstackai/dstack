@@ -696,6 +696,7 @@ async def stop_runs(
     project: ProjectModel,
     runs_names: List[str],
     abort: bool,
+    pipeline_hinter: Optional[PipelineHinterProtocol] = None,
 ):
     res = await session.execute(
         select(RunModel).where(
@@ -716,7 +717,6 @@ async def stop_runs(
             .execution_options(populate_existing=True)
         )
         run_models = res.scalars().all()
-        now = common_utils.get_current_datetime()
         for run_model in run_models:
             if run_model.status.is_finished():
                 continue
@@ -727,9 +727,11 @@ async def stop_runs(
             switch_run_status(
                 session, run_model, RunStatus.TERMINATING, actor=events.UserActor.from_user(user)
             )
-            run_model.last_processed_at = now
+            run_model.skip_min_processing_interval = True
             # The run will be terminated by RunPipeline.
         await session.commit()
+    if pipeline_hinter is not None:
+        pipeline_hinter.hint_fetch(RunModel.__name__)
 
 
 async def delete_runs(

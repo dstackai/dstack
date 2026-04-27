@@ -180,6 +180,7 @@ async def stop_runs(
     body: StopRunsRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
 ):
     """
     Stop one or more runs.
@@ -191,6 +192,7 @@ async def stop_runs(
         project=project,
         runs_names=body.runs_names,
         abort=body.abort,
+        pipeline_hinter=pipeline_hinter,
     )
 
 

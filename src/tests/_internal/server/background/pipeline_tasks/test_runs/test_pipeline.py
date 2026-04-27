@@ -106,6 +106,18 @@ class TestRunFetcher:
             submitted_at=now,
             last_processed_at=now + dt.timedelta(seconds=10),
         )
+        recent_terminating_skip = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="recent-terminating-skip",
+            status=RunStatus.TERMINATING,
+            submitted_at=now,
+            last_processed_at=now + dt.timedelta(seconds=9),
+        )
+        recent_terminating_skip.skip_min_processing_interval = True
+        await session.commit()
 
         items = await fetcher.fetch(limit=10)
 
@@ -115,6 +127,7 @@ class TestRunFetcher:
             pending_retry.id,
             pending_scheduled_ready.id,
             pending_zero_scaled.id,
+            recent_terminating_skip.id,
         }
         assert {item.id: item.status for item in items} == {
             submitted.id: RunStatus.SUBMITTED,
@@ -122,6 +135,7 @@ class TestRunFetcher:
             pending_retry.id: RunStatus.PENDING,
             pending_scheduled_ready.id: RunStatus.PENDING,
             pending_zero_scaled.id: RunStatus.PENDING,
+            recent_terminating_skip.id: RunStatus.TERMINATING,
         }
 
         for run in [
@@ -133,6 +147,7 @@ class TestRunFetcher:
             future_scheduled,
             finished,
             recent,
+            recent_terminating_skip,
         ]:
             await session.refresh(run)
 
@@ -142,10 +157,12 @@ class TestRunFetcher:
             pending_retry,
             pending_scheduled_ready,
             pending_zero_scaled,
+            recent_terminating_skip,
         ]
         assert all(run.lock_owner == RunPipeline.__name__ for run in fetched_runs)
         assert all(run.lock_expires_at is not None for run in fetched_runs)
         assert all(run.lock_token is not None for run in fetched_runs)
+        assert all(not run.skip_min_processing_interval for run in fetched_runs)
         assert len({run.lock_token for run in fetched_runs}) == 1
 
         assert future_scheduled.lock_owner is None

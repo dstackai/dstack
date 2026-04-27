@@ -200,6 +200,7 @@ async def delete_fleets(
     body: DeleteFleetsRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
 ):
     """
     Deletes one or more fleets.
@@ -210,6 +211,7 @@ async def delete_fleets(
         project=project,
         user=user,
         names=body.names,
+        pipeline_hinter=pipeline_hinter,
     )
 
 
@@ -218,6 +220,7 @@ async def delete_fleet_instances(
     body: DeleteFleetInstancesRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
 ):
     """
     Deletes one or more instances within the fleet.
@@ -229,4 +232,5 @@ async def delete_fleet_instances(
         user=user,
         names=[body.name],
         instance_nums=body.instance_nums,
+        pipeline_hinter=pipeline_hinter,
     )

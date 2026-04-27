@@ -186,6 +186,7 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                                 <= now - self._min_processing_interval * 2,
                                 JobModel.volumes_detached_at.is_not(None),
                             ),
+                            JobModel.skip_min_processing_interval == True,
                         ),
                         or_(
                             JobModel.lock_expires_at.is_(None),
@@ -205,6 +206,7 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                             JobModel.lock_token,
                             JobModel.lock_expires_at,
                             JobModel.volumes_detached_at,
+                            JobModel.skip_min_processing_interval,
                         )
                     )
                 )
@@ -217,6 +219,7 @@ class JobTerminatingFetcher(Fetcher[JobTerminatingPipelineItem]):
                     job_model.lock_expires_at = lock_expires_at
                     job_model.lock_token = lock_token
                     job_model.lock_owner = JobTerminatingPipeline.__name__
+                    job_model.skip_min_processing_interval = False
                     items.append(
                         JobTerminatingPipelineItem(
                             __tablename__=JobModel.__tablename__,
@@ -280,6 +283,14 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
             instance_model=instance_model,
             result=result,
         )
+        if (
+            result.instance_update_map is not None
+            and result.instance_update_map.get("status") == InstanceStatus.TERMINATING
+        ):
+            self._pipeline_hinter.hint_fetch(InstanceModel.__name__)
+        # TODO: Hint RunPipeline to quickly move run to TERMINATED.
+        # Currently not implemented since it also requires making run eligible for processing.
+        # (This pipeline cannot modify runs so it's not simple).
 
 
 class _JobUpdateMap(ItemUpdateMap, total=False):
@@ -299,6 +310,7 @@ class _InstanceUpdateMap(ItemUpdateMap, total=False):
     termination_reason_message: Optional[str]
     busy_blocks: int
     last_job_processed_at: UpdateMapDateTime
+    skip_min_processing_interval: bool
 
 
 class _VolumeUpdateRow(TypedDict):
@@ -318,6 +330,7 @@ class _ProcessResult:
     volume_update_rows: list[_VolumeUpdateRow] = field(default_factory=list)
     detached_volume_ids: set[uuid.UUID] = field(default_factory=set)
     unassign_event_message: Optional[str] = None
+    graceful_stop_event_message: Optional[str] = None
     replica_unregistration: Optional[_UnregisterReplicaResult] = (
         None  # None = not unregistered yet
     )
@@ -567,6 +580,14 @@ async def _apply_process_result(
                 ],
             )
 
+        if result.graceful_stop_event_message is not None and instance_model is not None:
+            events.emit(
+                session,
+                result.graceful_stop_event_message,
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(job_model)],
+            )
+
         if result.replica_unregistration is not None:
             targets = [events.Target.from_model(job_model)]
             if result.replica_unregistration.gateway_target is not None:
@@ -622,7 +643,9 @@ async def _process_terminating_job(
         # Placeholder has no VM and no provisioning data. Skip graceful stop,
         # container stop, and volume detach.
         instance_update_map = get_or_error(result.instance_update_map)
-        instance_update_map["status"] = InstanceStatus.TERMINATING
+        if instance_model.status != InstanceStatus.TERMINATING:
+            instance_update_map["status"] = InstanceStatus.TERMINATING
+            instance_update_map["skip_min_processing_interval"] = True
         instance_update_map["termination_reason"] = InstanceTerminationReason.JOB_FINISHED
         result.job_update_map["instance_id"] = None
         await _unregister_replica_and_update_result(result=result, job_model=job_model)
@@ -631,6 +654,7 @@ async def _process_terminating_job(
 
     if job_model.graceful_termination_attempts == 0 and job_model.remove_at is None:
         result.job_update_map = await _stop_job_gracefully(job_model, instance_model)
+        result.graceful_stop_event_message = "Graceful job stop requested"
         return result
 
     jrd = get_job_runtime_data(job_model)
@@ -666,7 +690,9 @@ async def _process_terminating_job(
     if instance_model.status != InstanceStatus.BUSY or jpd is None or not jpd.dockerized:
         if instance_model.status not in InstanceStatus.finished_statuses():
             instance_update_map["termination_reason"] = InstanceTerminationReason.JOB_FINISHED
-            instance_update_map["status"] = InstanceStatus.TERMINATING
+            if instance_model.status != InstanceStatus.TERMINATING:
+                instance_update_map["status"] = InstanceStatus.TERMINATING
+                instance_update_map["skip_min_processing_interval"] = True
     elif not [j for j in instance_model.jobs if j.id != job_model.id]:
         instance_update_map["status"] = InstanceStatus.IDLE
 

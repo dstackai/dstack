@@ -428,6 +428,9 @@ class RunModel(PipelineModelMixin, BaseModel):
     run_name: Mapped[str] = mapped_column(String(100))
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    skip_min_processing_interval: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     status: Mapped[RunStatus] = mapped_column(EnumAsString(RunStatus, 100), index=True)
     """`status` must be changed only via `switch_run_status()`."""
@@ -526,6 +529,9 @@ class JobModel(PipelineModelMixin, BaseModel):
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    skip_min_processing_interval: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     status: Mapped[JobStatus] = mapped_column(EnumAsString(JobStatus, 100), index=True)
     """`status` must be changed only via `switch_job_status()`."""
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
@@ -740,6 +746,9 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
+    )
+    skip_min_processing_interval: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
     )
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)

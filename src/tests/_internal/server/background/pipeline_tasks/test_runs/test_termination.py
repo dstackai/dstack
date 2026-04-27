@@ -95,6 +95,7 @@ class TestRunTerminatingWorker:
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
         assert job.graceful_termination_attempts == 0
+        assert job.skip_min_processing_interval
         assert job.remove_at is None
         assert job.lock_token is None
         assert job.lock_expires_at is None
@@ -147,10 +148,12 @@ class TestRunTerminatingWorker:
         assert delayed_job.status == JobStatus.TERMINATING
         assert delayed_job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
         assert delayed_job.graceful_termination_attempts == 0
+        assert delayed_job.skip_min_processing_interval
         assert delayed_job.remove_at is None
         assert regular_job.status == JobStatus.TERMINATING
         assert regular_job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
         assert regular_job.graceful_termination_attempts is None
+        assert regular_job.skip_min_processing_interval
         assert regular_job.remove_at is None
 
     async def test_finishes_non_scheduled_run_when_all_jobs_are_finished(

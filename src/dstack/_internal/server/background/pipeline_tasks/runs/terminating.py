@@ -36,6 +36,7 @@ class TerminatingRunJobUpdateMap(ItemUpdateMap, total=False):
     status: JobStatus
     termination_reason: Optional[JobTerminationReason]
     graceful_termination_attempts: int
+    skip_min_processing_interval: bool
 
 
 @dataclass
@@ -114,12 +115,14 @@ def _get_job_id_to_update_map(
         job_id_to_update_map[job_id] = TerminatingRunJobUpdateMap(
             status=JobStatus.TERMINATING,
             termination_reason=job_termination_reason,
+            skip_min_processing_interval=True,
         )
     for job_id in delayed_job_ids:
         job_id_to_update_map[job_id] = TerminatingRunJobUpdateMap(
             status=JobStatus.TERMINATING,
             termination_reason=job_termination_reason,
             graceful_termination_attempts=0,
+            skip_min_processing_interval=True,
         )
     return job_id_to_update_map
 

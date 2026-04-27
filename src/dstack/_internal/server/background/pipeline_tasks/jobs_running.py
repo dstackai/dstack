@@ -225,13 +225,18 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                                 JobModel.last_processed_at
                                 <= now - self._min_processing_interval * 2,
                             ),
+                            JobModel.skip_min_processing_interval == True,
                         ),
                         or_(
                             and_(
                                 # Do not try to lock jobs if the run is waiting for the lock or terminating,
                                 # but allow retrying jobs whose own lock is stale because
-                                # the run pipeline cannot reclaim stale job locks.
-                                RunModel.lock_owner.is_(None),
+                                # the run pipeline cannot reclaim stale job locks, and allow jobs with
+                                # skip_min_processing_interval set to speed up provisioning.
+                                or_(
+                                    RunModel.lock_owner.is_(None),
+                                    JobModel.skip_min_processing_interval == True,
+                                ),
                                 RunModel.status.not_in([RunStatus.TERMINATING]),
                                 JobModel.lock_expires_at.is_(None),
                             ),
@@ -252,6 +257,7 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                             JobModel.lock_expires_at,
                             JobModel.status,
                             JobModel.replica_num,
+                            JobModel.skip_min_processing_interval,
                         )
                     )
                 )
@@ -264,6 +270,7 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                     job_model.lock_expires_at = lock_expires_at
                     job_model.lock_token = lock_token
                     job_model.lock_owner = JobRunningPipeline.__name__
+                    job_model.skip_min_processing_interval = False
                     items.append(
                         JobRunningPipelineItem(
                             __tablename__=JobModel.__tablename__,
@@ -339,6 +346,7 @@ class _JobUpdateMap(ItemUpdateMap, total=False):
     exit_status: Optional[int]
     registered: bool
     image_pull_progress: Optional[str]
+    skip_min_processing_interval: bool
 
 
 @dataclass
@@ -643,6 +651,7 @@ async def _process_provisioning_status(
         )
         if success:
             _set_job_status(context.job_model, result, JobStatus.PULLING)
+            result.job_update_map["skip_min_processing_interval"] = True
             return
     else:
         logger.debug(
