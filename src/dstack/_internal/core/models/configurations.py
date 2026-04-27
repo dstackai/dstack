@@ -222,10 +222,22 @@ class ScalingSpec(CoreModel):
         ),
     ]
     scale_up_delay: Annotated[
-        Duration, Field(description="The delay in seconds before scaling up")
+        Duration,
+        Field(
+            description=(
+                "The minimum time, in seconds, between a scaling event and the next scale-up decision."
+                " Used to prevent overly frequent scaling"
+            )
+        ),
     ] = Duration.parse("5m")
     scale_down_delay: Annotated[
-        Duration, Field(description="The delay in seconds before scaling down")
+        Duration,
+        Field(
+            description=(
+                "The minimum time, in seconds, between a scaling event and the next scale-down decision."
+                " Used to prevent overly frequent scaling"
+            )
+        ),
     ] = Duration.parse("10m")
 
 
