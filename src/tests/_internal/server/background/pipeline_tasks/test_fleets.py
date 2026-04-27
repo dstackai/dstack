@@ -23,9 +23,16 @@ from dstack._internal.server.background.pipeline_tasks.fleets import (
     FleetPipeline,
     FleetWorker,
 )
-from dstack._internal.server.models import EventModel, EventTargetModel, FleetModel, InstanceModel
+from dstack._internal.server.models import (
+    EventModel,
+    EventTargetModel,
+    ExportedFleetModel,
+    FleetModel,
+    InstanceModel,
+)
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_export,
     create_fleet,
     create_instance,
     create_placement_group,
@@ -1109,7 +1116,7 @@ class TestFleetWorker:
         assert instance2.status == InstanceStatus.BUSY
         assert fleet.consolidation_attempt == 3
 
-    async def test_marks_placement_groups_fleet_deleted_on_fleet_delete(
+    async def test_deletes_related_resources_on_fleet_delete(
         self, test_db, session: AsyncSession, worker: FleetWorker
     ):
         project = await create_project(session)
@@ -1130,6 +1137,12 @@ class TestFleetWorker:
             fleet=fleet,
             name="test-pg-2",
         )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[fleet],
+        )
 
         fleet.lock_token = uuid.uuid4()
         fleet.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
@@ -1143,6 +1156,8 @@ class TestFleetWorker:
         assert fleet.deleted
         assert placement_group1.fleet_deleted
         assert placement_group2.fleet_deleted
+        res = await session.execute(select(ExportedFleetModel))
+        assert len(res.scalars().all()) == 0
 
     async def test_consolidation_respects_retry_delay(
         self, test_db, session: AsyncSession, worker: FleetWorker
