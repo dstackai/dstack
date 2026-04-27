@@ -3,13 +3,21 @@ from unittest.mock import patch
 
 import pytest
 
+from dstack._internal.core.models.configurations import DEFAULT_SCALING_WINDOW
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, Stat
 from dstack._internal.server.services.services.autoscalers import BaseServiceScaler, RPSAutoscaler
 
 
 @pytest.fixture
 def rps_scaler():
-    return RPSAutoscaler(0, 5, 10, 5 * 60, 10 * 60)
+    return RPSAutoscaler(
+        min_replicas=0,
+        max_replicas=5,
+        target=10,
+        window=DEFAULT_SCALING_WINDOW,
+        scale_up_delay=5 * 60,
+        scale_down_delay=10 * 60,
+    )
 
 
 @pytest.fixture
@@ -21,7 +29,9 @@ def time():
 
 
 def stats(rps: float) -> PerWindowStats:
-    return {60: Stat(requests=int(rps * 60), request_time=0.1)}
+    return {
+        DEFAULT_SCALING_WINDOW: Stat(requests=int(rps * DEFAULT_SCALING_WINDOW), request_time=0.1)
+    }
 
 
 class TestRPSAutoscaler:
@@ -138,4 +148,23 @@ class TestRPSAutoscaler:
                 last_scaled_at=time - datetime.timedelta(seconds=3600),
             )
             == 0
+        )
+
+    @pytest.mark.parametrize("window,expected", [(30, 3), (60, 2), (300, 1)])
+    def test_window(self, window: int, expected: int, time: datetime.datetime) -> None:
+        stats: PerWindowStats = {
+            30: Stat(requests=900, request_time=0.1),  # 900 req / 30s = 30 rps → 3 replicas
+            60: Stat(requests=1200, request_time=0.1),  # 1200 req / 60s = 20 rps → 2 replicas
+            300: Stat(requests=1500, request_time=0.1),  # 1500 req / 300s = 5 rps → 1 replica
+        }
+        scaler = RPSAutoscaler(
+            min_replicas=0,
+            max_replicas=5,
+            target=10,
+            window=window,
+            scale_up_delay=5 * 60,
+            scale_down_delay=10 * 60,
+        )
+        assert (
+            scaler.get_desired_count(1, stats, time - datetime.timedelta(seconds=3600)) == expected
         )

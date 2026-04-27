@@ -40,6 +40,7 @@ from dstack._internal.core.models.volumes import (
     parse_volume_configuration,
 )
 from dstack._internal.core.services import is_valid_replica_group_name
+from dstack._internal.proxy.gateway.const import SERVICE_SCALING_WINDOWS
 from dstack._internal.utils.common import has_duplicates, list_enum_values_for_annotation
 from dstack._internal.utils.json_schema import add_extra_schema_types
 from dstack._internal.utils.json_utils import (
@@ -66,6 +67,9 @@ DEFAULT_PROBE_UNTIL_READY = False
 MAX_PROBE_URL_LEN = 2048
 DEFAULT_REPLICA_GROUP_NAME = "0"
 OPENAI_MODEL_PROBE_TIMEOUT = 30
+ALLOWED_SCALING_WINDOWS_DESCRIPTION = ", ".join(f"`{w}s`" for w in SERVICE_SCALING_WINDOWS)
+DEFAULT_SCALING_WINDOW = 60
+assert DEFAULT_SCALING_WINDOW in SERVICE_SCALING_WINDOWS
 
 
 class RunConfigurationType(str, Enum):
@@ -221,12 +225,28 @@ class ScalingSpec(CoreModel):
             gt=0,
         ),
     ]
+    window: Annotated[
+        Optional[Duration],
+        Field(
+            description=(
+                "The time window used to calculate requests per second."
+                f" Allowed values: {ALLOWED_SCALING_WINDOWS_DESCRIPTION}."
+                f" Defaults to `{DEFAULT_SCALING_WINDOW}s`"
+            ),
+        ),
+    ] = None
     scale_up_delay: Annotated[
         Duration, Field(description="The delay in seconds before scaling up")
     ] = Duration.parse("5m")
     scale_down_delay: Annotated[
         Duration, Field(description="The delay in seconds before scaling down")
     ] = Duration.parse("10m")
+
+    @validator("window")
+    def validate_window(cls, v: Optional[Duration]) -> Optional[Duration]:
+        if v is not None and v not in SERVICE_SCALING_WINDOWS:
+            raise ValueError(f"Window must be one of: {ALLOWED_SCALING_WINDOWS_DESCRIPTION}")
+        return v
 
 
 class IPAddressPartitioningKey(CoreModel):
