@@ -283,6 +283,11 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
             instance_model=instance_model,
             result=result,
         )
+        if (
+            result.instance_update_map is not None
+            and result.instance_update_map.get("status") == InstanceStatus.TERMINATING
+        ):
+            self._pipeline_hinter.hint_fetch(InstanceModel.__name__)
         # TODO: Hint RunPipeline to quickly move run to TERMINATED.
         # Currently not implemented since it also requires making run eligible for processing.
         # (This pipeline cannot modify runs so it's not simple).
@@ -305,6 +310,7 @@ class _InstanceUpdateMap(ItemUpdateMap, total=False):
     termination_reason_message: Optional[str]
     busy_blocks: int
     last_job_processed_at: UpdateMapDateTime
+    skip_min_processing_interval: bool
 
 
 class _VolumeUpdateRow(TypedDict):
@@ -637,7 +643,9 @@ async def _process_terminating_job(
         # Placeholder has no VM and no provisioning data. Skip graceful stop,
         # container stop, and volume detach.
         instance_update_map = get_or_error(result.instance_update_map)
-        instance_update_map["status"] = InstanceStatus.TERMINATING
+        if instance_model.status != InstanceStatus.TERMINATING:
+            instance_update_map["status"] = InstanceStatus.TERMINATING
+            instance_update_map["skip_min_processing_interval"] = True
         instance_update_map["termination_reason"] = InstanceTerminationReason.JOB_FINISHED
         result.job_update_map["instance_id"] = None
         await _unregister_replica_and_update_result(result=result, job_model=job_model)
@@ -682,7 +690,9 @@ async def _process_terminating_job(
     if instance_model.status != InstanceStatus.BUSY or jpd is None or not jpd.dockerized:
         if instance_model.status not in InstanceStatus.finished_statuses():
             instance_update_map["termination_reason"] = InstanceTerminationReason.JOB_FINISHED
-            instance_update_map["status"] = InstanceStatus.TERMINATING
+            if instance_model.status != InstanceStatus.TERMINATING:
+                instance_update_map["status"] = InstanceStatus.TERMINATING
+                instance_update_map["skip_min_processing_interval"] = True
     elif not [j for j in instance_model.jobs if j.id != job_model.id]:
         instance_update_map["status"] = InstanceStatus.IDLE
 

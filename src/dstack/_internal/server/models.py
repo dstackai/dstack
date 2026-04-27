@@ -747,6 +747,9 @@ class InstanceModel(PipelineModelMixin, BaseModel):
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
     )
+    skip_min_processing_interval: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
