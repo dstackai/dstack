@@ -727,6 +727,7 @@ async def stop_runs(
             switch_run_status(
                 session, run_model, RunStatus.TERMINATING, actor=events.UserActor.from_user(user)
             )
+            run_model.skip_min_processing_interval = True
             # The run will be terminated by RunPipeline.
         await session.commit()
     if pipeline_hinter is not None:

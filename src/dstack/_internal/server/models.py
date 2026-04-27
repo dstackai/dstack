@@ -428,6 +428,9 @@ class RunModel(PipelineModelMixin, BaseModel):
     run_name: Mapped[str] = mapped_column(String(100))
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    skip_min_processing_interval: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     next_triggered_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     status: Mapped[RunStatus] = mapped_column(EnumAsString(RunStatus, 100), index=True)
     """`status` must be changed only via `switch_run_status()`."""

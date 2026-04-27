@@ -185,6 +185,7 @@ class RunFetcher(Fetcher[RunPipelineItem]):
                                 <= now - self._min_processing_interval * 2,
                             ),
                             RunModel.last_processed_at == RunModel.submitted_at,
+                            RunModel.skip_min_processing_interval == True,
                         ),
                         or_(
                             RunModel.lock_expires_at.is_(None),
@@ -204,6 +205,7 @@ class RunFetcher(Fetcher[RunPipelineItem]):
                             RunModel.lock_token,
                             RunModel.lock_expires_at,
                             RunModel.status,
+                            RunModel.skip_min_processing_interval,
                         )
                     )
                 )
@@ -216,6 +218,7 @@ class RunFetcher(Fetcher[RunPipelineItem]):
                     run_model.lock_expires_at = lock_expires_at
                     run_model.lock_token = lock_token
                     run_model.lock_owner = RunPipeline.__name__
+                    run_model.skip_min_processing_interval = False
                     items.append(
                         RunPipelineItem(
                             __tablename__=RunModel.__tablename__,
