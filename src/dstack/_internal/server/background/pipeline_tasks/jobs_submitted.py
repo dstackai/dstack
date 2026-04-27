@@ -328,6 +328,7 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
                 item=item,
                 provisioning=provisioning,
             )
+            self._pipeline_hinter.hint_fetch(JobModel.__name__)
             return
 
         logger.debug("%s: assignment has started", fmt(context.job_model))

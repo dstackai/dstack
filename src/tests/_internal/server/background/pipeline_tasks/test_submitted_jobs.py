@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from datetime import timedelta
 from typing import cast
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 from sqlalchemy import select
@@ -652,7 +652,7 @@ class TestJobSubmittedWorker:
         assert job.lock_token is None
         assert job.lock_expires_at is None
         hint_fetch = cast(Mock, worker._pipeline_hinter.hint_fetch)
-        hint_fetch.assert_called_once_with(FleetModel.__name__)
+        hint_fetch.assert_has_calls([call(FleetModel.__name__), call(JobModel.__name__)])
 
     async def test_provisioning_non_master_job_ignores_cluster_master_fleet_lock(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker

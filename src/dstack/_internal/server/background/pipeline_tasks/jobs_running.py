@@ -231,8 +231,12 @@ class JobRunningFetcher(Fetcher[JobRunningPipelineItem]):
                             and_(
                                 # Do not try to lock jobs if the run is waiting for the lock or terminating,
                                 # but allow retrying jobs whose own lock is stale because
-                                # the run pipeline cannot reclaim stale job locks.
-                                RunModel.lock_owner.is_(None),
+                                # the run pipeline cannot reclaim stale job locks, and allow jobs with
+                                # skip_min_processing_interval set to speed up provisioning.
+                                or_(
+                                    RunModel.lock_owner.is_(None),
+                                    JobModel.skip_min_processing_interval == True,
+                                ),
                                 RunModel.status.not_in([RunStatus.TERMINATING]),
                                 JobModel.lock_expires_at.is_(None),
                             ),
