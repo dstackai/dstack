@@ -754,6 +754,7 @@ async def delete_fleets(
     user: UserModel,
     names: List[str],
     instance_nums: Optional[List[int]] = None,
+    pipeline_hinter: Optional[PipelineHinterProtocol] = None,
 ):
     res = await session.execute(
         select(FleetModel.id)
@@ -856,9 +857,13 @@ async def delete_fleets(
             logger.info(
                 "Deleting fleets %s instances %s", [f.name for f in fleet_models], instance_nums
             )
+        hint_instance_pipeline = False
         for fleet_model in fleet_models:
-            _terminate_fleet_instances(
-                session=session, fleet_model=fleet_model, instance_nums=instance_nums, actor=user
+            hint_instance_pipeline |= _terminate_fleet_instances(
+                session=session,
+                fleet_model=fleet_model,
+                instance_nums=instance_nums,
+                actor=user,
             )
             # TERMINATING fleets are deleted by FleetPipeline after instances are terminated
             if instance_nums is None:
@@ -869,6 +874,8 @@ async def delete_fleets(
                     actor=events.UserActor.from_user(user),
                 )
         await session.commit()
+    if hint_instance_pipeline and pipeline_hinter is not None:
+        pipeline_hinter.hint_fetch(InstanceModel.__name__)
 
 
 def fleet_model_to_fleet(
@@ -1431,7 +1438,8 @@ def _terminate_fleet_instances(
     fleet_model: FleetModel,
     instance_nums: Optional[List[int]],
     actor: UserModel,
-):
+) -> bool:
+    hint_instance_pipeline = False
     if is_fleet_in_use(fleet_model, instance_nums=instance_nums):
         if instance_nums is not None:
             raise ServerClientError(
@@ -1447,9 +1455,13 @@ def _terminate_fleet_instances(
             instance.deleted = True
         else:
             instance.termination_reason = InstanceTerminationReason.TERMINATED_BY_USER
+            if instance.status != InstanceStatus.TERMINATING:
+                instance.skip_min_processing_interval = True
+                hint_instance_pipeline = True
             switch_instance_status(
                 session,
                 instance,
                 InstanceStatus.TERMINATING,
                 actor=events.UserActor.from_user(actor),
             )
+    return hint_instance_pipeline
