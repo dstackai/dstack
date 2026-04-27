@@ -318,6 +318,7 @@ class _ProcessResult:
     volume_update_rows: list[_VolumeUpdateRow] = field(default_factory=list)
     detached_volume_ids: set[uuid.UUID] = field(default_factory=set)
     unassign_event_message: Optional[str] = None
+    graceful_stop_event_message: Optional[str] = None
     replica_unregistration: Optional[_UnregisterReplicaResult] = (
         None  # None = not unregistered yet
     )
@@ -567,6 +568,14 @@ async def _apply_process_result(
                 ],
             )
 
+        if result.graceful_stop_event_message is not None and instance_model is not None:
+            events.emit(
+                session,
+                result.graceful_stop_event_message,
+                actor=events.SystemActor(),
+                targets=[events.Target.from_model(job_model)],
+            )
+
         if result.replica_unregistration is not None:
             targets = [events.Target.from_model(job_model)]
             if result.replica_unregistration.gateway_target is not None:
@@ -631,6 +640,7 @@ async def _process_terminating_job(
 
     if job_model.graceful_termination_attempts == 0 and job_model.remove_at is None:
         result.job_update_map = await _stop_job_gracefully(job_model, instance_model)
+        result.graceful_stop_event_message = "Graceful job stop requested"
         return result
 
     jrd = get_job_runtime_data(job_model)

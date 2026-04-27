@@ -289,6 +289,9 @@ class TestJobTerminatingWorker:
         assert instance.lock_expires_at is None
         assert instance.lock_owner is None
 
+        events = await list_events(session)
+        assert any(event.message == "Graceful job stop requested" for event in events)
+
     async def test_terminates_gracefully_stopped_job_after_remove_at(
         self, test_db, session: AsyncSession, worker: JobTerminatingWorker
     ):
