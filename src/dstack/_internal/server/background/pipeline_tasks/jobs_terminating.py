@@ -283,6 +283,9 @@ class JobTerminatingWorker(Worker[JobTerminatingPipelineItem]):
             instance_model=instance_model,
             result=result,
         )
+        # TODO: Hint RunPipeline to quickly move run to TERMINATED.
+        # Currently not implemented since it also requires making run eligible for processing.
+        # (This pipeline cannot modify runs so it's not simple).
 
 
 class _JobUpdateMap(ItemUpdateMap, total=False):
