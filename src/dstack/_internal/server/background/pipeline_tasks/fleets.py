@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Optional, Sequence, TypedDict
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
@@ -33,6 +33,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
+    ExportedFleetModel,
     FleetModel,
     InstanceModel,
     JobModel,
@@ -488,6 +489,11 @@ async def _apply_process_result(
                 update(PlacementGroupModel)
                 .where(PlacementGroupModel.fleet_id == context.fleet_model.id)
                 .values(fleet_deleted=True)
+            )
+            await session.execute(
+                delete(ExportedFleetModel).where(
+                    ExportedFleetModel.fleet_id == context.fleet_model.id
+                )
             )
         if instance_update_rows:
             await session.execute(

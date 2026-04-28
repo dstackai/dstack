@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.models import MemberModel, ProjectModel
+from dstack._internal.server.models import ExportModel, ImportModel, MemberModel, ProjectModel
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
@@ -1366,6 +1366,63 @@ class TestDeleteProject:
         assert response.status_code == 200
         res = await session.execute(select(ProjectModel).where(ProjectModel.deleted.is_(False)))
         assert len(res.all()) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_deletes_export_models_on_project_delete(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session=session, owner=user)
+        fleet = await create_fleet(session=session, project=project, deleted=True)
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[fleet],
+        )
+
+        res = await session.execute(select(ExportModel))
+        assert len(res.scalars().all()) == 1
+
+        response = await client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project.name]},
+        )
+        assert response.status_code == 200
+
+        res = await session.execute(select(ExportModel))
+        assert len(res.scalars().all()) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_deletes_import_models_on_project_delete(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        exporter_project = await create_project(session=session, owner=user, name="exporter")
+        importer_project = await create_project(session=session, owner=user, name="importer")
+        fleet = await create_fleet(session=session, project=exporter_project, deleted=True)
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[fleet],
+        )
+
+        res = await session.execute(select(ImportModel))
+        assert len(res.scalars().all()) == 1
+
+        response = await client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [importer_project.name]},
+        )
+        assert response.status_code == 200
+
+        res = await session.execute(select(ImportModel))
+        assert len(res.scalars().all()) == 0
 
 
 class TestGetProject:

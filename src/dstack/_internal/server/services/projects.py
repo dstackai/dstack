@@ -27,7 +27,9 @@ from dstack._internal.core.models.projects import (
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import (
+    ExportModel,
     FleetModel,
+    ImportModel,
     MemberModel,
     ProjectModel,
     RunModel,
@@ -272,6 +274,7 @@ async def delete_projects(
         # so there can be dangling active resources due to race conditions.
         await _check_project_has_active_resources(session=session, project_id=p.id)
 
+    project_ids = {p.id for p in projects}
     timestamp = str(int(get_current_datetime().timestamp()))
     updates = []
     for p in projects:
@@ -290,6 +293,8 @@ async def delete_projects(
             targets=[events.Target.from_model(p)],
         )
     await session.execute(update(ProjectModel), updates)
+    await session.execute(delete(ExportModel).where(ExportModel.project_id.in_(project_ids)))
+    await session.execute(delete(ImportModel).where(ImportModel.project_id.in_(project_ids)))
     await session.commit()
 
 
