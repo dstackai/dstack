@@ -1,5 +1,6 @@
 import itertools
 import json
+from collections.abc import Mapping
 from datetime import timedelta
 from typing import Dict, Iterable, List, Optional, Tuple
 from uuid import UUID
@@ -27,6 +28,7 @@ from dstack._internal.core.models.runs import (
     JobStatus,
     JobSubmission,
     JobTerminationReason,
+    RegistryAuth,
     RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume, VolumeMountPoint, VolumeStatus
@@ -62,6 +64,7 @@ from dstack._internal.server.services.sshproxy import (
 )
 from dstack._internal.utils import common
 from dstack._internal.utils.common import run_async
+from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import build_ssh_command, build_ssh_url_authority
 
@@ -164,6 +167,16 @@ async def get_job_specs_from_run_spec(
     )
     job_specs = await job_configurator.get_job_specs(replica_num=replica_num)
     return job_specs
+
+
+def interpolate_job_spec_secrets(job_spec: JobSpec, secrets: Mapping[str, str]) -> None:
+    interpolate = VariablesInterpolator({"secrets": secrets}).interpolate_or_error
+    job_spec.env = {k: interpolate(v) for k, v in job_spec.env.items()}
+    if job_spec.registry_auth is not None:
+        job_spec.registry_auth = RegistryAuth(
+            username=interpolate(job_spec.registry_auth.username),
+            password=interpolate(job_spec.registry_auth.password),
+        )
 
 
 def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:

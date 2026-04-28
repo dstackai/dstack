@@ -86,6 +86,7 @@ from dstack._internal.server.services.jobs import (
     get_job_attached_volumes,
     get_job_runtime_data,
     get_job_spec,
+    interpolate_job_spec_secrets,
     is_master_job,
     job_model_to_job_submission,
 )
@@ -105,7 +106,7 @@ from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
-from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
+from dstack._internal.utils.interpolator import InterpolatorError
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -504,7 +505,7 @@ async def _prepare_startup_context(
     ).repo_creds
 
     try:
-        _interpolate_secrets(secrets, context.job.job_spec)
+        interpolate_job_spec_secrets(context.job.job_spec, secrets)
     except InterpolatorError as e:
         _terminate_job(
             job_model=context.job_model,
@@ -1665,16 +1666,6 @@ async def _get_job_file_archive(archive_id: uuid.UUID, user: UserModel) -> bytes
         logger.error("Failed to get file archive %s from storage", archive_id)
         return b""
     return blob
-
-
-def _interpolate_secrets(secrets: Dict[str, str], job_spec: JobSpec) -> None:
-    interpolate = VariablesInterpolator({"secrets": secrets}).interpolate_or_error
-    job_spec.env = {k: interpolate(v) for k, v in job_spec.env.items()}
-    if job_spec.registry_auth is not None:
-        job_spec.registry_auth = RegistryAuth(
-            username=interpolate(job_spec.registry_auth.username),
-            password=interpolate(job_spec.registry_auth.password),
-        )
 
 
 def _emit_reachability_change_event(
