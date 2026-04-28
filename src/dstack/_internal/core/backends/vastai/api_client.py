@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
-import dstack._internal.server.services.docker as docker
+import dstack._internal.utils.docker as docker
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.common import RegistryAuth

@@ -7,7 +7,8 @@ from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.server.schemas.runner import GPUDevice
-from dstack._internal.server.services.docker import apply_server_docker_defaults, parse_image_name
+from dstack._internal.server.services.docker import apply_server_docker_defaults
+from dstack._internal.utils.docker import parse_image_name
 
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types
 _AWS_EFA_ENABLED_INSTANCE_TYPE_PATTERNS = [

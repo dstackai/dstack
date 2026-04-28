@@ -1,4 +1,6 @@
+import base64
 import dataclasses
+import json
 import re
 from collections.abc import Mapping
 from decimal import Decimal
@@ -26,6 +28,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.resources import CPUSpec, GPUSpec, Memory
 from dstack._internal.core.models.runs import Requirements
+from dstack._internal.utils import docker as docker_utils
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
@@ -177,6 +180,21 @@ def validate_label_value(value: str) -> None:
 
 def format_dstack_label_key(name: str) -> str:
     return f"k8s.dstack.ai/{name}"
+
+
+def build_dockerconfigjson(image_name: str, username: str, password: str) -> str:
+    registry = docker_utils.parse_image_name(image_name).registry
+    if registry is None or docker_utils.is_default_registry(registry):
+        # https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+        # > Use https://index.docker.io/v1/ for DockerHub
+        registry = "https://index.docker.io/v1/"
+    auth = base64.b64encode(f"{username}:{password}".encode()).decode()
+    entry = {
+        "username": username,
+        "password": password,
+        "auth": auth,
+    }
+    return json.dumps({"auths": {registry: entry}})
 
 
 parse_quantity = cast(
