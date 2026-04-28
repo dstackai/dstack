@@ -35,9 +35,9 @@ func mainInner() int {
 	var args shim.CLIArgs
 	var serviceMode bool
 
-	const defaultLogLevel = int(logrus.InfoLevel)
+	const defaultLogLevel = logrus.InfoLevel
 
-	log.DefaultEntry.Logger.SetLevel(logrus.Level(defaultLogLevel))
+	log.DefaultEntry.Logger.SetLevel(defaultLogLevel)
 	log.DefaultEntry.Logger.SetOutput(os.Stderr)
 
 	shimBinaryPath, err := os.Executable()
@@ -74,10 +74,10 @@ func mainInner() int {
 				Destination: &args.Shim.HTTPPort,
 				Sources:     cli.EnvVars("DSTACK_SHIM_HTTP_PORT"),
 			},
-			&cli.IntFlag{
+			&cli.StringFlag{
 				Name:        "shim-log-level",
 				Usage:       "Set shim's log level",
-				Value:       defaultLogLevel,
+				Value:       defaultLogLevel.String(),
 				Destination: &args.Shim.LogLevel,
 				Sources:     cli.EnvVars("DSTACK_SHIM_LOG_LEVEL"),
 			},
@@ -110,10 +110,16 @@ func mainInner() int {
 				Destination: &args.Runner.SSHPort,
 				Sources:     cli.EnvVars("DSTACK_RUNNER_SSH_PORT"),
 			},
-			&cli.IntFlag{
+			&cli.StringFlag{
+				Name:        "runner-ssh-log-level",
+				Usage:       "Set runner's ssh log level",
+				Destination: &args.Runner.SSHLogLevel,
+				Sources:     cli.EnvVars("DSTACK_RUNNER_SSH_LOG_LEVEL"),
+			},
+			&cli.StringFlag{
 				Name:        "runner-log-level",
 				Usage:       "Set runner's log level",
-				Value:       defaultLogLevel,
+				Value:       defaultLogLevel.String(),
 				Destination: &args.Runner.LogLevel,
 				Sources:     cli.EnvVars("DSTACK_RUNNER_LOG_LEVEL"),
 			},
@@ -178,7 +184,15 @@ func mainInner() int {
 }
 
 func start(ctx context.Context, args shim.CLIArgs, serviceMode bool) (err error) {
-	log.DefaultEntry.Logger.SetLevel(logrus.Level(args.Shim.LogLevel))
+	_, err = log.ParseLevel(args.Runner.LogLevel)
+	if err != nil {
+		return err
+	}
+	logLevel, err := log.ParseLevel(args.Shim.LogLevel)
+	if err != nil {
+		return err
+	}
+	log.DefaultEntry.Logger.SetLevel(logrus.Level(logLevel))
 	log.Info(ctx, "Starting dstack-shim", "version", Version)
 
 	shimHomeDir := args.Shim.HomeDir

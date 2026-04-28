@@ -27,6 +27,26 @@ func NewEntry(out io.Writer, level int) *logrus.Entry {
 
 var DefaultEntry = NewEntry(os.Stderr, int(logrus.InfoLevel))
 
+// ParseLevel accepts the following values:
+// * fatal, error, warn(ing), info, debug, trace, in any letter case
+// * any digit in a range from 1 (fatal) to 6 (trace)
+func ParseLevel(lvl string) (int, error) {
+	var level int
+	if len(lvl) == 1 && lvl[0] >= '0' && lvl[0] <= '9' {
+		level = int(lvl[0] - 48)
+	} else {
+		logrusLevel, err := logrus.ParseLevel(lvl)
+		if err != nil {
+			return 0, fmt.Errorf("invalid log level: %s", lvl)
+		}
+		level = int(logrusLevel)
+	}
+	if level < 1 || level > 6 {
+		return 0, fmt.Errorf("invalid log level: %s", lvl)
+	}
+	return level, nil
+}
+
 func Fatal(ctx context.Context, msg string, args ...interface{}) {
 	logger := AppendArgs(GetLogger(ctx), args...)
 	logger.Fatal(msg)
