@@ -9,15 +9,15 @@ from typing import Iterable, Optional, TextIO
 
 from pydantic import BaseModel
 
+from dstack._internal.proxy.gateway.const import SERVICE_SCALING_WINDOWS
 from dstack._internal.proxy.gateway.repo.repo import GatewayProxyRepo
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, ServiceStats, Stat
 from dstack._internal.proxy.lib.errors import UnexpectedProxyError
 from dstack._internal.utils.common import run_async
 
 logger = logging.getLogger(__name__)
-WINDOWS = (30, 60, 300)
-TTL = WINDOWS[-1]
-EMPTY_STATS = {window: Stat(requests=0, request_time=0.0) for window in WINDOWS}
+TTL = max(SERVICE_SCALING_WINDOWS)
+EMPTY_STATS = {window: Stat(requests=0, request_time=0.0) for window in SERVICE_SCALING_WINDOWS}
 
 
 class StatFrame(BaseModel):
@@ -67,7 +67,7 @@ class StatsCollector:
         Aggregate 1s `frames` into windows 30s, 1m, 5m before `now`
         """
         result = {}
-        for window in WINDOWS:
+        for window in SERVICE_SCALING_WINDOWS:
             req_count = 0
             req_time_total = 0.0
             for frame in reversed(frames):

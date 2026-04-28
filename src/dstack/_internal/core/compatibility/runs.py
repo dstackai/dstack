@@ -102,8 +102,18 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
             configuration_excludes["https"] = True
 
         replicas = run_spec.configuration.replicas
-        if isinstance(replicas, list) and all(g.router is None for g in replicas):
-            configuration_excludes["replicas"] = {"__all__": {"router": True}}
+        if isinstance(replicas, list):
+            replica_group_excludes: IncludeExcludeDictType = {}
+            if all(g.router is None for g in replicas):
+                replica_group_excludes["router"] = True
+            if all(g.scaling is None or g.scaling.window is None for g in replicas):
+                replica_group_excludes["scaling"] = {"window": True}
+            if replica_group_excludes:
+                configuration_excludes["replicas"] = {"__all__": replica_group_excludes}
+
+        scaling = run_spec.configuration.scaling
+        if scaling is not None and scaling.window is None:
+            configuration_excludes["scaling"] = {"window": True}
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes
