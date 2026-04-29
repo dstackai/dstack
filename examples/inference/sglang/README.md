@@ -138,7 +138,7 @@ enable tool calling, add `--tool-call-parser qwen3_coder` to the serve command.
 
 ### PD disaggregation
 
-To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html), use replicas groups: one for a router (for example, [SGLang Model Gateway](https://docs.sglang.io/advanced_features/sgl_model_gateway.html)), one for prefill workers, and one for decode workers.
+To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/pd_disaggregation.html), use replica groups: one for [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html), one for prefill workers, and one for decode workers.
 
 === "NVIDIA"
 
