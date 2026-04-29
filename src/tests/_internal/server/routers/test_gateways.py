@@ -10,6 +10,7 @@ from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     clear_events,
     create_backend,
+    create_export,
     create_gateway,
     create_gateway_compute,
     create_project,
@@ -53,6 +54,7 @@ class TestListAndGetGateways:
         assert response.json() == [
             {
                 "id": SomeUUID4Str(),
+                "project_name": project.name,
                 "backend": backend.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
@@ -107,6 +109,7 @@ class TestListAndGetGateways:
         assert response.status_code == 200
         assert response.json() == {
             "id": SomeUUID4Str(),
+            "project_name": project.name,
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": False,
@@ -147,6 +150,181 @@ class TestListAndGetGateways:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_list_returns_imported_gateway_with_include_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            name="exported-gateway",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/gateways/list",
+            headers=get_auth_headers(importer_user.token),
+            json={"include_imported": True},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 1
+        assert response_json[0]["name"] == "exported-gateway"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_list_not_returns_imported_gateway_without_include_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            name="exported-gateway",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/gateways/list",
+            headers=get_auth_headers(importer_user.token),
+            json={},
+        )
+        assert response.status_code == 200
+        assert response.json() == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_get_returns_imported_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            name="exported-gateway",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/gateways/get",
+            headers=get_auth_headers(importer_user.token),
+            json={"name": "exported-gateway"},
+        )
+        assert response.status_code == 200
+        assert response.json()["name"] == "exported-gateway"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_get_returns_403_on_foreign_gateway_if_not_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        not_importer_user = await create_user(
+            session, name="not-importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        not_importer_project = await create_project(
+            session, name="not-importer-project", owner=not_importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=not_importer_project,
+            user=not_importer_user,
+            project_role=ProjectRole.USER,
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            name="exported-gateway",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/gateways/get",
+            headers=get_auth_headers(not_importer_user.token),
+            json={"name": "exported-gateway"},
+        )
+        assert response.status_code == 403
 
 
 class TestCreateGateway:
@@ -190,6 +368,7 @@ class TestCreateGateway:
         assert response.status_code == 200
         assert response.json() == {
             "id": SomeUUID4Str(),
+            "project_name": project.name,
             "name": "test",
             "backend": "aws",
             "region": "us",
@@ -247,6 +426,7 @@ class TestCreateGateway:
         assert response.status_code == 200
         assert response.json() == {
             "id": SomeUUID4Str(),
+            "project_name": project.name,
             "name": "random-name",
             "backend": "aws",
             "region": "us",
@@ -355,6 +535,7 @@ class TestDefaultGateway:
         assert response.status_code == 200
         assert response.json() == {
             "id": SomeUUID4Str(),
+            "project_name": project.name,
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": True,
@@ -431,6 +612,45 @@ class TestDefaultGateway:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_importer_member_cannot_set_default_imported_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            name="exported-gateway",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/gateways/set_default",
+            headers=get_auth_headers(importer_user.token),
+            json={"name": gateway.name},
+        )
+        assert response.status_code == 403
 
 
 class TestDeleteGateway:
@@ -515,6 +735,45 @@ class TestDeleteGateway:
         assert {e.targets[0].entity_name for e in events} == {"gateway-aws", "gateway-gcp"}
         assert all(e.actor_user_id == user.id for e in events)
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_importer_member_cannot_delete_imported_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            name="exported-gateway",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/gateways/delete",
+            headers=get_auth_headers(importer_user.token),
+            json={"names": [gateway.name]},
+        )
+        assert response.status_code == 403
+
 
 class TestUpdateGateway:
     @pytest.mark.asyncio
@@ -561,6 +820,7 @@ class TestUpdateGateway:
         assert response.status_code == 200
         assert response.json() == {
             "id": SomeUUID4Str(),
+            "project_name": project.name,
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "status": "submitted",
@@ -608,3 +868,42 @@ class TestUpdateGateway:
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_importer_member_cannot_set_wildcard_domain_on_imported_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(session, name="exporter-project")
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.ADMIN,
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            name="exported-gateway",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/gateways/set_wildcard_domain",
+            headers=get_auth_headers(importer_user.token),
+            json={"name": gateway.name, "wildcard_domain": "new.example"},
+        )
+        assert response.status_code == 403
