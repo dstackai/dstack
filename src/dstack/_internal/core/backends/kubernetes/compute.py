@@ -255,6 +255,7 @@ class KubernetesCompute(
             else:
                 assert False, f"unexpected mount point: {mount_point!r}"
         for volume in volumes:
+            assert isinstance(volume.configuration, KubernetesVolumeConfiguration)
             pvc_name = volume.volume_id
             assert pvc_name is not None, f"missing PVC name: {volume!r}"
             mount_path = volume_name_path_map.get(volume.name)
@@ -265,7 +266,6 @@ class KubernetesCompute(
                     name=volume_name,
                     persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
                         claim_name=pvc_name,
-                        read_only=False,
                     ),
                 ),
             )
@@ -273,6 +273,8 @@ class KubernetesCompute(
                 client.V1VolumeMount(
                     name=volume_name,
                     mount_path=mount_path,
+                    read_only=volume.configuration.read_only,
+                    recursive_read_only="IfPossible" if volume.configuration.read_only else None,
                 )
             )
 
