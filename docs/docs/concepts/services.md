@@ -365,9 +365,10 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
       - count: 1
         # For now replica group with router must have count: 1
         commands:
-          - pip install sglang_router
+          - pip install smg
           - |
-            python -m sglang_router.launch_router \
+            smg launch \
+              --host 0.0.0.0 \
               --port 8000 \
               --pd-disaggregation \
               --prefill-policy cache_aware

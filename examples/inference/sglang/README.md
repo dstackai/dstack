@@ -157,9 +157,9 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
       - count: 1
         # For now replica group with router must have count: 1
         commands:
-          - pip install sglang_router
+          - pip install smg
           - |
-            python -m sglang_router.launch_router \
+            smg launch \
               --host 0.0.0.0 \
               --port 8000 \
               --pd-disaggregation \
