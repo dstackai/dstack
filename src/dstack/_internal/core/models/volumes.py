@@ -165,6 +165,9 @@ class KubernetesVolumeConfiguration(BaseVolumeConfiguration):
         list[str],
         Field(description="A list of accepted access modes. Ignored if `claim_name` is set"),
     ] = ["ReadWriteOnce"]
+    read_only: Annotated[
+        bool, Field(description="If `true`, enforces the volume to be mounted as read-only")
+    ] = False
 
     @property
     def external_volume_id(self) -> Optional[str]:

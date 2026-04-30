@@ -1,5 +1,9 @@
 from dstack._internal.core.models.common import IncludeExcludeDictType
-from dstack._internal.core.models.volumes import AnyVolumeConfiguration, VolumeSpec
+from dstack._internal.core.models.volumes import (
+    AnyVolumeConfiguration,
+    KubernetesVolumeConfiguration,
+    VolumeSpec,
+)
 
 
 def get_volume_spec_excludes(volume_spec: VolumeSpec) -> IncludeExcludeDictType:
@@ -29,9 +33,7 @@ def _get_volume_configuration_excludes(
 ) -> IncludeExcludeDictType:
     configuration_excludes: IncludeExcludeDictType = {}
 
-    # Add excludes like this:
-    #
-    # if configuration.tags is None:
-    #     configuration_excludes["tags"] = True
+    if isinstance(configuration, KubernetesVolumeConfiguration) and not configuration.read_only:
+        configuration_excludes["read_only"] = True
 
     return configuration_excludes
