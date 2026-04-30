@@ -107,6 +107,7 @@ from dstack._internal.server.services.jobs import (
     get_job_configured_volumes,
     get_job_runtime_data,
     get_job_spec,
+    interpolate_job_spec_secrets,
     is_master_job,
     is_multinode_job,
     switch_job_status,
@@ -135,9 +136,11 @@ from dstack._internal.server.services.runs.plan import (
 from dstack._internal.server.services.runs.spec import (
     check_run_spec_requires_instance_mounts,
 )
+from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.utils import sentry_utils
 from dstack._internal.utils.common import get_current_datetime, get_or_error, run_async
+from dstack._internal.utils.interpolator import InterpolatorError
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -1335,6 +1338,8 @@ async def _process_new_capacity_provisioning(
         master_job_provisioning_data=master_provisioning_data,
         volumes=preconditions.prepared_job_volumes.volumes,
     )
+    if isinstance(provision_new_capacity_result, _TerminateSubmittedJobResult):
+        return provision_new_capacity_result
     if isinstance(provision_new_capacity_result, _FailedNewCapacityProvisioning):
         logger.debug("%s: provisioning failed", fmt(context.job_model))
         return _TerminateSubmittedJobResult(
@@ -2060,12 +2065,22 @@ async def _provision_new_capacity(
     project_ssh_private_key: str,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[list[list[Volume]]] = None,
-) -> Union[_FailedNewCapacityProvisioning, _ProvisionNewCapacityResult]:
+) -> Union[
+    _TerminateSubmittedJobResult, _FailedNewCapacityProvisioning, _ProvisionNewCapacityResult
+]:
+    secrets = await _load_project_secrets(project=project)
     jobs = copy.deepcopy(jobs)
     for job in jobs:
         job.job_spec.image_name, job.job_spec.registry_auth = apply_server_docker_defaults(
             job.job_spec.image_name, job.job_spec.registry_auth
         )
+        try:
+            interpolate_job_spec_secrets(job.job_spec, secrets)
+        except InterpolatorError as e:
+            return _TerminateSubmittedJobResult(
+                reason=JobTerminationReason.TERMINATED_BY_SERVER,
+                message=f"Secrets interpolation error: {e.args[0]}",
+            )
     job = jobs[0]
     if volumes is None:
         volumes = []
@@ -2226,6 +2241,11 @@ async def _provision_new_capacity(
             new_placement_group_models=new_placement_group_models,
         )
     )
+
+
+async def _load_project_secrets(project: ProjectModel) -> dict[str, str]:
+    async with get_session_ctx() as session:
+        return await get_project_secrets_mapping(session=session, project=project)
 
 
 async def _load_fleet_placement_group_models(fleet_id: uuid.UUID) -> list["PlacementGroupModel"]:

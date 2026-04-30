@@ -13,6 +13,7 @@ from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.placement import PlacementGroup
@@ -40,6 +41,8 @@ from dstack._internal.server.models import (
     PlacementGroupModel,
     VolumeAttachmentModel,
 )
+from dstack._internal.server.services.docker import ImageConfig
+from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.testing.common import (
     ComputeMockSpec,
     create_export,
@@ -50,6 +53,7 @@ from dstack._internal.server.testing.common import (
     create_project,
     create_repo,
     create_run,
+    create_secret,
     create_user,
     create_volume,
     get_compute_group_provisioning_data,
@@ -1872,6 +1876,125 @@ class TestJobSubmittedWorker:
             assert job_configuration.job.job_spec.registry_auth == RegistryAuth(
                 username="server-user", password="server-pass"
             )
+
+    async def test_interpolates_secrets_when_provisioning_new_capacity(
+        self,
+        test_db,
+        session: AsyncSession,
+        image_config_mock: ImageConfig,
+        worker: JobSubmittedWorker,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        await create_secret(session=session, project=project, name="token", value="s3cret")
+        await create_secret(
+            session=session, project=project, name="registry_user", value="docker-user"
+        )
+        await create_secret(
+            session=session, project=project, name="registry_pass", value="docker-pass"
+        )
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="ubuntu",
+                env=Env.parse_obj({"TOKEN": "${{ secrets.token }}"}),
+                registry_auth=RegistryAuth(
+                    username="${{ secrets.registry_user }}",
+                    password="${{ secrets.registry_pass }}",
+                ),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        with patch.object(JobConfigurator, "_get_image_config") as m:
+            m.return_value = image_config_mock
+            job = await create_job(session=session, run=run, instance_assigned=True)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
+                dockerized=False, backend=BackendType.RUNPOD
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        backend_mock.compute.return_value.run_job.assert_called_once()
+        submitted_job = backend_mock.compute.return_value.run_job.call_args[0][1]
+        assert submitted_job.job_spec.env == {"TOKEN": "s3cret"}
+        assert submitted_job.job_spec.registry_auth == RegistryAuth(
+            username="docker-user", password="docker-pass"
+        )
+        # The persisted JobModel keeps the unresolved literals so secrets aren't leaked.
+        await session.refresh(job)
+        assert "${{ secrets.token }}" in job.job_spec_data
+        assert "${{ secrets.registry_user }}" in job.job_spec_data
+        assert "${{ secrets.registry_pass }}" in job.job_spec_data
+
+    async def test_terminates_job_when_secret_is_missing(
+        self,
+        test_db,
+        session: AsyncSession,
+        image_config_mock: ImageConfig,
+        worker: JobSubmittedWorker,
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run_spec = get_run_spec(
+            run_name="test-run",
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="ubuntu",
+                registry_auth=RegistryAuth(
+                    username="registry_user",
+                    password="${{ secrets.registry_pass }}",
+                ),
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        with patch.object(JobConfigurator, "_get_image_config") as m:
+            m.return_value = image_config_mock
+            job = await create_job(session=session, run=run, instance_assigned=True)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.RUNPOD)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.RUNPOD
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.run_job.return_value = get_job_provisioning_data(
+                dockerized=False, backend=BackendType.RUNPOD
+            )
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
+        assert job.termination_reason_message is not None
+        assert "Secrets interpolation error" in job.termination_reason_message
+        backend_mock.compute.return_value.run_job.assert_not_called()
 
 
 @pytest.mark.asyncio
