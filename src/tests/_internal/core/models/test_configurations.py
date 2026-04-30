@@ -461,6 +461,172 @@ class TestReplicaGroupContainerFields:
                 }
             )
 
+    # ---- Cross-level conflicting image sources ----
+    # Validates `validate_no_conflicting_image_sources_across_levels`.
+
+    def test_service_image_conflicts_with_group_docker_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `image` conflicts with group-level `docker`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "image": "alpine",
+                    "replicas": [{"count": 1, "docker": True, "commands": ["x"]}],
+                }
+            )
+
+    def test_service_image_conflicts_with_group_python_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `image` conflicts with group-level `python`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "image": "alpine",
+                    "replicas": [{"count": 1, "python": "3.12", "commands": ["x"]}],
+                }
+            )
+
+    def test_service_image_conflicts_with_group_nvcc_rejected(self):
+        """Reviewer's exact example."""
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `image` conflicts with group-level `nvcc`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "image": "alpine",
+                    "replicas": [{"count": 1, "nvcc": True, "commands": ["x"]}],
+                }
+            )
+
+    def test_service_docker_conflicts_with_group_image_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `docker` conflicts with group-level `image`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "docker": True,
+                    "replicas": [{"count": 1, "image": "alpine", "commands": ["x"]}],
+                }
+            )
+
+    def test_service_docker_conflicts_with_group_python_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `docker` conflicts with group-level `python`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "docker": True,
+                    "replicas": [{"count": 1, "python": "3.12", "commands": ["x"]}],
+                }
+            )
+
+    def test_service_docker_conflicts_with_group_nvcc_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `docker` conflicts with group-level `nvcc`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "docker": True,
+                    "replicas": [{"count": 1, "nvcc": True, "commands": ["x"]}],
+                }
+            )
+
+    def test_service_python_conflicts_with_group_image_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `python` conflicts with group-level `image`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "python": "3.12",
+                    "replicas": [{"count": 1, "image": "alpine", "commands": ["x"]}],
+                }
+            )
+
+    def test_service_python_conflicts_with_group_docker_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `python` conflicts with group-level `docker`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "python": "3.12",
+                    "replicas": [{"count": 1, "docker": True, "commands": ["x"]}],
+                }
+            )
+
+    def test_service_nvcc_conflicts_with_group_image_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `nvcc` conflicts with group-level `image`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "nvcc": True,
+                    "replicas": [{"count": 1, "image": "alpine", "commands": ["x"]}],
+                }
+            )
+
+    def test_service_nvcc_conflicts_with_group_docker_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="Service-level `nvcc` conflicts with group-level `docker`",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "nvcc": True,
+                    "replicas": [{"count": 1, "docker": True, "commands": ["x"]}],
+                }
+            )
+
+    def test_service_python_with_group_nvcc_allowed(self):
+        """`python` and `nvcc` are compatible base-image knobs and may
+        coexist across levels."""
+        parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "python": "3.12",
+                "replicas": [{"count": 1, "nvcc": True, "commands": ["x"]}],
+            }
+        )
+
+    def test_service_nvcc_with_group_python_allowed(self):
+        parse_run_configuration(
+            {
+                "type": "service",
+                "port": 8000,
+                "nvcc": True,
+                "replicas": [{"count": 1, "python": "3.12", "commands": ["x"]}],
+            }
+        )
+
     def test_replica_group_with_only_image_no_commands_allowed(self):
         parse_run_configuration(
             {
@@ -470,28 +636,54 @@ class TestReplicaGroupContainerFields:
             }
         )
 
-    def test_replica_group_with_only_python_no_commands_allowed(self):
-        parse_run_configuration(
-            {
-                "type": "service",
-                "port": 8000,
-                "replicas": [{"count": 1, "python": "3.12"}],
-            }
-        )
+    def test_replica_group_with_only_python_no_commands_rejected(self):
+        """`python` configures the base image but doesn't supply a runnable
+        workload — must be paired with `commands` or `image`. Matches
+        service-level behavior."""
+        with pytest.raises(
+            ConfigurationError,
+            match="either `commands` or `image` must be set",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "replicas": [{"count": 1, "python": "3.12"}],
+                }
+            )
 
-    def test_replica_group_with_only_nvcc_no_commands_allowed(self):
-        parse_run_configuration(
-            {
-                "type": "service",
-                "port": 8000,
-                "replicas": [{"count": 1, "nvcc": True}],
-            }
-        )
+    def test_replica_group_with_only_nvcc_no_commands_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="either `commands` or `image` must be set",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "replicas": [{"count": 1, "nvcc": True}],
+                }
+            )
+
+    def test_replica_group_with_only_docker_no_commands_rejected(self):
+        """`docker: true` runs DIND but injects only `start-dockerd`;
+        without user commands the replica has no actual workload."""
+        with pytest.raises(
+            ConfigurationError,
+            match="either `commands` or `image` must be set",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "replicas": [{"count": 1, "docker": True}],
+                }
+            )
 
     def test_empty_replica_group_rejected(self):
         with pytest.raises(
             ConfigurationError,
-            match="has nothing to run",
+            match="either `commands` or `image` must be set",
         ):
             parse_run_configuration(
                 {

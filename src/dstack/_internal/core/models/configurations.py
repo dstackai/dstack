@@ -1147,7 +1147,7 @@ class ServiceConfigurationParams(CoreModel):
             (
                 "docker",
                 values.get("docker") is True,
-                lambda g: g.docker is True,
+                lambda g: g.docker is not None,
             ),
             (
                 "privileged",
@@ -1162,7 +1162,7 @@ class ServiceConfigurationParams(CoreModel):
             (
                 "nvcc",
                 values.get("nvcc") is True,
-                lambda g: g.nvcc is True,
+                lambda g: g.nvcc is not None,
             ),
         ]
 
@@ -1179,38 +1179,60 @@ class ServiceConfigurationParams(CoreModel):
         return values
 
     @root_validator()
+    def validate_no_conflicting_image_sources_across_levels(cls, values):
+        """
+        Image-source fields (`image`, `docker`, `python`, `nvcc`) cannot
+        be mixed across service and group levels in conflicting ways.
+        """
+        replicas = values.get("replicas")
+        if not isinstance(replicas, list):
+            return values
+
+        forbidden = [
+            ("image", values.get("image") is not None, "docker", lambda g: g.docker is not None),
+            ("image", values.get("image") is not None, "python", lambda g: g.python is not None),
+            ("image", values.get("image") is not None, "nvcc", lambda g: g.nvcc is not None),
+            ("docker", values.get("docker") is True, "image", lambda g: g.image is not None),
+            ("docker", values.get("docker") is True, "python", lambda g: g.python is not None),
+            ("docker", values.get("docker") is True, "nvcc", lambda g: g.nvcc is not None),
+            ("python", values.get("python") is not None, "image", lambda g: g.image is not None),
+            ("python", values.get("python") is not None, "docker", lambda g: g.docker is not None),
+            ("nvcc", values.get("nvcc") is True, "image", lambda g: g.image is not None),
+            ("nvcc", values.get("nvcc") is True, "docker", lambda g: g.docker is not None),
+        ]
+
+        for s_field, s_set, g_field, g_pred in forbidden:
+            if s_set:
+                conflicting = [g.name for g in replicas if g_pred(g)]
+                if conflicting:
+                    raise ValueError(
+                        f"Service-level `{s_field}` conflicts with group-level "
+                        f"`{g_field}` in replica group(s) {conflicting}. "
+                        f"These image-source fields are mutually exclusive."
+                    )
+        return values
+
+    @root_validator()
     def validate_replica_groups_have_commands_or_image(cls, values):
         """
         When replicas is a list, ensure each ReplicaGroup has something
-        to run. That means at least one of:
-          - group.commands
-          - group.image / group.docker / group.python / group.nvcc
-          - service-level image / docker / python / nvcc
+        to run. Mirrors the service-level rule: either explicit
+        `commands` or an `image` (group-level or service-level) is
+        required.
         """
         replicas = values.get("replicas")
 
         if not isinstance(replicas, list):
             return values
 
-        service_has_image_source = (
-            values.get("image") is not None
-            or values.get("docker") is True
-            or values.get("python") is not None
-            or values.get("nvcc") is True
-        )
+        service_has_image = values.get("image") is not None
 
         for group in replicas:
-            group_has_image_source = (
-                group.image is not None
-                or group.docker is True
-                or group.python is not None
-                or group.nvcc is True
-            )
-            if not group.commands and not group_has_image_source and not service_has_image_source:
+            if not group.commands and group.image is None and not service_has_image:
                 raise ValueError(
-                    f"Replica group '{group.name}' has nothing to run. "
-                    "Set `commands`, `image`, `docker`, `python`, or `nvcc` "
-                    "in the group, or set one of these at the service level."
+                    f"Replica group '{group.name}': either `commands` or "
+                    "`image` must be set in the group, or `image` at the "
+                    "service level."
                 )
 
         return values
