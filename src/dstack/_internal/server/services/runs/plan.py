@@ -832,7 +832,7 @@ def _get_job_plan(
     job_offers.extend(offer for _, offer in instance_offers)
     if profile.creation_policy == CreationPolicy.REUSE_OR_CREATE:
         job_offers.extend(offer for _, offer in backend_offers)
-    job_offers.sort(key=lambda offer: not offer.availability.is_available())
+    job_offers.sort(key=lambda offer: (not offer.availability.is_available(), offer.price))
     remove_job_spec_sensitive_info(job.job_spec)
     return JobPlan(
         job_spec=job.job_spec,
