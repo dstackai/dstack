@@ -165,6 +165,7 @@ class RunpodCompute(
             resp = self.api_client.create_cpu_pod(
                 name=pod_name,
                 image_name=job.job_spec.image_name,
+                container_registry_auth_id=container_registry_auth_id,
                 instance_id=instance_offer.instance.name,
                 cloud_type="SECURE",
                 deploy_cost=instance_offer.price,
@@ -193,6 +194,7 @@ class RunpodCompute(
             resp = self.api_client.create_pod(
                 name=pod_name,
                 image_name=job.job_spec.image_name,
+                container_registry_auth_id=container_registry_auth_id,
                 gpu_type_id=instance_offer.instance.name,
                 cloud_type=cloud_type,
                 data_center_id=data_center_id,
@@ -211,18 +213,6 @@ class RunpodCompute(
             )
 
         instance_id = resp["id"]
-
-        # Call edit_pod to pass container_registry_auth_id.
-        # Expect a long time (~5m) for the pod to pick up the creds.
-        # TODO: remove editPod once Runpod's create mutations support docker's username/password
-        # (or a reliable containerRegistryAuthId at create time).
-        if container_registry_auth_id is not None:
-            instance_id = self.api_client.edit_pod(
-                pod_id=instance_id,
-                image_name=job.job_spec.image_name,
-                container_disk_in_gb=disk_size,
-                container_registry_auth_id=container_registry_auth_id,
-            )
 
         if (
             self._last_cleanup_time is None
@@ -316,13 +306,15 @@ class RunpodCompute(
             env={"RUNPOD_POD_USER": "0"},
         )
 
-        # An "edit pod" trick to pass container registry creds.
+        # Unlike create mutations for individual pods, createCluster mutation doesn't accept
+        # containerRegistryAuthId.
+        # The workaround is to inject containerRegistryAuthId into already created pods.
+        # Expect a long time (~5m) for the pods to pick up the creds.
+        # TODO: remove once createCluster supports containerRegistryAuthId
         if container_registry_auth_id is not None:
             for pod in resp["pods"]:
-                self.api_client.edit_pod(
+                self.api_client.update_pod_container_registry_auth(
                     pod_id=pod["id"],
-                    image_name=master_job.job_spec.image_name,
-                    container_disk_in_gb=disk_size,
                     container_registry_auth_id=container_registry_auth_id,
                 )
 
