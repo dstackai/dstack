@@ -234,17 +234,6 @@ class Requirements(CoreModel):
         return res
 
 
-class Gateway(CoreModel):
-    gateway_name: Optional[str]
-    service_port: int
-    hostname: Optional[str]
-    public_port: int = 80
-    secure: bool = False
-
-    auth: bool = True
-    options: dict = {}
-
-
 class JobSSHKey(CoreModel):
     private: str
     public: str

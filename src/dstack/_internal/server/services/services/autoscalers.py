@@ -3,23 +3,10 @@ import math
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from pydantic import BaseModel
-
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.models.configurations import DEFAULT_SCALING_WINDOW, ScalingSpec
 from dstack._internal.core.models.resources import Range
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
-
-
-class ReplicaInfo(BaseModel):
-    """
-    Attributes:
-        active (bool): starting/running/retrying or downscaled
-        timestamp (datetime.datetime): `submitted_at` for active, `last_processed_at` for inactive
-    """
-
-    active: bool
-    timestamp: datetime.datetime
 
 
 class BaseServiceScaler(ABC):
