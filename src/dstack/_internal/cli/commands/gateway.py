@@ -17,6 +17,7 @@ from dstack._internal.cli.utils.gateway import (
     print_gateways_table,
 )
 from dstack._internal.core.errors import CLIError, ResourceNotExistsError
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 from dstack._internal.utils.logging import get_logger
@@ -67,7 +68,7 @@ class GatewayCommand(APIBaseCommand):
         )
         delete_parser.set_defaults(subfunc=self._delete)
         delete_parser.add_argument(
-            "name", help="The name of the gateway"
+            "name", type=EntityReference.parse, help="The name of the gateway"
         ).completer = GatewayNameCompleter()  # type: ignore[attr-defined]
         delete_parser.add_argument(
             "-y", "--yes", action="store_true", help="Don't ask for confirmation"
@@ -78,7 +79,7 @@ class GatewayCommand(APIBaseCommand):
         )
         update_parser.set_defaults(subfunc=self._update)
         update_parser.add_argument(
-            "name", help="The name of the gateway"
+            "name", type=EntityReference.parse, help="The name of the gateway"
         ).completer = GatewayNameCompleter()  # type: ignore[attr-defined]
         update_parser.add_argument(
             "--set-default", action="store_true", help="Set it the default gateway for the project"
@@ -89,7 +90,7 @@ class GatewayCommand(APIBaseCommand):
             "get", help="Get a gateway", formatter_class=self._parser.formatter_class
         )
         get_parser.add_argument(
-            "name", metavar="NAME", help="The name of the gateway"
+            "name", metavar="NAME", type=EntityReference.parse, help="The name of the gateway"
         ).completer = GatewayNameCompleter()  # type: ignore[attr-defined]
         get_parser.add_argument(
             "--json",
@@ -108,7 +109,7 @@ class GatewayCommand(APIBaseCommand):
         if args.watch and args.format == "json":
             raise CLIError("JSON output is not supported together with --watch")
 
-        gateways = self.api.client.gateways.list(self.api.project)
+        gateways = self.api.client.gateways.list(self.api.project, include_imported=True)
         deprecated_router_gateways = [
             g.name
             for g in gateways
@@ -127,45 +128,64 @@ class GatewayCommand(APIBaseCommand):
             if args.format == "json":
                 print_gateways_json(gateways, project=self.api.project)
             else:
-                print_gateways_table(gateways, verbose=args.verbose)
+                print_gateways_table(
+                    gateways, current_project=self.api.project, verbose=args.verbose
+                )
             return
 
         try:
             with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
                 while True:
-                    live.update(get_gateways_table(gateways, verbose=args.verbose))
+                    live.update(
+                        get_gateways_table(
+                            gateways, current_project=self.api.project, verbose=args.verbose
+                        )
+                    )
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     gateways = self.api.client.gateways.list(self.api.project)
         except KeyboardInterrupt:
             pass
 
     def _delete(self, args: argparse.Namespace):
-        gateway = self.api.client.gateways.get(self.api.project, args.name)
-        print_gateways_table([gateway])
+        if args.name.project is not None:
+            console.print(
+                "The [code]<project>/<gateway>[/] format is not supported for gateway names."
+                " Can only delete gateways owned by the current project"
+            )
+            exit(1)
+        name = args.name.name
+        gateway = self.api.client.gateways.get(self.api.project, name)
+        print_gateways_table([gateway], current_project=self.api.project)
         if args.yes or confirm_ask("Do you want to delete the gateway?"):
             with console.status("Deleting gateway..."):
-                self.api.client.gateways.delete(self.api.project, [args.name])
+                self.api.client.gateways.delete(self.api.project, [name])
             console.print("Gateway deleted")
         else:
             console.print("Exiting...")
             return
 
     def _update(self, args: argparse.Namespace):
+        if args.name.project is not None:
+            console.print(
+                "The [code]<project>/<gateway>[/] format is not supported for gateway names."
+                " Can only update gateways owned by the current project"
+            )
+            exit(1)
+        name = args.name.name
         with console.status("Updating gateway..."):
             if args.set_default:
-                self.api.client.gateways.set_default(self.api.project, args.name)
+                self.api.client.gateways.set_default(self.api.project, name)
             if args.domain:
-                self.api.client.gateways.set_wildcard_domain(
-                    self.api.project, args.name, args.domain
-                )
-        gateway = self.api.client.gateways.get(self.api.project, args.name)
-        print_gateways_table([gateway])
+                self.api.client.gateways.set_wildcard_domain(self.api.project, name, args.domain)
+        gateway = self.api.client.gateways.get(self.api.project, name)
+        print_gateways_table([gateway], current_project=self.api.project)
 
     def _get(self, args: argparse.Namespace):
         # TODO: Implement non-json output format
         try:
             gateway = self.api.client.gateways.get(
-                project_name=self.api.project, gateway_name=args.name
+                project_name=args.name.project or self.api.project,
+                gateway_name=args.name.name,
             )
         except ResourceNotExistsError:
             console.print("Gateway not found")
