@@ -17,7 +17,7 @@ dependencies = [
     "cryptography",
     "packaging",
     "python-dateutil",
-    "cachetools",
+    "cachetools<7.1.0",  # Pin to work around https://github.com/tkem/cachetools/issues/394
     "gitpython",
     "jsonschema",
     "paramiko>=3.2.0",
