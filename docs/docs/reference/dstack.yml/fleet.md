@@ -2,9 +2,10 @@
 
 The `fleet` configuration type allows creating and updating fleets.
 
-## Root reference
 
 === "Backend fleet"
+
+    ## Root reference
 
     #SCHEMA# dstack._internal.core.models.fleets.BackendFleetConfiguration
         overrides:
@@ -54,6 +55,8 @@ The `fleet` configuration type allows creating and updating fleets.
           show_root_heading: false
 
 === "SSH fleet"
+
+    ## Root reference
 
     #SCHEMA# dstack._internal.core.models.fleets.SSHFleetConfiguration
         overrides:
