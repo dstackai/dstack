@@ -1,5 +1,6 @@
 import string
-from typing import Dict, Iterable, List, Literal, Optional, Tuple, Union, overload
+from collections.abc import Mapping
+from typing import Iterable, List, Literal, Optional, Tuple, Union, overload
 
 
 class Pattern:
@@ -25,7 +26,7 @@ class InterpolatorError(ValueError):
 
 class VariablesInterpolator:
     def __init__(
-        self, namespaces: Dict[str, Dict[str, str]], *, skip: Optional[Iterable[str]] = None
+        self, namespaces: Mapping[str, Mapping[str, str]], *, skip: Optional[Iterable[str]] = None
     ):
         self.skip = set(skip) if skip is not None else set()
         self.variables = {f"{ns}.{k}": v for ns in namespaces for k, v in namespaces[ns].items()}

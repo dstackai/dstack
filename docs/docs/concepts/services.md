@@ -342,7 +342,7 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 <!-- NOTE: this section is referenced from the CLI, keep the URL unchanged -->
 
-Since 0.20.17, `dstack` supports serving a model using PD disaggregation. To use it, configure three replica groups: one for a router (for example, [SGLang Model Gateway](https://docs.sglang.io/advanced_features/sgl_model_gateway.html)), one for prefill workers, and one for decode workers.
+Since 0.20.17, `dstack` supports serving a model using PD disaggregation. To use it, configure three replica groups: one for [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html), one for prefill workers, and one for decode workers.
 
 > Currently, Prefill-Decode disaggregation is supported only for SGLang.
 
@@ -365,9 +365,10 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
       - count: 1
         # For now replica group with router must have count: 1
         commands:
-          - pip install sglang_router
+          - pip install smg
           - |
-            python -m sglang_router.launch_router \
+            smg launch \
+              --host 0.0.0.0 \
               --port 8000 \
               --pd-disaggregation \
               --prefill-policy cache_aware

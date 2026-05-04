@@ -9,16 +9,16 @@ from pydantic import Field, ValidationError, validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.errors import DockerRegistryError
-from dstack._internal.core.models.common import (
-    CoreModel,
-    FrozenCoreModel,
-    RegistryAuth,
-)
+from dstack._internal.core.models.common import CoreModel, RegistryAuth
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.utils.common import join_byte_stream_checked
+from dstack._internal.utils.docker import (
+    LEGACY_DEFAULT_REGISTRY,
+    is_default_registry,
+    parse_image_name,
+)
 
 DEFAULT_PLATFORM = "linux/amd64"
-DEFAULT_REGISTRY = "index.docker.io"
 MAX_CONFIG_OBJECT_SIZE = 2**22  # 4 MiB
 REGISTRY_REQUEST_TIMEOUT = 20
 
@@ -33,14 +33,6 @@ class DXFAuthAdapter:
             password=self.registry_auth.password if self.registry_auth else None,
             response=response,
         )
-
-
-class DockerImage(FrozenCoreModel):
-    image: str
-    registry: Optional[str] = None
-    repo: str
-    tag: str
-    digest: Optional[str] = None
 
 
 class ImageConfig(CoreModel):
@@ -75,8 +67,12 @@ class ImageManifest(CoreModel):
 def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> ImageConfigObject:
     image = parse_image_name(image_name)
 
+    registry = image.registry
+    if registry is None or is_default_registry(registry):
+        registry = LEGACY_DEFAULT_REGISTRY
+
     registry_client = DXF(
-        host=image.registry or DEFAULT_REGISTRY,
+        host=registry,
         repo=image.repo,
         auth=DXFAuthAdapter(registry_auth),  # type: ignore[assignment]
         timeout=REGISTRY_REQUEST_TIMEOUT,
@@ -98,58 +94,6 @@ def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> 
 
         except (DXFError, requests.RequestException, ValidationError) as e:
             raise DockerRegistryError(e)
-
-
-def parse_image_name(image: str) -> DockerImage:
-    """
-    :param image: docker image name
-    :return: registry host, repo, tag, digest
-
-    >>> parse_image_name("ubuntu:22.04")
-    DockerImage(registry=None, repo='library/ubuntu', tag='22.04', digest=None)
-    >>> parse_image_name("dstackai/miniforge:py3.9-0.2")
-    DockerImage(registry=None, repo='dstackai/miniforge', tag='py3.9-0.2', digest=None)
-    >>> parse_image_name("ghcr.io/dstackai/miniforge")
-    DockerImage(registry='ghcr.io', repo='dstackai/miniforge', tag='latest', digest=None)
-    >>> parse_image_name("dstackai/miniforge@sha256:a4ba18a847a172a248d68faf6689e69fae4779b90b250211b79a26d21ddd6a15")
-    DockerImage(registry=None, repo='dstackai/miniforge', tag='latest', digest='sha256:a4ba18a847a172a248d68faf6689e69fae4779b90b250211b79a26d21ddd6a15')
-    """
-
-    digest = None
-    if "@" in image.split("/")[-1]:
-        image, digest = image.rsplit("@", maxsplit=1)
-
-    tag = "latest"
-    if ":" in image.split("/")[-1]:  # avoid detecting port as a tag
-        image, tag = image.rsplit(":", maxsplit=1)
-
-    registry = None
-    components = image.split("/")
-    if len(components) == 1:  # default registry, official image
-        repo = "library/" + components[0]
-    elif not is_host(components[0]):  # default registry, custom image
-        repo = "/".join(components)
-    else:  # custom registry
-        registry = components[0]
-        repo = "/".join(components[1:])
-
-    return DockerImage(image=image, registry=registry, repo=repo, tag=tag, digest=digest)
-
-
-def is_host(s: str) -> bool:
-    """
-    >>> is_host("localhost")
-    True
-    >>> is_host("localhost:5000")
-    True
-    >>> is_host("ghcr.io")
-    True
-    >>> is_host("127.0.0.1")
-    True
-    >>> is_host("dstackai")
-    False
-    """
-    return s == "localhost" or ":" in s or "." in s
 
 
 def apply_server_docker_defaults(

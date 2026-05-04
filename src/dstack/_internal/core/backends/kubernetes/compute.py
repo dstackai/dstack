@@ -43,6 +43,7 @@ from dstack._internal.core.backends.kubernetes.resources import (
     OBJECT_NAME_MAX_LENGTH,
     PodPhase,
     TaintEffect,
+    build_dockerconfigjson,
     filter_invalid_labels,
     format_dstack_label_key,
     format_memory,
@@ -162,6 +163,25 @@ class KubernetesCompute(
             project_ssh_public_key=project_ssh_public_key.strip(),
         )
 
+        image_pull_secrets: Optional[list[client.V1LocalObjectReference]] = None
+        if job.job_spec.registry_auth is not None:
+            registry_auth_secret_name = _get_registry_auth_secret_name(instance_name)
+            dockerconfigjson = build_dockerconfigjson(
+                image_name=job.job_spec.image_name,
+                username=job.job_spec.registry_auth.username,
+                password=job.job_spec.registry_auth.password,
+            )
+            registry_auth_secret = client.V1Secret(
+                metadata=client.V1ObjectMeta(name=registry_auth_secret_name),
+                type="kubernetes.io/dockerconfigjson",
+                string_data={".dockerconfigjson": dockerconfigjson},
+            )
+            self.api.create_namespaced_secret(
+                namespace=self.config.namespace,
+                body=registry_auth_secret,
+            )
+            image_pull_secrets = [client.V1LocalObjectReference(name=registry_auth_secret_name)]
+
         resources_requests: dict[str, str] = {}
         resources_limits: dict[str, str] = {}
         node_affinity: Optional[client.V1NodeAffinity] = None
@@ -255,6 +275,7 @@ class KubernetesCompute(
             else:
                 assert False, f"unexpected mount point: {mount_point!r}"
         for volume in volumes:
+            assert isinstance(volume.configuration, KubernetesVolumeConfiguration)
             pvc_name = volume.volume_id
             assert pvc_name is not None, f"missing PVC name: {volume!r}"
             mount_path = volume_name_path_map.get(volume.name)
@@ -265,7 +286,6 @@ class KubernetesCompute(
                     name=volume_name,
                     persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
                         claim_name=pvc_name,
-                        read_only=False,
                     ),
                 ),
             )
@@ -273,6 +293,8 @@ class KubernetesCompute(
                 client.V1VolumeMount(
                     name=volume_name,
                     mount_path=mount_path,
+                    read_only=volume.configuration.read_only,
+                    recursive_read_only="IfPossible" if volume.configuration.read_only else None,
                 )
             )
 
@@ -311,6 +333,7 @@ class KubernetesCompute(
                         volume_mounts=volume_mounts,
                     )
                 ],
+                image_pull_secrets=image_pull_secrets,
                 affinity=client.V1Affinity(
                     node_affinity=node_affinity,
                 ),
@@ -434,6 +457,13 @@ class KubernetesCompute(
             self.api.delete_namespaced_pod,
             expected=404,
             name=instance_id,
+            namespace=self.config.namespace,
+            body=client.V1DeleteOptions(),
+        )
+        call_api_method(
+            self.api.delete_namespaced_secret,
+            expected=404,
+            name=_get_registry_auth_secret_name(instance_id),
             namespace=self.config.namespace,
             body=client.V1DeleteOptions(),
         )
@@ -1108,3 +1138,7 @@ def _run_ssh_command(
 
 def _get_pod_service_name(pod_name: str) -> str:
     return f"{pod_name}-service"
+
+
+def _get_registry_auth_secret_name(pod_name: str) -> str:
+    return f"{pod_name}-registry-auth"

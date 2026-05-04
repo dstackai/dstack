@@ -4,6 +4,7 @@ Generates schema reference for dstack models.
 
 import importlib
 import inspect
+import json
 import logging
 import re
 from enum import Enum
@@ -233,15 +234,26 @@ def generate_schema_reference(
         schema_props = {}
     for name, field in cls.__fields__.items():
         default = field.default
-        if isinstance(default, Enum):
-            default = default.value
+        default_repr: Optional[str]
+        if default is None:
+            default_repr = None
+        elif isinstance(default, (list, tuple, dict)) and len(default) == 0:
+            default_repr = None
+        elif isinstance(default, str):
+            default_repr = default
+        elif isinstance(default, BaseModel):
+            default_repr = str(default)
+        elif isinstance(default, Enum):
+            default_repr = str(default.value)
+        else:
+            default_repr = json.dumps(default)
         friendly_type = get_friendly_type(field.annotation)
         friendly_type = _enrich_type_from_schema(friendly_type, schema_props.get(name, {}))
         values = dict(
             name=name,
             description=field.field_info.description,
             type=friendly_type,
-            default=default,
+            default=default_repr,
             required=field.required,
         )
         # TODO: If the field doesn't have description (e.g. BaseConfiguration.type), we could fallback to docstring

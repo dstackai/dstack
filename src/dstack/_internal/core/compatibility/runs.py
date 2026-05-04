@@ -109,6 +109,16 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
                 replica_group_excludes["router"] = True
             if all(g.scaling is None or g.scaling.window is None for g in replicas):
                 replica_group_excludes["scaling"] = {"window": True}
+            if all(g.image is None for g in replicas):
+                replica_group_excludes["image"] = True
+            if all(g.docker is None for g in replicas):
+                replica_group_excludes["docker"] = True
+            if all(g.python is None for g in replicas):
+                replica_group_excludes["python"] = True
+            if all(g.nvcc is None for g in replicas):
+                replica_group_excludes["nvcc"] = True
+            if all(g.privileged is None for g in replicas):
+                replica_group_excludes["privileged"] = True
             if replica_group_excludes:
                 configuration_excludes["replicas"] = {"__all__": replica_group_excludes}
 

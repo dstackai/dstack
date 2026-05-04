@@ -1145,6 +1145,9 @@ projects:
     - apiGroups: [""]
       resources: ["persistentvolumeclaims"]
       verbs: ["get", "create", "delete"]
+    - apiGroups: [""]
+      resources: ["secrets"]
+      verbs: ["create", "delete"]
     ```
 
     Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.

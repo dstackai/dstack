@@ -841,6 +841,39 @@ class ReplicaGroup(CoreModel):
         CommandsList,
         Field(description="The shell commands to run for replicas in this group"),
     ] = []
+    image: Annotated[
+        Optional[str],
+        Field(
+            description="The name of the Docker image to run for replicas in this group. "
+            "Mutually exclusive with group-level `docker` and `python`."
+        ),
+    ] = None
+    python: Annotated[
+        Optional[PythonVersion],
+        Field(
+            description="The major version of Python for replicas in this group. "
+            "Mutually exclusive with group-level `image` and `docker`."
+        ),
+    ] = None
+    nvcc: Annotated[
+        Optional[bool],
+        Field(
+            description="Use the image with NVIDIA CUDA Compiler (NVCC) included for replicas in this group. "
+            "Mutually exclusive with group-level `docker`."
+        ),
+    ] = None
+    docker: Annotated[
+        Optional[bool],
+        Field(
+            description="Use the docker-in-docker image for this group "
+            "(injects `start-dockerd` and runs privileged). Mutually "
+            "exclusive with group-level `image`, `python`, and `nvcc`."
+        ),
+    ] = None
+    privileged: Annotated[
+        Optional[bool],
+        Field(description="Run replicas in this group in privileged mode."),
+    ] = None
     router: Annotated[
         Optional[ReplicaGroupRouterConfig],
         Field(
@@ -858,6 +891,42 @@ class ReplicaGroup(CoreModel):
     @validator("count")
     def convert_count(cls, v: Range[int]) -> Range[int]:
         return _validate_replica_range(v)
+
+    @validator("python", pre=True, always=True)
+    def convert_python(cls, v, values) -> Optional[PythonVersion]:
+        if v is not None and values.get("image"):
+            raise ValueError("`image` and `python` are mutually exclusive within a replica group")
+        if isinstance(v, float):
+            v = str(v)
+            if v == "3.1":
+                v = "3.10"
+        if isinstance(v, str):
+            return PythonVersion(v)
+        return v
+
+    @validator("docker", pre=True, always=True)
+    def _docker(cls, v, values) -> Optional[bool]:
+        if v is True and values.get("image"):
+            raise ValueError("`image` and `docker` are mutually exclusive within a replica group")
+        if v is True and values.get("python"):
+            raise ValueError("`python` and `docker` are mutually exclusive within a replica group")
+        if v is True and values.get("nvcc"):
+            raise ValueError("`nvcc` and `docker` are mutually exclusive within a replica group")
+        return v
+
+    @validator("privileged", pre=True, always=True)
+    def _privileged(cls, v, values) -> Optional[bool]:
+        # Docker-in-docker requires privileged mode. The service level
+        # cannot enforce this rule because its `privileged` field defaults
+        # to `False` (existing backwards-compatibility constraint), so it
+        # cannot distinguish "unset" from explicit `False`. At the group
+        # level we keep `privileged` as `Optional[bool] = None`, so we can.
+        if v is False and values.get("docker") is True:
+            raise ValueError(
+                "`privileged: false` is incompatible with `docker: true` within "
+                "a replica group (docker-in-docker requires privileged mode)"
+            )
+        return v
 
     @root_validator()
     def validate_scaling(cls, values):
@@ -1073,21 +1142,112 @@ class ServiceConfigurationParams(CoreModel):
         return values
 
     @root_validator()
-    def validate_replica_groups_have_commands_or_image(cls, values):
+    def validate_no_mixed_service_and_group_container_fields(cls, values):
         """
-        When replicas is a list, ensure each ReplicaGroup has commands OR service has image.
+        When replicas is a list (image, docker, privileged) may be set
+        at the service level OR in replica groups, never both. Mixing is
+        rejected — including partial mixing, where only some groups set a
+        field the service also sets — because it leaves precedence ambiguous.
         """
         replicas = values.get("replicas")
-        image = values.get("image")
+        if not isinstance(replicas, list):
+            return values
+
+        checks = [
+            (
+                "image",
+                values.get("image") is not None,
+                lambda g: g.image is not None,
+            ),
+            (
+                "docker",
+                values.get("docker") is True,
+                lambda g: g.docker is not None,
+            ),
+            (
+                "privileged",
+                values.get("privileged") is True,
+                lambda g: g.privileged is not None,
+            ),
+            (
+                "python",
+                values.get("python") is not None,
+                lambda g: g.python is not None,
+            ),
+            (
+                "nvcc",
+                values.get("nvcc") is True,
+                lambda g: g.nvcc is not None,
+            ),
+        ]
+
+        for field, service_set, group_set in checks:
+            if service_set:
+                conflicting = [g.name for g in replicas if group_set(g)]
+                if conflicting:
+                    raise ValueError(
+                        f"`{field}` is set at both the service level and in "
+                        f"replica group(s) {conflicting}. Set `{field}` in one "
+                        f"place only — either at the service level (all groups "
+                        f"inherit) or per group, but not both."
+                    )
+        return values
+
+    @root_validator()
+    def validate_no_conflicting_image_sources_across_levels(cls, values):
+        """
+        Image-source fields (`image`, `docker`, `python`, `nvcc`) cannot
+        be mixed across service and group levels in conflicting ways.
+        """
+        replicas = values.get("replicas")
+        if not isinstance(replicas, list):
+            return values
+
+        forbidden = [
+            ("image", values.get("image") is not None, "docker", lambda g: g.docker is not None),
+            ("image", values.get("image") is not None, "python", lambda g: g.python is not None),
+            ("image", values.get("image") is not None, "nvcc", lambda g: g.nvcc is not None),
+            ("docker", values.get("docker") is True, "image", lambda g: g.image is not None),
+            ("docker", values.get("docker") is True, "python", lambda g: g.python is not None),
+            ("docker", values.get("docker") is True, "nvcc", lambda g: g.nvcc is not None),
+            ("python", values.get("python") is not None, "image", lambda g: g.image is not None),
+            ("python", values.get("python") is not None, "docker", lambda g: g.docker is not None),
+            ("nvcc", values.get("nvcc") is True, "image", lambda g: g.image is not None),
+            ("nvcc", values.get("nvcc") is True, "docker", lambda g: g.docker is not None),
+        ]
+
+        for s_field, s_set, g_field, g_pred in forbidden:
+            if s_set:
+                conflicting = [g.name for g in replicas if g_pred(g)]
+                if conflicting:
+                    raise ValueError(
+                        f"Service-level `{s_field}` conflicts with group-level "
+                        f"`{g_field}` in replica group(s) {conflicting}. "
+                        f"These image-source fields are mutually exclusive."
+                    )
+        return values
+
+    @root_validator()
+    def validate_replica_groups_have_commands_or_image(cls, values):
+        """
+        When replicas is a list, ensure each ReplicaGroup has something
+        to run. Mirrors the service-level rule: either explicit
+        `commands` or an `image` (group-level or service-level) is
+        required.
+        """
+        replicas = values.get("replicas")
 
         if not isinstance(replicas, list):
             return values
 
+        service_has_image = values.get("image") is not None
+
         for group in replicas:
-            if not group.commands and not image:
+            if not group.commands and group.image is None and not service_has_image:
                 raise ValueError(
-                    f"Replica group '{group.name}' has no commands. "
-                    "Either set `commands` in the replica group or set `image` at the service level."
+                    f"Replica group '{group.name}': either `commands` or "
+                    "`image` must be set in the group, or `image` at the "
+                    "service level."
                 )
 
         return values
