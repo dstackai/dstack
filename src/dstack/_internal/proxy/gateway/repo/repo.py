@@ -41,6 +41,14 @@ class GatewayProxyRepo(BaseProxyRepo):
         async with self.reader():
             return self._state.services.get(project_name, {}).get(run_name)
 
+    async def get_service_by_domain(self, domain: str) -> Optional[Service]:
+        async with self.reader():
+            for project_services in self._state.services.values():
+                for service in project_services.values():
+                    if service.domain == domain:
+                        return service
+            return None
+
     async def set_service(self, service: Service) -> None:
         async with self.writer():
             self._state.services.setdefault(service.project_name, {})[service.run_name] = service

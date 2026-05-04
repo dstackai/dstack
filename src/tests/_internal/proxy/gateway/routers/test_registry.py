@@ -174,6 +174,24 @@ class TestRegisterService:
         assert (tmp_path / "443-test-run.proj-1.gtw.test.conf").exists()
         assert (tmp_path / "443-test-run.proj-2.gtw.test.conf").exists()
 
+    async def test_register_same_domain_error(self, tmp_path: Path, system_mocks: Mocks) -> None:
+        client = make_client(tmp_path)
+        resp = await client.post(
+            "/api/registry/test-proj-1/services/register",
+            json=register_service_payload(run_name="test-run", domain="test-run.gtw.test"),
+        )
+        assert resp.status_code == 200
+        resp = await client.post(
+            "/api/registry/test-proj/services/register",
+            json=register_service_payload(run_name="test-run", domain="test-run.gtw.test"),
+        )
+        assert resp.status_code == 400
+        assert resp.json() == {
+            "detail": "Domain name 'test-run.gtw.test' is already taken by another service"
+        }
+        assert (tmp_path / "443-test-run.gtw.test.conf").exists()
+        assert system_mocks.reload_nginx.call_count == 1
+
     @freeze_time(datetime(2024, 12, 12, 0, 30))
     async def test_register_with_model(self, tmp_path: Path, system_mocks: Mocks) -> None:
         repo = GatewayProxyRepo()
