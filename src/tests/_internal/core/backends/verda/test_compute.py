@@ -9,8 +9,6 @@ from dstack._internal.core.backends.verda.compute import (
     VerdaInstanceBackendData,
     _create_ssh_key,
     _create_startup_script,
-    _is_ssh_key_not_found_error,
-    _is_startup_script_not_found_error,
 )
 from dstack._internal.core.errors import BackendError, NoCapacityError
 
@@ -297,7 +295,7 @@ class TestTerminateInstance:
 
         _assert_terminate_call(compute.client.instances.action)
         compute.client.startup_scripts.delete_by_id.assert_not_called()
-        compute.client.ssh_keys.delete_by_id.assert_not_called()
+        compute.client.ssh_keys.delete.assert_not_called()
 
     def test_terminate_instance_deletes_startup_script(self):
         compute = VerdaCompute.__new__(VerdaCompute)
@@ -311,7 +309,7 @@ class TestTerminateInstance:
 
         _assert_terminate_call(compute.client.instances.action)
         compute.client.startup_scripts.delete_by_id.assert_called_once_with("script-id")
-        assert compute.client.ssh_keys.delete_by_id.call_count == 2
+        compute.client.ssh_keys.delete.assert_called_once_with(["ssh-key-id-1", "ssh-key-id-2"])
 
     def test_terminate_instance_still_deletes_script_when_instance_is_missing(self):
         compute = VerdaCompute.__new__(VerdaCompute)
@@ -325,41 +323,7 @@ class TestTerminateInstance:
         compute.terminate_instance("instance-id", "FIN-01", backend_data)
 
         compute.client.startup_scripts.delete_by_id.assert_called_once_with("script-id")
-        compute.client.ssh_keys.delete_by_id.assert_called_once_with("ssh-key-id-1")
-
-    def test_terminate_instance_ignores_missing_startup_script(self):
-        compute = VerdaCompute.__new__(VerdaCompute)
-        compute.client = MagicMock()
-        compute.client.startup_scripts.delete_by_id.side_effect = APIException(
-            "",
-            "Invalid startup script id",
-        )
-        backend_data = VerdaInstanceBackendData(
-            startup_script_id="script-id",
-            ssh_key_ids=["ssh-key-id-1"],
-        ).json()
-
-        compute.terminate_instance("instance-id", "FIN-01", backend_data)
-
-        _assert_terminate_call(compute.client.instances.action)
-        compute.client.ssh_keys.delete_by_id.assert_called_once_with("ssh-key-id-1")
-
-    def test_terminate_instance_ignores_missing_startup_script_invalid_script_id(self):
-        compute = VerdaCompute.__new__(VerdaCompute)
-        compute.client = MagicMock()
-        compute.client.startup_scripts.delete_by_id.side_effect = APIException(
-            "invalid_request",
-            "Invalid script ID",
-        )
-        backend_data = VerdaInstanceBackendData(
-            startup_script_id="script-id",
-            ssh_key_ids=["ssh-key-id-1"],
-        ).json()
-
-        compute.terminate_instance("instance-id", "FIN-01", backend_data)
-
-        _assert_terminate_call(compute.client.instances.action)
-        compute.client.ssh_keys.delete_by_id.assert_called_once_with("ssh-key-id-1")
+        compute.client.ssh_keys.delete.assert_called_once_with(["ssh-key-id-1"])
 
     def test_terminate_instance_retries_on_script_delete_error(self):
         compute = VerdaCompute.__new__(VerdaCompute)
@@ -375,49 +339,12 @@ class TestTerminateInstance:
         with pytest.raises(APIException):
             compute.terminate_instance("instance-id", "FIN-01", backend_data)
 
-        compute.client.ssh_keys.delete_by_id.assert_not_called()
-
-    def test_terminate_instance_ignores_missing_ssh_key(self):
-        compute = VerdaCompute.__new__(VerdaCompute)
-        compute.client = MagicMock()
-        compute.client.ssh_keys.delete_by_id.side_effect = APIException(
-            "invalid_request",
-            "Invalid ssh-key ID",
-        )
-        backend_data = VerdaInstanceBackendData(
-            startup_script_id="script-id",
-            ssh_key_ids=["ssh-key-id-1"],
-        ).json()
-
-        compute.terminate_instance("instance-id", "FIN-01", backend_data)
-
-        _assert_terminate_call(compute.client.instances.action)
-        compute.client.startup_scripts.delete_by_id.assert_called_once_with("script-id")
-        compute.client.ssh_keys.delete_by_id.assert_called_once_with("ssh-key-id-1")
-
-    def test_terminate_instance_deletes_remaining_ssh_keys_when_one_missing(self):
-        compute = VerdaCompute.__new__(VerdaCompute)
-        compute.client = MagicMock()
-        compute.client.ssh_keys.delete_by_id.side_effect = [
-            APIException("invalid_request", "Invalid ssh-key ID"),
-            None,
-        ]
-        backend_data = VerdaInstanceBackendData(
-            startup_script_id="script-id",
-            ssh_key_ids=["ssh-key-id-1", "ssh-key-id-2"],
-        ).json()
-
-        compute.terminate_instance("instance-id", "FIN-01", backend_data)
-
-        compute.client.startup_scripts.delete_by_id.assert_called_once_with("script-id")
-        compute.client.ssh_keys.delete_by_id.assert_any_call("ssh-key-id-1")
-        compute.client.ssh_keys.delete_by_id.assert_any_call("ssh-key-id-2")
-        assert compute.client.ssh_keys.delete_by_id.call_count == 2
+        compute.client.ssh_keys.delete.assert_not_called()
 
     def test_terminate_instance_retries_on_ssh_key_delete_error(self):
         compute = VerdaCompute.__new__(VerdaCompute)
         compute.client = MagicMock()
-        compute.client.ssh_keys.delete_by_id.side_effect = APIException("", "Random API error")
+        compute.client.ssh_keys.delete.side_effect = APIException("", "Random API error")
         backend_data = VerdaInstanceBackendData(
             startup_script_id="script-id",
             ssh_key_ids=["ssh-key-id-1"],
@@ -425,49 +352,3 @@ class TestTerminateInstance:
 
         with pytest.raises(APIException):
             compute.terminate_instance("instance-id", "FIN-01", backend_data)
-
-
-class TestIsStartupScriptNotFoundError:
-    def test_returns_true_for_not_found_code_even_with_custom_message(self):
-        assert _is_startup_script_not_found_error(
-            APIException("not_found", "Startup script does not exist anymore")
-        )
-
-    def test_returns_true_for_invalid_script_id(self):
-        assert _is_startup_script_not_found_error(
-            APIException("invalid_request", "Invalid script ID")
-        )
-
-    def test_returns_true_for_not_found(self):
-        assert _is_startup_script_not_found_error(APIException("not_found", "Not Found"))
-
-    def test_returns_false_for_unrelated_error(self):
-        assert not _is_startup_script_not_found_error(
-            APIException("forbidden", "Permission denied")
-        )
-
-    def test_returns_false_for_unrelated_invalid_request(self):
-        assert not _is_startup_script_not_found_error(
-            APIException("invalid_request", "Some other invalid request")
-        )
-
-
-class TestIsSSHKeyNotFoundError:
-    def test_returns_true_for_not_found_code_even_with_custom_message(self):
-        assert _is_ssh_key_not_found_error(
-            APIException("not_found", "SSH key does not exist anymore")
-        )
-
-    def test_returns_true_for_invalid_ssh_key_id(self):
-        assert _is_ssh_key_not_found_error(APIException("invalid_request", "Invalid ssh-key ID"))
-
-    def test_returns_true_for_not_found(self):
-        assert _is_ssh_key_not_found_error(APIException("not_found", "Not Found"))
-
-    def test_returns_false_for_unrelated_error(self):
-        assert not _is_ssh_key_not_found_error(APIException("forbidden", "Permission denied"))
-
-    def test_returns_false_for_unrelated_invalid_request(self):
-        assert not _is_ssh_key_not_found_error(
-            APIException("invalid_request", "Some other invalid request")
-        )
