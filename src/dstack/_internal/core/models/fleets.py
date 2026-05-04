@@ -84,7 +84,7 @@ class SSHHostParams(CoreModel):
                 "The amount of blocks to split the instance into, a number or `auto`."
                 " `auto` means as many as possible."
                 " The number of GPUs and CPUs must be divisible by the number of blocks."
-                " Defaults to the top-level `blocks` value."
+                " Defaults to the top-level `blocks` value"
             ),
             ge=1,
         ),
@@ -130,7 +130,7 @@ class SSHParams(CoreModel):
                 " If not specified, `dstack` will use IPs from the first found internal network."
             )
         ),
-    ]
+    ] = None
 
     @validator("network")
     def validate_network(cls, value):
@@ -206,50 +206,13 @@ class FleetNodesSpec(CoreModel):
         return values
 
 
-class InstanceGroupParamsConfig(CoreConfig):
-    @staticmethod
-    def schema_extra(schema: Dict[str, Any]):
-        add_extra_schema_types(
-            schema["properties"]["nodes"],
-            extra_types=[{"type": "integer"}, {"type": "string"}],
-        )
-        add_extra_schema_types(
-            schema["properties"]["idle_duration"],
-            extra_types=[{"type": "string"}],
-        )
-
-
-class InstanceGroupParams(CoreModel):
-    env: Annotated[
-        Env,
-        Field(description="The mapping or the list of environment variables"),
-    ] = Env()
-    ssh_config: Annotated[
-        Optional[SSHParams],
-        Field(description="The parameters for adding instances via SSH"),
-    ] = None
-
-    nodes: Annotated[
-        Optional[FleetNodesSpec], Field(description="The number of instances in cloud fleet")
-    ] = None
+class CommonFleetConfigurationProps(CoreModel):
+    type: Literal["fleet"] = "fleet"
+    name: Annotated[Optional[str], Field(description="The fleet name")] = None
     placement: Annotated[
         Optional[InstanceGroupPlacement],
         Field(description="The placement of instances: `any` or `cluster`"),
     ] = None
-    reservation: Annotated[
-        Optional[str],
-        Field(
-            description=(
-                "The existing reservation to use for instance provisioning."
-                " Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations"
-            )
-        ),
-    ] = None
-    resources: Annotated[
-        Optional[ResourcesSpec],
-        Field(description="The resources requirements"),
-    ] = None
-
     blocks: Annotated[
         Union[Literal["auto"], int],
         Field(
@@ -263,6 +226,22 @@ class InstanceGroupParams(CoreModel):
         ),
     ] = 1
 
+
+class BackendFleetConfiguraionProps(CoreModel):
+    nodes: Annotated[Optional[FleetNodesSpec], Field(description="The number of instances")] = None
+    reservation: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The existing reservation to use for instance provisioning."
+                " Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations"
+            )
+        ),
+    ] = None
+    resources: Annotated[
+        Optional[ResourcesSpec],
+        Field(description="The resources requirements"),
+    ] = None
     backends: Annotated[
         Optional[List[BackendType]],
         Field(description="The backends to consider for provisioning (e.g., `[aws, gcp]`)"),
@@ -314,6 +293,16 @@ class InstanceGroupParams(CoreModel):
             )
         ),
     ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The custom tags to associate with the resource."
+                " The tags are also propagated to the underlying backend resources."
+                " If there is a conflict with backend-level tags, does not override them"
+            )
+        ),
+    ] = None
 
     @validator("nodes", pre=True)
     def parse_nodes(cls, v: Optional[Union[dict, str]]) -> Optional[dict]:
@@ -329,35 +318,61 @@ class InstanceGroupParams(CoreModel):
         parse_idle_duration
     )
 
-
-class FleetProps(CoreModel):
-    type: Literal["fleet"] = "fleet"
-    name: Annotated[Optional[str], Field(description="The fleet name")] = None
+    _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
 
 
-class FleetConfigurationConfig(InstanceGroupParamsConfig):
+class BackendFleetConfigurationPropsConfig(CoreConfig):
     @staticmethod
     def schema_extra(schema: Dict[str, Any]):
-        InstanceGroupParamsConfig.schema_extra(schema)
+        add_extra_schema_types(
+            schema["properties"]["nodes"],
+            extra_types=[{"type": "integer"}, {"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["idle_duration"],
+            extra_types=[{"type": "string"}],
+        )
+
+
+class SSHFleetConfigurationProps(CoreModel):
+    ssh_config: Annotated[
+        Optional[SSHParams],
+        Field(description="The parameters for adding instances via SSH"),
+    ] = None
+    env: Annotated[
+        Env,
+        Field(description="The mapping or the list of environment variables"),
+    ] = Env()
+
+
+class FleetConfigurationConfig(BackendFleetConfigurationPropsConfig):
+    @staticmethod
+    def schema_extra(schema: dict[str, Any]):
+        BackendFleetConfigurationPropsConfig.schema_extra(schema)
 
 
 class FleetConfiguration(
-    InstanceGroupParams,
-    FleetProps,
+    SSHFleetConfigurationProps,
+    BackendFleetConfiguraionProps,
+    CommonFleetConfigurationProps,
     generate_dual_core_model(FleetConfigurationConfig),
 ):
-    tags: Annotated[
-        Optional[Dict[str, str]],
-        Field(
-            description=(
-                "The custom tags to associate with the resource."
-                " The tags are also propagated to the underlying backend resources."
-                " If there is a conflict with backend-level tags, does not override them"
-            )
-        ),
-    ] = None
+    pass
 
-    _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
+
+class BackendFleetConfiguration(
+    BackendFleetConfiguraionProps,
+    CommonFleetConfigurationProps,
+    generate_dual_core_model(BackendFleetConfigurationPropsConfig),
+):
+    """For the documentation only"""
+
+
+class SSHFleetConfiguration(
+    SSHFleetConfigurationProps,
+    CommonFleetConfigurationProps,
+):
+    """For the documentation only"""
 
 
 class FleetSpecConfig(CoreConfig):
