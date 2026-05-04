@@ -14,6 +14,7 @@ from dstack._internal.core.models.common import (
     CoreConfig,
     CoreModel,
     Duration,
+    EntityReference,
     RegistryAuth,
     generate_dual_core_model,
 )
@@ -876,7 +877,13 @@ class ServiceConfigurationParams(CoreModel):
         Field(description="The port the application listens on"),
     ]
     gateway: Annotated[
-        Optional[Union[bool, str]],
+        Optional[
+            Union[
+                bool,
+                EntityReference,
+                str,  # For server response compatibility with pre-0.20.20 clients
+            ]
+        ],
         Field(
             description=(
                 "The name of the gateway. Specify boolean `false` to run without a gateway."
@@ -987,6 +994,14 @@ class ServiceConfigurationParams(CoreModel):
             # Because of the bug, our gen_schema_reference.py fails to determine the type of
             # ServiceConfiguration.probes and insert the correct hyperlink.
             raise ValueError("Probes must be unique")
+        return v
+
+    @validator("gateway")
+    def validate_gateway(
+        cls, v: Optional[Union[bool, EntityReference, str]]
+    ) -> Optional[Union[bool, EntityReference]]:
+        if isinstance(v, str):
+            return EntityReference.parse(v)
         return v
 
     @validator("replicas")

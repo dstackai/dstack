@@ -30,6 +30,7 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.gateways import (
     AnyGatewayRouterConfig,
     Gateway,
@@ -148,10 +149,10 @@ async def list_project_gateways(
 async def get_gateway_by_name(
     session: AsyncSession, project: ProjectModel, name: str
 ) -> Optional[Gateway]:
-    gateway = await get_project_gateway_model_by_name(
+    gateway = await get_project_gateway_model_by_reference(
         session=session,
         project=project,
-        name=name,
+        ref=EntityReference(name=name, project=None),
         load_gateway_compute=True,
         load_backend_type=True,
     )
@@ -266,10 +267,10 @@ async def create_gateway(
             )
             default_gateway = gateway
         pipeline_hinter.hint_fetch(GatewayModel.__name__)
-        gateway = await get_project_gateway_model_by_name(
+        gateway = await get_project_gateway_model_by_reference(
             session=session,
             project=project,
-            name=configuration.name,
+            ref=EntityReference(name=configuration.name, project=None),
             load_gateway_compute=True,
             load_backend_type=True,
         )
@@ -395,7 +396,9 @@ async def set_gateway_wildcard_domain(
 async def set_default_gateway(
     session: AsyncSession, project: ProjectModel, name: str, user: Optional[UserModel]
 ):
-    gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
+    gateway = await get_project_gateway_model_by_reference(
+        session=session, project=project, ref=EntityReference(name=name, project=None)
+    )
     if gateway is None:
         raise ResourceNotExistsError()
     if gateway.to_be_deleted:
@@ -457,17 +460,26 @@ async def list_project_gateway_models(
     return res.unique().scalars().all()
 
 
-async def get_project_gateway_model_by_name(
+async def get_project_gateway_model_by_reference(
     session: AsyncSession,
     project: ProjectModel,
-    name: str,
+    ref: EntityReference,
     load_gateway_compute: bool = False,
     load_backend_type: bool = False,
 ) -> Optional[GatewayModel]:
-    stmt = select(GatewayModel).where(
-        GatewayModel.project_id == project.id,
-        GatewayModel.name == name,
-    )
+    stmt = select(GatewayModel).where(GatewayModel.name == ref.name)
+    if ref.project is None or ref.project == project.name:
+        stmt = stmt.where(GatewayModel.project_id == project.id)
+    else:
+        stmt = stmt.where(
+            exists().where(
+                ImportModel.project_id == project.id,
+                ImportModel.export_id == ExportedGatewayModel.export_id,
+                ExportedGatewayModel.gateway_id == GatewayModel.id,
+                GatewayModel.project_id == ProjectModel.id,
+                ProjectModel.name == ref.project,
+            )
+        )
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
     if load_backend_type:
