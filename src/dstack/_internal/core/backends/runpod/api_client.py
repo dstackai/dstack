@@ -22,7 +22,8 @@ class RunpodApiClientError(BackendError):
 
 class RunpodApiClient:
     def __init__(self, api_key: str):
-        self.api_key = api_key
+        self._session = requests.Session()
+        self._session.headers.update({"Authorization": f"Bearer {api_key}"})
 
     def validate_api_key(self) -> bool:
         try:
@@ -353,9 +354,9 @@ class RunpodApiClient:
 
     def _make_request(self, data: Optional[Dict[str, Any]] = None) -> Response:
         try:
-            response = requests.request(
+            response = self._session.request(
                 method="POST",
-                url=f"{API_URL}?api_key={self.api_key}",
+                url=API_URL,
                 json=data,
                 timeout=120,
             )
