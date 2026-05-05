@@ -142,7 +142,9 @@ class GatewayCommand(APIBaseCommand):
                         )
                     )
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
-                    gateways = self.api.client.gateways.list(self.api.project)
+                    gateways = self.api.client.gateways.list(
+                        self.api.project, include_imported=True
+                    )
         except KeyboardInterrupt:
             pass
 
