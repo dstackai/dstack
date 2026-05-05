@@ -1,13 +1,5 @@
 from dstack._internal.core.models.common import IncludeExcludeDictType
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewaySpec
-from dstack._internal.server.schemas.gateways import ListGatewaysRequest
-
-
-def get_list_gateways_excludes(request: ListGatewaysRequest) -> IncludeExcludeDictType:
-    excludes: IncludeExcludeDictType = {}
-    if not request.include_imported:
-        excludes["include_imported"] = True
-    return excludes
 
 
 def get_gateway_spec_excludes(gateway_spec: GatewaySpec) -> IncludeExcludeDictType:

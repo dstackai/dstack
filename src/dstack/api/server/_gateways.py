@@ -2,10 +2,7 @@ from typing import List
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.compatibility.gateways import (
-    get_create_gateway_excludes,
-    get_list_gateways_excludes,
-)
+from dstack._internal.core.compatibility.gateways import get_create_gateway_excludes
 from dstack._internal.core.models.gateways import Gateway, GatewayConfiguration
 from dstack._internal.server.schemas.gateways import (
     CreateGatewayRequest,
@@ -23,10 +20,7 @@ class GatewaysAPIClient(APIClientGroup):
         body = ListGatewaysRequest(
             include_imported=include_imported,
         )
-        resp = self._request(
-            f"/api/project/{project_name}/gateways/list",
-            body=body.json(exclude=get_list_gateways_excludes(body)),
-        )
+        resp = self._request(f"/api/project/{project_name}/gateways/list", body=body.json())
         return parse_obj_as(List[Gateway.__response__], resp.json())
 
     def get(self, project_name: str, gateway_name: str) -> Gateway:
