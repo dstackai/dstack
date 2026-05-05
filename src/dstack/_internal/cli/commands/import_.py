@@ -68,6 +68,7 @@ def print_imports_table(imports: list[Import]):
     table = Table(box=None)
     table.add_column("NAME", no_wrap=True)
     table.add_column("FLEETS")
+    table.add_column("GATEWAYS")
 
     for imp in imports:
         name = f"{imp.export.project_name}/{imp.export.name}"
@@ -76,10 +77,16 @@ def print_imports_table(imports: list[Import]):
             if imp.export.exported_fleets
             else "-"
         )
+        gateways = (
+            ", ".join([g.name for g in imp.export.exported_gateways])
+            if imp.export.exported_gateways
+            else "-"
+        )
 
         row = {
             "NAME": name,
             "FLEETS": fleets,
+            "GATEWAYS": gateways,
         }
         add_row_from_dict(table, row)
 

@@ -8,6 +8,7 @@ from dstack._internal.server.schemas.gateways import (
     CreateGatewayRequest,
     DeleteGatewaysRequest,
     GetGatewayRequest,
+    ListGatewaysRequest,
     SetDefaultGatewayRequest,
     SetWildcardDomainRequest,
 )
@@ -15,8 +16,11 @@ from dstack.api.server._group import APIClientGroup
 
 
 class GatewaysAPIClient(APIClientGroup):
-    def list(self, project_name: str) -> List[Gateway]:
-        resp = self._request(f"/api/project/{project_name}/gateways/list")
+    def list(self, project_name: str, *, include_imported: bool = False) -> List[Gateway]:
+        body = ListGatewaysRequest(
+            include_imported=include_imported,
+        )
+        resp = self._request(f"/api/project/{project_name}/gateways/list", body=body.json())
         return parse_obj_as(List[Gateway.__response__], resp.json())
 
     def get(self, project_name: str, gateway_name: str) -> Gateway:

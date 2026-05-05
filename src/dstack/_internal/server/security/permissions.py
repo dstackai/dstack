@@ -12,7 +12,9 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import (
     ExportedFleetModel,
+    ExportedGatewayModel,
     FleetModel,
+    GatewayModel,
     ImportModel,
     InstanceModel,
     MemberModel,
@@ -306,6 +308,32 @@ async def check_can_access_fleet(
     else:
         filters.append(FleetModel.id == fleet_name_or_id.id)
     res = await session.execute(select(func.count()).select_from(FleetModel).where(*filters))
+    if res.scalar_one() == 0:
+        raise error_forbidden()
+
+
+async def check_can_access_gateway(
+    session: AsyncSession,
+    user: UserModel,
+    gateway_project: ProjectModel,
+    gateway_name: str,
+) -> None:
+    if (
+        user.global_role == GlobalRole.ADMIN
+        or get_user_project_role(user=user, project=gateway_project) is not None
+    ):
+        return
+    filters = [
+        GatewayModel.project_id == gateway_project.id,
+        GatewayModel.name == gateway_name,
+        exists().where(
+            MemberModel.user_id == user.id,
+            MemberModel.project_id == ImportModel.project_id,
+            ImportModel.export_id == ExportedGatewayModel.export_id,
+            ExportedGatewayModel.gateway_id == GatewayModel.id,
+        ),
+    ]
+    res = await session.execute(select(func.count()).select_from(GatewayModel).where(*filters))
     if res.scalar_one() == 0:
         raise error_forbidden()
 

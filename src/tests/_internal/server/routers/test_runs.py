@@ -1338,6 +1338,61 @@ class TestGetRun:
         assert response.json()["run_spec"]["configuration"]["fleets"] == expected_fleets
         assert response.json()["run_spec"]["profile"]["fleets"] == expected_fleets
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "client_version,expected_gateway",
+        [
+            (
+                "0.20.19",
+                "other-project/my-gateway",
+            ),
+            (
+                "0.20.20",
+                {"project": "other-project", "name": "my-gateway"},
+            ),
+            (
+                None,
+                {"project": "other-project", "name": "my-gateway"},
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_patches_service_gateway_for_old_clients(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        client_version: Optional[str],
+        expected_gateway,
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+
+        run_spec = get_run_spec(
+            configuration=ServiceConfiguration(
+                commands=["echo hello"],
+                port=80,
+                gateway=EntityReference(project="other-project", name="my-gateway"),
+            ),
+            repo_id=repo.name,
+        )
+        run = await create_run(
+            session=session, project=project, repo=repo, user=user, run_spec=run_spec
+        )
+
+        headers = get_auth_headers(user.token)
+        if client_version is not None:
+            headers["X-API-Version"] = client_version
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get",
+            headers=headers,
+            json={"run_name": run.run_name},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["run_spec"]["configuration"]["gateway"] == expected_gateway
+
 
 class TestGetRunPlan:
     @pytest.mark.asyncio
@@ -3390,7 +3445,10 @@ class TestSubmitService:
         assert response.status_code == 400
         assert response.json() == {
             "detail": [
-                {"msg": "Gateway nonexistent does not exist", "code": "resource_not_exists"}
+                {
+                    "msg": f"Gateway nonexistent does not exist in project {project.name}",
+                    "code": "resource_not_exists",
+                }
             ]
         }
 
@@ -3415,6 +3473,95 @@ class TestSubmitService:
             "detail": [
                 {
                     "msg": "The service requires a gateway, but there is no default gateway in the project",
+                    "code": "resource_not_exists",
+                }
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_submit_to_foreign_gateway_only_if_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        exporter_user = await create_user(
+            session=session, global_role=GlobalRole.USER, name="exporter_user"
+        )
+        exporter_project = await create_project(
+            session=session, owner=exporter_user, name="exporter-project"
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            status=GatewayStatus.RUNNING,
+            name="exported-gateway",
+            wildcard_domain="exported-gateway.example",
+        )
+
+        importer_user = await create_user(
+            session=session, global_role=GlobalRole.USER, name="importer_user"
+        )
+        importer_project = await create_project(
+            session=session, owner=importer_user, name="importer-project"
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.USER,
+        )
+        importer_repo = await create_repo(session=session, project_id=importer_project.id)
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+
+        not_importer_user = await create_user(
+            session=session, global_role=GlobalRole.USER, name="not_importer_user"
+        )
+        not_importer_project = await create_project(
+            session=session, owner=not_importer_user, name="not-importer-project"
+        )
+        await add_project_member(
+            session=session,
+            project=not_importer_project,
+            user=not_importer_user,
+            project_role=ProjectRole.USER,
+        )
+        not_importer_repo = await create_repo(session=session, project_id=not_importer_project.id)
+
+        importer_run_spec = get_service_run_spec(
+            repo_id=importer_repo.name,
+            run_name="test-service",
+            gateway="exporter-project/exported-gateway",
+        )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/runs/submit",
+            headers=get_auth_headers(importer_user.token),
+            json={"run_spec": importer_run_spec},
+        )
+        assert response.status_code == 200
+        assert response.json()["service"]["url"] == "https://test-service.exported-gateway.example"
+
+        not_importer_run_spec = get_service_run_spec(
+            repo_id=not_importer_repo.name,
+            gateway="exporter-project/exported-gateway",
+        )
+        response = await client.post(
+            f"/api/project/{not_importer_project.name}/runs/submit",
+            headers=get_auth_headers(not_importer_user.token),
+            json={"run_spec": not_importer_run_spec},
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [
+                {
+                    "msg": "Gateway exporter-project/exported-gateway does not exist in project not-importer-project",
                     "code": "resource_not_exists",
                 }
             ]

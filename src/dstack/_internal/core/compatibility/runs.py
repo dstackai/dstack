@@ -2,6 +2,7 @@ from typing import Optional
 
 from dstack._internal.core.compatibility.common import patch_profile_params
 from dstack._internal.core.models.common import (
+    EntityReference,
     IncludeExcludeDictType,
     IncludeExcludeSetType,
 )
@@ -177,3 +178,7 @@ def patch_run_spec(run_spec: RunSpec) -> None:
     patch_profile_params(run_spec.configuration)
     if run_spec.profile is not None:
         patch_profile_params(run_spec.profile)
+    if isinstance(run_spec.configuration, ServiceConfiguration):
+        if isinstance(run_spec.configuration.gateway, EntityReference):
+            # Pre-0.20.20 servers do not support `EntityReference` in `gateway`
+            run_spec.configuration.gateway = run_spec.configuration.gateway.format()

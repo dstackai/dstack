@@ -3,11 +3,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from dstack._internal.core.errors import ResourceNotExistsError
-from dstack._internal.core.models.imports import Import, ImportExport, ImportExportedFleet
+from dstack._internal.core.models.imports import (
+    Import,
+    ImportExport,
+    ImportExportedFleet,
+    ImportExportedGateway,
+)
 from dstack._internal.server.models import (
     ExportedFleetModel,
+    ExportedGatewayModel,
     ExportModel,
     FleetModel,
+    GatewayModel,
     ImportModel,
     ProjectModel,
 )
@@ -31,6 +38,9 @@ async def list_imports(session: AsyncSession, project: ProjectModel) -> list[Imp
                 )
                 .joinedload(ExportedFleetModel.fleet)
                 .load_only(FleetModel.id, FleetModel.name),
+                selectinload(ExportModel.exported_gateways)
+                .joinedload(ExportedGatewayModel.gateway)
+                .load_only(GatewayModel.id, GatewayModel.name),
             )
         )
         .order_by(ImportModel.created_at.desc())
@@ -79,6 +89,13 @@ def import_model_to_import(import_model: ImportModel) -> Import:
                     name=ef.fleet.name,
                 )
                 for ef in import_model.export.exported_fleets
+            ],
+            exported_gateways=[
+                ImportExportedGateway(
+                    id=eg.gateway.id,
+                    name=eg.gateway.name,
+                )
+                for eg in import_model.export.exported_gateways
             ],
         ),
     )

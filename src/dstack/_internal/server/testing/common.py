@@ -100,6 +100,7 @@ from dstack._internal.server.models import (
     DecryptedString,
     EventModel,
     ExportedFleetModel,
+    ExportedGatewayModel,
     ExportModel,
     FileArchiveModel,
     FleetModel,
@@ -591,6 +592,7 @@ async def create_export(
     exporter_project: ProjectModel,
     importer_projects: list[ProjectModel],
     exported_fleets: list[FleetModel],
+    exported_gateways: Optional[list[GatewayModel]] = None,
     name: str = "test-export",
 ) -> ExportModel:
     export = ExportModel(
@@ -598,6 +600,9 @@ async def create_export(
         project=exporter_project,
         imports=[ImportModel(project=project) for project in importer_projects],
         exported_fleets=[ExportedFleetModel(fleet=fleet) for fleet in exported_fleets],
+        exported_gateways=[
+            ExportedGatewayModel(gateway=gateway) for gateway in (exported_gateways or [])
+        ],
     )
     session.add(export)
     await session.commit()
