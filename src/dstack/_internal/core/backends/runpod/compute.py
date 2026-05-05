@@ -430,7 +430,19 @@ class RunpodCompute(
 
     def delete_volume(self, volume: Volume):
         if volume.volume_id is not None:
-            self.api_client.delete_network_volume(volume_id=volume.volume_id)
+            try:
+                self.api_client.delete_network_volume(volume_id=volume.volume_id)
+            except RunpodApiClientError as e:
+                if (
+                    len(e.errors) > 0
+                    and "Tried to delete nonexistent network volume" in e.errors[0]["message"]
+                ):
+                    logger.debug(
+                        "The volume %s not found. Skipping deletion.",
+                        volume.volume_id,
+                    )
+                    return
+                raise
 
     def _generate_container_registry_auth_id(
         self, registry_auth: Optional[RegistryAuth]
