@@ -22,4 +22,4 @@ class Export(CoreModel):
     name: str
     imports: list[ExportImport]
     exported_fleets: list[ExportedFleet]
-    exported_gateways: list[ExportedGateway]
+    exported_gateways: list[ExportedGateway] = []
