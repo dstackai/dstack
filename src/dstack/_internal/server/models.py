@@ -1142,6 +1142,10 @@ class ExportModel(BaseModel):
         back_populates="export",
         cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
     )
+    exported_gateways: Mapped[List["ExportedGatewayModel"]] = relationship(
+        back_populates="export",
+        cascade=CASCADE_DEFAULT_WITH_DELETE_ORPHAN,
+    )
 
 
 class ImportModel(BaseModel):
@@ -1185,6 +1189,27 @@ class ExportedFleetModel(BaseModel):
         ForeignKey("fleets.id", ondelete="CASCADE"), index=True
     )
     fleet: Mapped["FleetModel"] = relationship()
+
+
+class ExportedGatewayModel(BaseModel):
+    __tablename__ = "exported_gateways"
+    __table_args__ = (
+        UniqueConstraint(
+            "export_id", "gateway_id", name="uq_exported_gateways_export_id_gateway_id"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    export_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("exports.id", ondelete="CASCADE"), index=True
+    )
+    export: Mapped["ExportModel"] = relationship()
+    gateway_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("gateways.id", ondelete="CASCADE"), index=True
+    )
+    gateway: Mapped["GatewayModel"] = relationship()
 
 
 class UserPublicKeyModel(BaseModel):

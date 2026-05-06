@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 
 from rich.table import Table
 
-from dstack._internal.cli.utils.common import add_row_from_dict, console
+from dstack._internal.cli.utils.common import add_row_from_dict, console, format_entity_reference
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import Fleet, FleetNodesSpec, FleetStatus
 from dstack._internal.core.models.instances import Instance, InstanceStatus
@@ -43,10 +43,6 @@ def get_fleets_table(
         config = fleet.spec.configuration
         merged_profile = fleet.spec.merged_profile
 
-        name = fleet.name
-        if fleet.project_name != current_project:
-            name = f"{fleet.project_name}/{fleet.name}"
-
         # Detect SSH fleet vs backend fleet
         if config.ssh_config is not None:
             # SSH fleet: fixed number of hosts, no cloud billing
@@ -76,7 +72,7 @@ def get_fleets_table(
             nodes = f"{nodes} (cluster)"
 
         fleet_row = {
-            "NAME": name,
+            "NAME": format_entity_reference(fleet.name, fleet.project_name, current_project),
             "NODES": nodes,
             "RESOURCES": resources,
             "GPU": gpu,

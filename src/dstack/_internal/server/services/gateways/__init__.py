@@ -8,7 +8,7 @@ from functools import partial
 from typing import List, Optional, Sequence
 
 import httpx
-from sqlalchemy import func, select, update
+from sqlalchemy import exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -30,6 +30,7 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.gateways import (
     AnyGatewayRouterConfig,
     Gateway,
@@ -44,8 +45,10 @@ from dstack._internal.server import settings
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     BackendModel,
+    ExportedGatewayModel,
     GatewayComputeModel,
     GatewayModel,
+    ImportModel,
     ProjectModel,
     UserModel,
 )
@@ -125,29 +128,37 @@ GATEWAY_CONFIGURE_ATTEMPTS = 50
 GATEWAY_CONFIGURE_DELAY = 3
 
 
-async def list_project_gateways(session: AsyncSession, project: ProjectModel) -> List[Gateway]:
+async def list_project_gateways(
+    session: AsyncSession,
+    project: ProjectModel,
+    include_imported: bool = False,
+) -> List[Gateway]:
     gateways = await list_project_gateway_models(
         session=session,
         project=project,
+        include_imported=include_imported,
         load_gateway_compute=True,
         load_backend_type=True,
     )
-    return [gateway_model_to_gateway(g) for g in gateways]
+    return [
+        gateway_model_to_gateway(g, default_gateway_id=project.default_gateway_id)
+        for g in gateways
+    ]
 
 
 async def get_gateway_by_name(
     session: AsyncSession, project: ProjectModel, name: str
 ) -> Optional[Gateway]:
-    gateway = await get_project_gateway_model_by_name(
+    gateway = await get_project_gateway_model_by_reference(
         session=session,
         project=project,
-        name=name,
+        ref=EntityReference(name=name, project=None),
         load_gateway_compute=True,
         load_backend_type=True,
     )
     if gateway is None:
         return None
-    return gateway_model_to_gateway(gateway)
+    return gateway_model_to_gateway(gateway, default_gateway_id=project.default_gateway_id)
 
 
 async def create_gateway_compute(
@@ -254,16 +265,17 @@ async def create_gateway(
             await set_default_gateway(
                 session=session, project=project, name=configuration.name, user=user
             )
+            default_gateway = gateway
         pipeline_hinter.hint_fetch(GatewayModel.__name__)
-        gateway = await get_project_gateway_model_by_name(
+        gateway = await get_project_gateway_model_by_reference(
             session=session,
             project=project,
-            name=configuration.name,
+            ref=EntityReference(name=configuration.name, project=None),
             load_gateway_compute=True,
             load_backend_type=True,
         )
         assert gateway is not None
-        return gateway_model_to_gateway(gateway)
+        return gateway_model_to_gateway(gateway, default_gateway_id=default_gateway.id)
 
 
 # NOTE: dstack Sky imports and uses this function
@@ -378,13 +390,15 @@ async def set_gateway_wildcard_domain(
                 targets=[events.Target.from_model(gateway)],
             )
             await session.commit()
-    return gateway_model_to_gateway(gateway)
+    return gateway_model_to_gateway(gateway, default_gateway_id=project.default_gateway_id)
 
 
 async def set_default_gateway(
     session: AsyncSession, project: ProjectModel, name: str, user: Optional[UserModel]
 ):
-    gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
+    gateway = await get_project_gateway_model_by_reference(
+        session=session, project=project, ref=EntityReference(name=name, project=None)
+    )
     if gateway is None:
         raise ResourceNotExistsError()
     if gateway.to_be_deleted:
@@ -420,29 +434,52 @@ async def set_default_gateway(
 async def list_project_gateway_models(
     session: AsyncSession,
     project: ProjectModel,
+    include_imported: bool = False,
     load_gateway_compute: bool = False,
     load_backend_type: bool = False,
 ) -> Sequence[GatewayModel]:
-    stmt = select(GatewayModel).where(GatewayModel.project_id == project.id)
+    stmt = select(GatewayModel)
+    if include_imported:
+        stmt = stmt.where(
+            or_(
+                GatewayModel.project_id == project.id,
+                exists().where(
+                    ImportModel.project_id == project.id,
+                    ImportModel.export_id == ExportedGatewayModel.export_id,
+                    ExportedGatewayModel.gateway_id == GatewayModel.id,
+                ),
+            )
+        ).options(joinedload(GatewayModel.project).load_only(ProjectModel.id, ProjectModel.name))
+    else:
+        stmt = stmt.where(GatewayModel.project_id == project.id)
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
     if load_backend_type:
         stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
-    return res.scalars().all()
+    return res.unique().scalars().all()
 
 
-async def get_project_gateway_model_by_name(
+async def get_project_gateway_model_by_reference(
     session: AsyncSession,
     project: ProjectModel,
-    name: str,
+    ref: EntityReference,
     load_gateway_compute: bool = False,
     load_backend_type: bool = False,
 ) -> Optional[GatewayModel]:
-    stmt = select(GatewayModel).where(
-        GatewayModel.project_id == project.id,
-        GatewayModel.name == name,
-    )
+    stmt = select(GatewayModel).where(GatewayModel.name == ref.name)
+    if ref.project is None or ref.project == project.name:
+        stmt = stmt.where(GatewayModel.project_id == project.id)
+    else:
+        stmt = stmt.where(
+            exists().where(
+                ImportModel.project_id == project.id,
+                ImportModel.export_id == ExportedGatewayModel.export_id,
+                ExportedGatewayModel.gateway_id == GatewayModel.id,
+                GatewayModel.project_id == ProjectModel.id,
+                ProjectModel.name == ref.project,
+            )
+        )
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
     if load_backend_type:
@@ -708,7 +745,15 @@ def get_gateway_compute_configuration(
     )
 
 
-def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
+def gateway_model_to_gateway(
+    gateway_model: GatewayModel, default_gateway_id: Optional[uuid.UUID]
+) -> Gateway:
+    """
+    Args:
+        gateway_model: Gateway model to convert
+        default_gateway_id: ID of the default gateway in the project where `gateway_model` is being
+            viewed. Can be different from `gateway_model.project` if the gateway is imported.
+    """
     ip_address = ""
     instance_id = ""
     hostname = ""
@@ -721,18 +766,20 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
     backend_type = gateway_model.backend.type
     if gateway_model.backend.type == BackendType.DSTACK:
         backend_type = BackendType.AWS
+    is_default = default_gateway_id == gateway_model.id
     configuration = get_gateway_configuration(gateway_model)
-    configuration.default = gateway_model.project.default_gateway_id == gateway_model.id
+    configuration.default = is_default
     return Gateway(
         id=gateway_model.id,
         name=gateway_model.name,
+        project_name=gateway_model.project.name,
         ip_address=ip_address,
         instance_id=instance_id,
         hostname=hostname,
         backend=backend_type,
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
-        default=gateway_model.project.default_gateway_id == gateway_model.id,
+        default=is_default,
         created_at=gateway_model.created_at,
         status=gateway_model.status,
         status_message=gateway_model.status_message,

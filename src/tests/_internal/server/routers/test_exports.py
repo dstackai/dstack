@@ -9,8 +9,10 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import ExportModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_backend,
     create_export,
     create_fleet,
+    create_gateway,
     create_project,
     create_user,
     get_auth_headers,
@@ -87,6 +89,10 @@ class TestCreateExport:
             name="fleet1",
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
         )
+        backend = await create_backend(session=session, project_id=project.id)
+        await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway1"
+        )
 
         response = await client.post(
             f"/api/project/{project.name}/exports/create",
@@ -95,6 +101,7 @@ class TestCreateExport:
                 "name": "test-export",
                 "importer_projects": ["ImporterProject"],
                 "exported_fleets": ["fleet1"],
+                "exported_gateways": ["gateway1"],
             },
         )
         assert response.status_code == 200
@@ -104,6 +111,8 @@ class TestCreateExport:
         assert export_response["imports"][0]["project_name"] == "ImporterProject"
         assert len(export_response["exported_fleets"]) == 1
         assert export_response["exported_fleets"][0]["name"] == "fleet1"
+        assert len(export_response["exported_gateways"]) == 1
+        assert export_response["exported_gateways"][0]["name"] == "gateway1"
 
         res = await session.execute(select(ExportModel).where(ExportModel.name == "test-export"))
         assert res.scalar() is not None
@@ -161,6 +170,14 @@ class TestCreateExport:
             pytest.param(
                 {
                     "name": "test-export",
+                    "exported_gateways": ["nonexistent-gateway"],
+                },
+                "Gateways {'nonexistent-gateway'} not found in project 'ExporterProject'",
+                id="nonexistent-gateway",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
                     "importer_projects": [
                         "ImporterProject",
                         "iMpOrTeRpRoJeCt",
@@ -176,6 +193,14 @@ class TestCreateExport:
                 },
                 "Some fleets are listed for addition more than once",
                 id="duplicate-fleet",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "exported_gateways": ["exported-gateway", "exported-gateway"],
+                },
+                "Some gateways are listed for addition more than once",
+                id="duplicate-gateway",
             ),
             pytest.param(
                 {
@@ -237,6 +262,13 @@ class TestCreateExport:
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
         )
         await create_fleet(session=session, project=project, name="cloud-fleet")
+        backend = await create_backend(session=session, project_id=project.id)
+        await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="exported-gateway",
+        )
         not_permitted_project = await create_project(
             session=session, name="NotPermittedProject", owner=user
         )
@@ -344,11 +376,19 @@ class TestUpdateExport:
             name="fleet2",
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
         )
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway1 = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway1"
+        )
+        gateway2 = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway2"
+        )
         export = await create_export(
             session=session,
             exporter_project=project,
             importer_projects=[other_project, another_project],
             exported_fleets=[fleet1, fleet2],
+            exported_gateways=[gateway1, gateway2],
             name="test-export",
         )
 
@@ -365,6 +405,9 @@ class TestUpdateExport:
             project=project,
             name="fleet4",
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway3"
         )
         if importer_project_role is not None:
             await add_project_member(
@@ -383,6 +426,8 @@ class TestUpdateExport:
                 "remove_importer_projects": ["AnotherProject"],
                 "add_exported_fleets": ["fleet3", "fleet4"],
                 "remove_exported_fleets": ["fleet2"],
+                "add_exported_gateways": ["gateway3"],
+                "remove_exported_gateways": ["gateway2"],
             },
         )
         assert response.status_code == 200
@@ -401,10 +446,16 @@ class TestUpdateExport:
             "fleet3",
             "fleet4",
         }
+        assert len(export_response["exported_gateways"]) == 2
+        assert {g["name"] for g in export_response["exported_gateways"]} == {
+            "gateway1",
+            "gateway3",
+        }
 
-        await session.refresh(export, ["imports", "exported_fleets"])
+        await session.refresh(export, ["imports", "exported_fleets", "exported_gateways"])
         assert len(export.imports) == 3
         assert len(export.exported_fleets) == 3
+        assert len(export.exported_gateways) == 2
 
         response = await client.post(
             f"/api/project/{project.name}/exports/list", headers=get_auth_headers(user.token)
@@ -416,6 +467,8 @@ class TestUpdateExport:
         export_list[0]["imports"].sort(key=lambda i: i["project_name"])
         export_response["exported_fleets"].sort(key=lambda f: f["name"])
         export_list[0]["exported_fleets"].sort(key=lambda f: f["name"])
+        export_response["exported_gateways"].sort(key=lambda g: g["name"])
+        export_list[0]["exported_gateways"].sort(key=lambda g: g["name"])
         assert export_list[0] == export_response
 
     async def test_can_add_same_entities_as_existing_deleted_ones(
@@ -533,6 +586,14 @@ class TestUpdateExport:
             pytest.param(
                 {
                     "name": "test-export",
+                    "add_exported_gateways": ["nonexistent-gateway"],
+                },
+                "Gateways {'nonexistent-gateway'} not found in project 'ExporterProject'",
+                id="add-nonexistent-gateway",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
                     "add_importer_projects": ["iMpOrTeRpRoJeCt"],  # case-insensitive
                 },
                 "Projects {'importerproject'} are already importing export 'test-export'",
@@ -564,6 +625,22 @@ class TestUpdateExport:
                 },
                 "Some fleets are listed for addition more than once",
                 id="add-duplicate-fleet",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "add_exported_gateways": ["exported-gateway"],
+                },
+                "Gateways {'exported-gateway'} are already exported by export 'test-export'",
+                id="add-already-added-gateway",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "add_exported_gateways": ["not-exported-gateway", "not-exported-gateway"],
+                },
+                "Some gateways are listed for addition more than once",
+                id="add-duplicate-gateway",
             ),
             pytest.param(
                 {
@@ -616,6 +693,22 @@ class TestUpdateExport:
             pytest.param(
                 {
                     "name": "test-export",
+                    "remove_exported_gateways": ["not-exported-gateway"],
+                },
+                "Gateways {'not-exported-gateway'} are not exported by export 'test-export'",
+                id="remove-not-exported-gateway",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "remove_exported_gateways": ["nonexistent-gateway"],
+                },
+                "Gateways {'nonexistent-gateway'} are not exported by export 'test-export'",
+                id="remove-nonexistent-gateway",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
                     "remove_importer_projects": [
                         "ImporterProject",
                         "iMpOrTeRpRoJeCt",
@@ -635,6 +728,14 @@ class TestUpdateExport:
             pytest.param(
                 {
                     "name": "test-export",
+                    "remove_exported_gateways": ["exported-gateway", "exported-gateway"],
+                },
+                "Some gateways are listed for removal more than once",
+                id="remove-duplicate-gateway",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
                     "add_importer_projects": ["NotImporterProject"],
                     "remove_importer_projects": ["NoTiMpOrTeRpRoJeCt"],  # case-insensitive
                 },
@@ -649,6 +750,15 @@ class TestUpdateExport:
                 },
                 "Fleets {'not-exported-fleet'} are listed for both addition and removal. Cannot add and remove at the same time",
                 id="add-remove-same-fleet",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "add_exported_gateways": ["not-exported-gateway"],
+                    "remove_exported_gateways": ["not-exported-gateway"],
+                },
+                "Gateways {'not-exported-gateway'} are listed for both addition and removal. Cannot add and remove at the same time",
+                id="add-remove-same-gateway",
             ),
         ],
     )
@@ -672,11 +782,25 @@ class TestUpdateExport:
             name="exported-fleet",
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
         )
+        backend = await create_backend(session=session, project_id=project.id)
+        exported_gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="exported-gateway",
+        )
+        await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="not-exported-gateway",
+        )
         await create_export(
             session=session,
             exporter_project=project,
             importer_projects=[importer_project],
             exported_fleets=[exported_fleet],
+            exported_gateways=[exported_gateway],
             name="test-export",
         )
         await create_fleet(session=session, project=project, name="cloud-fleet")
@@ -847,12 +971,23 @@ class TestListExports:
             name="fleet2",
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
         )
-        for name, fleet in (("export1", fleet1), ("export2", fleet2)):
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway1 = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway1"
+        )
+        gateway2 = await create_gateway(
+            session=session, project_id=project.id, backend_id=backend.id, name="gateway2"
+        )
+        for name, fleet, gateway in (
+            ("export1", fleet1, gateway1),
+            ("export2", fleet2, gateway2),
+        ):
             await create_export(
                 session=session,
                 exporter_project=project,
                 importer_projects=[other_project],
                 exported_fleets=[fleet],
+                exported_gateways=[gateway],
                 name=name,
             )
 
@@ -870,12 +1005,16 @@ class TestListExports:
         assert exports[0]["imports"][0]["project_name"] == "OtherProject"
         assert len(exports[0]["exported_fleets"]) == 1
         assert exports[0]["exported_fleets"][0]["name"] == "fleet1"
+        assert len(exports[0]["exported_gateways"]) == 1
+        assert exports[0]["exported_gateways"][0]["name"] == "gateway1"
 
         assert exports[1]["name"] == "export2"
         assert len(exports[1]["imports"]) == 1
         assert exports[1]["imports"][0]["project_name"] == "OtherProject"
         assert len(exports[1]["exported_fleets"]) == 1
         assert exports[1]["exported_fleets"][0]["name"] == "fleet2"
+        assert len(exports[1]["exported_gateways"]) == 1
+        assert exports[1]["exported_gateways"][0]["name"] == "gateway2"
 
     @pytest.mark.parametrize(
         "global_role, project_role",

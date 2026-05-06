@@ -2,6 +2,7 @@ from typing import Optional
 
 from packaging.version import Version
 
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.runs import Run, RunPlan, RunSpec
 from dstack._internal.server.compatibility.common import patch_offers_list, patch_profile_params
@@ -44,3 +45,10 @@ def patch_run_spec(run_spec: RunSpec, client_version: Optional[Version]) -> None
     patch_profile_params(run_spec.configuration, client_version)
     if run_spec.profile is not None:
         patch_profile_params(run_spec.profile, client_version)
+    # Clients prior to 0.20.20 do not support `EntityReference` in `gateway`
+    if (
+        client_version < Version("0.20.20")
+        and isinstance(run_spec.configuration, ServiceConfiguration)
+        and isinstance(run_spec.configuration.gateway, EntityReference)
+    ):
+        run_spec.configuration.gateway = run_spec.configuration.gateway.format()

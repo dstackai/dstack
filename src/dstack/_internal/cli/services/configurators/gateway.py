@@ -122,7 +122,9 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
                 f"Provisioning [code]{gateway.name}[/]...", console=console
             ) as live:
                 while not _finished_provisioning(gateway):
-                    table = get_gateways_table([gateway], include_created=True)
+                    table = get_gateways_table(
+                        [gateway], current_project=self.api.project, include_created=True
+                    )
                     live.update(table)
                     time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     gateway = self.api.client.gateways.get(self.api.project, gateway.name)
@@ -139,6 +141,7 @@ class GatewayConfigurator(BaseApplyConfigurator[GatewayConfiguration]):
         console.print(
             get_gateways_table(
                 [gateway],
+                current_project=self.api.project,
                 verbose=gateway.status == GatewayStatus.FAILED,
                 include_created=True,
                 format_date=local_time,

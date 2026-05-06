@@ -14,6 +14,10 @@ class CreateGatewayRequest(generate_dual_core_model(CreateGatewayRequestConfig))
     configuration: GatewayConfiguration
 
 
+class ListGatewaysRequest(CoreModel):
+    include_imported: bool = False
+
+
 class GetGatewayRequest(CoreModel):
     name: str
 

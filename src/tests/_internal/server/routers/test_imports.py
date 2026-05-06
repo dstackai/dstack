@@ -9,8 +9,10 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import ExportModel, ImportModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_backend,
     create_export,
     create_fleet,
+    create_gateway,
     create_project,
     create_user,
     get_auth_headers,
@@ -195,11 +197,26 @@ class TestListImports:
             name="fleet2",
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
         )
+        backend1 = await create_backend(session=session, project_id=exporter_project1.id)
+        gateway1 = await create_gateway(
+            session=session,
+            project_id=exporter_project1.id,
+            backend_id=backend1.id,
+            name="gateway1",
+        )
+        backend2 = await create_backend(session=session, project_id=exporter_project2.id)
+        gateway2 = await create_gateway(
+            session=session,
+            project_id=exporter_project2.id,
+            backend_id=backend2.id,
+            name="gateway2",
+        )
         await create_export(
             session=session,
             exporter_project=exporter_project1,
             importer_projects=[importer_project],
             exported_fleets=[fleet1],
+            exported_gateways=[gateway1],
             name="export1",
         )
         await create_export(
@@ -207,6 +224,7 @@ class TestListImports:
             exporter_project=exporter_project2,
             importer_projects=[importer_project],
             exported_fleets=[fleet2],
+            exported_gateways=[gateway2],
             name="export2",
         )
 
@@ -223,11 +241,15 @@ class TestListImports:
         assert imports[0]["export"]["project_name"] == "ExporterProject1"
         assert len(imports[0]["export"]["exported_fleets"]) == 1
         assert imports[0]["export"]["exported_fleets"][0]["name"] == "fleet1"
+        assert len(imports[0]["export"]["exported_gateways"]) == 1
+        assert imports[0]["export"]["exported_gateways"][0]["name"] == "gateway1"
 
         assert imports[1]["export"]["name"] == "export2"
         assert imports[1]["export"]["project_name"] == "ExporterProject2"
         assert len(imports[1]["export"]["exported_fleets"]) == 1
         assert imports[1]["export"]["exported_fleets"][0]["name"] == "fleet2"
+        assert len(imports[1]["export"]["exported_gateways"]) == 1
+        assert imports[1]["export"]["exported_gateways"][0]["name"] == "gateway2"
 
     @pytest.mark.parametrize(
         "global_role, project_role",
