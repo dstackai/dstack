@@ -138,6 +138,58 @@ class TestListAndGetGateways:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_list_non_member_public_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session, is_public=True)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway_compute = await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+        )
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+        assert response.json()[0]["name"] == gateway.name
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_get_non_member_public_project(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session, is_public=True)
+        backend = await create_backend(session, project.id)
+        gateway_compute = await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+        )
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": gateway.name},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        assert response.json()["name"] == gateway.name
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_get_missing(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)

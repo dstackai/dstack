@@ -320,6 +320,7 @@ async def check_can_access_gateway(
 ) -> None:
     if (
         user.global_role == GlobalRole.ADMIN
+        or gateway_project.is_public
         or get_user_project_role(user=user, project=gateway_project) is not None
     ):
         return
