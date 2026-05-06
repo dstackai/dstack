@@ -31,17 +31,10 @@ def read_frontmatter(file_path: Path) -> Dict[str, Any]:
     return {}
 
 
-def get_page_info(page_path: str, docs_dir: Path, repo_root: Path) -> Optional[Dict[str, str]]:
+def get_page_info(page_path: str, docs_dir: Path) -> Optional[Dict[str, str]]:
     """Get title and description for a page from its frontmatter."""
     # page_path is relative to docs_dir
     full_path = docs_dir / page_path
-
-    # For examples/**/index.md, read from README.md at repo root (same logic as hooks.py)
-    if page_path.startswith("examples/") and page_path.endswith("index.md"):
-        example_dir = Path(page_path).parent
-        readme_path = repo_root / example_dir / "README.md"
-        if readme_path.exists():
-            full_path = readme_path
 
     if not full_path.exists():
         return None
@@ -67,7 +60,6 @@ def parse_mkdocs_nav(mkdocs_config: Dict[str, Any], repo_root: str) -> List[Dict
 
     # Get docs_dir from config
     docs_dir = Path(repo_root) / mkdocs_config.get("docs_dir", "docs")
-    repo_root_path = Path(repo_root)
 
     def extract_pages(content_list):
         """Recursively extract all pages from a section's content, including nested subsections."""
@@ -75,7 +67,7 @@ def parse_mkdocs_nav(mkdocs_config: Dict[str, Any], repo_root: str) -> List[Dict
         for item in content_list:
             if isinstance(item, str):
                 # Plain string path like "examples.md"
-                page_info = get_page_info(item, docs_dir, repo_root_path)
+                page_info = get_page_info(item, docs_dir)
                 if page_info:
                     items.append(
                         {
@@ -89,7 +81,7 @@ def parse_mkdocs_nav(mkdocs_config: Dict[str, Any], repo_root: str) -> List[Dict
                 for title, path in item.items():
                     if isinstance(path, str):
                         # Page with title
-                        page_info = get_page_info(path, docs_dir, repo_root_path)
+                        page_info = get_page_info(path, docs_dir)
                         if page_info:
                             items.append(
                                 {

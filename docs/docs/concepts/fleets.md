@@ -164,22 +164,22 @@ This property ensures that instances are interconnected. This is required for ru
 
     === "AWS"
         On AWS, `dstack` requires `public_ips` to be set to `false` in the backend configuration.
-        Refer to the [AWS](../../examples/clusters/aws/index.md) example for more details.
+        Refer to the [AWS](../../examples/clusters/aws.md) example for more details.
 
     === "GCP"
         On GCP, you may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
-        Refer to the [GCP](../../examples/clusters/gcp/index.md) examples for more details.
+        Refer to the [GCP](../../examples/clusters/gcp.md) examples for more details.
 
     === "Nebius"
         On [Nebius](https://docs.nebius.com/compute/clusters/gpu), `dstack` automatically configures InfiniBand networking if it is supported by the selected instance type.
 
     === "Crusoe"
         On [Crusoe](https://docs.crusoecloud.com/networking/infiniband/managing-infiniband-networks), `dstack` automatically configures InfiniBand networking if it is supported by the selected instance type.
-        Refer to the [Crusoe](../../examples/clusters/crusoe/index.md#vms) example for more details.
+        Refer to the [Crusoe](../../examples/clusters/crusoe.md#vms) example for more details.
 
     === "Kubernetes"
         If the Kubernetes cluster has interconnect configured, `dstack` can use it without additional setup.
-        See the [Lambda](../../examples/clusters/lambda/index.md#kubernetes) or [Crusoe](../../examples/clusters/crusoe/index.md#kubernetes) examples.
+        See the [Lambda](../../examples/clusters/lambda.md#kubernetes) or [Crusoe](../../examples/clusters/crusoe.md#kubernetes) examples.
     
     > See the [Clusters](../../examples.md#clusters) examples.
 

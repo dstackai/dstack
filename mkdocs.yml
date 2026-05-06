@@ -98,41 +98,41 @@ plugins:
         "docs/tasks.md": "docs/concepts/tasks.md"
         "docs/services.md": "docs/concepts/services.md"
         "docs/fleets.md": "docs/concepts/fleets.md"
-        "docs/examples/llms/llama31.md": "examples/inference/vllm/index.md"
-        "docs/examples/llms/llama32.md": "examples/inference/vllm/index.md"
-        "docs/examples/llms/qwen36.md": "examples/models/qwen36/index.md"
-        "examples/llms/llama31/index.md": "examples/inference/vllm/index.md"
-        "examples/llms/llama32/index.md": "examples/inference/vllm/index.md"
-        "examples/llms/qwen36/index.md": "examples/models/qwen36/index.md"
-        "docs/examples/accelerators/amd/index.md": "examples/accelerators/amd/index.md"
-        "docs/examples/deployment/nim/index.md": "examples/inference/nim/index.md"
-        "docs/examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
+        "docs/examples/llms/llama31.md": "examples/inference/vllm.md"
+        "docs/examples/llms/llama32.md": "examples/inference/vllm.md"
+        "docs/examples/llms/qwen36.md": "examples/models/qwen36.md"
+        "examples/llms/llama31/index.md": "examples/inference/vllm.md"
+        "examples/llms/llama32/index.md": "examples/inference/vllm.md"
+        "examples/llms/qwen36/index.md": "examples/models/qwen36.md"
+        "docs/examples/accelerators/amd/index.md": "examples/accelerators/amd.md"
+        "docs/examples/deployment/nim/index.md": "examples/inference/nim.md"
+        "docs/examples/deployment/vllm/index.md": "examples/inference/vllm.md"
         "backends.md": "docs/concepts/backends.md"
         "blog/monitoring-gpu-usage.md": "blog/posts/dstack-metrics.md"
         "blog/inactive-dev-environments-auto-shutdown.md": "blog/posts/inactivity-duration.md"
         "blog/data-centers-and-private-clouds.md": "blog/posts/gpu-blocks-and-proxy-jump.md"
-        "blog/distributed-training-with-aws-efa.md": "examples/clusters/aws/index.md"
+        "blog/distributed-training-with-aws-efa.md": "examples/clusters/aws.md"
         "blog/dstack-stats.md": "blog/posts/dstack-metrics.md"
         "docs/guides/metrics.md": "docs/concepts/metrics.md"
         "docs/guides/monitoring.md": "docs/concepts/metrics.md"
         "blog/nvidia-and-amd-on-vultr.md.md": "blog/posts/nvidia-and-amd-on-vultr.md"
-        "examples/misc/nccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
-        "examples/misc/a3high-clusters/index.md": "examples/clusters/gcp/index.md"
-        "examples/misc/a3mega-clusters/index.md": "examples/clusters/gcp/index.md"
-        "examples/distributed-training/nccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
-        "examples/distributed-training/rccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
-        "examples/deployment/nim/index.md": "examples/inference/nim/index.md"
-        "examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
-        "examples/deployment/sglang/index.md": "examples/inference/sglang/index.md"
-        "examples/deployment/trtllm/index.md": "examples/inference/trtllm/index.md"
-        "examples/fine-tuning/trl/index.md": "examples/single-node-training/trl/index.md"
-        "examples/fine-tuning/axolotl/index.md": "examples/single-node-training/axolotl/index.md"
-        "blog/efa.md": "examples/clusters/aws/index.md"
+        "examples/misc/nccl-tests/index.md": "examples/clusters/nccl-rccl-tests.md"
+        "examples/misc/a3high-clusters/index.md": "examples/clusters/gcp.md"
+        "examples/misc/a3mega-clusters/index.md": "examples/clusters/gcp.md"
+        "examples/distributed-training/nccl-tests/index.md": "examples/clusters/nccl-rccl-tests.md"
+        "examples/distributed-training/rccl-tests/index.md": "examples/clusters/nccl-rccl-tests.md"
+        "examples/deployment/nim/index.md": "examples/inference/nim.md"
+        "examples/deployment/vllm/index.md": "examples/inference/vllm.md"
+        "examples/deployment/sglang/index.md": "examples/inference/sglang.md"
+        "examples/deployment/trtllm/index.md": "examples/inference/trtllm.md"
+        "examples/fine-tuning/trl/index.md": "examples/single-node-training/trl.md"
+        "examples/fine-tuning/axolotl/index.md": "examples/single-node-training/axolotl.md"
+        "blog/efa.md": "examples/clusters/aws.md"
         "docs/concepts/repos.md": "docs/concepts/dev-environments.md#repos"
-        "examples/clusters/a3high/index.md": "examples/clusters/gcp/index.md"
-        "examples/clusters/a3mega/index.md": "examples/clusters/gcp/index.md"
-        "examples/clusters/a4/index.md": "examples/clusters/gcp/index.md"
-        "examples/clusters/efa/index.md": "examples/clusters/aws/index.md"
+        "examples/clusters/a3high/index.md": "examples/clusters/gcp.md"
+        "examples/clusters/a3mega/index.md": "examples/clusters/gcp.md"
+        "examples/clusters/a4/index.md": "examples/clusters/gcp.md"
+        "examples/clusters/efa/index.md": "examples/clusters/aws.md"
         "docs/guides/migration.md": "docs/guides/upgrade.md"
         "docs/reference/api/rest/index.md": "docs/reference/api/http/index.md"
   - typeset
@@ -242,10 +242,11 @@ nav:
       - Guides:
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
-          - Protips: docs/guides/protips.md
-          - Upgrade: docs/guides/upgrade.md
-          - Migration: 
-            - Slurm: docs/guides/migration/slurm.md
+          - More:
+            - Protips: docs/guides/protips.md
+            - Upgrade: docs/guides/upgrade.md
+            - Migration: 
+              - Slurm: docs/guides/migration/slurm.md
       - Reference:
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
@@ -288,31 +289,31 @@ nav:
   - Examples:
       - examples.md
       - Single-node training:
-          - TRL: examples/single-node-training/trl/index.md
-          - Axolotl: examples/single-node-training/axolotl/index.md
+          - TRL: examples/single-node-training/trl.md
+          - Axolotl: examples/single-node-training/axolotl.md
       - Distributed training:
-          - TRL: examples/distributed-training/trl/index.md
-          - Axolotl: examples/distributed-training/axolotl/index.md
-          - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
+          - TRL: examples/distributed-training/trl.md
+          - Axolotl: examples/distributed-training/axolotl.md
+          - Ray+RAGEN: examples/distributed-training/ray-ragen.md
       - Clusters:
-          - AWS: examples/clusters/aws/index.md
-          - GCP: examples/clusters/gcp/index.md
-          - Lambda: examples/clusters/lambda/index.md
-          - Crusoe: examples/clusters/crusoe/index.md
-          - Nebius: examples/clusters/nebius/index.md
-          - NCCL/RCCL tests: examples/clusters/nccl-rccl-tests/index.md
+          - AWS: examples/clusters/aws.md
+          - GCP: examples/clusters/gcp.md
+          - Lambda: examples/clusters/lambda.md
+          - Crusoe: examples/clusters/crusoe.md
+          - Nebius: examples/clusters/nebius.md
+          - NCCL/RCCL tests: examples/clusters/nccl-rccl-tests.md
       - Inference:
-          - SGLang: examples/inference/sglang/index.md
-          - vLLM: examples/inference/vllm/index.md
-          - NIM: examples/inference/nim/index.md
-          - TensorRT-LLM: examples/inference/trtllm/index.md
+          - SGLang: examples/inference/sglang.md
+          - vLLM: examples/inference/vllm.md
+          - NIM: examples/inference/nim.md
+          - TensorRT-LLM: examples/inference/trtllm.md
       - Models:
-          - DeepSeek V4: examples/models/deepseek-v4/index.md
-          - Qwen 3.6: examples/models/qwen36/index.md
+          - DeepSeek V4: examples/models/deepseek-v4.md
+          - Qwen 3.6: examples/models/qwen36.md
       - Accelerators:
-          - AMD: examples/accelerators/amd/index.md
-          - TPU: examples/accelerators/tpu/index.md
-          - Tenstorrent: examples/accelerators/tenstorrent/index.md
+          - AMD: examples/accelerators/amd.md
+          - TPU: examples/accelerators/tpu.md
+          - Tenstorrent: examples/accelerators/tenstorrent.md
   - Blog:
       - blog/index.md
   - Case studies: blog/case-studies.md
