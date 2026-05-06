@@ -67,7 +67,7 @@ $ dstack apply -f crusoe-fleet.dstack.yml
 
 This will automatically create an IB partition and provision instances with InfiniBand networking.
 
-Once the fleet is created, you can run [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), and [services](../../docs/concepts/services.md).
+Once the fleet is created, you can run [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), and [services](../../concepts/services.md).
 
 > If you want instances to be provisioned on demand, you can set `nodes` to `0..2`. In this case, `dstack` will create instances only when you run workloads.
 
@@ -84,7 +84,7 @@ Once the fleet is created, you can run [dev environments](../../docs/concepts/de
 
 ### Configure the backend
 
-Follow the standard instructions for setting up a [`kubernetes`](../../docs/concepts/backends.md#kubernetes) backend:
+Follow the standard instructions for setting up a [`kubernetes`](../../concepts/backends.md#kubernetes) backend:
 
 <div editor-title="~/.dstack/server/config.yml">
 
@@ -133,15 +133,15 @@ $ dstack apply -f crusoe-fleet.dstack.yml
 
 </div>
 
-Once the fleet is created, you can run [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), and [services](../../docs/concepts/services.md).
+Once the fleet is created, you can run [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), and [services](../../concepts/services.md).
 
 ## NCCL tests
 
-Use a [distributed task](../../docs/concepts/tasks.md#distributed-tasks) that runs NCCL tests to validate cluster network bandwidth.
+Use a [distributed task](../../concepts/tasks.md#distributed-tasks) that runs NCCL tests to validate cluster network bandwidth.
 
 === "VMs"
 
-    With the Crusoe backend, HPC-X and NCCL topology files are pre-installed on the host VM image. Mount them into the container via [instance volumes](../../docs/concepts/volumes.md#instance-volumes).
+    With the Crusoe backend, HPC-X and NCCL topology files are pre-installed on the host VM image. Mount them into the container via [instance volumes](../../concepts/volumes.md#instance-volumes).
 
     <div editor-title="crusoe-nccl-tests.dstack.yml">
 
@@ -275,6 +275,6 @@ $ dstack apply -f crusoe-nccl-tests.dstack.yml
 
 ## What's next
 
-1. Learn about [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md)
-2. Check out [backends](../../docs/concepts/backends.md#crusoe-cloud) and [fleets](../../docs/concepts/fleets.md#cloud-fleets)
+1. Learn about [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), [services](../../concepts/services.md)
+2. Check out [backends](../../concepts/backends.md#crusoe-cloud) and [fleets](../../concepts/fleets.md#cloud-fleets)
 3. Check the docs on [Crusoe's networking](https://docs.crusoecloud.com/networking/infiniband/) and ["Crusoe Managed" Kubernetes](https://docs.crusoecloud.com/orchestration/cmk/index.html)

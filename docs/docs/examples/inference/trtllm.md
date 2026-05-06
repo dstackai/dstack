@@ -53,7 +53,7 @@ resources:
 ```
 </div>
 
-Apply it with [`dstack apply`](../../docs/reference/cli/dstack/apply.md):
+Apply it with [`dstack apply`](../../reference/cli/dstack/apply.md):
 
 <div class="termy">
 
@@ -90,10 +90,10 @@ $ curl http://127.0.0.1:3000/proxy/services/main/qwen235/v1/chat/completions \
 
 </div>
 
-When a [gateway](../../docs/concepts/gateways.md) is configured, the service endpoint will be available at `https://qwen235.<gateway domain>/`.
+When a [gateway](../../concepts/gateways.md) is configured, the service endpoint will be available at `https://qwen235.<gateway domain>/`.
 
 ## What's next?
 
-1. Read about [services](../../docs/concepts/services.md) and [gateways](../../docs/concepts/gateways.md)
+1. Read about [services](../../concepts/services.md) and [gateways](../../concepts/gateways.md)
 2. Browse the [TensorRT-LLM deployment guides](https://nvidia.github.io/TensorRT-LLM/deployment-guide/index.html) and the [Qwen3 deployment guide](https://nvidia.github.io/TensorRT-LLM/deployment-guide/deployment-guide-for-qwen3-on-trtllm.html)
 3. See the [`trtllm-serve` reference](https://nvidia.github.io/TensorRT-LLM/commands/trtllm-serve/trtllm-serve.html)

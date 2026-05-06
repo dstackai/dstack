@@ -51,7 +51,7 @@ A healthy instance is ready for workloads. A warning means you should monitor it
 
 This release focuses on passive checks using DCGM background health checks. These run continuously and do not interrupt workloads.
 
-For active checks today, you can run [NCCL/RCCL tests](../../examples/clusters/nccl-rccl-tests.md) as a [distributed task](../../docs/concepts/tasks.md#distributed-tasks) to verify GPU-to-GPU communication and bandwidth across a fleet. Active tests like these can reveal network or interconnect issues that passive monitoring might miss. More built-in support for active diagnostics is planned.
+For active checks today, you can run [NCCL/RCCL tests](../../docs/examples/clusters/nccl-rccl-tests.md) as a [distributed task](../../docs/concepts/tasks.md#distributed-tasks) to verify GPU-to-GPU communication and bandwidth across a fleet. Active tests like these can reveal network or interconnect issues that passive monitoring might miss. More built-in support for active diagnostics is planned.
 
 ## Supported backends
 
@@ -68,6 +68,6 @@ If you have experience with GPU reliability or ideas for automated recovery, joi
 
 !!! info "What's next?"
     1. Check [Quickstart](../../docs/quickstart.md)
-    2. Explore the [clusters](../../examples.md#clusters) examples
+    2. Explore the [fleets](../../docs/concepts/fleets.md#cluster-placement) guide
     3. Learn more about [metrics](../../docs/concepts/metrics.md)
     4. Join [Discord](https://discord.gg/u8SmfwPpMd)

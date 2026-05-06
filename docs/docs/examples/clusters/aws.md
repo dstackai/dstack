@@ -197,6 +197,6 @@ Provisioning...
 Instead of setting `python`, you can specify your own Docker image using `image`. Make sure that the image is properly configured for EFA.
 
 !!! info "What's next"
-    1. Learn more about [distributed tasks](../../docs/concepts/tasks.md#distributed-tasks) and [cluster placement](../../docs/concepts/fleets.md#cluster-placement)
-    2. Check [dev environments](../../docs/concepts/dev-environments.md),
-       [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)
+    1. Learn more about [distributed tasks](../../concepts/tasks.md#distributed-tasks) and [cluster placement](../../concepts/fleets.md#cluster-placement)
+    2. Check [dev environments](../../concepts/dev-environments.md),
+       [services](../../concepts/services.md), and [fleets](../../concepts/fleets.md)

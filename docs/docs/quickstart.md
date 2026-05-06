@@ -277,5 +277,5 @@ Something not working? See the [troubleshooting](guides/troubleshooting.md) guid
 
 !!! info "What's next?"
     1. Read about [backends](concepts/backends.md),  [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), [services](concepts/services.md), and [fleets](concepts/services.md)
-    2. Browse [examples](../examples.md)
+    2. Browse [examples](examples.md)
     3. Join [Discord](https://discord.gg/u8SmfwPpMd)

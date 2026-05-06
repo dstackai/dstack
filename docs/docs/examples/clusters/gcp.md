@@ -518,10 +518,10 @@ Use a distributed task that runs NCCL tests to validate cluster network bandwidt
 ### Distributed training
 
 === "A4"
-    You can use the standard [distributed task](../../docs/concepts/tasks.md#distributed-tasks) example to run distributed training on A4 instances.
+    You can use the standard [distributed task](../../concepts/tasks.md#distributed-tasks) example to run distributed training on A4 instances.
 
 === "A3 Mega"
-    You can use the standard [distributed task](../../docs/concepts/tasks.md#distributed-tasks) example to run distributed training on A3 Mega instances. To enable GPUDirect-TCPX, make sure the required [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl) are properly set, for example by adding the following commands at the beginning:
+    You can use the standard [distributed task](../../concepts/tasks.md#distributed-tasks) example to run distributed training on A3 Mega instances. To enable GPUDirect-TCPX, make sure the required [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl) are properly set, for example by adding the following commands at the beginning:
 
     ```shell
     # ...
@@ -540,7 +540,7 @@ Use a distributed task that runs NCCL tests to validate cluster network bandwidt
     ```
 
 === "A3 High/Edge"
-    You can use the standard [distributed task](../../docs/concepts/tasks.md#distributed-tasks) example to run distributed training on A3 High/Edge instances. To enable GPUDirect-TCPX0, make sure the required [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl) are properly set, for example by adding the following commands at the beginning:
+    You can use the standard [distributed task](../../concepts/tasks.md#distributed-tasks) example to run distributed training on A3 High/Edge instances. To enable GPUDirect-TCPX0, make sure the required [NCCL environment variables](https://cloud.google.com/kubernetes-engine/docs/how-to/gpu-bandwidth-gpudirect-tcpx-autopilot#environment-variables-nccl) are properly set, for example by adding the following commands at the beginning:
 
     ```shell
     # ...
@@ -577,6 +577,6 @@ In addition to distributed training, you can of course run regular tasks, dev en
 
 ## What's new
 
-1. Learn about [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md)
-2. Read about [cluster placement](../../docs/concepts/fleets.md#cluster-placement)
+1. Learn about [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), [services](../../concepts/services.md)
+2. Read about [cluster placement](../../concepts/fleets.md#cluster-placement)
 3. Check GCP's docs on using [A4](https://docs.cloud.google.com/compute/docs/gpus/create-gpu-vm-a3u-a4), and [A3 Mega/High/Edge](https://docs.cloud.google.com/compute/docs/gpus/gpudirect) instances

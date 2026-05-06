@@ -97,10 +97,10 @@ router:
 
 </div>
 
-If you configure the `sglang` router, [services](../concepts/services.md) can run either [standard SGLang workers](../../examples/inference/sglang.md) or [Prefill-Decode workers](../../examples/inference/sglang.md#pd-disaggregation) (aka PD disaggregation).
+If you configure the `sglang` router, [services](../concepts/services.md) can run either [standard SGLang workers](../examples/inference/sglang.md) or [Prefill-Decode workers](../examples/inference/sglang.md#pd-disaggregation) (aka PD disaggregation).
 
 !!! note "PD disaggregation"
-    To run services with PD disaggregation see [SGLang PD disaggregation](https://dstack.ai/examples/inference/sglang/#pd-disaggregation).
+    To run services with PD disaggregation see [SGLang PD disaggregation](../examples/inference/sglang.md#pd-disaggregation).
 
 !!! note "Deprecation"
     Configuring the SGLang router in a gateway is deprecated and will be disallowed in a future release.

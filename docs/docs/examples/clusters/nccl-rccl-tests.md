@@ -5,10 +5,10 @@ description: Running NCCL and RCCL tests to validate cluster network bandwidth
 
 # NCCL/RCCL tests
 
-This example shows how to run [NCCL](https://github.com/NVIDIA/nccl-tests) or [RCCL](https://github.com/ROCm/rccl-tests) tests on a cluster using [distributed tasks](../../docs/concepts/tasks.md#distributed-tasks).
+This example shows how to run [NCCL](https://github.com/NVIDIA/nccl-tests) or [RCCL](https://github.com/ROCm/rccl-tests) tests on a cluster using [distributed tasks](../../concepts/tasks.md#distributed-tasks).
 
 !!! info "Prerequisites"
-    Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../docs/concepts/fleets.md#cluster-placement) or an [SSH fleet](../../docs/concepts/fleets.md#ssh-placement)).
+    Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#ssh-placement)).
 
 ## Running as a task
 
@@ -120,7 +120,7 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
 
 ### Apply a configuration
 
-To run a configuration, use the [`dstack apply`](../../docs/reference/cli/dstack/apply.md) command.
+To run a configuration, use the [`dstack apply`](../../reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
@@ -139,5 +139,5 @@ Submit the run nccl-tests? [y/n]: y
 
 ## What's next?
 
-1. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), 
-   [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md).
+1. Check [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), 
+   [services](../../concepts/services.md), and [fleets](../../concepts/fleets.md).

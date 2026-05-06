@@ -7,7 +7,7 @@ description: Deploying and fine-tuning models on Google Cloud TPUs using Optimum
 
 If you've configured the `gcp` backend in `dstack`, you can run dev environments, tasks, and services on [TPUs](https://cloud.google.com/tpu/docs/intro-to-tpu).
 Choose a TPU instance by specifying the TPU version and the number of cores (e.g. `v5litepod-8`) in the `gpu` property under `resources`,
-or request TPUs by specifying `tpu` as `vendor` ([see examples](../../docs/guides/protips.md#gpu)).
+or request TPUs by specifying `tpu` as `vendor` ([see examples](../../guides/protips.md#gpu)).
 
 Below are a few examples on using TPUs for deployment and fine-tuning.
 
@@ -18,12 +18,12 @@ Below are a few examples on using TPUs for deployment and fine-tuning.
 
 !!! info "TPU storage"
     By default, each TPU VM contains a 100GB boot disk and its size cannot be changed.
-    If you need more storage, attach additional disks using [Volumes](../../docs/concepts/volumes.md).
+    If you need more storage, attach additional disks using [Volumes](../../concepts/volumes.md).
 
 ## Deployment
 
 Many serving frameworks including vLLM and TGI have TPU support.
-Here's an example of a [service](../../docs/concepts/services.md) that deploys Llama 3.1 8B using
+Here's an example of a [service](../../concepts/services.md) that deploys Llama 3.1 8B using
 [Optimum TPU](https://github.com/huggingface/optimum-tpu)
 and [vLLM](https://github.com/vllm-project/vllm).
 
@@ -189,5 +189,5 @@ Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each co
 1. Browse [Optimum TPU](https://github.com/huggingface/optimum-tpu),
    [Optimum TPU TGI](https://github.com/huggingface/optimum-tpu/tree/main/text-generation-inference) and
    [vLLM](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html).
-2. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md),
-   [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md).
+2. Check [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md),
+   [services](../../concepts/services.md), and [fleets](../../concepts/fleets.md).

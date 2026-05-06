@@ -75,7 +75,7 @@ $ dstack apply -f nebius-fleet.dstack.yml
 
 This will automatically create a Nebius cluster and provision instances. 
 
-Once the fleet is created, you can run [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), and [services](../../docs/concepts/services.md).
+Once the fleet is created, you can run [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), and [services](../../concepts/services.md).
 
 > If you want instances to be provisioned on demand, you can set `nodes` to `0..2`. In this case, `dstack` will create instances only when you run workloads.
 
@@ -107,7 +107,7 @@ $ nebius mk8s cluster get-credentials --id &lt;cluster id&gt; --external
 
 ### Configure a backend
 
-Follow the standard instructions for setting up a [`kubernetes`](../../docs/concepts/backends.md#kubernetes) backend:
+Follow the standard instructions for setting up a [`kubernetes`](../../concepts/backends.md#kubernetes) backend:
 
 <div editor-title="~/.dstack/server/config.yml">
 
@@ -154,11 +154,11 @@ $ dstack apply -f nebius-fleet.dstack.yml
 
 </div>
 
-Once the fleet is created, you can run [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), and [services](../../docs/concepts/services.md).
+Once the fleet is created, you can run [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), and [services](../../concepts/services.md).
 
 ## NCCL tests
 
-Use a [distributed task](../../docs/concepts/tasks.md#distributed-tasks) to run NCCL tests and validate the cluster’s network bandwidth.
+Use a [distributed task](../../concepts/tasks.md#distributed-tasks) to run NCCL tests and validate the cluster’s network bandwidth.
 
 <div editor-title="nccl-tests.dstack.yml">
 
@@ -252,6 +252,6 @@ nccl-tests provisioning completed (running)
 
 ## What's next
 
-1. Learn about [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md)
-2. Check out [backends](../../docs/concepts/backends.md) and [fleets](../../docs/concepts/fleets.md)
+1. Learn about [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), [services](../../concepts/services.md)
+2. Check out [backends](../../concepts/backends.md) and [fleets](../../concepts/fleets.md)
 3. Read Nebius' docs on [networking for VMs](https://docs.nebius.com/compute/clusters/gpu) and the [managed Kubernetes service](https://docs.nebius.com/kubernetes).

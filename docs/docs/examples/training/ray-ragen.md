@@ -11,7 +11,7 @@ to fine-tune an agent on multiple nodes.
 Under the hood `RAGEN` uses [verl](https://github.com/volcengine/verl) for Reinforcement Learning and [Ray](https://docs.ray.io/en/latest/) for distributed training.
 
 !!! info "Prerequisites"
-    Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../docs/concepts/fleets.md#cluster-placement) or an [SSH fleet](../../docs/concepts/fleets.md#ssh-placement)).
+    Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#ssh-placement)).
 
 ## Run a Ray cluster
 
@@ -130,5 +130,5 @@ $ ray job submit \
 Using Ray via `dstack` is a powerful way to get access to the rich Ray ecosystem while benefiting from `dstack`'s provisioning capabilities.
 
 !!! info "What's next"
-    1. Read about [distributed tasks](../../docs/concepts/tasks.md#distributed-tasks), [fleets](../../docs/concepts/fleets.md), and [cluster placement](../../docs/concepts/fleets.md#cluster-placement)
+    1. Read about [distributed tasks](../../concepts/tasks.md#distributed-tasks), [fleets](../../concepts/fleets.md), and [cluster placement](../../concepts/fleets.md#cluster-placement)
     2. Browse Ray's [docs](https://docs.ray.io/en/latest/train/examples.html) for other examples.

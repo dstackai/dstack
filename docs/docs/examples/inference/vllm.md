@@ -89,7 +89,7 @@ Qwen3.6-27B is a multimodal model. For text-only workloads, add
 calling, add `--enable-auto-tool-choice --tool-call-parser qwen3_coder`.
 
 Save one of the configurations above as `service.dstack.yml`, then use the
-[`dstack apply`](../../docs/reference/cli/dstack/apply.md) command.
+[`dstack apply`](../../reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
@@ -122,9 +122,9 @@ curl http://127.0.0.1:3000/proxy/services/main/qwen36/v1/chat/completions \
 
 </div>
 
-> If a [gateway](../../docs/concepts/gateways.md) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://qwen36.<gateway domain>/`.
+> If a [gateway](../../concepts/gateways.md) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://qwen36.<gateway domain>/`.
 
 ## What's next?
 
-1. Read about [services](../../docs/concepts/services.md) and [gateways](../../docs/concepts/gateways.md)
+1. Read about [services](../../concepts/services.md) and [gateways](../../concepts/gateways.md)
 2. Browse the [Qwen 3.5 & 3.6 vLLM recipe](https://docs.vllm.ai/projects/recipes/en/latest/Qwen/Qwen3.5.html) and the [SGLang](../inference/sglang.md) example

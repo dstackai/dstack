@@ -1188,7 +1188,7 @@ projects:
 
     This applies to offers shown in `dstack apply` (run plans), during provisioning, and in `dstack offer`. Unlike other backends, offers for the `kubernetes` backend always reflect the lower limit of the range.
 
-> To learn more, see the [Lambda](../../examples/clusters/lambda/#kubernetes) and [Crusoe](../../examples/clusters/crusoe/#kubernetes) examples.
+> To learn more, see the [Lambda](../examples/clusters/lambda/#kubernetes) and [Crusoe](../examples/clusters/crusoe/#kubernetes) examples.
 
 ### Runpod
 

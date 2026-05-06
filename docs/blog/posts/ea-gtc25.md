@@ -85,4 +85,4 @@ By adopting tools that are cloud-agnostic and developer-friendly, EA has reduced
 !!! info "What's next?"
     1. Check [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), and [fleets](../../docs/concepts/fleets.md)
     2. Follow [Quickstart](../../docs/quickstart.md)
-    3. Browse [Examples](../../examples.md)
+    3. Browse [Examples](../../docs/examples.md)

@@ -19,7 +19,7 @@ description: Setting up Lambda clusters using Kubernetes or 1-Click Clusters wit
 
 ### Configure the backend
 
-Follow the standard instructions for setting up a [Kubernetes](../../docs/concepts/backends.md#kubernetes) backend:
+Follow the standard instructions for setting up a [Kubernetes](../../concepts/backends.md#kubernetes) backend:
 
 <div editor-title="~/.dstack/server/config.yml">
 
@@ -68,11 +68,11 @@ $ dstack apply -f lambda-fleet.dstack.yml
 
 </div>
 
-Once the fleet is created, you can run [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), and [services](../../docs/concepts/services.md).
+Once the fleet is created, you can run [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), and [services](../../concepts/services.md).
 
 ## 1-Click Clusters
 
-Another way to work with Lambda clusters is through [1CC](https://lambda.ai/1-click-clusters). While `dstack` supports automated cluster provisioning via [VM-based backends](../../docs/concepts/backends.md#vm-based), there is currently no programmatic way to provision Lambda 1CCs. As a result, to use a 1CC cluster with `dstack`, you must use [SSH fleets](../../docs/concepts/fleets.md).
+Another way to work with Lambda clusters is through [1CC](https://lambda.ai/1-click-clusters). While `dstack` supports automated cluster provisioning via [VM-based backends](../../concepts/backends.md#vm-based), there is currently no programmatic way to provision Lambda 1CCs. As a result, to use a 1CC cluster with `dstack`, you must use [SSH fleets](../../concepts/fleets.md).
 
 ### Prerequsisites
 
@@ -80,7 +80,7 @@ Another way to work with Lambda clusters is through [1CC](https://lambda.ai/1-cl
 
 ### Create a fleet
 
-Follow the standard instructions for setting up an [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets):
+Follow the standard instructions for setting up an [SSH fleet](../../concepts/fleets.md#ssh-fleets):
 
 <div editor-title="lambda-fleet.dstack.yml"> 
     
@@ -116,11 +116,11 @@ $ dstack apply -f lambda-fleet.dstack.yml
 
 </div>
 
-Once the fleet is created, you can run [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), and [services](../../docs/concepts/services.md).
+Once the fleet is created, you can run [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), and [services](../../concepts/services.md).
 
 ## Run tasks
 
-To run tasks on a cluster, you must use [distributed tasks](../../docs/concepts/tasks.md#distributed-task).
+To run tasks on a cluster, you must use [distributed tasks](../../concepts/tasks.md#distributed-task).
 
 ### Run NCCL tests
 
@@ -213,6 +213,6 @@ Provisioning...
 
 ## What's next
 
-1. Learn about [dev environments](../../docs/concepts/dev-environments.md), [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md)
-2. Read about the [Kubernetes backend](../../docs/concepts/backends.md#kubernetes) and [cluster placement](../../docs/concepts/fleets.md#cluster-placement)
+1. Learn about [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), [services](../../concepts/services.md)
+2. Read about the [Kubernetes backend](../../concepts/backends.md#kubernetes) and [cluster placement](../../concepts/fleets.md#cluster-placement)
 3. Check Lambda's docs on [Kubernetes](https://docs.lambda.ai/public-cloud/1-click-clusters/managed-kubernetes/#accessing-mk8s) and [1CC](https://docs.lambda.ai/public-cloud/1-click-clusters/)

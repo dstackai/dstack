@@ -6,7 +6,7 @@ description: Deploying DeepSeek-V4-Pro using SGLang on NVIDIA B200:8
 # DeepSeek V4
 
 This example shows how to deploy `deepseek-ai/DeepSeek-V4-Pro` as a
-[service](../../docs/concepts/services.md) using
+[service](../../concepts/services.md) using
 [SGLang](https://github.com/sgl-project/sglang) and `dstack`.
 
 ## Apply a configuration
@@ -64,7 +64,7 @@ This configuration uses the single-node Blackwell `DeepSeek-V4-Pro` recipe
 shape for `8 x NVIDIA B200`.
 
 Export your Hugging Face token and apply the configuration with
-[`dstack apply`](../../docs/reference/cli/dstack/apply.md).
+[`dstack apply`](../../reference/cli/dstack/apply.md).
 
 <div class="termy">
 

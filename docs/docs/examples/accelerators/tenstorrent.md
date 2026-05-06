@@ -42,7 +42,7 @@ description: Running dev environments, tasks, and services on Tenstorrent Wormho
 
     </div>
 
-    For more details on fleet configuration, refer to [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets).
+    For more details on fleet configuration, refer to [SSH fleets](../../concepts/fleets.md#ssh-fleets).
 
 ## Services
 
@@ -123,10 +123,10 @@ Additionally, the model is available via `dstack`'s control plane UI:
 
 ![](https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-model-ui.png){ width=800 }
 
-When a [gateway](../../docs/concepts/gateways.md) is configured, the service endpoint 
+When a [gateway](../../concepts/gateways.md) is configured, the service endpoint 
 is available at `https://<run name>.<gateway domain>/`.
 
-> Services support many options, including authentication, auto-scaling policies, etc. To learn more, refer to [Services](../../docs/concepts/services.md).
+> Services support many options, including authentication, auto-scaling policies, etc. To learn more, refer to [Services](../../concepts/services.md).
 
 ## Tasks
 
@@ -159,7 +159,7 @@ resources:
 
 </div>
 
-> Tasks support many options, including multi-node configuration, max duration, etc. To learn more, refer to [Tasks](../../docs/concepts/tasks.md).
+> Tasks support many options, including multi-node configuration, max duration, etc. To learn more, refer to [Tasks](../../concepts/tasks.md).
 
 ## Dev environments
 
@@ -191,7 +191,7 @@ If you run it via `dstack apply`, it will output the URL to access it via your d
 
 ![](https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-cursor.png){ width=800 }
 
-> Dev nevironments support many options, including inactivity and max duration, IDE configuration, etc. To learn more, refer to [Dev environments](../../docs/concepts/tasks.md).
+> Dev nevironments support many options, including inactivity and max duration, IDE configuration, etc. To learn more, refer to [Dev environments](../../concepts/tasks.md).
 
 ??? info "Feedback"
     Found a bug, or want to request a feature? File it in the [issue tracker](https://github.com/dstackai/dstack/issues),

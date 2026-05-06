@@ -158,7 +158,7 @@ $ dstack apply -f examples/single-node-training/trl/intel/.dstack.yml -R
 
 `dstack` will automatically create containers according to the run configuration and execute them across the fleet.
 
-> Explore our [examples](../../examples/accelerators/intel/index.md) to learn how to train and deploy large models on
+> Explore our [examples](../../docs/examples/accelerators/intel/index.md) to learn how to train and deploy large models on
 > Intel Gaudi AI Accelerator.
 
 !!! info "Intel Tiber AI Cloud"

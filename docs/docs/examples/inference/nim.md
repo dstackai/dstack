@@ -8,7 +8,7 @@ description: Deploying Nemotron-3-Super-120B-A12B using NVIDIA NIM
 This example shows how to deploy Nemotron-3-Super-120B-A12B using [NVIDIA NIM](https://docs.nvidia.com/nim/large-language-models/latest/getting-started.html) and `dstack`.
 
 ??? info "Prerequisites"
-    Once `dstack` is [installed](../../docs/installation.md), clone the repo with examples.
+    Once `dstack` is [installed](../../installation.md), clone the repo with examples.
 
     <div class="termy">
  
@@ -54,7 +54,7 @@ resources:
 ### Running a configuration
 
 Save the configuration above as `nemotron120.dstack.yml`, then use the
-[`dstack apply`](../../docs/reference/cli/dstack/apply.md) command.
+[`dstack apply`](../../reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
@@ -91,9 +91,9 @@ $ curl http://127.0.0.1:3000/proxy/services/main/nemotron120/v1/chat/completions
 
 </div>
 
-When a [gateway](../../docs/concepts/gateways.md) is configured, the service endpoint will be available at `https://nemotron120.<gateway domain>/`.
+When a [gateway](../../concepts/gateways.md) is configured, the service endpoint will be available at `https://nemotron120.<gateway domain>/`.
 
 ## What's next?
 
-1. Check [services](../../docs/concepts/services.md)
+1. Check [services](../../concepts/services.md)
 2. Browse the [Nemotron-3-Super-120B-A12B model page](https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b)

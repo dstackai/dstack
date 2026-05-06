@@ -14,66 +14,39 @@ hide:
 }
 </style> -->
 
-## Single-node training
+## Training
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/single-node-training/trl"
+    <a href="/docs/examples/training/trl"
        class="feature-cell">
         <h3>
             TRL
         </h3>
 
         <p>
-            Fine-tune Llama 3.1 8B on a custom dataset using TRL.
+            Fine-tune Llama 3.1 8B with SFT and QLoRA, single-node or distributed across multiple nodes.
         </p>
     </a>
 
-    <a href="/examples/single-node-training/axolotl"
+    <a href="/docs/examples/training/axolotl"
        class="feature-cell">
         <h3>
             Axolotl
         </h3>
 
         <p>
-            Fine-tune Llama 4 on a custom dataset using Axolotl.
+            Fine-tune Llama models with FSDP and QLoRA, single-node or distributed across multiple nodes.
         </p>
     </a>
-</div>
 
-## Distributed training
-
-<div class="tx-landing__highlights_grid">
-    <a href="/examples/distributed-training/trl"
-       class="feature-cell sky">
-        <h3>
-            TRL
-        </h3>
-
-        <p>
-            Fine-tune LLM on multiple nodes
-            with TRL, Accelerate, and Deepspeed.
-        </p>
-    </a>
-    <a href="/examples/distributed-training/axolotl"
-       class="feature-cell sky">
-        <h3>
-            Axolotl
-        </h3>
-
-        <p>
-            Fine-tune LLM on multiple nodes
-            with Axolotl.
-        </p>
-    </a>
-    <a href="/examples/distributed-training/ray-ragen"
-       class="feature-cell sky">
+    <a href="/docs/examples/training/ray-ragen"
+       class="feature-cell">
         <h3>
             Ray+RAGEN
         </h3>
 
         <p>
-            Fine-tune an agent on multiple nodes
-            with RAGEN, verl, and Ray.
+            Fine-tune an agent on multiple nodes with RAGEN, verl, and Ray.
         </p>
     </a>
 </div>
@@ -82,7 +55,7 @@ hide:
 ## Clusters
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/clusters/gcp"
+    <a href="/docs/examples/clusters/gcp"
        class="feature-cell sky">
         <h3>
             GCP
@@ -92,7 +65,7 @@ hide:
             Set up GCP A4 and A3 clusters with optimized networking
         </p>
     </a>
-    <a href="/examples/clusters/efa"
+    <a href="/docs/examples/clusters/efa"
        class="feature-cell sky">
         <h3>
             AWS
@@ -102,7 +75,7 @@ hide:
             Set up AWS EFA clusters with optimized networking
         </p>
     </a>
-    <a href="/examples/clusters/lambda"
+    <a href="/docs/examples/clusters/lambda"
        class="feature-cell sky">
         <h3>
             Lambda
@@ -112,7 +85,7 @@ hide:
             Set up Lambda clusters with optimized networking
         </p>
     </a>
-    <a href="/examples/clusters/crusoe"
+    <a href="/docs/examples/clusters/crusoe"
        class="feature-cell sky">
         <h3>
             Crusoe
@@ -122,7 +95,7 @@ hide:
             Set up Crusoe clusters with optimized networking
         </p>
     </a>
-    <a href="/examples/clusters/nebius"
+    <a href="/docs/examples/clusters/nebius"
        class="feature-cell sky">
         <h3>
             Nebius
@@ -132,7 +105,7 @@ hide:
             Set up Nebius clusters with optimized networking
         </p>
     </a>
-    <a href="/examples/clusters/nccl-rccl-tests"
+    <a href="/docs/examples/clusters/nccl-rccl-tests"
        class="feature-cell sky">
         <h3>
             NCCL/RCCL tests
@@ -147,7 +120,7 @@ hide:
 ## Inference
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/inference/sglang" 
+    <a href="/docs/examples/inference/sglang" 
        class="feature-cell">
        <h3>
            SGLang
@@ -156,7 +129,7 @@ hide:
            Deploy Qwen3.6-27B with SGLang
       </p>
     </a>
-    <a href="/examples/inference/vllm" 
+    <a href="/docs/examples/inference/vllm" 
        class="feature-cell">
        <h3>
            vLLM
@@ -165,7 +138,7 @@ hide:
             Deploy Qwen3.6-27B with vLLM
         </p>
     </a>
-    <a href="/examples/inference/nim" 
+    <a href="/docs/examples/inference/nim" 
        class="feature-cell">
        <h3>
            NIM
@@ -174,7 +147,7 @@ hide:
             Deploy a DeepSeek distilled model with NIM
         </p>
     </a>
-    <a href="/examples/inference/trtllm"
+    <a href="/docs/examples/inference/trtllm"
        class="feature-cell">
        <h3>
            TensorRT-LLM
@@ -188,7 +161,7 @@ hide:
 ## Models
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/models/deepseek-v4"
+    <a href="/docs/examples/models/deepseek-v4"
        class="feature-cell">
         <h3>
             DeepSeek V4
@@ -199,7 +172,7 @@ hide:
         </p>
     </a>
 
-    <a href="/examples/models/qwen36"
+    <a href="/docs/examples/models/qwen36"
        class="feature-cell">
         <h3>
             Qwen 3.6
@@ -214,7 +187,7 @@ hide:
 ## Accelerators
 
 <div class="tx-landing__highlights_grid">
-    <a href="/examples/accelerators/amd"
+    <a href="/docs/examples/accelerators/amd"
        class="feature-cell sky">
         <h3>
             AMD
@@ -225,7 +198,7 @@ hide:
         </p>
     </a>
 
-    <a href="/examples/accelerators/tpu"
+    <a href="/docs/examples/accelerators/tpu"
        class="feature-cell sky">
         <h3>
             TPU
@@ -236,7 +209,7 @@ hide:
         </p>
     </a>
 
-    <a href="/examples/accelerators/tenstorrent"
+    <a href="/docs/examples/accelerators/tenstorrent"
        class="feature-cell sky">
         <h3>
             Tenstorrent

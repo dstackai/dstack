@@ -150,8 +150,10 @@ Jobs on each node communicate using their private IP addresses. Use `DSTACK_MAST
 
 `dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
     
-> For detailed examples, see the [distributed training](../../examples.md#distributed-training) 
-  and [clusters](../../examples.md#clusters) examples.
+!!! info "Examples"
+    See the training examples for [TRL](../examples/training/trl.md#distributed-training), [Axolotl](../examples/training/axolotl.md#distributed-training), and [Ray+RAGEN](../examples/training/ray-ragen.md).
+
+    See the cluster examples for [AWS](../examples/clusters/aws.md), [GCP](../examples/clusters/gcp.md), [Lambda](../examples/clusters/lambda.md), [Crusoe](../examples/clusters/crusoe.md), [Nebius](../examples/clusters/nebius.md), and [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md).
 
 ??? info "Network interface"
     Distributed frameworks usually detect the correct network interface automatically,
@@ -877,4 +879,4 @@ via the [`spot_policy`](../reference/dstack.yml/task.md#spot_policy) property. I
 !!! info "What's next?"
     1. Read about [dev environments](dev-environments.md) and [services](services.md)
     2. Learn how to manage [fleets](fleets.md)
-    3. Check the [Axolotl](/examples/single-node-training/axolotl) example
+    3. Check the [Axolotl](../examples/training/axolotl.md) example

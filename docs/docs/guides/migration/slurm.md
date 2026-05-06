@@ -1847,4 +1847,4 @@ fi
 
 1. Check out [Quickstart](../../quickstart.md)
 2. Read about [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), and [services](../../concepts/services.md)
-3. Browse the [examples](../../../examples.md)
+3. Browse the [examples](../../examples.md)

@@ -27,7 +27,7 @@ For inference, `dstack` provides a [services](../../docs/concepts/services.md) a
 > If you’re new to Prefill–Decode disaggregation, see the official [SGLang docs](https://docs.sglang.io/advanced_features/pd_disaggregation.html).
 
 !!! note "Deprecation notice"
-    Configuring the SGLang router in a gateway is deprecated and will be disallowed in a future release. To run router and workers as separate replica groups, see [SGLang PD disaggregation (router as replica group)](https://dstack.ai/examples/inference/sglang/#pd-disaggregation).
+    Configuring the SGLang router in a gateway is deprecated and will be disallowed in a future release. To run router and workers as separate replica groups, see [SGLang PD disaggregation (router as replica group)](../../docs/examples/inference/sglang.md#pd-disaggregation).
 
 ## Services
 

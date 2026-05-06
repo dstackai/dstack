@@ -284,7 +284,7 @@ Submit the run nccl-tests? [y/n]: y
 
 </div>
 
-For more examples, explore the [distirbuted training](../../examples.md#distributed-training) section in the docs.
+For more examples, explore the [training](../../docs/examples.md#training) section in the docs.
 
 ## FAQ
 
@@ -311,5 +311,5 @@ Support for AMD GPUs is coming soon — our team is actively working on it right
     2. Explore [dev environments](../../docs/concepts/dev-environments.md), 
         [tasks](../../docs/concepts/tasks.md), [services](../../docs/concepts/services.md), 
         and [fleets](../../docs/concepts/fleets.md)
-    3. Browse the [clusters](../../examples.md#clusters) examples
+    3. Browse the [fleets](../../docs/concepts/fleets.md#cluster-placement) guide
     4. Join [Discord](https://discord.gg/u8SmfwPpMd)

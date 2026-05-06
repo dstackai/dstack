@@ -95,7 +95,7 @@ standard `qwen3` reasoning parser without extra ROCm-specific tuning flags.
 The first startup on MI300X can take longer while SGLang compiles ROCm kernels.
 
 Save one of the configurations above as `service.dstack.yml`, then use the
-[`dstack apply`](../../docs/reference/cli/dstack/apply.md) command.
+[`dstack apply`](../../reference/cli/dstack/apply.md) command.
 
 <div class="termy">
 
@@ -132,7 +132,7 @@ Qwen3.6 uses thinking mode by default. To disable thinking, pass
 `"chat_template_kwargs": {"enable_thinking": false}` in the request body. To
 enable tool calling, add `--tool-call-parser qwen3_coder` to the serve command.
 
-> If a [gateway](../../docs/concepts/gateways.md) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://qwen36.<gateway domain>/`.
+> If a [gateway](../../concepts/gateways.md) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://qwen36.<gateway domain>/`.
 
 ## Configuration options
 
@@ -221,5 +221,5 @@ Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics 
 
 ## What's next?
 
-1. Read about [services](../../docs/concepts/services.md) and [gateways](../../docs/concepts/gateways.md)
+1. Read about [services](../../concepts/services.md) and [gateways](../../concepts/gateways.md)
 2. Browse the [Qwen 3.6 SGLang cookbook](https://docs.sglang.io/cookbook/autoregressive/Qwen/Qwen3.6) and the [SGLang server arguments reference](https://docs.sglang.ai/advanced_features/server_arguments.html)

@@ -6,7 +6,7 @@ description: Deploying Qwen3.6-27B using SGLang on NVIDIA and AMD GPUs
 # Qwen 3.6
 
 This example shows how to deploy `Qwen/Qwen3.6-27B` as a
-[service](../../docs/concepts/services.md) using
+[service](../../concepts/services.md) using
 [SGLang](https://github.com/sgl-project/sglang) and `dstack`.
 
 ## Apply a configuration
@@ -92,7 +92,7 @@ The NVIDIA and AMD configurations above use pinned SGLang images and the same
 straightforward 4-GPU layout used across the Qwen 3.6 docs and examples.
 
 Apply the configuration with
-[`dstack apply`](../../docs/reference/cli/dstack/apply.md).
+[`dstack apply`](../../reference/cli/dstack/apply.md).
 
 <div class="termy">
 

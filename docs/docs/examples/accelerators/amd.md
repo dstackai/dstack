@@ -6,12 +6,12 @@ description: Deploying and fine-tuning models on AMD MI300X GPUs using SGLang, v
 # AMD
 
 `dstack` supports running dev environments, tasks, and services on AMD GPUs.
-You can do that by setting up an [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets)
+You can do that by setting up an [SSH fleet](../../concepts/fleets.md#ssh-fleets)
 with on-prem AMD GPUs or configuring a backend that offers AMD GPUs such as the `runpod` backend.
 
 ## Deployment
 
-Here are examples of a [service](../../docs/concepts/services.md) that deploy
+Here are examples of a [service](../../concepts/services.md) that deploy
 `Qwen/Qwen3.6-27B` on AMD MI300X GPUs using
 [SGLang](https://github.com/sgl-project/sglang) and
 [vLLM](https://docs.vllm.ai/en/latest/).
@@ -238,6 +238,6 @@ $ dstack apply -f <configuration file>
 2. For multi-node training, run
    [NCCL/RCCL tests](../clusters/nccl-rccl-tests.md)
    to validate AMD cluster networking.
-3. Check [dev environments](../../docs/concepts/dev-environments.md),
-   [tasks](../../docs/concepts/tasks.md), and
-   [services](../../docs/concepts/services.md).
+3. Check [dev environments](../../concepts/dev-environments.md),
+   [tasks](../../concepts/tasks.md), and
+   [services](../../concepts/services.md).
