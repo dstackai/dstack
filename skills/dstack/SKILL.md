@@ -2,6 +2,8 @@
 name: dstack
 description: |
   dstack is an open-source control plane for GPU provisioning and orchestration across GPU clouds, Kubernetes, and on-prem clusters.
+
+  This skill covers dstack's core capabilities for managing fleets, dev environments, tasks, and services. It includes best practices for applying configurations, monitoring workloads, and troubleshooting common issues.
 ---
 
 # dstack
