@@ -1,8 +1,11 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.compatibility.gateways import get_create_gateway_excludes
+from dstack._internal.core.compatibility.gateways import (
+    get_create_gateway_excludes,
+    get_set_default_gateway_excludes,
+)
 from dstack._internal.core.models.gateways import Gateway, GatewayConfiguration
 from dstack._internal.server.schemas.gateways import (
     CreateGatewayRequest,
@@ -44,9 +47,16 @@ class GatewaysAPIClient(APIClientGroup):
         body = DeleteGatewaysRequest(names=gateways_names)
         self._request(f"/api/project/{project_name}/gateways/delete", body=body.json())
 
-    def set_default(self, project_name: str, gateway_name: str) -> None:
-        body = SetDefaultGatewayRequest(name=gateway_name)
-        self._request(f"/api/project/{project_name}/gateways/set_default", body=body.json())
+    def set_default(
+        self, project_name: str, gateway_name: str, *, gateway_project: Optional[str] = None
+    ) -> None:
+        if gateway_project == project_name:
+            gateway_project = None  # omit for compatibility with pre-0.20.20 servers
+        body = SetDefaultGatewayRequest(name=gateway_name, gateway_project=gateway_project)
+        self._request(
+            f"/api/project/{project_name}/gateways/set_default",
+            body=body.json(exclude=get_set_default_gateway_excludes(body)),
+        )
 
     def set_wildcard_domain(
         self, project_name: str, gateway_name: str, wildcard_domain: str

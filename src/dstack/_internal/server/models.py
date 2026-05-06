@@ -274,9 +274,10 @@ class ProjectModel(BaseModel):
     default_gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateways.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )
-    default_gateway: Mapped[Optional["GatewayModel"]] = relationship(
-        foreign_keys=[default_gateway_id]
-    )
+    """
+    **NOTE**: default_gateway_id may point to a previously imported gateway that the project is no
+    longer authorized to use. Check access before using the gateway.
+    """
 
     # TODO: drop `default_pool_id` after the release without pools.
     default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
