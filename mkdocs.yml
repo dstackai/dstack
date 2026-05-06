@@ -104,7 +104,6 @@ plugins:
         "examples/llms/llama31/index.md": "docs/examples/inference/vllm.md"
         "examples/llms/llama32/index.md": "docs/examples/inference/vllm.md"
         "examples/llms/qwen36/index.md": "docs/examples/models/qwen36.md"
-        "docs/examples/accelerators/amd/index.md": "docs/examples/accelerators/amd.md"
         "docs/examples/deployment/nim/index.md": "docs/examples/inference/nim.md"
         "docs/examples/deployment/vllm/index.md": "docs/examples/inference/vllm.md"
         "backends.md": "docs/concepts/backends.md"
