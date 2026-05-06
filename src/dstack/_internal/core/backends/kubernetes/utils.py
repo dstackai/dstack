@@ -1,4 +1,4 @@
-from typing import Callable, Optional, TypeVar, Union
+from typing import Annotated, Callable, Optional, TypeVar, Union
 
 import yaml
 from kubernetes.client import CoreV1Api
@@ -7,19 +7,66 @@ from kubernetes.config import (
     # XXX: This function is missing in the stubs package
     new_client_from_config_dict,  # pyright: ignore[reportAttributeAccessIssue]
 )
+from pydantic import Field
 from typing_extensions import ParamSpec
+
+from dstack._internal.core.models.common import CoreModel
 
 T = TypeVar("T")
 P = ParamSpec("P")
 
 
-def get_api_from_config_data(kubeconfig_data: str) -> CoreV1Api:
-    config_dict = yaml.load(kubeconfig_data, yaml.FullLoader)
-    return get_api_from_config_dict(config_dict)
+class KubeconfigContext(CoreModel):
+    namespace: str = "default"
 
 
-def get_api_from_config_dict(kubeconfig: dict) -> CoreV1Api:
-    api_client = new_client_from_config_dict(config_dict=kubeconfig)
+class KubeconfigNamedContext(CoreModel):
+    name: str
+    context: KubeconfigContext
+
+
+class Kubeconfig(CoreModel):
+    """
+    `Kubeconfig` model only includes fields used by `dstack`.
+    Reference: https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/
+    """
+
+    contexts: list[KubeconfigNamedContext] = []
+    current_context: Annotated[Optional[str], Field(alias="current-context")] = None
+
+    def get_context(self, name: Optional[str] = None) -> KubeconfigContext:
+        if name is None:
+            name = self.current_context
+            if name is None:
+                raise ValueError("current-context is not set")
+        for named_context in self.contexts:
+            if named_context.name == name:
+                return named_context.context
+        raise ValueError(f"context {name} not found")
+
+
+def kubeconfig_data_to_kubeconfig_dict(kubeconfig_data: str) -> dict:
+    kubeconfig_dict = yaml.load(kubeconfig_data, yaml.FullLoader)
+    if not isinstance(kubeconfig_dict, dict):
+        raise TypeError(f"Unexpected kubeconfig_data type: {kubeconfig_dict.__class__.__name__}")
+    return kubeconfig_dict
+
+
+def kubeconfig_dict_to_kubeconfig(kubeconfig_dict: dict) -> Kubeconfig:
+    return Kubeconfig.__response__.parse_obj(kubeconfig_dict)
+
+
+def get_api_from_kubeconfig_data(
+    kubeconfig_data: str, *, context: Optional[str] = None
+) -> CoreV1Api:
+    kubeconfig_dict = kubeconfig_data_to_kubeconfig_dict(kubeconfig_data)
+    return get_api_from_kubeconfig_dict(kubeconfig_dict, context=context)
+
+
+def get_api_from_kubeconfig_dict(
+    kubeconfig_dict: dict, *, context: Optional[str] = None
+) -> CoreV1Api:
+    api_client = new_client_from_config_dict(config_dict=kubeconfig_dict, context=context)
     return CoreV1Api(api_client=api_client)
 
 
