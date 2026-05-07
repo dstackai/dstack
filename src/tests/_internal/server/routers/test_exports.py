@@ -5,6 +5,7 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import ExportModel
 from dstack._internal.server.services.projects import add_project_member
@@ -213,6 +214,14 @@ class TestCreateExport:
             pytest.param(
                 {
                     "name": "test-export",
+                    "exported_gateways": ["sky-gateway"],
+                },
+                "Exporting the built-in dstack Sky gateway is not allowed",
+                id="sky-gateway",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
                     "importer_projects": ["eXpOrTeRpRoJeCt"],  # case-insensitive
                 },
                 "Project 'ExporterProject' cannot import from itself",
@@ -268,6 +277,15 @@ class TestCreateExport:
             project_id=project.id,
             backend_id=backend.id,
             name="exported-gateway",
+        )
+        sky_backend = await create_backend(
+            session=session, project_id=project.id, backend_type=BackendType.DSTACK
+        )
+        await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=sky_backend.id,
+            name="sky-gateway",
         )
         not_permitted_project = await create_project(
             session=session, name="NotPermittedProject", owner=user
@@ -653,6 +671,14 @@ class TestUpdateExport:
             pytest.param(
                 {
                     "name": "test-export",
+                    "add_exported_gateways": ["sky-gateway"],
+                },
+                "Exporting the built-in dstack Sky gateway is not allowed",
+                id="add-sky-gateway",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
                     "add_importer_projects": ["eXpOrTeRpRoJeCt"],  # case-insensitive
                 },
                 "Project 'ExporterProject' cannot import from itself",
@@ -809,6 +835,15 @@ class TestUpdateExport:
             project=project,
             name="not-exported-fleet",
             spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        sky_backend = await create_backend(
+            session=session, project_id=project.id, backend_type=BackendType.DSTACK
+        )
+        await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=sky_backend.id,
+            name="sky-gateway",
         )
         not_importer_project = await create_project(
             session=session, name="NotImporterProject", owner=user
