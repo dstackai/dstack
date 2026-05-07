@@ -3617,3 +3617,84 @@ class TestSubmitService:
         )
         # Verify that register_service was called twice (first failed, then succeeded)
         assert client_mock.register_service.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_return_error_if_default_gateway_forbids_new_services(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user, name="test-project")
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            status=GatewayStatus.RUNNING,
+            wildcard_domain="example.com",
+            forbid_new_services=True,
+        )
+        project.default_gateway_id = gateway.id
+        await session.commit()
+
+        response = await client.post(
+            "/api/project/test-project/runs/submit",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": get_service_run_spec(repo_id=repo.name, run_name="test-service")},
+        )
+
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [{"msg": "Gateway does not accept new services", "code": "error"}]
+        }
+
+    @pytest.mark.asyncio
+    async def test_return_error_if_explicitly_specified_gateway_forbids_new_services(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user, name="test-project")
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            status=GatewayStatus.RUNNING,
+            name="restricted-gateway",
+            wildcard_domain="example.com",
+            forbid_new_services=True,
+        )
+
+        response = await client.post(
+            "/api/project/test-project/runs/submit",
+            headers=get_auth_headers(user.token),
+            json={
+                "run_spec": get_service_run_spec(
+                    repo_id=repo.name,
+                    run_name="test-service",
+                    gateway="restricted-gateway",
+                )
+            },
+        )
+
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [{"msg": "Gateway does not accept new services", "code": "error"}]
+        }

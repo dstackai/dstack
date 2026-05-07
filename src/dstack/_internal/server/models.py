@@ -614,6 +614,11 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     status_message: Mapped[Optional[str]] = mapped_column(Text)
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    forbid_new_services: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    """
+    `forbid_new_services` is useful when migrating off the gateway or doing maintenance.
+    For now, it can only be set by server admins via an SQL query.
+    """
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])

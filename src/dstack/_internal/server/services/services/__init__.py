@@ -105,6 +105,9 @@ async def _register_service_in_gateway(
     if gateway.status != GatewayStatus.RUNNING:
         raise ServerClientError("Gateway status is not running")
 
+    if gateway.forbid_new_services:
+        raise ServerClientError("Gateway does not accept new services")
+
     gateway_configuration = get_gateway_configuration(gateway)
 
     has_replica_group_router = any(
