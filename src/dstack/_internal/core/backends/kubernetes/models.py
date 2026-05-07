@@ -28,8 +28,20 @@ class KubernetesBackendConfig(CoreModel):
         Optional[KubernetesProxyJumpConfig], Field(description="The SSH proxy jump configuration")
     ] = None
     namespace: Annotated[
-        str, Field(description="The namespace for resources managed by `dstack`")
+        str,
+        Field(
+            description=(
+                "The namespace for resources managed by `dstack`."
+                " Always overrides the namespace set in the kubeconfig, even if not set. "
+                " Deprecated and will be eventually removed in futute versions, but"
+                " in the current version must be set unless equals to `default`."
+                " Future versions will use the namespace from the kubeconfig instead."
+                " To prepare for future versions, set the same value in the kubeconfig"
+            )
+        ),
     ] = DEFAULT_NAMESPACE
+    """`namespace` is formally deprecated since 0.20.20 but still used. Future versions will switch
+    to namespace from kubeconfig context, which is currently ignored"""
 
 
 class KubernetesBackendConfigWithCreds(KubernetesBackendConfig):

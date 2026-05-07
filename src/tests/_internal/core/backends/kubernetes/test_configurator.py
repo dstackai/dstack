@@ -20,7 +20,7 @@ class TestKubernetesConfigurator:
             proxy_jump=KubernetesProxyJumpConfig(hostname=None, port=None),
         )
         with patch(
-            "dstack._internal.core.backends.kubernetes.utils.get_api_from_config_data"
+            "dstack._internal.core.backends.kubernetes.utils.get_api_from_kubeconfig_data"
         ) as get_api_mock:
             api_mock = Mock()
             api_mock.list_node.return_value = Mock()
@@ -34,7 +34,7 @@ class TestKubernetesConfigurator:
         )
         with (
             patch(
-                "dstack._internal.core.backends.kubernetes.utils.get_api_from_config_data"
+                "dstack._internal.core.backends.kubernetes.utils.get_api_from_kubeconfig_data"
             ) as get_api_mock,
             pytest.raises(BackendInvalidCredentialsError) as exc_info,
         ):
