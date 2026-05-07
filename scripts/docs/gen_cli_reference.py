@@ -14,6 +14,7 @@ from fnmatch import fnmatch
 from functools import cache
 
 import mkdocs_gen_files
+
 from mkdocs.structure.files import File
 
 FILE_PATTERN = "docs/reference/cli/dstack/*.md"

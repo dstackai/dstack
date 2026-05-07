@@ -13,11 +13,11 @@ from typing import Optional
 
 import mkdocs_gen_files
 import yaml
-from mkdocs.structure.files import File
 from pydantic.main import BaseModel
 from typing_extensions import Annotated, Any, Dict, Literal, Type, Union, get_args, get_origin
 
 from dstack._internal.core.models.resources import Range
+from mkdocs.structure.files import File
 
 FILE_PATTERN = "docs/reference/**.md"
 logger = logging.getLogger("mkdocs.plugins.dstack.schema")
