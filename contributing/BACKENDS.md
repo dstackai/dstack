@@ -160,8 +160,8 @@ If instances in the backend take more than 10 minutes to start, override the def
 
 ### 2.10. Document the backend
 
-Add the backend to the [Concepts->Backends](https://github.com/dstackai/dstack/blob/master/docs/docs/concepts/backends.md
-) page and the [server/comfig.yml](https://github.com/dstackai/dstack/blob/master/docs/docs/reference/server/config.yml.md) reference.
+Add the backend to the [Concepts->Backends](https://github.com/dstackai/dstack/blob/master/mkdocs/docs/concepts/backends.md
+) page and the [server/comfig.yml](https://github.com/dstackai/dstack/blob/master/mkdocs/docs/reference/server/config.yml.md) reference.
 
 ## 3. Appendix
 

@@ -4,7 +4,7 @@
 - Core Python package lives in `src/dstack`; internal modules (including server) sit under `_internal`, API surfaces under `api`, and plugin integrations under `plugins`.
 - Tests reside in `src/tests` and mirror package paths; add new suites alongside the code they cover.
 - Frontend lives in `frontend` (React/webpack) and is built into `src/dstack/_internal/server/statics`.
-- Docs sources are in `docs` with extra contributor notes in `contributing/*.md`; examples for users sit in `examples/`.
+- Docs sources are in `mkdocs/docs/` with extra contributor notes in `contributing/*.md`.
 
 ## Build, Test, and Development Commands
 - Install deps (editable package with extras): `uv sync --all-extras` (uses `.venv` in repo).

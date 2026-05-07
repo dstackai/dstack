@@ -5,7 +5,9 @@
 # Run `just` to see all available commands.
 #
 # Components:
-# * runner/justfile – Building and uploading dstack runner and shim
+# * runner/.justfile – Building and uploading dstack runner and shim
+# * frontend/.justfile – Building and running the frontend
+# * mkdocs/.justfile – Building and previewing the docs site
 
 default:
     @just --list
@@ -16,5 +18,4 @@ import "runner/.justfile"
 
 import "frontend/.justfile"
 
-docs-serve:
-    uv run mkdocs serve --livereload -w examples -s
+import "mkdocs/.justfile"
