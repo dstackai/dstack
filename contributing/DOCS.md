@@ -39,8 +39,10 @@ uv run pre-commit install
 To preview the documentation, run the follow command:
 
 ```shell
-uv run mkdocs serve -s
+uv run mkdocs serve --livereload -s
 ```
+
+The `--livereload` flag is required to work around live-reload bugs in recent `mkdocs` versions.
 
 If you want to build static files, you can use the following command:
 
@@ -99,7 +101,7 @@ description: Short description of what this page covers
 ---
 ```
 
-For examples, add frontmatter to the page files (e.g., `docs/examples/single-node-training/trl.md`).
+For examples, add frontmatter to the page files (e.g., `mkdocs/docs/examples/training/trl.md`).
 
 #### 3. Skills discovery
 
@@ -112,28 +114,32 @@ The build creates `.well-known/skills/` directory structure for skills discovery
 ### File structure
 
 ```
-docs/
-├── docs/                    # Main documentation content
-│   ├── index.md            # Getting started
+mkdocs/                         # docs_dir for the mkdocs site
+├── index.md                    # Homepage
+├── docs/                       # /docs/ URL section
+│   ├── index.md                # Getting started
 │   ├── installation.md
 │   ├── quickstart.md
-│   ├── concepts/           # Concept pages
-│   ├── guides/             # How-to guides
-│   └── reference/          # API reference (schema expansion)
-├── examples/               # Example pages (inline source code)
-│   └── single-node-training/
-│       └── trl.md          # Page content with frontmatter
-└── overrides/              # Theme customization
+│   ├── concepts/               # Concept pages
+│   ├── guides/                 # How-to guides
+│   ├── reference/              # API reference (schema expansion)
+│   └── examples/               # Example pages (inline source code)
+│       └── training/
+│           └── trl.md          # Page content with frontmatter
+├── blog/                       # Blog posts
+├── overrides/                  # Theme customization
+├── layouts/                    # Social card layouts
+└── assets/                     # Stylesheets, images, fonts
 
 scripts/docs/
-├── hooks.py                # MkDocs build hooks
-├── gen_llms_files.py       # llms.txt generation
-├── gen_schema_reference.py # Schema expansion
-└── gen_cli_reference.py    # CLI reference generation
+├── hooks.py                    # MkDocs build hooks
+├── gen_llms_files.py           # llms.txt generation
+├── gen_schema_reference.py     # Schema expansion
+└── gen_cli_reference.py        # CLI reference generation
 
 skills/
 └── dstack/
-    └── SKILL.md            # Skills discovery content
+    └── SKILL.md                # Skills discovery content
 ```
 
 ### Testing changes
