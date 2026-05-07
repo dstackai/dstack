@@ -174,6 +174,11 @@ domain: example.com
 !!! info "Reference"
     For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).
 
+## Export gateways
+
+Gateways can be exported to other projects, allowing those projects to use the exported gateways
+for running services. See [Exports](exports.md) for more details.
+
 ## Manage gateways
 
 ### List gateways

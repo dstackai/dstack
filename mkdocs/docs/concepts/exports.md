@@ -10,7 +10,7 @@ the specified importer projects can see and use it as if it were their own.
 
 !!! warning "Experimental"
     Exports are an experimental feature.
-    Currently, only [SSH fleets](fleets.md#ssh-fleets) can be exported.
+    Currently, [SSH fleets](fleets.md#ssh-fleets) and [gateways](gateways.md) can be exported.
 
 An export is created in the exporter project and specifies the resources to export and the
 importer projects that will gain access to them.
@@ -28,27 +28,27 @@ for running tasks, dev environments, and services. Imported resources appear wit
 ### Create exports
 
 Use the `dstack export create` command to create a new export. Specify the fleets to export
-with `--fleet` and the importer projects with `--importer`:
+with `--fleet`, the gateways to export with `--gateway`, and the importer projects with `--importer`:
 
 <div class="termy">
 
 ```shell
-$ dstack export create my-export --fleet my-fleet --importer team-b
- NAME        FLEETS    IMPORTERS
- my-export   my-fleet  team-b
+$ dstack export create my-export --fleet my-fleet --gateway my-gateway --importer team-b
+ NAME        FLEETS    GATEWAYS    IMPORTERS
+ my-export   my-fleet  my-gateway  team-b
 
 ```
 
 </div>
 
-Both `--fleet` and `--importer` can be specified multiple times:
+`--fleet`, `--gateway`, and `--importer` can be specified multiple times:
 
 <div class="termy">
 
 ```shell
 $ dstack export create shared-gpus --fleet gpu-fleet-1 --fleet gpu-fleet-2 --importer team-b --importer team-c
- NAME         FLEETS                    IMPORTERS
- shared-gpus  gpu-fleet-1, gpu-fleet-2  team-b, team-c
+ NAME         FLEETS                    GATEWAYS  IMPORTERS
+ shared-gpus  gpu-fleet-1, gpu-fleet-2  -         team-b, team-c
 
 ```
 
@@ -62,9 +62,9 @@ Use `dstack export list` (or simply `dstack export`) to list all exports in the 
 
 ```shell
 $ dstack export list
- NAME         FLEETS                    IMPORTERS
- my-export    my-fleet                  team-b
- shared-gpus  gpu-fleet-1, gpu-fleet-2  team-b, team-c
+ NAME         FLEETS                    GATEWAYS    IMPORTERS
+ my-export    my-fleet                  my-gateway  team-b
+ shared-gpus  gpu-fleet-1, gpu-fleet-2  -           team-b, team-c
 
 ```
 
@@ -72,27 +72,27 @@ $ dstack export list
 
 ### Update exports
 
-Use the `dstack export update` command to add or remove fleets and importers from an existing export:
+Use the `dstack export update` command to add or remove fleets, gateways, and importers from an existing export:
 
 <div class="termy">
 
 ```shell
 $ dstack export update my-export --add-fleet another-fleet --add-importer team-c
- NAME        FLEETS                   IMPORTERS
- my-export   my-fleet, another-fleet  team-b, team-c
+ NAME        FLEETS                   GATEWAYS    IMPORTERS
+ my-export   my-fleet, another-fleet  my-gateway  team-b, team-c
 
 ```
 
 </div>
 
-To remove a fleet or importer:
+To remove a fleet, gateway, or importer:
 
 <div class="termy">
 
 ```shell
 $ dstack export update my-export --remove-importer team-b
- NAME        FLEETS                   IMPORTERS
- my-export   my-fleet, another-fleet  team-c
+ NAME        FLEETS                   GATEWAYS    IMPORTERS
+ my-export   my-fleet, another-fleet  my-gateway  team-c
 
 ```
 
@@ -114,7 +114,7 @@ Export my-export deleted
 
 Use `-y` to skip the confirmation prompt.
 
-## Access imported fleets
+## Access imported resources
 
 From the importer project's perspective, use `dstack import list` (or simply `dstack import`) to list all imports in the project — i.e., all exports from other projects that this project has been granted access to:
 
@@ -122,14 +122,14 @@ From the importer project's perspective, use `dstack import list` (or simply `ds
 
 ```shell
 $ dstack import list
- NAME              FLEETS
- team-a/my-export  my-fleet, another-fleet
+ NAME              FLEETS                   GATEWAYS
+ team-a/my-export  my-fleet, another-fleet  my-gateway
 
 ```
 
 </div>
 
-Imported fleets also appear in `dstack fleet list` in the `<project>/<fleet>` format:
+Imported fleets and gateways also appear in `dstack fleet list` and `dstack gateway list` in the `<project>/<name>` format:
 
 <div class="termy">
 
@@ -140,17 +140,24 @@ $ dstack fleet list
  team-a/my-fleet       2      A100:80GB:8  -     ssh      -      active  1 week ago
  team-a/another-fleet  1      H100:80GB:4  -     ssh      -      active  2 days ago
 
+$ dstack gateway list
+ NAME               BACKEND          HOSTNAME  DOMAIN                 DEFAULT  STATUS
+ team-a/my-gateway  aws (eu-west-1)  10.0.0.4  gtw.mycompany.example           running
+
 ```
 
 </div>
 
-Imported fleets can be used for runs just like the project's own fleets.
+Imported resources can be used for runs just like the project's own resources.
 
 <div editor-title=".dstack.yml">
     
 ```yaml
-type: dev-environment
-ide: vscode
+type: service
+image: nginx
+port: 80
+
+gateway: team-a/my-gateway
 
 fleets:
 - my-local-fleet
@@ -166,4 +173,5 @@ fleets:
     1. Check the [`dstack export` CLI reference](../reference/cli/dstack/export.md)
     1. Check the [`dstack import` CLI reference](../reference/cli/dstack/import.md)
     1. Learn how to manage [fleets](fleets.md)
+    1. Learn how to manage [gateways](gateways.md)
     1. Read about [projects](projects.md) and project roles
