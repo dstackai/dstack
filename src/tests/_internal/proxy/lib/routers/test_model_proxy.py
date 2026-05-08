@@ -212,12 +212,11 @@ async def test_chat_completions_model_not_found() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("token", ["wrong-token", ""])
-async def test_unauthorized(token: str) -> None:
+async def test_unauthorized_openai_sdk() -> None:
     auth = ProxyTestAuthProvider({"test-proj": {"correct-token"}})
     repo = GatewayProxyRepo()
     await repo.set_project(make_project("test-proj"))
-    client = make_openai_client(repo, auth, "test-proj", auth_token=token)
+    client = make_openai_client(repo, auth, "test-proj", auth_token="invalid-token")
 
     with pytest.raises(openai.PermissionDeniedError):
         await client.models.list()
@@ -229,17 +228,28 @@ async def test_unauthorized(token: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_no_token() -> None:
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"Authorization": "Bearer invalid-token"},
+        {"Authorization": "Bearer "},
+        {"Authorization": "Bearer"},
+        {"Authorization": ""},
+        None,
+    ],
+)
+async def test_unauthorized_http(headers) -> None:
     auth = ProxyTestAuthProvider({"test-proj": {"correct-token"}})
     repo = GatewayProxyRepo()
     await repo.set_project(make_project("test-proj"))
     client = make_http_client(repo, auth)
 
-    resp = await client.get("http://test-host/proxy/models/test-proj/models")
+    resp = await client.get("http://test-host/proxy/models/test-proj/models", headers=headers)
     assert resp.status_code == 403
 
     resp = await client.post(
         "http://test-host/proxy/models/test-proj/chat/completions",
         json={"model": "test-model", "messages": [{"role": "user", "content": "Hi"}]},
+        headers=headers,
     )
     assert resp.status_code == 403

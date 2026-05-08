@@ -39,8 +39,10 @@ uv run pre-commit install
 To preview the documentation, run the follow command:
 
 ```shell
-uv run mkdocs serve -w examples -s
+uv run mkdocs serve --livereload -s
 ```
+
+The `--livereload` flag is required to work around live-reload bugs in recent `mkdocs` versions.
 
 If you want to build static files, you can use the following command:
 
@@ -57,7 +59,6 @@ The documentation uses a custom build system with MkDocs hooks to generate vario
 Use these in `.envrc` to disable expensive docs regeneration, especially during `mkdocs serve` auto-reload. Set any of them to disable the corresponding artifact.
 
 ```shell
-export DSTACK_DOCS_DISABLE_EXAMPLES=1
 export DSTACK_DOCS_DISABLE_LLM_TXT=1
 export DSTACK_DOCS_DISABLE_CLI_REFERENCE=1
 export DSTACK_DOCS_DISABLE_YAML_SCHEMAS=1
@@ -69,19 +70,11 @@ export DSTACK_DOCS_DISABLE_REST_PLUGIN_SPEC_REFERENCE=1
 
 The build process is customized via hooks in `scripts/docs/hooks.py`:
 
-#### 1. Example materialization
-
-Example pages like `examples/single-node-training/trl/index.md` are stubs that reference `README.md` files in the repository root:
-- **Stub location**: `docs/examples/single-node-training/trl/index.md`
-- **Content source**: `examples/single-node-training/trl/README.md`
-
-During the build, the hook reads the README content and uses it for rendering the HTML page.
-
-#### 2. Schema reference expansion
+#### 1. Schema reference expansion
 
 Files in `docs/reference/**/*.md` can use `#SCHEMA#` placeholders that are expanded with generated schema documentation during the build.
 
-#### 3. llms.txt generation
+#### 2. llms.txt generation
 
 Two files are generated for LLM consumption:
 
@@ -108,9 +101,9 @@ description: Short description of what this page covers
 ---
 ```
 
-For examples, add frontmatter to the `README.md` files in the repository root (e.g., `examples/single-node-training/trl/README.md`).
+For examples, add frontmatter to the page files (e.g., `mkdocs/docs/examples/training/trl.md`).
 
-#### 4. Skills discovery
+#### 3. Skills discovery
 
 The build creates `.well-known/skills/` directory structure for skills discovery:
 - Reads `skills/dstack/SKILL.md`
@@ -121,35 +114,32 @@ The build creates `.well-known/skills/` directory structure for skills discovery
 ### File structure
 
 ```
-docs/
-├── docs/                    # Main documentation content
-│   ├── index.md            # Getting started
+mkdocs/                         # docs_dir for the mkdocs site
+├── index.md                    # Homepage
+├── docs/                       # /docs/ URL section
+│   ├── index.md                # Getting started
 │   ├── installation.md
 │   ├── quickstart.md
-│   ├── concepts/           # Concept pages
-│   ├── guides/             # How-to guides
-│   └── reference/          # API reference (schema expansion)
-├── examples/               # Example stub files (index.md)
-│   └── single-node-training/
-│       └── trl/
-│           └── index.md    # Stub referencing root README
-└── overrides/              # Theme customization
-
-examples/                    # Example content (repository root)
-└── single-node-training/
-    └── trl/
-        ├── README.md       # Actual content with frontmatter
-        └── train.dstack.yml
+│   ├── concepts/               # Concept pages
+│   ├── guides/                 # How-to guides
+│   ├── reference/              # API reference (schema expansion)
+│   └── examples/               # Example pages (inline source code)
+│       └── training/
+│           └── trl.md          # Page content with frontmatter
+├── blog/                       # Blog posts
+├── overrides/                  # Theme customization
+├── layouts/                    # Social card layouts
+└── assets/                     # Stylesheets, images, fonts
 
 scripts/docs/
-├── hooks.py                # MkDocs build hooks
-├── gen_llms_files.py       # llms.txt generation
-├── gen_schema_reference.py # Schema expansion
-└── gen_cli_reference.py    # CLI reference generation
+├── hooks.py                    # MkDocs build hooks
+├── gen_llms_files.py           # llms.txt generation
+├── gen_schema_reference.py     # Schema expansion
+└── gen_cli_reference.py        # CLI reference generation
 
 skills/
 └── dstack/
-    └── SKILL.md            # Skills discovery content
+    └── SKILL.md                # Skills discovery content
 ```
 
 ### Testing changes

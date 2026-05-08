@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,11 +7,15 @@ import dstack._internal.core.models.gateways as models
 import dstack._internal.server.schemas.gateways as schemas
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.server.db import get_session
+from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.security.permissions import (
+    Authenticated,
     ProjectAdmin,
     ProjectMemberOrPublicAccess,
+    check_can_access_gateway,
 )
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
@@ -28,12 +32,19 @@ router = APIRouter(
 
 @router.post("/list", response_model=List[models.Gateway])
 async def list_gateways(
+    body: Optional[schemas.ListGatewaysRequest] = None,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
 ):
     _, project = user_project
+    if body is None:
+        body = schemas.ListGatewaysRequest()
     return CustomORJSONResponse(
-        await gateways.list_project_gateways(session=session, project=project)
+        await gateways.list_project_gateways(
+            session=session,
+            project=project,
+            include_imported=body.include_imported,
+        )
     )
 
 
@@ -41,9 +52,12 @@ async def list_gateways(
 async def get_gateway(
     body: schemas.GetGatewayRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
+    user: UserModel = Depends(Authenticated()),
+    project: ProjectModel = Depends(Project()),
 ):
-    _, project = user_project
+    await check_can_access_gateway(
+        session=session, user=user, gateway_project=project, gateway_name=body.name
+    )
     gateway = await gateways.get_gateway_by_name(session=session, project=project, name=body.name)
     if gateway is None:
         raise ResourceNotExistsError()
@@ -91,7 +105,12 @@ async def set_default_gateway(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     user, project = user_project
-    await gateways.set_default_gateway(session=session, project=project, name=body.name, user=user)
+    await gateways.set_default_gateway(
+        session=session,
+        project=project,
+        ref=EntityReference(name=body.name, project=body.gateway_project),
+        user=user,
+    )
 
 
 @router.post("/set_wildcard_domain", response_model=models.Gateway)

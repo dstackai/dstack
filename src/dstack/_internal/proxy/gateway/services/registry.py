@@ -68,6 +68,8 @@ async def register_service(
     async with lock:
         if await repo.get_service(project_name, run_name) is not None:
             raise ProxyError(SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE.format(ref=service.fmt()))
+        if await repo.get_service_by_domain(domain) is not None:
+            raise ProxyError(f"Domain name {domain!r} is already taken by another service")
 
         old_project = await repo.get_project(project_name)
         new_project = models.Project(name=project_name, ssh_private_key=ssh_private_key)

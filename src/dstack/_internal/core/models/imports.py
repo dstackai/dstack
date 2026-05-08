@@ -8,11 +8,17 @@ class ImportExportedFleet(CoreModel):
     name: str
 
 
+class ImportExportedGateway(CoreModel):
+    id: uuid.UUID
+    name: str
+
+
 class ImportExport(CoreModel):
     id: uuid.UUID
     name: str
     project_name: str
     exported_fleets: list[ImportExportedFleet]
+    exported_gateways: list[ImportExportedGateway] = []
 
 
 class Import(CoreModel):

@@ -43,6 +43,13 @@ class ExportCommand(APIBaseCommand):
             help="Fleet name to export (can be specified multiple times)",
             default=[],
         )
+        create_parser.add_argument(
+            "--gateway",
+            action="append",
+            dest="gateways",
+            help="Gateway name to export (can be specified multiple times)",
+            default=[],
+        )
         create_parser.set_defaults(subfunc=self._create)
 
         update_parser = subparsers.add_parser(
@@ -80,6 +87,20 @@ class ExportCommand(APIBaseCommand):
             help="Fleet name to remove (can be specified multiple times)",
             default=[],
         )
+        update_parser.add_argument(
+            "--add-gateway",
+            action="append",
+            dest="add_gateways",
+            help="Gateway name to add (can be specified multiple times)",
+            default=[],
+        )
+        update_parser.add_argument(
+            "--remove-gateway",
+            action="append",
+            dest="remove_gateways",
+            help="Gateway name to remove (can be specified multiple times)",
+            default=[],
+        )
         update_parser.set_defaults(subfunc=self._update)
 
         delete_parser = subparsers.add_parser(
@@ -109,6 +130,7 @@ class ExportCommand(APIBaseCommand):
                 name=args.name,
                 importer_projects=args.importers,
                 exported_fleets=args.fleets,
+                exported_gateways=args.gateways,
             )
         print_exports_table([export])
 
@@ -121,6 +143,8 @@ class ExportCommand(APIBaseCommand):
                 remove_importer_projects=args.remove_importers,
                 add_exported_fleets=args.add_fleets,
                 remove_exported_fleets=args.remove_fleets,
+                add_exported_gateways=args.add_gateways,
+                remove_exported_gateways=args.remove_gateways,
             )
         print_exports_table([export])
 
@@ -139,17 +163,24 @@ def print_exports_table(exports: list[Export]):
     table = Table(box=None)
     table.add_column("NAME", no_wrap=True)
     table.add_column("FLEETS")
+    table.add_column("GATEWAYS")
     table.add_column("IMPORTERS")
 
     for export in exports:
         fleets = (
             ", ".join([f.name for f in export.exported_fleets]) if export.exported_fleets else "-"
         )
+        gateways = (
+            ", ".join([g.name for g in export.exported_gateways])
+            if export.exported_gateways
+            else "-"
+        )
         importers = ", ".join([i.project_name for i in export.imports]) if export.imports else "-"
 
         row = {
             "NAME": export.name,
             "FLEETS": fleets,
+            "GATEWAYS": gateways,
             "IMPORTERS": importers,
         }
         add_row_from_dict(table, row)

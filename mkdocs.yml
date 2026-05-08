@@ -8,10 +8,13 @@ site_description: >-
 # Repository
 repo_url: https://github.com/dstackai/dstack
 repo_name: dstackai/dstack
-edit_uri: edit/master/docs/
+edit_uri: edit/master/mkdocs/
 
 #Copyright
 copyright: © 2025 dstack
+
+# Source directory for site content
+docs_dir: mkdocs
 
 hooks:
   - scripts/docs/hooks.py
@@ -19,7 +22,7 @@ hooks:
 # Configuration
 theme:
   name: material
-  custom_dir: docs/overrides
+  custom_dir: mkdocs/overrides
   logo: assets/images/dstack-logo-notext.svg
   favicon: assets/images/dstack-fav-32.ico
   icon:
@@ -77,7 +80,7 @@ plugins:
         color: "#FFFFFF"
         font_family: "Roboto"
       #      debug: true
-      cards_layout_dir: docs/layouts
+      cards_layout_dir: mkdocs/layouts
       cards_layout: custom
   - search
   - redirects:
@@ -98,43 +101,70 @@ plugins:
         "docs/tasks.md": "docs/concepts/tasks.md"
         "docs/services.md": "docs/concepts/services.md"
         "docs/fleets.md": "docs/concepts/fleets.md"
-        "docs/examples/llms/llama31.md": "examples/inference/vllm/index.md"
-        "docs/examples/llms/llama32.md": "examples/inference/vllm/index.md"
-        "docs/examples/llms/qwen36.md": "examples/models/qwen36/index.md"
-        "examples/llms/llama31/index.md": "examples/inference/vllm/index.md"
-        "examples/llms/llama32/index.md": "examples/inference/vllm/index.md"
-        "examples/llms/qwen36/index.md": "examples/models/qwen36/index.md"
-        "docs/examples/accelerators/amd/index.md": "examples/accelerators/amd/index.md"
-        "docs/examples/deployment/nim/index.md": "examples/inference/nim/index.md"
-        "docs/examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
+        "docs/examples/llms/llama31.md": "docs/examples/inference/vllm.md"
+        "docs/examples/llms/llama32.md": "docs/examples/inference/vllm.md"
+        "docs/examples/llms/qwen36.md": "docs/examples/models/qwen36.md"
+        "examples/llms/llama31/index.md": "docs/examples/inference/vllm.md"
+        "examples/llms/llama32/index.md": "docs/examples/inference/vllm.md"
+        "examples/llms/qwen36/index.md": "docs/examples/models/qwen36.md"
+        "docs/examples/deployment/nim/index.md": "docs/examples/inference/nim.md"
+        "docs/examples/deployment/vllm/index.md": "docs/examples/inference/vllm.md"
         "backends.md": "docs/concepts/backends.md"
         "blog/monitoring-gpu-usage.md": "blog/posts/dstack-metrics.md"
         "blog/inactive-dev-environments-auto-shutdown.md": "blog/posts/inactivity-duration.md"
         "blog/data-centers-and-private-clouds.md": "blog/posts/gpu-blocks-and-proxy-jump.md"
-        "blog/distributed-training-with-aws-efa.md": "examples/clusters/aws/index.md"
+        "blog/distributed-training-with-aws-efa.md": "docs/examples/clusters/aws.md"
         "blog/dstack-stats.md": "blog/posts/dstack-metrics.md"
         "docs/guides/metrics.md": "docs/concepts/metrics.md"
         "docs/guides/monitoring.md": "docs/concepts/metrics.md"
         "blog/nvidia-and-amd-on-vultr.md.md": "blog/posts/nvidia-and-amd-on-vultr.md"
-        "examples/misc/nccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
-        "examples/misc/a3high-clusters/index.md": "examples/clusters/gcp/index.md"
-        "examples/misc/a3mega-clusters/index.md": "examples/clusters/gcp/index.md"
-        "examples/distributed-training/nccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
-        "examples/distributed-training/rccl-tests/index.md": "examples/clusters/nccl-rccl-tests/index.md"
-        "examples/deployment/nim/index.md": "examples/inference/nim/index.md"
-        "examples/deployment/vllm/index.md": "examples/inference/vllm/index.md"
-        "examples/deployment/sglang/index.md": "examples/inference/sglang/index.md"
-        "examples/deployment/trtllm/index.md": "examples/inference/trtllm/index.md"
-        "examples/fine-tuning/trl/index.md": "examples/single-node-training/trl/index.md"
-        "examples/fine-tuning/axolotl/index.md": "examples/single-node-training/axolotl/index.md"
-        "blog/efa.md": "examples/clusters/aws/index.md"
+        "examples/misc/nccl-tests/index.md": "docs/examples/clusters/nccl-rccl-tests.md"
+        "examples/misc/a3high-clusters/index.md": "docs/examples/clusters/gcp.md"
+        "examples/misc/a3mega-clusters/index.md": "docs/examples/clusters/gcp.md"
+        "examples/distributed-training/nccl-tests/index.md": "docs/examples/clusters/nccl-rccl-tests.md"
+        "examples/distributed-training/rccl-tests/index.md": "docs/examples/clusters/nccl-rccl-tests.md"
+        "examples/deployment/nim/index.md": "docs/examples/inference/nim.md"
+        "examples/deployment/vllm/index.md": "docs/examples/inference/vllm.md"
+        "examples/deployment/sglang/index.md": "docs/examples/inference/sglang.md"
+        "examples/deployment/trtllm/index.md": "docs/examples/inference/trtllm.md"
+        "examples/fine-tuning/trl/index.md": "docs/examples/training/trl.md"
+        "examples/fine-tuning/axolotl/index.md": "docs/examples/training/axolotl.md"
+        "blog/efa.md": "docs/examples/clusters/aws.md"
         "docs/concepts/repos.md": "docs/concepts/dev-environments.md#repos"
-        "examples/clusters/a3high/index.md": "examples/clusters/gcp/index.md"
-        "examples/clusters/a3mega/index.md": "examples/clusters/gcp/index.md"
-        "examples/clusters/a4/index.md": "examples/clusters/gcp/index.md"
-        "examples/clusters/efa/index.md": "examples/clusters/aws/index.md"
+        "examples/clusters/a3high/index.md": "docs/examples/clusters/gcp.md"
+        "examples/clusters/a3mega/index.md": "docs/examples/clusters/gcp.md"
+        "examples/clusters/a4/index.md": "docs/examples/clusters/gcp.md"
+        "examples/clusters/efa/index.md": "docs/examples/clusters/aws.md"
         "docs/guides/migration.md": "docs/guides/upgrade.md"
         "docs/reference/api/rest/index.md": "docs/reference/api/http/index.md"
+        # Examples moved from /examples/ to /docs/examples/
+        "examples.md": "docs/examples.md"
+        "examples/single-node-training/trl.md": "docs/examples/training/trl.md"
+        "examples/single-node-training/axolotl.md": "docs/examples/training/axolotl.md"
+        "examples/distributed-training/trl.md": "docs/examples/training/trl.md"
+        "examples/distributed-training/axolotl.md": "docs/examples/training/axolotl.md"
+        "examples/distributed-training/ray-ragen.md": "docs/examples/training/ray-ragen.md"
+        # Single-node and distributed training merged under Training
+        "docs/examples/single-node-training/trl.md": "docs/examples/training/trl.md"
+        "docs/examples/single-node-training/axolotl.md": "docs/examples/training/axolotl.md"
+        "docs/examples/distributed-training/trl.md": "docs/examples/training/trl.md"
+        "docs/examples/distributed-training/axolotl.md": "docs/examples/training/axolotl.md"
+        "docs/examples/distributed-training/ray-ragen.md": "docs/examples/training/ray-ragen.md"
+        "examples/clusters/aws.md": "docs/examples/clusters/aws.md"
+        "examples/clusters/gcp.md": "docs/examples/clusters/gcp.md"
+        "examples/clusters/lambda.md": "docs/examples/clusters/lambda.md"
+        "examples/clusters/crusoe.md": "docs/examples/clusters/crusoe.md"
+        "examples/clusters/nebius.md": "docs/examples/clusters/nebius.md"
+        "examples/clusters/nccl-rccl-tests.md": "docs/examples/clusters/nccl-rccl-tests.md"
+        "examples/inference/sglang.md": "docs/examples/inference/sglang.md"
+        "examples/inference/vllm.md": "docs/examples/inference/vllm.md"
+        "examples/inference/nim.md": "docs/examples/inference/nim.md"
+        "examples/inference/trtllm.md": "docs/examples/inference/trtllm.md"
+        "examples/models/deepseek-v4.md": "docs/examples/models/deepseek-v4.md"
+        "examples/models/qwen36.md": "docs/examples/models/qwen36.md"
+        "examples/accelerators/amd.md": "docs/examples/accelerators/amd.md"
+        "examples/accelerators/tpu.md": "docs/examples/accelerators/tpu.md"
+        "examples/accelerators/tenstorrent.md": "docs/examples/accelerators/tenstorrent.md"
   - typeset
   - gen-files:
       # TODO: convert these to hooks (schema reference migrated)
@@ -171,7 +201,7 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.superfences
   - pymdownx.snippets:
-      base_path: ["docs"]
+      base_path: ["mkdocs"]
   - pymdownx.tabbed:
       alternate_style: true
       slugify: !!python/object/apply:pymdownx.slugs.slugify
@@ -242,10 +272,35 @@ nav:
       - Guides:
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
-          - Protips: docs/guides/protips.md
-          - Upgrade: docs/guides/upgrade.md
-          - Migration: 
-            - Slurm: docs/guides/migration/slurm.md
+          - More:
+            - Protips: docs/guides/protips.md
+            - Upgrade: docs/guides/upgrade.md
+            - Migration: 
+              - Slurm: docs/guides/migration/slurm.md
+      - Examples:
+        - Training:
+            - TRL: docs/examples/training/trl.md
+            - Axolotl: docs/examples/training/axolotl.md
+            - Ray+RAGEN: docs/examples/training/ray-ragen.md
+        - Clusters:
+            - AWS: docs/examples/clusters/aws.md
+            - GCP: docs/examples/clusters/gcp.md
+            - Lambda: docs/examples/clusters/lambda.md
+            - Crusoe: docs/examples/clusters/crusoe.md
+            - Nebius: docs/examples/clusters/nebius.md
+            - NCCL/RCCL tests: docs/examples/clusters/nccl-rccl-tests.md
+        - Inference:
+            - SGLang: docs/examples/inference/sglang.md
+            - vLLM: docs/examples/inference/vllm.md
+            - NIM: docs/examples/inference/nim.md
+            - TensorRT-LLM: docs/examples/inference/trtllm.md
+        - Models:
+            - DeepSeek V4: docs/examples/models/deepseek-v4.md
+            - Qwen 3.6: docs/examples/models/qwen36.md
+        - Accelerators:
+            - AMD: docs/examples/accelerators/amd.md
+            - TPU: docs/examples/accelerators/tpu.md
+            - Tenstorrent: docs/examples/accelerators/tenstorrent.md
       - Reference:
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
@@ -285,38 +340,10 @@ nav:
               - REST API: docs/reference/plugins/rest/index.md
           - llms-full.txt: https://dstack.ai/llms-full.txt
           - skill.md: https://dstack.ai/skill.md
-  - Examples:
-      - examples.md
-      - Single-node training:
-          - TRL: examples/single-node-training/trl/index.md
-          - Axolotl: examples/single-node-training/axolotl/index.md
-      - Distributed training:
-          - TRL: examples/distributed-training/trl/index.md
-          - Axolotl: examples/distributed-training/axolotl/index.md
-          - Ray+RAGEN: examples/distributed-training/ray-ragen/index.md
-      - Clusters:
-          - AWS: examples/clusters/aws/index.md
-          - GCP: examples/clusters/gcp/index.md
-          - Lambda: examples/clusters/lambda/index.md
-          - Crusoe: examples/clusters/crusoe/index.md
-          - Nebius: examples/clusters/nebius/index.md
-          - NCCL/RCCL tests: examples/clusters/nccl-rccl-tests/index.md
-      - Inference:
-          - SGLang: examples/inference/sglang/index.md
-          - vLLM: examples/inference/vllm/index.md
-          - NIM: examples/inference/nim/index.md
-          - TensorRT-LLM: examples/inference/trtllm/index.md
-      - Models:
-          - DeepSeek V4: examples/models/deepseek-v4/index.md
-          - Qwen 3.6: examples/models/qwen36/index.md
-      - Accelerators:
-          - AMD: examples/accelerators/amd/index.md
-          - TPU: examples/accelerators/tpu/index.md
-          - Tenstorrent: examples/accelerators/tenstorrent/index.md
-  - Blog:
-      - blog/index.md
   - Case studies: blog/case-studies.md
   - Benchmarks: blog/benchmarks.md
+  - Blog:
+      - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
 #  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
 #  - GitHub: https://github.com/dstackai/dstack" target="_blank

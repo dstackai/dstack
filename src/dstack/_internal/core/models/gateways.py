@@ -106,6 +106,8 @@ class Gateway(CoreModel):
     id: Optional[uuid.UUID] = None
     """`id` is only optional on the client side for compatibility with pre-0.20.7 servers."""
     name: str
+    project_name: Optional[str] = None
+    """`project_name` is only optional on the client side for compatibility with pre-0.20.20 servers."""
     configuration: GatewayConfiguration
     created_at: datetime.datetime
     status: GatewayStatus

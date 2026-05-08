@@ -5,7 +5,7 @@ on:
     branches:
       - "master"
     paths-ignore:
-      - "docs/**"
+      - "mkdocs/**"
       - "mkdocs.yml"
   pull_request:
     branches:

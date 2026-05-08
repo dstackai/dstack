@@ -60,7 +60,9 @@ from dstack._internal.core.backends.kubernetes.resources import (
 )
 from dstack._internal.core.backends.kubernetes.utils import (
     call_api_method,
-    get_api_from_config_data,
+    get_api_from_kubeconfig_dict,
+    kubeconfig_data_to_kubeconfig_dict,
+    kubeconfig_dict_to_kubeconfig,
 )
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ComputeError, ProvisioningError
@@ -127,7 +129,29 @@ class KubernetesCompute(
         if proxy_jump is None:
             proxy_jump = KubernetesProxyJumpConfig()
         self.proxy_jump = proxy_jump
-        self.api = get_api_from_config_data(config.kubeconfig.data)
+        kubeconfig_dict = kubeconfig_data_to_kubeconfig_dict(config.kubeconfig.data)
+        self.api = get_api_from_kubeconfig_dict(kubeconfig_dict)
+        kubeconfig = kubeconfig_dict_to_kubeconfig(kubeconfig_dict)
+        current_context = kubeconfig.get_context()
+        if current_context.namespace != config.namespace:
+            logger.warning(
+                (
+                    "Namespace mismatch: kubeconfig -> '%s', backend config -> '%s'."
+                    " The current dstack version ignores kubeconfig"
+                    " and uses deprecated namespace property from backend config."
+                    " Future versions will use namespace from kubeconfig."
+                    " To keep using '%s' namespace in future versions and suppress this warning,"
+                    " set namespace to '%s' in kubeconfig context '%s'"
+                ),
+                current_context.namespace,
+                config.namespace,
+                config.namespace,
+                config.namespace,
+                kubeconfig.current_context,
+            )
+        # TODO: switch to current_context.namespace
+        self.namespace = config.namespace
+        logger.debug("Using namespace '%s'", self.namespace)
 
     def get_offers_by_requirements(
         self, requirements: Requirements
@@ -156,7 +180,7 @@ class KubernetesCompute(
         jump_pod_service_name = _get_pod_service_name(jump_pod_name)
         _create_jump_pod_service_if_not_exists(
             api=self.api,
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             jump_pod_name=jump_pod_name,
             jump_pod_service_name=jump_pod_service_name,
             jump_pod_port=self.proxy_jump.port,
@@ -177,7 +201,7 @@ class KubernetesCompute(
                 string_data={".dockerconfigjson": dockerconfigjson},
             )
             self.api.create_namespaced_secret(
-                namespace=self.config.namespace,
+                namespace=self.namespace,
                 body=registry_auth_secret,
             )
             image_pull_secrets = [client.V1LocalObjectReference(name=registry_auth_secret_name)]
@@ -342,11 +366,11 @@ class KubernetesCompute(
             ),
         )
         self.api.create_namespaced_pod(
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             body=pod,
         )
         self.api.create_namespaced_service(
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             body=client.V1Service(
                 metadata=client.V1ObjectMeta(name=_get_pod_service_name(instance_name)),
                 spec=client.V1ServiceSpec(
@@ -395,7 +419,7 @@ class KubernetesCompute(
             backend_data = KubernetesBackendData.load(provisioning_data.backend_data)
             ssh_proxy = _check_and_configure_jump_pod_service(
                 api=self.api,
-                namespace=self.config.namespace,
+                namespace=self.namespace,
                 jump_pod_name=backend_data.jump_pod_name,
                 jump_pod_service_name=backend_data.jump_pod_service_name,
                 jump_pod_hostname=self.proxy_jump.hostname,
@@ -412,7 +436,7 @@ class KubernetesCompute(
 
         pod = self.api.read_namespaced_pod(
             name=provisioning_data.instance_id,
-            namespace=self.config.namespace,
+            namespace=self.namespace,
         )
         if pod.status is None:
             return
@@ -422,7 +446,7 @@ class KubernetesCompute(
         provisioning_data.internal_ip = pod_ip
         service = self.api.read_namespaced_service(
             name=_get_pod_service_name(provisioning_data.instance_id),
-            namespace=self.config.namespace,
+            namespace=self.namespace,
         )
         service_spec = get_or_error(service.spec)
         provisioning_data.hostname = get_or_error(service_spec.cluster_ip)
@@ -450,21 +474,21 @@ class KubernetesCompute(
             self.api.delete_namespaced_service,
             expected=404,
             name=_get_pod_service_name(instance_id),
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             body=client.V1DeleteOptions(),
         )
         call_api_method(
             self.api.delete_namespaced_pod,
             expected=404,
             name=instance_id,
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             body=client.V1DeleteOptions(),
         )
         call_api_method(
             self.api.delete_namespaced_secret,
             expected=404,
             name=_get_registry_auth_secret_name(instance_id),
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             body=client.V1DeleteOptions(),
         )
 
@@ -520,7 +544,7 @@ class KubernetesCompute(
             ),
         )
         self.api.create_namespaced_pod(
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             body=pod,
         )
         service = client.V1Service(
@@ -550,13 +574,13 @@ class KubernetesCompute(
             ),
         )
         self.api.create_namespaced_service(
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             body=service,
         )
         # address is eiher a domain name or an IP address
         address = _wait_for_load_balancer_address(
             api=self.api,
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             service_name=_get_pod_service_name(instance_name),
         )
         if address is None:
@@ -591,7 +615,7 @@ class KubernetesCompute(
         pvc = call_api_method(
             self.api.read_namespaced_persistent_volume_claim,
             expected=404,
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             name=pvc_name,
         )
         if pvc is None:
@@ -650,7 +674,7 @@ class KubernetesCompute(
             ),
         )
         self.api.create_namespaced_persistent_volume_claim(
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             body=pvc,
         )
         logger.debug("Created PVC %s for volume %s", pvc_name, volume.name)
@@ -671,7 +695,7 @@ class KubernetesCompute(
         pvc = call_api_method(
             self.api.delete_namespaced_persistent_volume_claim,
             expected=404,
-            namespace=self.config.namespace,
+            namespace=self.namespace,
             name=pvc_name,
         )
         if pvc is None:

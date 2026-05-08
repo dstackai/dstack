@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from dstack._internal.core.models.common import CoreConfig, CoreModel, generate_dual_core_model
 from dstack._internal.core.models.gateways import GatewayConfiguration
@@ -14,6 +14,10 @@ class CreateGatewayRequest(generate_dual_core_model(CreateGatewayRequestConfig))
     configuration: GatewayConfiguration
 
 
+class ListGatewaysRequest(CoreModel):
+    include_imported: bool = False
+
+
 class GetGatewayRequest(CoreModel):
     name: str
 
@@ -24,6 +28,7 @@ class DeleteGatewaysRequest(CoreModel):
 
 class SetDefaultGatewayRequest(CoreModel):
     name: str
+    gateway_project: Optional[str] = None
 
 
 class SetWildcardDomainRequest(CoreModel):

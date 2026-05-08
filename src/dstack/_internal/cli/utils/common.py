@@ -151,6 +151,13 @@ def resolve_url(url: str, timeout: float = 5.0) -> str:
     return response.url
 
 
+def format_entity_reference(name: str, project: str, current_project: str) -> str:
+    if current_project == project:
+        return name
+    else:
+        return f"{project}/{name}"
+
+
 def format_instance_availability(v: InstanceAvailability) -> str:
     if v in (InstanceAvailability.UNKNOWN, InstanceAvailability.AVAILABLE):
         return ""
