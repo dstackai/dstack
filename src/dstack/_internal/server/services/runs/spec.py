@@ -5,6 +5,7 @@ from dstack._internal.core.models.configurations import (
     ServiceConfiguration,
 )
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
+from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.runs import LEGACY_REPO_DIR, AnyRunConfiguration, RunSpec
 from dstack._internal.core.models.volumes import InstanceMountPoint
 from dstack._internal.core.services import validate_dstack_resource_name
@@ -213,6 +214,19 @@ def _check_can_update_configuration(
             raise ServerClientError(
                 "Cannot update router replica groups in-place (adding/removing `router` or changing "
                 "which replica group is the router is not supported). Stop the run and apply again."
+            )
+        # Dynamo: any change to the router replica group requires stop+re-apply.
+        # The router's replica_num and address must remain stable so workers'
+        # cached DSTACK_ROUTER_INTERNAL_IP stays valid for the life of the run.
+        if (
+            current_router_group is not None
+            and current_router_group.router is not None
+            and current_router_group.router.type == RouterType.DYNAMO
+            and current_router_group != new_router_group
+        ):
+            raise ServerClientError(
+                "Cannot update a Dynamo router replica group in place. "
+                "Stop the run with `dstack stop` and re-apply."
             )
     updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
         new.type, []

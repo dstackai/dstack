@@ -23,6 +23,7 @@ from dstack._internal.core.models.instances import InstanceStatus, SSHConnection
 from dstack._internal.core.models.metrics import Metric
 from dstack._internal.core.models.profiles import StartupOrder
 from dstack._internal.core.models.repos import RemoteRepoCreds
+from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.runs import (
     ClusterInfo,
     ImagePullProgress,
@@ -102,6 +103,13 @@ from dstack._internal.server.services.repos import (
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import is_job_ready, run_model_to_run
+from dstack._internal.server.services.runs.replicas import (
+    ROUTER_FAILED,
+    ROUTER_NOT_PROVISIONED,
+    get_router_env_for_job,
+    get_router_replica_group,
+    get_router_replica_num,
+)
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.server.utils import sentry_utils
@@ -113,6 +121,8 @@ logger = get_logger(__name__)
 
 
 JOB_STATUSES_WITH_MIN_PROCESSING_INTERVAL = [JobStatus.PROVISIONING, JobStatus.PULLING]
+
+ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS = 30 * 60
 
 JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 """`The minimum time before terminating active job in case of connectivity issues."""
@@ -384,8 +394,12 @@ async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_Proce
                 job_submissions=[job_model_to_job_submission(job_model)],
             )
         else:
-            # PROVISIONING/PULLING jobs need same-replica siblings for cluster coordination.
-            # All sibling access is replica-scoped, so only load jobs for this replica.
+            # PROVISIONING/PULLING jobs need same-replica siblings for cluster
+            # coordination, plus — when the run has a router replica group —
+            # the router replica's job (cross-replica) so the env-injection
+            # gate in _prepare_startup_context can read its status / IP.
+            # _fetch_run_model handles both: same-replica jobs always, plus
+            # the router replica's job when one exists.
             run_model = await _fetch_run_model(
                 session=session, run_id=job_model.run_id, replica_num=item.replica_num
             )
@@ -477,6 +491,54 @@ async def _prepare_startup_context(
             )
             return None
 
+    # If this run has a router replica group and this job is a worker, gate
+    # startup on the router replica's state. The helper returns None for the
+    # router itself and for runs without a router group, so this whole block
+    # is a no-op in those cases.
+    router_env = get_router_env_for_job(
+        run_model=context.run_model,
+        run_spec=context.run.run_spec,
+        job_model=context.job_model,
+    )
+    if router_env is ROUTER_FAILED:
+        # Router has reached a terminal state — the worker cannot recover by
+        # waiting. Terminate it now with a clear reason instead of letting it
+        # idle until the run-level reconciler tears the whole run down.
+        _terminate_job(
+            job_model=context.job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message=(
+                "Router replica is in a terminal state; cannot provision worker "
+                "without a running router."
+            ),
+        )
+        return None
+    if router_env is ROUTER_NOT_PROVISIONED:
+        # Router is alive but its internal_ip is not yet known. Defer this
+        # worker — the next pipeline tick will re-check. Bound the wait so a
+        # router that is genuinely stuck can't burn worker instance-hours
+        # forever; see ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS.
+        waited_seconds = (get_current_datetime() - context.job_model.submitted_at).total_seconds()
+        if waited_seconds > ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS:
+            _terminate_job(
+                job_model=context.job_model,
+                job_update_map=result.job_update_map,
+                termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+                termination_reason_message=(
+                    f"Router replica did not acquire an internal IP within "
+                    f"{ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS}s; terminating worker."
+                ),
+            )
+            return None
+        logger.debug(
+            "%s: waiting for router replica to be provisioned",
+            fmt(context.job_model),
+        )
+        return None
+    if router_env:
+        context.job.job_spec.env.update(router_env)
+
     cluster_info = _get_cluster_info(
         jobs=context.run.jobs,
         replica_num=context.job.job_spec.replica_num,
@@ -549,7 +611,10 @@ async def _fetch_run_model(
     Args:
         replica_num: If None, skip loading jobs (for RUNNING jobs that don't need siblings).
             If set, load only latest-submission jobs for that replica (for PROVISIONING/PULLING
-            jobs that need same-replica siblings for cluster coordination).
+            jobs that need same-replica siblings for cluster coordination). When the run has
+            a router replica group whose replica_num differs from this one, that replica's
+            jobs are also loaded so cross-replica router lookups (see get_router_env_for_job
+            in services/runs/replicas.py) can find it.
     """
     query = (
         select(RunModel)
@@ -560,6 +625,31 @@ async def _fetch_run_model(
         .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
     )
     if replica_num is not None:
+        # Pre-fetch the bare run_spec to discover whether the run has a
+        # router replica group, and if so at which replica_num. The query
+        # below then includes both this replica AND the router replica
+        # For runs without a router group (services without one, plus
+        # all tasks and dev-environments), the helper returns None and we
+        # fall through to the original single-replica behavior.
+        spec_res = await session.execute(select(RunModel.run_spec).where(RunModel.id == run_id))
+        run_spec_str = spec_res.scalar_one()
+        run_spec = RunSpec.__response__.parse_raw(run_spec_str)
+        # The router pre-fetch only exists to feed get_router_env_for_job,
+        # which is gated to Dynamo. Skip it for SGLang and non-router runs.
+        router_group = get_router_replica_group(run_spec)
+        if (
+            router_group is not None
+            and router_group.router is not None
+            and router_group.router.type == RouterType.DYNAMO
+        ):
+            router_replica_num = get_router_replica_num(run_spec)
+        else:
+            router_replica_num = None
+
+        replica_nums: list[int] = [replica_num]
+        if router_replica_num is not None and router_replica_num != replica_num:
+            replica_nums.append(router_replica_num)
+
         latest_submissions_sq = (
             select(
                 JobModel.run_id.label("run_id"),
@@ -567,7 +657,7 @@ async def _fetch_run_model(
                 JobModel.job_num.label("job_num"),
                 func.max(JobModel.submission_num).label("max_submission_num"),
             )
-            .where(JobModel.run_id == run_id, JobModel.replica_num == replica_num)
+            .where(JobModel.run_id == run_id, JobModel.replica_num.in_(replica_nums))
             .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
             .subquery()
         )

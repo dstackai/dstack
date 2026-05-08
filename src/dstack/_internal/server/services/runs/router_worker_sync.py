@@ -19,7 +19,7 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.utils.logging import get_logger
 
 from .replicas import job_belongs_to_group
-from .service_router_worker_sync import run_spec_has_router_replica_group
+from .service_router_worker_sync import run_spec_has_sglang_router_replica_group
 
 logger = get_logger(__name__)
 
@@ -93,9 +93,9 @@ class _TargetWorker(TypedDict):
     bootstrap_port: NotRequired[Optional[int]]
 
 
-def run_model_has_router_replica_group(run_model: RunModel) -> bool:
+def run_model_has_sglang_router_replica_group(run_model: RunModel) -> bool:
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-    return run_spec_has_router_replica_group(run_spec)
+    return run_spec_has_sglang_router_replica_group(run_spec)
 
 
 def _get_router_job(run_model: RunModel, router_group: ReplicaGroup) -> Optional[JobModel]:

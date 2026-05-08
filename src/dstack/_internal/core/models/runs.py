@@ -43,6 +43,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import Memory, ResourcesSpec
+from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.unix import UnixUser
 from dstack._internal.core.models.volumes import MountPoint
 from dstack._internal.utils import common as common_utils
@@ -601,6 +602,31 @@ class RunSpec(generate_dual_core_model(RunSpecConfig)):
         if merged_profile.creation_policy is None:
             merged_profile.creation_policy = CreationPolicy.REUSE_OR_CREATE
         values["merged_profile"] = merged_profile
+        return values
+
+    @root_validator
+    def _validate_dynamo_no_retry(cls, values) -> Dict:
+        """Reject `retry` for services with a Dynamo router replica group.
+        Dynamo workers cache the router's internal IP at provisioning time. A
+        retry would produce a new router and likely a new internal_ip, leaving workers bound
+        to a router that no longer exists.
+        """
+        merged_profile = values.get("merged_profile")
+        cfg = values.get("configuration")
+        if merged_profile is None or merged_profile.retry is None:
+            return values
+        if not isinstance(cfg, ServiceConfiguration):
+            return values
+        for g in cfg.replica_groups:
+            if g.router is not None and g.router.type == RouterType.DYNAMO:
+                raise ValueError(
+                    "Retry cannot be configured for services with a Dynamo "
+                    "router replica group. The router's address must remain "
+                    "stable for the life of the run; allowing retry would "
+                    "leave workers bound to a router that no longer exists. "
+                    "Remove `retry` from the profile/configuration and "
+                    "re-apply."
+                )
         return values
 
 

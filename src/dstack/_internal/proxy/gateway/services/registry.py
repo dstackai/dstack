@@ -20,7 +20,7 @@ from dstack._internal.proxy.gateway.services.nginx import (
     ServiceConfig,
 )
 from dstack._internal.proxy.lib import models
-from dstack._internal.proxy.lib.const import SGLANG_WHITELISTED_PATHS
+from dstack._internal.proxy.lib.const import ROUTER_WHITELISTED_PATHS
 from dstack._internal.proxy.lib.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.proxy.lib.repo import BaseProxyRepo
 from dstack._internal.proxy.lib.services.service_connection import (
@@ -344,7 +344,7 @@ async def get_nginx_service_config(
 ) -> ServiceConfig:
     limit_req_zones: list[LimitReqZoneConfig] = []
     locations: list[LocationConfig] = []
-    is_sglang = (
+    is_router = (
         service.router is not None and service.router.type == RouterType.SGLANG
     ) or service.has_router_replica
     sglang_limits: dict[str, LimitReqConfig] = {}
@@ -361,8 +361,8 @@ async def get_nginx_service_config(
         limit_req_zones.append(
             LimitReqZoneConfig(name=zone_name, key=key, rpm=round(rate_limit.rps * 60))
         )
-        if is_sglang:
-            for path in SGLANG_WHITELISTED_PATHS:
+        if is_router:
+            for path in ROUTER_WHITELISTED_PATHS:
                 if rate_limit.prefix == path or path.startswith(rate_limit.prefix):
                     # Use the longest prefix if multiple prefixes match the same path
                     current_prefix_len = len(rate_limit.prefix)
@@ -381,9 +381,9 @@ async def get_nginx_service_config(
                 )
             )
 
-    # Add SGLang whitelisted paths as locations
-    if is_sglang:
-        for path in SGLANG_WHITELISTED_PATHS:
+    # Add router whitelisted paths as locations
+    if is_router:
+        for path in ROUTER_WHITELISTED_PATHS:
             # Use prefix match for paths that end with a slash and exact match for paths that don't
             if path.endswith("/"):
                 locations.append(LocationConfig(prefix=path, limit_req=sglang_limits.get(path)))
@@ -392,8 +392,8 @@ async def get_nginx_service_config(
                     LocationConfig(prefix=f"= {path}", limit_req=sglang_limits.get(path))
                 )
 
-    # Don't auto-add / location for SGLang routers (catch-all 403 handles it)
-    if not any(location.prefix == "/" for location in locations) and not is_sglang:
+    # Don't auto-add / location for router-based services (catch-all 403 handles it)
+    if not any(location.prefix == "/" for location in locations) and not is_router:
         locations.append(LocationConfig(prefix="/", limit_req=None))
     return ServiceConfig(
         domain=service.domain_safe,
