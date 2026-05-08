@@ -233,7 +233,6 @@ class AWSCompute(
                 logger.debug("Skipping instance %s termination. Instance not found.", instance_id)
             else:
                 raise e
-        # AWS auto-disassociates EIP on instance termination, so we only need to release.
         instance_backend_data = _parse_instance_backend_data(backend_data)
         if instance_backend_data.eip_allocation_id is not None:
             _release_eip(
@@ -1396,17 +1395,36 @@ def _get_primary_network_interface_id(instance: Any) -> str:
 
 def _release_eip(ec2_client: botocore.client.BaseClient, allocation_id: str) -> None:
     """
-    Releases an Elastic IP by allocation ID. Tolerates "not found" (already released).
-    AWS auto-disassociates EIPs once the instance reaches the `terminated` state, but
-    `TerminateInstances` only initiates shutdown — `ReleaseAddress` may briefly fail
-    with `InvalidIPAddress.InUse`. Surface that error so the termination pipeline
-    retries.
+    Releases an Elastic IP by allocation ID. Disassociates first if the EIP is still
+    bound to an instance — `TerminateInstances` only initiates shutdown, and AWS
+    auto-disassociates only once the instance reaches `terminated`. Releasing
+    explicitly avoids the `InvalidIPAddress.InUse` race and the retry loop.
     """
+    try:
+        response = ec2_client.describe_addresses(AllocationIds=[allocation_id])
+    except botocore.exceptions.ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("InvalidAllocationID.NotFound", "InvalidAddress.NotFound"):
+            logger.debug("Skipping EIP %s release. Already released.", allocation_id)
+            return
+        raise
+    addresses = response.get("Addresses", [])
+    if not addresses:
+        return
+    association_id = addresses[0].get("AssociationId")
+    if association_id is not None:
+        try:
+            ec2_client.disassociate_address(AssociationId=association_id)
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            # AWS may have auto-disassociated between our Describe and Disassociate
+            # if the instance just reached `terminated`. Tolerated.
+            if code != "InvalidAssociationID.NotFound":
+                raise
     try:
         ec2_client.release_address(AllocationId=allocation_id)
     except botocore.exceptions.ClientError as e:
         code = e.response.get("Error", {}).get("Code", "")
         if code in ("InvalidAllocationID.NotFound", "InvalidAddress.NotFound"):
-            logger.debug("Skipping EIP %s release. Already released.", allocation_id)
             return
         raise

@@ -162,6 +162,8 @@ There are two ways to configure AWS: using an access key or using the default cr
         "Action": [
             "ec2:AllocateAddress",
             "ec2:AssociateAddress",
+            "ec2:DescribeAddresses",
+            "ec2:DisassociateAddress",
             "ec2:ReleaseAddress"
         ],
         "Resource": "*"
