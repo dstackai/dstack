@@ -154,6 +154,22 @@ There are two ways to configure AWS: using an access key or using the default cr
 
     The `iam:*` permissions are only needed if you specify `iam_instance_profile` to assign to EC2 instances.
 
+    The following additional permissions are required when running [multi-EFA instance types](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html#network-cards) with `public_ips: true`:
+
+    ```
+    {
+        "Effect": "Allow",
+        "Action": [
+            "ec2:AllocateAddress",
+            "ec2:AssociateAddress",
+            "ec2:DescribeAddresses",
+            "ec2:DisassociateAddress",
+            "ec2:ReleaseAddress"
+        ],
+        "Resource": "*"
+    }
+    ```
+
     You can also limit permissions to specific resources in your account:
     
     ```

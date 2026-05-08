@@ -196,19 +196,15 @@ def create_instances_struct(
     # AWS allows specifying either NetworkInterfaces for specific subnet_id
     # or instance-level SecurityGroupIds in case of no specific subnet_id, not both.
     if subnet_id is not None:
-        # If the instance type supports multiple cards, we request multiple interfaces only if not allocate_public_ip
-        # due to the limitation: "AssociatePublicIpAddress [...] You cannot specify more than one
-        # network interface in the request".
-        # Error message: "(InvalidParameterCombination) when calling the RunInstances operation:
-        # The associatePublicIPAddress parameter cannot be specified when launching with
-        # multiple network interfaces".
-        # See: https://stackoverflow.com/questions/49882121
-        # If we need more than one card, we should either use Elastic IP (AWS-recommended way) or
-        # create the instance with one interface and add the rest later (the latter is not tested
-        # and may or may not work).
+        # AWS does not auto-assign a public IPv4 to instances launched with multiple network
+        # interfaces ("AssociatePublicIpAddress [...] You cannot specify more than one network
+        # interface in the request"). For multi-EFA instance types (e.g. p4d, p5, trn1), we
+        # therefore launch all EFA NICs without `AssociatePublicIpAddress` and, when
+        # `public_ips: true`, attach an Elastic IP after launch in `update_provisioning_data`.
+        multi_eni = max_efa_interfaces > 1
         struct["NetworkInterfaces"] = [
             {
-                "AssociatePublicIpAddress": allocate_public_ip,
+                "AssociatePublicIpAddress": allocate_public_ip and not multi_eni,
                 "DeviceIndex": 0,
                 "SubnetId": subnet_id,
                 "Groups": [security_group_id],
@@ -216,7 +212,7 @@ def create_instances_struct(
             },
         ]
 
-        if max_efa_interfaces > 1 and allocate_public_ip is False:
+        if multi_eni:
             for i in range(1, max_efa_interfaces):
                 # Set to efa-only to use interfaces exclusively for GPU-to-GPU communication
                 interface_type = "efa-only"
@@ -226,7 +222,7 @@ def create_instances_struct(
                     interface_type = "efa" if i % 4 == 0 else "efa-only"
                 struct["NetworkInterfaces"].append(
                     {
-                        "AssociatePublicIpAddress": allocate_public_ip,
+                        "AssociatePublicIpAddress": False,
                         "NetworkCardIndex": i,
                         "DeviceIndex": 1,
                         "SubnetId": subnet_id,

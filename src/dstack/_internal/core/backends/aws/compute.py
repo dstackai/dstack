@@ -98,6 +98,12 @@ class AWSVolumeBackendData(CoreModel):
     iops: int
 
 
+class AWSInstanceBackendData(CoreModel):
+    eip_allocation_id: Optional[str] = None
+    """Elastic IP allocated for multi-ENI instances launched with `public_ips: true`.
+    """
+
+
 def _ec2client_cache_methodkey(self, ec2_client, *args, **kwargs):
     return hashkey(*args, **kwargs)
 
@@ -227,6 +233,12 @@ class AWSCompute(
                 logger.debug("Skipping instance %s termination. Instance not found.", instance_id)
             else:
                 raise e
+        instance_backend_data = _parse_instance_backend_data(backend_data)
+        if instance_backend_data.eip_allocation_id is not None:
+            _release_eip(
+                ec2_client=ec2_client,
+                allocation_id=instance_backend_data.eip_allocation_id,
+            )
 
     def create_instance(
         self,
@@ -395,6 +407,7 @@ class AWSCompute(
         project_ssh_private_key: str,
     ):
         ec2_resource = self.session.resource("ec2", region_name=provisioning_data.region)
+        ec2_client = self.session.client("ec2", region_name=provisioning_data.region)
         instance = ec2_resource.Instance(provisioning_data.instance_id)  # pyright: ignore[reportAttributeAccessIssue]
         try:
             instance.load()
@@ -422,8 +435,24 @@ class AWSCompute(
                 f"Failed to get instance IP address. Unknown instance state {state}."
             )
 
-        hostname = _get_instance_ip(instance, self.config.allocate_public_ips)
-        provisioning_data.hostname = hostname
+        if self.config.allocate_public_ips and instance.public_ip_address is None:
+            # AWS can't auto-assign a public IPv4 to multi-ENI instances (multi-EFA instances).
+            # When `public_ips: true` and no public IP is present after launch, attach an Elastic IP to the primary ENI.
+            # The check relies on running instances always having IP assigned if ever.
+            public_ip, allocation_id = _allocate_and_associate_eip(
+                ec2_client=ec2_client,
+                instance=instance,
+                project_name=_get_project_name_from_instance_tags(instance),
+                backend_tags=self.config.tags,
+            )
+            provisioning_data.backend_data = AWSInstanceBackendData(
+                eip_allocation_id=allocation_id
+            ).json()
+            provisioning_data.hostname = public_ip
+        else:
+            provisioning_data.hostname = _get_instance_ip(
+                instance, self.config.allocate_public_ips
+            )
         provisioning_data.internal_ip = instance.private_ip_address
         provisioning_data.ssh_port = 22
 
@@ -1263,3 +1292,139 @@ def _get_instance_ip(instance: Any, public_ip: bool) -> str:
 def _get_volume_price(size: int, iops: int) -> float:
     # https://aws.amazon.com/ebs/pricing/
     return size * 0.08 + (iops - 3000) * 0.005
+
+
+def _parse_instance_backend_data(backend_data: Optional[str]) -> "AWSInstanceBackendData":
+    if backend_data is None:
+        return AWSInstanceBackendData()
+    try:
+        return AWSInstanceBackendData.parse_raw(backend_data)
+    except ValidationError:
+        logger.exception("Failed to parse AWS instance backend_data; treating as empty")
+        return AWSInstanceBackendData()
+
+
+def _get_project_name_from_instance_tags(instance: Any) -> Optional[str]:
+    for tag in instance.tags or []:
+        if tag.get("Key") == "dstack_project":
+            return tag.get("Value")
+    return None
+
+
+def _allocate_and_associate_eip(
+    ec2_client: botocore.client.BaseClient,
+    instance: Any,
+    project_name: Optional[str],
+    backend_tags: Optional[Dict[str, str]],
+) -> Tuple[str, str]:
+    """
+    Allocates an Elastic IP and associates it with the primary ENI of `instance`.
+    Returns `(public_ip, allocation_id)`.
+    """
+    primary_nic_id = _get_primary_network_interface_id(instance)
+    tags = {
+        "owner": "dstack",
+        "dstack_instance": instance.instance_id,
+    }
+    if project_name is not None:
+        tags["dstack_project"] = project_name
+    if backend_tags:
+        for k, v in backend_tags.items():
+            tags.setdefault(k, v)
+    tags = aws_resources.filter_invalid_tags(tags)
+
+    try:
+        allocate_response = ec2_client.allocate_address(
+            Domain="vpc",
+            TagSpecifications=[
+                {
+                    "ResourceType": "elastic-ip",
+                    "Tags": aws_resources.make_tags(tags),
+                }
+            ],
+        )
+    except botocore.exceptions.ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        region = ec2_client.meta.region_name
+        if code == "AddressLimitExceeded":
+            raise ProvisioningError(
+                f"Elastic IP quota exceeded in {region}. "
+                "Raise the EC2 'EC2-VPC Elastic IPs' quota in Service Quotas, "
+                "or reduce concurrent multi-EFA instances."
+            )
+        raise ProvisioningError(f"Failed to allocate Elastic IP in {region}: {e}")
+
+    allocation_id = allocate_response["AllocationId"]
+    public_ip = allocate_response["PublicIp"]
+    try:
+        ec2_client.associate_address(
+            AllocationId=allocation_id,
+            NetworkInterfaceId=primary_nic_id,
+            AllowReassociation=False,
+        )
+    except botocore.exceptions.ClientError as e:
+        # Best-effort release; on failure the EIP leaks until manually released.
+        logger.warning(
+            "Failed to associate EIP %s to instance %s; releasing.",
+            allocation_id,
+            instance.instance_id,
+        )
+        try:
+            ec2_client.release_address(AllocationId=allocation_id)
+        except botocore.exceptions.ClientError:
+            logger.exception(
+                "Failed to release just-allocated EIP %s; release it manually.",
+                allocation_id,
+            )
+        raise ProvisioningError(
+            f"Failed to associate Elastic IP {allocation_id} to instance "
+            f"{instance.instance_id}: {e}"
+        )
+    return public_ip, allocation_id
+
+
+def _get_primary_network_interface_id(instance: Any) -> str:
+    for nic in instance.network_interfaces_attribute or []:
+        attachment = nic.get("Attachment") or {}
+        if attachment.get("DeviceIndex") == 0:
+            return nic["NetworkInterfaceId"]
+    raise ProvisioningError(
+        f"Instance {instance.instance_id} has no primary network interface (DeviceIndex=0)"
+    )
+
+
+def _release_eip(ec2_client: botocore.client.BaseClient, allocation_id: str) -> None:
+    """
+    Releases an Elastic IP by allocation ID. Disassociates first if the EIP is still
+    bound to an instance — `TerminateInstances` only initiates shutdown, and AWS
+    auto-disassociates only once the instance reaches `terminated`. Releasing
+    explicitly avoids the `InvalidIPAddress.InUse` race and the retry loop.
+    """
+    try:
+        response = ec2_client.describe_addresses(AllocationIds=[allocation_id])
+    except botocore.exceptions.ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("InvalidAllocationID.NotFound", "InvalidAddress.NotFound"):
+            logger.debug("Skipping EIP %s release. Already released.", allocation_id)
+            return
+        raise
+    addresses = response.get("Addresses", [])
+    if not addresses:
+        return
+    association_id = addresses[0].get("AssociationId")
+    if association_id is not None:
+        try:
+            ec2_client.disassociate_address(AssociationId=association_id)
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            # AWS may have auto-disassociated between our Describe and Disassociate
+            # if the instance just reached `terminated`. Tolerated.
+            if code != "InvalidAssociationID.NotFound":
+                raise
+    try:
+        ec2_client.release_address(AllocationId=allocation_id)
+    except botocore.exceptions.ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("InvalidAllocationID.NotFound", "InvalidAddress.NotFound"):
+            return
+        raise
