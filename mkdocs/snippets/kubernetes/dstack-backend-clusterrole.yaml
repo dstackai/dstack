@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dstack-backend
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    # "create" is only needed if dstack should create the namespace.
+    # Could be dropped if the namespace already exists.
+    verbs: ["get", "create"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
