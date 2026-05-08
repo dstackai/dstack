@@ -11,6 +11,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.exports import (
     Export,
     ExportedFleet,
@@ -299,8 +300,12 @@ async def add_exported_gateways(
         raise ServerClientError(
             f"Gateways {already_exported} are already exported by export {export.name!r}"
         )
-    gateways = await list_project_gateway_models(session=session, project=export.project)
+    gateways = await list_project_gateway_models(
+        session=session, project=export.project, load_backend_type=True
+    )
     gateways = [g for g in gateways if g.name in names]
+    if any(g.backend.type == BackendType.DSTACK for g in gateways):
+        raise ServerClientError("Exporting the built-in dstack Sky gateway is not allowed")
     if missing := set(names) - {g.name for g in gateways}:
         raise ResourceNotExistsError(
             f"Gateways {missing} not found in project {export.project.name!r}"
