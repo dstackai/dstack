@@ -1,5 +1,6 @@
 from dstack._internal.core.models.common import IncludeExcludeDictType
 from dstack._internal.core.models.gateways import GatewayConfiguration, GatewaySpec
+from dstack._internal.server.schemas.gateways import SetDefaultGatewayRequest
 
 
 def get_gateway_spec_excludes(gateway_spec: GatewaySpec) -> IncludeExcludeDictType:
@@ -24,6 +25,13 @@ def get_create_gateway_excludes(configuration: GatewayConfiguration) -> IncludeE
     create_gateway_excludes: IncludeExcludeDictType = {}
     create_gateway_excludes["configuration"] = _get_gateway_configuration_excludes(configuration)
     return create_gateway_excludes
+
+
+def get_set_default_gateway_excludes(request: SetDefaultGatewayRequest) -> IncludeExcludeDictType:
+    excludes: IncludeExcludeDictType = {}
+    if request.gateway_project is None:
+        excludes["gateway_project"] = True
+    return excludes
 
 
 def _get_gateway_configuration_excludes(

@@ -4,8 +4,36 @@ from rich.table import Table
 
 from dstack._internal.cli.models.gateways import GatewayCommandOutput
 from dstack._internal.cli.utils.common import add_row_from_dict, console, format_entity_reference
+from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.utils.common import DateFormatter, pretty_date
+from dstack.api.server._gateways import GatewaysAPIClient
+
+
+def get_gateway_relative_to_project(
+    client: GatewaysAPIClient, project: str, gateway_project: str, gateway_name: str
+) -> Gateway:
+    """
+    Retrieves a single gateway, ensuring that `Gateway.default` is resolved relative to
+    `project` rather than relative to the gateway's host project.
+    """
+    if project == gateway_project:
+        return client.get(project, gateway_name)
+
+    # For imported gateways, use `list`.
+    # `get` would resolve `Gateway.default` relative to the gateway's host project
+    gateways = client.list(project, include_imported=True)
+    for gateway in gateways:
+        if gateway.name == gateway_name and (
+            gateway_project == gateway.project_name
+            # Compatibility with pre-0.20.20 servers:
+            # gateway.project_name is None means the gateway is in the current `project`
+            or (gateway.project_name is None and gateway_project == project)
+        ):
+            return gateway
+    ref = EntityReference(name=gateway_name, project=gateway_project)
+    raise ResourceNotExistsError(msg=f"Gateway {ref.format()!r} not found in project {project!r}")
 
 
 def print_gateways_table(gateways: List[Gateway], current_project: str, verbose: bool = False):

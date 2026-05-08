@@ -12,11 +12,12 @@ from dstack._internal.cli.utils.common import (
     console,
 )
 from dstack._internal.cli.utils.gateway import (
+    get_gateway_relative_to_project,
     get_gateways_table,
     print_gateways_json,
     print_gateways_table,
 )
-from dstack._internal.core.errors import CLIError, ResourceNotExistsError
+from dstack._internal.core.errors import CLIError
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
@@ -167,30 +168,38 @@ class GatewayCommand(APIBaseCommand):
             return
 
     def _update(self, args: argparse.Namespace):
-        if args.name.project is not None:
-            console.print(
-                "The [code]<project>/<gateway>[/] format is not supported for gateway names."
-                " Can only update gateways owned by the current project"
-            )
-            exit(1)
-        name = args.name.name
         with console.status("Updating gateway..."):
-            if args.set_default:
-                self.api.client.gateways.set_default(self.api.project, name)
             if args.domain:
-                self.api.client.gateways.set_wildcard_domain(self.api.project, name, args.domain)
-        gateway = self.api.client.gateways.get(self.api.project, name)
+                if args.name.project is not None:
+                    console.print(
+                        "The [code]<project>/<gateway>[/] format is not supported for gateway names"
+                        " when [code]--domain[/] is passed."
+                        " Can only update gateways owned by the current project"
+                    )
+                    exit(1)
+                self.api.client.gateways.set_wildcard_domain(
+                    self.api.project, args.name.name, args.domain
+                )
+            if args.set_default:
+                self.api.client.gateways.set_default(
+                    self.api.project,
+                    gateway_name=args.name.name,
+                    gateway_project=args.name.project,
+                )
+        gateway = get_gateway_relative_to_project(
+            client=self.api.client.gateways,
+            project=self.api.project,
+            gateway_project=args.name.project or self.api.project,
+            gateway_name=args.name.name,
+        )
         print_gateways_table([gateway], current_project=self.api.project)
 
     def _get(self, args: argparse.Namespace):
         # TODO: Implement non-json output format
-        try:
-            gateway = self.api.client.gateways.get(
-                project_name=args.name.project or self.api.project,
-                gateway_name=args.name.name,
-            )
-        except ResourceNotExistsError:
-            console.print("Gateway not found")
-            exit(1)
-
+        gateway = get_gateway_relative_to_project(
+            client=self.api.client.gateways,
+            project=self.api.project,
+            gateway_project=args.name.project or self.api.project,
+            gateway_name=args.name.name,
+        )
         print(pydantic_orjson_dumps_with_indent(gateway.dict(), default=None))

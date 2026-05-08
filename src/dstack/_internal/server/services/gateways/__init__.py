@@ -263,7 +263,10 @@ async def create_gateway(
         default_gateway = await get_project_default_gateway_model(session=session, project=project)
         if default_gateway is None or configuration.default:
             await set_default_gateway(
-                session=session, project=project, name=configuration.name, user=user
+                session=session,
+                project=project,
+                ref=EntityReference(name=configuration.name, project=None),
+                user=user,
             )
             default_gateway = gateway
         pipeline_hinter.hint_fetch(GatewayModel.__name__)
@@ -394,18 +397,18 @@ async def set_gateway_wildcard_domain(
 
 
 async def set_default_gateway(
-    session: AsyncSession, project: ProjectModel, name: str, user: Optional[UserModel]
+    session: AsyncSession, project: ProjectModel, ref: EntityReference, user: Optional[UserModel]
 ):
     gateway = await get_project_gateway_model_by_reference(
-        session=session, project=project, ref=EntityReference(name=name, project=None)
+        session=session, project=project, ref=ref
     )
     if gateway is None:
         raise ResourceNotExistsError()
     if gateway.to_be_deleted:
         raise ServerClientError("Cannot set gateway marked for deletion as default")
-    if project.default_gateway_id == gateway.id:
-        return
     previous_gateway = await get_project_default_gateway_model(session, project)
+    if previous_gateway is not None and previous_gateway.id == gateway.id:
+        return
     await session.execute(
         update(ProjectModel)
         .where(
@@ -418,15 +421,21 @@ async def set_default_gateway(
     if previous_gateway is not None:
         events.emit(
             session,
-            "Gateway unset as default",
+            "Gateway unset as project default",
             actor=events.UserActor.from_user(user) if user is not None else events.SystemActor(),
-            targets=[events.Target.from_model(previous_gateway)],
+            targets=[
+                events.Target.from_model(previous_gateway),
+                events.Target.from_model(project),
+            ],
         )
     events.emit(
         session,
-        "Gateway set as default",
+        "Gateway set as project default",
         actor=events.UserActor.from_user(user) if user is not None else events.SystemActor(),
-        targets=[events.Target.from_model(gateway)],
+        targets=[
+            events.Target.from_model(gateway),
+            events.Target.from_model(project),
+        ],
     )
     await session.commit()
 
@@ -531,6 +540,14 @@ async def get_project_default_gateway_model(
     stmt = select(GatewayModel).where(
         GatewayModel.id == project.default_gateway_id,
         GatewayModel.to_be_deleted == False,
+        or_(
+            GatewayModel.project_id == project.id,
+            exists().where(
+                ImportModel.project_id == project.id,
+                ImportModel.export_id == ExportedGatewayModel.export_id,
+                ExportedGatewayModel.gateway_id == GatewayModel.id,
+            ),
+        ),
     )
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))

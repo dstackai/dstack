@@ -3568,6 +3568,55 @@ class TestSubmitService:
         }
 
     @pytest.mark.asyncio
+    async def test_not_submits_to_default_gateway_if_not_imported(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        gateway_project = await create_project(session=session, owner=user, name="gateway-project")
+        backend = await create_backend(session=session, project_id=gateway_project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=gateway_project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            status=GatewayStatus.RUNNING,
+        )
+
+        service_project = await create_project(session=session, owner=user, name="service-project")
+        # The project's default_gateway_id may point to the gateway (e.g., if the gateway was
+        # imported previously), but that does not authorize the project to use this gateway if it
+        # is no longer imported.
+        service_project.default_gateway_id = gateway.id
+        await session.commit()
+        await add_project_member(
+            session=session,
+            project=service_project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=service_project.id)
+
+        run_spec = get_service_run_spec(
+            repo_id=repo.name,
+            gateway=True,
+        )
+        response = await client.post(
+            f"/api/project/{service_project.name}/runs/submit",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec},
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [
+                {
+                    "msg": "The service requires a gateway, but there is no default gateway in the project",
+                    "code": "resource_not_exists",
+                }
+            ]
+        }
+
+    @pytest.mark.asyncio
     async def test_unregister_dangling_service(
         self,
         test_db,

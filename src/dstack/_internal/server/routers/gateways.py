@@ -7,6 +7,7 @@ import dstack._internal.core.models.gateways as models
 import dstack._internal.server.schemas.gateways as schemas
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.server.db import get_session
 from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -104,7 +105,12 @@ async def set_default_gateway(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     user, project = user_project
-    await gateways.set_default_gateway(session=session, project=project, name=body.name, user=user)
+    await gateways.set_default_gateway(
+        session=session,
+        project=project,
+        ref=EntityReference(name=body.name, project=body.gateway_project),
+        user=user,
+    )
 
 
 @router.post("/set_wildcard_domain", response_model=models.Gateway)
