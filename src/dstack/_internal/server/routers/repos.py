@@ -24,7 +24,7 @@ from dstack._internal.utils.common import sizeof_fmt
 
 router = APIRouter(
     prefix="/api/project/{project_name}/repos",
-    tags=["repos"],
+    tags=["Repos"],
     responses=get_base_api_additional_responses(),
 )
 

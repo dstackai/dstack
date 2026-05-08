@@ -1,5 +1,5 @@
 """
-Environment variables read by the dstack server. Documented in reference/environment-variables.md
+Environment variables read by the dstack server. Documented in reference/env.md
 """
 
 import os
@@ -93,7 +93,7 @@ SERVER_INSTANCE_HEALTH_MIN_COLLECT_INTERVAL_SECONDS = environ.get_int(
 )
 
 SERVER_EVENTS_TTL_SECONDS = int(
-    # default documented in reference/environment-variables.md, keep in sync
+    # default documented in reference/env.md, keep in sync
     os.getenv("DSTACK_SERVER_EVENTS_TTL_SECONDS", 30 * 24 * 3600)
 )
 

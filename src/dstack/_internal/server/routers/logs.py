@@ -14,7 +14,7 @@ from dstack._internal.server.utils.routers import (
 
 router = APIRouter(
     prefix="/api/project/{project_name}/logs",
-    tags=["logs"],
+    tags=["Logs"],
     responses=get_base_api_additional_responses(),
 )
 

@@ -20,7 +20,7 @@ from dstack._internal.utils.common import sizeof_fmt
 
 router = APIRouter(
     prefix="/api/files",
-    tags=["files"],
+    tags=["Files"],
     responses=get_base_api_additional_responses(),
 )
 

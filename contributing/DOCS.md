@@ -111,6 +111,32 @@ The build creates `.well-known/skills/` directory structure for skills discovery
 - Generates `.well-known/skills/index.json`
 - Copies SKILL.md to both `.well-known/skills/dstack/` and site root
 
+#### 4. HTTP API reference
+
+The HTTP API reference is generated from the FastAPI OpenAPI schema:
+
+- `scripts/docs/gen_openapi_reference.py` writes `mkdocs/docs/reference/http/openapi.json`,
+  keeps the per-tag Markdown pages in sync, and updates the generated tag list in the HTTP API
+  index page.
+- Tag pages use `!!swagger openapi.json tag="<tag>"!!`. Keep tag names exactly as they appear
+  in the OpenAPI schema.
+- `scripts/docs/hooks.py` expands the `!!swagger` directive into the Swagger UI container and
+  the hidden operation headings that MkDocs uses for the page table of contents.
+- `mkdocs/assets/javascripts/swagger.js` loads the shared `openapi.json`, filters it by tag on
+  the client, and adapts Swagger UI markup to the docs layout.
+- `mkdocs/assets/stylesheets/swagger.css` contains Swagger-specific styling and should stay
+  scoped under `.dstack-swagger-ui`.
+
+Keep hook logic limited to build-time Markdown/page structure, generated assets, and data
+attributes needed by the client. Small presentation changes belong in `swagger.css`; small
+behavior changes belong in `swagger.js`.
+
+If the HTTP API reference needs deeper structural customization, such as replacing major Swagger
+UI panels, request/response rendering, model rendering, or "try it out" behavior, prefer moving
+toward a dedicated local bundle or custom Swagger UI layout instead of adding more DOM patching.
+That bundle can still use the single generated `openapi.json` and filter by tag on the client, so
+we should not reintroduce per-tag OpenAPI files unless there is a concrete reason.
+
 ### File structure
 
 ```

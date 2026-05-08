@@ -30,12 +30,21 @@ class Termynal {
     constructor(container = '#termynal', options = {}) {
         this.container = (typeof container === 'string') ? document.querySelector(container) : container;
         this.pfx = `data-${options.prefix || 'ty'}`;
-        this.originalStartDelay = this.startDelay = options.startDelay
-            || parseFloat(this.container.getAttribute(`${this.pfx}-startDelay`)) || 300;
-        this.originalTypeDelay = this.typeDelay = options.typeDelay
-            || parseFloat(this.container.getAttribute(`${this.pfx}-typeDelay`)) || 60;
-        this.originalLineDelay = this.lineDelay = options.lineDelay
-            || parseFloat(this.container.getAttribute(`${this.pfx}-lineDelay`)) || 1500;
+        this.originalStartDelay = this.startDelay = this.getOptionNumber(
+            options.startDelay,
+            `${this.pfx}-startDelay`,
+            300
+        );
+        this.originalTypeDelay = this.typeDelay = this.getOptionNumber(
+            options.typeDelay,
+            `${this.pfx}-typeDelay`,
+            60
+        );
+        this.originalLineDelay = this.lineDelay = this.getOptionNumber(
+            options.lineDelay,
+            `${this.pfx}-lineDelay`,
+            1500
+        );
         this.progressLength = options.progressLength
             || parseFloat(this.container.getAttribute(`${this.pfx}-progressLength`)) || 40;
         this.progressChar = options.progressChar
@@ -45,8 +54,20 @@ class Termynal {
         this.cursor = options.cursor
             || this.container.getAttribute(`${this.pfx}-cursor`) || '▋';
         this.lineData = this.lineDataToElements(options.lineData || []);
+        this.fastForward = false;
+        this.waitTimeout = null;
+        this.waitResolver = null;
+        this.lineContainer = null;
         this.loadLines()
         if (!options.noInit) this.init()
+    }
+
+    getOptionNumber(value, attr, fallback) {
+        if (value !== undefined && value !== null) {
+            return value;
+        }
+        const attrValue = parseFloat(this.container.getAttribute(attr));
+        return Number.isNaN(attrValue) ? fallback : attrValue;
     }
 
     loadLines() {
@@ -58,9 +79,11 @@ class Termynal {
         this.container.appendChild(finish)
         // Appends dynamically loaded lines to existing line elements.
         this.lines = [...this.container.querySelectorAll(`[${this.pfx}]`)].concat(this.lineData);
+        const lineParent = this.container.classList.contains('dstack-termy-scrollable') ?
+            this.getLineContainer() : this.container;
         for (let line of this.lines) {
             line.style.visibility = 'hidden'
-            this.container.appendChild(line)
+            lineParent.appendChild(line)
         }
         const restart = this.generateRestart()
         restart.style.visibility = 'hidden'
@@ -79,11 +102,15 @@ class Termynal {
         const containerStyle = getComputedStyle(this.container);
         this.container.style.width = containerStyle.width !== '0px' ?
             containerStyle.width : undefined;
-        this.container.style.minHeight = containerStyle.height !== '0px' ?
-            containerStyle.height : undefined;
+        if (!this.container.classList.contains('dstack-termy-scrollable') && containerStyle.height !== '0px') {
+            this.container.style.minHeight = containerStyle.height;
+        } else {
+            this.container.style.minHeight = '';
+        }
 
         this.container.setAttribute('data-termynal', '');
         this.container.innerHTML = '';
+        this.lineContainer = null;
         for (let line of this.lines) {
             line.style.visibility = 'visible'
         }
@@ -113,7 +140,7 @@ class Termynal {
             }
 
             else {
-                this.container.appendChild(line);
+                this.appendLine(line);
                 await this._wait(delay);
             }
 
@@ -139,6 +166,7 @@ class Termynal {
         this.lineDelay = this.originalLineDelay
         this.typeDelay = this.originalTypeDelay
         this.startDelay = this.originalStartDelay
+        this.fastForward = false
     }
 
     generateRestart() {
@@ -148,7 +176,7 @@ class Termynal {
             this.container.innerHTML = ''
             this.init()
         }
-        restart.href = '#'
+        restart.href = 'javascript:void(0)'
         restart.setAttribute('data-terminal-control', '')
         restart.innerHTML = "restart ↻"
         return restart
@@ -161,8 +189,10 @@ class Termynal {
             this.lineDelay = 0
             this.typeDelay = 0
             this.startDelay = 0
+            this.fastForward = true
+            this.flushWait()
         }
-        finish.href = '#'
+        finish.href = 'javascript:void(0)'
         finish.setAttribute('data-terminal-control', '')
         finish.innerHTML = "fast →"
         this.finishElement = finish
@@ -186,11 +216,19 @@ class Termynal {
     async type(line) {
         const chars = [...line.textContent];
         line.textContent = '';
-        this.container.appendChild(line);
+        this.appendLine(line);
+        const delay = line.getAttribute(`${this.pfx}-typeDelay`) || this.typeDelay;
+        if (delay <= 0) {
+            line.textContent = chars.join('');
+            return;
+        }
 
         for (let char of chars) {
-            const delay = line.getAttribute(`${this.pfx}-typeDelay`) || this.typeDelay;
             await this._wait(delay);
+            if (this.fastForward) {
+                line.textContent = chars.join('');
+                return;
+            }
             line.textContent += char;
         }
     }
@@ -207,13 +245,21 @@ class Termynal {
         const chars = progressChar.repeat(progressLength);
 		const progressPercent = line.getAttribute(`${this.pfx}-progressPercent`)
 			|| this.progressPercent;
-		const typeDelay = line.getAttribute(`${this.pfx}-typeDelay`)
-			|| this.typeDelay;
+        const typeDelay = line.getAttribute(`${this.pfx}-typeDelay`)
+            || this.typeDelay;
         line.textContent = '';
-        this.container.appendChild(line);
+        this.appendLine(line);
+        if (typeDelay <= 0) {
+            line.textContent = this.getFullProgressText(progressLength, progressChar, progressPercent);
+            return;
+        }
 
         for (let i = 1; i < chars.length + 1; i++) {
             await this._wait(typeDelay);
+            if (this.fastForward) {
+                line.textContent = this.getFullProgressText(progressLength, progressChar, progressPercent);
+                return;
+            }
             const percent = Math.round(i / chars.length * 100);
             line.textContent = `${chars.slice(0, i)} ${percent}%`;
 			if (percent>progressPercent) {
@@ -222,12 +268,55 @@ class Termynal {
         }
     }
 
+    appendLine(line) {
+        this.getLineContainer().appendChild(line);
+    }
+
+    getLineContainer() {
+        if (!this.container.classList.contains('dstack-termy-scrollable')) {
+            return this.container;
+        }
+        if (!this.lineContainer) {
+            this.lineContainer = document.createElement('div');
+            this.lineContainer.setAttribute('data-termynal-body', '');
+            this.container.appendChild(this.lineContainer);
+        }
+        return this.lineContainer;
+    }
+
+    getFullProgressText(progressLength, progressChar, progressPercent) {
+        const visibleLength = Math.ceil(progressLength * progressPercent / 100);
+        return `${progressChar.repeat(visibleLength)} ${progressPercent}%`;
+    }
+
     /**
      * Helper function for animation delays, called with `await`.
      * @param {number} time - Timeout, in ms.
      */
     _wait(time) {
-        return new Promise(resolve => setTimeout(resolve, time));
+        if (this.fastForward || time <= 0) {
+            return Promise.resolve();
+        }
+        return new Promise(resolve => {
+            this.waitResolver = resolve;
+            this.waitTimeout = setTimeout(() => {
+                this.waitTimeout = null;
+                this.waitResolver = null;
+                resolve();
+            }, time);
+        });
+    }
+
+    flushWait() {
+        if (this.waitTimeout) {
+            clearTimeout(this.waitTimeout);
+            this.waitTimeout = null;
+        }
+        if (this.waitResolver) {
+            const resolve = this.waitResolver;
+            this.waitResolver = null;
+            resolve();
+        }
     }
 
     /**

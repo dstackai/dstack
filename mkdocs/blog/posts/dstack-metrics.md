@@ -33,7 +33,7 @@ Similar to `kubectl top`, if a run consists of multiple jobs (such as distribute
 
 !!! info "HTTP API"
     In addition to the `dstack stats` CLI commands, metrics can be obtained via the
-    [`/api/project/{project_name}/metrics/job/{run_name}`](../../docs/reference/api/http/#operations-tag-metrics) HTTP endpoint.
+    [`/api/project/{project_name}/metrics/job/{run_name}`](../../docs/reference/http/metrics.md) HTTP endpoint.
 
 ## Why monitor GPU usage
 

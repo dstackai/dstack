@@ -19,7 +19,7 @@ from dstack._internal.server.utils.routers import (
 
 router = APIRouter(
     prefix="/api/users/public_keys",
-    tags=["user public keys"],
+    tags=["Users"],
     responses=get_base_api_additional_responses(),
 )
 

@@ -1,5 +1,7 @@
 ---
 title: HTTP API
+hide:
+  - toc
 ---
 
 The HTTP API enables running tasks, services, and managing runs programmatically.
@@ -55,30 +57,29 @@ while True:
     time.sleep(2)
 ```
 
-<style>
-    .swagger-ui .info {
-        margin: 0 !important;
-    }
+## Reference
 
-    .swagger-ui .info h1, .swagger-ui .info h2, .swagger-ui .info h3, .swagger-ui .info h4, .swagger-ui .info h5 {
-        font-weight: 800 !important;
-        letter-spacing: -1px !important;
-        color: rgb(0, 0, 0) !important;
-        text-transform: none !important;
-        font-family: var(--md-text-font-family) !important;
-    }
+The HTTP API reference is split by endpoint tag.
 
-    .swagger-ui .info .title {
-        padding: 0 !important;
-    }
-
-    .swagger-ui .info li, .swagger-ui .info p, .swagger-ui .info table {
-        line-height: 1.3rem !important;
-        font-size: 0.8rem !important;
-        font-family: var(--md-text-font-family) !important;
-    }
-</style>
-
-<br></br>
-
-!!swagger openapi.json!!
+<!-- BEGIN GENERATED HTTP API TAGS -->
+- [Server](server.md)
+- [Users](users.md)
+- [Authentication](authentication.md)
+- [Projects](projects.md)
+- [Backends](backends.md)
+- [Fleets](fleets.md)
+- [Repos](repos.md)
+- [Runs](runs.md)
+- [GPUs](gpus.md)
+- [Metrics](metrics.md)
+- [Logs](logs.md)
+- [Secrets](secrets.md)
+- [Gateways](gateways.md)
+- [Volumes](volumes.md)
+- [Proxy](proxy.md)
+- [Files](files.md)
+- [Events](events.md)
+- [Templates](templates.md)
+- [Exports](exports.md)
+- [default](default.md)
+<!-- END GENERATED HTTP API TAGS -->

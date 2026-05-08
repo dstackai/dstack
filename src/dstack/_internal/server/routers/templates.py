@@ -10,7 +10,7 @@ from dstack._internal.server.utils.routers import CustomORJSONResponse
 
 router = APIRouter(
     prefix="/api/project/{project_name}/templates",
-    tags=["templates"],
+    tags=["Templates"],
 )
 
 

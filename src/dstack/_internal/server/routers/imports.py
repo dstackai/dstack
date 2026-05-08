@@ -13,7 +13,7 @@ from dstack._internal.server.utils.routers import get_base_api_additional_respon
 
 project_router = APIRouter(
     prefix="/api/project/{project_name}/imports",
-    tags=["imports"],
+    tags=["Exports"],
     responses=get_base_api_additional_responses(),
 )
 

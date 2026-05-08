@@ -8,7 +8,7 @@ from dstack._internal.server.schemas.auth import (
 from dstack._internal.server.services import auth as auth_services
 from dstack._internal.server.utils.routers import CustomORJSONResponse
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 @router.post("/list_providers", response_model=list[OAuthProviderInfo])

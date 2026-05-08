@@ -15,7 +15,7 @@ from dstack._internal.server.utils.routers import error_not_found
 _auth = OptionalServiceAccount(os.getenv("DSTACK_PROMETHEUS_AUTH_TOKEN"))
 
 router = APIRouter(
-    tags=["prometheus"],
+    tags=["Metrics"],
     default_response_class=PlainTextResponse,
     dependencies=[Depends(_auth)],
 )
