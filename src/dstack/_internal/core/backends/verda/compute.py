@@ -261,65 +261,13 @@ def _create_startup_script(client: VerdaClient, name: str, script: str) -> str:
 def _delete_startup_script(client: VerdaClient, startup_script_id: Optional[str]) -> None:
     if startup_script_id is None:
         return
-    try:
-        client.startup_scripts.delete_by_id(startup_script_id)
-    except APIException as e:
-        if _is_startup_script_not_found_error(e):
-            logger.debug(
-                "Skipping startup script %s deletion. Startup script not found.",
-                startup_script_id,
-            )
-            return
-        raise
+    client.startup_scripts.delete_by_id(startup_script_id)
 
 
 def _delete_ssh_keys(client: VerdaClient, ssh_key_ids: Optional[List[str]]) -> None:
     if not ssh_key_ids:
         return
-    for ssh_key_id in ssh_key_ids:
-        _delete_ssh_key(client, ssh_key_id)
-
-
-def _delete_ssh_key(client: VerdaClient, ssh_key_id: str) -> None:
-    try:
-        client.ssh_keys.delete_by_id(ssh_key_id)
-    except APIException as e:
-        if _is_ssh_key_not_found_error(e):
-            logger.debug("Skipping ssh key %s deletion. SSH key not found.", ssh_key_id)
-            return
-        raise
-
-
-def _is_ssh_key_not_found_error(error: APIException) -> bool:
-    code = (error.code or "").lower()
-    message = (error.message or "").lower()
-    if code == "not_found":
-        return True
-    if code not in {"", "invalid_request"}:
-        return False
-    return (
-        message == "invalid ssh-key id"
-        or message == "invalid ssh key id"
-        or message == "not found"
-        or ("ssh-key id" in message and "invalid" in message)
-        or ("ssh key id" in message and "invalid" in message)
-    )
-
-
-def _is_startup_script_not_found_error(error: APIException) -> bool:
-    code = (error.code or "").lower()
-    message = (error.message or "").lower()
-    if code == "not_found":
-        return True
-    if code not in {"", "invalid_request"}:
-        return False
-    return (
-        message == "invalid startup script id"
-        or message == "invalid script id"
-        or message == "not found"
-        or ("startup script id" in message and "invalid" in message)
-        or ("script id" in message and "invalid" in message)
-    )
+    client.ssh_keys.delete(ssh_key_ids)
 
 
 def _get_instance_by_id(
