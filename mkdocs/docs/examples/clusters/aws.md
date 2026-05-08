@@ -25,15 +25,9 @@ projects:
       creds:
         type: default
       regions: ["us-west-2"]
-
-      public_ips: false
-      vpc_name: my-custom-vpc
 ```
 
 </div>
-
-!!! info "Multiple network interfaces"
-    To use P4, P5, or P6 instances, set `public_ips` to `false` — this allows AWS to attach multiple network interfaces for EFA. In this case, the `dstack` server can reach your VPC’s private subnets.
 
 !!! info "VPC"
     If you use a custom VPC, verify that it permits all internal traffic between nodes for EFA to function properly
