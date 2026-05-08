@@ -101,7 +101,6 @@ class AWSVolumeBackendData(CoreModel):
 class AWSInstanceBackendData(CoreModel):
     eip_allocation_id: Optional[str] = None
     """Elastic IP allocated for multi-ENI instances launched with `public_ips: true`.
-    See `_allocate_and_associate_eip` for context.
     """
 
 
@@ -440,6 +439,7 @@ class AWSCompute(
         if self.config.allocate_public_ips and instance.public_ip_address is None:
             # AWS can't auto-assign a public IPv4 to multi-ENI instances (multi-EFA instances).
             # When `public_ips: true` and no public IP is present after launch, attach an Elastic IP to the primary ENI.
+            # The check relies on running instances always having IP assigned if ever.
             public_ip, allocation_id = _allocate_and_associate_eip(
                 ec2_client=ec2_client,
                 instance=instance,
