@@ -639,6 +639,7 @@ async def create_gateway(
     gateway_compute_id: Optional[UUID] = None,
     status: Optional[GatewayStatus] = GatewayStatus.SUBMITTED,
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    forbid_new_services: bool = False,
 ) -> GatewayModel:
     gateway = GatewayModel(
         project_id=project_id,
@@ -649,6 +650,7 @@ async def create_gateway(
         gateway_compute_id=gateway_compute_id,
         status=status,
         last_processed_at=last_processed_at,
+        forbid_new_services=forbid_new_services,
     )
     session.add(gateway)
     await session.commit()
