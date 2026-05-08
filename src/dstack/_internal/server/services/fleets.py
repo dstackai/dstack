@@ -20,12 +20,14 @@ from dstack._internal.core.models.common import ApplyAction, CoreModel
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     ApplyFleetPlanInput,
+    BackendFleetConfiguraionProps,
     Fleet,
     FleetConfiguration,
     FleetPlan,
     FleetSpec,
     FleetStatus,
     InstanceGroupPlacement,
+    SSHFleetConfigurationProps,
     SSHHostParams,
     SSHParams,
 )
@@ -1370,10 +1372,7 @@ def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
 def _validate_fleet_spec_and_set_defaults(spec: FleetSpec):
     if spec.configuration.name is not None:
         validate_dstack_resource_name(spec.configuration.name)
-    if spec.configuration.ssh_config is None and spec.configuration.nodes is None:
-        raise ServerClientError("No ssh_config or nodes specified")
-    if spec.configuration.ssh_config is not None and spec.configuration.nodes is not None:
-        raise ServerClientError("ssh_config and nodes are mutually exclusive")
+    _validate_fleet_configuration_subtype_specific_fields(spec.configuration)
     if spec.configuration.ssh_config is not None:
         _validate_all_ssh_params_specified(spec.configuration.ssh_config)
         if spec.configuration.ssh_config.ssh_key is not None:
@@ -1383,6 +1382,31 @@ def _validate_fleet_spec_and_set_defaults(spec: FleetSpec):
                 _validate_ssh_key(host.ssh_key)
         _validate_internal_ips(spec.configuration.ssh_config)
     _set_fleet_spec_defaults(spec)
+
+
+def _validate_fleet_configuration_subtype_specific_fields(conf: FleetConfiguration):
+    if conf.ssh_config is None and conf.nodes is None:
+        raise ServerClientError("No ssh_config or nodes specified")
+    if conf.ssh_config is not None and conf.nodes is not None:
+        raise ServerClientError("ssh_config and nodes are mutually exclusive")
+    subtype: str
+    props_model: type[CoreModel]
+    if conf.ssh_config is not None:
+        subtype = "SSH"
+        props_model = BackendFleetConfiguraionProps
+    else:
+        subtype = "Backend"
+        props_model = SSHFleetConfigurationProps
+    non_default_fields: list[str] = []
+    for field in props_model.__fields__.values():
+        if getattr(conf, field.name) != field.default:
+            non_default_fields.append(field.name)
+    if non_default_fields:
+        raise ServerClientError(
+            f"{subtype} fleet configuration does not support the following fields:"
+            f" {non_default_fields}"
+        )
+    return conf
 
 
 def _set_fleet_spec_defaults(spec: FleetSpec):

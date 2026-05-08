@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import EntityReference
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     FleetConfiguration,
     FleetNodesSpec,
@@ -1527,6 +1528,78 @@ class TestApplyFleetPlan:
             json={"plan": {"spec": spec.dict()}, "force": False},
         )
         assert response.status_code == 400
+
+    @pytest.mark.parametrize(
+        ["field_name", "field_value"],
+        [
+            pytest.param("backends", [BackendType.AWS], id="backends"),
+            pytest.param("regions", ["eu-west-1"], id="regions"),
+            pytest.param("instance_types", ["p3.8xlarge"], id="instance_types"),
+            pytest.param("idle_duration", 60, id="idle_duration"),
+            pytest.param("tags", {}, id="tags"),  # falsy value
+        ],
+    )
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_errors_if_ssh_fleet_uses_backend_only_field(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        field_name: str,
+        field_value: Any,
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        conf = get_ssh_fleet_configuration(name="test-ssh-fleet", hosts=["1.1.1.1"])
+        setattr(conf, field_name, field_value)
+        spec = get_fleet_spec(conf=conf)
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/apply",
+            headers=get_auth_headers(user.token),
+            json={"plan": {"spec": spec.dict()}, "force": False},
+        )
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"][0]["msg"] == (
+            f"SSH fleet configuration does not support the following fields: ['{field_name}']"
+        )
+
+    @pytest.mark.parametrize(
+        ["field_name", "field_value"],
+        [
+            pytest.param("env", Env.parse_obj({"K": "V"}), id="env"),
+        ],
+    )
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_errors_if_backend_fleet_uses_ssh_only_field(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        field_name: str,
+        field_value: Any,
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        conf = get_fleet_configuration()
+        setattr(conf, field_name, field_value)
+        spec = get_fleet_spec(conf=conf)
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/apply",
+            headers=get_auth_headers(user.token),
+            json={"plan": {"spec": spec.dict()}, "force": False},
+        )
+        assert response.status_code == 400, response.json()
+        assert response.json()["detail"][0]["msg"] == (
+            f"Backend fleet configuration does not support the following fields: ['{field_name}']"
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
