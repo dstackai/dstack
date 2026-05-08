@@ -162,10 +162,6 @@ This property ensures that instances are interconnected. This is required for ru
 
     Fast interconnect is supported on the `aws`, `gcp`, `nebius`, `crusoe`, and `kubernetes` backends. Some backends may require additional configuration.
 
-    === "AWS"
-        On AWS, `dstack` requires `public_ips` to be set to `false` in the backend configuration.
-        Refer to the [AWS](../examples/clusters/aws.md) example for more details.
-
     === "GCP"
         On GCP, you may need to configure `extra_vpcs` and `roce_vpcs` in the `gcp` backend configuration.
         Refer to the [GCP](../examples/clusters/gcp.md) examples for more details.
