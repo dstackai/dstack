@@ -299,6 +299,7 @@ nav:
             - Events: docs/concepts/events.md
             - Exports: docs/concepts/exports.md
       - Guides:
+          - CLI & API: docs/guides/cli-api.md
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
           - More:

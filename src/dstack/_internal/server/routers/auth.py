@@ -11,7 +11,9 @@ from dstack._internal.server.utils.routers import CustomORJSONResponse
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
-@router.post("/list_providers", response_model=list[OAuthProviderInfo])
+@router.post(
+    "/list_providers", summary="List OAuth providers", response_model=list[OAuthProviderInfo]
+)
 async def list_providers():
     """
     Returns OAuth2 providers registered on the server.
@@ -19,7 +21,11 @@ async def list_providers():
     return CustomORJSONResponse(auth_services.list_providers())
 
 
-@router.post("/get_next_redirect", response_model=OAuthGetNextRedirectResponse)
+@router.post(
+    "/get_next_redirect",
+    summary="Get next redirect URL",
+    response_model=OAuthGetNextRedirectResponse,
+)
 async def get_next_redirect(body: OAuthGetNextRedirectRequest):
     """
     A helper endpoint that returns the next redirect URL in case the state encodes it.

@@ -250,7 +250,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(volumes.root_router)
     app.include_router(volumes.project_router)
     app.include_router(service_proxy.router, prefix="/proxy/services", tags=["Proxy"])
-    app.include_router(model_proxy.router, prefix="/proxy/models", tags=["Proxy"])
+    app.include_router(model_proxy.router, prefix="/proxy/models", tags=["Proxy"], deprecated=True)
     app.include_router(prometheus.router)
     app.include_router(files.router)
     app.include_router(events.root_router)

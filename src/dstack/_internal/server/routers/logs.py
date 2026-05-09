@@ -21,6 +21,7 @@ router = APIRouter(
 
 @router.post(
     "/poll",
+    summary="Poll logs",
     response_model=JobSubmissionLogs,
 )
 async def poll_logs(

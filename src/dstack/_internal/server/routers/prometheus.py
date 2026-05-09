@@ -21,7 +21,7 @@ router = APIRouter(
 )
 
 
-@router.get("/metrics")
+@router.get("/metrics", summary="Get Prometheus metrics")
 async def get_prometheus_metrics(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> str:

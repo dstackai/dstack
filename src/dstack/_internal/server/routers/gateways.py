@@ -30,7 +30,7 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=List[models.Gateway])
+@router.post("/list", summary="List gateways", response_model=List[models.Gateway])
 async def list_gateways(
     body: Optional[schemas.ListGatewaysRequest] = None,
     session: AsyncSession = Depends(get_session),
@@ -48,7 +48,7 @@ async def list_gateways(
     )
 
 
-@router.post("/get", response_model=models.Gateway)
+@router.post("/get", summary="Get gateway", response_model=models.Gateway)
 async def get_gateway(
     body: schemas.GetGatewayRequest,
     session: AsyncSession = Depends(get_session),
@@ -64,7 +64,7 @@ async def get_gateway(
     return CustomORJSONResponse(gateway)
 
 
-@router.post("/create", response_model=models.Gateway)
+@router.post("/create", summary="Create gateway", response_model=models.Gateway)
 async def create_gateway(
     body: schemas.CreateGatewayRequest,
     session: AsyncSession = Depends(get_session),
@@ -83,7 +83,7 @@ async def create_gateway(
     )
 
 
-@router.post("/delete")
+@router.post("/delete", summary="Delete gateways")
 async def delete_gateways(
     body: schemas.DeleteGatewaysRequest,
     session: AsyncSession = Depends(get_session),
@@ -98,7 +98,7 @@ async def delete_gateways(
     )
 
 
-@router.post("/set_default")
+@router.post("/set_default", summary="Set default gateway")
 async def set_default_gateway(
     body: schemas.SetDefaultGatewayRequest,
     session: AsyncSession = Depends(get_session),
@@ -113,7 +113,7 @@ async def set_default_gateway(
     )
 
 
-@router.post("/set_wildcard_domain", response_model=models.Gateway)
+@router.post("/set_wildcard_domain", summary="Set wildcard domain", response_model=models.Gateway)
 async def set_gateway_wildcard_domain(
     body: schemas.SetWildcardDomainRequest,
     session: AsyncSession = Depends(get_session),

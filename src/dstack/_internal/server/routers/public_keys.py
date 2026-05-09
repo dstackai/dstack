@@ -24,7 +24,7 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=list[PublicKeyInfo])
+@router.post("/list", summary="List SSH keys", response_model=list[PublicKeyInfo])
 async def list_user_public_keys(
     session: Annotated[AsyncSession, Depends(get_session)],
     user: Annotated[UserModel, Depends(Authenticated())],
@@ -33,7 +33,7 @@ async def list_user_public_keys(
     return CustomORJSONResponse(public_keys)
 
 
-@router.post("/add", response_model=PublicKeyInfo)
+@router.post("/add", summary="Add SSH key", response_model=PublicKeyInfo)
 async def add_user_public_key(
     body: AddPublicKeyRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -45,7 +45,7 @@ async def add_user_public_key(
     return CustomORJSONResponse(public_key)
 
 
-@router.post("/delete")
+@router.post("/delete", summary="Delete SSH keys")
 async def delete_user_public_keys(
     body: DeletePublicKeysRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
