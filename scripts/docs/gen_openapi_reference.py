@@ -9,12 +9,15 @@ import re
 from pathlib import Path
 from typing import Any
 
+import mkdocs_gen_files
+
 from dstack._internal.server.main import app
 from dstack._internal.settings import DSTACK_VERSION
 
 logger = logging.getLogger("mkdocs.plugins.dstack.openapi")
 disable_env = "DSTACK_DOCS_DISABLE_OPENAPI_REFERENCE"
-output_dir = Path("mkdocs/docs/reference/http")
+output_dir = Path("docs/reference/http")
+source_output_dir = Path("mkdocs") / output_dir
 openapi_path = output_dir / "openapi.json"
 
 TAG_LIST_BEGIN = "<!-- BEGIN GENERATED HTTP API TAGS -->"
@@ -39,9 +42,10 @@ def _write_tag_references(tags: list[str]) -> None:
 
 def _update_index(tags: list[str]) -> None:
     index_path = output_dir / "index.md"
-    if not index_path.exists():
+    try:
+        text = _read_text(index_path)
+    except FileNotFoundError:
         return
-    text = index_path.read_text()
     tag_links = "\n".join(f"- [{_tag_title(tag)}]({_tag_page_filename(tag)})" for tag in tags)
     generated = f"{TAG_LIST_BEGIN}\n{tag_links}\n{TAG_LIST_END}"
     pattern = re.compile(f"{re.escape(TAG_LIST_BEGIN)}.*?{re.escape(TAG_LIST_END)}", re.S)
@@ -53,12 +57,12 @@ def _update_index(tags: list[str]) -> None:
 
 
 def _remove_stale_openapi_files() -> None:
-    for path in output_dir.glob("*.openapi.json"):
+    for path in source_output_dir.glob("*.openapi.json"):
         path.unlink()
 
 
 def _remove_stale_tag_pages(page_filenames: set[str]) -> None:
-    for path in output_dir.glob("*.md"):
+    for path in source_output_dir.glob("*.md"):
         if path.name != "index.md" and path.name not in page_filenames:
             path.unlink()
 
@@ -89,8 +93,13 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
 
 
 def _write_text(path: Path, content: str) -> None:
-    if not path.exists() or path.read_text() != content:
-        path.write_text(content)
+    with mkdocs_gen_files.open(path.as_posix(), "w") as f:
+        f.write(content)
+
+
+def _read_text(path: Path) -> str:
+    with mkdocs_gen_files.open(path.as_posix(), "r") as f:
+        return f.read()
 
 
 def main() -> None:
@@ -105,7 +114,8 @@ def main() -> None:
     schema = app.openapi()
     tags = _get_tags(schema)
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Generating OpenAPI reference...")
+    source_output_dir.mkdir(parents=True, exist_ok=True)
     _write_json(openapi_path, schema)
     _write_tag_references(tags)
     _update_index(tags)
