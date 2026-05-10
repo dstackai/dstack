@@ -1,5 +1,5 @@
 ---
-title: Runs
+title: runs
 ---
 
-!!swagger openapi.json tag="Runs"!!
+!!swagger openapi.json tag="runs"!!

@@ -1,5 +1,5 @@
 ---
-title: Events
+title: events
 ---
 
-!!swagger openapi.json tag="Events"!!
+!!swagger openapi.json tag="events"!!

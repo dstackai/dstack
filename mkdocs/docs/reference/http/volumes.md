@@ -1,5 +1,5 @@
 ---
-title: Volumes
+title: volumes
 ---
 
-!!swagger openapi.json tag="Volumes"!!
+!!swagger openapi.json tag="volumes"!!

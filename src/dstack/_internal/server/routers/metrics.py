@@ -19,7 +19,7 @@ from dstack._internal.server.utils.routers import (
 
 router = APIRouter(
     prefix="/api/project/{project_name}/metrics",
-    tags=["Metrics"],
+    tags=["metrics"],
     responses=get_base_api_additional_responses(),
 )
 

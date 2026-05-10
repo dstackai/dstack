@@ -23,10 +23,10 @@ from dstack._internal.server.utils.routers import (
 
 root_router = APIRouter(
     prefix="/api/volumes",
-    tags=["Volumes"],
+    tags=["volumes"],
     responses=get_base_api_additional_responses(),
 )
-project_router = APIRouter(prefix="/api/project/{project_name}/volumes", tags=["Volumes"])
+project_router = APIRouter(prefix="/api/project/{project_name}/volumes", tags=["volumes"])
 
 
 @root_router.post("/list", response_model=List[Volume])

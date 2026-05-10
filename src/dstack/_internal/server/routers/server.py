@@ -6,7 +6,7 @@ from dstack._internal.server.utils.routers import CustomORJSONResponse
 
 router = APIRouter(
     prefix="/api/server",
-    tags=["Server"],
+    tags=["server"],
 )
 
 

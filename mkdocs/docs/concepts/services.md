@@ -125,7 +125,7 @@ If you do not have a [gateway](gateways.md) created, the service endpoint will b
 ```shell
 $ curl http://localhost:3000/proxy/services/main/qwen36/v1/chat/completions \
     -H 'Content-Type: application/json' \
-    -H 'Authorization: Bearer &lt;dstack token&gt;' \
+    -H 'Authorization: Bearer &lt;user token&gt;' \
     -d '{
         "model": "Qwen/Qwen3.6-27B",
         "messages": [
@@ -143,7 +143,7 @@ The request and response format depends on the serving framework used by the
 service. Even for OpenAI-compatible endpoints, the format may vary slightly
 across frameworks.
 
-If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`.
+If [authorization](#authorization) is not disabled, the service endpoint requires the `Authorization` header with `Bearer <user token>`.
 
 ## Configuration options
 
@@ -173,7 +173,7 @@ If you have a [gateway](gateways.md) created, the service endpoint will be acces
 ```shell
 $ curl https://llama31.example.com/v1/chat/completions \
     -H 'Content-Type: application/json' \
-    -H 'Authorization: Bearer &lt;dstack token&gt;' \
+    -H 'Authorization: Bearer &lt;user token&gt;' \
     -d '{
         "model": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "messages": [

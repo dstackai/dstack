@@ -22,7 +22,7 @@ else:
 
 router = APIRouter(
     prefix="/api/sshproxy",
-    tags=["Proxy"],
+    tags=["proxy"],
     responses=get_base_api_additional_responses(),
     dependencies=[Depends(_auth)],
 )

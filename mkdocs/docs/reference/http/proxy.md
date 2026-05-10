@@ -1,5 +1,5 @@
 ---
-title: Proxy
+title: proxy
 ---
 
-!!swagger openapi.json tag="Proxy"!!
+!!swagger openapi.json tag="proxy"!!

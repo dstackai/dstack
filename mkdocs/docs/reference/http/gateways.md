@@ -1,5 +1,5 @@
 ---
-title: Gateways
+title: gateways
 ---
 
-!!swagger openapi.json tag="Gateways"!!
+!!swagger openapi.json tag="gateways"!!

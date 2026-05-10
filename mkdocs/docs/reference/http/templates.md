@@ -1,5 +1,5 @@
 ---
-title: Templates
+title: templates
 ---
 
-!!swagger openapi.json tag="Templates"!!
+!!swagger openapi.json tag="templates"!!

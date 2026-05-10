@@ -1,5 +1,5 @@
 ---
-title: Repos
+title: repos
 ---
 
-!!swagger openapi.json tag="Repos"!!
+!!swagger openapi.json tag="repos"!!

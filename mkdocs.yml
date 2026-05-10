@@ -361,25 +361,25 @@ nav:
               - dstack export: docs/reference/cli/dstack/export.md
               - dstack import: docs/reference/cli/dstack/import.md
           - HTTP API:
-            - Users: docs/reference/http/users.md
-            - Projects: docs/reference/http/projects.md
-            - Backends: docs/reference/http/backends.md
-            - Fleets: docs/reference/http/fleets.md
-            - Runs: docs/reference/http/runs.md
-            - Gateways: docs/reference/http/gateways.md
-            - Volumes: docs/reference/http/volumes.md
-            - Logs: docs/reference/http/logs.md
-            - Events: docs/reference/http/events.md
-            - Repos: docs/reference/http/repos.md
-            - Files: docs/reference/http/files.md
-            - Secrets: docs/reference/http/secrets.md
-            - Exports: docs/reference/http/exports.md
-            - Metrics: docs/reference/http/metrics.md
-            - GPUs: docs/reference/http/gpus.md
-            - Templates: docs/reference/http/templates.md
-            - Proxy: docs/reference/http/proxy.md
-            - Authentication: docs/reference/http/authentication.md
-            - Server: docs/reference/http/server.md
+            - users: docs/reference/http/users.md
+            - projects: docs/reference/http/projects.md
+            - backends: docs/reference/http/backends.md
+            - fleets: docs/reference/http/fleets.md
+            - runs: docs/reference/http/runs.md
+            - gateways: docs/reference/http/gateways.md
+            - volumes: docs/reference/http/volumes.md
+            - logs: docs/reference/http/logs.md
+            - events: docs/reference/http/events.md
+            - repos: docs/reference/http/repos.md
+            - files: docs/reference/http/files.md
+            - secrets: docs/reference/http/secrets.md
+            - exports: docs/reference/http/exports.md
+            - metrics: docs/reference/http/metrics.md
+            - gpus: docs/reference/http/gpus.md
+            - templates: docs/reference/http/templates.md
+            - proxy: docs/reference/http/proxy.md
+            - authentication: docs/reference/http/authentication.md
+            - server: docs/reference/http/server.md
           - Environment variables: docs/reference/env.md
           - More:
             - .dstack/profiles.yml: docs/reference/profiles.yml.md

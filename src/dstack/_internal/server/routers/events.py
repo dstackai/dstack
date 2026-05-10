@@ -14,7 +14,7 @@ from dstack._internal.server.utils.routers import (
 
 root_router = APIRouter(
     prefix="/api/events",
-    tags=["Events"],
+    tags=["events"],
     responses=get_base_api_additional_responses(),
 )
 

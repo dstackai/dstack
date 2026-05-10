@@ -1,5 +1,5 @@
 ---
-title: Secrets
+title: secrets
 ---
 
-!!swagger openapi.json tag="Secrets"!!
+!!swagger openapi.json tag="secrets"!!

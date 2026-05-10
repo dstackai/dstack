@@ -13,17 +13,22 @@ description: |
 **When to use this skill:**
 - Running or managing dev environments, tasks, or services on dstack
 - Creating, editing, or applying `*.dstack.yml` configurations
-- Managing fleets, volumes, and resource availability
+- Managing fleets, volumes, gateways, and checking available offers
 
 ## How it works
 
 `dstack` operates through three core components:
 
 1. `dstack` server - Can run locally, remotely, or via dstack Sky (managed)
-2. `dstack` CLI - Applies configurations and manages resources; the CLI can be pointed to a server and default project (`~/.dstack/config.yml` or via `dstack project`)
+2. `dstack` CLI - Applies configurations and manages or inspects fleets, runs,
+   logs, events, volumes, gateways, and offers; it uses project configurations
+   stored in `~/.dstack/config.yml`, which can be managed with `dstack project`
 3. `dstack` configuration files - YAML files ending with `.dstack.yml`
 
-`dstack apply` plans, provisions cloud resources, and schedules containers/runners. By default it attaches when the run reaches `running` (opens SSH tunnel, forwards ports, streams logs). With `-d`, it submits and exits.
+`dstack apply` shows a plan and submits configuration changes. For run
+configurations, it attaches when the run reaches `running` by default: it
+configures SSH access, forwards declared ports, and streams logs. With `-d`, it
+submits and exits.
 
 ## Quick agent flow (detached runs)
 
@@ -58,7 +63,7 @@ description: |
 - Never guess or invent flags. Example verification commands:
   ```bash
   dstack --help                               # List all commands
-  dstack apply --help <configuration type>    # Flags for apply per configuration type (dev-environment, task, service, fleet, etc)
+  dstack apply -h <configuration type>        # Flags for apply per configuration type (dev-environment, task, service, fleet, etc)
   dstack fleet --help                         # Fleet subcommands
   dstack ps --help                            # Flags for ps
   ```
@@ -137,11 +142,11 @@ If background attach fails in the sandbox (permissions writing `~/.dstack` or `~
 
 ## Configuration types
 
-`dstack` supports five main configuration types. Configuration files can be named `<name>.dstack.yml` or simply `.dstack.yml`.
+`dstack` supports run configurations (dev environments, tasks, and services) and infrastructure configurations (fleets, volumes, and gateways). Configuration files can be named `<name>.dstack.yml` or simply `.dstack.yml`.
 
 **Common parameters:** All run configurations (dev environments, tasks, services) support many parameters including:
-- **Git integration:** Clone repos automatically (`repo`), mount existing repos (`repos`)
-- **File upload:** `files` (see concept docs for examples)
+- **Git integration:** Clone repos automatically (`repo`) or mount existing repos (`repos`)
+- **File upload:** Upload local files (`files`; see concept docs for examples)
 - **Docker support:** Use custom Docker images (`image`); use `docker: true` if you want to use Docker from inside the container (VM-based backends only)
 - **Environment:** Set environment variables (`env`), often via `.envrc`. Secrets are supported but less common.
 - **Storage:** Persistent network volumes (`volumes`), specify disk size
@@ -157,7 +162,7 @@ If background attach fails in the sandbox (permissions writing `~/.dstack` or `~
 Use `files` and `repos` only when the user intends to use local/repo files inside the run.
 
 - If user asks to use project code/data/config in the run, then add `files` or `repos` as appropriate.
-- If it is totally unclear whether files ore repos must be mounted, ask one explicit clarification question or default to not mounting.
+- If it is totally unclear whether files or repos must be mounted, ask one explicit clarification question or default to not mounting.
 
 `files` guidance:
 - Relative paths are valid and preferred for local project files.
@@ -168,24 +173,6 @@ Use `files` and `repos` only when the user intends to use local/repo files insid
 - When setting an explicit repo mount path, also set `working_dir` to the same path.
 - Reason: custom images may have a different/non-empty default working directory, and mounting a repo into a non-empty path can fail.
 - With `dstack` default images, the default `working_dir` is already `/dstack/run`.
-
-### AMD image selection policy
-
-When `resources.gpu` targets AMD (e.g., `MI300X`), you have to set `image`.
-
-Use the official ROCm Docker image namespace as the default source: `https://hub.docker.com/u/rocm`
-
-1. **If the user provides an image, use it as-is.** Do not override user intent.
-2. **If the user asks for a specific framework/runtime, prefer official `rocm/*` framework images and select tags with the latest available ROCm version by default. Pick the most recent ROCm-compatible tag appropriate for the requested AMD GPU family.**
-   - **SGLang:** `rocm/sgl-dev`
-   - **vLLM:** `rocm/vllm`
-   - **PyTorch-only:** `rocm/pytorch`
-3. **If no framework is specified (generic AMD dev/task use case), default to**
-   `rocm/dev-ubuntu-24.04`.
-
-Additional guidance:
-- Prefer `:latest` where applicable for generic/default recommendations, unless the user asks for pinning or reproducibility.
-- Ensure AMD-compatible images include ROCm userspace/tooling; avoid non-ROCm images for AMD GPU runs.
 
 ### 1. Dev environments
 **Use for:** Interactive development with IDE integration (VS Code, Cursor, etc.).
@@ -255,16 +242,17 @@ resources:
 ```
 
 **Service endpoints:**
-- Without gateway: `<dstack server URL>/proxy/services/f/<run name>/`
+- Without gateway: `<server URL>/proxy/services/<project name>/<run name>/`
 - With gateway: `https://<run name>.<gateway domain>/`
-- Authentication: Unless `auth` is `false`, include `Authorization: Bearer <DSTACK_TOKEN>` on all service requests.
+- Authentication: Unless `auth` is `false`, include `Authorization: Bearer <user token>` on service requests.
 - Model endpoint: If `model` is set, `service.model.base_url` from `dstack run get <run name> --json` provides the model endpoint. For OpenAI-compatible models (the default, unless format is set otherwise), this will be `service.url` + `/v1`.
 - Example (with gateway):
   ```bash
   curl -sS -X POST "https://<run name>.<gateway domain>/v1/chat/completions" \
-    -H "Authorization: Bearer <dstack token>" \
+    -H "Authorization: Bearer <user token>" \
     -H "Content-Type: application/json" \
     -d '{"model":"<model name>","messages":[{"role":"user","content":"Hello"}],"max_tokens":64}'
+  ```
 
 [Concept documentation](https://dstack.ai/docs/concepts/services.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/service.md)
 
@@ -330,9 +318,26 @@ volumes:
     optional: true
 ```
 
-**Attach to runs:** Use `volumes` in dev environments, tasks, and services. Network volumes persist independently; instance volumes are tied to the instance lifecycle.
+**Mounting volumes:** Use `volumes` in dev environments, tasks, and services. Network volumes persist independently; instance volumes are tied to the instance lifecycle.
 
 [Concept documentation](https://dstack.ai/docs/concepts/volumes.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/volume.md)
+
+### 6. Gateways
+**Use for:** Gateways are optional for basic service endpoints. They are
+required when a service uses auto-scaling or rate limits, needs HTTPS on a
+custom domain, requires WebSockets, or cannot work with the server proxy path
+prefix.
+
+```yaml
+type: gateway
+name: my-gateway
+
+backend: aws
+region: us-east-1
+domain: example.com
+```
+
+[Concept documentation](https://dstack.ai/docs/concepts/gateways.md) | [Configuration reference](https://dstack.ai/docs/reference/dstack.yml/gateway.md)
 
 ## Essential CLI commands
 
@@ -341,7 +346,7 @@ volumes:
 **Important behavior:**
 - `dstack apply` shows a plan with estimated costs and may ask for confirmation
 - In attached mode (default), the terminal blocks and shows output
-- In detached mode (`-d`), runs in background without blocking the terminal
+- In detached mode (`-d`), it submits and exits without attaching
 
 **Workflow for applying run configurations (dev-environment, task, service):**
 
@@ -370,7 +375,7 @@ volumes:
 
 1. **Show plan:**
    ```bash
-   echo "n" | dstack apply -f fleet.dstack.yml
+   echo "n" | dstack apply -f infra.dstack.yml
    ```
    Display the FULL output. **Do NOT summarize or reformat.**
 
@@ -378,7 +383,7 @@ volumes:
 
 3. **Execute:**
    ```bash
-   dstack apply -f fleet.dstack.yml -y
+   dstack apply -f infra.dstack.yml -y
    ```
 
 4. **Verify:** Use `dstack fleet`, `dstack volume`, or `dstack gateway` respectively.
@@ -459,7 +464,11 @@ dstack stop my-run-name --abort
 
 ### List offers
 
-Offers represent available instance configurations available for provisioning across backends. By default, `dstack offer` ignores fleet configurations and shows all available offers that match the request. Use `--fleet` to inspect offers available through specific fleets.
+Offers represent available instance configurations that match resource
+requirements. If `--fleet` is omitted, `dstack offer` checks all configured
+backends. Listing offers does not create capacity; submitting a run still
+requires at least one fleet that can provision or reuse matching instances.
+Use `--fleet` to inspect offers available through specific fleets.
 
 ```bash
 # Filter by specific backend
@@ -486,8 +495,12 @@ dstack offer --json
 
 With one `--fleet`, `dstack offer` shows offers available through that fleet. With multiple `--fleet`, it combines offers available through the selected fleets. Identical backend offers are shown once, while matching existing instances stay separate.
 
-**Max offers:** By default, `dstack offer` returns first N offers (output also includes the total number). Use `--max-offers N` to increase the limit.
-**Grouping:** Prefer `--group-by gpu` (other supported values: `gpu,backend`, `gpu,backend,region`) for aggregated output across all offers, not `--max-offers`.
+**Max offers:** By default, `dstack offer` returns first N offers (output also
+includes the total number). Use `--max-offers N` to increase the limit.
+
+**Grouping:** Prefer `--group-by gpu` for aggregated output across all offers,
+not `--max-offers`. Other supported fields are `backend`, `region`, and
+`count`; `region` requires `backend`.
 
 ## Troubleshooting
 
@@ -517,7 +530,7 @@ When diagnosing issues with dstack workloads or infrastructure:
    ```
 
 Common issues:
-- **No offers:** Check `dstack offer` and ensure that at least one fleet matches requirements
+- **No offers:** Check `dstack offer`; if submitting a run, ensure at least one fleet can provision or reuse matching instances
 - **No fleet:** Ensure at least one fleet is created
 - **Configuration errors:** Validate YAML syntax; check `dstack apply` output for specific errors
 - **Provisioning timeouts:** Use `dstack ps -v` to see provisioning status; consider spot vs on-demand
@@ -542,12 +555,12 @@ Common issues:
 - [Events](https://dstack.ai/docs/concepts/events.md)
 
 **Guides:**
+- [CLI & API](https://dstack.ai/docs/guides/cli-api.md)
 - [Server deployment](https://dstack.ai/docs/guides/server-deployment.md)
-- [Pro tips](https://dstack.ai/docs/guides/protips.md)
 
 **Accelerator-specific examples:**
-- [AMD](https://dstack.ai/docs/examples/accelerators/amd.md)
-- [Google TPU](https://dstack.ai/docs/examples/accelerators/tpu.md)
-- [Tenstorrent](https://dstack.ai/docs/examples/accelerators/tenstorrent.md)
+- [AMD](https://dstack.ai/examples/accelerators/amd/index.md)
+- [Google TPU](https://dstack.ai/examples/accelerators/tpu/index.md)
+- [Tenstorrent](https://dstack.ai/examples/accelerators/tenstorrent/index.md)
 
 **Full documentation:** https://dstack.ai/llms-full.txt

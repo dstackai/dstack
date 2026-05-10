@@ -25,7 +25,7 @@ from dstack._internal.server.utils.routers import (
 
 router = APIRouter(
     prefix="/api/project/{project_name}/gateways",
-    tags=["Gateways"],
+    tags=["gateways"],
     responses=get_base_api_additional_responses(),
 )
 

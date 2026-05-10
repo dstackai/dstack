@@ -1,5 +1,5 @@
 ---
-title: Authentication
+title: authentication
 ---
 
-!!swagger openapi.json tag="Authentication"!!
+!!swagger openapi.json tag="authentication"!!

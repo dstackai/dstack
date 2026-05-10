@@ -5,34 +5,22 @@ description: How to use the dstack CLI and HTTP API
 
 # CLI & API
 
-You can use `dstack` via the CLI or the HTTP API. Both require a running
-[`dstack` server](../installation.md#launch-the-server).
+!!! info "Prerequisites"
+    Ensure the [server](../installation.md#server) is up and running. To use `dstack` with AI agents, install [skills](../installation.md#skills).
 
-!!! info "Projects and users"
-    [Projects](../concepts/projects.md) isolate resources such as backends,
-    fleets, runs, volumes, gateways, and secrets.
-
-    [Users](../concepts/projects.md#project-members) can be added to projects
-    and assigned [roles](../concepts/projects.md#project-roles). Each user has a
-    [user token](../concepts/projects.md#user-token) used by the CLI and API.
-
-The CLI can be used to manage [fleets](../concepts/fleets.md), submit and
-inspect runs ([dev environments](../concepts/dev-environments.md),
-[tasks](../concepts/tasks.md), and [services](../concepts/services.md)), view
-logs, and inspect [events](../concepts/events.md).
+The primary way to use `dstack` is the CLI. It can be used to manage
+[fleets](../concepts/fleets.md), runs, [volumes](../concepts/volumes.md), and
+[gateways](../concepts/gateways.md), view logs, and inspect
+[events](../concepts/events.md). Use the HTTP API for functionality not
+available in the CLI or for integrations that need to call the server directly.
 
 ## CLI
 
-The CLI requires a project configuration with the project name, server URL, and
-user token in `~/.dstack/config.yml`.
+> See [installation](../installation.md#cli) on how to install the CLI.
 
-!!! info "AI agents"
-    AI agents can use the CLI with agent skills; see how to
-    [install agent skills](../installation.md#install-agent-skills).
+### Configuration
 
-### Projects
-
-The project configuration can contain multiple projects:
+The CLI requires a [project](../concepts/projects.md) configuration with the project name, server URL, and user token in `~/.dstack/config.yml`.
 
 <div editor-title="~/.dstack/config.yml">
 
@@ -54,7 +42,10 @@ Use [`dstack project`](../reference/cli/dstack/project.md) to list,
 project configurations. To run a command against a non-default project, pass
 `--project NAME`, or set `DSTACK_PROJECT` in the current shell.
 
-### Fleets
+??? info "Projects"
+    [Projects](../concepts/projects.md) enable the isolation of different teams and their resources. Users can be added to projects and assigned roles. Each user has a user token for authentication.
+
+### Manage fleets
 
 Before submitting runs, you must create at least one
 [fleet](../concepts/fleets.md). Fleets act as both pools of instances and
@@ -121,7 +112,7 @@ $ dstack apply -f fleet.dstack.yml
 If the `nodes` range starts with `0`, `dstack` creates a fleet template.
 Instances are provisioned when matching runs are submitted.
 
-### Runs
+### Submit runs
 
 To submit a run, define a
 [dev environment](../concepts/dev-environments.md),
@@ -150,14 +141,28 @@ $ dstack apply -f .dstack.yml
 
 </div>
 
+!!! info "Plan and confirmation"
+    `dstack apply` shows the plan and asks for confirmation before submitting
+    the run. To only see the plan, answer `n` at the prompt:
+
+    <div class="termy">
+
+    ```shell
+    $ echo "n" | dstack apply -f .dstack.yml
+    ```
+
+    </div>
+
+    Use `-y` to skip confirmation.
+
 !!! info "Attached by default"
     For run configurations, `dstack apply` automatically attaches after
     submitting the run. This streams logs, forwards declared ports, and
-    configures SSH access. See [Attached mode](#attached-mode).
+    configures SSH access. See [Attach to runs](#attach-to-runs).
 
-    Use `-d` to submit in detached mode. Use `-y` to skip confirmation.
+    Use `-d` to submit in detached mode.
 
-### Attached mode
+### Attach to runs
 
 If the run was submitted with `-d`, or if you need to attach to another job in
 a multi-job run, use `dstack attach`:
@@ -170,54 +175,55 @@ $ dstack attach &lt;run name&gt;
 
 </div>
 
-During `dstack apply` in attached mode and during `dstack attach <run name>`,
-the CLI downloads the current user's built-in private SSH key if needed and
-stores it under `~/.dstack/ssh/`.
+!!! info "SSH"
+    During `dstack apply` in attached mode and during
+    `dstack attach <run name>`, the CLI downloads the current user's built-in
+    private SSH key if needed and stores it under `~/.dstack/ssh/`.
 
-While attached, the CLI updates `~/.dstack/ssh/config` with the run name as an
-SSH host alias and ensures this file is included from `~/.ssh/config`:
+    While attached, the CLI updates `~/.dstack/ssh/config` with the run name as
+    an SSH host alias and ensures this file is included from `~/.ssh/config`:
 
-<div editor-title="~/.dstack/ssh/config">
+    <div editor-title="~/.dstack/ssh/config">
 
-```ssh-config
-Host &lt;run name&gt;
-    HostName localhost
-    Port &lt;local SSH port&gt;
-    User root
-    IdentityFile ~/.dstack/ssh/&lt;key&gt;
-    IdentitiesOnly yes
-```
+    ```ssh-config
+    Host &lt;run name&gt;
+        HostName localhost
+        Port &lt;local SSH port&gt;
+        User root
+        IdentityFile ~/.dstack/ssh/&lt;key&gt;
+        IdentitiesOnly yes
+    ```
 
-</div>
+    </div>
 
-For VM-based and SSH fleets, `dstack` may also configure the
-`<run name>-host` alias for SSH access to the host.
+    For VM-based and SSH fleets, `dstack` may also configure the
+    `<run name>-host` alias for SSH access to the host.
 
-While attached, connect to the run with:
+    While attached, connect to the run with:
 
-<div class="termy">
+    <div class="termy">
 
-```shell
-$ ssh &lt;run name&gt;
-```
+    ```shell
+    $ ssh &lt;run name&gt;
+    ```
 
-</div>
+    </div>
 
-Use `--logs` with `dstack attach` to stream logs while attaching. Use
-`--job JOB_NUMBER` with `dstack attach` to attach to another job. Ports declared
-in the run configuration are forwarded while attached.
+Use `--job JOB_NUMBER` with `dstack attach` to attach to another job. Ports
+declared in the run configuration are forwarded while attached.
 
 ??? info "User SSH keys"
     The server stores a built-in SSH key pair for each user.
 
     Users can add custom public SSH keys via the UI or the
-    [Users](../reference/http/users.md) API. To use a custom private key for a
+    [users](../reference/http/users.md) API. To use a custom private key for a
     particular run, pass `--ssh-identity` to `dstack apply` or `dstack attach`.
 
-### Logs
+### Browse logs
 
-Use [`dstack logs`](../reference/cli/dstack/logs.md) to view logs without
-attaching:
+When `dstack apply` is attached, it streams logs for job `0` automatically.
+Use [`dstack logs`](../reference/cli/dstack/logs.md) to view logs in detached
+mode, or to view logs for a specific job:
 
 <div class="termy">
 
@@ -229,20 +235,32 @@ $ dstack logs &lt;run name&gt;
 
 Use `--job JOB_NUMBER` to select a job and `--since` to filter by time.
 
+??? info "Attached logs"
+    Use `--logs` with `dstack attach` to stream logs while attaching:
+
+    <div class="termy">
+
+    ```shell
+    $ dstack attach &lt;run name&gt; --logs
+    ```
+
+    </div>
+
 ### Commands
 
 Other common CLI commands include [`dstack ps`](../reference/cli/dstack/ps.md),
 [`dstack stop`](../reference/cli/dstack/stop.md), and
 [`dstack event`](../reference/cli/dstack/event.md).
 
-Use `-v` for more details where supported. For automation, use `--json`, e.g.
-`dstack ps --json`, `dstack run get <run name> --json`, or
-`dstack fleet get <fleet name> --json`.
+!!! info "Verbose and JSON modes"
+    Use `-v` for more details where supported. For automation, use `--json`,
+    e.g. `dstack ps --json`, `dstack run get <run name> --json`, or
+    `dstack fleet get <fleet name> --json`.
 
 ## API
 
-The `dstack` API is represented by the HTTP API. It is useful for CI workflows,
-scripts, and integrations.
+The `dstack` API is represented by the HTTP API. Use it for functionality not
+available in the CLI or for integrations that need to call the server directly.
 
 <!--
 Out of scope for this guide:
@@ -252,7 +270,7 @@ Out of scope for this guide:
 - Backward compatibility between older clients and servers
 -->
 
-### Authentication
+### Authenticate
 
 The HTTP API requires the `Authorization` header for user authentication:
 
@@ -260,9 +278,9 @@ The HTTP API requires the `Authorization` header for user authentication:
 Authorization: Bearer <user token>
 ```
 
-### Fleets
+### Manage fleets
 
-The [Fleets](../reference/http/fleets.md) API can list existing fleets, their
+The [fleets](../reference/http/fleets.md) API can list existing fleets, their
 configurations, and instances (if any):
 
 <div class="termy">
@@ -312,7 +330,7 @@ $ curl "&lt;server URL&gt;/api/project/&lt;project name&gt;/fleets/list" \
     a fleet.
 
     To group offers by GPU and other fields, use the
-    [GPUs](../reference/http/gpus.md) API.
+    [gpus](../reference/http/gpus.md) API.
 
 Creating fleets uses `/fleets/get_plan` followed by `/fleets/apply`:
 
@@ -371,9 +389,9 @@ $ curl "&lt;server URL&gt;/api/project/&lt;project name&gt;/fleets/apply" \
 
 </div>
 
-### Runs
+### Submit runs
 
-Use the [Runs](../reference/http/runs.md) API to submit
+Use the [runs](../reference/http/runs.md) API to submit
 [dev environments](../concepts/dev-environments.md), [tasks](../concepts/tasks.md),
 and [services](../concepts/services.md). The example below submits a task:
 
@@ -417,9 +435,9 @@ $ curl "&lt;server URL&gt;/api/project/&lt;project name&gt;/runs/get" \
 
 </div>
 
-### Logs
+### Poll logs
 
-Use the [Logs](../reference/http/logs.md) API to poll logs. Get
+Use the [logs](../reference/http/logs.md) API to poll logs. Get
 `job_submission_id` from `/runs/get`, e.g. from `latest_job_submission.id`.
 
 <div class="termy">
@@ -442,34 +460,17 @@ Use `next_token` from the response to continue polling.
 
 ## Reference
 
-!!! info "Reference"
-    * CLI: [`dstack server`](../reference/cli/dstack/server.md),
-      [`dstack project`](../reference/cli/dstack/project.md),
-      [`dstack apply`](../reference/cli/dstack/apply.md),
-      [`dstack fleet`](../reference/cli/dstack/fleet.md),
-      [`dstack offer`](../reference/cli/dstack/offer.md),
-      [`dstack ps`](../reference/cli/dstack/ps.md),
-      [`dstack logs`](../reference/cli/dstack/logs.md), and
-      [`dstack event`](../reference/cli/dstack/event.md).
-    * HTTP API: [Server](../reference/http/server.md),
-      [Users](../reference/http/users.md),
-      [Projects](../reference/http/projects.md),
-      [Backends](../reference/http/backends.md),
-      [Fleets](../reference/http/fleets.md),
-      [Runs](../reference/http/runs.md), [GPUs](../reference/http/gpus.md),
-      [Logs](../reference/http/logs.md), and
-      [Events](../reference/http/events.md).
+For complete details on specific CLI commands and HTTP APIs, see the
+[`dstack server`](../reference/cli/dstack/server.md) and
+[server](../reference/http/server.md) references.
 
-!!! info "OpenAPI schema"
-    Use [openapi.json](../reference/http/openapi.json) to generate HTTP API
-    clients.
+!!! info "OpenAPI"
+    For complete information on the HTTP API, or to generate native clients,
+    refer to [openapi.json](../reference/http/openapi.json).
 
 !!! info "What's next?"
     1. Follow the [installation guide](../installation.md)
-    2. Read about [Projects](../concepts/projects.md) and
-       [Fleets](../concepts/fleets.md)
-    3. Check [dev environments](../concepts/dev-environments.md),
+    2. Read about [projects](../concepts/projects.md)
+    3. Check [fleets](../concepts/fleets.md),
+       [dev environments](../concepts/dev-environments.md),
        [tasks](../concepts/tasks.md), and [services](../concepts/services.md)
-    4. Explore the [`fleet`](../reference/dstack.yml/fleet.md),
-       [`task`](../reference/dstack.yml/task.md), and
-       [`service`](../reference/dstack.yml/service.md) configuration references

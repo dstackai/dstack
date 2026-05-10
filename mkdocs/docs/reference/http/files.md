@@ -1,5 +1,5 @@
 ---
-title: Files
+title: files
 ---
 
-!!swagger openapi.json tag="Files"!!
+!!swagger openapi.json tag="files"!!

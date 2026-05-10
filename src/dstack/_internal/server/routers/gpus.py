@@ -17,7 +17,7 @@ from dstack._internal.server.utils.routers import (
 
 project_router = APIRouter(
     prefix="/api/project/{project_name}/gpus",
-    tags=["GPUs"],
+    tags=["gpus"],
     responses=get_base_api_additional_responses(),
 )
 

@@ -1,5 +1,5 @@
 ---
-title: Server
+title: server
 ---
 
-!!swagger openapi.json tag="Server"!!
+!!swagger openapi.json tag="server"!!

@@ -1,5 +1,5 @@
 ---
-title: Metrics
+title: metrics
 ---
 
-!!swagger openapi.json tag="Metrics"!!
+!!swagger openapi.json tag="metrics"!!

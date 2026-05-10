@@ -1,5 +1,5 @@
 ---
-title: Users
+title: users
 ---
 
-!!swagger openapi.json tag="Users"!!
+!!swagger openapi.json tag="users"!!

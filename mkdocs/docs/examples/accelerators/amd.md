@@ -93,8 +93,15 @@ Here are examples of a [service](../../concepts/services.md) that deploy
     </div>
 
 !!! info "Docker image"
-    AMD deployments require specifying an image that already includes ROCm
-    drivers. The SGLang and vLLM examples above use pinned ROCm images.
+    AMD workloads require specifying an image with ROCm-compatible userspace and
+    framework packages. The SGLang and vLLM examples above use pinned ROCm
+    images.
+
+    If you already have a ROCm-compatible image, use it. Otherwise, choose an
+    image for the framework you use from
+    [ROCm Docker images](https://hub.docker.com/u/rocm), e.g. `rocm/sgl-dev`
+    for SGLang, `rocm/vllm` for vLLM, or `rocm/pytorch` for PyTorch. For
+    generic AMD dev environments or tasks, use `rocm/dev-ubuntu-24.04`.
 
 To request multiple GPUs, specify the quantity after the GPU name, separated by a colon, e.g., `MI300X:4`.
 

@@ -1,5 +1,5 @@
 ---
-title: Projects
+title: projects
 ---
 
-!!swagger openapi.json tag="Projects"!!
+!!swagger openapi.json tag="projects"!!

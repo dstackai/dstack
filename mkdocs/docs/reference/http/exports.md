@@ -1,5 +1,5 @@
 ---
-title: Exports
+title: exports
 ---
 
-!!swagger openapi.json tag="Exports"!!
+!!swagger openapi.json tag="exports"!!

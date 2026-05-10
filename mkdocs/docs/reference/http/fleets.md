@@ -1,5 +1,5 @@
 ---
-title: Fleets
+title: fleets
 ---
 
-!!swagger openapi.json tag="Fleets"!!
+!!swagger openapi.json tag="fleets"!!

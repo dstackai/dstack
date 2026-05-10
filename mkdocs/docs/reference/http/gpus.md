@@ -1,5 +1,5 @@
 ---
-title: GPUs
+title: gpus
 ---
 
-!!swagger openapi.json tag="GPUs"!!
+!!swagger openapi.json tag="gpus"!!

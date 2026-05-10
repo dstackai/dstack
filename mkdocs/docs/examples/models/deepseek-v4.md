@@ -83,7 +83,7 @@ If no gateway is created, the service endpoint will be available at
 ```shell
 curl http://127.0.0.1:3000/proxy/services/main/deepseek-v4/v1/chat/completions \
     -X POST \
-    -H 'Authorization: Bearer &lt;dstack token&gt;' \
+    -H 'Authorization: Bearer &lt;user token&gt;' \
     -H 'Content-Type: application/json' \
     -d '{
       "model": "deepseek-ai/DeepSeek-V4-Pro",
@@ -114,7 +114,7 @@ top-level JSON fields.
 ```shell
 curl http://127.0.0.1:3000/proxy/services/main/deepseek-v4/v1/chat/completions \
     -X POST \
-    -H 'Authorization: Bearer &lt;dstack token&gt;' \
+    -H 'Authorization: Bearer &lt;user token&gt;' \
     -H 'Content-Type: application/json' \
     -d '{
       "model": "deepseek-ai/DeepSeek-V4-Pro",
