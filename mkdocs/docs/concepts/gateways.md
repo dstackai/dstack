@@ -57,6 +57,17 @@ A gateway requires a `domain` to be specified in the configuration before creati
 
 Once the gateway is created and assigned a hostname, configure your DNS by adding a wildcard record for `*.<gateway domain>` (e.g. `*.example.com`). The record should point to the gateway's hostname and should be of type `A` if the hostname is an IP address (most cases), or of type `CNAME` if the hostname is another domain (some private gateways and Kubernetes).
 
+??? info "Project name interpolation"
+    You can use the `${{ run.project_name }}` variable to include the service’s project name in the domain name. This is especially useful when [exporting](exports.md) the gateway to multiple projects, as it ensures each importer receives a unique domain name.
+
+    ```yaml
+    type: gateway
+    name: global-gateway
+    backend: aws
+    region: eu-west-1
+    domain: ${{ run.project_name }}.mycompany.example
+    ```
+
 ### Backend
 
 You can create gateways with the `aws`, `azure`, `gcp`, or `kubernetes` backends, but that does not limit where services run. A gateway can use one backend while services run on any other backend supported by dstack, including backends where gateways themselves cannot be created.
