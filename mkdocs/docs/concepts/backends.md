@@ -1140,31 +1140,14 @@ projects:
 ??? info "Required permissions"
     The following Kubernetes permissions are sufficient for `dstack` to work:
 
-    ```yaml
-    apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRole
-    metadata:
-      name: dstack-backend
-    rules:
-    - apiGroups: [""]
-      resources: ["namespaces"]
-      verbs: ["get", "create"]
-    - apiGroups: [""]
-      resources: ["pods"]
-      verbs: ["get", "create", "delete", "list"]
-    - apiGroups: [""]
-      resources: ["services"]
-      verbs: ["get", "create", "delete"]
-    - apiGroups: [""]
-      resources: ["nodes"]
-      verbs: ["list", "get"]
-    - apiGroups: [""]
-      resources: ["persistentvolumeclaims"]
-      verbs: ["get", "create", "delete"]
-    - apiGroups: [""]
-      resources: ["secrets"]
-      verbs: ["create", "delete"]
-    ```
+    * Cluster-scoped resources:
+      ```yaml
+      --8<-- "snippets/kubernetes/dstack-backend-clusterrole.yaml"
+      ```
+    * Namespaced resources (replace the `${NAMESPACE}` placeholder with an actual value):
+      ```yaml
+      --8<-- "snippets/kubernetes/dstack-backend-role.yaml"
+      ```
 
     Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
 
