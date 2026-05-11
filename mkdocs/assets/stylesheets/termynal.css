@@ -35,8 +35,8 @@
     line-height: var(--dstack-code-line-height);
     /* font-family: 'Fira Mono', Consolas, Menlo, Monaco, 'Courier New', Courier, monospace; */
     font-family: var(--md-code-font-family) !important;
-    border-radius: 0;
-    padding: 45px 12px 25px 25px;
+    border-radius: 3px;
+    padding: 60px 12px 25px 25px;
     /*padding: 75px 45px 35px;*/
     position: relative;
     -webkit-box-sizing: border-box;
@@ -170,9 +170,11 @@
 }
 
 a[data-terminal-control] {
-    text-align: right;
-    display: block;
     color: #aebbff;
+    display: block;
+    margin-right: 0.5rem;
+    margin-top: 1rem;
+    text-align: right;
 }
 
 [data-ty] {

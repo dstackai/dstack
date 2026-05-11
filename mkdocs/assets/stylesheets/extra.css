@@ -1,6 +1,6 @@
 html {
     --dstack-code-font-size: 14px;
-    --dstack-code-line-height: 1.2rem;
+    --dstack-code-line-height: 1.075rem;
 }
 
 @media screen and (min-width: 76.1875em) {
@@ -435,7 +435,7 @@ h4.doc-heading {
 .md-typeset :not(pre, h1, h2, h3, h4, h5, h6) > code {
     background-color: rgba(163, 68, 215, 0.05);
     /*border: 1px solid #dce0e6;*/
-    border-radius: 2px;
+    border-radius: 3px;
     font-weight: 600;
     color: var(--md-primary-fg-color);
     text-align: center;
@@ -470,8 +470,8 @@ h4.doc-heading {
 
 .md-typeset pre > code {
     background-color: rgb(21, 22, 29);
-    padding: 65px 15px 35px 40px;
-    border-radius: 0;
+    padding: 55px 15px 35px 30px;
+    border-radius: 3px;
     font-size: var(--dstack-code-font-size);
     line-height: var(--dstack-code-line-height);
 
@@ -504,7 +504,7 @@ h4.doc-heading {
 .md-typeset :is(.highlight.dstack-scrollable-code, .dstack-editable-code) {
     background-color: rgb(21, 22, 29);
     box-sizing: border-box;
-    padding: 65px 15px 35px 40px;
+    padding: 55px 15px 35px 30px;
     position: relative;
 }
 
@@ -1197,7 +1197,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 @media screen and (min-width: 76.1875em) {
     .md-typeset .tabbed-block > .highlight:first-child > pre > code, .md-typeset .tabbed-block > pre:first-child > code {
-        border-radius: 0;
+        border-radius: 3px;
     }
 }
 
@@ -1213,12 +1213,12 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 .js .md-typeset .tabbed-labels:before {
-    height: auto;
+height: auto;
     background: none;
     z-index: 1;
     padding: 5px;
     border-radius: 0;
-    border: 1px dotted black;
+    border: 0;
     bottom: -0.7px;
     top: -0.7px;
     left: -0.7px;
@@ -1227,7 +1227,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 .md-typeset .tabbed-labels > label:after {
-        content: "";
+    content: "";    
     height: auto;
     z-index: 1;
     background: rgba(0,0,0, 0.25);
@@ -1236,8 +1236,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     position: absolute;
     width: 0.5px;
     margin-left: -18.5px;
-    margin-top: 16px;
-    margin-bottom: 16px;
+    /* margin-top: 16px;
+    margin-bottom: 16px; */
 }
 
 

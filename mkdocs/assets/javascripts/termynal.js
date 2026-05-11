@@ -54,9 +54,6 @@ class Termynal {
         this.cursor = options.cursor
             || this.container.getAttribute(`${this.pfx}-cursor`) || '▋';
         this.lineData = this.lineDataToElements(options.lineData || []);
-        this.fastForward = false;
-        this.waitTimeout = null;
-        this.waitResolver = null;
         this.lineContainer = null;
         this.loadLines()
         if (!options.noInit) this.init()
@@ -74,9 +71,6 @@ class Termynal {
         // Load all the lines and create the container so that the size is fixed
         // Otherwise it would be changing and the user viewport would be constantly
         // moving as she/he scrolls
-        const finish = this.generateFinish()
-        finish.style.visibility = 'hidden'
-        this.container.appendChild(finish)
         // Appends dynamically loaded lines to existing line elements.
         this.lines = [...this.container.querySelectorAll(`[${this.pfx}]`)].concat(this.lineData);
         const lineParent = this.container.classList.contains('dstack-termy-scrollable') ?
@@ -121,7 +115,6 @@ class Termynal {
      * Start the animation and rener the lines depending on their data attributes.
      */
     async start() {
-        this.addFinish()
         await this._wait(this.startDelay);
 
         for (let line of this.lines) {
@@ -162,11 +155,9 @@ class Termynal {
             this.lines[lastInputIdx].setAttribute(`${this.pfx}-cursor`, this.cursor);
         }
         this.addRestart()
-        this.finishElement.style.visibility = 'hidden'
         this.lineDelay = this.originalLineDelay
         this.typeDelay = this.originalTypeDelay
         this.startDelay = this.originalStartDelay
-        this.fastForward = false
     }
 
     generateRestart() {
@@ -182,31 +173,9 @@ class Termynal {
         return restart
     }
 
-    generateFinish() {
-        const finish = document.createElement('a')
-        finish.onclick = (e) => {
-            e.preventDefault()
-            this.lineDelay = 0
-            this.typeDelay = 0
-            this.startDelay = 0
-            this.fastForward = true
-            this.flushWait()
-        }
-        finish.href = 'javascript:void(0)'
-        finish.setAttribute('data-terminal-control', '')
-        finish.innerHTML = "fast →"
-        this.finishElement = finish
-        return finish
-    }
-
     addRestart() {
         const restart = this.generateRestart()
         this.container.appendChild(restart)
-    }
-
-    addFinish() {
-        const finish = this.generateFinish()
-        this.container.appendChild(finish)
     }
 
     /**
@@ -225,10 +194,6 @@ class Termynal {
 
         for (let char of chars) {
             await this._wait(delay);
-            if (this.fastForward) {
-                line.textContent = chars.join('');
-                return;
-            }
             line.textContent += char;
         }
     }
@@ -256,10 +221,6 @@ class Termynal {
 
         for (let i = 1; i < chars.length + 1; i++) {
             await this._wait(typeDelay);
-            if (this.fastForward) {
-                line.textContent = this.getFullProgressText(progressLength, progressChar, progressPercent);
-                return;
-            }
             const percent = Math.round(i / chars.length * 100);
             line.textContent = `${chars.slice(0, i)} ${percent}%`;
 			if (percent>progressPercent) {
@@ -294,29 +255,10 @@ class Termynal {
      * @param {number} time - Timeout, in ms.
      */
     _wait(time) {
-        if (this.fastForward || time <= 0) {
+        if (time <= 0) {
             return Promise.resolve();
         }
-        return new Promise(resolve => {
-            this.waitResolver = resolve;
-            this.waitTimeout = setTimeout(() => {
-                this.waitTimeout = null;
-                this.waitResolver = null;
-                resolve();
-            }, time);
-        });
-    }
-
-    flushWait() {
-        if (this.waitTimeout) {
-            clearTimeout(this.waitTimeout);
-            this.waitTimeout = null;
-        }
-        if (this.waitResolver) {
-            const resolve = this.waitResolver;
-            this.waitResolver = null;
-            resolve();
-        }
+        return new Promise(resolve => setTimeout(resolve, time));
     }
 
     /**
