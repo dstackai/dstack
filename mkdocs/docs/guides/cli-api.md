@@ -9,9 +9,10 @@ description: How to use the dstack CLI and HTTP API
     Ensure the [server](../installation.md#server) is up and running. To use `dstack` with AI agents, install [skills](../installation.md#skills).
 
 The primary way to use `dstack` is the CLI. It can be used to manage
-[fleets](../concepts/fleets.md), runs, [volumes](../concepts/volumes.md), and
-[gateways](../concepts/gateways.md), view logs, and inspect
-[events](../concepts/events.md). Use the HTTP API for functionality not
+[fleets](../concepts/fleets.md), [dev environments](../concepts/dev-environments.md),
+[tasks](../concepts/tasks.md), [services](../concepts/services.md),
+[volumes](../concepts/volumes.md), and [gateways](../concepts/gateways.md), view logs,
+and inspect [events](../concepts/events.md). Use the HTTP API for functionality not
 available in the CLI or for integrations that need to call the server directly.
 
 ## CLI
