@@ -47,6 +47,7 @@ def use_legacy_repo_dir(
 
 @root_router.post(
     "/list",
+    summary="List runs",
     response_model=List[Run],
 )
 async def list_runs(
@@ -83,10 +84,7 @@ async def list_runs(
     return CustomORJSONResponse(run_list)
 
 
-@project_router.post(
-    "/get",
-    response_model=Run,
-)
+@project_router.post("/get", response_model=Run, summary="Get run")
 async def get_run(
     body: GetRunRequest,
     session: AsyncSession = Depends(get_session),
@@ -113,6 +111,7 @@ async def get_run(
 
 @project_router.post(
     "/get_plan",
+    summary="Get run plan",
     response_model=RunPlan,
 )
 async def get_plan(
@@ -141,10 +140,7 @@ async def get_plan(
     return CustomORJSONResponse(run_plan)
 
 
-@project_router.post(
-    "/apply",
-    response_model=Run,
-)
+@project_router.post("/apply", response_model=Run, summary="Apply run plan")
 async def apply_plan(
     body: ApplyRunPlanRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -175,7 +171,7 @@ async def apply_plan(
     return CustomORJSONResponse(run)
 
 
-@project_router.post("/stop")
+@project_router.post("/stop", summary="Stop runs")
 async def stop_runs(
     body: StopRunsRequest,
     session: AsyncSession = Depends(get_session),
@@ -196,7 +192,7 @@ async def stop_runs(
     )
 
 
-@project_router.post("/delete")
+@project_router.post("/delete", summary="Delete runs")
 async def delete_runs(
     body: DeleteRunsRequest,
     session: AsyncSession = Depends(get_session),

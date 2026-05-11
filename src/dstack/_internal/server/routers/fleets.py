@@ -45,7 +45,7 @@ project_router = APIRouter(
 )
 
 
-@root_router.post("/list", response_model=List[Fleet])
+@root_router.post("/list", summary="List fleets", response_model=List[Fleet])
 async def list_fleets(
     body: ListFleetsRequest,
     session: AsyncSession = Depends(get_session),
@@ -76,7 +76,7 @@ async def list_fleets(
     return CustomORJSONResponse(fleet_list)
 
 
-@project_router.post("/list", response_model=List[Fleet])
+@project_router.post("/list", summary="List project fleets", response_model=List[Fleet])
 async def list_project_fleets(
     body: Optional[ListProjectFleetsRequest] = None,
     session: AsyncSession = Depends(get_session),
@@ -100,7 +100,7 @@ async def list_project_fleets(
     return CustomORJSONResponse(fleet_list)
 
 
-@project_router.post("/get", response_model=Fleet)
+@project_router.post("/get", summary="Get fleet", response_model=Fleet)
 async def get_fleet(
     body: GetFleetRequest,
     session: AsyncSession = Depends(get_session),
@@ -125,7 +125,7 @@ async def get_fleet(
     return CustomORJSONResponse(fleet)
 
 
-@project_router.post("/get_plan", response_model=FleetPlan)
+@project_router.post("/get_plan", summary="Get fleet plan", response_model=FleetPlan)
 async def get_plan(
     body: GetFleetPlanRequest,
     session: AsyncSession = Depends(get_session),
@@ -146,7 +146,7 @@ async def get_plan(
     return CustomORJSONResponse(plan)
 
 
-@project_router.post("/apply", response_model=Fleet)
+@project_router.post("/apply", summary="Apply fleet plan", response_model=Fleet)
 async def apply_plan(
     body: ApplyFleetPlanRequest,
     session: AsyncSession = Depends(get_session),
@@ -172,7 +172,7 @@ async def apply_plan(
     return CustomORJSONResponse(fleet)
 
 
-@project_router.post("/create", response_model=Fleet, deprecated=True)
+@project_router.post("/create", summary="Create fleet", response_model=Fleet, deprecated=True)
 async def create_fleet(
     body: CreateFleetRequest,
     session: AsyncSession = Depends(get_session),
@@ -195,7 +195,7 @@ async def create_fleet(
     return CustomORJSONResponse(fleet)
 
 
-@project_router.post("/delete")
+@project_router.post("/delete", summary="Delete fleets")
 async def delete_fleets(
     body: DeleteFleetsRequest,
     session: AsyncSession = Depends(get_session),
@@ -215,7 +215,7 @@ async def delete_fleets(
     )
 
 
-@project_router.post("/delete_instances")
+@project_router.post("/delete_instances", summary="Delete fleet instances")
 async def delete_fleet_instances(
     body: DeleteFleetInstancesRequest,
     session: AsyncSession = Depends(get_session),

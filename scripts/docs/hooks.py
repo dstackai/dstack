@@ -3,10 +3,16 @@ import json
 import logging
 import mimetypes
 import os
+import posixpath
+import re
 import shutil
 import sys
+from pathlib import Path
+from xml.sax.saxutils import escape
 
 import yaml
+
+from mkdocs.structure.files import File
 
 mimetypes.add_type("text/plain", ".md")
 
@@ -17,6 +23,19 @@ SKILL_PATH = ("skills", "dstack", "SKILL.md")
 DISABLE_LLM_TXT_ENV = "DSTACK_DOCS_DISABLE_LLM_TXT"
 DISABLE_YAML_SCHEMAS_ENV = "DSTACK_DOCS_DISABLE_YAML_SCHEMAS"
 SCHEMA_REFERENCE_PREFIX = "docs/reference/"
+SWAGGER_TAG_ARG = r"(?:\s+tag=(?P<tag_quote>[\"'])(?P<tag>.*?)(?P=tag_quote))?"
+SWAGGER_TOKEN = re.compile(rf"!!swagger(?:\s+(?P<path>[^\s<>&:!]+){SWAGGER_TAG_ARG})?!!")
+SWAGGER_HTTP_TOKEN = re.compile(
+    rf"!!swagger-http(?:\s+(?P<path>https?://[^\s!]+){SWAGGER_TAG_ARG})?!!"
+)
+SWAGGER_USAGE_MSG = (
+    "Usage: '!!swagger <filename> [tag=\"tag name\"]!!' or "
+    "'!!swagger-http <url> [tag=\"tag name\"]!!'. "
+    "File must either exist locally and be placed next to the .md that contains "
+    "the swagger statement, or be an http(s) URL."
+)
+HTTP_METHODS = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+UNTAGGED_OPENAPI_TAG = "default"
 
 
 def _expand_schema_references(text: str) -> str:
@@ -70,6 +89,160 @@ def on_page_read_source(page, config):
     if content is not None:
         return content
     return None
+
+
+def on_page_markdown(markdown, page, config, files):
+    """Render Swagger UI tokens with the project's preferred defaults."""
+    while True:
+        match = SWAGGER_TOKEN.search(markdown)
+        is_http = False
+        if match is None:
+            match = SWAGGER_HTTP_TOKEN.search(markdown)
+            is_http = True
+        if match is None:
+            return markdown
+        markdown = _replace_swagger_token(markdown, match, is_http, page, files)
+
+
+def _replace_swagger_token(markdown, match, is_http, page, files):
+    pre_token = markdown[: match.start()]
+    post_token = markdown[match.end() :]
+    path = match.group("path")
+    tag = match.groupdict().get("tag")
+    operation_headings = ""
+    if path is None:
+        return _swagger_error(pre_token, post_token, SWAGGER_USAGE_MSG)
+    if is_http:
+        url = path
+    else:
+        try:
+            api_file = Path(page.file.abs_src_path).parent / path
+        except ValueError as exc:  # pragma: no cover
+            return _swagger_error(pre_token, post_token, f"Invalid path. {exc.args[0]}")
+        if not api_file.exists():
+            return _swagger_error(pre_token, post_token, f"File {path} not found.")
+        try:
+            src_uri = api_file.relative_to(page.file.src_dir).as_posix()
+        except ValueError as exc:
+            return _swagger_error(
+                pre_token,
+                post_token,
+                f"File {path} must be inside the docs directory. {exc.args[0]}",
+            )
+        new_file = File(src_uri, page.file.src_dir, page.file.dest_dir, False)
+        url = _relative_url(page.file.dest_uri, new_file.dest_uri)
+        for file in files:
+            if file.dest_uri != new_file.dest_uri:
+                continue
+            if file.abs_src_path == new_file.abs_src_path:
+                break
+            return _swagger_error(
+                pre_token,
+                post_token,
+                "Cannot use 2 different swagger files with same filename in same page.",
+            )
+        else:
+            files.append(new_file)
+        operation_headings = _openapi_operation_headings(api_file, tag)
+    return pre_token + operation_headings + _swagger_html(url, tag) + post_token
+
+
+def _relative_url(page_dest_uri: str, asset_dest_uri: str) -> str:
+    page_dir = posixpath.dirname(page_dest_uri)
+    return posixpath.relpath(asset_dest_uri, page_dir)
+
+
+def _swagger_html(url: str, tag: str | None) -> str:
+    tag_attr = ""
+    if tag is not None:
+        tag_attr = f' data-openapi-tag="{_escape_html_attr(tag)}"'
+    return f"""
+
+<div class="dstack-swagger-ui" data-openapi-url="{_escape_html_attr(url)}"{tag_attr}></div>
+
+"""
+
+
+def _openapi_operation_headings(api_file: Path, tag: str | None) -> str:
+    try:
+        schema = json.loads(api_file.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        log.warning(f"Cannot generate Swagger operation headings from {api_file}: {exc}")
+        return ""
+
+    operations = _get_openapi_operations(schema, tag)
+    if not operations:
+        return ""
+
+    used_ids: set[str] = set()
+    headings = [_openapi_operation_heading(operation, used_ids) for operation in operations]
+    return "\n".join(headings) + "\n\n"
+
+
+def _get_openapi_operations(
+    schema: dict,
+    tag: str | None,
+) -> list[dict[str, str]]:
+    operations = []
+    for path, path_item in schema.get("paths", {}).items():
+        if not isinstance(path_item, dict):
+            continue
+        for method, operation in path_item.items():
+            method = method.lower()
+            if method not in HTTP_METHODS or not isinstance(operation, dict):
+                continue
+            operation_tags = operation.get("tags") or [UNTAGGED_OPENAPI_TAG]
+            if tag is not None and tag not in operation_tags:
+                continue
+            operations.append(
+                {
+                    "method": method,
+                    "path": path,
+                    "summary": str(operation.get("summary") or ""),
+                }
+            )
+    return operations
+
+
+def _openapi_operation_heading(operation: dict[str, str], used_ids: set[str]) -> str:
+    method = operation["method"]
+    path = operation["path"]
+    label = _openapi_operation_label(operation)
+    anchor_id = _openapi_operation_anchor_id(method, path, used_ids)
+    attrs = [
+        f"#{anchor_id}",
+        ".dstack-swagger-operation-anchor",
+        f"data-toc-label={json.dumps(label)}",
+        f"data-openapi-method={json.dumps(method)}",
+        f"data-openapi-path={json.dumps(path)}",
+    ]
+    return f"## {label} {{ {' '.join(attrs)} }}"
+
+
+def _openapi_operation_label(operation: dict[str, str]) -> str:
+    summary = operation.get("summary", "").strip()
+    if summary:
+        return summary
+    return operation["path"]
+
+
+def _openapi_operation_anchor_id(method: str, path: str, used_ids: set[str]) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", f"{method}-{path}".lower()).strip("-") or method
+    anchor_id = base
+    index = 2
+    while anchor_id in used_ids:
+        anchor_id = f"{base}-{index}"
+        index += 1
+    used_ids.add(anchor_id)
+    return anchor_id
+
+
+def _escape_html_attr(value: str) -> str:
+    return escape(value, {'"': "&quot;"})
+
+
+def _swagger_error(pre_token: str, post_token: str, message: str) -> str:
+    return pre_token + escape(f"!! SWAGGER ERROR: {message} !!") + post_token
 
 
 def on_config(config):

@@ -29,7 +29,7 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=UsersInfoListOrUsersList)
+@router.post("/list", summary="List users", response_model=UsersInfoListOrUsersList)
 async def list_users(
     body: Optional[ListUsersRequest] = None,
     session: AsyncSession = Depends(get_session),
@@ -60,7 +60,7 @@ async def list_users(
     )
 
 
-@router.post("/get_my_user", response_model=UserWithCreds)
+@router.post("/get_my_user", summary="Get my user", response_model=UserWithCreds)
 async def get_my_user(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
@@ -71,7 +71,7 @@ async def get_my_user(
     return CustomORJSONResponse(users.user_model_to_user_with_creds(user))
 
 
-@router.post("/get_user", response_model=UserWithCreds)
+@router.post("/get_user", summary="Get user", response_model=UserWithCreds)
 async def get_user(
     body: GetUserRequest,
     session: AsyncSession = Depends(get_session),
@@ -85,7 +85,7 @@ async def get_user(
     return CustomORJSONResponse(res)
 
 
-@router.post("/create", response_model=User)
+@router.post("/create", summary="Create user", response_model=User)
 async def create_user(
     body: CreateUserRequest,
     session: AsyncSession = Depends(get_session),
@@ -102,7 +102,7 @@ async def create_user(
     return CustomORJSONResponse(users.user_model_to_user(res))
 
 
-@router.post("/update", response_model=User)
+@router.post("/update", summary="Update user", response_model=User)
 async def update_user(
     body: UpdateUserRequest,
     session: AsyncSession = Depends(get_session),
@@ -121,7 +121,7 @@ async def update_user(
     return CustomORJSONResponse(users.user_model_to_user(res))
 
 
-@router.post("/refresh_ssh_key", response_model=UserWithCreds)
+@router.post("/refresh_ssh_key", summary="Refresh SSH key", response_model=UserWithCreds)
 async def refresh_ssh_key(
     body: RefreshTokenRequest,
     session: AsyncSession = Depends(get_session),
@@ -133,7 +133,7 @@ async def refresh_ssh_key(
     return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
 
 
-@router.post("/refresh_token", response_model=UserWithCreds)
+@router.post("/refresh_token", summary="Refresh token", response_model=UserWithCreds)
 async def refresh_token(
     body: RefreshTokenRequest,
     session: AsyncSession = Depends(get_session),
@@ -145,7 +145,7 @@ async def refresh_token(
     return CustomORJSONResponse(users.user_model_to_user_with_creds(res))
 
 
-@router.post("/delete")
+@router.post("/delete", summary="Delete users")
 async def delete_users(
     body: DeleteUsersRequest,
     session: AsyncSession = Depends(get_session),

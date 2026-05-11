@@ -25,7 +25,9 @@ router = APIRouter(
 )
 
 
-@router.post("/get_archive_by_hash", response_model=FileArchive)
+@router.post(
+    "/get_archive_by_hash", summary="Get file archive by hash", response_model=FileArchive
+)
 async def get_archive_by_hash(
     body: GetFileArchiveByHashRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -41,7 +43,7 @@ async def get_archive_by_hash(
     return CustomORJSONResponse(archive)
 
 
-@router.post("/upload_archive", response_model=FileArchive)
+@router.post("/upload_archive", summary="Upload file archive", response_model=FileArchive)
 async def upload_archive(
     request: Request,
     file: UploadFile,

@@ -136,7 +136,34 @@ plugins:
         "examples/clusters/a4/index.md": "docs/examples/clusters/gcp.md"
         "examples/clusters/efa/index.md": "docs/examples/clusters/aws.md"
         "docs/guides/migration.md": "docs/guides/upgrade.md"
-        "docs/reference/api/rest/index.md": "docs/reference/api/http/index.md"
+        "docs/reference/api/rest/index.md": "docs/reference/http/index.md"
+        "docs/reference/api/http/index.md": "docs/reference/http/index.md"
+        "docs/reference/api/http/auth.md": "docs/reference/http/authentication.md"
+        "docs/reference/api/http/backends.md": "docs/reference/http/backends.md"
+        "docs/reference/api/http/default.md": "docs/reference/http/default.md"
+        "docs/reference/api/http/events.md": "docs/reference/http/events.md"
+        "docs/reference/api/http/exports.md": "docs/reference/http/exports.md"
+        "docs/reference/api/http/files.md": "docs/reference/http/files.md"
+        "docs/reference/api/http/fleets.md": "docs/reference/http/fleets.md"
+        "docs/reference/api/http/gateways.md": "docs/reference/http/gateways.md"
+        "docs/reference/api/http/gpus.md": "docs/reference/http/gpus.md"
+        "docs/reference/api/http/imports.md": "docs/reference/http/exports.md"
+        "docs/reference/api/http/instances.md": "docs/reference/http/fleets.md"
+        "docs/reference/api/http/logs.md": "docs/reference/http/logs.md"
+        "docs/reference/api/http/metrics.md": "docs/reference/http/metrics.md"
+        "docs/reference/api/http/model-proxy.md": "docs/reference/http/proxy.md"
+        "docs/reference/api/http/projects.md": "docs/reference/http/projects.md"
+        "docs/reference/api/http/prometheus.md": "docs/reference/http/metrics.md"
+        "docs/reference/api/http/repos.md": "docs/reference/http/repos.md"
+        "docs/reference/api/http/runs.md": "docs/reference/http/runs.md"
+        "docs/reference/api/http/secrets.md": "docs/reference/http/secrets.md"
+        "docs/reference/api/http/server.md": "docs/reference/http/server.md"
+        "docs/reference/api/http/service-proxy.md": "docs/reference/http/proxy.md"
+        "docs/reference/api/http/sshproxy.md": "docs/reference/http/proxy.md"
+        "docs/reference/api/http/templates.md": "docs/reference/http/templates.md"
+        "docs/reference/api/http/user-public-keys.md": "docs/reference/http/users.md"
+        "docs/reference/api/http/users.md": "docs/reference/http/users.md"
+        "docs/reference/api/http/volumes.md": "docs/reference/http/volumes.md"
         # Examples moved from /examples/ to /docs/examples/
         "examples.md": "docs/examples.md"
         "examples/single-node-training/trl.md": "docs/examples/training/trl.md"
@@ -178,8 +205,6 @@ plugins:
           options:
             docstring_style: google
             show_source: false
-  - render_swagger:
-      allow_arbitrary_locations: true
 
 # Extensions
 markdown_extensions:
@@ -219,11 +244,15 @@ markdown_extensions:
 
 # Customization
 extra_css:
+  - https://unpkg.com/swagger-ui-dist@5.32.0/swagger-ui.css
   - assets/stylesheets/extra.css
+  - assets/stylesheets/swagger.css
   - assets/stylesheets/termynal.css
   - assets/stylesheets/landing.css
   - assets/stylesheets/pricing.css
 extra_javascript:
+  - https://unpkg.com/swagger-ui-dist@5.32.0/swagger-ui-bundle.js
+  - assets/javascripts/swagger.js
   - assets/javascripts/extra.js
   - assets/javascripts/pricing.js
 extra:
@@ -270,6 +299,7 @@ nav:
             - Events: docs/concepts/events.md
             - Exports: docs/concepts/exports.md
       - Guides:
+          - CLI & API: docs/guides/cli-api.md
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
           - More:
@@ -330,16 +360,34 @@ nav:
               - dstack secret: docs/reference/cli/dstack/secret.md
               - dstack export: docs/reference/cli/dstack/export.md
               - dstack import: docs/reference/cli/dstack/import.md
-          - API:
-              - Python API: docs/reference/api/python/index.md
-              - HTTP API: docs/reference/api/http/index.md
-          - Environment variables: docs/reference/environment-variables.md
-          - .dstack/profiles.yml: docs/reference/profiles.yml.md
-          - Plugins:
-              - Python API: docs/reference/plugins/python/index.md
-              - REST API: docs/reference/plugins/rest/index.md
-          - llms-full.txt: https://dstack.ai/llms-full.txt
-          - skill.md: https://dstack.ai/skill.md
+          - HTTP API:
+            - users: docs/reference/http/users.md
+            - projects: docs/reference/http/projects.md
+            - backends: docs/reference/http/backends.md
+            - fleets: docs/reference/http/fleets.md
+            - runs: docs/reference/http/runs.md
+            - gateways: docs/reference/http/gateways.md
+            - volumes: docs/reference/http/volumes.md
+            - logs: docs/reference/http/logs.md
+            - events: docs/reference/http/events.md
+            - repos: docs/reference/http/repos.md
+            - files: docs/reference/http/files.md
+            - secrets: docs/reference/http/secrets.md
+            - exports: docs/reference/http/exports.md
+            - metrics: docs/reference/http/metrics.md
+            - gpus: docs/reference/http/gpus.md
+            - templates: docs/reference/http/templates.md
+            - proxy: docs/reference/http/proxy.md
+            - authentication: docs/reference/http/authentication.md
+            - server: docs/reference/http/server.md
+          - Environment variables: docs/reference/env.md
+          - More:
+            - .dstack/profiles.yml: docs/reference/profiles.yml.md
+            - Plugins:
+                - Python API: docs/reference/plugins/python/index.md
+                - REST API: docs/reference/plugins/rest/index.md
+            - llms-full.txt: https://dstack.ai/llms-full.txt
+            - skill.md: https://dstack.ai/skill.md
   - Case studies: blog/case-studies.md
   - Benchmarks: blog/benchmarks.md
   - Blog:

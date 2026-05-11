@@ -14,7 +14,7 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=List[UITemplate])
+@router.post("/list", summary="List templates", response_model=List[UITemplate])
 async def list_templates(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):

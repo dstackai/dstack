@@ -27,12 +27,12 @@ from dstack._internal.server.utils.routers import (
 
 root_router = APIRouter(
     prefix="/api/instances",
-    tags=["instances"],
+    tags=["fleets"],
     responses=get_base_api_additional_responses(),
 )
 project_router = APIRouter(
     prefix="/api/project/{project_name}/instances",
-    tags=["instances"],
+    tags=["fleets"],
     responses=get_base_api_additional_responses(),
 )
 

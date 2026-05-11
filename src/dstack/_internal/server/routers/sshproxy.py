@@ -22,13 +22,13 @@ else:
 
 router = APIRouter(
     prefix="/api/sshproxy",
-    tags=["sshproxy"],
+    tags=["proxy"],
     responses=get_base_api_additional_responses(),
     dependencies=[Depends(_auth)],
 )
 
 
-@router.post("/get_upstream", response_model=GetUpstreamResponse)
+@router.post("/get_upstream", summary="Get upstream", response_model=GetUpstreamResponse)
 async def get_upstream(
     body: GetUpstreamRequest,
     session: Annotated[AsyncSession, Depends(get_session)],

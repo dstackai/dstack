@@ -10,7 +10,7 @@ router = APIRouter(
 )
 
 
-@router.post("/get_info", response_model=ServerInfo)
+@router.post("/get_info", summary="Get server info", response_model=ServerInfo)
 async def get_server_info():
     return CustomORJSONResponse(
         ServerInfo(

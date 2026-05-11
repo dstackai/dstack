@@ -17,7 +17,7 @@
 }
 
 .small > [data-termynal] {
-    font-size: 14px;
+    font-size: var(--dstack-code-font-size);
     line-height: 1.4;
 }
 
@@ -32,10 +32,11 @@
     color: var(--color-text);
     /* font-size: 18px; */
     font-size: 14px;
+    line-height: var(--dstack-code-line-height);
     /* font-family: 'Fira Mono', Consolas, Menlo, Monaco, 'Courier New', Courier, monospace; */
     font-family: var(--md-code-font-family) !important;
-    border-radius: 0;
-    padding: 45px 25px 25px;
+    border-radius: 3px;
+    padding: 60px 12px 25px 25px;
     /*padding: 75px 45px 35px;*/
     position: relative;
     -webkit-box-sizing: border-box;
@@ -69,15 +70,116 @@
     text-align: center;
 }
 
-a[data-terminal-control] {
-    text-align: right;
+[data-termynal].dstack-termy-scrollable {
+    overflow: visible;
+}
+
+[data-termynal].dstack-termy-scrollable > [data-termynal-body] {
+    max-height: var(--dstack-termy-max-height);
+    overflow: auto;
+    scrollbar-color: #a2a2a2 rgba(255, 255, 255, 0.06);
+    scrollbar-width: thin;
+}
+
+[data-termynal].dstack-termy-scrollable > [data-termynal-body]::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+}
+
+[data-termynal].dstack-termy-scrollable > [data-termynal-body]::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+[data-termynal].dstack-termy-scrollable > [data-termynal-body]::-webkit-scrollbar-thumb {
+    background: #a2a2a2;
+    background-clip: content-box;
+    border: 2px solid transparent;
+    border-radius: 8px;
+}
+
+[data-termynal].dstack-termy-scrollable > [data-termynal-body]::-webkit-scrollbar-thumb:hover {
+    background: #e5e5e9;
+    background-clip: content-box;
+}
+
+[data-termynal].dstack-termy-has-copy > a[data-terminal-control] {
+    box-sizing: border-box;
+    padding-right: 32px;
+}
+
+[data-termynal] > .dstack-termy-copy {
+    -webkit-appearance: none;
+            appearance: none;
+    background: transparent;
+    border: 0;
+    color: var(--color-text-subtle);
+    cursor: pointer;
+    height: 24px;
+    padding: 0;
+    position: absolute;
+    right: 15px;
+    top: 9px;
+    width: 24px;
+    z-index: 2;
+}
+
+[data-termynal] > .dstack-termy-copy:before {
+    background: rgb(21, 22, 29);
+    border: 1px solid var(--color-text-subtle);
+    color: var(--color-text);
+    content: 'Copied to clipboard';
+    font-family: var(--md-text-font-family);
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0;
+    padding: 5px 7px;
+    pointer-events: none;
+    position: absolute;
+    right: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    transition: opacity 0.15s ease;
+    white-space: nowrap;
+}
+
+[data-termynal] > .dstack-termy-copy.dstack-termy-copy-copied:before {
+    opacity: 1;
+}
+
+[data-termynal] > .dstack-termy-copy:after {
+    background-color: currentColor;
+    content: '';
     display: block;
+    height: 16px;
+    margin: 4px;
+    mask-image: var(--md-code-copy-icon, var(--md-clipboard-icon));
+    mask-position: center;
+    mask-repeat: no-repeat;
+    mask-size: contain;
+    -webkit-mask-image: var(--md-code-copy-icon, var(--md-clipboard-icon));
+    -webkit-mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    width: 16px;
+}
+
+[data-termynal] > .dstack-termy-copy:hover,
+[data-termynal] > .dstack-termy-copy:focus-visible {
+    color: var(--color-text);
+    outline: none;
+}
+
+a[data-terminal-control] {
     color: #aebbff;
+    display: block;
+    margin-right: 0.5rem;
+    margin-top: 1rem;
+    text-align: right;
 }
 
 [data-ty] {
     display: block;
-    line-height: 2;
+    line-height: inherit;
 }
 
 [data-ty]:before {

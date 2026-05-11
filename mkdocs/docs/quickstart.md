@@ -5,8 +5,8 @@ description: Quick guide to creating fleets and submitting runs
 
 # Quickstart
 
-!!! info "Prerequsites"
-    Before using `dstack`, ensure you've [installed](installation.md) the server, CLI, and agent skills.
+!!! info "Prerequisites"
+    Ensure the server and CLI are [installed](installation.md). To use `dstack` with AI agents, install [skills](installation.md#skills).
 
 ## Create a fleet
 

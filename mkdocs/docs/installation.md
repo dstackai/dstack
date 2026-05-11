@@ -9,7 +9,7 @@ description: How to install the dstack server and CLI
     If you don't want to host the `dstack` server (or want to access GPU marketplace),
     skip installation and proceed to [dstack Sky](https://sky.dstack.ai). -->
 
-## Launch the server
+## Launch the server { #server }
 
 The server can run on your laptop or any environment with access to the cloud and on-prem clusters you plan to use.
 
@@ -74,7 +74,7 @@ For more details on server deployment options, see the [Server deployment](guide
 
     To orchestrate compute across GPU clouds or Kubernetes clusters, you need to configure [backends](concepts/backends.md).
 
-## Install the CLI
+## Install the CLI { #cli }
 
 Once the server is up, you can access it via the `dstack` CLI. 
 
@@ -203,42 +203,18 @@ Later, you can create additional projects and users.
 
 Once the project is configured, you can use the `dstack` CLI or API.
 
-## Install agent skills
+> See the [CLI & API](guides/cli-api.md) guide for using the CLI and HTTP API.
 
-Install [`dstack` skills](https://skills.sh/dstackai/dstack/dstack) to help AI agents use the CLI and edit configuration files.
+## Install agent skills { #skills }
+
+If you'd like to use `dstack` with AI agents like Claude, Codex, and Cursor,
+install [`dstack` skills](https://skills.sh/dstackai/dstack/dstack) to help
+them use the CLI and edit configuration files.
 
 <div class="termy">
 
 ```shell
 $ npx skills add dstackai/dstack
-```
-
-</div>
-
-### Use agents
-
-AI agents like Claude, Codex, and Cursor can now create and manage fleets and submit workloads on your behalf.
-
-<div class="termy">
-
-```shell
- ▐▛███▜▌   Claude Code v2.1.83
-▝▜█████▛▘  Opus 4.6 (1M context) · Claude Team
-  ▘▘ ▝▝    ~/skills-demo
-
-$ /dstack
-
-dstack skill loaded. How can I help? For example:
-
-  - Apply a configuration (*.dstack.yml)
-  - Check run status (dstack ps)
-  - Manage fleets, volumes, or services
-  - Create or edit a dstack configuration
-  - Troubleshoot provisioning or connectivity issues
-
-  What would you like to do?
-
-$ 
 ```
 
 </div>

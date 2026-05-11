@@ -26,6 +26,7 @@ router = APIRouter(
 
 @router.get(
     "/job/{run_name}",
+    summary="Get metrics",
     response_model=JobMetrics,
 )
 async def get_job_metrics(

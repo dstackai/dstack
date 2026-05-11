@@ -22,7 +22,7 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=List[Secret])
+@router.post("/list", summary="List secrets", response_model=List[Secret])
 async def list_secrets(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
@@ -37,7 +37,7 @@ async def list_secrets(
     )
 
 
-@router.post("/get", response_model=Secret)
+@router.post("/get", summary="Get secret", response_model=Secret)
 async def get_secret(
     body: GetSecretRequest,
     session: AsyncSession = Depends(get_session),
@@ -55,7 +55,7 @@ async def get_secret(
     return CustomORJSONResponse(secret)
 
 
-@router.post("/create_or_update", response_model=Secret)
+@router.post("/create_or_update", summary="Create or update secret", response_model=Secret)
 async def create_or_update_secret(
     body: CreateOrUpdateSecretRequest,
     session: AsyncSession = Depends(get_session),
@@ -73,7 +73,7 @@ async def create_or_update_secret(
     )
 
 
-@router.post("/delete")
+@router.post("/delete", summary="Delete secrets")
 async def delete_secrets(
     body: DeleteSecretsRequest,
     session: AsyncSession = Depends(get_session),

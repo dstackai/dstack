@@ -98,7 +98,7 @@ at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
 ```shell
 $ curl http://127.0.0.1:3000/proxy/services/main/tt-inference-server/v1/chat/completions \
     -X POST \
-    -H 'Authorization: Bearer &lt;dstack token&gt;' \
+    -H 'Authorization: Bearer &lt;user token&gt;' \
     -H 'Content-Type: application/json' \
     -d '{
       "model": "meta-llama/Llama-3.2-1B-Instruct",

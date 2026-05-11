@@ -15,13 +15,13 @@ from dstack._internal.server.utils.routers import error_not_found
 _auth = OptionalServiceAccount(os.getenv("DSTACK_PROMETHEUS_AUTH_TOKEN"))
 
 router = APIRouter(
-    tags=["prometheus"],
+    tags=["metrics"],
     default_response_class=PlainTextResponse,
     dependencies=[Depends(_auth)],
 )
 
 
-@router.get("/metrics")
+@router.get("/metrics", summary="Get Prometheus metrics")
 async def get_prometheus_metrics(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> str:

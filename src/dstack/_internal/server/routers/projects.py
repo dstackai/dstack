@@ -36,7 +36,7 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=ProjectsInfoListOrProjectsList)
+@router.post("/list", summary="List projects", response_model=ProjectsInfoListOrProjectsList)
 async def list_projects(
     body: Optional[ListProjectsRequest] = None,
     session: AsyncSession = Depends(get_session),
@@ -68,7 +68,11 @@ async def list_projects(
     )
 
 
-@router.post("/list_only_no_fleets", response_model=List[Project])
+@router.post(
+    "/list_only_no_fleets",
+    summary="List projects with no active fleets",
+    response_model=List[Project],
+)
 async def list_only_no_fleets(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
@@ -87,7 +91,7 @@ async def list_only_no_fleets(
     )
 
 
-@router.post("/create", response_model=Project)
+@router.post("/create", summary="Create project", response_model=Project)
 async def create_project(
     body: CreateProjectRequest,
     session: AsyncSession = Depends(get_session),
@@ -104,7 +108,7 @@ async def create_project(
     )
 
 
-@router.post("/delete")
+@router.post("/delete", summary="Delete projects")
 async def delete_projects(
     body: DeleteProjectsRequest,
     session: AsyncSession = Depends(get_session),
@@ -117,7 +121,7 @@ async def delete_projects(
     )
 
 
-@router.post("/{project_name}/get", response_model=Project)
+@router.post("/{project_name}/get", summary="Get project", response_model=Project)
 async def get_project(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMemberOrPublicAccess()),
@@ -128,6 +132,7 @@ async def get_project(
 
 @router.post(
     "/{project_name}/set_members",
+    summary="Set members",
     response_model=Project,
 )
 async def set_project_members(
@@ -148,6 +153,7 @@ async def set_project_members(
 
 @router.post(
     "/{project_name}/add_members",
+    summary="Add members",
     response_model=Project,
 )
 async def add_project_members(
@@ -168,6 +174,7 @@ async def add_project_members(
 
 @router.post(
     "/{project_name}/remove_members",
+    summary="Remove members",
     response_model=Project,
 )
 async def remove_project_members(
@@ -188,6 +195,7 @@ async def remove_project_members(
 
 @router.post(
     "/{project_name}/update",
+    summary="Update project",
     response_model=Project,
 )
 async def update_project(

@@ -29,7 +29,7 @@ router = APIRouter(
 )
 
 
-@router.post("/list", response_model=List[RepoHead])
+@router.post("/list", summary="List repos", response_model=List[RepoHead])
 async def list_repos(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
@@ -38,7 +38,7 @@ async def list_repos(
     return CustomORJSONResponse(await repos.list_repos(session=session, project=project))
 
 
-@router.post("/get", response_model=RepoHeadWithCreds)
+@router.post("/get", summary="Get repo", response_model=RepoHeadWithCreds)
 async def get_repo(
     body: GetRepoRequest,
     session: AsyncSession = Depends(get_session),
@@ -57,7 +57,7 @@ async def get_repo(
     return CustomORJSONResponse(repo)
 
 
-@router.post("/init")
+@router.post("/init", summary="Initialize repo")
 async def init_repo(
     body: SaveRepoCredsRequest,
     session: AsyncSession = Depends(get_session),
@@ -79,7 +79,7 @@ async def init_repo(
     )
 
 
-@router.post("/delete")
+@router.post("/delete", summary="Delete repos")
 async def delete_repos(
     body: DeleteReposRequest,
     session: AsyncSession = Depends(get_session),
@@ -89,7 +89,7 @@ async def delete_repos(
     await repos.delete_repos(session=session, project=project, repos_ids=body.repos_ids)
 
 
-@router.post("/upload_code")
+@router.post("/upload_code", summary="Upload code")
 async def upload_code(
     request: Request,
     repo_id: str,
