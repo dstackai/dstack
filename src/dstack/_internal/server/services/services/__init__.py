@@ -39,6 +39,7 @@ from dstack._internal.server.services.gateways import (
 )
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.services.options import get_service_options
+from dstack._internal.utils.common import interpolate_gateway_domain
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -158,6 +159,11 @@ async def _register_service_in_gateway(
     wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     if wildcard_domain is None:
         raise ServerClientError("Domain is required for gateway")
+    wildcard_domain = interpolate_gateway_domain(
+        domain=wildcard_domain,
+        run_project_name=run_model.project.name,
+        exception_type=GatewayError,
+    )
     service_url = f"{service_protocol}://{run_model.run_name}.{wildcard_domain}"
     if isinstance(run_spec.configuration.model, OpenAIChatModel):
         model_url = service_url + run_spec.configuration.model.prefix

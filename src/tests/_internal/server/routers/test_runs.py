@@ -3617,6 +3617,128 @@ class TestSubmitService:
         }
 
     @pytest.mark.asyncio
+    async def test_interpolates_project_name_in_imported_gateway_domain(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        exporter_user = await create_user(
+            session=session, global_role=GlobalRole.USER, name="exporter_user"
+        )
+        exporter_project = await create_project(
+            session=session, owner=exporter_user, name="exporter-project"
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            status=GatewayStatus.RUNNING,
+            name="exported-gateway",
+            wildcard_domain="${{ run.project_name }}.example.com",
+        )
+
+        importer_user = await create_user(
+            session=session, global_role=GlobalRole.USER, name="importer_user"
+        )
+        importer_project = await create_project(
+            session=session, owner=importer_user, name="importer-project"
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.USER,
+        )
+        importer_repo = await create_repo(session=session, project_id=importer_project.id)
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+
+        run_spec = get_service_run_spec(
+            repo_id=importer_repo.name,
+            run_name="test-service",
+            gateway="exporter-project/exported-gateway",
+        )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/runs/submit",
+            headers=get_auth_headers(importer_user.token),
+            json={"run_spec": run_spec},
+        )
+        assert response.status_code == 200
+        assert (
+            response.json()["service"]["url"]
+            == "https://test-service.importer-project.example.com"
+        )
+
+    @pytest.mark.asyncio
+    async def test_returns_error_if_imported_gateway_domain_has_unknown_variable(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        exporter_user = await create_user(
+            session=session, global_role=GlobalRole.USER, name="exporter_user"
+        )
+        exporter_project = await create_project(
+            session=session, owner=exporter_user, name="exporter-project"
+        )
+        backend = await create_backend(session=session, project_id=exporter_project.id)
+        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=exporter_project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+            status=GatewayStatus.RUNNING,
+            name="exported-gateway",
+            wildcard_domain="${{ run.unknown_variable }}.example.com",
+        )
+
+        importer_user = await create_user(
+            session=session, global_role=GlobalRole.USER, name="importer_user"
+        )
+        importer_project = await create_project(
+            session=session, owner=importer_user, name="importer-project"
+        )
+        await add_project_member(
+            session=session,
+            project=importer_project,
+            user=importer_user,
+            project_role=ProjectRole.USER,
+        )
+        importer_repo = await create_repo(session=session, project_id=importer_project.id)
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            exported_gateways=[gateway],
+        )
+
+        run_spec = get_service_run_spec(
+            repo_id=importer_repo.name,
+            run_name="test-service",
+            gateway="exporter-project/exported-gateway",
+        )
+        response = await client.post(
+            f"/api/project/{importer_project.name}/runs/submit",
+            headers=get_auth_headers(importer_user.token),
+            json={"run_spec": run_spec},
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [
+                {
+                    "msg": "Cannot interpolate gateway domain name: Failed to interpolate due to missing vars: ['run.unknown_variable']",
+                    "code": "gateway_error",
+                }
+            ]
+        }
+
+    @pytest.mark.asyncio
     async def test_unregister_dangling_service(
         self,
         test_db,

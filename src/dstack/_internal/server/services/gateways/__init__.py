@@ -67,7 +67,11 @@ from dstack._internal.server.services.locking import (
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
-from dstack._internal.utils.common import get_current_datetime, run_async
+from dstack._internal.utils.common import (
+    get_current_datetime,
+    interpolate_gateway_domain,
+    run_async,
+)
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
@@ -815,6 +819,14 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
 
     if configuration.name is not None:
         validate_dstack_resource_name(configuration.name)
+
+    if configuration.domain is not None:
+        # validate that domain can be interpolated
+        interpolate_gateway_domain(
+            domain=configuration.domain,
+            run_project_name="example",
+            exception_type=ServerClientError,
+        )
 
     if (
         not configuration.public_ip

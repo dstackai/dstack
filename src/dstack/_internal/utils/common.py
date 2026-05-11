@@ -15,6 +15,7 @@ from uuid import UUID
 from typing_extensions import ParamSpec
 
 from dstack._internal.core.models.common import Duration
+from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 
 
 class Unset:
@@ -334,6 +335,18 @@ def make_proxy_url(server_url: str, proxy_url: str) -> str:
         path=concat_url_path(server.path, proxy.path),
     )
     return proxy.geturl()
+
+
+def interpolate_gateway_domain(
+    domain: str, run_project_name: str, exception_type: Optional[type[Exception]]
+) -> str:
+    interpolator = VariablesInterpolator({"run": {"project_name": run_project_name}})
+    try:
+        return interpolator.interpolate_or_error(domain)
+    except InterpolatorError as e:
+        if exception_type is None:
+            return domain
+        raise exception_type(f"Cannot interpolate gateway domain name: {e.args[0]}") from e
 
 
 def list_enum_values_for_annotation(enum_class: type[enum.Enum]) -> str:

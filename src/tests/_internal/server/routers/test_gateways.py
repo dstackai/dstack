@@ -531,6 +531,58 @@ class TestCreateGateway:
         )
         assert response.status_code == 400
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_create_gateway_with_valid_domain_interpolation(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_backend(session, project.id, backend_type=BackendType.AWS)
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/create",
+            json={
+                "configuration": {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "aws",
+                    "region": "us",
+                    "domain": "${{ run.project_name }}.example.com",
+                },
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_create_gateway_with_invalid_domain_interpolation(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_backend(session, project.id, backend_type=BackendType.AWS)
+        response = await client.post(
+            f"/api/project/{project.name}/gateways/create",
+            json={
+                "configuration": {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "aws",
+                    "region": "us",
+                    "domain": "${{ run.unknown_variable }}.example.com",
+                },
+            },
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 400
+
 
 class TestDefaultGateway:
     @pytest.mark.asyncio
