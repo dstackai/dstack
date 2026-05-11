@@ -203,6 +203,46 @@ async def test_redirect_to_service_root(mock_replica_client_httpbin) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "response_headers",
+    [
+        pytest.param(
+            {
+                "X-Custom-Header": "1",
+                "Server": "test",
+                "Date": "Mon, 11 May 2026 00:00:00 GMT",
+            },
+            id="mixed-case",
+        ),
+        pytest.param(
+            {
+                "x-custom-header": "1",
+                "server": "test",
+                "date": "Mon, 11 May 2026 00:00:00 GMT",
+            },
+            id="lower-case",
+        ),
+    ],
+)
+async def test_drop_uvicorn_headers(
+    mock_replica_client_httpbin, response_headers: dict[str, str]
+) -> None:
+    repo = ProxyTestRepo()
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(make_service("test-proj", "httpbin"))
+    _, client = make_app_client(repo)
+    resp = await client.post(
+        "http://test-host/proxy/services/test-proj/httpbin/response-headers",
+        params=response_headers,
+    )
+    assert resp.status_code == 200
+    assert "X-Custom-Header" in resp.headers
+    # These should be stripped by the proxy, as they are then set by uvicorn
+    assert "Server" not in resp.headers
+    assert "Date" not in resp.headers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     ("token", "status"), [("correct-token", 200), ("incorrect-token", 403), ("", 403), (None, 403)]
 )
 async def test_auth(mock_replica_client_httpbin, token: Optional[str], status: int) -> None:
