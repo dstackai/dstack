@@ -158,8 +158,8 @@ $ dstack apply -f .dstack.yml
 
 !!! info "Attached by default"
     For run configurations, `dstack apply` automatically attaches after
-    submitting the run. This streams logs, forwards declared ports, and
-    configures SSH access. See [Attach to runs](#attach-to-runs).
+    submitting the run. This configures SSH access, forwards declared ports, and
+    streams logs. See [Attach to runs](#attach-to-runs).
 
     Use `-d` to submit in detached mode.
 
@@ -181,24 +181,26 @@ $ dstack attach &lt;run name&gt;
     `dstack attach <run name>`, the CLI downloads the current user's built-in
     private SSH key if needed and stores it under `~/.dstack/ssh/`.
 
-    While attached, the CLI updates `~/.dstack/ssh/config` with the run name as
-    an SSH host alias and ensures this file is included from `~/.ssh/config`:
+    While attached, the CLI updates `~/.dstack/ssh/config` and ensures this file
+    is included from `~/.ssh/config`. The file contains a `Host <run name>`
+    alias used by `ssh <run name>` to SSH into the run container:
 
     <div editor-title="~/.dstack/ssh/config">
 
     ```ssh-config
-    Host &lt;run name&gt;
-        HostName localhost
-        Port &lt;local SSH port&gt;
-        User root
-        IdentityFile ~/.dstack/ssh/&lt;key&gt;
+    Host <run name>
+        HostName <host>
+        Port <ssh port>
+        User <user>
+        IdentityFile <private user SSH key>
         IdentitiesOnly yes
     ```
 
     </div>
 
-    For VM-based and SSH fleets, `dstack` may also configure the
-    `<run name>-host` alias for SSH access to the host.
+    > For [VM-based backends](../concepts/backends.md#vm-based) and
+    > [SSH fleets](../concepts/fleets.md), `dstack` may add an additional alias
+    > `<run name>-host` and use it as a proxy jump for `ssh <run name>`.
 
     While attached, connect to the run with:
 
