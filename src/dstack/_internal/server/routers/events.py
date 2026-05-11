@@ -19,7 +19,7 @@ root_router = APIRouter(
 )
 
 
-@root_router.post("/list", response_model=list[Event])
+@root_router.post("/list", summary="List events", response_model=list[Event])
 async def list_events(
     body: ListEventsRequest,
     session: AsyncSession = Depends(get_session),

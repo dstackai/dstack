@@ -18,7 +18,7 @@ project_router = APIRouter(
 )
 
 
-@project_router.post("/delete")
+@project_router.post("/delete", summary="Delete import")
 async def delete_import(
     body: DeleteImportRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -33,7 +33,7 @@ async def delete_import(
     )
 
 
-@project_router.post("/list", response_model=list[Import])
+@project_router.post("/list", summary="List imports", response_model=list[Import])
 async def list_imports(
     session: Annotated[AsyncSession, Depends(get_session)],
     user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectMember())],

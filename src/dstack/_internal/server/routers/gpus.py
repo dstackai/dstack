@@ -22,7 +22,9 @@ project_router = APIRouter(
 )
 
 
-@project_router.post("/list", response_model=ListGpusResponse, response_model_exclude_none=True)
+@project_router.post(
+    "/list", summary="List GPUs", response_model=ListGpusResponse, response_model_exclude_none=True
+)
 async def list_gpus(
     body: ListGpusRequest,
     session: Annotated[AsyncSession, Depends(get_session)],

@@ -29,7 +29,7 @@ root_router = APIRouter(
 project_router = APIRouter(prefix="/api/project/{project_name}/volumes", tags=["volumes"])
 
 
-@root_router.post("/list", response_model=List[Volume])
+@root_router.post("/list", summary="List volumes", response_model=List[Volume])
 async def list_volumes(
     body: ListVolumesRequest,
     session: AsyncSession = Depends(get_session),
@@ -56,7 +56,7 @@ async def list_volumes(
     )
 
 
-@project_router.post("/list", response_model=List[Volume])
+@project_router.post("/list", summary="List project volumes", response_model=List[Volume])
 async def list_project_volumes(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
@@ -70,7 +70,7 @@ async def list_project_volumes(
     )
 
 
-@project_router.post("/get", response_model=Volume)
+@project_router.post("/get", summary="Get volume", response_model=Volume)
 async def get_volume(
     body: GetVolumeRequest,
     session: AsyncSession = Depends(get_session),
@@ -88,7 +88,7 @@ async def get_volume(
     return CustomORJSONResponse(volume)
 
 
-@project_router.post("/create", response_model=Volume)
+@project_router.post("/create", summary="Create volume", response_model=Volume)
 async def create_volume(
     body: CreateVolumeRequest,
     session: AsyncSession = Depends(get_session),
@@ -110,7 +110,7 @@ async def create_volume(
     )
 
 
-@project_router.post("/delete")
+@project_router.post("/delete", summary="Delete volumes")
 async def delete_volumes(
     body: DeleteVolumesRequest,
     session: AsyncSession = Depends(get_session),
