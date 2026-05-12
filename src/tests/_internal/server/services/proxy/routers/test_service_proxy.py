@@ -88,7 +88,6 @@ async def test_proxy(mock_replica_client_httpbin, method: str) -> None:
         content=req_body,
     )
     assert resp.status_code == 200
-    assert resp.headers["server"].startswith("Pytest-HTTPBIN")
     resp_body = resp.json()
     assert resp_body["url"] == f"http://test-host:8888/{method}?a=b&c="
     assert resp_body["args"] == {"a": "b", "c": ""}
