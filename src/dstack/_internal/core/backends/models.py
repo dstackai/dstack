@@ -39,6 +39,11 @@ from dstack._internal.core.backends.hotaisle.models import (
     HotAisleBackendConfigWithCreds,
     HotAisleBackendFileConfigWithCreds,
 )
+from dstack._internal.core.backends.jarvislabs.models import (
+    JarvisLabsBackendConfig,
+    JarvisLabsBackendConfigWithCreds,
+    JarvisLabsBackendFileConfigWithCreds,
+)
 from dstack._internal.core.backends.kubernetes.models import (
     KubernetesBackendConfig,
     KubernetesBackendConfigWithCreds,
@@ -89,6 +94,7 @@ AnyBackendConfigWithoutCreds = Union[
     BaseDigitalOceanBackendConfig,
     GCPBackendConfig,
     HotAisleBackendConfig,
+    JarvisLabsBackendConfig,
     KubernetesBackendConfig,
     LambdaBackendConfig,
     NebiusBackendConfig,
@@ -115,6 +121,7 @@ AnyBackendConfigWithCreds = Union[
     BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendConfigWithCreds,
     HotAisleBackendConfigWithCreds,
+    JarvisLabsBackendConfigWithCreds,
     KubernetesBackendConfigWithCreds,
     LambdaBackendConfigWithCreds,
     OCIBackendConfigWithCreds,
@@ -139,6 +146,7 @@ AnyBackendFileConfigWithCreds = Union[
     BaseDigitalOceanBackendConfigWithCreds,
     GCPBackendFileConfigWithCreds,
     HotAisleBackendFileConfigWithCreds,
+    JarvisLabsBackendFileConfigWithCreds,
     KubernetesBackendFileConfigWithCreds,
     LambdaBackendConfigWithCreds,
     OCIBackendConfigWithCreds,

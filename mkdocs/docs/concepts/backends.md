@@ -918,6 +918,26 @@ projects:
 
     </div>
 
+### JarvisLabs
+
+Log into your [JarvisLabs](https://cloud.jarvislabs.ai/) account and create an API key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: jarvislabs
+      creds:
+        type: api_key
+        api_key: ...
+```
+
+</div>
+
 ### CloudRift
 
 Log into your [CloudRift](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
