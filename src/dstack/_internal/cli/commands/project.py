@@ -140,9 +140,9 @@ class ProjectCommand(BaseCommand):
         try:
             api_client.projects.get(args.name)
         except HTTPError as e:
-            if e.response.status_code == 403:
+            if e.response is not None and e.response.status_code == 403:
                 raise CLIError("Forbidden. Ensure the token is valid.")
-            elif e.response.status_code == 404:
+            elif e.response is not None and e.response.status_code == 404:
                 raise CLIError(f"Project '{args.name}' not found.")
             else:
                 raise e

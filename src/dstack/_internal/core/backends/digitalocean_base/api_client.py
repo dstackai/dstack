@@ -20,8 +20,7 @@ class DigitalOceanAPIClient:
             response.raise_for_status()
             return True
         except requests.HTTPError as e:
-            status = e.response.status_code
-            if status == 401:
+            if e.response is not None and e.response.status_code == 401:
                 raise_invalid_credentials_error(
                     fields=[["creds", "api_key"]], details="Invaild API key"
                 )

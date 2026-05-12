@@ -117,7 +117,7 @@ class VultrCompute(
         try:
             self.api_client.terminate_instance(instance_id=instance_id, plan_type=plan_type)
         except requests.HTTPError as e:
-            raise BackendError(e.response.text)
+            raise BackendError(e.response.text if e.response is not None else str(e))
 
     def update_provisioning_data(
         self,
