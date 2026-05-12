@@ -7,7 +7,7 @@ from dstack._internal.cli.utils.common import add_row_from_dict, console, format
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.gateways import Gateway
-from dstack._internal.utils.common import DateFormatter, pretty_date
+from dstack._internal.utils.common import DateFormatter, interpolate_gateway_domain, pretty_date
 from dstack.api.server._gateways import GatewaysAPIClient
 
 
@@ -62,7 +62,7 @@ def get_gateways_table(
     table.add_column("NAME", no_wrap=True)
     table.add_column("BACKEND")
     table.add_column("HOSTNAME", no_wrap=True)
-    table.add_column("DOMAIN")
+    table.add_column("DOMAIN", no_wrap=True)
     table.add_column("DEFAULT")
     table.add_column("STATUS")
     if verbose or include_created:
@@ -78,11 +78,23 @@ def get_gateways_table(
             gateway.project_name if gateway.project_name is not None else current_project,
             current_project,
         )
+        domain = gateway.wildcard_domain
+        if (
+            gateway.project_name is not None
+            and gateway.project_name != current_project
+            and domain is not None
+        ):
+            domain = interpolate_gateway_domain(
+                domain=domain,
+                run_project_name=current_project,
+                # Ignore errors in case future server versions introduce more interpolation variables
+                exception_type=None,
+            )
         row = {
             "NAME": name,
             "BACKEND": f"{gateway.configuration.backend.value} ({gateway.configuration.region})",
             "HOSTNAME": gateway.hostname,
-            "DOMAIN": gateway.wildcard_domain,
+            "DOMAIN": domain,
             "DEFAULT": "✓" if gateway.default else "",
             "STATUS": gateway.status,
             "CREATED": format_date(gateway.created_at),
