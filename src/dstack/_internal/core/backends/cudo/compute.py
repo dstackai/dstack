@@ -133,10 +133,10 @@ class CudoCompute(
         try:
             self.api_client.terminate_virtual_machine(instance_id, self.config.project_id)
         except requests.HTTPError as e:
-            if e.response.status_code == requests.codes.not_found:
+            if e.response is not None and e.response.status_code == requests.codes.not_found:
                 logger.debug("The instance with name %s not found", instance_id)
                 return
-            raise BackendError(e.response.text)
+            raise BackendError(e.response.text if e.response is not None else str(e))
 
     def update_provisioning_data(
         self,

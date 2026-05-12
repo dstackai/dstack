@@ -13,7 +13,7 @@ class LambdaAPIClient:
         try:
             self.list_instance_types()
         except requests.HTTPError as e:
-            if e.response.status_code in [401, 403]:
+            if e.response is not None and e.response.status_code in [401, 403]:
                 return False
             raise e
         return True
