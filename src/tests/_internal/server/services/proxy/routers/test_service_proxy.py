@@ -88,7 +88,6 @@ async def test_proxy(mock_replica_client_httpbin, method: str) -> None:
         content=req_body,
     )
     assert resp.status_code == 200
-    assert resp.headers["server"].startswith("Pytest-HTTPBIN")
     resp_body = resp.json()
     assert resp_body["url"] == f"http://test-host:8888/{method}?a=b&c="
     assert resp_body["args"] == {"a": "b", "c": ""}
@@ -199,6 +198,46 @@ async def test_redirect_to_service_root(mock_replica_client_httpbin) -> None:
     resp = await client.get(url, follow_redirects=True)
     assert resp.status_code == 200
     assert resp.request.url == url + "/"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response_headers",
+    [
+        pytest.param(
+            {
+                "X-Custom-Header": "1",
+                "Server": "test",
+                "Date": "Mon, 11 May 2026 00:00:00 GMT",
+            },
+            id="mixed-case",
+        ),
+        pytest.param(
+            {
+                "x-custom-header": "1",
+                "server": "test",
+                "date": "Mon, 11 May 2026 00:00:00 GMT",
+            },
+            id="lower-case",
+        ),
+    ],
+)
+async def test_drop_uvicorn_headers(
+    mock_replica_client_httpbin, response_headers: dict[str, str]
+) -> None:
+    repo = ProxyTestRepo()
+    await repo.set_project(make_project("test-proj"))
+    await repo.set_service(make_service("test-proj", "httpbin"))
+    _, client = make_app_client(repo)
+    resp = await client.post(
+        "http://test-host/proxy/services/test-proj/httpbin/response-headers",
+        params=response_headers,
+    )
+    assert resp.status_code == 200
+    assert "X-Custom-Header" in resp.headers
+    # These should be stripped by the proxy, as they are then set by uvicorn
+    assert "Server" not in resp.headers
+    assert "Date" not in resp.headers
 
 
 @pytest.mark.asyncio
