@@ -229,9 +229,9 @@ function ProductOverview() {
                             <dt>dstack Sky</dt>
 
                             <dd>
-                                Bring Your Own Cloud{' '}
+                                Bring your own cloud{' '}
                                 <Popover
-                                    header="Bring Your Own Cloud (BYOC)"
+                                    header="Bring your own cloud (BYOC)"
                                     content={
                                         <>
                                             <Box variant="p">
@@ -257,9 +257,9 @@ function ProductOverview() {
                             </dd>
 
                             <dd>
-                                GPU Marketplace{' '}
+                                GPU marketplace{' '}
                                 <Popover
-                                    header="GPU Marketplace"
+                                    header="GPU marketplace"
                                     content={
                                         <>
                                             <Box variant="p">
@@ -320,7 +320,7 @@ function ProductOverview() {
 
                             <dd>Pricing</dd>
                             <dd>Free</dd>
-                            <dd>Pay only if you use GPU Marketplace</dd>
+                            <dd>Pay only if you use GPU marketplace</dd>
 
                             <dd></dd>
                             <dd>Self-hosted</dd>
@@ -335,7 +335,7 @@ function ProductOverview() {
                     </Header>
                     <TextContent>
                         <ul>
-                            <li>Use compute from your own cloud account(s) or through GPU Marketplace.</li>
+                            <li>Use compute from your own cloud account(s) or through GPU marketplace.</li>
                             <li>Create dev environments, run training tasks, and deploy inference services.</li>
                             <li>Manage volumes and fleets.</li>
                             <li>Manage multiple projects and teams.</li>
