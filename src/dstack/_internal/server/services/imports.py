@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.errors import ResourceNotExistsError, ServerClientError
 from dstack._internal.core.models.imports import (
     Import,
     ImportExport,
@@ -70,6 +70,10 @@ async def delete_import(
             raise not_found_error
         if project.name.lower() not in {imp.project.name.lower() for imp in export.imports}:
             raise not_found_error
+        if export.is_global:
+            raise ServerClientError(
+                f"'{export_project_name}/{export_name}' is a global export, cannot stop importing"
+            )
         export.imports = [
             imp for imp in export.imports if imp.project.name.lower() != project.name.lower()
         ]

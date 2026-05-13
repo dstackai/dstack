@@ -1155,6 +1155,46 @@ class TestCreateProject:
         project = res.scalar_one()
         assert project.is_public is False
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_new_project_imports_global_exports(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        exporter_project = await create_project(session=session, name="ExporterProject")
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="non-global",
+            is_global=False,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="global-export",
+            is_global=True,
+        )
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+
+        response = await client.post(
+            "/api/projects/create",
+            headers=get_auth_headers(user.token),
+            json={"project_name": "new-project"},
+        )
+        assert response.status_code == 200
+
+        response = await client.post(
+            "/api/project/new-project/imports/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        imports = response.json()
+        assert len(imports) == 1
+        assert imports[0]["export"]["name"] == "global-export"
+
 
 class TestDeleteProject:
     @pytest.mark.asyncio

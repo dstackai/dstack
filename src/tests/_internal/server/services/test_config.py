@@ -9,10 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.aws.configurator import DEFAULT_REGIONS
 from dstack._internal.server import settings
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, ImportModel, ProjectModel
 from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.testing.common import (
     create_backend,
+    create_export,
     create_project,
     create_user,
 )
@@ -213,3 +214,36 @@ class TestServerConfigManager:
                 manager.load_config()
                 await manager.apply_config(session, owner)
             update_backend.assert_awaited_once()
+
+        @pytest.mark.asyncio
+        @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+        async def test_new_project_imports_global_exports(
+            self, test_db, session: AsyncSession, tmp_path: Path
+        ):
+            owner = await create_user(session=session, name="test_owner")
+            exporter_project = await create_project(session=session, owner=owner, name="exporter")
+            await create_export(
+                session=session,
+                exporter_project=exporter_project,
+                importer_projects=[],
+                exported_fleets=[],
+                name="global-export",
+                is_global=True,
+            )
+            config_filepath = tmp_path / "config.yml"
+            config = {"projects": [{"name": "new-project"}]}
+            with open(config_filepath, "w+") as f:
+                yaml.dump(config, f)
+            with patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath):
+                manager = ServerConfigManager()
+                manager.load_config()
+                await manager.apply_config(session, owner)
+            new_project_res = await session.execute(
+                select(ProjectModel).where(ProjectModel.name == "new-project")
+            )
+            new_project = new_project_res.scalar_one()
+            imports_res = await session.execute(
+                select(ImportModel).where(ImportModel.project_id == new_project.id)
+            )
+            imports = imports_res.scalars().all()
+            assert len(imports) == 1

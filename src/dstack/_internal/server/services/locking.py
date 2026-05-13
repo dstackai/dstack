@@ -126,13 +126,19 @@ def string_to_lock_id(s: str) -> int:
 async def advisory_lock_ctx(
     bind: Union[AsyncConnection, AsyncSession], dialect_name: str, resource: str
 ):
+    """
+    Take a global lock on `resource` across all dstack server replicas.
+    In-memory lock for SQLite, advisory lock for Postgres.
+    """
     if dialect_name == "postgresql":
         await bind.execute(select(func.pg_advisory_lock(string_to_lock_id(resource))))
-    try:
-        yield
-    finally:
-        if dialect_name == "postgresql":
-            await bind.execute(select(func.pg_advisory_unlock(string_to_lock_id(resource))))
+    lock, _ = get_locker(dialect_name).get_lockset(resource)
+    async with lock:
+        try:
+            yield
+        finally:
+            if dialect_name == "postgresql":
+                await bind.execute(select(func.pg_advisory_unlock(string_to_lock_id(resource))))
 
 
 @asynccontextmanager

@@ -114,6 +114,23 @@ Export my-export deleted
 
 Use `-y` to skip the confirmation prompt.
 
+### Global exports
+
+Users with the global admin role can mark any export as a global export. Global exports are automatically imported into all projects, and their imports cannot be deleted.
+
+<div class="termy">
+
+```shell
+$ dstack export create global-export --gateway shared-gateway --global
+ NAME           FLEETS  GATEWAYS        IMPORTERS
+ global-export  -       shared-gateway  *
+
+```
+
+Only promoting an export to global requires the global admin role. Regular project admins can add or remove resources, remove global status, or delete the export.
+
+</div>
+
 ## Access imported resources
 
 From the importer project's perspective, use `dstack import list` (or simply `dstack import`) to list all imports in the project — i.e., all exports from other projects that this project has been granted access to:

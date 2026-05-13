@@ -50,6 +50,13 @@ class ExportCommand(APIBaseCommand):
             help="Gateway name to export (can be specified multiple times)",
             default=[],
         )
+        create_parser.add_argument(
+            "--global",
+            dest="is_global",
+            action="store_true",
+            help="Make this export global (automatically imported into all projects)",
+            default=False,
+        )
         create_parser.set_defaults(subfunc=self._create)
 
         update_parser = subparsers.add_parser(
@@ -101,6 +108,21 @@ class ExportCommand(APIBaseCommand):
             help="Gateway name to remove (can be specified multiple times)",
             default=[],
         )
+        global_group = update_parser.add_mutually_exclusive_group()
+        global_group.add_argument(
+            "--set-global",
+            dest="set_global",
+            action="store_true",
+            help="Make this export global (automatically imported into all projects)",
+            default=False,
+        )
+        global_group.add_argument(
+            "--unset-global",
+            dest="unset_global",
+            action="store_true",
+            help="Remove the global flag from this export",
+            default=False,
+        )
         update_parser.set_defaults(subfunc=self._update)
 
         delete_parser = subparsers.add_parser(
@@ -128,6 +150,7 @@ class ExportCommand(APIBaseCommand):
             export = self.api.client.exports.create(
                 project_name=self.api.project,
                 name=args.name,
+                is_global=args.is_global,
                 importer_projects=args.importers,
                 exported_fleets=args.fleets,
                 exported_gateways=args.gateways,
@@ -139,6 +162,8 @@ class ExportCommand(APIBaseCommand):
             export = self.api.client.exports.update(
                 project_name=self.api.project,
                 name=args.name,
+                set_global=args.set_global,
+                unset_global=args.unset_global,
                 add_importer_projects=args.add_importers,
                 remove_importer_projects=args.remove_importers,
                 add_exported_fleets=args.add_fleets,
@@ -175,7 +200,12 @@ def print_exports_table(exports: list[Export]):
             if export.exported_gateways
             else "-"
         )
-        importers = ", ".join([i.project_name for i in export.imports]) if export.imports else "-"
+        if export.is_global:
+            importers = "*"
+        else:
+            importers = (
+                ", ".join([i.project_name for i in export.imports]) if export.imports else "-"
+            )
 
         row = {
             "NAME": export.name,

@@ -594,10 +594,12 @@ async def create_export(
     exported_fleets: list[FleetModel],
     exported_gateways: Optional[list[GatewayModel]] = None,
     name: str = "test-export",
+    is_global: bool = False,
 ) -> ExportModel:
     export = ExportModel(
         name=name,
         project=exporter_project,
+        is_global=is_global,
         imports=[ImportModel(project=project) for project in importer_projects],
         exported_fleets=[ExportedFleetModel(fleet=fleet) for fleet in exported_fleets],
         exported_gateways=[
