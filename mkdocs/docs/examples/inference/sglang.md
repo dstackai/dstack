@@ -92,7 +92,6 @@ Here's an example of a service that deploys
 The AMD example keeps the deployment close to the upstream Qwen and SGLang
 guidance: a pinned ROCm image, tensor parallelism across all four GPUs, and the
 standard `qwen3` reasoning parser without extra ROCm-specific tuning flags.
-The first startup on MI300X can take longer while SGLang compiles ROCm kernels.
 
 Save one of the configurations above as `service.dstack.yml`, then use the
 [`dstack apply`](../../reference/cli/dstack/apply.md) command.
