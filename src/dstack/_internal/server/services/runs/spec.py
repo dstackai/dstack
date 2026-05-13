@@ -215,19 +215,56 @@ def _check_can_update_configuration(
                 "Cannot update router replica groups in-place (adding/removing `router` or changing "
                 "which replica group is the router is not supported). Stop the run and apply again."
             )
-        # Dynamo: any change to the router replica group requires stop+re-apply.
-        # The router's replica_num and address must remain stable so workers'
-        # cached DSTACK_ROUTER_INTERNAL_IP stays valid for the life of the run.
+        current_router_type = (
+            current_router_group.router.type
+            if current_router_group is not None and current_router_group.router is not None
+            else None
+        )
+        new_router_type = (
+            new_router_group.router.type
+            if new_router_group is not None and new_router_group.router is not None
+            else None
+        )
+        # Universal rule: changing router.type in place is incompatible with
+        # the currently-provisioned router and the workers/clients configured
+        # for it. Applies to any pair of router types (today sglang ↔ dynamo).
         if (
-            current_router_group is not None
-            and current_router_group.router is not None
-            and current_router_group.router.type == RouterType.DYNAMO
-            and current_router_group != new_router_group
+            current_router_type is not None
+            and new_router_type is not None
+            and current_router_type != new_router_type
         ):
             raise ServerClientError(
-                "Cannot update a Dynamo router replica group in place. "
-                "Stop the run with `dstack stop` and re-apply."
+                "Cannot change router.type in place. Stop the run with `dstack stop` and re-apply."
             )
+        # Dynamo-specific: even when router.type stays the same, Dynamo's
+        # workers cache the router's internal IP at provisioning time, so any
+        # change that would re-provision the router must be rejected.
+        if RouterType.DYNAMO in (current_router_type, new_router_type):
+            # 1. Direct changes to the router replica group's own fields.
+            if current_router_group != new_router_group:
+                raise ServerClientError(
+                    "Cannot update a Dynamo router replica group in place. "
+                    "Stop the run with `dstack stop` and re-apply."
+                )
+            # 2. Top-level service fields that cascade to replicas — these
+            # would re-provision the router via inheritance whenever the
+            # router group does not override them at the group level.
+            # Sourced from dstack's rolling-updatable service field list to
+            # stay in sync if new fields are added later.
+            _router_affecting_top_level_fields = tuple(
+                f
+                for f in _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get("service", [])
+                if f not in ("replicas", "scaling")
+            )
+            for field in _router_affecting_top_level_fields:
+                if getattr(current, field, None) != getattr(new, field, None):
+                    raise ServerClientError(
+                        f"Cannot change top-level `{field}` in place when the "
+                        f"service has a Dynamo router (would re-provision the "
+                        f"router and invalidate workers' cached "
+                        f"DSTACK_ROUTER_INTERNAL_IP). Stop the run with "
+                        f"`dstack stop` and re-apply."
+                    )
     updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
         new.type, []
     )
