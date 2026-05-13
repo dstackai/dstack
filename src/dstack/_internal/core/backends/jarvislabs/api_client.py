@@ -83,6 +83,8 @@ class JarvisLabsAPIClient:
                 "duration": "hour",
                 "disk_type": "ssd",
                 "http_ports": "",
+                # JarvisLabs accepts script_id for VM creates, but live CPU/GPU VM tests
+                # showed it is not injected into cloud-init user-data/runcmd.
                 "script_id": None,
                 "script_args": "",
                 "fs_id": None,
@@ -113,6 +115,7 @@ class JarvisLabsAPIClient:
                 "name": name,
                 "duration": "hour",
                 "disk_type": "ssd",
+                # Do not pass script_id here either; CPU VM create accepts it but ignores it.
             },
         )
         return _get_created_machine_id(resp, "CPU VM creation")
