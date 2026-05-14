@@ -132,6 +132,75 @@ def validate_run_spec_and_set_defaults(
         run_spec.configuration.working_dir = LEGACY_REPO_DIR
 
 
+def _check_dynamo_in_place_update_compatibility(
+    current_run_spec: RunSpec, new_run_spec: RunSpec
+) -> None:
+    """Reject in-place updates that would re-provision a Dynamo router.
+
+    Workers cache the router internal IP at provisioning time; changes that
+    trigger a rolling router update must not be applied in place.
+    """
+    current_cfg = current_run_spec.configuration
+    new_cfg = new_run_spec.configuration
+    if not isinstance(current_cfg, ServiceConfiguration) or not isinstance(
+        new_cfg, ServiceConfiguration
+    ):
+        return
+
+    current_router_group = next(
+        (g for g in current_cfg.replica_groups if g.router is not None), None
+    )
+    new_router_group = next((g for g in new_cfg.replica_groups if g.router is not None), None)
+    current_router_type = (
+        current_router_group.router.type
+        if current_router_group is not None and current_router_group.router is not None
+        else None
+    )
+    new_router_type = (
+        new_router_group.router.type
+        if new_router_group is not None and new_router_group.router is not None
+        else None
+    )
+    if (
+        current_router_type is not None
+        and new_router_type is not None
+        and current_router_type != new_router_type
+    ):
+        raise ServerClientError(
+            "Cannot change router.type in place. Stop the run with `dstack stop` and re-apply."
+        )
+    if RouterType.DYNAMO not in (current_router_type, new_router_type):
+        return
+    if current_router_group != new_router_group:
+        raise ServerClientError(
+            "Cannot update a Dynamo router replica group in place. "
+            "Stop the run with `dstack stop` and re-apply."
+        )
+    _router_affecting_top_level_fields = tuple(
+        f
+        for f in _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get("service", [])
+        if f not in ("replicas", "scaling")
+    )
+    for field in _router_affecting_top_level_fields:
+        if getattr(current_cfg, field, None) != getattr(new_cfg, field, None):
+            raise ServerClientError(
+                f"Cannot change top-level `{field}` in place when the "
+                f"service has a Dynamo router (would re-provision the "
+                f"router and invalidate workers' cached "
+                f"DSTACK_ROUTER_INTERNAL_IP). Stop the run with "
+                f"`dstack stop` and re-apply."
+            )
+    for field in _TYPE_SPECIFIC_UPDATABLE_SPEC_FIELDS.get("service", []):
+        if getattr(current_run_spec, field, None) != getattr(new_run_spec, field, None):
+            raise ServerClientError(
+                f"Cannot change top-level `{field}` in place when the "
+                f"service has a Dynamo router (would re-provision the "
+                f"router and invalidate workers' cached "
+                f"DSTACK_ROUTER_INTERNAL_IP). Stop the run with "
+                f"`dstack stop` and re-apply."
+            )
+
+
 def check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> ModelDiff:
     """
     Check if in-place update is possible.
@@ -150,6 +219,7 @@ def check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) 
                 f"Failed to update fields {changed_spec_fields}."
                 f" Can only update {updatable_spec_fields}."
             )
+    _check_dynamo_in_place_update_compatibility(current_run_spec, new_run_spec)
     # We don't allow update if the order of archives has been changed, as even if the archives
     # are the same (the same id => hash => content and the same container path), the order of
     # unpacking matters when one path is a subpath of another.
@@ -215,56 +285,6 @@ def _check_can_update_configuration(
                 "Cannot update router replica groups in-place (adding/removing `router` or changing "
                 "which replica group is the router is not supported). Stop the run and apply again."
             )
-        current_router_type = (
-            current_router_group.router.type
-            if current_router_group is not None and current_router_group.router is not None
-            else None
-        )
-        new_router_type = (
-            new_router_group.router.type
-            if new_router_group is not None and new_router_group.router is not None
-            else None
-        )
-        # Universal rule: changing router.type in place is incompatible with
-        # the currently-provisioned router and the workers/clients configured
-        # for it. Applies to any pair of router types (today sglang ↔ dynamo).
-        if (
-            current_router_type is not None
-            and new_router_type is not None
-            and current_router_type != new_router_type
-        ):
-            raise ServerClientError(
-                "Cannot change router.type in place. Stop the run with `dstack stop` and re-apply."
-            )
-        # Dynamo-specific: even when router.type stays the same, Dynamo's
-        # workers cache the router's internal IP at provisioning time, so any
-        # change that would re-provision the router must be rejected.
-        if RouterType.DYNAMO in (current_router_type, new_router_type):
-            # 1. Direct changes to the router replica group's own fields.
-            if current_router_group != new_router_group:
-                raise ServerClientError(
-                    "Cannot update a Dynamo router replica group in place. "
-                    "Stop the run with `dstack stop` and re-apply."
-                )
-            # 2. Top-level service fields that cascade to replicas — these
-            # would re-provision the router via inheritance whenever the
-            # router group does not override them at the group level.
-            # Sourced from dstack's rolling-updatable service field list to
-            # stay in sync if new fields are added later.
-            _router_affecting_top_level_fields = tuple(
-                f
-                for f in _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get("service", [])
-                if f not in ("replicas", "scaling")
-            )
-            for field in _router_affecting_top_level_fields:
-                if getattr(current, field, None) != getattr(new, field, None):
-                    raise ServerClientError(
-                        f"Cannot change top-level `{field}` in place when the "
-                        f"service has a Dynamo router (would re-provision the "
-                        f"router and invalidate workers' cached "
-                        f"DSTACK_ROUTER_INTERNAL_IP). Stop the run with "
-                        f"`dstack stop` and re-apply."
-                    )
     updatable_fields = _CONF_UPDATABLE_FIELDS + _TYPE_SPECIFIC_CONF_UPDATABLE_FIELDS.get(
         new.type, []
     )
