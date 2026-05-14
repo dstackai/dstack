@@ -228,10 +228,58 @@ function ProductOverview() {
                             </dt>
                             <dt>dstack Sky</dt>
 
-                            <dd>Your cloud accounts</dd>
+                            <dd>
+                                Bring your own cloud{' '}
+                                <Popover
+                                    header="Bring your own cloud (BYOC)"
+                                    content={
+                                        <>
+                                            <Box variant="p">
+                                                Use compute from your own cloud account(s) by providing your credentials.
+                                            </Box>
+                                            <Box variant="p">
+                                                You pay for compute and storage usage directly to the configured cloud
+                                                provider(s) through their billing. <code>dstack</code> won't bill or charge you.
+                                            </Box>
+                                        </>
+                                    }
+                                >
+                                    <Link variant="info">
+                                        <Icon name="status-info" size="small" />
+                                    </Link>
+                                </Popover>
+                            </dd>
                             <dd>
                                 <Icon name="check" />
                             </dd>
+                            <dd>
+                                <Icon name="check" />
+                            </dd>
+
+                            <dd>
+                                GPU marketplace{' '}
+                                <Popover
+                                    header="GPU marketplace"
+                                    content={
+                                        <>
+                                            <Box variant="p">
+                                                Use compute from multiple cloud providers without needing your own cloud
+                                                account(s).
+                                            </Box>
+                                            <Box variant="p">
+                                                You pay for compute and storage usage directly to <code>dstack</code>. You can
+                                                top up your balance in your <code>dstack</code> user settings.
+                                            </Box>
+                                            <Box variant="p">When you sign up, you get $5 in credits.</Box>
+                                        </>
+                                    }
+                                >
+                                    <Link variant="info">
+                                        <Icon name="status-info" size="small" />
+                                    </Link>
+                                </Popover>
+                            </dd>
+                            <dd></dd>
                             <dd>
                                 <Icon name="check" />
                             </dd>
@@ -255,23 +303,6 @@ function ProductOverview() {
                             </dd>
 
                             <dd>
-                                GPU marketplace{' '}
-                                <Popover
-                                    header="GPU marketplace"
-                                    content="dstack Sky offers the cheapest cloud GPU offers from a variety of supported providers.
-                                    You pay directly to dstack Sky for GPU usage."
-                                >
-                                    <Link variant="info">
-                                        <Icon name="status-info" size="small" />
-                                    </Link>
-                                </Popover>
-                            </dd>
-                            <dd></dd>
-                            <dd>
-                                <Icon name="check" />
-                            </dd>
-
-                            <dd>
                                 Gateway{' '}
                                 <Popover
                                     header="Gateway endpoint"
@@ -283,11 +314,13 @@ function ProductOverview() {
                                 </Popover>
                             </dd>
                             <dd>Configure your own domain</dd>
-                            <dd>Pre-configured *.sky.dstack.ai</dd>
+                            <dd>
+                                Pre-configured <code>*.sky.dstack.ai</code>
+                            </dd>
 
                             <dd>Pricing</dd>
                             <dd>Free</dd>
-                            <dd>Pay only for marketplace GPU</dd>
+                            <dd>Pay only if you use GPU marketplace</dd>
 
                             <dd></dd>
                             <dd>Self-hosted</dd>
@@ -302,7 +335,7 @@ function ProductOverview() {
                     </Header>
                     <TextContent>
                         <ul>
-                            <li>Use your own cloud accounts or access the cheapest GPUs from our marketplace.</li>
+                            <li>Use compute from your own cloud account(s) or through GPU marketplace.</li>
                             <li>Create dev environments, run training tasks, and deploy inference services.</li>
                             <li>Manage volumes and fleets.</li>
                             <li>Manage multiple projects and teams.</li>

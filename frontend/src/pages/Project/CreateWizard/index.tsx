@@ -8,6 +8,7 @@ import { WizardProps } from '@cloudscape-design/components';
 import { TilesProps } from '@cloudscape-design/components/tiles';
 
 import {
+    Alert,
     Cards,
     Container,
     FormCards,
@@ -127,7 +128,7 @@ export const CreateProjectWizard: React.FC = () => {
     const formMethods = useForm<IProjectWizardForm>({
         resolver,
         defaultValues: {
-            project_type: 'gpu_marketplace',
+            project_type: 'own_cloud',
             fleet: {
                 ...fleetFormDefaultValues,
                 enable_default: true,
@@ -137,6 +138,7 @@ export const CreateProjectWizard: React.FC = () => {
 
     const { handleSubmit, control, watch, trigger, formState, getValues, setValue, setError } = formMethods;
     const formValues = watch();
+    const selectedProjectTypeOption = projectTypeOptions.find(({ value }) => value === formValues['project_type']);
 
     const onCancelHandler = () => {
         navigate(ROUTES.PROJECT.LIST);
@@ -365,18 +367,26 @@ export const CreateProjectWizard: React.FC = () => {
                                     />
 
                                     <div>
-                                        <FormField
-                                            label={t('projects.edit.project_type')}
-                                            description={t('projects.edit.project_type_description')}
-                                            errorText={formState.errors.project_type?.message}
-                                        >
-                                            <FormTiles
-                                                control={control}
-                                                name="project_type"
-                                                items={projectTypeOptions}
-                                                onChange={onChangeProjectTypeHandler}
-                                            />
-                                        </FormField>
+                                        <SpaceBetween direction="vertical" size="s">
+                                            <FormField
+                                                label={t('projects.edit.project_type')}
+                                                description={t('projects.edit.project_type_description')}
+                                                errorText={formState.errors.project_type?.message}
+                                            >
+                                                <FormTiles
+                                                    control={control}
+                                                    name="project_type"
+                                                    items={projectTypeOptions}
+                                                    onChange={onChangeProjectTypeHandler}
+                                                />
+                                            </FormField>
+
+                                            {selectedProjectTypeOption?.billing_notes && (
+                                                <FormField label={t('billing.title')}>
+                                                    <Alert type="success">{selectedProjectTypeOption.billing_notes}</Alert>
+                                                </FormField>
+                                            )}
+                                        </SpaceBetween>
                                     </div>
                                 </SpaceBetween>
                             </Container>
@@ -463,8 +473,7 @@ export const CreateProjectWizard: React.FC = () => {
                                         },
                                         {
                                             label: t('projects.edit.project_type'),
-                                            value: projectTypeOptions.find(({ value }) => value === formValues['project_type'])
-                                                ?.label,
+                                            value: selectedProjectTypeOption?.label,
                                         },
                                         {
                                             label: t('projects.edit.backends'),
