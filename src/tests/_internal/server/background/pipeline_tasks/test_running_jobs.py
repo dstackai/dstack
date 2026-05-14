@@ -2322,7 +2322,7 @@ class TestPrepareStartupContextRouterEnv:
             out = await _prepare_startup_context(context=context, result=result)
         assert out is None
         assert (
-            result.job_update_map["termination_reason"]
+            result.job_update_map.get("termination_reason")
             == JobTerminationReason.TERMINATED_BY_SERVER
         )
         assert "Router replica is in a terminal state" in (
@@ -2356,7 +2356,7 @@ class TestPrepareStartupContextRouterEnv:
             out = await _prepare_startup_context(context=context, result=result)
         assert out is None
         assert (
-            result.job_update_map["termination_reason"]
+            result.job_update_map.get("termination_reason")
             == JobTerminationReason.TERMINATED_BY_SERVER
         )
         msg = result.job_update_map.get("termination_reason_message") or ""
