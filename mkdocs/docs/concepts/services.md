@@ -443,7 +443,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
           - python3 -m venv ~/dyn-venv
           - source ~/dyn-venv/bin/activate
           - pip install -U pip
-          - pip install --pre "ai-dynamo[sglang]"
+          - pip install "ai-dynamo[sglang]==1.1.1"
           - git clone https://github.com/ai-dynamo/dynamo.git
           # Brings up the NATS / etcd compose stack and runs the Dynamo HTTP frontend.
           - docker compose -f dynamo/deploy/docker-compose.yml up -d
@@ -474,7 +474,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
                && (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/4222) 2>/dev/null; do
               echo "waiting for etcd/NATS on $DSTACK_ROUTER_INTERNAL_IP..."; sleep 3
             done
-          - pip install --pre "ai-dynamo[sglang]"
+          - pip install "ai-dynamo[sglang]==1.1.1"
           - |
             python3 -m dynamo.sglang \
               --model-path $MODEL_ID --served-model-name $MODEL_ID \
@@ -499,7 +499,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
                && (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/4222) 2>/dev/null; do
               echo "waiting for etcd/NATS on $DSTACK_ROUTER_INTERNAL_IP..."; sleep 3
             done
-          - pip install --pre "ai-dynamo[sglang]"
+          - pip install "ai-dynamo[sglang]==1.1.1"
           - |
             python3 -m dynamo.sglang \
               --model-path $MODEL_ID --served-model-name $MODEL_ID \
