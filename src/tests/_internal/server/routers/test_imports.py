@@ -139,6 +139,40 @@ class TestDeleteImport:
         # Import not found
         await assert_not_found(export_project_name="ExporterProject", export_name="test-export")
 
+    async def test_cannot_delete_import_of_global_export(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        importer_project = await create_project(
+            session=session, name="ImporterProject", owner=user
+        )
+        await add_project_member(
+            session=session, project=importer_project, user=user, project_role=ProjectRole.ADMIN
+        )
+
+        exporter_project = await create_project(
+            session=session, name="ExporterProject", owner=user
+        )
+        export = await create_export(
+            session=session,
+            is_global=True,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[],
+            name="test-export",
+        )
+
+        response = await client.post(
+            f"/api/project/{importer_project.name}/imports/delete",
+            headers=get_auth_headers(user.token),
+            json={"export_name": export.name, "export_project_name": exporter_project.name},
+        )
+        assert response.status_code == 400
+        assert (
+            response.json()["detail"][0]["msg"]
+            == "'ExporterProject/test-export' is a global export, cannot stop importing"
+        )
+
 
 class TestListImports:
     async def test_returns_403_if_not_authenticated(self, client: AsyncClient):

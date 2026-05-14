@@ -1139,6 +1139,7 @@ class ExportModel(BaseModel):
         ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     project: Mapped["ProjectModel"] = relationship()
+    is_global: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     imports: Mapped[List["ImportModel"]] = relationship(
         back_populates="export",

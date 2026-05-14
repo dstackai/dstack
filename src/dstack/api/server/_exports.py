@@ -25,12 +25,14 @@ class ExportsAPIClient(APIClientGroup):
         project_name: str,
         name: str,
         *,
+        is_global: bool = False,
         importer_projects: List[str] = [],
         exported_fleets: List[str] = [],
         exported_gateways: List[str] = [],
     ) -> Export:
         body = CreateExportRequest(
             name=name,
+            is_global=is_global,
             importer_projects=importer_projects,
             exported_fleets=exported_fleets,
             exported_gateways=exported_gateways,
@@ -46,6 +48,8 @@ class ExportsAPIClient(APIClientGroup):
         project_name: str,
         name: str,
         *,
+        set_global: bool = False,
+        unset_global: bool = False,
         add_importer_projects: List[str] = [],
         remove_importer_projects: List[str] = [],
         add_exported_fleets: List[str] = [],
@@ -55,6 +59,8 @@ class ExportsAPIClient(APIClientGroup):
     ) -> Export:
         body = UpdateExportRequest(
             name=name,
+            set_global=set_global,
+            unset_global=unset_global,
             add_importer_projects=add_importer_projects,
             remove_importer_projects=remove_importer_projects,
             add_exported_fleets=add_exported_fleets,

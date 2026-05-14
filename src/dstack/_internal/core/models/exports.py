@@ -20,6 +20,7 @@ class ExportedGateway(CoreModel):
 class Export(CoreModel):
     id: uuid.UUID
     name: str
+    is_global: bool = False
     imports: list[ExportImport]
     exported_fleets: list[ExportedFleet]
     exported_gateways: list[ExportedGateway] = []

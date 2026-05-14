@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.models import ExportModel
+from dstack._internal.server.models import ExportModel, ImportModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_backend,
@@ -54,6 +54,21 @@ class TestCreateExport:
                 "importer_projects": ["OtherProject"],
                 "exported_fleets": ["fleet1"],
             },
+        )
+        assert response.status_code == 403
+
+    async def test_create_global_returns_403_if_not_global_admin(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/exports/create",
+            headers=get_auth_headers(user.token),
+            json={"name": "my-export", "is_global": True},
         )
         assert response.status_code == 403
 
@@ -108,6 +123,7 @@ class TestCreateExport:
         assert response.status_code == 200
         export_response = response.json()
         assert export_response["name"] == "test-export"
+        assert export_response["is_global"] == False
         assert len(export_response["imports"]) == 1
         assert export_response["imports"][0]["project_name"] == "ImporterProject"
         assert len(export_response["exported_fleets"]) == 1
@@ -140,6 +156,33 @@ class TestCreateExport:
 
         res = await session.execute(select(ExportModel).where(ExportModel.name == "empty-export"))
         assert res.scalar() is not None
+
+    async def test_creates_global_export(self, session: AsyncSession, client: AsyncClient):
+        admin = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        exporter_project = await create_project(
+            session=session, name="ExporterProject", owner=admin
+        )
+        await add_project_member(
+            session=session, project=exporter_project, user=admin, project_role=ProjectRole.ADMIN
+        )
+        project_a = await create_project(session=session, name="ProjectA", owner=admin)
+        project_b = await create_project(session=session, name="ProjectB", owner=admin)
+
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/exports/create",
+            headers=get_auth_headers(admin.token),
+            json={"name": "my-export", "is_global": True},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_global"] is True
+        imported_names = {imp["project_name"] for imp in data["imports"]}
+        assert imported_names == {project_a.name, project_b.name}
+        assert exporter_project.name not in imported_names
+        res = await session.execute(select(func.count()).select_from(ExportModel))
+        assert res.scalar_one() == 1
+        res = await session.execute(select(func.count()).select_from(ImportModel))
+        assert res.scalar_one() == 2
 
     @pytest.mark.parametrize(
         "body,error",
@@ -304,6 +347,28 @@ class TestCreateExport:
         )
         assert response.status_code == 400
         assert error in response.json()["detail"][0]["msg"]
+        res = await session.execute(select(func.count()).select_from(ExportModel))
+        assert res.scalar_one() == 0
+
+    async def test_rejects_invalid_global_export_with_importer_projects(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session=session, name="ExporterProject", owner=user)
+        response = await client.post(
+            f"/api/project/{project.name}/exports/create",
+            headers=get_auth_headers(user.token),
+            json={
+                "name": "test-export",
+                "is_global": True,
+                "importer_projects": ["ImporterProject"],
+            },
+        )
+        assert response.status_code == 400
+        assert (
+            "Do not specify any importer projects when creating a global export"
+            in response.json()["detail"][0]["msg"]
+        )
         res = await session.execute(select(func.count()).select_from(ExportModel))
         assert res.scalar_one() == 0
 
@@ -786,6 +851,41 @@ class TestUpdateExport:
                 "Gateways {'not-exported-gateway'} are listed for both addition and removal. Cannot add and remove at the same time",
                 id="add-remove-same-gateway",
             ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "set_global": True,
+                    "unset_global": True,
+                },
+                "Cannot set and unset global at the same time",
+                id="set-and-unset-global",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "unset_global": True,
+                },
+                "The export is already not global",
+                id="unset-non-global",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "set_global": True,
+                    "add_importer_projects": ["NotImporterProject"],
+                },
+                "Cannot change global status and add/remove importers at the same time",
+                id="set-global-with-importer-changes",
+            ),
+            pytest.param(
+                {
+                    "name": "test-export",
+                    "unset_global": True,
+                    "remove_importer_projects": ["ImporterProject"],
+                },
+                "Cannot change global status and add/remove importers at the same time",
+                id="unset-global-with-importer-changes",
+            ),
         ],
     )
     async def test_rejects_invalid_update(
@@ -885,6 +985,200 @@ class TestUpdateExport:
         assert response.status_code == 200
         assert response.json() == canonical_exports
 
+    async def test_set_global_returns_403_if_not_global_admin(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="my-export",
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/update",
+            headers=get_auth_headers(user.token),
+            json={"name": "my-export", "set_global": True},
+        )
+        assert response.status_code == 403
+
+    async def test_project_admin_can_unset_global(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="my-export",
+            is_global=True,
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/update",
+            headers=get_auth_headers(user.token),
+            json={"name": "my-export", "unset_global": True},
+        )
+        assert response.status_code == 200
+        assert response.json()["is_global"] is False
+
+    async def test_set_global(self, session: AsyncSession, client: AsyncClient):
+        admin = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        exporter_project = await create_project(
+            session=session, name="ExporterProject", owner=admin
+        )
+        already_importing = await create_project(
+            session=session, name="AlreadyImporting", owner=admin
+        )
+        not_yet_importing = await create_project(
+            session=session, name="NotYetImporting", owner=admin
+        )
+        export = await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[already_importing],
+            exported_fleets=[],
+            name="my-export",
+        )
+
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/exports/update",
+            headers=get_auth_headers(admin.token),
+            json={"name": "my-export", "set_global": True},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_global"] is True
+        imported_names = {imp["project_name"] for imp in data["imports"]}
+        assert imported_names == {already_importing.name, not_yet_importing.name}
+        assert exporter_project.name not in imported_names
+        await session.refresh(export, ["imports"])
+        assert len(export.imports) == 2
+
+    async def test_unset_global_keeps_imports(self, session: AsyncSession, client: AsyncClient):
+        admin = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        exporter_project = await create_project(
+            session=session, name="ExporterProject", owner=admin
+        )
+        importer = await create_project(session=session, name="ImporterProject", owner=admin)
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer],
+            exported_fleets=[],
+            name="my-export",
+            is_global=True,
+        )
+
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/exports/update",
+            headers=get_auth_headers(admin.token),
+            json={"name": "my-export", "unset_global": True},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["is_global"] is False
+        # imports still present
+        assert len(data["imports"]) == 1
+        assert data["imports"][0]["project_name"] == importer.name
+
+    async def test_cannot_remove_importer_from_global_export(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        exporter_project = await create_project(session=session, owner=admin)
+        importer = await create_project(session=session, name="ImporterProject", owner=admin)
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer],
+            exported_fleets=[],
+            name="my-export",
+            is_global=True,
+        )
+
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/exports/update",
+            headers=get_auth_headers(admin.token),
+            json={
+                "name": "my-export",
+                "remove_importer_projects": [importer.name],
+            },
+        )
+        assert response.status_code == 400
+        assert (
+            "Cannot remove importers from a global export" in response.json()["detail"][0]["msg"]
+        )
+
+    async def test_can_add_missing_importer_to_global_export(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        """
+        Global exports should always be imported in all projects, but in case this invariant
+        is ever violated (e.g., due to bugs or unforeseen race conditions), adding a missing
+        importer is still allowed.
+        """
+        admin = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        exporter_project = await create_project(session=session, owner=admin)
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="my-export",
+            is_global=True,
+        )
+        importer = await create_project(session=session, name="ImporterProject", owner=admin)
+
+        response = await client.post(
+            f"/api/project/{exporter_project.name}/exports/update",
+            headers=get_auth_headers(admin.token),
+            json={
+                "name": "my-export",
+                "add_importer_projects": [importer.name],
+            },
+        )
+        assert response.status_code == 200
+        export_response = response.json()
+        assert len(export_response["imports"]) == 1
+        assert export_response["imports"][0]["project_name"] == importer.name
+
+    async def test_set_global_already_global_returns_400(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        admin = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        project = await create_project(session=session, owner=admin)
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
+        await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="my-export",
+            is_global=True,
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/update",
+            headers=get_auth_headers(admin.token),
+            json={"name": "my-export", "set_global": True},
+        )
+        assert response.status_code == 400
+        assert "The export is already global" in response.json()["detail"][0]["msg"]
+
 
 class TestDeleteExport:
     async def test_returns_403_if_not_authenticated(self, client: AsyncClient):
@@ -954,6 +1248,33 @@ class TestDeleteExport:
         )
         assert response.status_code == 400
         assert response.json()["detail"][0]["code"] == "resource_not_exists"
+
+    async def test_project_admin_can_delete_global_export(
+        self, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        export = await create_export(
+            session=session,
+            exporter_project=project,
+            importer_projects=[],
+            exported_fleets=[],
+            name="my-export",
+            is_global=True,
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/exports/delete",
+            headers=get_auth_headers(user.token),
+            json={"name": export.name},
+        )
+        assert response.status_code == 200
+
+        res = await session.execute(select(ExportModel))
+        assert res.scalar() is None
 
 
 class TestListExports:
