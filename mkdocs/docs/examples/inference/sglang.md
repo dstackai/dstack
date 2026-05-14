@@ -163,10 +163,10 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
               --port 8000 \
               --pd-disaggregation \
               --prefill-policy cache_aware
-        router:
-          type: sglang
         resources:
           cpu: 4
+        router:
+          type: sglang
 
       - count: 1..4
         scaling:
@@ -210,6 +210,8 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
     ```
 
     </div>
+
+> With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
 
 Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
 

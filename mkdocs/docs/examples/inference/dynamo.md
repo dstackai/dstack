@@ -27,8 +27,6 @@ env:
 replicas:
   - count: 1
     docker: true
-    router:
-      type: dynamo
     commands:
       - apt-get update
       - apt-get install -y python3-dev python3-venv
@@ -46,6 +44,8 @@ replicas:
           --kv-cache-block-size 64
     resources:
       cpu: 4
+    router:
+      type: dynamo
 
   - count: 1..4
     scaling:
@@ -112,6 +112,8 @@ probes:
 ```
 
 </div>
+
+> With the the `dynamo` router, you can use SGLang, vLLM, and TensorRT-LLM prefill and decode workers.
 
 Save the configuration as `service.dstack.yml`, then use the
 [`dstack apply`](../../reference/cli/dstack/apply.md) command.

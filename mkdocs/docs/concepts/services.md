@@ -342,11 +342,9 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 <!-- NOTE: this section is referenced from the CLI, keep the URL unchanged -->
 
-Since 0.20.17, `dstack` supports serving a model using PD (Prefill-Decode) disaggregation. To use it, configure three replica groups: one for the router, one for prefill workers, and one for decode workers.
+Since 0.20.17, `dstack` supports serving a model using Prefill-Decode disaggregation. To use it, configure three replica groups: one for the router, one for prefill workers, and one for decode workers.
 
 `dstack` integrates with two routers for PD disaggregation: [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html) and [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo).
-
-> Currently, with SMG router Prefill-Decode disaggregation is supported only for SGLang.
 
 Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
 
@@ -374,10 +372,10 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
               --port 8000 \
               --pd-disaggregation \
               --prefill-policy cache_aware
-        router:
-          type: sglang
         resources:
           cpu: 4
+        router:
+          type: sglang
 
       - count: 1..4
         scaling:
@@ -420,6 +418,8 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
 
     </div>
 
+    > With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
+
 === "Dynamo"
 
     <div editor-title="pd.dstack.yml">
@@ -435,8 +435,6 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
     replicas:
       - count: 1
         docker: true
-        router:
-          type: dynamo
         commands:
           - apt-get update
           - apt-get install -y python3-dev python3-venv
@@ -454,6 +452,8 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
               --kv-cache-block-size 64
         resources:
           cpu: 4
+        router:
+          type: dynamo
 
       - count: 1..4
         scaling:
@@ -520,6 +520,8 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
     ```
 
     </div>
+
+    > With the the `dynamo` router, you can use SGLang, vLLM, and TensorRT-LLM prefill and decode workers.
 
 !!! info "Cluster"
     PD disaggregation requires the service to run in a fleet with `placement` set to `cluster`, because the replicas require an interconnect between instances.
