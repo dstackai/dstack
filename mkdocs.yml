@@ -321,6 +321,7 @@ nav:
             - NCCL/RCCL tests: docs/examples/clusters/nccl-rccl-tests.md
         - Inference:
             - SGLang: docs/examples/inference/sglang.md
+            - Dynamo: docs/examples/inference/dynamo.md
             - vLLM: docs/examples/inference/vllm.md
             - NIM: docs/examples/inference/nim.md
             - TensorRT-LLM: docs/examples/inference/trtllm.md

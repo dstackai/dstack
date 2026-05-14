@@ -92,7 +92,6 @@ Here's an example of a service that deploys
 The AMD example keeps the deployment close to the upstream Qwen and SGLang
 guidance: a pinned ROCm image, tensor parallelism across all four GPUs, and the
 standard `qwen3` reasoning parser without extra ROCm-specific tuning flags.
-The first startup on MI300X can take longer while SGLang compiles ROCm kernels.
 
 Save one of the configurations above as `service.dstack.yml`, then use the
 [`dstack apply`](../../reference/cli/dstack/apply.md) command.
@@ -164,10 +163,10 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
               --port 8000 \
               --pd-disaggregation \
               --prefill-policy cache_aware
-        router:
-          type: sglang
         resources:
           cpu: 4
+        router:
+          type: sglang
 
       - count: 1..4
         scaling:
@@ -211,6 +210,8 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
     ```
 
     </div>
+
+> With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
 
 Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
 

@@ -342,13 +342,13 @@ Setting the minimum number of replicas to `0` allows the service to scale down t
 
 <!-- NOTE: this section is referenced from the CLI, keep the URL unchanged -->
 
-Since 0.20.17, `dstack` supports serving a model using PD disaggregation. To use it, configure three replica groups: one for [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html), one for prefill workers, and one for decode workers.
+Since 0.20.17, `dstack` supports serving a model using Prefill-Decode disaggregation. To use it, configure three replica groups: one for the router, one for prefill workers, and one for decode workers.
 
-> Currently, Prefill-Decode disaggregation is supported only for SGLang.
+`dstack` integrates with two routers for PD disaggregation: [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html) and [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo).
 
 Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
 
-=== "NVIDIA"
+=== "SMG"
 
     <div editor-title="pd.dstack.yml">
 
@@ -372,10 +372,10 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
               --port 8000 \
               --pd-disaggregation \
               --prefill-policy cache_aware
-        router:
-          type: sglang
         resources:
           cpu: 4
+        router:
+          type: sglang
 
       - count: 1..4
         scaling:
@@ -417,6 +417,111 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8`:
     ```
 
     </div>
+
+    > With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
+
+=== "Dynamo"
+
+    <div editor-title="pd.dstack.yml">
+
+    ```yaml
+    type: service
+    name: dynamo-pd
+
+    env:
+      - HF_TOKEN
+      - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+
+    replicas:
+      - count: 1
+        docker: true
+        commands:
+          - apt-get update
+          - apt-get install -y python3-dev python3-venv
+          - python3 -m venv ~/dyn-venv
+          - source ~/dyn-venv/bin/activate
+          - pip install -U pip
+          - pip install "ai-dynamo[sglang]==1.1.1"
+          - git clone https://github.com/ai-dynamo/dynamo.git
+          # Brings up the NATS / etcd compose stack and runs the Dynamo HTTP frontend.
+          - docker compose -f dynamo/deploy/docker-compose.yml up -d
+          - |
+            python3 -m dynamo.frontend \
+              --http-host 0.0.0.0 --http-port 8000 \
+              --discovery-backend etcd --router-mode kv \
+              --kv-cache-block-size 64
+        resources:
+          cpu: 4
+        router:
+          type: dynamo
+
+      - count: 1..4
+        scaling:
+          metric: rps
+          target: 3
+        python: "3.12"
+        nvcc: true
+        commands:
+          # dstack injects DSTACK_ROUTER_INTERNAL_IP after the router replica
+          # is provisioned. Compose the etcd/NATS endpoints from it.
+          - export ETCD_ENDPOINTS="http://$DSTACK_ROUTER_INTERNAL_IP:2379"
+          - export NATS_SERVER="nats://$DSTACK_ROUTER_INTERNAL_IP:4222"
+          # Set to enable /health endpoint required by dstack probes.
+          - export DYN_SYSTEM_PORT="8000"
+          # Wait until the router's etcd and NATS ports are actually accepting connections.
+          - |
+            until (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/2379) 2>/dev/null \
+               && (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/4222) 2>/dev/null; do
+              echo "waiting for etcd/NATS on $DSTACK_ROUTER_INTERNAL_IP..."; sleep 3
+            done
+          - pip install "ai-dynamo[sglang]==1.1.1"
+          - |
+            python3 -m dynamo.sglang \
+              --model-path $MODEL_ID --served-model-name $MODEL_ID \
+              --discovery-backend etcd --host 0.0.0.0 \
+              --page-size 64 \
+              --disaggregation-mode prefill --disaggregation-transfer-backend nixl
+        resources:
+          gpu: H200
+
+      - count: 1..8
+        scaling:
+          metric: rps
+          target: 2
+        python: "3.12"
+        nvcc: true
+        commands:
+          - export ETCD_ENDPOINTS="http://$DSTACK_ROUTER_INTERNAL_IP:2379"
+          - export NATS_SERVER="nats://$DSTACK_ROUTER_INTERNAL_IP:4222"
+          - export DYN_SYSTEM_PORT="8000"
+          - |
+            until (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/2379) 2>/dev/null \
+               && (echo > /dev/tcp/$DSTACK_ROUTER_INTERNAL_IP/4222) 2>/dev/null; do
+              echo "waiting for etcd/NATS on $DSTACK_ROUTER_INTERNAL_IP..."; sleep 3
+            done
+          - pip install "ai-dynamo[sglang]==1.1.1"
+          - |
+            python3 -m dynamo.sglang \
+              --model-path $MODEL_ID --served-model-name $MODEL_ID \
+              --discovery-backend etcd --host 0.0.0.0 \
+              --page-size 64 \
+              --disaggregation-mode decode --disaggregation-transfer-backend nixl
+        resources:
+          gpu: H200
+
+    port: 8000
+    model: zai-org/GLM-4.5-Air-FP8
+
+    # Custom probe is required for PD disaggregation.
+    probes:
+      - type: http
+        url: /health
+        interval: 15s
+    ```
+
+    </div>
+
+    > With the the `dynamo` router, you can use SGLang, vLLM, and TensorRT-LLM prefill and decode workers.
 
 !!! info "Cluster"
     PD disaggregation requires the service to run in a fleet with `placement` set to `cluster`, because the replicas require an interconnect between instances.
