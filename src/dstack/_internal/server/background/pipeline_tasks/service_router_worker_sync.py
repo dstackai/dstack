@@ -33,7 +33,7 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.runs.router_worker_sync import (
-    run_model_has_router_replica_group,
+    run_model_has_sglang_router_replica_group,
     sync_router_workers_for_run_model,
 )
 from dstack._internal.server.utils import sentry_utils
@@ -212,7 +212,7 @@ class ServiceRouterWorkerSyncWorker(Worker[ServiceRouterWorkerSyncPipelineItem])
                 run_model.deleted
                 or run_model.status.is_finished()
                 or run_model.status != RunStatus.RUNNING
-                or not run_model_has_router_replica_group(run_model)
+                or not run_model_has_sglang_router_replica_group(run_model)
             ):
                 early_cleanup_update_map: _SyncRowUpdateMap = {"deleted": True}
                 set_processed_update_map_fields(early_cleanup_update_map)

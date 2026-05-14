@@ -104,16 +104,23 @@ class RunnerClient:
         secrets: Dict[str, str],
         repo_credentials: Optional[RemoteRepoCreds],
         instance_env: Optional[Union[Env, Dict[str, str]]] = None,
+        router_env: Optional[Dict[str, str]] = None,
     ):
-        # XXX: This is a quick-and-dirty hack to deliver InstanceModel-specific environment
-        # variables to the runner without runner API modification.
+        # XXX: This is a quick-and-dirty hack to deliver InstanceModel-specific
+        # and Dynamo-router environment variables to the runner without runner
+        # API modification. Both layers are merged into a deep-copied job_spec
+        # so the shared spec object held by the caller is not mutated.
         job_spec = job.job_spec
-        if instance_env is not None:
-            if isinstance(instance_env, Env):
-                merged_env = instance_env.as_dict()
-            else:
-                merged_env = instance_env.copy()
+        if instance_env is not None or router_env is not None:
+            merged_env: Dict[str, str] = {}
+            if instance_env is not None:
+                if isinstance(instance_env, Env):
+                    merged_env.update(instance_env.as_dict())
+                else:
+                    merged_env.update(instance_env)
             merged_env.update(job_spec.env)
+            if router_env is not None:
+                merged_env.update(router_env)
             job_spec = job_spec.copy(deep=True)
             job_spec.env = merged_env
         quota = server_settings.SERVER_LOG_QUOTA_PER_JOB_HOUR

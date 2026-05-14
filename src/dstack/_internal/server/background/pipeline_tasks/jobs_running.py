@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Iterable, Literal, Optional, Sequence, Union
 
 import httpx
-from sqlalchemy import and_, exists, func, or_, select, update
+from sqlalchemy import and_, exists, false, func, or_, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
@@ -23,6 +23,7 @@ from dstack._internal.core.models.instances import InstanceStatus, SSHConnection
 from dstack._internal.core.models.metrics import Metric
 from dstack._internal.core.models.profiles import StartupOrder
 from dstack._internal.core.models.repos import RemoteRepoCreds
+from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.runs import (
     ClusterInfo,
     ImagePullProgress,
@@ -102,6 +103,11 @@ from dstack._internal.server.services.repos import (
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import is_job_ready, run_model_to_run
+from dstack._internal.server.services.runs.replicas import (
+    RouterEnvStatus,
+    get_router_env_for_job,
+    get_router_replica_group,
+)
 from dstack._internal.server.services.secrets import get_project_secrets_mapping
 from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.server.utils import sentry_utils
@@ -113,6 +119,8 @@ logger = get_logger(__name__)
 
 
 JOB_STATUSES_WITH_MIN_PROCESSING_INTERVAL = [JobStatus.PROVISIONING, JobStatus.PULLING]
+
+ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS = 30 * 60
 
 JOB_DISCONNECTED_RETRY_TIMEOUT = timedelta(minutes=2)
 """`The minimum time before terminating active job in case of connectivity issues."""
@@ -368,6 +376,12 @@ class _StartupContext:
     volumes: list[Volume]
     secrets: dict[str, str]
     repo_creds: Optional[RemoteRepoCreds]
+    router_env: Optional[Dict[str, str]] = None
+    """Dynamo-specific env (e.g. DSTACK_ROUTER_INTERNAL_IP) computed from the
+    router replica's state. Passed through to RunnerClient.submit_job, which
+    merges it into a deep-copied job_spec.env so the shared job_spec is not
+    mutated. None for SGLang services, non-router runs, and the router
+    replica itself."""
 
 
 async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_ProcessContext]:
@@ -384,10 +398,18 @@ async def _load_process_context(item: JobRunningPipelineItem) -> Optional[_Proce
                 job_submissions=[job_model_to_job_submission(job_model)],
             )
         else:
-            # PROVISIONING/PULLING jobs need same-replica siblings for cluster coordination.
-            # All sibling access is replica-scoped, so only load jobs for this replica.
+            # PROVISIONING/PULLING jobs need same-replica siblings for cluster
+            # coordination, plus — when the run has a router replica group —
+            # the router replica's job (cross-replica) so the env-injection
+            # gate in _prepare_startup_context can read its status / IP.
+            # _fetch_run_model handles both: same-replica jobs always, plus
+            # all non-terminated jobs when one exists.
+            run_spec = RunSpec.__response__.parse_raw(job_model.run.run_spec)
             run_model = await _fetch_run_model(
-                session=session, run_id=job_model.run_id, replica_num=item.replica_num
+                session=session,
+                run_id=job_model.run_id,
+                replica_num=item.replica_num,
+                run_spec=run_spec,
             )
             run = run_model_to_run(run_model, include_sensitive=True)
             job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
@@ -477,6 +499,58 @@ async def _prepare_startup_context(
             )
             return None
 
+    # If this run has a router replica group and this job is a worker, gate
+    # startup on the router replica's state. The helper returns None for the
+    # router itself and for runs without a router group, so this whole block
+    # is a no-op in those cases.
+    router_env_outcome = get_router_env_for_job(
+        run_model=context.run_model,
+        run_spec=context.run.run_spec,
+        job_model=context.job_model,
+    )
+    if router_env_outcome is RouterEnvStatus.FAILED:
+        # Router has reached a terminal state — the worker cannot recover by
+        # waiting. Terminate it now with a clear reason instead of letting it
+        # idle until the run-level reconciler tears the whole run down.
+        _terminate_job(
+            job_model=context.job_model,
+            job_update_map=result.job_update_map,
+            termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+            termination_reason_message=(
+                "Router replica is in a terminal state; cannot provision worker "
+                "without a running router."
+            ),
+        )
+        return None
+    if router_env_outcome is RouterEnvStatus.NOT_PROVISIONED:
+        # Router is alive but its internal_ip is not yet known. Defer this
+        # worker — the next pipeline tick will re-check. Bound the wait so a
+        # router that is genuinely stuck can't burn worker instance-hours
+        # forever; see ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS.
+        waited_seconds = (get_current_datetime() - context.job_model.submitted_at).total_seconds()
+        if waited_seconds > ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS:
+            _terminate_job(
+                job_model=context.job_model,
+                job_update_map=result.job_update_map,
+                termination_reason=JobTerminationReason.TERMINATED_BY_SERVER,
+                termination_reason_message=(
+                    f"Router replica did not acquire an internal IP within "
+                    f"{ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS}s; terminating worker."
+                ),
+            )
+            return None
+        logger.debug(
+            "%s: waiting for router replica to be provisioned",
+            fmt(context.job_model),
+        )
+        return None
+    # Past the enum branches, router_env_outcome is either None or a Dict.
+    # We don't mutate job_spec.env here — RunnerClient.submit_job merges it
+    # into a deep-copied spec, mirroring how instance_env is handled.
+    router_env: Optional[Dict[str, str]] = (
+        router_env_outcome if isinstance(router_env_outcome, dict) else None
+    )
+
     cluster_info = _get_cluster_info(
         jobs=context.run.jobs,
         replica_num=context.job.job_spec.replica_num,
@@ -520,6 +594,7 @@ async def _prepare_startup_context(
         volumes=volumes,
         secrets=secrets,
         repo_creds=repo_creds,
+        router_env=router_env,
     )
 
 
@@ -534,6 +609,7 @@ async def _refetch_locked_job_model(
         )
         .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
         .options(joinedload(JobModel.probes).load_only(ProbeModel.success_streak))
+        .options(joinedload(JobModel.run).load_only(RunModel.id, RunModel.run_spec))
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
@@ -543,13 +619,22 @@ async def _fetch_run_model(
     session: AsyncSession,
     run_id: uuid.UUID,
     replica_num: Optional[int] = None,
+    run_spec: Optional[RunSpec] = None,
 ) -> RunModel:
     """Fetch run model with related project, user, repo, and fleet.
 
     Args:
         replica_num: If None, skip loading jobs (for RUNNING jobs that don't need siblings).
             If set, load only latest-submission jobs for that replica (for PROVISIONING/PULLING
-            jobs that need same-replica siblings for cluster coordination).
+            jobs that need same-replica siblings for cluster coordination). When the run has
+            a Dynamo router replica group, all non-terminated latest-submission jobs for the
+            run are loaded so find_router_job can identify the router by replica-group
+            membership.
+        run_spec: Required whenever `replica_num` is set. Used only to detect
+            whether the run has a Dynamo router replica group. The caller is
+            expected to parse it once from the eager-loaded JobModel.run
+            (see _refetch_locked_job_model) so we don't issue a separate
+            query for it here.
     """
     query = (
         select(RunModel)
@@ -560,6 +645,14 @@ async def _fetch_run_model(
         .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
     )
     if replica_num is not None:
+        assert run_spec is not None, "run_spec must be provided when replica_num is set"
+        router_group = get_router_replica_group(run_spec)
+        is_dynamo = (
+            router_group is not None
+            and router_group.router is not None
+            and router_group.router.type == RouterType.DYNAMO
+        )
+
         latest_submissions_sq = (
             select(
                 JobModel.run_id.label("run_id"),
@@ -567,7 +660,12 @@ async def _fetch_run_model(
                 JobModel.job_num.label("job_num"),
                 func.max(JobModel.submission_num).label("max_submission_num"),
             )
-            .where(JobModel.run_id == run_id, JobModel.replica_num == replica_num)
+            .where(
+                JobModel.run_id == run_id,
+                # For Service with Dynamo router: load all replicas. For Non-Dynamo: only the worker's
+                # own replica.
+                true() if is_dynamo else JobModel.replica_num == replica_num,
+            )
             .group_by(JobModel.run_id, JobModel.replica_num, JobModel.job_num)
             .subquery()
         )
@@ -581,6 +679,15 @@ async def _fetch_run_model(
                     job_alias.replica_num == latest_submissions_sq.c.replica_num,
                     job_alias.job_num == latest_submissions_sq.c.job_num,
                     job_alias.submission_num == latest_submissions_sq.c.max_submission_num,
+                    # For Dynamo runs, drop terminated rows so accumulated
+                    # scale-down history doesn't bloat the load. Non-Dynamo
+                    # runs are already restricted to the worker's own
+                    # replica above, so this filter is a no-op for them.
+                    or_(
+                        false() if is_dynamo else true(),
+                        ~job_alias.status.in_(JobStatus.finished_statuses())
+                        & (job_alias.status != JobStatus.TERMINATING),
+                    ),
                 ),
             )
             .options(contains_eager(RunModel.jobs, alias=job_alias))
@@ -690,6 +797,7 @@ async def _process_provisioning_status(
                 file_archives=file_archives,
                 secrets=startup_context.secrets,
                 repo_credentials=startup_context.repo_creds,
+                router_env=startup_context.router_env,
                 success_if_not_available=False,
             )
             if submit_result is not False:
@@ -800,6 +908,7 @@ async def _process_pulling_status(
                 file_archives=file_archives,
                 secrets=startup_context.secrets,
                 repo_credentials=startup_context.repo_creds,
+                router_env=startup_context.router_env,
                 success_if_not_available=True,
             )
             if submit_result is not False:
@@ -1408,6 +1517,7 @@ def _submit_job_to_runner(
     file_archives: Iterable[tuple[uuid.UUID, bytes]],
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
+    router_env: Optional[Dict[str, str]],
     success_if_not_available: bool,
 ) -> Union[_SubmitJobToRunnerResult, Literal[False]]:
     logger.debug("%s: submitting job spec", fmt(job_model))
@@ -1435,6 +1545,7 @@ def _submit_job_to_runner(
         secrets={},
         repo_credentials=repo_credentials,
         instance_env=instance_env,
+        router_env=router_env,
     )
     for archive_id, archive in file_archives:
         logger.debug("%s: uploading file archive: %s", fmt(job_model), archive_id)
