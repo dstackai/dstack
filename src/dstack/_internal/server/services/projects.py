@@ -27,7 +27,7 @@ from dstack._internal.core.models.projects import (
 from dstack._internal.core.models.runs import RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.const import GLOBAL_EXPORTS_LOCK_NAMESPACE
-from dstack._internal.server.db import get_db
+from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     ExportModel,
     FleetModel,
@@ -44,7 +44,10 @@ from dstack._internal.server.services import templates as templates_service
 from dstack._internal.server.services.backends import (
     get_backend_config_without_creds_from_backend_model,
 )
-from dstack._internal.server.services.locking import advisory_lock_ctx
+from dstack._internal.server.services.locking import (
+    get_locker,
+    string_to_lock_id,
+)
 from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
 from dstack._internal.utils.common import get_current_datetime, run_async
@@ -629,18 +632,30 @@ async def create_project_model(
         is_public=is_public,
         templates_repo=templates_repo,
     )
-    session.add(project)
-    events.emit(
-        session,
-        "Project created",
-        actor=events.UserActor.from_user(owner),
-        targets=[events.Target.from_model(project)],
+
+    if is_db_sqlite():
+        # Start new transaction to see committed changes after lock
+        await session.commit()
+    elif is_db_postgres():
+        await session.execute(
+            select(safunc.pg_advisory_xact_lock(string_to_lock_id(GLOBAL_EXPORTS_LOCK_NAMESPACE)))
+        )
+    global_exports_lock, _ = get_locker(get_db().dialect_name).get_lockset(
+        GLOBAL_EXPORTS_LOCK_NAMESPACE
     )
-    async with advisory_lock_ctx(session, get_db().dialect_name, GLOBAL_EXPORTS_LOCK_NAMESPACE):
+
+    async with global_exports_lock:
         res = await session.execute(select(ExportModel.id).where(ExportModel.is_global == True))
         for export_id in res.scalars().all():
             session.add(ImportModel(project=project, export_id=export_id))
-        await session.commit()  # commit before releasing the lock
+        session.add(project)
+        events.emit(
+            session,
+            "Project created",
+            actor=events.UserActor.from_user(owner),
+            targets=[events.Target.from_model(project)],
+        )
+        await session.commit()
     return project
 
 
