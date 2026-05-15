@@ -20,6 +20,7 @@ from dstack._internal.core.backends.features import (
 from dstack._internal.core.errors import (
     BackendError,
     PlacementGroupNotSupportedError,
+    SkipOffer,
 )
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -114,8 +115,15 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
         include_only_create_instance_supported_backends=True,
     )
 
+    offers_iter = iter(offers)
+    offers_tried = 0
     # Limit number of offers tried to prevent long-running processing in case all offers fail.
-    for backend, instance_offer in offers[: server_settings.MAX_OFFERS_TRIED]:
+    while offers_tried < server_settings.MAX_OFFERS_TRIED:
+        backend_with_instance_offer = next(offers_iter, None)
+        if backend_with_instance_offer is None:
+            break
+        backend, instance_offer = backend_with_instance_offer
+
         if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
             continue
         compute = backend.compute()
@@ -159,6 +167,7 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
             instance_offer.region,
             instance_offer.price,
         )
+        offers_tried += 1
         try:
             job_provisioning_data = await run_async(
                 compute.create_instance,
@@ -166,6 +175,17 @@ async def create_cloud_instance(instance_model: InstanceModel) -> ProcessResult:
                 instance_configuration,
                 placement_group_model_to_placement_group_optional(placement_group_model),
             )
+        except SkipOffer as exc:
+            offers_tried -= 1
+            logger.info(
+                "%s launch in %s/%s skipped: %s",
+                instance_offer.instance.name,
+                instance_offer.backend.value,
+                instance_offer.region,
+                exc,
+                extra={"instance_name": instance_model.name},
+            )
+            continue
         except BackendError as exc:
             logger.warning(
                 "%s launch in %s/%s failed: %s",

@@ -20,7 +20,7 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT,
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
-from dstack._internal.core.errors import BackendError, ServerClientError
+from dstack._internal.core.errors import BackendError, ServerClientError, SkipOffer
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.compute_groups import (
     ComputeGroupProvisioningData,
@@ -2120,8 +2120,13 @@ async def _provision_new_capacity(
         instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
         placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
     )
+    offers_iter = iter(offers)
     offers_tried = 0
-    for backend, offer in offers[: settings.MAX_OFFERS_TRIED]:
+    while offers_tried < settings.MAX_OFFERS_TRIED:
+        backend_with_offer = next(offers_iter, None)
+        if backend_with_offer is None:
+            break
+        backend, offer = backend_with_offer
         logger.debug(
             "%s: trying %s in %s/%s for $%0.4f per hour",
             fmt(job_model),
@@ -2214,6 +2219,17 @@ async def _provision_new_capacity(
                     new_placement_group_models=new_placement_group_models,
                 ),
             )
+        except SkipOffer as e:
+            offers_tried -= 1
+            logger.info(
+                "%s: %s launch in %s/%s skipped: %s",
+                fmt(job_model),
+                offer.instance.name,
+                offer.backend.value,
+                offer.region,
+                e,
+            )
+            continue
         except BackendError as e:
             logger.warning(
                 "%s: %s launch in %s/%s failed: %s",
