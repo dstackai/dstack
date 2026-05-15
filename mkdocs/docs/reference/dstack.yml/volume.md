@@ -60,3 +60,5 @@ The `volume` configuration type allows creating, registering, and updating [volu
             show_root_heading: false
             backend:
                 required: true
+            region:
+                required: true

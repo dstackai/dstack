@@ -278,6 +278,18 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
     yq -o=json ~/.kube/config | jq -c | jq -R
     ```
 
+###### `projects[n].backends[type=kubernetes].contexts[n]` { #kubernetes-contexts data-toc-label="contexts" }
+
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesContextConfig
+    overrides:
+        show_root_heading: false
+
+###### `projects[n].backends[type=kubernetes].contexts[n].proxy_jump` { #kubernetes-contexts-proxy_jump data-toc-label="proxy_jump" }
+
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesProxyJumpConfig
+    overrides:
+        show_root_heading: false
+
 ###### `projects[n].backends[type=kubernetes].proxy_jump` { #kubernetes-proxy_jump data-toc-label="proxy_jump" }
 
 #SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesProxyJumpConfig
