@@ -1,5 +1,5 @@
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from typing import Optional
 
 from sqlalchemy import func, select
@@ -36,11 +36,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services.fleets import get_fleet_spec, list_project_fleet_models
 from dstack._internal.server.services.gateways import list_project_gateway_models
-from dstack._internal.server.services.locking import (
-    advisory_lock_ctx,
-    get_locker,
-    string_to_lock_id,
-)
+from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.projects import (
     get_user_project_role,
     list_project_models,
@@ -124,17 +120,35 @@ async def create_export(
             " Global exports are automatically imported in all projects"
         )
 
-    lock_namespace = f"export_names_{project.name}"
+    export_names_lock_namespace = f"export_names_{project.name}"
     if is_db_sqlite():
         # Start new transaction to see committed changes after lock
         await session.commit()
     elif is_db_postgres():
         await session.execute(
-            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
+            select(func.pg_advisory_xact_lock(string_to_lock_id(export_names_lock_namespace)))
         )
-    lock, _ = get_locker(get_db().dialect_name).get_lockset(lock_namespace)
+    export_names_lock, _ = get_locker(get_db().dialect_name).get_lockset(
+        export_names_lock_namespace
+    )
 
-    async with lock:
+    if is_global:
+        if is_db_sqlite():
+            # Start new transaction to see committed changes after lock
+            await session.commit()
+        elif is_db_postgres():
+            await session.execute(
+                select(
+                    func.pg_advisory_xact_lock(string_to_lock_id(GLOBAL_EXPORTS_LOCK_NAMESPACE))
+                )
+            )
+        global_exports_lock, _ = get_locker(get_db().dialect_name).get_lockset(
+            GLOBAL_EXPORTS_LOCK_NAMESPACE
+        )
+    else:
+        global_exports_lock = nullcontext()
+
+    async with export_names_lock, global_exports_lock:
         if await export_exists(session, project, name):
             raise ResourceExistsError(
                 f"Export {name!r} already exists in project {project.name!r}"
@@ -150,15 +164,10 @@ async def create_export(
         await add_importer_projects(session, user, export, importer_project_names)
         await add_exported_fleets(session, export, exported_fleet_names)
         await add_exported_gateways(session, export, exported_gateway_names)
-        session.add(export)
         if is_global:
-            async with advisory_lock_ctx(
-                session, get_db().dialect_name, GLOBAL_EXPORTS_LOCK_NAMESPACE
-            ):
-                await set_as_global(session, export, user)
-                await session.commit()  # commit before releasing the lock
-        else:
-            await session.commit()
+            await set_as_global(session, export, user)
+        session.add(export)
+        await session.commit()
     return export_model_to_export(export)
 
 
@@ -176,7 +185,26 @@ async def update_export(
     add_exported_gateway_names: list[str],
     remove_exported_gateway_names: list[str],
 ) -> Export:
-    async with get_export_model_by_name_for_update(session, project, name) as export:
+    if set_global:
+        if is_db_sqlite():
+            # Start new transaction to see committed changes after lock
+            await session.commit()
+        elif is_db_postgres():
+            await session.execute(
+                select(
+                    func.pg_advisory_xact_lock(string_to_lock_id(GLOBAL_EXPORTS_LOCK_NAMESPACE))
+                )
+            )
+        global_exports_lock, _ = get_locker(get_db().dialect_name).get_lockset(
+            GLOBAL_EXPORTS_LOCK_NAMESPACE
+        )
+    else:
+        global_exports_lock = nullcontext()
+
+    async with (
+        global_exports_lock,
+        get_export_model_by_name_for_update(session, project, name) as export,
+    ):
         if export is None:
             raise ResourceNotExistsError(f"Export {name!r} not found in project {project.name!r}")
 
@@ -237,13 +265,8 @@ async def update_export(
         if unset_global:
             await unset_as_global(export)
         if set_global:
-            async with advisory_lock_ctx(
-                session, get_db().dialect_name, GLOBAL_EXPORTS_LOCK_NAMESPACE
-            ):
-                await set_as_global(session, export, user)
-                await session.commit()  # commit before releasing the lock
-        else:
-            await session.commit()
+            await set_as_global(session, export, user)
+        await session.commit()
     return export_model_to_export(export)
 
 
