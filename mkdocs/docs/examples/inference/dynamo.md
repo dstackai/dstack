@@ -1,6 +1,6 @@
 ---
-title: Dynamo
-description: Deploying zai-org/GLM-4.5-Air-FP8 using NVIDIA Dynamo
+title: NVIDIA Dynamo
+description: Deploying zai-org/GLM-4.5-Air-FP8 using NVIDIA Dynamo with Prefill-Decode disaggregation.
 ---
 
 # Dynamo
