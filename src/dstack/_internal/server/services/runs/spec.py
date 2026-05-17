@@ -4,6 +4,7 @@ from dstack._internal.core.models.configurations import (
     SERVICE_HTTPS_DEFAULT,
     ServiceConfiguration,
 )
+from dstack._internal.core.models.profiles import ProfileRetry
 from dstack._internal.core.models.repos.virtual import DEFAULT_VIRTUAL_REPO_ID, VirtualRunRepoData
 from dstack._internal.core.models.routers import RouterType
 from dstack._internal.core.models.runs import LEGACY_REPO_DIR, AnyRunConfiguration, RunSpec
@@ -74,6 +75,7 @@ def validate_run_spec_and_set_defaults(
     # the defaults depend on the server version, not the client version.
     if run_spec.run_name is not None:
         validate_dstack_resource_name(run_spec.run_name)
+    _validate_retry_duration(run_spec)
     for mount_point in run_spec.configuration.volumes:
         if not is_valid_docker_volume_target(mount_point.path):
             raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
@@ -130,6 +132,12 @@ def validate_run_spec_and_set_defaults(
             raise ServerClientError("ssh_key_pub must be set if the user has no ssh_public_key")
     if run_spec.configuration.working_dir is None and legacy_repo_dir:
         run_spec.configuration.working_dir = LEGACY_REPO_DIR
+
+
+def _validate_retry_duration(run_spec: RunSpec) -> None:
+    retry = run_spec.merged_profile.retry
+    if isinstance(retry, ProfileRetry) and retry.duration is not None and retry.duration < 0:
+        raise ServerClientError("retry.duration cannot be negative")
 
 
 def _check_dynamo_in_place_update_compatibility(
