@@ -588,12 +588,12 @@ async def _apply_assignment_result(
                     return
                 fleet_spec = get_fleet_spec(fleet_model)
                 if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec):
-                    logger.debug(
-                        "%s: fleet %s is full, retrying assignment",
-                        fmt(context.job_model),
-                        fleet_model.name,
+                    await _terminate_submitted_job(
+                        session=session,
+                        job_model=job_model,
+                        reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                        message="Fleet is at capacity",
                     )
-                    await _reset_job_lock_for_retry(session=session, item=item)
                     return
                 instance_model = _create_placeholder_instance(
                     fleet_model=fleet_model,
