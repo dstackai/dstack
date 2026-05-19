@@ -88,6 +88,15 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.core.backends.jarvislabs.configurator import (
+        JarvisLabsConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(JarvisLabsConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.core.backends.kubernetes.configurator import (
         KubernetesConfigurator,
     )

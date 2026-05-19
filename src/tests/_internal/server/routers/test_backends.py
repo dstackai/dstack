@@ -92,6 +92,7 @@ class TestListBackendTypes:
             "digitalocean",
             "gcp",
             "hotaisle",
+            "jarvislabs",
             "kubernetes",
             "lambda",
             "nebius",
