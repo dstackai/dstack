@@ -211,7 +211,140 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
 
     </div>
 
-> With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
+    > With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
+
+=== "AMD"
+
+    Below is an example for running `Qwen/Qwen2.5-72B-Instruct` on `8xMI300X` with the [mooncake](https://docs.sglang.io/advanced_features/pd_disaggregation.html#mooncake) transfer backend.
+
+    <div editor-title="amd-pd.dstack.yml">
+
+    ```yaml
+    type: service
+    name: amd-sglang-pd-service
+
+    image: rocm/sgl-dev:v0.5.10.post1-rocm720-mi30x-20260427
+    privileged: true
+
+    env:
+      - MODEL_ID=Qwen/Qwen2.5-72B-Instruct
+      - HF_TOKEN
+      - SGLANG_USE_AITER=0
+      - SGLANG_ROCM_FUSED_DECODE_MLA=0
+      - SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT=600
+      - SGLANG_DISAGGREGATION_WAITING_TIMEOUT=600
+      - RDMA_DEVICES=bnxt_re0,bnxt_re1,bnxt_re2,bnxt_re3,bnxt_re4,bnxt_re5,bnxt_re6,bnxt_re7
+      - NCCL_IB_DISABLE=1
+
+    replicas:
+      - count: 1
+        commands:
+          - pip install smg
+          - |
+            smg launch \
+              --pd-disaggregation \
+              --host 0.0.0.0 \
+              --port 30000
+        resources:
+          cpu: 4..
+        router:
+          type: sglang
+
+      - count: 1..2
+        scaling:
+          metric: rps
+          target: 300
+        commands:
+          - |
+            set -e
+            inject_bnxt_re_libibverbs() {
+              CONT_LIB=/usr/lib/x86_64-linux-gnu
+              cp /mnt/host/lib64/libibverbs.so.1.14.54.0 "${CONT_LIB}/"
+              ln -sf libibverbs.so.1.14.54.0 "${CONT_LIB}/libibverbs.so.1"
+              cp /mnt/host/libibverbs/libbnxt_re-rdmav34.so "${CONT_LIB}/libibverbs/"
+              mkdir -p /usr/lib64
+              ln -sfn "${CONT_LIB}/libibverbs" /usr/lib64/libibverbs
+              ldconfig
+              ibv_devinfo 2>&1 | grep -E "hca_id|state|link_layer" || true
+            }
+            inject_bnxt_re_libibverbs
+            python3 -m sglang.launch_server \
+              --model $MODEL_ID \
+              --disaggregation-mode prefill \
+              --disaggregation-transfer-backend mooncake \
+              --host 0.0.0.0 \
+              --port 30000 \
+              --tp $DSTACK_GPUS_NUM \
+              --trust-remote-code \
+              --disaggregation-ib-device $RDMA_DEVICES \
+              --disaggregation-bootstrap-port 8998 \
+              --disable-radix-cache \
+              --disable-cuda-graph \
+              --disable-overlap-schedule \
+              --mem-fraction-static 0.8 \
+              --max-running-requests 1024
+        resources:
+          gpu: MI300X:8
+          cpu: 96..
+          memory: 512GB..
+
+      - count: 1..4
+        scaling:
+          metric: rps
+          target: 300
+        commands:
+          - |
+            set -e
+            inject_bnxt_re_libibverbs() {
+              CONT_LIB=/usr/lib/x86_64-linux-gnu
+              cp /mnt/host/lib64/libibverbs.so.1.14.54.0 "${CONT_LIB}/"
+              ln -sf libibverbs.so.1.14.54.0 "${CONT_LIB}/libibverbs.so.1"
+              cp /mnt/host/libibverbs/libbnxt_re-rdmav34.so "${CONT_LIB}/libibverbs/"
+              mkdir -p /usr/lib64
+              ln -sfn "${CONT_LIB}/libibverbs" /usr/lib64/libibverbs
+              ldconfig
+              ibv_devinfo 2>&1 | grep -E "hca_id|state|link_layer" || true
+            }
+            inject_bnxt_re_libibverbs
+            python3 -m sglang.launch_server \
+              --model $MODEL_ID \
+              --disaggregation-mode decode \
+              --disaggregation-transfer-backend mooncake \
+              --host 0.0.0.0 \
+              --port 30000 \
+              --tp $DSTACK_GPUS_NUM \
+              --trust-remote-code \
+              --disaggregation-ib-device $RDMA_DEVICES \
+              --disable-radix-cache \
+              --disable-cuda-graph \
+              --disable-overlap-schedule \
+              --decode-attention-backend triton \
+              --mem-fraction-static 0.8 \
+              --max-running-requests 1024
+        resources:
+          gpu: MI300X:8
+          cpu: 96..
+          memory: 512GB..
+
+    port: 30000
+    model: Qwen/Qwen2.5-72B-Instruct
+
+    # Custom probe is required for PD disaggregation.
+    probes:
+      - type: http
+        url: /health
+        interval: 15s
+
+    volumes:
+      - instance_path: /usr/lib64
+        path: /mnt/host/lib64
+      - instance_path: /usr/lib64/libibverbs
+        path: /mnt/host/libibverbs
+    ```
+
+    </div>
+
+    > On MI300X, `inject_bnxt_re_libibverbs()` injects host `libibverbs` so prefill/decode workers can use `bnxt_re` RDMA devices. Support for vLLM is coming soon.
 
 Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
 
