@@ -152,7 +152,7 @@ dev = [
     "testcontainers>=4.9.2",
     "pytest-xdist>=3.6.1",
     "pyinstrument>=5.0.0",
-    "kubernetes-stubs-elephant-fork",
+    "kubernetes-stubs-elephant-fork>=35.0.0.post3",
     # docs
     "dstack[server]; python_version >= '3.11'",
     "dstack-plugin-server; python_version >= '3.11'",
