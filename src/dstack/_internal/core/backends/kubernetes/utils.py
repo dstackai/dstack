@@ -1,6 +1,17 @@
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Annotated, Any, Callable, Generic, Literal, Optional, Protocol, TypeVar, Union
+from typing import (
+    Annotated,
+    Any,
+    Callable,
+    Generic,
+    Literal,
+    Optional,
+    Protocol,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import yaml
 from kubernetes.client import CoreV1Api, V1Status
@@ -9,9 +20,7 @@ from kubernetes.config import (
     # XXX: This function is missing in the stubs package
     new_client_from_config_dict,  # pyright: ignore[reportAttributeAccessIssue]
 )
-
-# XXX: The watch module is missing in the stubs package
-from kubernetes.watch import Watch  # pyright: ignore[reportMissingImports]
+from kubernetes.watch import Watch
 from pydantic import Field
 from typing_extensions import ParamSpec, TypedDict
 from urllib3.exceptions import HTTPError
@@ -157,7 +166,8 @@ def watch_events(
     method: Callable[P, ObjectList[T]], *args: P.args, **kwargs: P.kwargs
 ) -> Generator[Generator[tuple[str, T], None, None], None, None]:
     watch = Watch()
-    gen = _watch_events_gen(watch.stream(method, *args, **kwargs))
+    inner_gen = cast(Generator[_EventDict[T], None, None], watch.stream(method, *args, **kwargs))
+    gen = _watch_events_gen(inner_gen)
     try:
         yield gen
     finally:
@@ -182,8 +192,11 @@ class _ErrorEventDict(TypedDict):
     object: V1Status
 
 
+_EventDict = Union[_StateEventDict[T], _BookmarkEventDict[T], _ErrorEventDict]
+
+
 def _watch_events_gen(
-    gen: Generator[Union[_StateEventDict[T], _BookmarkEventDict[T], _ErrorEventDict], None, None],
+    gen: Generator[_EventDict[T], None, None],
 ) -> Generator[tuple[str, T], None, None]:
     try:
         for event in gen:
