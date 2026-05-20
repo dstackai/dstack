@@ -201,7 +201,9 @@ def generate_kubeconfig(
     service_account_token: str,
 ) -> str:
     logging.info("generating kubeconfig")
-    kubeconfig_content = kubectl.call("config", "view", "--minify", "--raw", capture_stdout=True)
+    kubeconfig_content = kubectl.call(
+        "config", "view", "--minify", "--raw", "--flatten", capture_stdout=True
+    )
     with tempfile.NamedTemporaryFile("w+") as f:
         f.write(kubeconfig_content)
         f.flush()

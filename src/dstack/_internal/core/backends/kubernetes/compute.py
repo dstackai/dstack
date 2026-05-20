@@ -1,3 +1,4 @@
+import concurrent.futures
 import random
 import shlex
 import subprocess
@@ -28,10 +29,8 @@ from dstack._internal.core.backends.base.compute import (
     get_dstack_gateway_commands,
     merge_tags,
 )
-from dstack._internal.core.backends.kubernetes.models import (
-    KubernetesConfig,
-    KubernetesProxyJumpConfig,
-)
+from dstack._internal.core.backends.kubernetes.api_client import API_CLIENT_EXCEPTIONS
+from dstack._internal.core.backends.kubernetes.models import KubernetesConfig
 from dstack._internal.core.backends.kubernetes.resources import (
     AMD_GPU_DEVICE_ID_LABEL_PREFIX,
     AMD_GPU_NAME_TO_DEVICE_IDS,
@@ -60,15 +59,16 @@ from dstack._internal.core.backends.kubernetes.resources import (
     parse_quantity,
 )
 from dstack._internal.core.backends.kubernetes.utils import (
+    LEGACY_CURRENT_CONTEXT_REGION,
+    Cluster,
+    SkipOfferCache,
     call_api_method,
-    get_api_from_kubeconfig_dict,
-    kubeconfig_data_to_kubeconfig_dict,
-    kubeconfig_dict_to_kubeconfig,
+    get_clusters_from_backend_config,
     try_delete_object_if_exists,
     watch_events,
 )
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.errors import ComputeError, ProvisioningError
+from dstack._internal.core.errors import ComputeError, ProvisioningError, SkipOffer
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import (
@@ -136,39 +136,34 @@ class KubernetesCompute(
 ):
     def __init__(self, config: KubernetesConfig):
         super().__init__()
-        self.config = config.copy()
-        proxy_jump = self.config.proxy_jump
-        if proxy_jump is None:
-            proxy_jump = KubernetesProxyJumpConfig()
-        self.proxy_jump = proxy_jump
-        kubeconfig_dict = kubeconfig_data_to_kubeconfig_dict(config.kubeconfig.data)
-        self.api = get_api_from_kubeconfig_dict(kubeconfig_dict)
-        kubeconfig = kubeconfig_dict_to_kubeconfig(kubeconfig_dict)
-        current_context = kubeconfig.get_context()
-        if current_context.namespace != config.namespace:
-            logger.warning(
-                (
-                    "Namespace mismatch: kubeconfig -> '%s', backend config -> '%s'."
-                    " The current dstack version ignores kubeconfig"
-                    " and uses deprecated namespace property from backend config."
-                    " Future versions will use namespace from kubeconfig."
-                    " To keep using '%s' namespace in future versions and suppress this warning,"
-                    " set namespace to '%s' in kubeconfig context '%s'"
-                ),
-                current_context.namespace,
-                config.namespace,
-                config.namespace,
-                config.namespace,
-                kubeconfig.current_context,
-            )
-        # TODO: switch to current_context.namespace
-        self.namespace = config.namespace
-        logger.debug("Using namespace '%s'", self.namespace)
+        self.region_cluster_map = {c.region: c for c in get_clusters_from_backend_config(config)}
+        self.skip_offer_cache = SkipOfferCache(ttl=60)
 
     def get_offers_by_requirements(
         self, requirements: Requirements
     ) -> list[InstanceOfferWithAvailability]:
-        return get_instance_offers(self.api, requirements)
+        offers: list[InstanceOfferWithAvailability] = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            future_cluster_map: dict[
+                concurrent.futures.Future[list[InstanceOfferWithAvailability]], Cluster
+            ] = {}
+            for region, cluster in self.region_cluster_map.items():
+                api = client.CoreV1Api(cluster.api_client)
+                future = executor.submit(get_instance_offers, api, region, requirements)
+                future_cluster_map[future] = cluster
+            for future in concurrent.futures.as_completed(future_cluster_map):
+                try:
+                    cluster_offers = future.result()
+                except API_CLIENT_EXCEPTIONS as e:
+                    logger.warning(
+                        "Failed to get offers from cluster %s: %s: %s",
+                        future_cluster_map[future],
+                        e.__class__.__name__,
+                        e,
+                    )
+                    continue
+                offers.extend(cluster_offers)
+        return offers
 
     def run_job(
         self,
@@ -180,8 +175,13 @@ class KubernetesCompute(
         volumes: list[Volume],
         placement_group: Optional[PlacementGroup],
     ) -> JobProvisioningData:
-        api = self.api
-        namespace = self.namespace
+        cluster = self.region_cluster_map.get(instance_offer.region)
+        if cluster is None:
+            raise ComputeError(f"Unknown region: {instance_offer.region!r}")
+        if self.skip_offer_cache.check(run, job, instance_offer):
+            raise SkipOffer(f"cluster {cluster} has recently failed to schedule a similar job")
+        api = client.CoreV1Api(cluster.api_client)
+        namespace = cluster.namespace
 
         # There is one jump pod per project that is used as an ssh proxy jump to connect
         # to all job pods of the same project.
@@ -193,7 +193,7 @@ class KubernetesCompute(
             namespace=namespace,
             jump_pod_name=jump_pod_name,
             jump_pod_service_name=jump_pod_service_name,
-            jump_pod_port=self.proxy_jump.port,
+            jump_pod_port=cluster.proxy_jump.port,
             project_ssh_public_key=project_ssh_public_key.strip(),
         )
 
@@ -246,6 +246,7 @@ class KubernetesCompute(
                 timeout_seconds=JOB_POD_SCHEDULING_TIMEOUT,
             )
             if not is_pod_scheduled_or_finished:
+                self.skip_offer_cache.add(run, job, instance_offer)
                 reason, message = _get_unscheduled_pod_reason_message(
                     api=api,
                     namespace=namespace,
@@ -256,6 +257,7 @@ class KubernetesCompute(
                     f" {reason or 'unknown reason'}: {message or 'no message'}"
                 )
             if pod_phase is not None and pod_phase.is_finished():
+                # It's not clear if we should add an entry to the SkipOfferCache in this case.
                 raise ComputeError(f"Pod {pod_name} already finished: {pod_phase}")
 
             pod_service_name = _get_pod_service_name(pod_name)
@@ -316,15 +318,21 @@ class KubernetesCompute(
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ):
+        cluster = self.region_cluster_map.get(provisioning_data.region)
+        if cluster is None:
+            raise ProvisioningError(f"Unknown region: {provisioning_data.region!r}")
+        api = client.CoreV1Api(cluster.api_client)
+        namespace = cluster.namespace
+
         if provisioning_data.backend_data is not None:
             # Before running a job, ensure the jump pod is running and has user's public SSH key.
             backend_data = KubernetesBackendData.load(provisioning_data.backend_data)
             ssh_proxy = _check_and_configure_jump_pod_service(
-                api=self.api,
-                namespace=self.namespace,
+                api=api,
+                namespace=namespace,
                 jump_pod_name=backend_data.jump_pod_name,
                 jump_pod_service_name=backend_data.jump_pod_service_name,
-                jump_pod_hostname=self.proxy_jump.hostname,
+                jump_pod_hostname=cluster.proxy_jump.hostname,
                 project_ssh_private_key=project_ssh_private_key,
                 user_ssh_public_key=backend_data.user_ssh_public_key,
             )
@@ -336,9 +344,9 @@ class KubernetesCompute(
             # in case update_provisioning_data() is called again.
             provisioning_data.backend_data = None
 
-        pod = self.api.read_namespaced_pod(
+        pod = api.read_namespaced_pod(
             name=provisioning_data.instance_id,
-            namespace=self.namespace,
+            namespace=namespace,
         )
         if pod.status is None:
             return
@@ -346,19 +354,20 @@ class KubernetesCompute(
         if not pod_ip:
             return
         provisioning_data.internal_ip = pod_ip
-        service = self.api.read_namespaced_service(
+        service = api.read_namespaced_service(
             name=_get_pod_service_name(provisioning_data.instance_id),
-            namespace=self.namespace,
+            namespace=namespace,
         )
         service_spec = get_or_error(service.spec)
         provisioning_data.hostname = get_or_error(service_spec.cluster_ip)
         pod_spec = get_or_error(pod.spec)
-        node = self.api.read_node(name=get_or_error(pod_spec.node_name))
+        node = api.read_node(name=get_or_error(pod_spec.node_name))
         # In the original offer, the resources have already been adjusted according to
         # the run configuration resource requirements, see get_offers_by_requirements()
         original_resources = provisioning_data.instance_type.resources
         instance_offer = get_instance_offer_from_node(
             node=node,
+            region=cluster.region,
             cpu_request=original_resources.cpus,
             memory_mib_request=original_resources.memory_mib,
             gpu_request=len(original_resources.gpus),
@@ -366,14 +375,30 @@ class KubernetesCompute(
         )
         if instance_offer is not None:
             provisioning_data.instance_type = instance_offer.instance
-            provisioning_data.region = instance_offer.region
             provisioning_data.price = instance_offer.price
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
-        api = self.api
-        namespace = self.namespace
+        cluster = self.region_cluster_map.get(region)
+        if cluster is None and region == "-":
+            # legacy DUMMY_REGION
+            cluster = self.region_cluster_map.get(LEGACY_CURRENT_CONTEXT_REGION)
+            if cluster is not None:
+                logger.warning(
+                    (
+                        "Terminating instance %s in unknown region %s."
+                        " Assuming it was created before multi-cluster support was added"
+                        " and is located in cluster %s"
+                    ),
+                    instance_id,
+                    repr(region),
+                    cluster,
+                )
+        if cluster is None:
+            raise ComputeError(f"Unknown region: {region!r}")
+        api = client.CoreV1Api(cluster.api_client)
+        namespace = cluster.namespace
         deleted = [
             try_delete_object_if_exists(
                 api.delete_namespaced_service,
@@ -401,6 +426,12 @@ class KubernetesCompute(
         self,
         configuration: GatewayComputeConfiguration,
     ) -> GatewayProvisioningData:
+        cluster = self.region_cluster_map.get(configuration.region)
+        if cluster is None:
+            raise ComputeError(f"Unknown region: {configuration.region!r}")
+        api = client.CoreV1Api(cluster.api_client)
+        namespace = cluster.namespace
+
         # Gateway creation is currently limited to Kubernetes with Load Balancer support.
         # If the cluster does not support Load Balancer, the service will be provisioned but
         # the external IP/hostname will never be allocated.
@@ -448,8 +479,8 @@ class KubernetesCompute(
                 ]
             ),
         )
-        self.api.create_namespaced_pod(
-            namespace=self.namespace,
+        api.create_namespaced_pod(
+            namespace=namespace,
             body=pod,
         )
         service = client.V1Service(
@@ -478,18 +509,18 @@ class KubernetesCompute(
                 ],
             ),
         )
-        self.api.create_namespaced_service(
-            namespace=self.namespace,
+        api.create_namespaced_service(
+            namespace=namespace,
             body=service,
         )
         # address is eiher a domain name or an IP address
         address = _wait_for_load_balancer_address(
-            api=self.api,
-            namespace=self.namespace,
+            api=api,
+            namespace=namespace,
             service_name=_get_pod_service_name(instance_name),
         )
         if address is None:
-            self.terminate_instance(instance_name, region="")
+            self.terminate_instance(instance_name, region=configuration.region)
             raise ComputeError(
                 "Failed to get gateway hostname. "
                 "Ensure the Kubernetes cluster supports Load Balancer services."
@@ -497,7 +528,7 @@ class KubernetesCompute(
         return GatewayProvisioningData(
             instance_id=instance_name,
             ip_address=address,
-            region="",
+            region=cluster.region,
         )
 
     def terminate_gateway(
@@ -506,21 +537,50 @@ class KubernetesCompute(
         configuration: GatewayComputeConfiguration,
         backend_data: Optional[str] = None,
     ):
+        region = configuration.region
+        cluster = self.region_cluster_map.get(region)
+        if cluster is None:
+            # It may be a legacy configuration with the region set to an arbitrary value
+            cluster = self.region_cluster_map.get(LEGACY_CURRENT_CONTEXT_REGION)
+            if cluster is not None:
+                logger.warning(
+                    (
+                        "Terminating gateway %s in unknown region %s."
+                        " Assuming it was created before multi-cluster support was added"
+                        " and is located in cluster %s"
+                    ),
+                    instance_id,
+                    repr(region),
+                    cluster,
+                )
+                region = LEGACY_CURRENT_CONTEXT_REGION
+            else:
+                raise ComputeError(f"Unknown region: {region!r}")
         self.terminate_instance(
             instance_id=instance_id,
-            region=configuration.region,
+            region=region,
             backend_data=backend_data,
         )
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
         assert isinstance(volume.configuration, KubernetesVolumeConfiguration)
+
+        region = volume.configuration.region
+        cluster = self.region_cluster_map.get(region)
+        if cluster is None:
+            if region == "":
+                raise ComputeError("region is not set")
+            raise ComputeError(f"Unknown region: {region!r}")
+        api = client.CoreV1Api(cluster.api_client)
+        namespace = cluster.namespace
+
         pvc_name = volume.configuration.claim_name
         assert pvc_name is not None
 
         pvc = call_api_method(
-            self.api.read_namespaced_persistent_volume_claim,
+            api.read_namespaced_persistent_volume_claim,
             expected=404,
-            namespace=self.namespace,
+            namespace=namespace,
             name=pvc_name,
         )
         if pvc is None:
@@ -548,7 +608,15 @@ class KubernetesCompute(
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
         assert isinstance(volume.configuration, KubernetesVolumeConfiguration)
-        assert volume.configuration.size is not None
+
+        region = volume.configuration.region
+        cluster = self.region_cluster_map.get(region)
+        if cluster is None:
+            if region == "":
+                raise ComputeError("region is not set")
+            raise ComputeError(f"Unknown region: {region!r}")
+        api = client.CoreV1Api(cluster.api_client)
+        namespace = cluster.namespace
 
         labels = {
             format_dstack_label_key("owner"): "dstack",
@@ -561,6 +629,8 @@ class KubernetesCompute(
             resource_tags=volume.configuration.tags,
         )
         labels = filter_invalid_labels(labels)
+
+        assert volume.configuration.size is not None
 
         pvc_name = generate_unique_volume_name(volume, max_length=OBJECT_NAME_MAX_LENGTH)
         pvc = client.V1PersistentVolumeClaim(
@@ -578,8 +648,8 @@ class KubernetesCompute(
                 ),
             ),
         )
-        self.api.create_namespaced_persistent_volume_claim(
-            namespace=self.namespace,
+        api.create_namespaced_persistent_volume_claim(
+            namespace=namespace,
             body=pvc,
         )
         logger.debug("Created PVC %s for volume %s", pvc_name, volume.name)
@@ -594,13 +664,21 @@ class KubernetesCompute(
 
     def delete_volume(self, volume: Volume):
         assert isinstance(volume.configuration, KubernetesVolumeConfiguration)
+
+        region = volume.configuration.region
+        cluster = self.region_cluster_map.get(region)
+        if cluster is None:
+            raise ComputeError(f"Unknown region: {region!r}")
+        api = client.CoreV1Api(cluster.api_client)
+        namespace = cluster.namespace
+
         pvc_name = volume.volume_id
         assert pvc_name is not None
 
         pvc = call_api_method(
-            self.api.delete_namespaced_persistent_volume_claim,
+            api.delete_namespaced_persistent_volume_claim,
             expected=404,
-            namespace=self.namespace,
+            namespace=namespace,
             name=pvc_name,
         )
         if pvc is None:
@@ -1170,11 +1248,15 @@ def _wait_for_pod_scheduled_or_finished(
     # the scheduler confirmed capacity and that the assigned node is actually Ready and
     # working on the pod.
     pod_phase: Optional[PodPhase] = None
+    # Ensure that API's timeoutSeconds fires earlier than the network timeout, which defaults to
+    # our custom ApiClient's constructor parameter, see DEFAULT_REQUEST_TIMEOUT
+    request_timeout = timeout_seconds + 5
     with watch_events(
         api.list_namespaced_pod,
         namespace=namespace,
         field_selector=f"metadata.name={pod_name}",
         timeout_seconds=timeout_seconds,
+        _request_timeout=request_timeout,
     ) as event_iter:
         for _, pod in event_iter:
             pod_status = pod.status

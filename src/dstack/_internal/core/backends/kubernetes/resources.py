@@ -240,7 +240,7 @@ def is_taint_tolerated(taint: V1Taint) -> bool:
 
 
 def get_instance_offers(
-    api: CoreV1Api, requirements: Requirements
+    api: CoreV1Api, region: str, requirements: Requirements
 ) -> list[InstanceOfferWithAvailability]:
     resources_spec = requirements.resources
     assert isinstance(resources_spec.cpu, CPUSpec)
@@ -262,6 +262,7 @@ def get_instance_offers(
             node=node,
             node_name=node_name,
             node_allocated_resources=nodes_allocated_resources.get(node_name),
+            region=region,
             cpu_request=cpu_request,
             memory_mib_request=memory_mib_request,
             gpu_request=gpu_request,
@@ -275,6 +276,7 @@ def get_instance_offers(
 def get_instance_offer_from_node(
     node: V1Node,
     *,
+    region: str,
     cpu_request: int,
     memory_mib_request: int,
     gpu_request: int,
@@ -287,6 +289,7 @@ def get_instance_offer_from_node(
         node=node,
         node_name=node_name,
         node_allocated_resources=None,
+        region=region,
         cpu_request=cpu_request,
         memory_mib_request=memory_mib_request,
         gpu_request=gpu_request,
@@ -342,6 +345,7 @@ def _get_instance_offer_from_node(
     node: V1Node,
     node_name: str,
     node_allocated_resources: Optional[KubernetesResources],
+    region: str,
     cpu_request: int,
     memory_mib_request: int,
     gpu_request: int,
@@ -384,7 +388,7 @@ def _get_instance_offer_from_node(
             ),
         ),
         price=0,
-        region="",
+        region=region,
         availability=InstanceAvailability.AVAILABLE,
         instance_runtime=InstanceRuntime.RUNNER,
     )

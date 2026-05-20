@@ -33,7 +33,10 @@ def _get_volume_configuration_excludes(
 ) -> IncludeExcludeDictType:
     configuration_excludes: IncludeExcludeDictType = {}
 
-    if isinstance(configuration, KubernetesVolumeConfiguration) and not configuration.read_only:
-        configuration_excludes["read_only"] = True
+    if isinstance(configuration, KubernetesVolumeConfiguration):
+        if not configuration.read_only:
+            configuration_excludes["read_only"] = True
+        if configuration.region == "":
+            configuration_excludes["region"] = True
 
     return configuration_excludes

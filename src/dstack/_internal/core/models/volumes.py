@@ -134,10 +134,12 @@ class RunpodVolumeConfiguration(VolumeConfigurationWithRegion, VolumeConfigurati
     """Runpod doesn't have AZs but we accept this field for compatibility with older clients."""
 
 
-class KubernetesVolumeConfiguration(BaseVolumeConfiguration):
+class KubernetesVolumeConfiguration(VolumeConfigurationWithRegion):
     backend: Annotated[
         Literal[BackendType.KUBERNETES], Field(description="The volume backend")
     ] = BackendType.KUBERNETES
+    region: Annotated[str, Field(description="The volume region (cluster)")] = ""
+    """`region` uses a default value for backward compatibility."""
     size: Annotated[
         Optional[Memory],
         Field(

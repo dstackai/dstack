@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import (
     Annotated,
     Any,
@@ -12,26 +13,150 @@ from typing import (
     Union,
     cast,
 )
+from uuid import UUID
 
 import yaml
-from kubernetes.client import CoreV1Api, V1Status
+from cachetools import TTLCache
+from kubernetes.client import V1Status, VersionApi
 from kubernetes.client.exceptions import ApiException
-from kubernetes.config import (
-    # XXX: This function is missing in the stubs package
-    new_client_from_config_dict,  # pyright: ignore[reportAttributeAccessIssue]
-)
 from kubernetes.watch import Watch
 from pydantic import Field
 from typing_extensions import ParamSpec, TypedDict
-from urllib3.exceptions import HTTPError
 
+from dstack._internal.core.backends.kubernetes.api_client import (
+    API_CLIENT_EXCEPTIONS,
+    ApiClient,
+    get_api_client_from_kubeconfig_dict,
+)
+from dstack._internal.core.backends.kubernetes.models import (
+    KubernetesBackendConfigWithCreds,
+    KubernetesProxyJumpConfig,
+)
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.instances import InstanceOffer
+from dstack._internal.core.models.runs import Job, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 T = TypeVar("T")
 P = ParamSpec("P")
+
+
+LEGACY_CURRENT_CONTEXT_REGION = ""
+
+
+@dataclass
+class Cluster:
+    context_name: str
+    region: str
+    api_client: ApiClient
+    namespace: str
+    proxy_jump: KubernetesProxyJumpConfig
+
+    def __str__(self) -> str:
+        parts: list[str] = []
+        parts.append(f"context={self.context_name!r}")
+        if self.context_name != self.region:
+            parts.append(f"region={self.region!r}")
+        return f"({' '.join(parts)})"
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}{self}"
+
+
+def check_cluster(cluster: Cluster) -> bool:
+    version_api = VersionApi(cluster.api_client)
+    try:
+        version_info = version_api.get_code()
+    except API_CLIENT_EXCEPTIONS as e:
+        logger.debug("cluster %s check failed: %s: %s", cluster, e.__class__.__name__, e)
+        return False
+    logger.debug("cluster %s gitVersion: %s", cluster, version_info.git_version)
+    return True
+
+
+def get_clusters_from_backend_config(
+    config: KubernetesBackendConfigWithCreds,
+    *,
+    request_timeout: Optional[int] = None,
+    retries: Optional[int] = None,
+) -> list[Cluster]:
+    clusters: list[Cluster] = []
+    kubeconfig_dict = kubeconfig_data_to_kubeconfig_dict(config.kubeconfig.data)
+    kubeconfig = kubeconfig_dict_to_kubeconfig(kubeconfig_dict)
+    if config.contexts is not None:
+        for context in config.contexts:
+            if isinstance(context, str):
+                context_name = context
+                proxy_jump = None
+            else:
+                context_name = context.name
+                proxy_jump = context.proxy_jump
+            kubeconfig_context = kubeconfig.get_context(context_name)
+            api_client = get_api_client_from_kubeconfig_dict(
+                kubeconfig_dict,
+                context=context_name,
+                request_timeout=request_timeout,
+                retries=retries,
+            )
+            namespace = kubeconfig_context.namespace
+            if proxy_jump is None:
+                proxy_jump = KubernetesProxyJumpConfig()
+            clusters.append(
+                Cluster(
+                    context_name=context_name,
+                    region=context_name,
+                    api_client=api_client,
+                    namespace=namespace,
+                    proxy_jump=proxy_jump,
+                )
+            )
+    else:
+        current_kubeconfig_context = kubeconfig.get_context()
+        context_name = kubeconfig.current_context
+        # Already checked by Kubeconfig.get_context()
+        assert context_name is not None
+        api_client = get_api_client_from_kubeconfig_dict(
+            kubeconfig_dict,
+            context=context_name,
+            request_timeout=request_timeout,
+            retries=retries,
+        )
+        config_namespace = config.namespace
+        if config_namespace is None:
+            config_namespace = "default"
+        context_namespace = current_kubeconfig_context.namespace
+        if context_namespace != config_namespace:
+            logger.warning(
+                (
+                    "Namespace mismatch: kubeconfig -> '%s', backend config -> '%s'."
+                    " The current dstack version ignores kubeconfig"
+                    " and uses deprecated namespace property from backend config."
+                    " Future versions will use namespace from kubeconfig."
+                    " To keep using '%s' namespace in future versions and suppress this warning,"
+                    " set namespace to '%s' in kubeconfig context '%s'"
+                ),
+                context_namespace,
+                config_namespace,
+                config_namespace,
+                config_namespace,
+                context_name,
+            )
+        proxy_jump = config.proxy_jump
+        if proxy_jump is None:
+            proxy_jump = KubernetesProxyJumpConfig()
+        clusters.append(
+            Cluster(
+                context_name=context_name,
+                region=LEGACY_CURRENT_CONTEXT_REGION,
+                api_client=api_client,
+                # TODO: switch to context_namespace
+                namespace=config_namespace,
+                proxy_jump=proxy_jump,
+            )
+        )
+    return clusters
 
 
 class KubeconfigContext(CoreModel):
@@ -74,18 +199,28 @@ def kubeconfig_dict_to_kubeconfig(kubeconfig_dict: dict) -> Kubeconfig:
     return Kubeconfig.__response__.parse_obj(kubeconfig_dict)
 
 
-def get_api_from_kubeconfig_data(
-    kubeconfig_data: str, *, context: Optional[str] = None
-) -> CoreV1Api:
-    kubeconfig_dict = kubeconfig_data_to_kubeconfig_dict(kubeconfig_data)
-    return get_api_from_kubeconfig_dict(kubeconfig_dict, context=context)
+class SkipOfferCache:
+    """
+    `SkipOfferCache` is used to track (run/job, offer) pairs that failed to provision.
 
+    The current implementation tracks _any_ job of the specific run (identified by `Run.id`)
+    on the specific cluster (identified by `InstanceOffer.region`, that is, a kubeconfig context).
+    """
 
-def get_api_from_kubeconfig_dict(
-    kubeconfig_dict: dict, *, context: Optional[str] = None
-) -> CoreV1Api:
-    api_client = new_client_from_config_dict(config_dict=kubeconfig_dict, context=context)
-    return CoreV1Api(api_client=api_client)
+    def __init__(self, *, ttl: int, maxsize: int = 1000) -> None:
+        self._cache = TTLCache[tuple[UUID, str], Literal[True]](maxsize=maxsize, ttl=ttl)
+
+    def add(self, run: Run, job: Job, offer: InstanceOffer) -> None:
+        self._cache[self._build_key(run, job, offer)] = True
+
+    def check(self, run: Run, job: Job, offer: InstanceOffer) -> bool:
+        return self._build_key(run, job, offer) in self._cache
+
+    def _build_key(self, run: Run, job: Job, offer: InstanceOffer) -> tuple[UUID, str]:
+        # The current implementation uses only Run.id ignoring the job/job spec.
+        # A more sophisticated implementation could use some parts of the job spec
+        # (e.g., requirements, volumes) instead.
+        return (run.id, offer.region)
 
 
 def call_api_method(
@@ -136,7 +271,7 @@ def try_delete_object_if_exists(
             namespace=namespace,
             name=name,
         )
-    except (HTTPError, ApiException) as e:
+    except API_CLIENT_EXCEPTIONS as e:
         if should_delete_manually_if_failed:
             logger.exception(
                 "Failed to delete %s %s in namespace %s. Please delete it manually",
