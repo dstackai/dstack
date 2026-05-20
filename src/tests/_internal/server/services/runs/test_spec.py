@@ -1,16 +1,19 @@
 import re
 import uuid
+from types import SimpleNamespace
 
 import pytest
 
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.files import FileArchiveMapping
+from dstack._internal.core.models.profiles import Profile, ProfileRetry
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.runs.spec import (
     _check_can_update_configuration,
     check_can_update_run_spec,
+    validate_run_spec_and_set_defaults,
 )
 from dstack._internal.server.testing.common import get_run_spec
 
@@ -75,6 +78,24 @@ def _run_spec_with_overrides(configuration: ServiceConfiguration, **overrides) -
     if not run_spec_overrides:
         return run_spec
     return RunSpec.parse_obj({**run_spec.dict(), **run_spec_overrides})
+
+
+class TestValidateRunSpecRetryDuration:
+    def test_model_accepts_negative_retry_duration_for_backward_compatibility(self):
+        retry = ProfileRetry(duration=-1)
+
+        assert retry.duration == -1
+
+    def test_rejects_negative_retry_duration_for_new_run_specs(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            profile=Profile(name="default", retry=ProfileRetry(duration=-1)),
+        )
+
+        with pytest.raises(ServerClientError, match="retry.duration cannot be negative"):
+            validate_run_spec_and_set_defaults(
+                SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
+            )
 
 
 class TestCheckCanUpdateConfigurationRouterType:
