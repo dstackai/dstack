@@ -567,19 +567,9 @@ replicas:
       metric: rps
       target: 300
     commands:
+      # Preload the RoCE driver library from the host (for Broadcom driver compatibility)
+      - export LD_PRELOAD=/mnt/lib/libbnxt_re-rdmav34.so
       - |
-        set -e
-        inject_bnxt_re_libibverbs() {
-          CONT_LIB=/usr/lib/x86_64-linux-gnu
-          cp /mnt/host/lib64/libibverbs.so.1.14.54.0 "${CONT_LIB}/"
-          ln -sf libibverbs.so.1.14.54.0 "${CONT_LIB}/libibverbs.so.1"
-          cp /mnt/host/libibverbs/libbnxt_re-rdmav34.so "${CONT_LIB}/libibverbs/"
-          mkdir -p /usr/lib64
-          ln -sfn "${CONT_LIB}/libibverbs" /usr/lib64/libibverbs
-          ldconfig
-          ibv_devinfo 2>&1 | grep -E "hca_id|state|link_layer" || true
-        }
-        inject_bnxt_re_libibverbs
         python3 -m sglang.launch_server \
           --model $MODEL_ID \
           --disaggregation-mode prefill \
@@ -605,19 +595,9 @@ replicas:
       metric: rps
       target: 300
     commands:
+      # Preload the RoCE driver library from the host (for Broadcom driver compatibility)
+      - export LD_PRELOAD=/mnt/lib/libbnxt_re-rdmav34.so
       - |
-        set -e
-        inject_bnxt_re_libibverbs() {
-          CONT_LIB=/usr/lib/x86_64-linux-gnu
-          cp /mnt/host/lib64/libibverbs.so.1.14.54.0 "${CONT_LIB}/"
-          ln -sf libibverbs.so.1.14.54.0 "${CONT_LIB}/libibverbs.so.1"
-          cp /mnt/host/libibverbs/libbnxt_re-rdmav34.so "${CONT_LIB}/libibverbs/"
-          mkdir -p /usr/lib64
-          ln -sfn "${CONT_LIB}/libibverbs" /usr/lib64/libibverbs
-          ldconfig
-          ibv_devinfo 2>&1 | grep -E "hca_id|state|link_layer" || true
-        }
-        inject_bnxt_re_libibverbs
         python3 -m sglang.launch_server \
           --model $MODEL_ID \
           --disaggregation-mode decode \
@@ -648,15 +628,25 @@ probes:
     interval: 15s
 
 volumes:
-  - instance_path: /usr/lib64
-    path: /mnt/host/lib64
-  - instance_path: /usr/lib64/libibverbs
-    path: /mnt/host/libibverbs
+  - /usr/local/lib:/mnt/lib
 ```
 
 </div>
 
-> On MI300X, `inject_bnxt_re_libibverbs()` injects host `libibverbs` so prefill/decode workers can use `bnxt_re` RDMA devices.
+!!! info "RoCE library"
+    The container does not include `libbnxt_re-rdmav34.so`, which is the Broadcom-specific userspace RDMA/RoCE provider library.
+    This library is required by `libibverbs` to communicate with Broadcom `bnxt_re` RDMA devices such as `bnxt_re0`, `bnxt_re1`, ...,
+    `bnxt_re7`. There are two ways to make this library available inside the container: either copy `libbnxt_re-rdmav34.so` from the
+    host to `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so`, or load it using `LD_PRELOAD` as done in the example.
+
+    In some setups, we may also need to copy the host’s `libibverbs` library itself into the container. For example:
+
+    From Host: `/usr/lib64/libibverbs.so.1.14.54.0` to Container: `/usr/lib/x86_64-linux-gnu/libibverbs.so.1.14.54.0`
+
+    After copying it, create a symlink:`/usr/lib/x86_64-linux-gnu/libibverbs.so.1 -> /usr/lib/x86_64-linux-gnu/libibverbs.so.1.14.54.0`
+
+    This is needed because most applications do not load the full versioned filename `libibverbs.so.1.14.54.0` directly. Instead,
+    they usually look for the generic shared library name: `libibverbs.so.1`.
 
 
 

@@ -111,9 +111,19 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
     </div>
 
     !!! info "RoCE library"
-        Broadcom RoCE drivers require the `libbnxt_re` userspace library inside the container to be compatible with the host’s Broadcom 
-        kernel driver `bnxt_re`. To ensure this compatibility, we mount `libbnxt_re-rdmav34.so` from the host and preload it 
-        using `LD_PRELOAD` when running MPI.
+        The container does not include `libbnxt_re-rdmav34.so`, which is the Broadcom-specific userspace RDMA/RoCE provider library.
+        This library is required by `libibverbs` to communicate with Broadcom `bnxt_re` RDMA devices such as `bnxt_re0`, `bnxt_re1`, ...,
+        `bnxt_re7`. There are two ways to make this library available inside the container: either copy `libbnxt_re-rdmav34.so` from the
+        host to `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so`, or load it using `LD_PRELOAD` as done in the example.
+
+        In some setups, we may also need to copy the host’s `libibverbs` library itself into the container. For example:
+
+        From Host: `/usr/lib64/libibverbs.so.1.14.54.0` to Container: `/usr/lib/x86_64-linux-gnu/libibverbs.so.1.14.54.0`
+
+        After copying it, create a symlink:`/usr/lib/x86_64-linux-gnu/libibverbs.so.1 -> /usr/lib/x86_64-linux-gnu/libibverbs.so.1.14.54.0`
+
+        This is needed because most applications do not load the full versioned filename `libibverbs.so.1.14.54.0` directly. Instead,
+        they usually look for the generic shared library name: `libibverbs.so.1`.
 
 !!! info "Privileged"
     In some cases, the backend (e.g., `kubernetes`) may require `privileged: true` to access the high-speed interconnect (e.g., InfiniBand).
