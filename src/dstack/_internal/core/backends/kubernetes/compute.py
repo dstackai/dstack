@@ -1248,11 +1248,15 @@ def _wait_for_pod_scheduled_or_finished(
     # the scheduler confirmed capacity and that the assigned node is actually Ready and
     # working on the pod.
     pod_phase: Optional[PodPhase] = None
+    # Ensure that API's timeoutSeconds fires earlier than the network timeout, which defaults to
+    # our custom ApiClient's constructor parameter, see DEFAULT_REQUEST_TIMEOUT
+    request_timeout = timeout_seconds + 5
     with watch_events(
         api.list_namespaced_pod,
         namespace=namespace,
         field_selector=f"metadata.name={pod_name}",
         timeout_seconds=timeout_seconds,
+        _request_timeout=request_timeout,
     ) as event_iter:
         for _, pod in event_iter:
             pod_status = pod.status
