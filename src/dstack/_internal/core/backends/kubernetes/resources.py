@@ -5,7 +5,7 @@ import re
 from collections.abc import Mapping
 from decimal import Decimal
 from enum import Enum
-from typing import Callable, Optional, Union, cast
+from typing import Callable, Literal, Optional, Union, cast
 
 from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
 
@@ -135,6 +135,29 @@ class KubernetesResources:
         return type(self)(**dct)
 
 
+def build_base_labels(
+    *,
+    component: Literal["ssh-proxy", "job", "gateway", "volume"],
+    unique_name: str,
+    project: str,
+    name: Optional[str] = None,
+    user: Optional[str] = None,
+) -> dict[str, str]:
+    labels = {
+        "app.kubernetes.io/name": f"dstack-{component}",
+        # app.kubernetes.io/component would be redundant as app.kubernetes.io/name already includes
+        # it with dstack- prefix
+        "app.kubernetes.io/instance": unique_name,
+        "app.kubernetes.io/managed-by": "dstack",
+        "k8s.dstack.ai/project": project,
+    }
+    if name is not None:
+        labels["k8s.dstack.ai/name"] = name
+    if user is not None:
+        labels["k8s.dstack.ai/user"] = user
+    return labels
+
+
 def filter_invalid_labels(labels: dict[str, str]) -> dict[str, str]:
     filtered_labels: dict[str, str] = {}
     for k, v in labels.items():
@@ -176,10 +199,6 @@ def validate_label_value(value: str) -> None:
         raise ValueError("Value too long")
     if LABEL_VALUE_REGEX.fullmatch(value) is None:
         raise ValueError("Invalid value")
-
-
-def format_dstack_label_key(name: str) -> str:
-    return f"k8s.dstack.ai/{name}"
 
 
 def build_dockerconfigjson(image_name: str, username: str, password: str) -> str:
