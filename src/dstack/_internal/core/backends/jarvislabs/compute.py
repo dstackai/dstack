@@ -1,24 +1,29 @@
 import shlex
 import subprocess
 import tempfile
-import time
+from collections.abc import Iterable
 from typing import List, Optional
 
 import gpuhunt
+from gpuhunt.providers.jarvislabs import JarvisLabsProvider
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
-    ComputeWithFilteredOffersCached,
     ComputeWithInstanceVolumesSupport,
     ComputeWithPrivilegedSupport,
     generate_unique_instance_name,
     get_shim_commands,
 )
-from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.offers import (
+    OfferModifier,
+    get_catalog_offers,
+    get_offers_disk_modifier,
+)
 from dstack._internal.core.backends.jarvislabs.api_client import JarvisLabsAPIClient
 from dstack._internal.core.backends.jarvislabs.models import JarvisLabsConfig
-from dstack._internal.core.errors import BackendError, NoCapacityError, ProvisioningError
+from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -26,23 +31,24 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.placement import PlacementGroup
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 MAX_INSTANCE_NAME_LEN = 40
-DEFAULT_DISK_SIZE_GB = 100
+# JarvisLabs VM storage is configurable through the `hdd` create parameter.
+MIN_DISK_SIZE = Memory.parse("100GB")
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=MIN_DISK_SIZE, max=None)
 DEFAULT_USERNAME = "ubuntu"
 SSH_CONNECT_TIMEOUT_SECONDS = 10
 SSH_SETUP_TIMEOUT_SECONDS = 240
 SSH_LAUNCH_TIMEOUT_SECONDS = 60
-CREATE_FAILURE_POLL_INTERVAL_SECONDS = 5
-CREATE_FAILURE_POLL_TIMEOUT_SECONDS = 30
 
 
 class JarvisLabsCompute(
-    ComputeWithFilteredOffersCached,
+    ComputeWithAllOffersCached,
     ComputeWithCreateInstanceSupport,
     ComputeWithPrivilegedSupport,
     ComputeWithInstanceVolumesSupport,
@@ -52,21 +58,23 @@ class JarvisLabsCompute(
         super().__init__()
         self.config = config
         self.api_client = JarvisLabsAPIClient(config.creds.api_key)
-        self._catalog: Optional[gpuhunt.Catalog] = None
+        self._catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
+        self._catalog.add_provider(JarvisLabsProvider(api_key=self.config.creds.api_key))
 
-    def get_offers_by_requirements(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    def get_all_offers_with_availability(self) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.JARVISLABS,
             locations=self.config.regions or None,
-            requirements=requirements,
-            catalog=self._get_catalog(),
+            catalog=self._catalog,
+            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
         return [
             offer.with_availability(availability=InstanceAvailability.AVAILABLE)
             for offer in offers
         ]
+
+    def get_offers_modifiers(self, requirements: Requirements) -> Iterable[OfferModifier]:
+        return [get_offers_disk_modifier(CONFIGURABLE_DISK_SIZE, requirements)]
 
     def create_instance(
         self,
@@ -98,11 +106,6 @@ class JarvisLabsCompute(
                     name=instance_name,
                 )
 
-            _raise_if_create_failed(
-                api_client=self.api_client,
-                machine_id=instance_id,
-                region=instance_offer.region,
-            )
         except BaseException:
             if instance_id is not None:
                 try:
@@ -143,12 +146,12 @@ class JarvisLabsCompute(
                 region=provisioning_data.region,
             )
             if status is not None and str(status.get("status")).lower() == "failed":
-                raise ProvisioningError(_format_failed_status(status), status)
+                _raise_failed_status(status)
             return
 
         status = str(instance.get("status")).lower()
         if status == "failed":
-            raise ProvisioningError("JarvisLabs instance entered Failed state", instance)
+            _raise_failed_status(instance)
         if status != "running":
             return
 
@@ -171,19 +174,6 @@ class JarvisLabsCompute(
     ):
         self.api_client.destroy_instance(machine_id=instance_id, region=region)
 
-    def _get_catalog(self) -> gpuhunt.Catalog:
-        if self._catalog is None:
-            try:
-                from gpuhunt.providers.jarvislabs import JarvisLabsProvider
-            except ImportError as e:
-                raise BackendError(
-                    "JarvisLabs backend requires gpuhunt with JarvisLabs provider support"
-                ) from e
-            catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
-            catalog.add_provider(JarvisLabsProvider(api_key=self.config.creds.api_key))
-            self._catalog = catalog
-        return self._catalog
-
 
 def _get_jarvislabs_gpu_type(instance_offer: InstanceOfferWithAvailability) -> str:
     gpu = instance_offer.instance.resources.gpus[0]
@@ -195,7 +185,7 @@ def _get_jarvislabs_gpu_type(instance_offer: InstanceOfferWithAvailability) -> s
 
 def _get_disk_size_gb(instance_offer: InstanceOfferWithAvailability) -> int:
     disk_size_gb = round(instance_offer.instance.resources.disk.size_mib / 1024)
-    return max(DEFAULT_DISK_SIZE_GB, disk_size_gb)
+    return max(round(MIN_DISK_SIZE), disk_size_gb)
 
 
 def _format_failed_status(status: dict) -> str:
@@ -206,31 +196,8 @@ def _format_failed_status(status: dict) -> str:
     return f"JarvisLabs instance creation failed: {message}"
 
 
-def _raise_if_create_failed(
-    *,
-    api_client: JarvisLabsAPIClient,
-    machine_id: str,
-    region: str,
-):
-    deadline = time.monotonic() + CREATE_FAILURE_POLL_TIMEOUT_SECONDS
-    while time.monotonic() < deadline:
-        status = api_client.get_instance_status(machine_id=machine_id, region=region)
-        if status is None:
-            return
-        status_value = str(status.get("status")).lower()
-        if status_value == "failed":
-            message = _format_failed_status(status)
-            if _looks_like_no_capacity(message):
-                raise NoCapacityError(message)
-            raise ProvisioningError(message)
-        if status_value == "running":
-            return
-        time.sleep(CREATE_FAILURE_POLL_INTERVAL_SECONDS)
-
-
-def _looks_like_no_capacity(message: str) -> bool:
-    message = message.lower()
-    return "capacity" in message or "available" in message or "stock" in message
+def _raise_failed_status(status: dict) -> None:
+    raise ProvisioningError(_format_failed_status(status), status)
 
 
 def _get_ssh_username(instance: dict) -> str:

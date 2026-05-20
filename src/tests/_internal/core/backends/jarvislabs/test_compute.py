@@ -3,11 +3,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from dstack._internal.core.backends.jarvislabs.compute import (
+    CONFIGURABLE_DISK_SIZE,
     JarvisLabsCompute,
     _get_disk_size_gb,
     _get_jarvislabs_gpu_type,
     _get_ssh_username,
-    _raise_if_create_failed,
 )
 from dstack._internal.core.backends.jarvislabs.models import JarvisLabsConfig, JarvisLabsCreds
 from dstack._internal.core.errors import NoCapacityError, ProvisioningError
@@ -17,12 +17,14 @@ from dstack._internal.core.models.instances import (
     Gpu,
     InstanceAvailability,
     InstanceConfiguration,
+    InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
     Resources,
     SSHKey,
 )
-from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 
 
 def _compute() -> JarvisLabsCompute:
@@ -87,6 +89,16 @@ def _cpu_offer(*, disk_size_mib: int = 10 * 1024) -> InstanceOfferWithAvailabili
     )
 
 
+def _cpu_catalog_offer(*, disk_size_mib: int = 10 * 1024) -> InstanceOffer:
+    offer = _cpu_offer(disk_size_mib=disk_size_mib)
+    return InstanceOffer(
+        backend=offer.backend,
+        instance=offer.instance,
+        region=offer.region,
+        price=offer.price,
+    )
+
+
 def test_get_jarvislabs_gpu_type_reconstructs_a100_80gb():
     assert _get_jarvislabs_gpu_type(_gpu_offer()) == "A100-80GB"
     assert _get_jarvislabs_gpu_type(_gpu_offer(gpu_memory_mib=40 * 1024)) == "A100"
@@ -96,6 +108,41 @@ def test_get_jarvislabs_gpu_type_reconstructs_a100_80gb():
 def test_get_disk_size_gb_clamps_to_jarvislabs_vm_minimum():
     assert _get_disk_size_gb(_cpu_offer(disk_size_mib=10 * 1024)) == 100
     assert _get_disk_size_gb(_gpu_offer(disk_size_mib=250 * 1024)) == 250
+
+
+def test_get_all_offers_uses_configurable_disk_size():
+    compute = _compute()
+
+    with patch(
+        "dstack._internal.core.backends.jarvislabs.compute.get_catalog_offers",
+        return_value=[_cpu_catalog_offer()],
+    ) as m:
+        offers = compute.get_all_offers_with_availability()
+
+    assert len(offers) == 1
+    assert offers[0].availability == InstanceAvailability.AVAILABLE
+    m.assert_called_once_with(
+        backend=BackendType.JARVISLABS,
+        locations=["india-noida-01"],
+        catalog=compute._catalog,
+        configurable_disk_size=CONFIGURABLE_DISK_SIZE,
+    )
+
+
+def test_get_offers_reuses_all_offers_cache_and_modifies_disk_size():
+    compute = _compute()
+    compute.get_all_offers_with_availability = MagicMock(
+        return_value=[_cpu_offer(disk_size_mib=100 * 1024)]
+    )
+
+    offers_250gb = list(compute.get_offers(Requirements(resources=ResourcesSpec(disk="250GB"))))
+    offers_300gb = list(compute.get_offers(Requirements(resources=ResourcesSpec(disk="300GB"))))
+
+    assert len(offers_250gb) == 1
+    assert offers_250gb[0].instance.resources.disk.size_mib == 250 * 1024
+    assert len(offers_300gb) == 1
+    assert offers_300gb[0].instance.resources.disk.size_mib == 300 * 1024
+    compute.get_all_offers_with_availability.assert_called_once()
 
 
 def test_create_gpu_instance_registers_ssh_key_and_creates_gpu_vm():
@@ -121,6 +168,7 @@ def test_create_gpu_instance_registers_ssh_key_and_creates_gpu_vm():
     assert provisioning_data.username == "ubuntu"
     assert provisioning_data.dockerized is True
     assert provisioning_data.backend_data is None
+    compute.api_client.get_instance_status.assert_not_called()
 
 
 def test_create_gpu_instance_passes_spot_flag():
@@ -254,14 +302,11 @@ def test_terminate_instance_delegates_to_api_client():
     )
 
 
-def test_create_instance_cleans_up_post_create_failure():
+def test_create_instance_propagates_create_failure_without_cleanup():
     compute = _compute()
-    compute.api_client.create_gpu_vm.return_value = "123"
-    compute.api_client.get_instance_status.return_value = {
-        "status": "Failed",
-        "error": "L4 not available at this moment, please try again later",
-        "code": 404,
-    }
+    compute.api_client.create_gpu_vm.side_effect = NoCapacityError(
+        "L4 not available at this moment, please try again later"
+    )
 
     with patch(
         "dstack._internal.core.backends.jarvislabs.compute.generate_unique_instance_name",
@@ -270,41 +315,58 @@ def test_create_instance_cleans_up_post_create_failure():
         with pytest.raises(NoCapacityError):
             compute.create_instance(_gpu_offer(spot=True), _instance_config(), None)
 
-    compute.api_client.destroy_instance.assert_called_once_with(
-        machine_id="123",
-        region="india-noida-01",
-    )
+    compute.api_client.destroy_instance.assert_not_called()
 
 
-def test_raise_if_create_failed_due_to_no_capacity():
-    api_client = MagicMock()
-    api_client.get_instance_status.return_value = {
+def test_update_provisioning_data_raises_provisioning_error_from_failed_capacity_status():
+    compute = _compute()
+    compute.api_client.get_instance.return_value = None
+    compute.api_client.get_instance_status.return_value = {
         "status": "Failed",
         "error": "L4 not available at this moment, please try again later",
         "code": 404,
     }
+    provisioning_data = JobProvisioningData(
+        backend=BackendType.JARVISLABS,
+        instance_type=_gpu_offer().instance,
+        instance_id="123",
+        region="india-noida-01",
+        price=1.49,
+        username="ubuntu",
+        ssh_port=22,
+        dockerized=True,
+    )
 
-    with patch("dstack._internal.core.backends.jarvislabs.compute.time.sleep"):
-        with pytest.raises(NoCapacityError):
-            _raise_if_create_failed(
-                api_client=api_client,
-                machine_id="123",
-                region="india-noida-01",
-            )
+    with pytest.raises(ProvisioningError):
+        compute.update_provisioning_data(
+            provisioning_data,
+            project_ssh_public_key="ssh-rsa AAAA test",
+            project_ssh_private_key="private-key",
+        )
 
 
-def test_raise_if_create_failed_raises_provisioning_error():
-    api_client = MagicMock()
-    api_client.get_instance_status.return_value = {
+def test_update_provisioning_data_raises_provisioning_error_from_failed_status():
+    compute = _compute()
+    compute.api_client.get_instance.return_value = None
+    compute.api_client.get_instance_status.return_value = {
         "status": "Failed",
         "error": "image setup failed",
         "code": 500,
     }
+    provisioning_data = JobProvisioningData(
+        backend=BackendType.JARVISLABS,
+        instance_type=_gpu_offer().instance,
+        instance_id="123",
+        region="india-noida-01",
+        price=1.49,
+        username="ubuntu",
+        ssh_port=22,
+        dockerized=True,
+    )
 
-    with patch("dstack._internal.core.backends.jarvislabs.compute.time.sleep"):
-        with pytest.raises(ProvisioningError):
-            _raise_if_create_failed(
-                api_client=api_client,
-                machine_id="123",
-                region="india-noida-01",
-            )
+    with pytest.raises(ProvisioningError):
+        compute.update_provisioning_data(
+            provisioning_data,
+            project_ssh_public_key="ssh-rsa AAAA test",
+            project_ssh_private_key="private-key",
+        )
