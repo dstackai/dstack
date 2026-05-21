@@ -111,9 +111,9 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
     </div>
 
     !!! info "RoCE library"
-        Broadcom RoCE drivers require the `libbnxt_re` userspace library inside the container to be compatible with the host’s Broadcom 
-        kernel driver `bnxt_re`. To ensure this compatibility, we mount `libbnxt_re-rdmav34.so` from the host and preload it 
-        using `LD_PRELOAD` when running MPI.
+        RCCL tests use the RDMA/RoCE interconnect for internode communication. To use the RDMA/RoCE interconnect on Broadcom `bnxt_re` devices, RCCL requires the Broadcom-specific userspace provider library `libbnxt_re-rdmav34.so` to be available inside the container at `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so`. We make this library available by mounting it from the host and using `LD_PRELOAD` when running MPI.
+
+        Alternatively, you can avoid `LD_PRELOAD` and directly mount `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so` if you use a custom image with OpenMPI pre-installed.
 
 !!! info "Privileged"
     In some cases, the backend (e.g., `kubernetes`) may require `privileged: true` to access the high-speed interconnect (e.g., InfiniBand).
