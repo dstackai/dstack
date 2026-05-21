@@ -1,6 +1,7 @@
 declare interface IGateway {
     backend: string,
     name: string,
+    project_name?: string,
     ip_address: string,
     instance_id: string,
     region:string
