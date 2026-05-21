@@ -27,9 +27,10 @@ logger.info("Generating schema reference...")
 
 def _is_linkable_type(annotation: Any) -> bool:
     """Check if a type annotation contains a BaseModel subclass (excluding Range)."""
-    if inspect.isclass(annotation):
-        return issubclass(annotation, BaseModel) and not issubclass(annotation, Range)
     origin = get_origin(annotation)
+    type_ = origin if origin is not None else annotation
+    if inspect.isclass(type_):
+        return issubclass(type_, BaseModel) and not issubclass(type_, Range)
     if origin is Annotated:
         return _is_linkable_type(get_args(annotation)[0])
     if origin is Union:
@@ -239,12 +240,12 @@ def generate_schema_reference(
             default_repr = None
         elif isinstance(default, (list, tuple, dict)) and len(default) == 0:
             default_repr = None
-        elif isinstance(default, str):
-            default_repr = default
-        elif isinstance(default, BaseModel):
-            default_repr = str(default)
         elif isinstance(default, Enum):
             default_repr = str(default.value)
+        elif isinstance(default, BaseModel):
+            default_repr = str(default)
+        elif isinstance(default, str):
+            default_repr = default
         else:
             default_repr = json.dumps(default)
         friendly_type = get_friendly_type(field.annotation)

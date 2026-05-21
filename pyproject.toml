@@ -153,18 +153,20 @@ dev = [
     "pytest-xdist>=3.6.1",
     "pyinstrument>=5.0.0",
     "kubernetes-stubs-elephant-fork>=35.0.0.post3",
-    # docs
-    "dstack[server]; python_version >= '3.11'",
-    "dstack-plugin-server; python_version >= '3.11'",
-    "pillow; python_version >= '3.11'",
-    "cairosvg; python_version >= '3.11'",
-    "mkdocs-material>=9.7.0; python_version >= '3.11'",
-    "mkdocs-material[imaging]; python_version >= '3.11'",
-    "mkdocs-material-extensions; python_version >= '3.11'",
-    "mkdocs-redirects; python_version >= '3.11'",
-    "mkdocs-gen-files; python_version >= '3.11'",
-    "mkdocstrings[python]; python_version >= '3.11'",
-    "mkdocs-render-swagger-plugin; python_version >= '3.11'",
+    {include-group = "docs"},
+]
+docs = [
+    "dstack[server]",
+    "dstack-plugin-server",
+    "pillow",
+    "cairosvg",
+    "mkdocs-material>=9.7.0",
+    "mkdocs-material[imaging]",
+    "mkdocs-material-extensions",
+    "mkdocs-redirects",
+    "mkdocs-gen-files",
+    "mkdocstrings[python]",
+    "mkdocs-render-swagger-plugin",
 ]
 
 [project.optional-dependencies]
