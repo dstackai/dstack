@@ -67,9 +67,6 @@ artifacts = [
     "src/dstack/_internal/server/statics/**",
 ]
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [tool.hatch.metadata.hooks.fancy-pypi-readme]
 content-type = "text/markdown"
 
