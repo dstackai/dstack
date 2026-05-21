@@ -69,8 +69,9 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
     startup_order: workers-first
     stop_criteria: master-done
 
+    # Mount the system libraries folder from the host
     volumes:
-      - /usr/local/lib/libbnxt_re-rdmav34.so:/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so
+      - /usr/local/lib:/mnt/lib
 
     image: rocm/dev-ubuntu-22.04:6.4-complete
     env:
@@ -83,6 +84,9 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
       - cd rccl-tests
       - make MPI=1 MPI_HOME=$OPEN_MPI_HOME
 
+      # Preload the RoCE driver library from the host (for Broadcom driver compatibility)
+      - export LD_PRELOAD=/mnt/lib/libbnxt_re-rdmav34.so
+
       # Run RCCL tests via MPI
       - |
         if [ $DSTACK_NODE_RANK -eq 0 ]; then
@@ -91,6 +95,7 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
             -n $DSTACK_GPUS_NUM \
             -N $DSTACK_GPUS_PER_NODE \
             --mca btl_tcp_if_include ens41np0 \
+            -x LD_PRELOAD \
             -x NCCL_IB_HCA=mlx5_0/1,bnxt_re0,bnxt_re1,bnxt_re2,bnxt_re3,bnxt_re4,bnxt_re5,bnxt_re6,bnxt_re7 \
             -x NCCL_IB_GID_INDEX=3 \
             -x NCCL_IB_DISABLE=0 \
@@ -106,7 +111,9 @@ Here's an example of a task that runs AllReduce test on 2 nodes, each with 4 GPU
     </div>
 
     !!! info "RoCE library"
-        RCCL tests use the RDMA/RoCE interconnect for internode communication. To use the RDMA/RoCE interconnect on Broadcom `bnxt_re` devices, RCCL requires the Broadcom-specific userspace provider library `libbnxt_re-rdmav34.so` to be available inside the container at `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so`. We make this library available by mounting the host provider library into the container path: `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so`.
+        RCCL tests use the RDMA/RoCE interconnect for internode communication. To use the RDMA/RoCE interconnect on Broadcom `bnxt_re` devices, RCCL requires the Broadcom-specific userspace provider library `libbnxt_re-rdmav34.so` to be available inside the container at `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so`. We make this library available by mounting it from the host and using `LD_PRELOAD` when running MPI.
+
+        Alternatively, you can avoid `LD_PRELOAD` and directly mount `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so` if you use a custom image with OpenMPI pre-installed.
 
 !!! info "Privileged"
     In some cases, the backend (e.g., `kubernetes`) may require `privileged: true` to access the high-speed interconnect (e.g., InfiniBand).
