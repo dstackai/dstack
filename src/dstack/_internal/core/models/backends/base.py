@@ -15,6 +15,7 @@ class BackendType(str, enum.Enum):
         DSTACK (BackendType): dstack Sky
         GCP (BackendType): Google Cloud Platform
         HOTAISLE (BackendType): Hot Aisle
+        JARVISLABS (BackendType): JarvisLabs
         KUBERNETES (BackendType): Kubernetes
         LAMBDA (BackendType): Lambda Cloud
         NEBIUS (BackendType): Nebius AI Cloud
@@ -38,6 +39,7 @@ class BackendType(str, enum.Enum):
     DSTACK = "dstack"
     GCP = "gcp"
     HOTAISLE = "hotaisle"
+    JARVISLABS = "jarvislabs"
     KUBERNETES = "kubernetes"
     LAMBDA = "lambda"
     LOCAL = "local"

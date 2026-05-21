@@ -381,6 +381,23 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         type:
             required: true
 
+##### `projects[n].backends[type=jarvislabs]` { #jarvislabs data-toc-label="jarvislabs" }
+
+#SCHEMA# dstack._internal.core.backends.jarvislabs.models.JarvisLabsBackendFileConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: jarvislabs-
+
+###### `projects[n].backends[type=jarvislabs].creds` { #jarvislabs-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.jarvislabs.models.JarvisLabsAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ##### `projects[n].backends[type=cloudrift]` { #cloudrift data-toc-label="cloudrift" }
 
 #SCHEMA# dstack._internal.core.backends.cloudrift.models.CloudRiftBackendConfigWithCreds
