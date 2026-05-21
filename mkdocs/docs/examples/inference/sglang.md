@@ -215,7 +215,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
 
 === "AMD"
 
-    Below is an example for running `Qwen/Qwen2.5-72B-Instruct` on `8xMI300X` with the [Mooncake](https://github.com/kvcache-ai/Mooncake) transfer engine.
+    The example below deploys `Qwen/Qwen2.5-72B-Instruct` on a multi-node cluster with AMD MI300X GPUs:
 
     <div editor-title="amd-pd.dstack.yml">
 
