@@ -527,7 +527,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
 
 #### AMD
 
-Below is an example for running `Qwen/Qwen2.5-72B-Instruct` on `8xMI300X`:
+Below is an example for running `Qwen/Qwen2.5-72B-Instruct` on `8xMI300X` with the [Mooncake](https://github.com/kvcache-ai/Mooncake) transfer engine:
 
 <div editor-title="amd-pd.dstack.yml">
 
@@ -567,8 +567,6 @@ replicas:
       metric: rps
       target: 300
     commands:
-      # Preload the RoCE driver library from the host (for Broadcom driver compatibility)
-      - export LD_PRELOAD=/mnt/lib/libbnxt_re-rdmav34.so
       - |
         python3 -m sglang.launch_server \
           --model $MODEL_ID \
@@ -595,8 +593,6 @@ replicas:
       metric: rps
       target: 300
     commands:
-      # Preload the RoCE driver library from the host (for Broadcom driver compatibility)
-      - export LD_PRELOAD=/mnt/lib/libbnxt_re-rdmav34.so
       - |
         python3 -m sglang.launch_server \
           --model $MODEL_ID \
@@ -628,25 +624,13 @@ probes:
     interval: 15s
 
 volumes:
-  - /usr/local/lib:/mnt/lib
+  - /usr/lib64/libibverbs/libbnxt_re-rdmav34.so:/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so
 ```
 
 </div>
 
 !!! info "RoCE library"
-    The container does not include `libbnxt_re-rdmav34.so`, which is the Broadcom-specific userspace RDMA/RoCE provider library.
-    This library is required by `libibverbs` to communicate with Broadcom `bnxt_re` RDMA devices such as `bnxt_re0`, `bnxt_re1`, ...,
-    `bnxt_re7`. There are two ways to make this library available inside the container: either copy `libbnxt_re-rdmav34.so` from the
-    host to `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so`, or load it using `LD_PRELOAD` as done in the example.
-
-    In some setups, we may also need to copy the host’s `libibverbs` library itself into the container. For example:
-
-    From Host: `/usr/lib64/libibverbs.so.1.14.54.0` to Container: `/usr/lib/x86_64-linux-gnu/libibverbs.so.1.14.54.0`
-
-    After copying it, create a symlink:`/usr/lib/x86_64-linux-gnu/libibverbs.so.1 -> /usr/lib/x86_64-linux-gnu/libibverbs.so.1.14.54.0`
-
-    This is needed because most applications do not load the full versioned filename `libibverbs.so.1.14.54.0` directly. Instead,
-    they usually look for the generic shared library name: `libibverbs.so.1`.
+    Mooncake uses the RDMA/RoCE interconnect for KV Cache transfer. To use the RDMA/RoCE interconnect on Broadcom `bnxt_re` devices, Mooncake requires the Broadcom-specific userspace provider library `libbnxt_re-rdmav34.so` to be available inside the container at `/usr/lib/x86_64-linux-gnu/libibverbs/libbnxt_re-rdmav34.so`. We make this library available by mounting the host provider library from `/usr/lib64/libibverbs/libbnxt_re-rdmav34.so`.
 
 
 
