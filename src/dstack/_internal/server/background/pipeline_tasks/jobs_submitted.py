@@ -20,7 +20,7 @@ from dstack._internal.core.backends.features import (
     BACKENDS_WITH_GROUP_PROVISIONING_SUPPORT,
     BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
 )
-from dstack._internal.core.errors import BackendError, ServerClientError
+from dstack._internal.core.errors import BackendError, ServerClientError, SkipOffer
 from dstack._internal.core.models.common import NetworkMode
 from dstack._internal.core.models.compute_groups import (
     ComputeGroupProvisioningData,
@@ -588,12 +588,12 @@ async def _apply_assignment_result(
                     return
                 fleet_spec = get_fleet_spec(fleet_model)
                 if not can_create_new_cloud_instance_in_fleet(fleet_model, fleet_spec):
-                    logger.debug(
-                        "%s: fleet %s is full, retrying assignment",
-                        fmt(context.job_model),
-                        fleet_model.name,
+                    await _terminate_submitted_job(
+                        session=session,
+                        job_model=job_model,
+                        reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+                        message="Fleet is at capacity",
                     )
-                    await _reset_job_lock_for_retry(session=session, item=item)
                     return
                 instance_model = _create_placeholder_instance(
                     fleet_model=fleet_model,
@@ -2120,8 +2120,13 @@ async def _provision_new_capacity(
         instance_mounts=check_run_spec_requires_instance_mounts(run.run_spec),
         placement_group=placement_group_model_to_placement_group_optional(placement_group_model),
     )
+    offers_iter = iter(offers)
     offers_tried = 0
-    for backend, offer in offers[: settings.MAX_OFFERS_TRIED]:
+    while offers_tried < settings.MAX_OFFERS_TRIED:
+        backend_with_offer = next(offers_iter, None)
+        if backend_with_offer is None:
+            break
+        backend, offer = backend_with_offer
         logger.debug(
             "%s: trying %s in %s/%s for $%0.4f per hour",
             fmt(job_model),
@@ -2214,6 +2219,17 @@ async def _provision_new_capacity(
                     new_placement_group_models=new_placement_group_models,
                 ),
             )
+        except SkipOffer as e:
+            offers_tried -= 1
+            logger.info(
+                "%s: %s launch in %s/%s skipped: %s",
+                fmt(job_model),
+                offer.instance.name,
+                offer.backend.value,
+                offer.region,
+                e,
+            )
+            continue
         except BackendError as e:
             logger.warning(
                 "%s: %s launch in %s/%s failed: %s",

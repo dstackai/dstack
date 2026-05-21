@@ -1202,14 +1202,18 @@ class TestJobSubmittedWorker:
         assert placeholder.offer is None
         assert placeholder.instance_num == 0
 
-    async def test_assignment_retries_when_fleet_is_full(
-        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    @pytest.mark.parametrize("fleet_type", ["cloud", "ssh"])
+    async def test_job_fails_when_fleet_is_full(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker, fleet_type: str
     ):
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
-        fleet_spec = get_fleet_spec()
-        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
+        if fleet_type == "cloud":
+            fleet_spec = get_fleet_spec()
+            fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=1)
+        else:
+            fleet_spec = get_fleet_spec(get_ssh_fleet_configuration(hosts=["10.0.0.1"]))
         fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
         await create_instance(
             session=session,
@@ -1230,10 +1234,9 @@ class TestJobSubmittedWorker:
             await _process_job(session=session, worker=worker, job_model=job)
 
         job = await _get_job(session, job.id)
-        # Assignment retried — job not committed as assigned
-        assert job.status == JobStatus.SUBMITTED
-        assert not job.instance_assigned
-        assert job.instance is None
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason_message == "Fleet is at capacity"
         # No placeholder must be committed when the fleet is full.
         res = await session.execute(
             select(InstanceModel).where(

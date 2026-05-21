@@ -918,6 +918,26 @@ projects:
 
     </div>
 
+### JarvisLabs
+
+Log into your [JarvisLabs](https://cloud.jarvislabs.ai/) account and create an API key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: jarvislabs
+      creds:
+        type: api_key
+        api_key: ...
+```
+
+</div>
+
 ### CloudRift
 
 Log into your [CloudRift](https://console.cloudrift.ai/) console, click `API Keys` in the sidebar and click the button to create a new API key.
@@ -1051,9 +1071,9 @@ Compared to [VM-based](#vm-based) backends, they offer less fine-grained control
 
 ### Kubernetes
 
-Regardless of whether it’s on-prem Kubernetes or managed, `dstack` can orchestrate container-based runs across your clusters.
+Regardless of whether it’s on-prem Kubernetes or managed, `dstack` can orchestrate container-based runs across your clusters. A single `kubernetes` backend can manage one or many clusters — each cluster is selected via a kubeconfig [context](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/#context).
 
-To use the `kubernetes` backend with `dstack`, you need to configure it with the path to the kubeconfig file, the IP address of any node in the cluster, and the port that `dstack` will use for proxying SSH traffic. 
+The recommended way is to enable clusters explicitly via the `contexts` property:
 
 <div editor-title="~/.dstack/server/config.yml">
 
@@ -1066,22 +1086,48 @@ projects:
     kubeconfig:
       filename: ~/.kube/config
 
-    proxy_jump:
-      hostname: 204.12.171.137
-      port: 32000
+    contexts:
+    - name: gpu-cluster-a
+    - name: gpu-cluster-b
 ```
 
 </div>
 
 !!! info "Proxy jump"
-    To allow the `dstack` server and CLI to access runs via SSH, `dstack` requires a node that acts as a jump host to proxy SSH traffic into containers.  
+    To allow the `dstack` server and CLI to access runs via SSH, `dstack` uses a node in each cluster as a jump host to proxy SSH traffic into containers. No additional setup is required — `dstack` configures and manages the proxy automatically.
 
-    To configure this node, specify `hostname` and `port` under the `proxy_jump` property:  
+    By default, `dstack` autodetects the jump host:
 
-    - `hostname` — the IP address of any cluster node selected as the jump host. Both the `dstack` server and CLI must be able to reach it. This node can be either a GPU node or a CPU-only node — it makes no difference.  
-    - `port` — any accessible port on that node, which `dstack` uses to forward SSH traffic.  
+    - `hostname` — picks the `ExternalIP` of the jump pod's node, or a random node `ExternalIP` from the cluster if the jump pod's node has none. If no node in the cluster has an `ExternalIP`, provisioning fails and you must set `hostname` explicitly.
+    - `port` — Kubernetes allocates a port from the cluster's NodePort range.
 
-    No additional setup is required — `dstack` configures and manages the proxy automatically.
+    Set `proxy_jump.hostname` and `proxy_jump.port` per context to override autodetection — useful when nodes lack `ExternalIP`s, or when you want a stable, firewall-friendly port:
+
+    ```yaml
+    contexts:
+    - name: gpu-cluster-a
+      proxy_jump:
+        hostname: 204.12.171.137
+        port: 32000
+    ```
+
+    Both fields are independent — you can set just one.
+
+    The jump host can be a GPU node or a CPU-only node — it makes no difference. The only requirement is that both the `dstack` server and CLI can reach `hostname:port`.
+
+!!! info "Region and namespace"
+    Each enabled context becomes its own `dstack` region, named after the context. When creating a `dstack` [volume](volumes.md) or [gateway](gateways.md), the `region` field selects which cluster the resource is provisioned in.
+
+    The namespace `dstack` uses for managed resources is taken from each kubeconfig context's `namespace` property, defaulting to `default` if not set:
+
+    ```yaml
+    contexts:
+    - name: gpu-cluster-a
+      context:
+        cluster: gpu-cluster-a
+        user: kubernetes-admin
+        namespace: dstack
+    ```
 
 ??? info "User interface"
     If you are configuring the `kubernetes` backend on the [project settings page](projects.md#backends),
@@ -1091,17 +1137,16 @@ projects:
 
     ```yaml
     type: kubernetes
-    
+
     kubeconfig:
       data: |
         apiVersion: v1
         kind: Config
-        current-context: kubernetes-admin@gpu-cluster
 
         clusters:
-        - name: gpu-cluster
+        - name: gpu-cluster-a
           cluster:
-            server: https://gpu-cluster.internal.example.com:6443
+            server: https://gpu-cluster-a.internal.example.com:6443
             certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t...LS0tLQo=
 
         users:
@@ -1111,17 +1156,50 @@ projects:
             client-key-data: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0t...LS0tLQo=
 
         contexts:
-        - name: kubernetes-admin@gpu-cluster
+        - name: gpu-cluster-a
           context:
-            cluster: gpu-cluster
+            cluster: gpu-cluster-a
             user: kubernetes-admin
-    
-    proxy_jump:
-      hostname: 204.12.171.137
-      port: 32000
+            namespace: dstack
+
+    contexts:
+    - name: gpu-cluster-a
+      proxy_jump:
+        hostname: 204.12.171.137
+        port: 32000
     ```
 
     </div>
+
+??? warning "Legacy configuration (without `contexts`)"
+    If `contexts` is not set, `dstack` falls back to using the kubeconfig's `current-context` as the only cluster, and the top-level `proxy_jump` and `namespace` properties apply:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: kubernetes
+
+        kubeconfig:
+          filename: ~/.kube/config
+
+        namespace: dstack
+
+        proxy_jump:
+          hostname: 204.12.171.137
+          port: 32000
+    ```
+
+    </div>
+
+    This mode is not recommended and may be deprecated and removed in the future. It also has a namespace-handling quirk: the top-level `namespace` property **overrides** the kubeconfig context's namespace (defaulting to `default` if not set in the config), unlike the `contexts` mode where the kubeconfig is authoritative. A warning is logged when the two disagree. To prepare for a possible future change, set the same value in both your kubeconfig context and the backend config.
+
+    With this configuration, the cluster's region is an empty string. When creating a `dstack` volume or gateway, set `region: ''` explicitly in the configuration.
+
+    !!! warning "Migrating from legacy to `contexts`"
+        Switching an existing backend from the legacy mode to `contexts` is not transparent for already-provisioned resources: their region changes from an empty string to the context name, so `dstack` can no longer terminate them. Terminate all jobs, gateways, and volumes managed by the backend before changing the configuration.
     
 ??? info "Required operators"
     === "NVIDIA"
@@ -1149,7 +1227,7 @@ projects:
       --8<-- "snippets/kubernetes/dstack-backend-role.yaml"
       ```
 
-    Ensure you've created a ClusterRoleBinding to grant the role to the user or the service account you're using.
+    Ensure you've created a ClusterRoleBinding and RoleBinding to grant the roles to the user or the service account you're using.
 
 ??? info "Resources and offers"
     If you use ranges with [`resources`](../concepts/tasks.md#resources) (e.g. `gpu: 1..8` or `memory: 64GB..`) in fleet or run configurations, other backends collect and try all offers that satisfy the range.

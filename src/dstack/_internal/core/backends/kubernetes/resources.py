@@ -5,7 +5,7 @@ import re
 from collections.abc import Mapping
 from decimal import Decimal
 from enum import Enum
-from typing import Callable, Optional, Union, cast
+from typing import Callable, Literal, Optional, Union, cast
 
 from gpuhunt import KNOWN_AMD_GPUS, KNOWN_NVIDIA_GPUS, AcceleratorVendor
 
@@ -135,6 +135,29 @@ class KubernetesResources:
         return type(self)(**dct)
 
 
+def build_base_labels(
+    *,
+    component: Literal["ssh-proxy", "job", "gateway", "volume"],
+    unique_name: str,
+    project: str,
+    name: Optional[str] = None,
+    user: Optional[str] = None,
+) -> dict[str, str]:
+    labels = {
+        "app.kubernetes.io/name": f"dstack-{component}",
+        # app.kubernetes.io/component would be redundant as app.kubernetes.io/name already includes
+        # it with dstack- prefix
+        "app.kubernetes.io/instance": unique_name,
+        "app.kubernetes.io/managed-by": "dstack",
+        "k8s.dstack.ai/project": project,
+    }
+    if name is not None:
+        labels["k8s.dstack.ai/name"] = name
+    if user is not None:
+        labels["k8s.dstack.ai/user"] = user
+    return labels
+
+
 def filter_invalid_labels(labels: dict[str, str]) -> dict[str, str]:
     filtered_labels: dict[str, str] = {}
     for k, v in labels.items():
@@ -176,10 +199,6 @@ def validate_label_value(value: str) -> None:
         raise ValueError("Value too long")
     if LABEL_VALUE_REGEX.fullmatch(value) is None:
         raise ValueError("Invalid value")
-
-
-def format_dstack_label_key(name: str) -> str:
-    return f"k8s.dstack.ai/{name}"
 
 
 def build_dockerconfigjson(image_name: str, username: str, password: str) -> str:
@@ -240,7 +259,7 @@ def is_taint_tolerated(taint: V1Taint) -> bool:
 
 
 def get_instance_offers(
-    api: CoreV1Api, requirements: Requirements
+    api: CoreV1Api, region: str, requirements: Requirements
 ) -> list[InstanceOfferWithAvailability]:
     resources_spec = requirements.resources
     assert isinstance(resources_spec.cpu, CPUSpec)
@@ -262,6 +281,7 @@ def get_instance_offers(
             node=node,
             node_name=node_name,
             node_allocated_resources=nodes_allocated_resources.get(node_name),
+            region=region,
             cpu_request=cpu_request,
             memory_mib_request=memory_mib_request,
             gpu_request=gpu_request,
@@ -275,6 +295,7 @@ def get_instance_offers(
 def get_instance_offer_from_node(
     node: V1Node,
     *,
+    region: str,
     cpu_request: int,
     memory_mib_request: int,
     gpu_request: int,
@@ -287,6 +308,7 @@ def get_instance_offer_from_node(
         node=node,
         node_name=node_name,
         node_allocated_resources=None,
+        region=region,
         cpu_request=cpu_request,
         memory_mib_request=memory_mib_request,
         gpu_request=gpu_request,
@@ -342,6 +364,7 @@ def _get_instance_offer_from_node(
     node: V1Node,
     node_name: str,
     node_allocated_resources: Optional[KubernetesResources],
+    region: str,
     cpu_request: int,
     memory_mib_request: int,
     gpu_request: int,
@@ -384,7 +407,7 @@ def _get_instance_offer_from_node(
             ),
         ),
         price=0,
-        region="",
+        region=region,
         availability=InstanceAvailability.AVAILABLE,
         instance_runtime=InstanceRuntime.RUNNER,
     )

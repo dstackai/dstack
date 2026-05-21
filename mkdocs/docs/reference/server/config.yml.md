@@ -278,6 +278,18 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
     yq -o=json ~/.kube/config | jq -c | jq -R
     ```
 
+###### `projects[n].backends[type=kubernetes].contexts[n]` { #kubernetes-contexts data-toc-label="contexts" }
+
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesContextConfig
+    overrides:
+        show_root_heading: false
+
+###### `projects[n].backends[type=kubernetes].contexts[n].proxy_jump` { #kubernetes-contexts-proxy_jump data-toc-label="proxy_jump" }
+
+#SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesProxyJumpConfig
+    overrides:
+        show_root_heading: false
+
 ###### `projects[n].backends[type=kubernetes].proxy_jump` { #kubernetes-proxy_jump data-toc-label="proxy_jump" }
 
 #SCHEMA# dstack._internal.core.backends.kubernetes.models.KubernetesProxyJumpConfig
@@ -364,6 +376,23 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
 ###### `projects[n].backends[type=hotaisle].creds` { #hotaisle-creds data-toc-label="creds" }
 
 #SCHEMA# dstack._internal.core.backends.hotaisle.models.HotAisleAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+##### `projects[n].backends[type=jarvislabs]` { #jarvislabs data-toc-label="jarvislabs" }
+
+#SCHEMA# dstack._internal.core.backends.jarvislabs.models.JarvisLabsBackendFileConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: jarvislabs-
+
+###### `projects[n].backends[type=jarvislabs].creds` { #jarvislabs-creds data-toc-label="creds" }
+
+#SCHEMA# dstack._internal.core.backends.jarvislabs.models.JarvisLabsAPIKeyCreds
     overrides:
         show_root_heading: false
         type:

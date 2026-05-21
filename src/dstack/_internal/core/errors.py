@@ -128,6 +128,19 @@ class NotYetTerminated(ComputeError):
         return super().__init__(details)
 
 
+class SkipOffer(ComputeError):
+    """
+    Used by Compute.run_job and Compute.create_instance to signal that the offer should be skipped.
+    """
+
+    def __init__(self, details: str) -> None:
+        """
+        Args:
+            details: details about why the offer should be skipped
+        """
+        return super().__init__(details)
+
+
 class CLIError(DstackError):
     pass
 

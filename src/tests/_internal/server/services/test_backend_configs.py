@@ -183,11 +183,12 @@ class TestKubernetesBackendConfig:
         backend_config = config_yaml_to_backend_config(config_yaml)
         backend = KubernetesBackend(backend_config)
 
-        assert backend.compute().api.api_client.configuration.host == (
+        cluster = backend.compute().region_cluster_map[""]
+        assert cluster.api_client.configuration.host == (
             "https://gpu-cluster.internal.example.com:6443"
         )
-        assert backend.compute().proxy_jump.hostname == "204.12.171.137"
-        assert backend.compute().proxy_jump.port == 32000
+        assert cluster.proxy_jump.hostname == "204.12.171.137"
+        assert cluster.proxy_jump.port == 32000
 
     def test_kubeconfig_context_namespace_does_not_set_backend_namespace(self):
         config_yaml = dedent(
@@ -226,4 +227,5 @@ class TestKubernetesBackendConfig:
         backend_config = config_yaml_to_backend_config(config_yaml)
         backend = KubernetesBackend(backend_config)
 
-        assert backend.compute().config.namespace == "default"
+        cluster = backend.compute().region_cluster_map[""]
+        assert cluster.namespace == "default"
