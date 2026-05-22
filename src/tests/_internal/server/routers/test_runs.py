@@ -18,13 +18,15 @@ from dstack._internal.core.models.common import ApplyAction, EntityReference
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
+    ReplicaGroup,
     ScalingSpec,
     ServiceConfiguration,
     TaskConfiguration,
 )
-from dstack._internal.core.models.fleets import FleetNodesSpec
+from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import (
+    Gpu,
     InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceStatus,
@@ -32,11 +34,12 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.profiles import Profile, Schedule
-from dstack._internal.core.models.resources import Range
+from dstack._internal.core.models.resources import GPUSpec, Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     JobSpec,
     JobStatus,
+    Requirements,
     Run,
     RunSpec,
     RunStatus,
@@ -1530,6 +1533,140 @@ class TestGetRunPlan:
             )
         assert response.status_code == 200, response.json()
         assert response.json() == run_plan_dict
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_task_with_two_nodes_returns_two_job_plans(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        await create_fleet(session=session, project=project, spec=fleet_spec)
+        repo = await create_repo(session=session, project_id=project.id)
+        offer = InstanceOfferWithAvailability(
+            backend=BackendType.AWS,
+            instance=InstanceType(
+                name="instance",
+                resources=Resources(cpus=4, memory_mib=16384, spot=False, gpus=[]),
+            ),
+            region="us",
+            price=1.0,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(commands=["echo hi"], nodes=2),
+        )
+        body = {"run_spec": json.loads(run_spec.json())}
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            m.return_value = [backend_mock]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        job_plans = response.json()["job_plans"]
+        assert len(job_plans) == 2
+        assert job_plans[0]["job_spec"]["job_num"] == 0
+        assert job_plans[1]["job_spec"]["job_num"] == 1
+        assert len(job_plans[0]["offers"]) == 1
+        assert job_plans[0]["offers"] == job_plans[1]["offers"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_service_with_two_replica_groups_returns_two_job_plans(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
+        repo = await create_repo(session=session, project_id=project.id)
+        gpu_offer = InstanceOfferWithAvailability(
+            backend=BackendType.AWS,
+            instance=InstanceType(
+                name="gpu-instance",
+                resources=Resources(
+                    cpus=8,
+                    memory_mib=32768,
+                    spot=False,
+                    gpus=[Gpu(name="A100", memory_mib=40960)],
+                ),
+            ),
+            region="us",
+            price=5.0,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        cpu_offer = InstanceOfferWithAvailability(
+            backend=BackendType.AWS,
+            instance=InstanceType(
+                name="cpu-instance",
+                resources=Resources(cpus=4, memory_mib=16384, spot=False, gpus=[]),
+            ),
+            region="us",
+            price=1.0,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                port=8080,
+                gateway=False,
+                replicas=[
+                    ReplicaGroup(
+                        name="gpu-group",
+                        count=Range[int](min=2, max=2),
+                        resources=ResourcesSpec(gpu=GPUSpec()),
+                        commands=["python server.py"],
+                    ),
+                    ReplicaGroup(
+                        name="cpu-group",
+                        count=Range[int](min=1, max=1),
+                        resources=ResourcesSpec(gpu=None),
+                        commands=["python router.py"],
+                    ),
+                ],
+            ),
+        )
+        body = {"run_spec": json.loads(run_spec.json())}
+
+        def offers_by_requirements(requirements: Requirements):
+            if (
+                requirements.resources.gpu is not None
+                and requirements.resources.gpu.count.min is not None
+                and requirements.resources.gpu.count.min > 0
+            ):
+                return [gpu_offer]
+            return [cpu_offer]
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.side_effect = offers_by_requirements
+            m.return_value = [backend_mock]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        gpu_job_plan, cpu_job_plan = response.json()["job_plans"]
+        assert gpu_job_plan["offers"][0]["instance"]["resources"]["gpus"] != []
+        assert cpu_job_plan["offers"][0]["instance"]["resources"]["gpus"] == []
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
