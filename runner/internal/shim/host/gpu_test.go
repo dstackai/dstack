@@ -239,6 +239,28 @@ func TestGetGpusFromTtSmiSnapshotMultipleDevices(t *testing.T) {
 	}
 }
 
+func TestGetGpusFromTtSmiSnapshotWormholePrefixMemoryCompatibility(t *testing.T) {
+	snapshot := &ttSmiSnapshot{
+		DeviceInfo: []ttDeviceInfo{
+			{BoardInfo: ttBoardInfo{BoardType: "n150-custom L", BoardID: "100018000000001"}},
+			{BoardInfo: ttBoardInfo{BoardType: "n300-custom L", BoardID: "100014000000001"}},
+			{BoardInfo: ttBoardInfo{BoardType: "n300-custom R", BoardID: "100014000000001"}},
+			{BoardInfo: ttBoardInfo{BoardType: "tt-galaxy-wh-custom L", BoardID: "100035000000001"}},
+		},
+	}
+
+	gpus := getGpusFromTtSmiSnapshot(snapshot)
+
+	expected := []GpuInfo{
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "n150-custom", Vram: 12 * 1024, ID: "100018000000001", Index: "0"},
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "n300-custom", Vram: 24 * 1024, ID: "100014000000001", Index: "1"},
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "tt-galaxy-wh-custom", Vram: 12 * 1024, ID: "100035000000001", Index: "2"},
+	}
+	if !reflect.DeepEqual(gpus, expected) {
+		t.Errorf("getGpusFromTtSmiSnapshot() = %v, want %v", gpus, expected)
+	}
+}
+
 func TestGetGpusFromTtSmiSnapshotGalaxy(t *testing.T) {
 	data, err := loadTestData("tenstorrent/galaxy.json")
 	if err != nil {
@@ -329,7 +351,8 @@ func TestGetGpusFromTtSmiSnapshotBlackholeRevisions(t *testing.T) {
 }
 
 func TestGetGpusFromTtSmiSnapshotBlackholeSourceFixtures(t *testing.T) {
-	// Derived from TT-Metal UMD Blackhole board descriptors.
+	// Synthetic tt-smi snapshot derived from TT-SMI board name mappings and
+	// TT-Metal UMD Blackhole board descriptors.
 	data, err := loadTestData("tenstorrent/blackhole_boards.json")
 	if err != nil {
 		t.Fatalf("Failed to load test data: %v", err)
@@ -355,6 +378,7 @@ func TestGetGpusFromTtSmiSnapshotBlackholeSourceFixtures(t *testing.T) {
 
 func TestGetGpusFromTtSmiSnapshotBlackholeEightP150(t *testing.T) {
 	// Derived from TT-Metal UMD blackhole_8xP150 cluster descriptor.
+	// The p150b name follows TT-SMI's board ID to board type mapping.
 	data, err := loadTestData("tenstorrent/blackhole_8xp150.json")
 	if err != nil {
 		t.Fatalf("Failed to load test data: %v", err)

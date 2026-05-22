@@ -201,8 +201,8 @@ If you run it via `dstack apply`, it will output the URL to access it via your d
 
 `resources.gpu` uses the usual `name:count` format. For Tenstorrent, `count`
 is the number of devices reported from the TT-SMI topology. On Galaxy systems,
-this corresponds to chips. For PCIe cards and workstations, use the card count
-shown in the examples below.
+this corresponds to chips. On PCIe systems, this is usually the card count, but
+dual-chip cards can also be reported as per-chip devices.
 
 ```yaml
 resources:
@@ -210,7 +210,8 @@ resources:
   # gpu: tt-galaxy-bh:32  # Galaxy Blackhole, 32 chips
   # gpu: n300:4           # TT-LoudBox or TT-QuietBox Wormhole, 4 n300 cards
   # gpu: p150:4           # TT-QuietBox Blackhole, 4 p150 cards
-  # gpu: p300:2           # TT-QuietBox 2 Blackhole, 2 p300 cards
+  # gpu: p300:64GB:2      # TT-QuietBox 2 Blackhole, 2 p300 cards
+  # gpu: p300:32GB:4      # TT-QuietBox 2 Blackhole, if exposed per chip
 ```
 
 Use `tt:<count>` only when the workload can run on any Tenstorrent device type.

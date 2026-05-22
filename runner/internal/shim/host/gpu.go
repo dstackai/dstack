@@ -248,9 +248,13 @@ func splitTtBoardType(boardType string) (name string, suffix string) {
 }
 
 func ttBoardVramMib(name string) int {
-	switch name {
-	case "n150", "n300", "tt-galaxy-wh":
+	switch {
+	case strings.HasPrefix(name, "n150"),
+		strings.HasPrefix(name, "n300"),
+		strings.HasPrefix(name, "tt-galaxy-wh"):
 		return 12 * 1024
+	}
+	switch name {
 	case "p100a":
 		return 28 * 1024
 	case "p150", "p300", "tt-galaxy-bh":
@@ -317,7 +321,7 @@ func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
 			// and add memory to the first "L" device we find with that board_id
 			for _, key := range gpuKeys {
 				gpu := gpuMap[key]
-				if gpu.ID == boardID && gpu.Name == name {
+				if gpu.ID == boardID && (gpu.Name == name || !isTtBlackholeBoard(name)) {
 					// Add memory to the "L" device
 					gpu.Vram += ttBoardVramMib(name)
 					break // Only add to the first matching "L" device
@@ -358,7 +362,7 @@ func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
 			existingGpu := false
 			for _, key := range gpuKeys {
 				gpu := gpuMap[key]
-				if gpu.ID == boardID && gpu.Name == name {
+				if gpu.ID == boardID {
 					gpu.Vram += baseVram
 					existingGpu = true
 					break
