@@ -52,7 +52,10 @@ from dstack._internal.server.services.jobs import (
     is_multinode_job,
     remove_job_spec_sensitive_info,
 )
-from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.offers import (
+    get_offers_by_requirements,
+    merge_offer_iterables,
+)
 from dstack._internal.server.services.requirements.combine import (
     combine_fleet_and_run_profiles,
     combine_fleet_and_run_requirements,
@@ -711,11 +714,10 @@ async def get_backend_offers_in_run_candidate_fleets(
         run_model=None,
         run_spec=run_spec,
     )
-    deduplicated_backend_offers: dict[
-        Hashable,
-        tuple[Backend, InstanceOfferWithAvailability],
-    ] = {}
+    seen_offer_identities = set()
+    offers: list[tuple[Backend, InstanceOfferWithAvailability]] = []
     for candidate_fleet_model in candidate_fleet_models:
+        offers_from_fleet = []
         for backend, offer in await _get_backend_offers_in_fleet(
             project=project,
             fleet_model=candidate_fleet_model,
@@ -724,13 +726,12 @@ async def get_backend_offers_in_run_candidate_fleets(
             volumes=volumes,
             max_offers=max_offers_per_fleet,
         ):
-            deduplicated_backend_offers.setdefault(
-                _get_backend_offer_identity(offer),
-                (backend, offer),
-            )
-    backend_offers = list(deduplicated_backend_offers.values())
-    backend_offers.sort(key=lambda offer: offer[1].price)
-    return backend_offers
+            offer_identity = _get_backend_offer_identity(offer)
+            if offer_identity not in seen_offer_identities:
+                offers_from_fleet.append((backend, offer))
+                seen_offer_identities.add(offer_identity)
+        offers = list(merge_offer_iterables(offers, offers_from_fleet))
+    return offers
 
 
 async def _get_offers_in_run_candidate_fleets(

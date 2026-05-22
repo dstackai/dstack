@@ -1,5 +1,4 @@
 import asyncio
-import heapq
 import json
 import time
 from collections.abc import Iterable, Iterator
@@ -43,6 +42,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
+from dstack._internal.server.services.offers import merge_offer_iterables
 from dstack._internal.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
@@ -459,7 +459,7 @@ async def get_backend_offers(
     backends: List[Backend],
     requirements: Requirements,
     exclude_not_available: bool = False,
-) -> Iterator[Tuple[Backend, InstanceOfferWithAvailability]]:
+) -> Iterable[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
     Yields backend offers satisfying `requirements` sorted by price.
     """
@@ -474,7 +474,7 @@ async def get_backend_offers(
 
     logger.debug("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
     tasks = [run_async(get_offers_tracked, backend, requirements) for backend in backends]
-    offers_by_backend = []
+    offers_by_backend: list[Iterable[tuple[Backend, InstanceOfferWithAvailability]]] = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
         if isinstance(result, BackendError):
             logger.warning(
@@ -491,9 +491,7 @@ async def get_backend_offers(
             )
             continue
         offers_by_backend.append(get_filtered_offers_with_backends(backend, result))
-    # Merge preserving order for every backend.
-    offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)
-    return offers
+    return merge_offer_iterables(*offers_by_backend)
 
 
 def check_backend_type_available(backend_type: BackendType):

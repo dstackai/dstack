@@ -21,6 +21,7 @@ from dstack._internal.core.models.configurations import (
     ScalingSpec,
     ServiceConfiguration,
     TaskConfiguration,
+    parse_run_configuration,
 )
 from dstack._internal.core.models.fleets import FleetNodesSpec
 from dstack._internal.core.models.gateways import GatewayStatus
@@ -66,6 +67,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     get_auth_headers,
+    get_fleet_configuration,
     get_fleet_spec,
     get_instance_offer_with_availability,
     get_job_provisioning_data,
@@ -1915,6 +1917,152 @@ class TestGetRunPlan:
         response_json = response.json()
         assert response_json["project_name"] == "importer"
         assert len(response_json["job_plans"][0]["offers"]) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "configuration",
+        [
+            pytest.param({"type": "dev-environment"}, id="regular-configuration"),
+            pytest.param(
+                {"type": "task", "commands": [":"], "image": "scratch"},
+                id="special-configuration-used-by-dstack-offer-cli-command",
+            ),
+            pytest.param(
+                {"type": "task", "commands": [":"], "image": "scratch", "fleets": ["test-fleet"]},
+                id="special-configuration-used-by-dstack-offer-cli-command-with-fleets",  # --fleet
+            ),
+        ],
+    )
+    async def test_preserves_backend_specific_offer_order(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        configuration: dict,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(conf=get_fleet_configuration(name="test-fleet")),
+        )
+
+        run_spec = get_run_spec(
+            repo_id=repo.name, configuration=parse_run_configuration(configuration)
+        )
+        body = {"run_spec": run_spec.dict()}
+
+        backend_mock_aws = Mock()
+        backend_mock_aws.TYPE = BackendType.AWS
+        backend_mock_aws.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0),
+            get_instance_offer_with_availability(backend=BackendType.AWS, price=4.0),
+        ]
+        backend_mock_vastai = Mock()
+        backend_mock_vastai.TYPE = BackendType.VASTAI
+        backend_mock_vastai.compute.return_value.get_offers.return_value = [
+            # not ordered by price - custom order should be preserved
+            get_instance_offer_with_availability(backend=BackendType.VASTAI, price=3.0),
+            get_instance_offer_with_availability(backend=BackendType.VASTAI, price=2.0),
+        ]
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock_aws, backend_mock_vastai]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        offers = [(o["backend"], o["price"]) for o in response.json()["job_plans"][0]["offers"]]
+        expected_offers = [
+            (BackendType.AWS.value, 1.0),
+            (BackendType.VASTAI.value, 3.0),
+            (BackendType.VASTAI.value, 2.0),
+            (BackendType.AWS.value, 4.0),
+        ]
+        assert offers == expected_offers
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_offer_cli_preserves_backend_specific_offer_order_across_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(name="fleet-aws", backends=[BackendType.AWS])
+            ),
+        )
+        await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(name="fleet-vastai", backends=[BackendType.VASTAI])
+            ),
+        )
+
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                fleets=["fleet-aws", "fleet-vastai"],
+            ),
+        )
+        body = {"run_spec": run_spec.dict()}
+
+        backend_mock_aws = Mock()
+        backend_mock_aws.TYPE = BackendType.AWS
+        backend_mock_aws.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0),
+            get_instance_offer_with_availability(backend=BackendType.AWS, price=4.0),
+        ]
+        backend_mock_vastai = Mock()
+        backend_mock_vastai.TYPE = BackendType.VASTAI
+        backend_mock_vastai.compute.return_value.get_offers.return_value = [
+            # not ordered by price - custom order should be preserved
+            get_instance_offer_with_availability(backend=BackendType.VASTAI, price=3.0),
+            get_instance_offer_with_availability(backend=BackendType.VASTAI, price=2.0),
+        ]
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock_aws, backend_mock_vastai]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        offers = [(o["backend"], o["price"]) for o in response.json()["job_plans"][0]["offers"]]
+        expected_offers = [
+            (BackendType.AWS.value, 1.0),
+            (BackendType.VASTAI.value, 3.0),
+            (BackendType.VASTAI.value, 2.0),
+            (BackendType.AWS.value, 4.0),
+        ]
+        assert offers == expected_offers
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
