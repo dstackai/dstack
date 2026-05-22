@@ -460,7 +460,7 @@ export const ProjectSettings: React.FC = () => {
                             : {})}
                     />
 
-                    <GatewaysTable gateways={gatewaysData} />
+                    <GatewaysTable gateways={gatewaysData} projectName={paramProjectName} />
 
                     <ProjectMembers
                         onChange={debouncedMembersHandler}

@@ -8,15 +8,25 @@ import styles from '../styles.module.scss';
 
 type hookArgs = {
     loading?: boolean;
+    projectName: string;
     onDeleteClick?: (gateway: IGateway) => void;
     onEditClick?: (gateway: IGateway) => void;
 };
 
-export const useColumnsDefinitions = ({ loading, onDeleteClick, onEditClick }: hookArgs) => {
+export const useColumnsDefinitions = ({ loading, projectName, onDeleteClick, onEditClick }: hookArgs) => {
     const { t } = useTranslation();
 
     const columns = useMemo(() => {
         return [
+            {
+                id: 'name',
+                header: t('gateway.edit.name'),
+                cell: (gateway: IGateway) =>
+                    gateway.project_name && gateway.project_name !== projectName
+                        ? `${gateway.project_name}/${gateway.name}`
+                        : gateway.name,
+            },
+
             {
                 id: 'type',
                 header: t('gateway.edit.backend'),
@@ -76,7 +86,7 @@ export const useColumnsDefinitions = ({ loading, onDeleteClick, onEditClick }: h
                 ),
             },
         ];
-    }, [loading, onEditClick, onDeleteClick]);
+    }, [loading, projectName, onEditClick, onDeleteClick]);
 
     return { columns } as const;
 };

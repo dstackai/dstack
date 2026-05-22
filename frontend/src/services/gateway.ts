@@ -17,6 +17,7 @@ export const gatewayApi = createApi({
             query: ({ projectName }) => ({
                 url: API.PROJECT_GATEWAYS.LIST(projectName),
                 method: 'POST',
+                body: { include_imported: true },
             }),
 
             providesTags: (result) =>

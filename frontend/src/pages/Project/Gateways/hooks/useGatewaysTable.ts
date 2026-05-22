@@ -8,6 +8,8 @@ export const useGatewaysTable = (projectName: IProject['project_name']) => {
     const { data, isLoading } = useGetProjectGatewaysQuery({ projectName });
     const [deleteGatewayRequest, { isLoading: isDeleting }] = useDeleteProjectGatewayMutation();
 
+    // NOTE: editing and deletion are disabled as of 0.20.21.
+    // If enabling, ensure that imported gateways cannot be edited or deleted.
     const editGateway = (gateway: IGateway) => {
         navigate(ROUTES.PROJECT.GATEWAY.EDIT.FORMAT(projectName, gateway.name));
     };

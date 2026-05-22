@@ -10,7 +10,7 @@ import { useColumnsDefinitions } from './hooks';
 
 import { IProps } from './types';
 
-export const GatewaysTable: React.FC<IProps> = ({ gateways, addItem, deleteItem, editItem, isDisabledDelete }) => {
+export const GatewaysTable: React.FC<IProps> = ({ gateways, projectName, addItem, deleteItem, editItem, isDisabledDelete }) => {
     const { t } = useTranslation();
     const [openHelpPanel] = useHelpPanel();
 
@@ -41,6 +41,7 @@ export const GatewaysTable: React.FC<IProps> = ({ gateways, addItem, deleteItem,
     };
 
     const { columns } = useColumnsDefinitions({
+        projectName,
         ...(editItem ? { onEditClick: (gateway) => editItem(gateway) } : {}),
         ...(deleteItem ? { onDeleteClick: (gateway) => deleteItem([gateway]) } : {}),
     });
