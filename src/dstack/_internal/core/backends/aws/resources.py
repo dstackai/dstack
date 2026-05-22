@@ -32,8 +32,7 @@ def get_image_id_and_username(
         image_owner = image.owner
         username = image.user
     elif _supported_by_dlami(instance_type):
-        # TODO: Update DLAMI image version from time to time
-        image_name = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04) 20250516"
+        image_name = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04) *"
         image_owner = DLAMI_OWNER_ACCOUNT_ID
         username = "ubuntu"
     else:
