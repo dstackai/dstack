@@ -213,9 +213,11 @@ resources:
   # gpu: p300:2           # TT-QuietBox 2 Blackhole, 2 p300 cards
 ```
 
-Use `tt:<count>` when any Tenstorrent device type is acceptable. Supported
-names are `n150`, `n300`, `tt-galaxy-wh`, `p100a`, `p150`, `p300`, and
-`tt-galaxy-bh`.
+Use `tt:<count>` only when the workload can run on any Tenstorrent device type.
+Use a model name when placement depends on the hardware family: `n150` or
+`n300` for Wormhole PCIe cards, `tt-galaxy-wh` for Galaxy Wormhole, `p100a`,
+`p150`, or `p300` for Blackhole PCIe cards, and `tt-galaxy-bh` for Galaxy
+Blackhole.
 
 ??? info "Feedback"
     Found a bug, or want to request a feature? File it in the [issue tracker](https://github.com/dstackai/dstack/issues),
