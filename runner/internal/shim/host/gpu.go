@@ -214,6 +214,7 @@ type ttDeviceInfo struct {
 type ttBoardInfo struct {
 	BoardType string `json:"board_type"`
 	BoardID   string `json:"board_id"`
+	BusID     string `json:"bus_id"`
 }
 
 func unmarshalTtSmiSnapshot(data []byte) (*ttSmiSnapshot, error) {
@@ -224,45 +225,83 @@ func unmarshalTtSmiSnapshot(data []byte) (*ttSmiSnapshot, error) {
 	return &snapshot, nil
 }
 
+func normalizeTtBoardName(name string) string {
+	switch {
+	case name == "bh-scrappy" || name == "p100":
+		return "p100a"
+	case strings.HasPrefix(name, "p150"):
+		return "p150"
+	case strings.HasPrefix(name, "p300"):
+		return "p300"
+	default:
+		return name
+	}
+}
+
+func splitTtBoardType(boardType string) (name string, suffix string) {
+	boardType = strings.TrimSpace(boardType)
+	if strings.HasSuffix(boardType, " L") || strings.HasSuffix(boardType, " R") {
+		suffix = boardType[len(boardType)-1:]
+		boardType = strings.TrimSpace(boardType[:len(boardType)-2])
+	}
+	return normalizeTtBoardName(boardType), suffix
+}
+
+func ttBoardVramMib(name string) int {
+	switch name {
+	case "n150", "n300", "tt-galaxy-wh":
+		return 12 * 1024
+	case "p100a":
+		return 28 * 1024
+	case "p150", "p300", "tt-galaxy-bh":
+		return 32 * 1024
+	default:
+		return 0
+	}
+}
+
+func isTtBlackholeBoard(name string) bool {
+	switch name {
+	case "p100a", "p150", "p300", "tt-galaxy-bh":
+		return true
+	default:
+		return false
+	}
+}
+
+func isRemoteTtDevice(device ttDeviceInfo) bool {
+	return strings.EqualFold(strings.TrimSpace(device.BoardInfo.BusID), "N/A")
+}
+
 func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
-	// Create a map to track "L" devices and their corresponding "R" devices
-	// Each "L" device becomes a separate GPU
-	lDeviceMap := make(map[string]*GpuInfo)
+	gpuMap := make(map[string]*GpuInfo)
+	gpuKeys := []string{}
 	indexCounter := 0
+	addGpu := func(key string, gpuInfo GpuInfo) {
+		gpuMap[key] = &gpuInfo
+		gpuKeys = append(gpuKeys, key)
+	}
 
 	// First pass: identify all "L" and "R" devices
 	for i, device := range snapshot.DeviceInfo {
 		boardID := device.BoardInfo.BoardID
-		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
+		name, suffix := splitTtBoardType(device.BoardInfo.BoardType)
 
-		// Determine if this is an "L" device
-		isLDevice := strings.HasSuffix(boardType, " L")
-
-		if isLDevice {
+		if suffix == "L" {
 			// Create unique identifier for this "L" device
 			uniqueID := fmt.Sprintf("%s_L_%d", boardID, i)
 
-			// Extract base name without L suffix
-			name := boardType[:len(boardType)-2]
-
 			// Determine base VRAM based on board type
-			baseVram := 0
-			if strings.HasPrefix(name, "n150") {
-				baseVram = 12 * 1024 // 12GB in MiB
-			} else if strings.HasPrefix(name, "n300") {
-				baseVram = 12 * 1024 // 12GB in MiB
-			} else if strings.HasPrefix(name, "tt-galaxy-wh") {
-				baseVram = 12 * 1024 // 12GB in MiB
-			}
+			baseVram := ttBoardVramMib(name)
 
 			// Create new GPU entry for "L" device
-			lDeviceMap[uniqueID] = &GpuInfo{
+			addGpu(uniqueID, GpuInfo{
 				Vendor: gpu.GpuVendorTenstorrent,
 				Name:   name,
 				Vram:   baseVram,
 				ID:     boardID,
 				Index:  strconv.Itoa(indexCounter),
-			}
+			})
 			indexCounter++
 		}
 	}
@@ -270,27 +309,17 @@ func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
 	// Second pass: add memory from "R" devices to corresponding "L" devices
 	for _, device := range snapshot.DeviceInfo {
 		boardID := device.BoardInfo.BoardID
-		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
+		name, suffix := splitTtBoardType(device.BoardInfo.BoardType)
 
-		if strings.HasSuffix(boardType, " R") {
+		if suffix == "R" {
 			// Find the corresponding "L" device with the same board_id
 			// Since we need to match "R" to "L", we'll use the board_id as the key
 			// and add memory to the first "L" device we find with that board_id
-			for _, gpu := range lDeviceMap {
-				if gpu.ID == boardID {
-					// Extract base name without R suffix
-					name := boardType[:len(boardType)-2]
-
-					// Determine base VRAM based on board type
-					baseVram := 0
-					if strings.HasPrefix(name, "n150") {
-						baseVram = 12 * 1024 // 12GB in MiB
-					} else if strings.HasPrefix(name, "n300") {
-						baseVram = 12 * 1024 // 12GB in MiB
-					}
-
+			for _, key := range gpuKeys {
+				gpu := gpuMap[key]
+				if gpu.ID == boardID && gpu.Name == name {
 					// Add memory to the "L" device
-					gpu.Vram += baseVram
+					gpu.Vram += ttBoardVramMib(name)
 					break // Only add to the first matching "L" device
 				}
 			}
@@ -300,25 +329,36 @@ func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
 	// Handle devices without L/R suffix (backward compatibility)
 	for i, device := range snapshot.DeviceInfo {
 		boardID := device.BoardInfo.BoardID
-		boardType := strings.TrimSpace(device.BoardInfo.BoardType)
+		name, suffix := splitTtBoardType(device.BoardInfo.BoardType)
 
-		if !strings.HasSuffix(boardType, " L") && !strings.HasSuffix(boardType, " R") {
+		if suffix == "" {
 			// For devices without L/R suffix, treat them as standalone GPUs
 			// This maintains backward compatibility with existing data
 			uniqueID := fmt.Sprintf("%s_standalone_%d", boardID, i)
 
 			// Determine base VRAM based on board type
-			baseVram := 0
-			if strings.HasPrefix(boardType, "n150") {
-				baseVram = 12 * 1024 // 12GB in MiB
-			} else if strings.HasPrefix(boardType, "n300") {
-				baseVram = 12 * 1024 // 12GB in MiB
+			baseVram := ttBoardVramMib(name)
+
+			if isTtBlackholeBoard(name) {
+				if isRemoteTtDevice(device) {
+					continue
+				}
+				addGpu(uniqueID, GpuInfo{
+					Vendor: gpu.GpuVendorTenstorrent,
+					Name:   name,
+					Vram:   baseVram,
+					ID:     boardID,
+					Index:  strconv.Itoa(indexCounter),
+				})
+				indexCounter++
+				continue
 			}
 
 			// Check if we already have a GPU with this board_id (old behavior)
 			existingGpu := false
-			for _, gpu := range lDeviceMap {
-				if gpu.ID == boardID {
+			for _, key := range gpuKeys {
+				gpu := gpuMap[key]
+				if gpu.ID == boardID && gpu.Name == name {
 					gpu.Vram += baseVram
 					existingGpu = true
 					break
@@ -327,26 +367,41 @@ func getGpusFromTtSmiSnapshot(snapshot *ttSmiSnapshot) []GpuInfo {
 
 			if !existingGpu {
 				// Create new GPU entry
-				lDeviceMap[uniqueID] = &GpuInfo{
+				addGpu(uniqueID, GpuInfo{
 					Vendor: gpu.GpuVendorTenstorrent,
-					Name:   boardType,
+					Name:   name,
 					Vram:   baseVram,
 					ID:     boardID,
 					Index:  strconv.Itoa(indexCounter),
-				}
+				})
 				indexCounter++
+			}
+		}
+	}
+
+	// Add memory from remote Blackhole chips to the matching local board.
+	for _, device := range snapshot.DeviceInfo {
+		boardID := device.BoardInfo.BoardID
+		name, suffix := splitTtBoardType(device.BoardInfo.BoardType)
+		if suffix != "" || !isTtBlackholeBoard(name) || !isRemoteTtDevice(device) {
+			continue
+		}
+		for _, key := range gpuKeys {
+			gpu := gpuMap[key]
+			if gpu.ID == boardID && gpu.Name == name {
+				gpu.Vram += ttBoardVramMib(name)
+				break
 			}
 		}
 	}
 
 	// Convert map to slice
 	var gpus []GpuInfo
-	for _, gpu := range lDeviceMap {
-		gpus = append(gpus, *gpu)
+	for _, key := range gpuKeys {
+		gpus = append(gpus, *gpuMap[key])
 	}
 
-	// Sort by the original index to ensure consistent ordering
-	// We'll reassign indices sequentially based on the original order
+	// Reassign indices sequentially based on discovery order.
 	for i := range gpus {
 		gpus[i].Index = strconv.Itoa(i)
 	}

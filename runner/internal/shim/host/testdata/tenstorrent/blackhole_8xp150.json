@@ -1,0 +1,60 @@
+{
+  "device_info": [
+    {
+      "board_info": {
+        "bus_id": "0000:01:00.0",
+        "board_type": "p150b",
+        "board_id": "0000041231915018"
+      }
+    },
+    {
+      "board_info": {
+        "bus_id": "0000:21:00.0",
+        "board_type": "p150b",
+        "board_id": "0000041231915002"
+      }
+    },
+    {
+      "board_info": {
+        "bus_id": "0000:41:00.0",
+        "board_type": "p150b",
+        "board_id": "0000041231915009"
+      }
+    },
+    {
+      "board_info": {
+        "bus_id": "0000:61:00.0",
+        "board_type": "p150b",
+        "board_id": "000004123191500f"
+      }
+    },
+    {
+      "board_info": {
+        "bus_id": "0000:81:00.0",
+        "board_type": "p150b",
+        "board_id": "0000041231914064"
+      }
+    },
+    {
+      "board_info": {
+        "bus_id": "0000:a1:00.0",
+        "board_type": "p150b",
+        "board_id": "0000041231915006"
+      }
+    },
+    {
+      "board_info": {
+        "bus_id": "0000:c1:00.0",
+        "board_type": "p150b",
+        "board_id": "0000041231914087"
+      }
+    },
+    {
+      "board_info": {
+        "bus_id": "0000:e1:00.0",
+        "board_type": "p150b",
+        "board_id": "000004123191402f"
+      }
+    }
+  ]
+}

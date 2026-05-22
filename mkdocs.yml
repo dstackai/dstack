@@ -330,8 +330,8 @@ nav:
             - Qwen 3.6: docs/examples/models/qwen36.md
         - Accelerators:
             - AMD: docs/examples/accelerators/amd.md
-            - TPU: docs/examples/accelerators/tpu.md
             - Tenstorrent: docs/examples/accelerators/tenstorrent.md
+            - TPU: docs/examples/accelerators/tpu.md
       - Reference:
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md

@@ -1,12 +1,12 @@
 ---
 title: Tenstorrent
-description: Running dev environments, tasks, and services on Tenstorrent Wormhole accelerators
+description: Running dev environments, tasks, and services on Tenstorrent accelerators
 ---
 
 # Tenstorrent
 
 `dstack` supports running dev environments, tasks, and services on Tenstorrent
-[Wormwhole](https://tenstorrent.com/en/hardware/wormhole) accelerators via SSH fleets.
+accelerators via SSH fleets.
 
 
 ??? info "SSH fleets"
@@ -19,7 +19,7 @@ description: Running dev environments, tasks, and services on Tenstorrent Wormho
     ssh_config:
       user: root
       identity_file: ~/.ssh/id_rsa
-      # Configure any number of hosts with n150 or n300 PCEe boards 
+      # Configure any number of Tenstorrent hosts, e.g. Galaxy systems
       hosts:
         - 192.168.2.108
     ```
@@ -36,8 +36,8 @@ description: Running dev environments, tasks, and services on Tenstorrent Wormho
     ```bash
     $ dstack apply -f tt-fleet.dstack.yml
 
-     FLEET     RESOURCES                             PRICE  STATUS  CREATED
-     tt-fleet  cpu=12 mem=32GB disk=243GB n150:12GB  $0     idle    18 sec ago
+     FLEET     RESOURCES                                                          PRICE  STATUS  CREATED
+     tt-fleet  cpu=64 mem=566.1GB disk=749.6GB gpu=tt-galaxy-wh:12GB:32           $0     idle    18 sec ago
     ```
 
     </div>
@@ -47,47 +47,53 @@ description: Running dev environments, tasks, and services on Tenstorrent Wormho
 ## Services
 
 Here's an example of a service that deploys
-[`Llama-3.2-1B-Instruct`](https://huggingface.co/meta-llama/Llama-3.2-1B) 
-using [Tenstorrent Inference Service](https://github.com/tenstorrent/tt-inference-server).
+[`gpt-oss-120b`](https://huggingface.co/openai/gpt-oss-120b) on a
+Tenstorrent Galaxy system using
+[Tenstorrent Inference Server](https://github.com/tenstorrent/tt-inference-server).
 
 <div editor-title="service.dstack.yml"> 
 
 ```yaml
 type: service
-name: tt-inference-server
+name: gpt-oss-120b
+
+image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.12.0-805f43d-a45c614
 
 env:
   - HF_TOKEN
-  - HF_MODEL_REPO_ID=meta-llama/Llama-3.2-1B-Instruct
-image: ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-20.04-amd64:0.0.4-v0.56.0-rc47-e2e0002ac7dc
+
 commands:
   - | 
-    . ${PYTHON_ENV_DIR}/bin/activate
-    pip install "huggingface_hub[cli]"
-    export LLAMA_DIR="/data/models--$(echo "$HF_MODEL_REPO_ID" | sed 's/\//--/g')/"
-    huggingface-cli download $HF_MODEL_REPO_ID --local-dir $LLAMA_DIR
-    python /home/container_app_user/app/src/run_vllm_api_server.py
-port: 7000
+    ulimit -n 65535
+    /home/container_app_user/tt-metal/python_env/bin/python /home/container_app_user/app/src/run_vllm_api_server.py \
+      --model gpt-oss-120b \
+      --tt-device galaxy
 
-model: meta-llama/Llama-3.2-1B-Instruct
+port: 8000
 
-# Cache downloaded model
+model: openai/gpt-oss-120b
+
 volumes:
-  - /mnt/data/tt-inference-server/data:/data
+  # Cache model weights and TT runtime artifacts on the host.
+  - /mnt/data/gpt-oss-120b/cache_root:/home/container_app_user/cache_root
+  - /mnt/data/gpt-oss-120b/dot-cache:/home/container_app_user/.cache
 
 resources:
-  gpu: n150:1
+  shm_size: 32GB
+  gpu: tt-galaxy-wh:32
 ```
 
 </div>
 
-Go ahead and run configuration using `dstack apply`:
+Go ahead and run the configuration using `dstack apply`:
 
 <div class="termy">
 
-    ```bash
-    $ dstack apply -f service.dstack.yml
-    ```
+```bash
+$ export HF_TOKEN=<your-hf-token>
+$ dstack apply -f service.dstack.yml
+```
+
 </div>
 
 Once the service is up, it will be available via the service endpoint
@@ -96,28 +102,26 @@ at `<dstack server URL>/proxy/services/<project name>/<run name>/`.
 <div class="termy">
 
 ```shell
-$ curl http://127.0.0.1:3000/proxy/services/main/tt-inference-server/v1/chat/completions \
+$ curl http://127.0.0.1:3000/proxy/services/main/gpt-oss-120b/v1/chat/completions \
     -X POST \
     -H 'Authorization: Bearer &lt;user token&gt;' \
     -H 'Content-Type: application/json' \
     -d '{
-      "model": "meta-llama/Llama-3.2-1B-Instruct",
+      "model": "openai/gpt-oss-120b",
       "messages": [
         {
-          "role": "system",
-          "content": "You are a helpful assistant."
-        },
-        {
           "role": "user",
-          "content": "What is Deep Learning?"
+          "content": "What is 17 + 25? Answer with just the number."
         }
       ],
-      "stream": true,
-      "max_tokens": 512
+      "max_tokens": 128
     }'
 ```
 
 </div>
+
+The response includes both the final answer and the model's reasoning fields
+(`reasoning` and `reasoning_content`).
 
 Additionally, the model is available via `dstack`'s control plane UI:
 
@@ -130,7 +134,7 @@ is available at `https://<run name>.<gateway domain>/`.
 
 ## Tasks
 
-Below is a task that simply runs `tt-smi -s`. Tasks can be used for training, fine-tuning, batch inference, or antything else.
+Below is a task that simply runs `tt-smi -s`. Tasks can be used for training, fine-tuning, batch inference, or anything else.
 
 <div editor-title="tt-task.dstack.yml"> 
 
@@ -151,7 +155,7 @@ commands:
 
 # Specify the number of accelerators, model, etc
 resources:
-  gpu: n150:1
+  gpu: tt-galaxy-wh:32
 
 # Uncomment if you want to run on a cluster of nodes
 #nodes: 2
@@ -163,14 +167,14 @@ resources:
 
 ## Dev environments
 
-Below is an example of a dev environment configuration. It can be used to provision a dev environemnt that can be accessed via your desktop IDE. 
+Below is an example of a dev environment configuration. It can be used to provision a dev environment that can be accessed via your desktop IDE.
 
 <div editor-title=".dstack.yml"> 
 
 ```yaml
 type: dev-environment
 # The name is optional, if not specified, generated randomly
-name: cursor
+name: vscode
 
 # (Optional) List required env variables
 env:
@@ -179,19 +183,39 @@ env:
 image: dstackai/tt-smi:latest
 
 # Can be `vscode` or `cursor`
-ide: cursor
+ide: vscode
 
 resources:
-  gpu: n150:1
+  gpu: tt-galaxy-wh:32
 ```
 
 </div>
 
 If you run it via `dstack apply`, it will output the URL to access it via your desktop IDE.
 
-![](https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-cursor.png){ width=800 }
+![](https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-vscode.png){ width=800 }
 
-> Dev nevironments support many options, including inactivity and max duration, IDE configuration, etc. To learn more, refer to [Dev environments](../../concepts/tasks.md).
+> Dev environments support many options, including inactivity and max duration, IDE configuration, etc. To learn more, refer to [Dev environments](../../concepts/tasks.md).
+
+## GPU specification
+
+`resources.gpu` uses the usual `name:count` format. For Tenstorrent, `count`
+is the number of devices reported from the TT-SMI topology. On Galaxy systems,
+this corresponds to chips. For PCIe cards and workstations, use the card count
+shown in the examples below.
+
+```yaml
+resources:
+  gpu: tt-galaxy-wh:32  # Galaxy Wormhole, 32 chips
+  # gpu: tt-galaxy-bh:32  # Galaxy Blackhole, 32 chips
+  # gpu: n300:4           # TT-LoudBox or TT-QuietBox Wormhole, 4 n300 cards
+  # gpu: p150:4           # TT-QuietBox Blackhole, 4 p150 cards
+  # gpu: p300:2           # TT-QuietBox 2 Blackhole, 2 p300 cards
+```
+
+Use `tt:<count>` when any Tenstorrent device type is acceptable. Supported
+names are `n150`, `n300`, `tt-galaxy-wh`, `p100a`, `p150`, `p300`, and
+`tt-galaxy-bh`.
 
 ??? info "Feedback"
     Found a bug, or want to request a feature? File it in the [issue tracker](https://github.com/dstackai/dstack/issues),

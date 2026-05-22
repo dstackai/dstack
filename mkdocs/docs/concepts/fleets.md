@@ -114,10 +114,6 @@ To create a fleet, define its configuration in a YAML file. The filename must en
             [native package manager](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
             or [AMDGPU installer](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
 
-        === "Intel Gaudi"
-            2.&nbsp;Hosts with Intel Gaudi accelerators must be pre-installed with [Gaudi software and drivers](https://docs.habana.ai/en/latest/Installation_Guide/Driver_Installation.html#driver-installation).
-            This must include the drivers, `hl-smi`, and Habana Container Runtime.
-
         === "Tenstorrent"
             2.&nbsp;Hosts with Tenstorrent accelerators must be pre-installed with [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation).
             This must include the drivers, `tt-smi`, and HugePages.

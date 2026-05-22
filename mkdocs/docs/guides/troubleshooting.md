@@ -113,7 +113,7 @@ If you want to use non-NVIDIA GPUs or multi-GPU instances, set the `gpu` propert
 in your configuration.
 
 Examples: `gpu: amd` (one AMD GPU), `gpu: A10:4..8` (4 to 8 A10 GPUs),
-`gpu: 8:Gaudi2` (8 Gaudi2 accelerators).
+`gpu: tt:32` (32 Tenstorrent devices).
 
 > If you don't specify the number of GPUs, `dstack` will only select single-GPU instances.
 
