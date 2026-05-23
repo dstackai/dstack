@@ -38,12 +38,14 @@ Kubernetes clusters or vanilla bare-metal hosts.
     provisioned and that you have access to, create an
     [SSH fleet](../../concepts/fleets.md).
 
+<h3 id="cluster-placement" style="display: none;">Cluster placement</h3>
+
 !!! info "Cluster placement"
     For multi-node workloads, the fleet must set `placement` to `cluster`. For
     Kubernetes and SSH fleets, the network must be properly configured.
 
-    > To test whether the cluster is properly configured, run the
-    > [RCCL tests via a distributed task](../clusters/nccl-rccl-tests.md).
+    To test whether the cluster is properly configured, run the
+    [RCCL tests via a distributed task](../clusters/nccl-rccl-tests.md).
 
 Once a fleet is created, you can run dev environments, tasks, and services.
 
@@ -100,8 +102,8 @@ Here are examples of a [service](../../concepts/services.md) that deploys
         example.
 
         For multi-node PD disaggregation, the fleet must set `placement` to
-        `cluster` and have a proper interconnect. See the cluster placement note
-        above.
+        `cluster` and have a proper interconnect. See
+        [cluster placement](#cluster-placement).
 
 === "vLLM"
 
@@ -196,8 +198,8 @@ resources:
     To run training across multiple nodes, use
     [distributed tasks](../../concepts/tasks.md#distributed-tasks). Distributed
     tasks may run on a cluster; in that case, the fleet must set `placement` to
-    `cluster` and have a proper interconnect. See the cluster placement note
-    above.
+    `cluster` and have a proper interconnect. See
+    [cluster placement](#cluster-placement).
 
 ## Dev environments
 
