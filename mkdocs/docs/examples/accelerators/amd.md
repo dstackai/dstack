@@ -224,9 +224,10 @@ resources:
 
 ## Docker image
 
-> If you'd like a run to use AMD GPUs, make sure to specify `image`. The image
-> should include a ROCm runtime compatible with the AMD GPUs and the packages
-> your workload needs.
+> If you'd like a run to use AMD GPUs, make sure to specify `image`.
+
+The image's ROCm runtime must be compatible with the AMD GPUs the run will use.
+The image should also include the packages your workload needs.
 
 ## Metrics
 
