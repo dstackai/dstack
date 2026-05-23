@@ -38,14 +38,15 @@ Kubernetes clusters or vanilla bare-metal hosts.
     provisioned and that you have access to, create an
     [SSH fleet](../../concepts/fleets.md).
 
-<h3 id="cluster-placement" style="display: none;">Cluster placement</h3>
-
 !!! info "Cluster placement"
-    For multi-node workloads, the fleet must set `placement` to `cluster`. For
-    Kubernetes and SSH fleets, the network must be properly configured.
+    ### Cluster placement { #cluster-placement style="display: none;" }
 
-    To test whether the cluster is properly configured, run the
-    [RCCL tests via a distributed task](../clusters/nccl-rccl-tests.md).
+    For multi-node workloads, the fleet must
+    [set](../../concepts/fleets.md#cluster-placement) `placement` to `cluster`.
+    For Kubernetes and SSH fleets, the network must be properly configured.
+
+    > To test whether the cluster is properly configured, run the
+    > [RCCL tests via a distributed task](../clusters/nccl-rccl-tests.md).
 
 Once a fleet is created, you can run dev environments, tasks, and services.
 
