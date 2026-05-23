@@ -188,8 +188,12 @@ resources:
 
 </div>
 
-> For multi-node training, see
-> [distributed tasks](../../concepts/tasks.md#distributed-tasks).
+!!! info "Distributed tasks"
+    To run training across multiple nodes, use
+    [distributed tasks](../../concepts/tasks.md#distributed-tasks). Distributed
+    tasks may run on a cluster; in that case, the fleet must set `placement` to
+    `cluster` and have a proper interconnect. See the cluster placement note
+    above.
 
 ## Dev environments
 
