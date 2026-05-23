@@ -11,6 +11,11 @@ on:
         description: "TT SMI version"
         required: true
         default: "3.0.25"
+      tag_latest:
+        description: "Update 'latest'"
+        type: boolean
+        required: true
+        default: false
 
 jobs:
   build-tt-smi:
@@ -38,8 +43,12 @@ jobs:
             --build-arg IMAGE_NAME=${IMAGE_NAME} \
             --build-arg TT_SMI_VERSION=${{ inputs.tt_smi_version }} \
             --build-arg BUILD_DATE=$(date --utc --iso-8601=seconds)Z \
-            --tag ${IMAGE_NAME}:latest
-          VERSION=$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' ${IMAGE_NAME})
-          docker tag ${IMAGE_NAME}:latest ${IMAGE_NAME}:${VERSION}
+            --tag ${IMAGE_NAME}:${{ inputs.tt_smi_version }}
+          VERSION=$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' ${IMAGE_NAME}:${{ inputs.tt_smi_version }})
+          docker tag ${IMAGE_NAME}:${{ inputs.tt_smi_version }} ${IMAGE_NAME}:${VERSION}
           docker push ${IMAGE_NAME}:${VERSION}
-          docker push ${IMAGE_NAME}:latest
+      - name: Tag and push latest
+        if: ${{ inputs.tag_latest }}
+        run: |
+          docker tag ${{ inputs.image_name }}:${{ inputs.tt_smi_version }} ${{ inputs.image_name }}:latest
+          docker push ${{ inputs.image_name }}:latest
