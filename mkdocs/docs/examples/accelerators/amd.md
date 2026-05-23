@@ -99,6 +99,10 @@ Here are examples of a [service](../../concepts/services.md) that deploys
         [SGLang PD disaggregation](../inference/sglang.md#pd-disaggregation)
         example.
 
+        For multi-node PD disaggregation, the fleet must set `placement` to
+        `cluster` and have a proper interconnect. See the cluster placement note
+        above.
+
 === "vLLM"
 
     <div editor-title="service.dstack.yml">
