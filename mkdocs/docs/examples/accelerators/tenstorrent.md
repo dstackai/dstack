@@ -1,16 +1,27 @@
 ---
 title: Tenstorrent
-description: Running dev environments, tasks, and services on Tenstorrent accelerators
+description: Running inference, training, and dev environments on Tenstorrent accelerators
 ---
 
 # Tenstorrent
 
-`dstack` supports running dev environments, tasks, and services on Tenstorrent
-accelerators via SSH fleets.
+`dstack` supports running inference, training, and dev environments on
+Tenstorrent accelerators via SSH fleets.
 
+The examples below assume the Tenstorrent hosts are pre-installed with
+[Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation),
+including the drivers, `tt-smi`, and HugePages.
 
-??? info "SSH fleets"
-    <div editor-title="tt-fleet.dstack.yml"> 
+## Fleets
+
+Currently, Tenstorrent accelerators are supported via
+[SSH fleets](../../concepts/fleets.md#ssh-fleets).
+
+=== "SSH fleets"
+
+    Start by creating an SSH fleet for your Tenstorrent hosts.
+
+    <div editor-title="tt-fleet.dstack.yml">
 
     ```yaml
     type: fleet
@@ -19,15 +30,11 @@ accelerators via SSH fleets.
     ssh_config:
       user: root
       identity_file: ~/.ssh/id_rsa
-      # Configure any number of Tenstorrent hosts, e.g. Galaxy systems
       hosts:
         - 192.168.2.108
     ```
 
     </div>
-
-    > Hosts should be pre-installed with [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation).
-    This should include the drivers, `tt-smi`, and HugePages.
 
     To apply the fleet configuration, run:
 
@@ -42,16 +49,14 @@ accelerators via SSH fleets.
 
     </div>
 
-    For more details on fleet configuration, refer to [SSH fleets](../../concepts/fleets.md#ssh-fleets).
+## Inference
 
-## Services
-
-Here's an example of a service that deploys
+Below is a [service](../../concepts/services.md) that deploys
 [`gpt-oss-120b`](https://huggingface.co/openai/gpt-oss-120b) on a
 Tenstorrent Galaxy system using
 [Tenstorrent Inference Server](https://github.com/tenstorrent/tt-inference-server).
 
-<div editor-title="service.dstack.yml"> 
+<div editor-title="service.dstack.yml">
 
 ```yaml
 type: service
@@ -63,7 +68,7 @@ env:
   - HF_TOKEN
 
 commands:
-  - | 
+  - |
     ulimit -n 65535
     /home/container_app_user/tt-metal/python_env/bin/python /home/container_app_user/app/src/run_vllm_api_server.py \
       --model gpt-oss-120b \
@@ -127,58 +132,127 @@ Additionally, the model is available via `dstack`'s control plane UI:
 
 ![](https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-model-ui.png){ width=800 }
 
-When a [gateway](../../concepts/gateways.md) is configured, the service endpoint 
+When a [gateway](../../concepts/gateways.md) is configured, the service endpoint
 is available at `https://<run name>.<gateway domain>/`.
 
-> Services support many options, including authentication, auto-scaling policies, etc. To learn more, refer to [Services](../../concepts/services.md).
+## Training
 
-## Tasks
+Below is a minimal [task](../../concepts/tasks.md) that runs a TT-XLA training
+smoke test.
 
-Below is a task that simply runs `tt-smi -s`. Tasks can be used for training, fine-tuning, batch inference, or anything else.
-
-<div editor-title="tt-task.dstack.yml"> 
+<div editor-title="tt-task.dstack.yml">
 
 ```yaml
 type: task
-# The name is optional, if not specified, generated randomly
-name: tt-smi
+name: tt-xla-train
 
-env:
-  - HF_TOKEN
+image: ghcr.io/tenstorrent/tt-xla-slim:latest
 
-# (Required) Use any image with TT drivers 
-image: dstackai/tt-smi:latest
-
-# Use any commands
 commands:
-  - tt-smi -s
+  - |
+    python - <<'PY'
+    import jax
+    import jax.numpy as jnp
 
-# Specify the number of accelerators, model, etc
+    devices = jax.devices("tt")
+    print("TT devices:", devices)
+    if not devices:
+        raise SystemExit("No Tenstorrent devices found by JAX")
+
+    with jax.default_device(devices[0]):
+        params = {
+            "w": jnp.ones((32, 32), dtype=jnp.bfloat16),
+            "b": jnp.zeros((32,), dtype=jnp.bfloat16),
+        }
+        x = jnp.ones((32, 32), dtype=jnp.bfloat16)
+        y = jnp.zeros((32, 32), dtype=jnp.bfloat16)
+
+    def loss_fn(params, x, y):
+        pred = x @ params["w"] + params["b"]
+        err = (pred - y).astype(jnp.float32)
+        return jnp.mean(err * err)
+
+    @jax.jit
+    def train_step(params, x, y):
+        loss, grads = jax.value_and_grad(loss_fn)(params, x, y)
+        next_params = jax.tree_util.tree_map(
+            lambda p, g: p - jnp.asarray(0.01, dtype=p.dtype) * g.astype(p.dtype),
+            params,
+            grads,
+        )
+        return next_params, loss
+
+    for step in range(3):
+        params, loss = train_step(params, x, y)
+        loss.block_until_ready()
+        print(f"step={step} loss={float(jax.device_get(loss)):.6f}")
+
+    print("tiny training smoke test passed")
+    PY
+
 resources:
   gpu: tt-galaxy-wh:32
-
-# Uncomment if you want to run on a cluster of nodes
-#nodes: 2
 ```
 
 </div>
 
-> Tasks support many options, including multi-node configuration, max duration, etc. To learn more, refer to [Tasks](../../concepts/tasks.md).
+For a single Wormhole PCIe card, use `gpu: n150:1`.
+
+??? info "Files and repos"
+    For longer commands, put the Python code in `train.py` next to
+    `tt-task.dstack.yml` and upload it with `files`:
+
+    <div editor-title="tt-task.dstack.yml">
+
+    ```yaml
+    type: task
+    name: tt-xla-train
+
+    image: ghcr.io/tenstorrent/tt-xla-slim:latest
+
+    files:
+      - train.py
+
+    commands:
+      - python train.py
+
+    resources:
+      gpu: tt-galaxy-wh:32
+    ```
+
+    </div>
+
+    If the script is part of a Git repository, use `repos` instead:
+
+    <div editor-title="tt-task.dstack.yml">
+
+    ```yaml
+    working_dir: /workspace
+
+    repos:
+      - .:/workspace
+
+    commands:
+      - python train.py
+    ```
+
+    </div>
+
+    For more details, refer to [Files](../../concepts/tasks.md#files) and
+    [Repos](../../concepts/tasks.md#repos).
 
 ## Dev environments
 
-Below is an example of a dev environment configuration. It can be used to provision a dev environment that can be accessed via your desktop IDE.
+Below is an example [dev environment](../../concepts/dev-environments.md)
+configuration. It can be used to provision a dev environment that can be
+accessed via your desktop IDE.
 
-<div editor-title=".dstack.yml"> 
+<div editor-title=".dstack.yml">
 
 ```yaml
 type: dev-environment
 # The name is optional, if not specified, generated randomly
 name: vscode
-
-# (Optional) List required env variables
-env:
-  - HF_TOKEN
 
 image: dstackai/tt-smi:latest
 
@@ -194,8 +268,6 @@ resources:
 If you run it via `dstack apply`, it will output the URL to access it via your desktop IDE.
 
 ![](https://dstack.ai/static-assets/static-assets/images/dstack-tenstorrent-vscode.png){ width=800 }
-
-> Dev environments support many options, including inactivity and max duration, IDE configuration, etc. To learn more, refer to [Dev environments](../../concepts/tasks.md).
 
 ## GPU specification
 
@@ -219,6 +291,15 @@ Use a model name when placement depends on the hardware family: `n150` or
 `n300` for Wormhole PCIe cards, `tt-galaxy-wh` for Galaxy Wormhole, `p100a`,
 `p150`, or `p300` for Blackhole PCIe cards, and `tt-galaxy-bh` for Galaxy
 Blackhole.
+
+## What's next?
+
+1. Check [Services](../../concepts/services.md),
+   [Tasks](../../concepts/tasks.md), [Dev environments](../../concepts/dev-environments.md),
+   and [SSH fleets](../../concepts/fleets.md#ssh-fleets).
+2. Browse [Tenstorrent Inference Server](https://github.com/tenstorrent/tt-inference-server),
+   [TT-XLA](https://github.com/tenstorrent/tt-xla), and
+   [TT-Metalium](https://github.com/tenstorrent/tt-metal).
 
 ??? info "Feedback"
     Found a bug, or want to request a feature? File it in the [issue tracker](https://github.com/dstackai/dstack/issues),
