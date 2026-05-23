@@ -42,8 +42,8 @@ Kubernetes clusters or vanilla bare-metal hosts.
     For multi-node workloads, the fleet must set `placement` to `cluster`. For
     Kubernetes and SSH fleets, the network must be properly configured.
 
-    To test whether the fleet is properly configured, run the
-    [RCCL tests via a distributed task](../clusters/nccl-rccl-tests.md).
+    > To test whether the fleet is properly configured, run the
+    > [RCCL tests via a distributed task](../clusters/nccl-rccl-tests.md).
 
 Once a fleet is created, you can run dev environments, tasks, and services.
 
