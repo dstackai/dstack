@@ -188,7 +188,8 @@ resources:
 
 </div>
 
-For multi-node training, see [distributed tasks](../../concepts/tasks.md#distributed-tasks).
+> For multi-node training, see
+> [distributed tasks](../../concepts/tasks.md#distributed-tasks).
 
 ## Dev environments
 
