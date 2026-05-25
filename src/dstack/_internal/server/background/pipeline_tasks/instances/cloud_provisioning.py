@@ -299,6 +299,11 @@ async def _get_cluster_placement_context(
             session=session,
             fleet_id=instance_model.fleet_id,
         )
+    for placement_group_model in placement_group_models:
+        _populate_placement_group_relations(
+            placement_group_model=placement_group_model,
+            instance_model=instance_model,
+        )
     placement_group_model = None
     if not cluster_context.is_current_instance_master:
         # Non-master instances only reuse the placement group chosen by the
@@ -307,11 +312,6 @@ async def _get_cluster_placement_context(
             placement_group_models=placement_group_models,
             fleet_id=instance_model.fleet_id,
         )
-        if placement_group_model is not None:
-            _populate_current_master_placement_group_relations(
-                placement_group_model=placement_group_model,
-                instance_model=instance_model,
-            )
     return placement_group_models, placement_group_model
 
 
@@ -358,13 +358,13 @@ def _get_current_master_placement_group_model(
     return placement_group_models[0]
 
 
-def _populate_current_master_placement_group_relations(
+def _populate_placement_group_relations(
     placement_group_model: PlacementGroupModel,
     instance_model: InstanceModel,
 ) -> None:
     # Placement groups are loaded in a separate session from the instance worker.
     # Reattach the already-known project/fleet objects so later detached access
-    # can still build a PlacementGroup value object without lazy loading.
+    # can build a PlacementGroup value object without lazy loading.
     set_committed_value(placement_group_model, "project", instance_model.project)
     if instance_model.fleet is not None:
         set_committed_value(placement_group_model, "fleet", instance_model.fleet)
