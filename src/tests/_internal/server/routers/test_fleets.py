@@ -1534,7 +1534,7 @@ class TestApplyFleetPlan:
         [
             pytest.param("backends", [BackendType.AWS], id="backends"),
             pytest.param("regions", ["eu-west-1"], id="regions"),
-            pytest.param("instance_types", ["p3.8xlarge"], id="instance_types"),
+            pytest.param("instance_types", ["g6e.24xlarge"], id="instance_types"),
             pytest.param("idle_duration", 60, id="idle_duration"),
             pytest.param("tags", {}, id="tags"),  # falsy value
         ],

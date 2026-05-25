@@ -257,7 +257,7 @@ class ProfileParams(CoreModel):
     instance_types: Annotated[
         Optional[List[str]],
         Field(
-            description="The cloud-specific instance types to consider for provisioning (e.g., `[p3.8xlarge, n1-standard-4]`)"
+            description="The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)"
         ),
     ] = None
     reservation: Annotated[
