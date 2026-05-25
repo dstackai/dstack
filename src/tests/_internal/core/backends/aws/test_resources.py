@@ -150,14 +150,23 @@ class TestGetImageIdAndUsername:
         assert "image 'dstack-0.0' not found" in caplog.text
 
     @pytest.mark.parametrize(
-        ["cuda", "expected"],
+        ["cuda", "expected_name", "expected_owner"],
         [
-            [False, "dstack-0.0"],
-            [True, "dstack-cuda-0.0"],
+            [False, "dstack-0.0", "142421590066"],
+            [
+                True,
+                "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04) *",
+                "898082745236",
+            ],
         ],
     )
-    def test_uses_dstack_image_name_and_account_id_if_image_config_not_provided(
-        self, monkeypatch: pytest.MonkeyPatch, ec2_client_mock: Mock, cuda: bool, expected: str
+    def test_uses_default_image_name_and_account_id_if_image_config_not_provided(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        ec2_client_mock: Mock,
+        cuda: bool,
+        expected_name: str,
+        expected_owner: str,
     ):
         monkeypatch.setattr("dstack.version.base_image", "0.0")
         _, username = get_image_id_and_username(
@@ -167,7 +176,7 @@ class TestGetImageIdAndUsername:
         )
         assert username == "ubuntu"
         ec2_client_mock.describe_images.assert_called_once_with(
-            Filters=[{"Name": "name", "Values": [expected]}], Owners=["142421590066"]
+            Filters=[{"Name": "name", "Values": [expected_name]}], Owners=[expected_owner]
         )
 
     @pytest.mark.parametrize(

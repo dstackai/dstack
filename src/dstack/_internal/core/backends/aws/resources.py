@@ -6,8 +6,6 @@ import botocore.exceptions
 
 import dstack.version as version
 from dstack._internal.core.backends.aws.models import AWSOSImageConfig
-from dstack._internal.core.backends.base.compute import requires_nvidia_proprietary_kernel_modules
-from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
 from dstack._internal.core.errors import BackendError, ComputeError, ComputeResourceNotFoundError
 from dstack._internal.utils.logging import get_logger
 
@@ -31,17 +29,15 @@ def get_image_id_and_username(
         image_name = image.name
         image_owner = image.owner
         username = image.user
-    elif _supported_by_dlami(instance_type):
+    elif gpu_name is not None:
+        # AWS Deep Learning AMIs (DLAMI) support all GPU instance types currently supported by dstack.
+        # dstack's cuda AMI is still built but not used.
+        # It may be used again in case some instance types are not supported by DLAMI.
         image_name = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04) *"
         image_owner = DLAMI_OWNER_ACCOUNT_ID
         username = "ubuntu"
     else:
-        if gpu_name is None:
-            image_name = f"dstack-{version.base_image}"
-        elif not requires_nvidia_proprietary_kernel_modules(gpu_name):
-            image_name = f"dstack-cuda-{version.base_image}"
-        else:
-            image_name = f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
+        image_name = f"dstack-{version.base_image}"
         image_owner = DSTACK_ACCOUNT_ID
         username = "ubuntu"
     response = ec2_client.describe_images(
@@ -634,25 +630,6 @@ def _is_private_subnet_with_internet_egress(
                     return True
 
     return False
-
-
-def _supported_by_dlami(instance_type: str) -> bool:
-    # Currently only p3. instances are not supported by DLAMI among GPU instances.
-    return any(
-        instance_type.startswith(family)
-        for family in [
-            "g4dn.",
-            "g5.",
-            "g6.",
-            "gr6.",
-            "g6e.",
-            "p4d.",
-            "p4de.",
-            "p5.",
-            "p5e.",
-            "p6-b200.",
-        ]
-    )
 
 
 def get_reservation(
