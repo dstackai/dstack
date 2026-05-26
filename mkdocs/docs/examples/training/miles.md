@@ -1,22 +1,32 @@
 ---
 title: Miles
-description: RL-fine-tune Qwen2.5-32B with Miles, SGLang, Megatron-LM, and Ray across two 8xH100 nodes
+description: RL fine-tuning Qwen2.5-32B with Miles, SGLang, Megatron-LM, and Ray across two 8xH100 nodes
 ---
 
 # Miles
 
 This example shows how to use `dstack` and [Miles](https://github.com/radixark/miles)
-to RL-fine-tune a 32B language model with [GRPO](https://arxiv.org/abs/2402.03300) across two 8xH100 nodes. Under the hood Miles uses [SGLang](https://github.com/sgl-project/sglang) for high-throughput rollout, [Megatron-LM](https://github.com/NVIDIA/Megatron-LM) for training, and [Ray](https://docs.ray.io/en/latest/) to coordinate the trainer
-and rollout actors across nodes.
+to fine-tune a 32B language model with [GRPO](https://arxiv.org/abs/2402.03300)
+across a multi-node cluster.
+Miles uses [SGLang](https://github.com/sgl-project/sglang) for high-throughput
+rollouts, [Megatron-LM](https://github.com/NVIDIA/Megatron-LM) for training,
+and [Ray](https://docs.ray.io/en/latest/) to coordinate the trainer and rollout
+actors across nodes.
 
-Here we fine-tune `Qwen/Qwen2.5-32B-Instruct` on [GSM8K](https://huggingface.co/datasets/openai/gsm8k) dataset.
+Here we fine-tune `Qwen/Qwen2.5-32B-Instruct` on the
+[GSM8K](https://huggingface.co/datasets/openai/gsm8k) dataset.
 
 !!! info "Prerequisites"
-    Before running a distributed task, make sure to create a fleet with `placement` set to `cluster` (can be a [managed fleet](../../concepts/fleets.md#cluster-placement) or an [SSH fleet](../../concepts/fleets.md#ssh-placement)).
+    Before running a distributed task, make sure to create a [fleet](../../concepts/fleets.md)
+    with `placement` set to [`cluster`](../../concepts/fleets.md#cluster-placement).
 
 ## Run a Ray cluster
 
-The task below starts a Ray cluster across both nodes and performs the one-time setup on each node. The setup includes: downloading the model, downloading the dataset, and converting the checkpoint to Megatron's `torch_dist` format.
+### Define a configuration
+
+The [task](../../concepts/tasks.md) below starts Ray on two nodes and prepares
+each node by downloading the model and dataset, then converting the checkpoint
+to Megatron's `torch_dist` format.
 
 <div editor-title="miles-qwen32b-h100.dstack.yml">
 
@@ -31,11 +41,11 @@ env:
   - NCCL_DEBUG=INFO
   - MODEL_ID=Qwen/Qwen2.5-32B-Instruct
 commands:
-  # 1. Download Model + dataset
+  # 1. Download the model and dataset.
   - pip install -U "huggingface_hub[cli]"
   - hf download "$MODEL_ID" --local-dir "/root/$(basename "$MODEL_ID")"
   - hf download --repo-type dataset openai/gsm8k --local-dir /root/gsm8k
-  # 2. Convert HF -> Megatron torch_dist
+  # 2. Convert the Hugging Face checkpoint to Megatron torch_dist.
   - |
     MODEL_NAME="$(basename "$MODEL_ID")"
     cd /root/miles && python tools/convert_hf_to_torch_dist.py \
@@ -56,7 +66,7 @@ commands:
       --untie-embeddings-and-output-weights \
       --hf-checkpoint "/root/$MODEL_NAME" \
       --save "/root/${MODEL_NAME}_torch_dist"
-  # 3. Start the Ray cluster.
+  # 3. Start Ray.
   - |
     if [ $DSTACK_NODE_RANK = 0 ]; then
       ray start --head --port=6379
@@ -76,7 +86,10 @@ volumes:
 
 </div>
 
-Now, if you run this task via `dstack apply`, it will automatically forward the Ray's dashboard port to `localhost:8265`.
+### Run the configuration
+
+Run the task with [`dstack apply`](../../reference/cli/dstack/apply.md). By
+default, `dstack apply` forwards the Ray dashboard port to `localhost:8265`.
 
 <div class="termy">
 
@@ -87,11 +100,14 @@ $ dstack apply -f miles-qwen32b-h100.dstack.yml
 
 </div>
 
-As long as the `dstack apply` is attached, you can use `localhost:8265` to submit Ray jobs for execution. If `dstack apply` is detached, you can use `dstack attach` to re-attach.
+While `dstack apply` is attached, you can submit Ray jobs through
+`localhost:8265`. If you detach or run from another machine, use
+[`dstack attach`](../../reference/cli/dstack/attach.md) to re-attach and make
+the dashboard port accessible on `localhost`.
 
 ## Submit Ray jobs
 
-Before you can submit Ray jobs, ensure `ray` is installed locally:
+Install `ray` locally before submitting jobs:
 
 <div class="termy">
 
@@ -102,7 +118,7 @@ $ pip install ray
 </div>
 
 The submit script below runs the Miles training job on the Ray cluster. The
-model is sharded across all 8 GPUs per node via tensor parallelism, and SGLang
+model is sharded across all 8 GPUs per node with tensor parallelism, and SGLang
 uses the same 8 GPUs per node for rollout.
 
 <div editor-title="submit-miles-train.sh">
@@ -115,7 +131,6 @@ export RAY_ADDRESS=http://localhost:8265
 
 : "${NUM_NODES:?NUM_NODES is not set}"
 : "${GPUS_PER_NODE:?GPUS_PER_NODE is not set}"
-TOTAL_GPUS=$((NUM_NODES * GPUS_PER_NODE))
 
 MODEL_ID="Qwen/Qwen2.5-32B-Instruct"
 MODEL_NAME="$(basename "$MODEL_ID")"
@@ -132,17 +147,6 @@ WANDB_PROJECT="dstack-miles-RL"
 WANDB_GROUP="${MODEL_NAME}-gsm8k-${NUM_NODES}node-${GPUS_PER_NODE}gpu"
 WANDB_NAME="rollout-$(date +%Y%m%d-%H%M%S)"
 ROLLOUT_GPUS_PER_ENGINE=8
-
-echo "===== submit-miles env ====="
-echo "NUM_NODES=${NUM_NODES}"
-echo "GPUS_PER_NODE=${GPUS_PER_NODE}"
-echo "TOTAL_GPUS=${TOTAL_GPUS}"
-echo "MODEL_ID=${MODEL_ID}"
-echo "HF_CHECKPOINT=${HF_CHECKPOINT}"
-echo "CHECKPOINT_DIR=${CHECKPOINT_DIR}"
-echo "============================"
-
-
 
 CMD='cd /root/miles && python3 train.py \
   --actor-num-nodes '"$NUM_NODES"' \
@@ -246,7 +250,7 @@ ray job submit \
 
 </div>
 
-Then run it:
+Submit the job with the same cluster shape as the task:
 
 <div class="termy">
 
@@ -256,15 +260,22 @@ $ NUM_NODES=2 GPUS_PER_NODE=8 bash submit-miles-train.sh
 
 </div>
 
-!!! info "Important parameters"
+!!! info "Training parameters"
     1. `--tensor-model-parallel-size 8` shards the 32B model across all 8 GPUs
        per node.
-    2. `--rollout-num-gpus-per-engine 8` starts SGLang engine with TP-8 on each node.
-    3. `--sglang-server-concurrency` sets how many requests SGLang processes concurrently.
-    4. `--max-tokens-per-gpu 9216` sets number of tokens each GPU processes. Lower this if Megatron OOM's during training.
-    5. `--sglang-mem-fraction-static 0.7` sets fraction of GPU memory SGLang pre-allocates for its KV cache. Lower this if Megatron OOM's at startup.
+    2. `--rollout-num-gpus-per-engine 8` starts SGLang with TP-8 on each node.
+    3. `--sglang-server-concurrency` sets how many requests SGLang processes
+       concurrently.
+    4. `--max-tokens-per-gpu 9216` sets the per-GPU token budget. Lower this if
+       Megatron OOMs during training.
+    5. `--sglang-mem-fraction-static 0.7` sets the SGLang KV cache memory
+       fraction. Lower this if Megatron OOMs at startup.
+
+Using Ray via `dstack` gives you access to the Ray ecosystem while benefiting
+from `dstack`'s provisioning capabilities.
 
 !!! info "What's next"
     1. Read about [distributed tasks](../../concepts/tasks.md#distributed-tasks)
-       and [fleets](../../concepts/fleets.md) for larger-scale setups.
-    2. Browse Miles' [examples](https://github.com/radixark/miles/tree/main/examples)
+       and [fleets](../../concepts/fleets.md)
+    2. See the [SGLang inference](../inference/sglang.md) example
+    3. Browse Miles' [examples](https://github.com/radixark/miles/tree/main/examples)
