@@ -1,6 +1,6 @@
 from typing import Optional
 
-from dstack._internal.core.compatibility.common import patch_profile_params
+from dstack._internal.core.compatibility.common import get_profile_excludes, patch_profile_params
 from dstack._internal.core.models.common import (
     EntityReference,
     IncludeExcludeDictType,
@@ -82,7 +82,10 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     """
     spec_excludes: IncludeExcludeDictType = {}
     configuration_excludes: IncludeExcludeDictType = {}
-    profile_excludes: IncludeExcludeSetType = set()
+    profile_excludes = get_profile_excludes(run_spec.profile)
+
+    if run_spec.configuration.backend_options is None:
+        configuration_excludes["backend_options"] = True
 
     if isinstance(run_spec.configuration, ServiceConfiguration):
         if run_spec.configuration.probes:
@@ -147,6 +150,9 @@ def get_job_spec_excludes(job_specs: list[JobSpec]) -> IncludeExcludeDictType:
     spec_excludes["probes"] = {"__all__": probe_excludes}
     if all(all(p.until_ready == DEFAULT_PROBE_UNTIL_READY for p in s.probes) for s in job_specs):
         probe_excludes["until_ready"] = True
+
+    if all(s.requirements.backend_options is None for s in job_specs):
+        spec_excludes["requirements"] = {"backend_options": True}
 
     return spec_excludes
 

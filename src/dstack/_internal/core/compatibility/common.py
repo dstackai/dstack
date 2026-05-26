@@ -1,5 +1,16 @@
-from dstack._internal.core.models.common import EntityReference
+from typing import Optional
+
+from dstack._internal.core.models.common import EntityReference, IncludeExcludeSetType
 from dstack._internal.core.models.profiles import ProfileParams
+
+
+def get_profile_excludes(profile: Optional[ProfileParams]) -> IncludeExcludeSetType:
+    excludes: IncludeExcludeSetType = set()
+    if profile is None:
+        return excludes
+    if profile.backend_options is None:
+        excludes.add("backend_options")
+    return excludes
 
 
 def patch_profile_params(params: ProfileParams) -> None:

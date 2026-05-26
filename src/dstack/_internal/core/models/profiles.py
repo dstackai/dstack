@@ -5,6 +5,7 @@ import orjson
 from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
+from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
     CoreConfig,
@@ -97,6 +98,19 @@ def parse_idle_duration(v: Optional[Union[int, str, bool]]) -> Optional[int]:
     if v is True:
         return None
     return parse_duration(v)
+
+
+def validate_backend_options(
+    v: Optional[List["AnyBackendProfileOptions"]],
+) -> Optional[List["AnyBackendProfileOptions"]]:
+    if v is None:
+        return v
+    seen = set()
+    for opt in v:
+        if opt.type in seen:
+            raise ValueError(f"backend_options contains duplicate entry for backend '{opt.type}'")
+        seen.add(opt.type)
+    return v
 
 
 class RetryEvent(str, Enum):
@@ -387,6 +401,10 @@ class ProfileParams(CoreModel):
             )
         ),
     ] = None
+    backend_options: Annotated[
+        Optional[List[AnyBackendProfileOptions]],
+        Field(description="Backend-specific options, applied only to offers from that backend"),
+    ] = None
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
@@ -399,6 +417,9 @@ class ProfileParams(CoreModel):
     )
     _validate_fleets = validator("fleets", allow_reuse=True, each_item=True)(EntityReference.parse)
     _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
+    _validate_backend_options = validator("backend_options", allow_reuse=True)(
+        validate_backend_options
+    )
 
 
 class ProfileProps(CoreModel):

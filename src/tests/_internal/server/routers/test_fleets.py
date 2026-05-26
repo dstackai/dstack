@@ -951,6 +951,7 @@ class TestApplyFleetPlan:
                     "reservation": None,
                     "blocks": 1,
                     "tags": None,
+                    "backend_options": None,
                 },
                 "profile": {
                     "backends": None,
@@ -973,6 +974,7 @@ class TestApplyFleetPlan:
                     "reservation": None,
                     "fleets": None,
                     "tags": None,
+                    "backend_options": None,
                 },
                 "autocreated": False,
             },
@@ -1069,6 +1071,7 @@ class TestApplyFleetPlan:
                     "reservation": None,
                     "blocks": 1,
                     "tags": None,
+                    "backend_options": None,
                 },
                 "profile": {
                     "backends": None,
@@ -1091,6 +1094,7 @@ class TestApplyFleetPlan:
                     "reservation": None,
                     "fleets": None,
                     "tags": None,
+                    "backend_options": None,
                 },
                 "autocreated": False,
             },
@@ -1286,6 +1290,7 @@ class TestApplyFleetPlan:
                     "reservation": None,
                     "blocks": 1,
                     "tags": None,
+                    "backend_options": None,
                 },
                 "profile": {
                     "backends": None,
@@ -1308,6 +1313,7 @@ class TestApplyFleetPlan:
                     "reservation": None,
                     "fleets": None,
                     "tags": None,
+                    "backend_options": None,
                 },
                 "autocreated": False,
             },
