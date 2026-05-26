@@ -75,7 +75,6 @@ commands:
     fi
 ports:
   - 8265
-privileged: true
 resources:
   gpu: H100:8
   shm_size: 32GB
