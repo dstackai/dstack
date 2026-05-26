@@ -1,17 +1,17 @@
 ---
 title: Miles
-description: RL fine-tuning Qwen2.5-32B with Miles, SGLang, Megatron-LM, and Ray across two 8xH100 nodes
+description: RL post-training Qwen2.5-32B with Miles, SGLang, Megatron-LM, and Ray across two 8xH100 nodes
 ---
 
 # Miles
 
 This example shows how to use `dstack` and [Miles](https://github.com/radixark/miles)
-to fine-tune a 32B language model with [GRPO](https://arxiv.org/abs/2402.03300)
-across a multi-node cluster.
-Miles uses [SGLang](https://github.com/sgl-project/sglang) for high-throughput
-rollouts, [Megatron-LM](https://github.com/NVIDIA/Megatron-LM) for training,
-and [Ray](https://docs.ray.io/en/latest/) to coordinate the trainer and rollout
-actors across nodes.
+for reinforcement learning (RL) post-training of a 32B language model with
+[GRPO](https://arxiv.org/abs/2402.03300) across a multi-node cluster.
+Miles integrates [SGLang](https://github.com/sgl-project/sglang) for
+high-throughput rollouts, [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)
+for training, and [Ray](https://docs.ray.io/en/latest/) to coordinate the
+trainer and rollout actors across nodes.
 
 Here we fine-tune `Qwen/Qwen2.5-32B-Instruct` on the
 [GSM8K](https://huggingface.co/datasets/openai/gsm8k) dataset.
