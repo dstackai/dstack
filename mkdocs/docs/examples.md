@@ -49,6 +49,17 @@ hide:
             Fine-tune an agent on multiple nodes with RAGEN, verl, and Ray.
         </p>
     </a>
+
+    <a href="/docs/examples/training/miles"
+       class="feature-cell">
+        <h3>
+            Miles
+        </h3>
+
+        <p>
+            RL-fine-tune Qwen2.5-32B with Miles.
+        </p>
+    </a>
 </div>
 
 

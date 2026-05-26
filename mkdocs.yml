@@ -171,12 +171,14 @@ plugins:
         "examples/distributed-training/trl.md": "docs/examples/training/trl.md"
         "examples/distributed-training/axolotl.md": "docs/examples/training/axolotl.md"
         "examples/distributed-training/ray-ragen.md": "docs/examples/training/ray-ragen.md"
+        "examples/distributed-training/miles.md": "docs/examples/training/miles.md"
         # Single-node and distributed training merged under Training
         "docs/examples/single-node-training/trl.md": "docs/examples/training/trl.md"
         "docs/examples/single-node-training/axolotl.md": "docs/examples/training/axolotl.md"
         "docs/examples/distributed-training/trl.md": "docs/examples/training/trl.md"
         "docs/examples/distributed-training/axolotl.md": "docs/examples/training/axolotl.md"
         "docs/examples/distributed-training/ray-ragen.md": "docs/examples/training/ray-ragen.md"
+        "docs/examples/distributed-training/miles.md": "docs/examples/training/miles.md"
         "examples/clusters/aws.md": "docs/examples/clusters/aws.md"
         "examples/clusters/gcp.md": "docs/examples/clusters/gcp.md"
         "examples/clusters/lambda.md": "docs/examples/clusters/lambda.md"
@@ -312,6 +314,7 @@ nav:
             - TRL: docs/examples/training/trl.md
             - Axolotl: docs/examples/training/axolotl.md
             - Ray+RAGEN: docs/examples/training/ray-ragen.md
+            - Miles: docs/examples/training/miles.md
         - Clusters:
             - AWS: docs/examples/clusters/aws.md
             - GCP: docs/examples/clusters/gcp.md
