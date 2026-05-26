@@ -1,17 +1,56 @@
 ---
 title: AMD
-description: Deploying and fine-tuning models on AMD MI300X GPUs using SGLang, vLLM, TRL, and Axolotl
+description: Running dev environments, tasks, and services on AMD GPUs
 ---
 
 # AMD
 
-`dstack` supports running dev environments, tasks, and services on AMD GPUs.
-You can do that by setting up an [SSH fleet](../../concepts/fleets.md#ssh-fleets)
-with on-prem AMD GPUs or configuring a backend that offers AMD GPUs such as the `runpod` backend.
+`dstack` natively supports AMD GPUs. This page covers the basics of setting up
+fleets, running inference, training, and dev environments on AMD GPUs.
 
-## Deployment
+## Fleets
 
-Here are examples of a [service](../../concepts/services.md) that deploy
+`dstack` supports native cloud provisioning, and can also work with existing
+Kubernetes clusters or vanilla bare-metal hosts.
+
+=== "Clouds"
+
+    `dstack` supports native provisioning of VMs with AMD GPUs across a number
+    of clouds, including
+    [AMD Developer Cloud](../../concepts/backends.md#amd-developer-cloud) and
+    [Hot Aisle](../../concepts/backends.md#hot-aisle). More cloud support is
+    coming soon.
+
+    To provision compute in these clouds, configure the corresponding
+    [backend](../../concepts/backends.md) and create a
+    [backend fleet](../../concepts/fleets.md).
+
+=== "Kubernetes"
+
+    To use `dstack` with existing Kubernetes cluster(s), configure the
+    [`kubernetes` backend](../../concepts/backends.md#kubernetes) and point it
+    to your kubeconfig file. Then create a
+    [backend fleet](../../concepts/fleets.md).
+
+=== "SSH fleets"
+
+    If you'd like `dstack` to use a cluster or machine that is already
+    provisioned and that you have access to, create an
+    [SSH fleet](../../concepts/fleets.md).
+
+!!! info "Cluster placement"
+    For multi-node workloads, the fleet must
+    [set](../../concepts/fleets.md#cluster-placement) `placement` to `cluster`.
+    For Kubernetes and SSH fleets, the network must be properly configured.
+
+    To test whether the cluster is properly configured, run the
+    [RCCL tests via a distributed task](../clusters/nccl-rccl-tests.md).
+
+Once a fleet is created, you can run dev environments, tasks, and services.
+
+## Inference
+
+Here are examples of a [service](../../concepts/services.md) that deploys
 `Qwen/Qwen3.6-27B` on AMD MI300X GPUs using
 [SGLang](https://github.com/sgl-project/sglang) and
 [vLLM](https://docs.vllm.ai/en/latest/).
@@ -22,7 +61,7 @@ Here are examples of a [service](../../concepts/services.md) that deploy
 
     ```yaml
     type: service
-    name: qwen36-service-sglang-amd
+    name: qwen36-sglang-amd
 
     image: lmsysorg/sglang:v0.5.10-rocm720-mi30x
 
@@ -50,10 +89,18 @@ Here are examples of a [service](../../concepts/services.md) that deploy
       memory: 896GB..
       shm_size: 16GB
       disk: 450GB..
-      gpu: MI300X:4
+      gpu: MI300X:4..
     ```
 
     </div>
+
+    !!! info "PD disaggregation"
+        To run SGLang with prefill and decode workers on an interconnected
+        cluster of AMD GPU instances, see the
+        [SGLang PD disaggregation](../inference/sglang.md#pd-disaggregation)
+        example.
+
+        For multi-node PD disaggregation, the fleet must use [cluster placement](../../concepts/fleets.md#cluster-placement).
 
 === "vLLM"
 
@@ -61,7 +108,7 @@ Here are examples of a [service](../../concepts/services.md) that deploy
 
     ```yaml
     type: service
-    name: qwen36-service-vllm-amd
+    name: qwen36-vllm-amd
 
     image: vllm/vllm-openai-rocm:v0.19.1
 
@@ -87,164 +134,123 @@ Here are examples of a [service](../../concepts/services.md) that deploy
       memory: 896GB..
       shm_size: 16GB
       disk: 450GB..
-      gpu: MI300X:4
+      gpu: MI300X:4..
     ```
 
     </div>
 
-!!! info "Docker image"
-    AMD workloads require specifying an image with ROCm-compatible userspace and
-    framework packages. The SGLang and vLLM examples above use pinned ROCm
-    images.
-
-    If you already have a ROCm-compatible image, use it. Otherwise, choose an
-    image for the framework you use from
-    [ROCm Docker images](https://hub.docker.com/u/rocm), e.g. `rocm/sgl-dev`
-    for SGLang, `rocm/vllm` for vLLM, or `rocm/pytorch` for PyTorch. For
-    generic AMD dev environments or tasks, use `rocm/dev-ubuntu-24.04`.
-
-To request multiple GPUs, specify the quantity after the GPU name, separated by a colon, e.g., `MI300X:4`.
-
-## Fine-tuning
-
-> If you're planning multi-node AMD training, validate cluster networking first
-with the [NCCL/RCCL tests](../clusters/nccl-rccl-tests.md)
-example.
-
-=== "TRL"
-
-    Below is an example of LoRA fine-tuning Llama 3.1 8B using [TRL](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/single-gpu-fine-tuning-and-inference.html)
-    and the [`mlabonne/guanaco-llama2-1k`](https://huggingface.co/datasets/mlabonne/guanaco-llama2-1k)
-    dataset.
-
-    <div editor-title="train.dstack.yml">
-
-    ```yaml
-    type: task
-    name: trl-amd-llama31-train
-
-    # Using Runpod's ROCm Docker image
-    image: runpod/pytorch:2.1.2-py3.10-rocm6.1-ubuntu22.04
-
-    # Required environment variables
-    env:
-      - HF_TOKEN
-    # Mount files
-    files:
-      - train.py
-    # Commands of the task
-    commands:
-      - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
-      - git clone https://github.com/ROCm/bitsandbytes
-      - cd bitsandbytes
-      - git checkout rocm_enabled
-      - pip install -r requirements-dev.txt
-      - cmake -DBNB_ROCM_ARCH="gfx942" -DCOMPUTE_BACKEND=hip -S  .
-      - make
-      - pip install .
-      - pip install trl
-      - pip install peft
-      - pip install transformers datasets huggingface-hub scipy
-      - cd ..
-      - python train.py
-
-    # Uncomment to leverage spot instances
-    #spot_policy: auto
-
-    resources:
-      gpu: MI300X
-      disk: 150GB
-    ```
-
-    </div>
-
-=== "Axolotl"
-    Below is an example of fine-tuning Llama 3.1 8B using [Axolotl](https://rocm.blogs.amd.com/artificial-intelligence/axolotl/README.html)
-    and the [tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)
-    dataset.
-
-    <div editor-title="train.dstack.yml">
-
-    ```yaml
-    type: task
-    # The name is optional, if not specified, generated randomly
-    name: axolotl-amd-llama31-train
-
-    # Using Runpod's ROCm Docker image
-    image: runpod/pytorch:2.1.2-py3.10-rocm6.0.2-ubuntu22.04
-    # Required environment variables
-    env:
-      - HF_TOKEN
-      - WANDB_API_KEY
-      - WANDB_PROJECT
-      - WANDB_NAME=axolotl-amd-llama31-train
-      - HUB_MODEL_ID
-    # Commands of the task
-    commands:
-      - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
-      - pip uninstall torch torchvision torchaudio -y
-      - python3 -m pip install --pre torch==2.3.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.0/
-      - git clone https://github.com/OpenAccess-AI-Collective/axolotl
-      - cd axolotl
-      - git checkout d4f6c65
-      - pip install -e .
-      # Latest pynvml is not compatible with axolotl commit d4f6c65, so we need to fall back to version 11.5.3
-      - pip uninstall pynvml -y
-      - pip install pynvml==11.5.3
-      - cd ..
-      - wget https://dstack-binaries.s3.amazonaws.com/flash_attn-2.0.4-cp310-cp310-linux_x86_64.whl
-      - pip install flash_attn-2.0.4-cp310-cp310-linux_x86_64.whl
-      - wget https://dstack-binaries.s3.amazonaws.com/xformers-0.0.26-cp310-cp310-linux_x86_64.whl
-      - pip install xformers-0.0.26-cp310-cp310-linux_x86_64.whl
-      - git clone --recurse https://github.com/ROCm/bitsandbytes
-      - cd bitsandbytes
-      - git checkout rocm_enabled
-      - pip install -r requirements-dev.txt
-      - cmake -DBNB_ROCM_ARCH="gfx942" -DCOMPUTE_BACKEND=hip -S  .
-      - make
-      - pip install .
-      - cd ..
-      - accelerate launch -m axolotl.cli.train -- axolotl/examples/llama-3/fft-8b.yaml
-              --wandb-project "$WANDB_PROJECT"
-              --wandb-name "$WANDB_NAME"
-              --hub-model-id "$HUB_MODEL_ID"
-
-    resources:
-      gpu: MI300X
-      disk: 150GB
-    ```
-    </div>
-
-    Note, to support ROCm, we need to checkout to commit `d4f6c65`. This commit eliminates the need to manually modify the Axolotl source code to make xformers compatible with ROCm, as described in the [xformers workaround](https://docs.axolotl.ai/docs/amd_hpc.html#apply-xformers-workaround). This installation approach is also followed for building Axolotl ROCm docker image. [(See Dockerfile)](https://github.com/ROCm/rocm-blogs/blob/release/blogs/artificial-intelligence/axolotl/src/Dockerfile.rocm).
-
-    > To speed up installation of `flash-attention` and `xformers`, we use pre-built binaries uploaded to S3.
-
-## Running a configuration
-
-Once a configuration is ready, save it to a `.dstack.yml` file. If your
-configuration references environment variables such as `HF_TOKEN` or
-`WANDB_API_KEY`, export them first. Then run
-`dstack apply -f <configuration file>`, and `dstack` will automatically
-provision the cloud resources and run the configuration.
+Use the [`dstack apply`](../../reference/cli/dstack/apply.md) command to apply
+any configuration, including services, tasks, dev environments, and fleets.
 
 <div class="termy">
 
 ```shell
-$ dstack apply -f <configuration file>
+$ dstack apply -f service.dstack.yml
 ```
 
 </div>
 
+## Training
+
+Below is a [task](../../concepts/tasks.md) that fine-tunes a small language
+model using the official
+[Transformers causal language modeling example](https://github.com/huggingface/transformers/tree/main/examples/pytorch/language-modeling)
+on AMD GPUs.
+
+<div editor-title="train.dstack.yml">
+
+```yaml
+type: task
+name: amd-qwen3-train
+
+image: rocm/pytorch:latest
+
+commands:
+  - git clone --depth 1 https://github.com/huggingface/transformers.git
+  - pip install -e ./transformers -r transformers/examples/pytorch/language-modeling/requirements.txt
+  - |
+    torchrun --standalone --nproc-per-node $DSTACK_GPUS_PER_NODE \
+      transformers/examples/pytorch/language-modeling/run_clm.py \
+      --model_name_or_path Qwen/Qwen3-0.6B-Base \
+      --dataset_name Salesforce/wikitext \
+      --dataset_config_name wikitext-2-raw-v1 \
+      --do_train \
+      --per_device_train_batch_size 1 \
+      --gradient_accumulation_steps 8 \
+      --max_steps 10 \
+      --block_size 512 \
+      --learning_rate 2e-5 \
+      --bf16 \
+      --logging_steps 1 \
+      --output_dir /tmp/qwen3-clm
+
+resources:
+  gpu: MI300X:4..
+  disk: 100GB..
+```
+
+</div>
+
+!!! info "Distributed tasks"
+    To run training across multiple nodes, use
+    [distributed tasks](../../concepts/tasks.md#distributed-tasks). Distributed
+    tasks may run on a cluster; in that case, the fleet must use
+    [cluster placement](../../concepts/fleets.md#cluster-placement).
+
+## Dev environments
+
+Here's an example of a [dev environment](../../concepts/dev-environments.md)
+that can be accessed via your desktop IDE.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+name: amd-vscode
+
+image: rocm/dev-ubuntu-24.04
+
+ide: vscode
+
+resources:
+  gpu: MI300X:1
+```
+
+</div>
+
+## Docker image
+
+> If you'd like a run to use AMD GPUs, make sure to specify `image`.
+
+The image's ROCm runtime must be compatible with the AMD GPUs the run will use.
+The image should also include the packages your workload needs.
+
+## Metrics
+
+Run and job [metrics](../../concepts/metrics.md) include CPU, memory, and GPU
+usage. They are available in the UI and via the CLI:
+
+<div class="termy">
+
+```shell
+$ dstack metrics &lt;run name&gt;
+```
+
+</div>
+
+> AMD GPU metrics require `amd-smi` to be available in the run image. If it
+> isn't present, GPU metrics may be unavailable.
+
 ## What's next?
 
 1. Browse the dedicated [SGLang](../inference/sglang.md)
-   and [vLLM](../inference/vllm.md) examples, plus
-   [Axolotl](https://github.com/ROCm/rocm-blogs/tree/release/blogs/artificial-intelligence/axolotl),
-   [TRL](https://rocm.docs.amd.com/en/latest/how-to/llm-fine-tuning-optimization/fine-tuning-and-inference.html),
-   and [ROCm Bitsandbytes](https://github.com/ROCm/bitsandbytes)
-2. For multi-node training, run
-   [NCCL/RCCL tests](../clusters/nccl-rccl-tests.md)
-   to validate AMD cluster networking.
-3. Check [dev environments](../../concepts/dev-environments.md),
-   [tasks](../../concepts/tasks.md), and
-   [services](../../concepts/services.md).
+   and [vLLM](../inference/vllm.md) examples, plus the
+   [Qwen 3.6](../models/qwen36.md) model page.
+2. For multi-node inference, see
+   [SGLang PD disaggregation](../inference/sglang.md#pd-disaggregation).
+3. For cluster validation, run
+   [NCCL/RCCL tests](../clusters/nccl-rccl-tests.md).
+4. Check [dev environments](../../concepts/dev-environments.md),
+   [tasks](../../concepts/tasks.md), [services](../../concepts/services.md),
+   [fleets](../../concepts/fleets.md), and
+   [backends](../../concepts/backends.md).

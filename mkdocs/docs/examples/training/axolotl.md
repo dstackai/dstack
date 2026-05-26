@@ -54,9 +54,6 @@ resources:
 
 The task uses Axolotl's Docker image, where Axolotl is already pre-installed.
 
-!!! info "AMD"
-    The example above uses NVIDIA accelerators. To use it with AMD, check out [AMD](../accelerators/amd.md#axolotl).
-
 ### Run the configuration
 
 Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
@@ -182,4 +179,3 @@ Provisioning...
 1. Check [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md),
    [services](../../concepts/services.md), and [fleets](../../concepts/fleets.md)
 2. Read about [cluster placement](../../concepts/fleets.md#cluster-placement)
-3. See the [AMD](../accelerators/amd.md#axolotl) example
