@@ -17,8 +17,8 @@ Here we fine-tune `Qwen/Qwen2.5-32B-Instruct` on the
 [GSM8K](https://huggingface.co/datasets/openai/gsm8k) dataset.
 
 !!! info "Prerequisites"
-    Before running a distributed task, make sure to create a [fleet](../../concepts/fleets.md)
-    with `placement` set to [`cluster`](../../concepts/fleets.md#cluster-placement).
+    Multi-node tasks require a [fleet](../../concepts/fleets.md) with
+    `placement` set to [`cluster`](../../concepts/fleets.md#cluster-placement).
 
 ## Run a Ray cluster
 
@@ -103,6 +103,9 @@ While `dstack apply` is attached, you can submit Ray jobs through
 `localhost:8265`. If you detach or run from another machine, use
 [`dstack attach`](../../reference/cli/dstack/attach.md) to re-attach and make
 the dashboard port accessible on `localhost`.
+
+> To run on a single node, remove `nodes` or set it to `1`, then submit the job
+> with `NUM_NODES=1`. In this case, `placement: cluster` is not required.
 
 ## Submit Ray jobs
 
