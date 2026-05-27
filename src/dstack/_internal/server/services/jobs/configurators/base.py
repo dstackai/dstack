@@ -336,6 +336,7 @@ class JobConfigurator(ABC):
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
             reservation=self.run_spec.merged_profile.reservation,
             multinode=jobs_per_replica > 1,
+            backend_options=self.run_spec.merged_profile.backend_options,
         )
 
     def _retry(self) -> Optional[Retry]:

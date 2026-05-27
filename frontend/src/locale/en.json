@@ -137,6 +137,7 @@
         "empty_message_text": "No gateways to display.",
 
         "edit": {
+            "name": "Name",
             "backend": "Backend",
             "backend_description": "Select a backend",
             "region": "Region",

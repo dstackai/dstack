@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
+from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
     ApplyAction,
@@ -22,6 +23,7 @@ from dstack._internal.core.models.profiles import (
     ProfileRetry,
     SpotPolicy,
     parse_idle_duration,
+    validate_backend_options,
 )
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils.common import list_enum_values_for_annotation
@@ -261,7 +263,7 @@ class BackendFleetConfiguraionProps(CoreModel):
     instance_types: Annotated[
         Optional[List[str]],
         Field(
-            description="The cloud-specific instance types to consider for provisioning (e.g., `[p3.8xlarge, n1-standard-4]`)"
+            description="The cloud-specific instance types to consider for provisioning (e.g., `[g6e.24xlarge, n1-standard-4]`)"
         ),
     ] = None
     spot_policy: Annotated[
@@ -303,6 +305,10 @@ class BackendFleetConfiguraionProps(CoreModel):
             )
         ),
     ] = None
+    backend_options: Annotated[
+        Optional[List[AnyBackendProfileOptions]],
+        Field(description="Backend-specific options, applied only to offers from that backend"),
+    ] = None
 
     @validator("nodes", pre=True)
     def parse_nodes(cls, v: Optional[Union[dict, str]]) -> Optional[dict]:
@@ -317,8 +323,10 @@ class BackendFleetConfiguraionProps(CoreModel):
     _validate_idle_duration = validator("idle_duration", pre=True, allow_reuse=True)(
         parse_idle_duration
     )
-
     _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
+    _validate_backend_options = validator("backend_options", allow_reuse=True)(
+        validate_backend_options
+    )
 
 
 class BackendFleetConfigurationPropsConfig(CoreConfig):

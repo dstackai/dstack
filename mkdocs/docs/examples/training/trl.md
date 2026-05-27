@@ -75,9 +75,6 @@ resources:
 
 Change the `resources` property to specify more GPUs.
 
-!!! info "AMD"
-    The example above uses NVIDIA accelerators. To use it with AMD, check out [AMD](../accelerators/amd.md#trl).
-
 ??? info "DeepSpeed"
     For more memory-efficient use of multiple GPUs, consider using DeepSpeed and ZeRO Stage 3.
 
@@ -269,4 +266,3 @@ Provisioning...
 1. Check [dev environments](../../concepts/dev-environments.md), [tasks](../../concepts/tasks.md), 
    [services](../../concepts/services.md), and [fleets](../../concepts/fleets.md)
 2. Read about [cluster placement](../../concepts/fleets.md#cluster-placement)
-3. See the [AMD](../accelerators/amd.md#trl) example

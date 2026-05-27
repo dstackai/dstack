@@ -151,7 +151,7 @@ Jobs on each node communicate using their private IP addresses. Use `DSTACK_MAST
 `dstack` is easy to use with `accelerate`, `torchrun`, Ray, Spark, and any other distributed frameworks.
     
 !!! info "Examples"
-    See the training examples for [TRL](../examples/training/trl.md#distributed-training), [Axolotl](../examples/training/axolotl.md#distributed-training), and [Ray+RAGEN](../examples/training/ray-ragen.md).
+    See the training examples for [TRL](../examples/training/trl.md#distributed-training), [Axolotl](../examples/training/axolotl.md#distributed-training), [Ray+RAGEN](../examples/training/ray-ragen.md), and [Miles](../examples/training/miles.md).
 
     See the cluster examples for [AWS](../examples/clusters/aws.md), [GCP](../examples/clusters/gcp.md), [Lambda](../examples/clusters/lambda.md), [Crusoe](../examples/clusters/crusoe.md), [Nebius](../examples/clusters/nebius.md), and [NCCL/RCCL tests](../examples/clusters/nccl-rccl-tests.md).
 

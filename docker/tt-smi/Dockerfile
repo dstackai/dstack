@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ARG IMAGE_NAME
 ARG TT_SMI_VERSION
@@ -10,7 +10,8 @@ RUN \
     apt-get update && \
     apt-get install -y curl git python3 python3-pip && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-    pip3 install --no-cache-dir git+https://github.com/tenstorrent/tt-smi@v${TT_SMI_VERSION} && \
+    pip3 install --no-cache-dir --upgrade pip setuptools wheel tomli && \
+    pip3 install --no-cache-dir --no-build-isolation git+https://github.com/tenstorrent/tt-smi@v${TT_SMI_VERSION} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
