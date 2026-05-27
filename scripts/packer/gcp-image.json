@@ -2,7 +2,6 @@
   "variables": {
     "build_prefix": "",
     "docker_version": "",
-    "image_repo": "",
     "image_version": ""
   },
   "builders": [
