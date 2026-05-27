@@ -1,10 +1,7 @@
 from typing import Optional
 
-from dstack._internal.core.compatibility.common import patch_profile_params
-from dstack._internal.core.models.common import (
-    IncludeExcludeDictType,
-    IncludeExcludeSetType,
-)
+from dstack._internal.core.compatibility.common import get_profile_excludes, patch_profile_params
+from dstack._internal.core.models.common import IncludeExcludeDictType
 from dstack._internal.core.models.fleets import ApplyFleetPlanInput, FleetSpec
 
 
@@ -24,6 +21,9 @@ def get_apply_plan_excludes(plan_input: ApplyFleetPlanInput) -> IncludeExcludeDi
     current_resource = plan_input.current_resource
     if current_resource is not None:
         current_resource_excludes = {}
+        current_resource_spec_excludes = get_fleet_spec_excludes(current_resource.spec)
+        if current_resource_spec_excludes:
+            current_resource_excludes["spec"] = current_resource_spec_excludes
         apply_plan_excludes["current_resource"] = current_resource_excludes
     return {"plan": apply_plan_excludes}
 
@@ -44,9 +44,11 @@ def get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[IncludeExcludeDic
     """
     spec_excludes: IncludeExcludeDictType = {}
     configuration_excludes: IncludeExcludeDictType = {}
-    profile_excludes: IncludeExcludeSetType = set()
+    profile_excludes = get_profile_excludes(fleet_spec.profile)
 
     spec_excludes["autocreated"] = True
+    if fleet_spec.configuration.backend_options is None:
+        configuration_excludes["backend_options"] = True
 
     if configuration_excludes:
         spec_excludes["configuration"] = configuration_excludes

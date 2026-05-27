@@ -3,6 +3,10 @@ from typing import Optional
 import gpuhunt
 import pytest
 
+from dstack._internal.core.backends.vastai.profile_options import (
+    VastAIOfferOrder,
+    VastAIProfileOptions,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.resources import (
@@ -18,6 +22,7 @@ from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server.services.requirements.combine import (
     CombineError,
     Profile,
+    _combine_backend_options_optional,
     _combine_cpu,
     _combine_gpu_optional,
     _combine_idle_duration_optional,
@@ -101,6 +106,22 @@ class TestCombineFleetAndRunProfiles:
                 None,
                 id="incompatible_profiles",
             ),
+            pytest.param(
+                Profile(backend_options=[VastAIProfileOptions(min_score=100)]),
+                Profile(backend_options=[VastAIProfileOptions(min_score=400)]),
+                Profile(backend_options=[VastAIProfileOptions(min_score=400)]),
+                id="backend_options_compatible",
+            ),
+            pytest.param(
+                Profile(
+                    backend_options=[VastAIProfileOptions(offer_order=VastAIOfferOrder.PRICE)]
+                ),
+                Profile(
+                    backend_options=[VastAIProfileOptions(offer_order=VastAIOfferOrder.SCORE)]
+                ),
+                None,
+                id="backend_options_incompatible",
+            ),
         ],
     )
     def test_combines_profiles(
@@ -150,6 +171,33 @@ class TestCombineFleetAndRunRequirements:
                 Requirements(resources=ResourcesSpec(gpu=GPUSpec(count=Range(min=3, max=4)))),
                 None,
                 id="incompatible_requirements",
+            ),
+            pytest.param(
+                Requirements(
+                    resources=ResourcesSpec(),
+                    backend_options=[VastAIProfileOptions(min_score=100)],
+                ),
+                Requirements(
+                    resources=ResourcesSpec(),
+                    backend_options=[VastAIProfileOptions(min_score=400)],
+                ),
+                Requirements(
+                    resources=ResourcesSpec(),
+                    backend_options=[VastAIProfileOptions(min_score=400)],
+                ),
+                id="backend_options_compatible",
+            ),
+            pytest.param(
+                Requirements(
+                    resources=ResourcesSpec(),
+                    backend_options=[VastAIProfileOptions(offer_order=VastAIOfferOrder.PRICE)],
+                ),
+                Requirements(
+                    resources=ResourcesSpec(),
+                    backend_options=[VastAIProfileOptions(offer_order=VastAIOfferOrder.SCORE)],
+                ),
+                None,
+                id="backend_options_incompatible",
             ),
         ],
     )
@@ -426,3 +474,26 @@ class TestCombineGpu:
         gpu2 = GPUSpec(count=Range(min=1, max=2), memory=Range(min=Memory(32), max=Memory(64)))
         with pytest.raises(CombineError):
             _combine_gpu_optional(gpu1, gpu2)
+
+
+class TestCombineBackendOptionsOptional:
+    def test_both_none_returns_none(self):
+        assert _combine_backend_options_optional(None, None) is None
+
+    def test_one_none_returns_copy_of_other(self):
+        opts = [VastAIProfileOptions(min_score=100)]
+        combine_none_opts = _combine_backend_options_optional(None, opts)
+        assert combine_none_opts == opts
+        assert combine_none_opts is not opts
+        combine_opts_none = _combine_backend_options_optional(opts, None)
+        assert combine_opts_none == opts
+        assert combine_opts_none is not opts
+
+    def test_combines_same_backend_type(self):
+        opts1 = [VastAIProfileOptions(min_score=100, min_reliability=0.7)]
+        opts2 = [VastAIProfileOptions(min_score=300, min_reliability=0.95)]
+        result = _combine_backend_options_optional(opts1, opts2)
+        assert result is not None
+        assert len(result) == 1
+        assert result[0].min_score == 300
+        assert result[0].min_reliability == 0.95

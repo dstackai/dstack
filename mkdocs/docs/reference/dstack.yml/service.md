@@ -229,3 +229,15 @@ The `service` configuration type allows running [services](../../concepts/servic
     * `~/.bashrc`, same as `~/.bashrc:~/.bashrc`
     * `/opt/myorg`, same as `/opt/myorg/` and `/opt/myorg:/opt/myorg`
     * `libs/patched_libibverbs.so.1:/lib/x86_64-linux-gnu/libibverbs.so.1`
+
+### `backend_options`
+
+Backend-specific options that only take effect for offers of the respective backend.
+
+#### `backend_options[n][type=vastai]` { #backend_options-vastai data-toc-label="vastai" }
+
+#SCHEMA# dstack._internal.core.backends.vastai.profile_options.VastAIProfileOptions
+    overrides:
+      show_root_heading: false
+      type:
+        required: true

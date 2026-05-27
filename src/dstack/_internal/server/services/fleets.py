@@ -958,6 +958,7 @@ def get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
         spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
         reservation=fleet_spec.configuration.reservation,
         multinode=fleet_spec.configuration.placement == InstanceGroupPlacement.CLUSTER,
+        backend_options=profile.backend_options,
     )
     return requirements
 

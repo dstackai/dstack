@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
 
+from dstack._internal.core.backends.profile_options import AnyBackendProfileOptions
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import (
     ApplyAction,
@@ -224,6 +225,7 @@ class Requirements(CoreModel):
     multinode: Optional[bool] = None
     """Backends can use `multinode` to filter out offers when some offers support multinode and some do not.
     """
+    backend_options: Optional[List[AnyBackendProfileOptions]] = None
 
     def pretty_format(self, resources_only: bool = False):
         res = self.resources.pretty_format()

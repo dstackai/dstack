@@ -54,6 +54,18 @@ The `fleet` configuration type allows creating and updating fleets.
         overrides:
           show_root_heading: false
 
+    ### `backend_options`
+
+    Backend-specific options that only take effect for offers of the respective backend.
+
+    #### `backend_options[n][type=vastai]` { #backend_options-vastai data-toc-label="vastai" }
+
+    #SCHEMA# dstack._internal.core.backends.vastai.profile_options.VastAIProfileOptions
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
 === "SSH fleet"
 
     ## Root reference

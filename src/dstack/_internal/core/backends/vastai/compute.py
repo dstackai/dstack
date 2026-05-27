@@ -2,6 +2,7 @@ from typing import List, Optional
 
 import gpuhunt
 from gpuhunt.providers.vastai import VastAIProvider
+from typing_extensions import assert_never
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
@@ -10,8 +11,15 @@ from dstack._internal.core.backends.base.compute import (
     get_docker_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.base.profile_options import get_backend_profile_options
 from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
 from dstack._internal.core.backends.vastai.models import VastAIConfig
+from dstack._internal.core.backends.vastai.profile_options import (
+    VASTAI_DEFAULT_MIN_RELIABILITY,
+    VASTAI_DEFAULT_OFFER_ORDER,
+    VastAIOfferOrder,
+    VastAIProfileOptions,
+)
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
@@ -40,31 +48,55 @@ class VastAICompute(
         super().__init__()
         self.config = config
         self.api_client = VastAIAPIClient(config.creds.api_key)
-        self.catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
-        self.catalog.add_provider(
+
+    def _make_catalog(self, options: VastAIProfileOptions) -> gpuhunt.Catalog:
+        filters = {
+            "direct_port_count": {"gte": 1},
+            "reliability2": {
+                "gte": options.min_reliability
+                if options.min_reliability is not None
+                else VASTAI_DEFAULT_MIN_RELIABILITY
+            },
+            "inet_down": {"gt": 128},
+            "verified": {"eq": True},
+            "cuda_max_good": {"gte": 12.8},
+            "compute_cap": {"gte": 600},
+        }
+        if options.min_score is not None:
+            filters["score"] = {"gte": options.min_score}
+        match options.offer_order or VASTAI_DEFAULT_OFFER_ORDER:
+            case VastAIOfferOrder.SCORE:
+                order = [("score", "desc")]
+            case VastAIOfferOrder.PRICE:
+                # NOTE: dph_base is only one of the price components,
+                # so we also sort by InstanceOffer.price later for accurate results.
+                order = [("dph_base", "asc")]
+            case other:
+                assert_never(other)
+        catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
+        catalog.add_provider(
             VastAIProvider(
-                community_cloud=config.allow_community_cloud,
-                extra_filters={
-                    "direct_port_count": {"gte": 1},
-                    "reliability2": {"gte": 0.9},
-                    "inet_down": {"gt": 128},
-                    "verified": {"eq": True},
-                    "cuda_max_good": {"gte": 12.8},
-                    "compute_cap": {"gte": 600},
-                },
+                community_cloud=self.config.allow_community_cloud,
+                extra_filters=filters,
+                order=order,
             )
         )
+        return catalog
 
     def get_offers_by_requirements(
         self, requirements: Requirements
     ) -> List[InstanceOfferWithAvailability]:
+        vastai_options = (
+            get_backend_profile_options(requirements.backend_options, VastAIProfileOptions)
+            or VastAIProfileOptions()
+        )
         offers = get_catalog_offers(
             backend=BackendType.VASTAI,
             locations=self.config.regions or None,
             requirements=requirements,
             # TODO(egor-s): spots currently not supported
             extra_filter=lambda offer: not offer.instance.resources.spot,
-            catalog=self.catalog,
+            catalog=self._make_catalog(vastai_options),
         )
         offers = [
             offer.with_availability(
@@ -73,6 +105,8 @@ class VastAICompute(
             )
             for offer in offers
         ]
+        if (vastai_options.offer_order or VASTAI_DEFAULT_OFFER_ORDER) == VastAIOfferOrder.PRICE:
+            offers = sorted(offers, key=lambda o: o.price)
         return offers
 
     def run_job(
