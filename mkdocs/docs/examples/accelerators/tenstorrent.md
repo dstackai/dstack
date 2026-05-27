@@ -8,10 +8,6 @@ description: Running inference, training, and dev environments on Tenstorrent ac
 `dstack` supports running inference, training, and dev environments on
 Tenstorrent accelerators via SSH fleets.
 
-The examples below assume the Tenstorrent hosts are pre-installed with
-[Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation),
-including the drivers, `tt-smi`, and HugePages.
-
 ## Fleets
 
 Currently, Tenstorrent accelerators are supported via
@@ -19,7 +15,7 @@ Currently, Tenstorrent accelerators are supported via
 
 === "SSH fleets"
 
-    Start by creating an SSH fleet for your Tenstorrent hosts.
+    To configure an SSH fleet, create a fleet configuration and list hostnames of the hosts along with the private key and username.
 
     <div editor-title="tt-fleet.dstack.yml">
 
@@ -35,6 +31,19 @@ Currently, Tenstorrent accelerators are supported via
     ```
 
     </div>
+
+    ??? info "Host requirements"
+        Before creating the fleet, make sure each host:
+
+        - Has Docker installed.
+        - Has [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation)
+          installed, including the drivers and HugePages.
+        - Can be accessed by the configured SSH user with passwordless `sudo`.
+        - Runs an SSH server with `AllowTcpForwarding yes`.
+        - Allows SSH through the firewall and should block other external
+          inbound traffic.
+
+        If `placement` is set to `cluster`, hosts can communicate with each other.
 
     To apply the fleet configuration, run:
 

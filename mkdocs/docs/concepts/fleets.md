@@ -116,13 +116,15 @@ To create a fleet, define its configuration in a YAML file. The filename must en
 
         === "Tenstorrent"
             2.&nbsp;Hosts with Tenstorrent accelerators must be pre-installed with [Tenstorrent software](https://docs.tenstorrent.com/getting-started/README.html#software-installation).
-            This must include the drivers, `tt-smi`, and HugePages.
+            This must include the drivers and HugePages.
 
         3.&nbsp;The user specified must have passwordless `sudo` access.
 
         4.&nbsp;The SSH server must be running and configured with `AllowTcpForwarding yes` in `/etc/ssh/sshd_config`.
 
-        5.&nbsp;The firewall must allow SSH and should forbid any other connections from external networks. For `placement: cluster` fleets, it should also allow any communication between fleet nodes.
+        5.&nbsp;The firewall must allow SSH and should forbid any other connections from external networks.
+
+        6.&nbsp;If `placement` is set to `cluster`, hosts must be able to communicate with each other.
 
 > Once the fleet is created, you can run [dev environments](dev-environments.md), [tasks](tasks.md), and [services](services.md).
 
