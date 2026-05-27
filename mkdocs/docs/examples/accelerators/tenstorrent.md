@@ -1,12 +1,16 @@
 ---
 title: Tenstorrent
-description: Running inference, training, and dev environments on Tenstorrent accelerators
+description: Running inference, training, and dev environments on Tenstorrent Wormhole and Blackhole accelerators
 ---
 
 # Tenstorrent
 
 `dstack` supports running inference, training, and dev environments on
-Tenstorrent accelerators via SSH fleets.
+Tenstorrent Wormhole and Blackhole accelerators, including
+[PCIe cards](https://tenstorrent.com/en/hardware/cards) and systems such as
+[TT-LoudBox](https://tenstorrent.com/en/hardware/tt-loudbox),
+[TT-QuietBox and TT-QuietBox 2](https://tenstorrent.com/en/hardware/tt-quietbox),
+and [Tenstorrent Galaxy](https://tenstorrent.com/hardware/galaxy).
 
 ## Fleets
 
