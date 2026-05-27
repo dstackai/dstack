@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 from unittest.mock import Mock
 
 import pytest
-from gpuhunt import AcceleratorVendor
+from gpuhunt import KNOWN_TENSTORRENT_ACCELERATORS, AcceleratorVendor
 
 from dstack._internal.cli.services.configurators import get_run_configurator_class
 from dstack._internal.cli.services.configurators.run import (
@@ -23,6 +23,10 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.server.testing.common import get_run_spec
+
+_TENSTORRENT_ACCELERATOR_NAMES = tuple(
+    sorted({gpu.name for gpu in KNOWN_TENSTORRENT_ACCELERATORS})
+)
 
 
 class TestApplyArgs:
@@ -263,11 +267,20 @@ class TestValidateGPUVendorAndImage:
         ):
             self.validate(conf)
 
-    @pytest.mark.parametrize("gpu_spec", ["n150", "n300"])
+    @pytest.mark.parametrize("gpu_spec", _TENSTORRENT_ACCELERATOR_NAMES)
     def test_tenstorrent_docker_true_no_image(self, gpu_spec):
         conf = self.prepare_conf(gpu_spec=gpu_spec, docker=True)
         self.validate(conf)
         assert conf.resources.gpu.vendor == AcceleratorVendor.TENSTORRENT
+
+    @pytest.mark.parametrize("gpu_spec", _TENSTORRENT_ACCELERATOR_NAMES)
+    def test_tenstorrent_vendor_inferred_no_image(self, gpu_spec):
+        conf = self.prepare_conf(gpu_spec=gpu_spec)
+        with pytest.raises(
+            ConfigurationError,
+            match=r"`image` is required if `resources.gpu.vendor` is `tenstorrent`",
+        ):
+            self.validate(conf)
 
 
 class TestValidateCPUArchAndImage:

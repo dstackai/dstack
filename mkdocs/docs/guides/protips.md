@@ -382,13 +382,14 @@ To run in detached mode, use `-d` with `dstack apply`.
 
 ## GPU specification
 
-`dstack` natively supports NVIDIA GPU, AMD GPU, and Google Cloud TPU accelerator chips.
+`dstack` natively supports NVIDIA GPUs, AMD GPUs, TPUs, and Tenstorrent
+devices.
 
 The `gpu` property within [`resources`](../reference/dstack.yml/dev-environment.md#resources) (or the `--gpu` option with [`dstack apply`](../reference/cli/dstack/apply.md) or
 [`dstack offer`](../reference/cli/dstack/offer.md))
 allows specifying not only memory size but also GPU vendor, names, their memory, and quantity.
 
-The general format is: `<vendor>:<comma-sparated names>:<memory range>:<quantity range>`.
+The general format is: `<vendor>:<comma-separated names>:<memory range>:<quantity range>`.
 
 Each component is optional. 
 
@@ -412,13 +413,18 @@ Examples:
 - `A100:2` (two A100)
 - `MI300X:4` (four MI300X)
 - `A100:40GB:2` (two A100 40GB)
-- `tpu:v2-8` (`v2` Google Cloud TPU with 8 cores)
+- `tpu:v2-8` (`v2` TPU with 8 cores)
+- `tt:32` (32 Tenstorrent devices)
+- `tt-galaxy-wh:32` (32 Galaxy Wormhole chips)
+- `tt-galaxy-bh:32` (32 Galaxy Blackhole chips)
+- `p150:8` (eight Tenstorrent Blackhole P150 devices)
 
 The GPU vendor is indicated by one of the following case-insensitive values:
 
 - `nvidia` (NVIDIA GPUs)
 - `amd` (AMD GPUs)
-- `tpu` (Google Cloud TPUs)
+- `tpu` (TPUs)
+- `tt` (Tenstorrent devices)
 
 ??? info "AMD"
     Currently, when an AMD GPU is specified, either by name or by vendor, the `image` property must be specified as well.

@@ -239,6 +239,28 @@ func TestGetGpusFromTtSmiSnapshotMultipleDevices(t *testing.T) {
 	}
 }
 
+func TestGetGpusFromTtSmiSnapshotWormholePrefixMemoryCompatibility(t *testing.T) {
+	snapshot := &ttSmiSnapshot{
+		DeviceInfo: []ttDeviceInfo{
+			{BoardInfo: ttBoardInfo{BoardType: "n150-custom L", BoardID: "100018000000001"}},
+			{BoardInfo: ttBoardInfo{BoardType: "n300-custom L", BoardID: "100014000000001"}},
+			{BoardInfo: ttBoardInfo{BoardType: "n300-custom R", BoardID: "100014000000001"}},
+			{BoardInfo: ttBoardInfo{BoardType: "tt-galaxy-wh-custom L", BoardID: "100035000000001"}},
+		},
+	}
+
+	gpus := getGpusFromTtSmiSnapshot(snapshot)
+
+	expected := []GpuInfo{
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "n150-custom", Vram: 12 * 1024, ID: "100018000000001", Index: "0"},
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "n300-custom", Vram: 24 * 1024, ID: "100014000000001", Index: "1"},
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "tt-galaxy-wh-custom", Vram: 12 * 1024, ID: "100035000000001", Index: "2"},
+	}
+	if !reflect.DeepEqual(gpus, expected) {
+		t.Errorf("getGpusFromTtSmiSnapshot() = %v, want %v", gpus, expected)
+	}
+}
+
 func TestGetGpusFromTtSmiSnapshotGalaxy(t *testing.T) {
 	data, err := loadTestData("tenstorrent/galaxy.json")
 	if err != nil {
@@ -287,5 +309,187 @@ func TestGetGpusFromTtSmiSnapshotGalaxy(t *testing.T) {
 	// Verify total VRAM is 384GB
 	if actualTotalVram != totalVram {
 		t.Errorf("Total VRAM = %d MiB, want %d MiB (384GB)", actualTotalVram, totalVram)
+	}
+}
+
+func TestGetGpusFromTtSmiSnapshotBlackholeRevisions(t *testing.T) {
+	snapshot := &ttSmiSnapshot{
+		DeviceInfo: []ttDeviceInfo{
+			{BoardInfo: ttBoardInfo{BoardType: "bh-scrappy", BoardID: "0000360000000000"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p100", BoardID: "0000430000000000"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p100a", BoardID: "0000430000000000"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p150a", BoardID: "0000400000000000"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p150b", BoardID: "0000410000000000"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p150c", BoardID: "0000420000000000"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p300b", BoardID: "0000440000000000"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p300a", BoardID: "0000450000000000"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p300c", BoardID: "0000460000000000"}},
+		},
+	}
+
+	gpus := getGpusFromTtSmiSnapshot(snapshot)
+
+	expectedNames := []string{"p100a", "p100a", "p100a", "p150", "p150", "p150", "p300", "p300", "p300"}
+	expectedVram := []int{28 * 1024, 28 * 1024, 28 * 1024, 32 * 1024, 32 * 1024, 32 * 1024, 32 * 1024, 32 * 1024, 32 * 1024}
+	if len(gpus) != len(expectedNames) {
+		t.Fatalf("getGpusFromTtSmiSnapshot() returned %d GPUs, want %d", len(gpus), len(expectedNames))
+	}
+	for i, expectedName := range expectedNames {
+		if gpus[i].Vendor != gpu.GpuVendorTenstorrent {
+			t.Errorf("GPU[%d] vendor = %v, want %v", i, gpus[i].Vendor, gpu.GpuVendorTenstorrent)
+		}
+		if gpus[i].Name != expectedName {
+			t.Errorf("GPU[%d] name = %s, want %s", i, gpus[i].Name, expectedName)
+		}
+		if gpus[i].Vram != expectedVram[i] {
+			t.Errorf("GPU[%d] VRAM = %d, want %d", i, gpus[i].Vram, expectedVram[i])
+		}
+		if gpus[i].Index != strconv.Itoa(i) {
+			t.Errorf("GPU[%d] index = %s, want %s", i, gpus[i].Index, strconv.Itoa(i))
+		}
+	}
+}
+
+func TestGetGpusFromTtSmiSnapshotBlackholeSourceFixtures(t *testing.T) {
+	// Synthetic tt-smi snapshot derived from TT-SMI board name mappings and
+	// TT-Metal UMD Blackhole board descriptors.
+	data, err := loadTestData("tenstorrent/blackhole_boards.json")
+	if err != nil {
+		t.Fatalf("Failed to load test data: %v", err)
+	}
+	snapshot, err := unmarshalTtSmiSnapshot(data)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal snapshot: %v", err)
+	}
+
+	gpus := getGpusFromTtSmiSnapshot(snapshot)
+
+	expected := []GpuInfo{
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "p100a", Vram: 28 * 1024, ID: "000004323191b040", Index: "0"},
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "p150", Vram: 32 * 1024, ID: "0000040100000000", Index: "1"},
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "p150", Vram: 32 * 1024, ID: "000004123191110e", Index: "2"},
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "p300", Vram: 32 * 1024, ID: "000004513190f004", Index: "3"},
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "p300", Vram: 32 * 1024, ID: "000004513190f004", Index: "4"},
+	}
+	if !reflect.DeepEqual(gpus, expected) {
+		t.Errorf("getGpusFromTtSmiSnapshot() = %v, want %v", gpus, expected)
+	}
+}
+
+func TestGetGpusFromTtSmiSnapshotBlackholeEightP150(t *testing.T) {
+	// Derived from TT-Metal UMD blackhole_8xP150 cluster descriptor.
+	// The p150b name follows TT-SMI's board ID to board type mapping.
+	data, err := loadTestData("tenstorrent/blackhole_8xp150.json")
+	if err != nil {
+		t.Fatalf("Failed to load test data: %v", err)
+	}
+	snapshot, err := unmarshalTtSmiSnapshot(data)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal snapshot: %v", err)
+	}
+
+	gpus := getGpusFromTtSmiSnapshot(snapshot)
+
+	expectedIDs := []string{
+		"0000041231915018",
+		"0000041231915002",
+		"0000041231915009",
+		"000004123191500f",
+		"0000041231914064",
+		"0000041231915006",
+		"0000041231914087",
+		"000004123191402f",
+	}
+	if len(gpus) != len(expectedIDs) {
+		t.Fatalf("getGpusFromTtSmiSnapshot() returned %d GPUs, want %d", len(gpus), len(expectedIDs))
+	}
+	for i, gpu_ := range gpus {
+		if gpu_.Vendor != gpu.GpuVendorTenstorrent {
+			t.Errorf("GPU[%d] vendor = %v, want %v", i, gpu_.Vendor, gpu.GpuVendorTenstorrent)
+		}
+		if gpu_.Name != "p150" {
+			t.Errorf("GPU[%d] name = %s, want p150", i, gpu_.Name)
+		}
+		if gpu_.Vram != 32*1024 {
+			t.Errorf("GPU[%d] VRAM = %d, want %d", i, gpu_.Vram, 32*1024)
+		}
+		if gpu_.ID != expectedIDs[i] {
+			t.Errorf("GPU[%d] ID = %s, want %s", i, gpu_.ID, expectedIDs[i])
+		}
+		if gpu_.Index != strconv.Itoa(i) {
+			t.Errorf("GPU[%d] index = %s, want %s", i, gpu_.Index, strconv.Itoa(i))
+		}
+	}
+}
+
+func TestGetGpusFromTtSmiSnapshotBlackholeP300SameBoardID(t *testing.T) {
+	snapshot := &ttSmiSnapshot{
+		DeviceInfo: []ttDeviceInfo{
+			{BoardInfo: ttBoardInfo{BoardType: "p300a", BoardID: "0000450000000000", BusID: "0000:01:00.0"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p300a", BoardID: "0000450000000000", BusID: "0000:02:00.0"}},
+		},
+	}
+
+	gpus := getGpusFromTtSmiSnapshot(snapshot)
+
+	if len(gpus) != 2 {
+		t.Fatalf("getGpusFromTtSmiSnapshot() returned %d GPUs, want 2", len(gpus))
+	}
+	for i, gpu_ := range gpus {
+		if gpu_.Name != "p300" {
+			t.Errorf("GPU[%d] name = %s, want p300", i, gpu_.Name)
+		}
+		if gpu_.Vram != 32*1024 {
+			t.Errorf("GPU[%d] VRAM = %d, want %d", i, gpu_.Vram, 32*1024)
+		}
+		if gpu_.Index != strconv.Itoa(i) {
+			t.Errorf("GPU[%d] index = %s, want %s", i, gpu_.Index, strconv.Itoa(i))
+		}
+	}
+}
+
+func TestGetGpusFromTtSmiSnapshotBlackholeP300RemoteChip(t *testing.T) {
+	snapshot := &ttSmiSnapshot{
+		DeviceInfo: []ttDeviceInfo{
+			{BoardInfo: ttBoardInfo{BoardType: "p300a", BoardID: "0000450000000000", BusID: "0000:01:00.0"}},
+			{BoardInfo: ttBoardInfo{BoardType: "p300a", BoardID: "0000450000000000", BusID: "N/A"}},
+		},
+	}
+
+	gpus := getGpusFromTtSmiSnapshot(snapshot)
+
+	expected := []GpuInfo{
+		{Vendor: gpu.GpuVendorTenstorrent, Name: "p300", Vram: 64 * 1024, ID: "0000450000000000", Index: "0"},
+	}
+	if !reflect.DeepEqual(gpus, expected) {
+		t.Errorf("getGpusFromTtSmiSnapshot() = %v, want %v", gpus, expected)
+	}
+}
+
+func TestGetGpusFromTtSmiSnapshotBlackholeGalaxy(t *testing.T) {
+	data, err := loadTestData("tenstorrent/blackhole_galaxy.json")
+	if err != nil {
+		t.Fatalf("Failed to load test data: %v", err)
+	}
+	snapshot, err := unmarshalTtSmiSnapshot(data)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal snapshot: %v", err)
+	}
+
+	gpus := getGpusFromTtSmiSnapshot(snapshot)
+
+	if len(gpus) != 32 {
+		t.Fatalf("getGpusFromTtSmiSnapshot() returned %d GPUs, want 32", len(gpus))
+	}
+	for i, gpu_ := range gpus {
+		if gpu_.Name != "tt-galaxy-bh" {
+			t.Errorf("GPU[%d] name = %s, want tt-galaxy-bh", i, gpu_.Name)
+		}
+		if gpu_.Vram != 32*1024 {
+			t.Errorf("GPU[%d] VRAM = %d, want %d", i, gpu_.Vram, 32*1024)
+		}
+		if gpu_.Index != strconv.Itoa(i) {
+			t.Errorf("GPU[%d] index = %s, want %s", i, gpu_.Index, strconv.Itoa(i))
+		}
 	}
 }
