@@ -700,7 +700,11 @@ def _generate_create_cluster_mutation(
         ports = ports.replace(" ", "")
         input_fields.append(f'ports: "{ports}"')
 
-    input_fields.append(f'minCudaVersion: "{RunpodProvider.MIN_CUDA_VERSION}"')
+    # Provisioning fails if minCudaVersion is specified for createCluster.
+    # See https://github.com/dstackai/dstack/issues/3910.
+    # TODO: Uncomment when RunPod fixes minCudaVersion for createCluster.
+    #
+    # input_fields.append(f'minCudaVersion: "{RunpodProvider.MIN_CUDA_VERSION}"')
 
     # Format input fields
     input_string = ", ".join(input_fields)
