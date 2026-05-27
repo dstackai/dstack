@@ -9,7 +9,6 @@
     "azure_vm_size": "Standard_D2s_v6",
     "build_prefix": "",
     "docker_version": "",
-    "image_repo": "",
     "image_version": ""
   },
   "builders": [{

@@ -5,14 +5,10 @@ on:
   workflow_dispatch:
     inputs:
       image_version:
-        description: "Docker image version"
+        description: "Image version"
         required: true
       staging:
         description: "Build staging images"
-        type: boolean
-        default: false
-      prepull_staging:
-        description: "Pre-pull staging Docker images"
         type: boolean
         default: false
       build_docker:
@@ -39,7 +35,6 @@ on:
 env:
   PACKER_VERSION: "1.9.2"
   BUILD_DOCKER_REPO: ${{ inputs.staging && 'base-stgn' || 'base' }}
-  PREPULL_DOCKER_REPO: ${{ inputs.prepull_staging && 'base-stgn' || 'base' }}
   VM_IMAGE_BUILD_PREFIX: ${{ inputs.staging && format('stgn-{0}-', github.run_number) || '' }} # staging ? prefix : ''
 
 jobs:
@@ -111,7 +106,7 @@ jobs:
           chmod +x packer
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json $PROD_VARS -var image_repo=${{ env.PREPULL_DOCKER_REPO }} -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX aws-image${{ matrix.variant }}.json
+          ./packer build -var-file=versions.json $PROD_VARS -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX aws-image${{ matrix.variant }}.json
         env:
           PROD_VARS: ${{ !inputs.staging && '-var-file=aws-vars-prod.json' || '' }} # production ? var-file : ''
 
@@ -144,7 +139,7 @@ jobs:
           chmod +x packer
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json -var image_repo=${{ env.PREPULL_DOCKER_REPO }} -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX azure-image${{ matrix.variant }}.json
+          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX azure-image${{ matrix.variant }}.json
       - name: Publish azure image
         if: ${{ !inputs.staging }}
         run: |
@@ -182,7 +177,7 @@ jobs:
           chmod +x packer
       - name: Run packer
         run: |
-          ./packer build -var-file=versions.json -var image_repo=${{ env.PREPULL_DOCKER_REPO }} -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX gcp-image${{ matrix.variant }}.json
+          ./packer build -var-file=versions.json -var image_version=${{ inputs.image_version }} -var build_prefix=$VM_IMAGE_BUILD_PREFIX gcp-image${{ matrix.variant }}.json
       - name: Publish images
         run: |
           IMAGE_VERSION=${IMAGE_VERSION//./-}
@@ -231,7 +226,6 @@ jobs:
         run: |
           ./packer build \
             -var-file=versions.json \
-            -var image_repo=${{ env.PREPULL_DOCKER_REPO }} \
             -var image_version=${{ inputs.image_version }} \
             -var build_prefix=$VM_IMAGE_BUILD_PREFIX \
             -var oci_compartment_ocid=$OCI_COMPARTMENT \
