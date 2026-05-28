@@ -306,6 +306,7 @@ nav:
           - Troubleshooting: docs/guides/troubleshooting.md
           - More:
             - Protips: docs/guides/protips.md
+            - Tenant isolation: docs/guides/tenant-isolation.md
             - Upgrade: docs/guides/upgrade.md
             - Migration: 
               - Slurm: docs/guides/migration/slurm.md
