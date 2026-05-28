@@ -65,7 +65,7 @@ class NoPrivilegedPolicy(ApplyPolicy):
 
 ## Instance volumes
 
-Instance volumes mount a path from the host filesystem directly into the container. A user with access to this feature can mount arbitrary host paths — including sensitive directories such as `/etc`, `/proc`, or `/var`.
+[Instance volumes](../concepts/volumes.md#instance-volumes) mount a path from the host filesystem directly into the container. A user with access to this feature can mount arbitrary host paths — including sensitive directories such as `/etc`, `/proc`, or `/var`.
 
 You can disallow instance volumes or restrict access to certain paths by writing a [REST plugin](../reference/plugins/rest/index.md) or a [Python plugin](../reference/plugins/python/index.md).
 
