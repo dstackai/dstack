@@ -5,6 +5,7 @@ import (
 )
 
 type DockerParameters interface {
+	DockerPassEnv() []string
 	DockerPrivileged() bool
 	DockerShellCommands(authorizedKeys []string, runnerHttpAddress string) []string
 	DockerMounts(string) ([]mount.Mount, error)
@@ -40,6 +41,7 @@ type CLIArgs struct {
 	}
 
 	Docker struct {
+		PassEnv    string
 		Privileged bool
 		PJRTDevice string
 	}
