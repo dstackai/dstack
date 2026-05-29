@@ -728,6 +728,12 @@ def create_pre_authenticated_request(
 def delete_bucket(
     namespace: str, bucket_name: str, client: oci.object_storage.ObjectStorageClient
 ) -> None:
+    in_progress_uploads: Iterable[oci.object_storage.models.MultipartUpload] = (
+        chain_paginated_responses(client.list_multipart_uploads, namespace, bucket_name)
+    )
+    for upload in in_progress_uploads:
+        client.abort_multipart_upload(namespace, bucket_name, upload.object, upload.upload_id)
+
     par_ids = {
         par.id
         for par in chain_paginated_responses(
