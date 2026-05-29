@@ -119,6 +119,10 @@ func (c *dockerParametersMock) DockerShellCommands(authorizedKeys []string, runn
 	return commands
 }
 
+func (c *dockerParametersMock) DockerPassEnv() []string {
+	return []string{}
+}
+
 func (c *dockerParametersMock) DockerPorts() []int {
 	return []int{}
 }
