@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: Agentic orchestration for AI infrastructure
+title: The orchestration stack for AI infrastructure
 hide:
    - navigation
    - toc
