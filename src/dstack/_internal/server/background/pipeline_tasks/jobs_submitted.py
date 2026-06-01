@@ -516,6 +516,7 @@ async def _select_assignment(
         master_job_provisioning_data=preconditions.master_job_provisioning_data,
         volumes=preconditions.prepared_job_volumes.volumes,
         exclude_not_available=True,
+        skip_backend_offers_on_pool_capacity=True,
     )
 
     if fleet_model is None:
