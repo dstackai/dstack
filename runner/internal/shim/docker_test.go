@@ -268,3 +268,31 @@ func TestPullTracker_MixedLayerStatuses(t *testing.T) {
 	assert.Equal(t, uint64(100+200), p.TotalBytes)
 	assert.False(t, p.IsTotalBytesFinal) // layer-waiting size unknown
 }
+
+func TestPullTracker_NonBytesExtractingUnit(t *testing.T) {
+	tracker := newPullTracker()
+	tracker.Update(PullMessage{Id: "3.11", Status: "Pulling from library/python"})
+	tracker.Update(PullMessage{Id: "aaa", Status: "Pulling fs layer"})
+	tracker.Update(pullMsg("aaa", "Downloading", 100, 200))
+	tracker.Update(pullMsg("aaa", "Downloading", 200, 200))
+	tracker.Update(PullMessage{Id: "aaa", Status: "Download complete"})
+	// Newer Docker daemons report extraction progress in seconds. Tested with 29.5.2
+	tracker.Update(PullMessage{Id: "aaa", Status: "Extracting", ProgressDetail: ProgressDetail{Current: 1, Units: "s"}})
+	tracker.Update(PullMessage{Id: "aaa", Status: "Extracting", ProgressDetail: ProgressDetail{Current: 2, Units: "s"}})
+
+	p := tracker.Progress()
+	require.NotNil(t, p)
+	assert.Equal(t, uint64(200), p.DownloadedBytes)
+	assert.Equal(t, uint64(0), p.ExtractedBytes) // reported in seconds, bytes unknown
+	assert.Equal(t, uint64(200), p.TotalBytes)
+	assert.True(t, p.IsTotalBytesFinal)
+
+	tracker.Update(PullMessage{Id: "aaa", Status: "Pull complete"})
+
+	p = tracker.Progress()
+	require.NotNil(t, p)
+	assert.Equal(t, uint64(200), p.DownloadedBytes)
+	assert.Equal(t, uint64(200), p.ExtractedBytes) // pull complete => extracted == total
+	assert.Equal(t, uint64(200), p.TotalBytes)
+	assert.True(t, p.IsTotalBytesFinal)
+}

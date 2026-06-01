@@ -56,15 +56,24 @@ const (
 // https://github.com/moby/moby/blob/e77ff99ede5ee5952b3a9227863552ae6e5b6fb1/pkg/jsonmessage/jsonmessage.go#L144
 // All fields are optional.
 type PullMessage struct {
-	Id             string `json:"id"` // layer id
-	Status         string `json:"status"`
-	ProgressDetail struct {
-		Current uint64 `json:"current"` // bytes
-		Total   uint64 `json:"total"`   // bytes
-	} `json:"progressDetail"`
-	ErrorDetail struct {
+	Id             string         `json:"id"` // layer id
+	Status         string         `json:"status"`
+	ProgressDetail ProgressDetail `json:"progressDetail"`
+	ErrorDetail    struct {
 		Message string `json:"message"`
 	} `json:"errorDetail"`
+}
+
+type ProgressDetail struct {
+	Current uint64 `json:"current"`
+	Total   uint64 `json:"total"`
+	Units   string `json:"units"`
+}
+
+func (p *ProgressDetail) isUnitBytes() bool {
+	// > Units is the unit to print for progress. It defaults to "bytes" if empty
+	// https://github.com/moby/moby/blob/8151a55a776f5f83f68bcf0030c19031439ea357/api/types/jsonstream/progress.go#L9
+	return p.Units == "bytes" || p.Units == ""
 }
 
 type layerProgress struct {
@@ -94,14 +103,18 @@ func (t *PullTracker) Update(msg PullMessage) {
 	case "Pulling fs layer", "Waiting", "Verifying Checksum", "Already exists":
 		// no bytes to update, just track status
 	case "Downloading":
-		layer.DownloadedBytes = msg.ProgressDetail.Current
-		layer.TotalBytes = msg.ProgressDetail.Total
+		if msg.ProgressDetail.isUnitBytes() {
+			layer.DownloadedBytes = msg.ProgressDetail.Current
+			layer.TotalBytes = msg.ProgressDetail.Total
+		}
 	case "Download complete":
 		layer.DownloadedBytes = layer.TotalBytes
 	case "Extracting":
-		layer.ExtractedBytes = msg.ProgressDetail.Current
-		layer.DownloadedBytes = msg.ProgressDetail.Total
-		layer.TotalBytes = msg.ProgressDetail.Total
+		if msg.ProgressDetail.isUnitBytes() {
+			layer.ExtractedBytes = msg.ProgressDetail.Current
+			layer.DownloadedBytes = msg.ProgressDetail.Total
+			layer.TotalBytes = msg.ProgressDetail.Total
+		}
 	case "Pull complete":
 		layer.ExtractedBytes = layer.TotalBytes
 		layer.DownloadedBytes = layer.TotalBytes
