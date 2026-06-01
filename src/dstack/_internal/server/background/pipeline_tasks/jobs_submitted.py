@@ -345,6 +345,7 @@ class JobSubmittedWorker(Worker[JobSubmittedPipelineItem]):
             context=context,
             assignment=assignment,
         )
+        self._pipeline_hinter.hint_fetch(JobModel.__name__)
 
 
 @dataclass
