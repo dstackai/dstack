@@ -321,6 +321,12 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
             job_model=context.job_model,
             result=result,
         )
+        new_status = result.job_update_map.get("status")
+        if new_status == JobStatus.PULLING:
+            self._pipeline_hinter.hint_fetch(JobModel.__name__)
+        # Hint run pipeline for fast run transition to RUNNING status.
+        if new_status == JobStatus.RUNNING and context.job_model.run.status != RunStatus.RUNNING:
+            self._pipeline_hinter.hint_fetch(RunModel.__name__)
 
 
 @dataclass
@@ -609,7 +615,9 @@ async def _refetch_locked_job_model(
         )
         .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
         .options(joinedload(JobModel.probes).load_only(ProbeModel.success_streak))
-        .options(joinedload(JobModel.run).load_only(RunModel.id, RunModel.run_spec))
+        .options(
+            joinedload(JobModel.run).load_only(RunModel.id, RunModel.run_spec, RunModel.status)
+        )
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
@@ -980,6 +988,18 @@ async def _apply_process_result(
 
         if result.new_probe_models:
             session.add_all(result.new_probe_models)
+
+        # Set RunModel.skip_min_processing_interval for fast run transition to RUNNING status.
+        # Cross-pipeline write is ok: worst case skip_min_processing_interval is overridden.
+        if (
+            result.job_update_map.get("status") == JobStatus.RUNNING
+            and job_model.run.status != RunStatus.RUNNING
+        ):
+            await session.execute(
+                update(RunModel)
+                .where(RunModel.id == job_model.run_id)
+                .values(skip_min_processing_interval=True)
+            )
 
         _emit_result_events(session=session, job_model=job_model, result=result)
 
