@@ -1165,6 +1165,86 @@ class TestJobSubmittedWorker:
         assert job.instance is not None and job.instance.id == instance_2.id
         assert job.fleet_id == fleet_2.id
 
+    async def test_assigns_job_to_specific_instance(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project, name="my-fleet")
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+            name="my-fleet-0",
+        )
+        instance_1 = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=1,
+            name="my-fleet-1",
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(name="default", instances=["my-fleet-1"]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == instance_1.id
+        assert job.fleet_id == fleet.id
+
+    async def test_does_not_provision_new_capacity_when_instances_specified(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        # A candidate fleet exists, but no instance matches the selector.
+        await create_fleet(session=session, project=project)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(name="default", instances=["missing-instance"]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        offer = get_instance_offer_with_availability(backend=BackendType.AWS)
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+
+            await _process_job(session=session, worker=worker, job_model=job)
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        # No placeholder instance should be created for a specific-instance target.
+        res = await session.execute(select(InstanceModel))
+        assert res.scalars().all() == []
+
     async def test_assignment_creates_placeholder_instance_for_new_capacity(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):

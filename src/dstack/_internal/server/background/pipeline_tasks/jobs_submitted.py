@@ -530,6 +530,11 @@ async def _select_assignment(
             volumes=preconditions.prepared_job_volumes.volumes,
         )
 
+    if context.run.run_spec.merged_profile.instances:
+        # The run targets specific existing instances (nodes). Do not provision new
+        # capacity to satisfy a node selector that no available instance matches.
+        return _NoFleetAssignment()
+
     return _NewCapacityAssignment(fleet_id=fleet_model.id)
 
 
@@ -905,6 +910,16 @@ async def _apply_no_fleet_selection(
     job_model: JobModel,
     run: Run,
 ) -> None:
+    if run.run_spec.merged_profile.instances:
+        logger.debug("%s: failed to use specified instances", fmt(job_model))
+        await _terminate_submitted_job(
+            session=session,
+            job_model=job_model,
+            reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            message="Failed to use specified instances",
+        )
+        return
+
     if run.run_spec.merged_profile.fleets is not None:
         logger.debug("%s: failed to use specified fleets", fmt(job_model))
         await _terminate_submitted_job(

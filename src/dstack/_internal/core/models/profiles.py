@@ -391,6 +391,18 @@ class ProfileParams(CoreModel):
             ),
         ),
     ] = None
+    instances: Annotated[
+        Optional[List[str]],
+        Field(
+            description=(
+                "The specific fleet instances (nodes) to consider for reuse."
+                " Each value matches an instance by its name (e.g. `my-fleet-0`)"
+                " or by its hostname/IP address."
+                " When set, the run is only placed on a matching existing instance"
+                " and no new instances are provisioned"
+            ),
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(

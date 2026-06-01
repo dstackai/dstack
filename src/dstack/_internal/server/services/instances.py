@@ -375,6 +375,22 @@ def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, O
     return host_private_key, proxy_private_keys[0]
 
 
+def instance_matches_selectors(instance: InstanceModel, selectors: List[str]) -> bool:
+    """
+    Check if an instance matches any of the given node selectors.
+    A selector matches the instance name or its hostname/IP address
+    (cloud public IP or SSH host).
+    """
+    candidates = {instance.name.lower()}
+    jpd = get_instance_provisioning_data(instance)
+    if jpd is not None and jpd.hostname is not None:
+        candidates.add(jpd.hostname.lower())
+    rci = get_instance_remote_connection_info(instance)
+    if rci is not None:
+        candidates.add(rci.host.lower())
+    return any(selector.lower() in candidates for selector in selectors)
+
+
 def instance_matches_constraints(
     instance: InstanceModel,
     *,
@@ -462,10 +478,15 @@ def filter_instances(
         regions = [r for r in regions if r == master_job_provisioning_data.region]
 
     instance_types = profile.instance_types
+    instance_selectors = profile.instances
 
     filtered_instances: List[InstanceModel] = []
     for instance in instances:
         if instance.unreachable:
+            continue
+        if instance_selectors is not None and not instance_matches_selectors(
+            instance, instance_selectors
+        ):
             continue
         if instance.health.is_failure():
             continue

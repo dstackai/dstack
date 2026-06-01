@@ -26,7 +26,9 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_job_provisioning_data,
     get_kubernetes_volume_configuration,
+    get_remote_connection_info,
     get_volume,
     get_volume_configuration,
     get_volume_provisioning_data,
@@ -201,6 +203,108 @@ class TestFilterInstances:
             volumes=[[volume]],
         )
         assert res == [aws_instance_2]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_by_instance_name(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        instance0 = await create_instance(
+            session=session,
+            project=project,
+            instance_num=0,
+            name="my-cluster-0",
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            instance_num=1,
+            name="my-cluster-1",
+        )
+        instances = [instance0, instance1]
+        res = instances_services.filter_instances(
+            instances=instances,
+            profile=Profile(name="test", instances=["my-cluster-1"]),
+        )
+        assert res == [instance1]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_by_instance_name_case_insensitive(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        instance0 = await create_instance(
+            session=session,
+            project=project,
+            name="my-cluster-0",
+        )
+        res = instances_services.filter_instances(
+            instances=[instance0],
+            profile=Profile(name="test", instances=["MY-CLUSTER-0"]),
+        )
+        assert res == [instance0]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_by_hostname(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        instance0 = await create_instance(
+            session=session,
+            project=project,
+            name="my-cluster-0",
+            job_provisioning_data=get_job_provisioning_data(hostname="10.0.0.7"),
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            name="my-cluster-1",
+            job_provisioning_data=get_job_provisioning_data(hostname="10.0.0.8"),
+        )
+        instances = [instance0, instance1]
+        res = instances_services.filter_instances(
+            instances=instances,
+            profile=Profile(name="test", instances=["10.0.0.8"]),
+        )
+        assert res == [instance1]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_by_ssh_host(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        instance0 = await create_instance(
+            session=session,
+            project=project,
+            name="my-cluster-0",
+            remote_connection_info=get_remote_connection_info(host="192.168.1.10"),
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            name="my-cluster-1",
+            remote_connection_info=get_remote_connection_info(host="192.168.1.11"),
+        )
+        instances = [instance0, instance1]
+        res = instances_services.filter_instances(
+            instances=instances,
+            profile=Profile(name="test", instances=["192.168.1.11"]),
+        )
+        assert res == [instance1]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_no_instances_selector_returns_all(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        instance0 = await create_instance(session=session, project=project, name="my-cluster-0")
+        instance1 = await create_instance(session=session, project=project, name="my-cluster-1")
+        instances = [instance0, instance1]
+        res = instances_services.filter_instances(
+            instances=instances,
+            profile=Profile(name="test", instances=None),
+        )
+        assert res == instances
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
