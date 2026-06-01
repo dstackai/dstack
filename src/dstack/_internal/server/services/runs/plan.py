@@ -812,7 +812,8 @@ def _get_job_plan(
     job_offers.extend(offer for _, offer in instance_offers)
     # When the run targets specific instances, new capacity is never provisioned,
     # so backend offers are not actually usable and must not be shown in the plan.
-    if profile.creation_policy == CreationPolicy.REUSE_OR_CREATE and not profile.instances:
+    # `instances is not None` (not truthiness) so an empty list is also treated as targeting.
+    if profile.creation_policy == CreationPolicy.REUSE_OR_CREATE and profile.instances is None:
         job_offers.extend(offer for _, offer in backend_offers)
     job_offers.sort(key=lambda offer: not offer.availability.is_available())
     remove_job_spec_sensitive_info(job.job_spec)

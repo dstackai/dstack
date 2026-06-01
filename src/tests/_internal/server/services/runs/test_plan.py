@@ -114,6 +114,33 @@ class TestGetJobPlan:
         assert job_plan.total_offers == 1
         assert job_plan.offers == [instance_offer]
 
+    @pytest.mark.asyncio
+    async def test_excludes_backend_offers_when_instances_empty_list(self) -> None:
+        # An explicit empty `instances` list must be treated the same as a non-empty
+        # selector (target existing instances only), not as "no targeting".
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(image="debian", commands=["echo"]),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        instance_offer = get_instance_offer_with_availability()
+        backend_offer = get_instance_offer_with_availability()
+
+        job_plan = _get_job_plan(
+            instance_offers=[(None, instance_offer)],
+            backend_offers=[(None, backend_offer)],
+            profile=Profile(
+                name="default",
+                creation_policy=CreationPolicy.REUSE_OR_CREATE,
+                instances=[],
+            ),
+            job=jobs[0],
+            max_offers=None,
+        )
+
+        assert job_plan.total_offers == 1
+        assert job_plan.offers == [instance_offer]
+
 
 class TestGetBackendOffersInFleet:
     @pytest.mark.asyncio

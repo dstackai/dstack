@@ -308,6 +308,56 @@ class TestFilterInstances:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_by_instance_name_for_multinode(self, test_db, session: AsyncSession):
+        # Regression: the selector must also be applied on the multinode filter path.
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        instance0 = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.AWS,
+            name="my-fleet-0",
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            backend=BackendType.AWS,
+            name="my-fleet-1",
+        )
+        res = instances_services.filter_instances(
+            instances=[instance0, instance1],
+            profile=Profile(name="test", instances=["my-fleet-1"]),
+            multinode=True,
+        )
+        assert res == [instance1]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_by_instance_name_for_shared(self, test_db, session: AsyncSession):
+        # Regression: the selector must also be applied on the shared-instances filter path.
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        instance0 = await create_instance(
+            session=session,
+            project=project,
+            name="my-fleet-0",
+            total_blocks=2,
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            name="my-fleet-1",
+            total_blocks=2,
+        )
+        res = instances_services.filter_instances(
+            instances=[instance0, instance1],
+            profile=Profile(name="test", instances=["my-fleet-1"]),
+            shared=True,
+        )
+        assert res == [instance1]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_volume_instances_without_region(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
