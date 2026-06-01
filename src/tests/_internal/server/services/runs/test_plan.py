@@ -7,11 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import InstanceAvailability
+from dstack._internal.core.models.profiles import CreationPolicy, Profile
 from dstack._internal.server.services.jobs import get_jobs_from_run_spec
 from dstack._internal.server.services.runs.plan import (
     _freeze_offer_identity_value,
     _get_backend_offer_identity,
     _get_backend_offers_in_fleet,
+    _get_job_plan,
 )
 from dstack._internal.server.testing.common import (
     create_fleet,
@@ -64,6 +66,53 @@ class TestFreezeOfferIdentityValue:
 
         assert _get_backend_offer_identity(offer) == _get_backend_offer_identity(same_offer)
         assert _get_backend_offer_identity(offer) != _get_backend_offer_identity(different_offer)
+
+
+class TestGetJobPlan:
+    @pytest.mark.asyncio
+    async def test_includes_backend_offers_by_default(self) -> None:
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(image="debian", commands=["echo"]),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        instance_offer = get_instance_offer_with_availability()
+        backend_offer = get_instance_offer_with_availability()
+
+        job_plan = _get_job_plan(
+            instance_offers=[(None, instance_offer)],
+            backend_offers=[(None, backend_offer)],
+            profile=Profile(name="default", creation_policy=CreationPolicy.REUSE_OR_CREATE),
+            job=jobs[0],
+            max_offers=None,
+        )
+
+        assert job_plan.total_offers == 2
+
+    @pytest.mark.asyncio
+    async def test_excludes_backend_offers_when_instances_specified(self) -> None:
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(image="debian", commands=["echo"]),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        instance_offer = get_instance_offer_with_availability()
+        backend_offer = get_instance_offer_with_availability()
+
+        job_plan = _get_job_plan(
+            instance_offers=[(None, instance_offer)],
+            backend_offers=[(None, backend_offer)],
+            profile=Profile(
+                name="default",
+                creation_policy=CreationPolicy.REUSE_OR_CREATE,
+                instances=["my-fleet-0"],
+            ),
+            job=jobs[0],
+            max_offers=None,
+        )
+
+        assert job_plan.total_offers == 1
+        assert job_plan.offers == [instance_offer]
 
 
 class TestGetBackendOffersInFleet:

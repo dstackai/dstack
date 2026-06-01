@@ -810,7 +810,9 @@ def _get_job_plan(
 ) -> JobPlan:
     job_offers: list[InstanceOfferWithAvailability] = []
     job_offers.extend(offer for _, offer in instance_offers)
-    if profile.creation_policy == CreationPolicy.REUSE_OR_CREATE:
+    # When the run targets specific instances, new capacity is never provisioned,
+    # so backend offers are not actually usable and must not be shown in the plan.
+    if profile.creation_policy == CreationPolicy.REUSE_OR_CREATE and not profile.instances:
         job_offers.extend(offer for _, offer in backend_offers)
     job_offers.sort(key=lambda offer: not offer.availability.is_available())
     remove_job_spec_sensitive_info(job.job_spec)

@@ -5,7 +5,11 @@ from types import SimpleNamespace
 import pytest
 
 from dstack._internal.core.errors import ServerClientError
-from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.configurations import (
+    DevEnvironmentConfiguration,
+    ServiceConfiguration,
+    TaskConfiguration,
+)
 from dstack._internal.core.models.files import FileArchiveMapping
 from dstack._internal.core.models.profiles import Profile, ProfileRetry
 from dstack._internal.core.models.repos.local import LocalRunRepoData
@@ -96,6 +100,39 @@ class TestValidateRunSpecRetryDuration:
             validate_run_spec_and_set_defaults(
                 SimpleNamespace(ssh_public_key="ssh-rsa test"), run_spec
             )
+
+
+class TestValidateRunSpecInstances:
+    def _user(self):
+        return SimpleNamespace(ssh_public_key="ssh-rsa test")
+
+    def test_rejects_fewer_instances_than_nodes(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(commands=["echo"], nodes=2),
+            profile=Profile(name="default", instances=["my-fleet-0"]),
+        )
+
+        with pytest.raises(ServerClientError, match="instances"):
+            validate_run_spec_and_set_defaults(self._user(), run_spec)
+
+    def test_allows_matching_instances_and_nodes(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(commands=["echo"], nodes=2),
+            profile=Profile(name="default", instances=["my-fleet-0", "my-fleet-1"]),
+        )
+
+        validate_run_spec_and_set_defaults(self._user(), run_spec)
+
+    def test_allows_single_node_with_instances(self):
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=DevEnvironmentConfiguration(ide="vscode"),
+            profile=Profile(name="default", instances=["my-fleet-3"]),
+        )
+
+        validate_run_spec_and_set_defaults(self._user(), run_spec)
 
 
 class TestCheckCanUpdateConfigurationRouterType:

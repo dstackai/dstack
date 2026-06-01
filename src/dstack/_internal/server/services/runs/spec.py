@@ -115,6 +115,15 @@ def validate_run_spec_and_set_defaults(
             raise ServerClientError(
                 f"Probe timeout cannot be longer than {settings.MAX_PROBE_TIMEOUT}s"
             )
+    instances = run_spec.merged_profile.instances
+    if instances is not None:
+        nodes_required_num = get_nodes_required_num(run_spec)
+        if len(instances) < nodes_required_num:
+            raise ServerClientError(
+                f"`instances` specifies {len(instances)} instance(s)"
+                f" but the run requires {nodes_required_num} nodes."
+                " Specify at least as many instances as nodes."
+            )
     if run_spec.configuration.priority is None:
         run_spec.configuration.priority = RUN_PRIORITY_DEFAULT
     # We do not reject top-level `resources` when `replicas` is a list. Adding strict checks
