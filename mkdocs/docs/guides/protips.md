@@ -208,6 +208,39 @@ $ dstack apply -R -f examples/.dstack.yml
 
 Or, set [`creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the run configuration.
 
+### Targeting specific instances
+
+If you have a fleet with multiple nodes and want a run to land on a particular node,
+set `instances` in the run configuration. Each value matches an instance by its name
+(e.g. `my-fleet-0`) or by its hostname/IP address:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+name: vscode
+ide: vscode
+
+# Only consider these specific fleet instances (nodes)
+instances:
+  - my-fleet-3
+```
+
+</div>
+
+You can list multiple instances and mix names and IP addresses:
+
+```yaml
+instances:
+  - my-fleet-3
+  - 203.0.113.10
+```
+
+When `instances` is set, the run is only placed on a matching existing instance and
+`dstack` never provisions new instances. If no matching instance is available, the run
+fails with a no-capacity error (use [`retry`](../reference/dstack.yml/dev-environment.md#retry)
+to wait for a targeted node to free up).
+
 ### Idle duration
 
 If the run is submitted to a fleet with `nodes` set to a range and a new instance is provisioned, the shorter of the fleet's and run's `idle_duration` is used.
