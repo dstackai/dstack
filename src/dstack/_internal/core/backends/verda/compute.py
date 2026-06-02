@@ -78,19 +78,21 @@ class VerdaCompute(
     def _get_offers_with_availability(
         self, offers: List[InstanceOffer]
     ) -> List[InstanceOfferWithAvailability]:
-        raw_availabilities: List[Dict] = self.client.instances.get_availabilities()
-
         region_availabilities = {}
-        for location in raw_availabilities:
-            location_code = location["location_code"]
-            availabilities = location["availabilities"]
-            for name in availabilities:
-                key = (name, location_code)
-                region_availabilities[key] = InstanceAvailability.AVAILABLE
+        for is_spot in (False, True):
+            raw_availabilities: List[Dict] = self.client.instances.get_availabilities(
+                is_spot=is_spot
+            )
+            for location in raw_availabilities:
+                location_code = location["location_code"]
+                availabilities = location["availabilities"]
+                for name in availabilities:
+                    key = (name, location_code, is_spot)
+                    region_availabilities[key] = InstanceAvailability.AVAILABLE
 
         availability_offers = []
         for offer in offers:
-            key = (offer.instance.name, offer.region)
+            key = (offer.instance.name, offer.region, offer.instance.resources.spot)
             availability = region_availabilities.get(key, InstanceAvailability.NOT_AVAILABLE)
             availability_offers.append(offer.with_availability(availability=availability))
 

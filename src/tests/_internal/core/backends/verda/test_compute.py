@@ -11,6 +11,25 @@ from dstack._internal.core.backends.verda.compute import (
     _create_startup_script,
 )
 from dstack._internal.core.errors import BackendError, NoCapacityError
+from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOffer,
+    InstanceType,
+    Resources,
+)
+
+
+def _offer(spot: bool, name: str = "SOME.INSTANCE", region: str = "FIN-01") -> InstanceOffer:
+    return InstanceOffer(
+        backend=BackendType.VERDA,
+        instance=InstanceType(
+            name=name,
+            resources=Resources(cpus=8, memory_mib=16384, gpus=[], spot=spot),
+        ),
+        region=region,
+        price=1.0,
+    )
 
 
 def _assert_terminate_call(action_mock: MagicMock):
@@ -284,6 +303,38 @@ class TestCreateInstance:
         backend_data = VerdaInstanceBackendData.load(jpd.backend_data)
         assert backend_data.startup_script_id == "startup-script-id"
         assert backend_data.ssh_key_ids == ["ssh-key-id-1", "ssh-key-id-2"]
+
+
+class TestGetOffersWithAvailability:
+    @pytest.mark.parametrize("available_as_spot", [True, False])
+    def test_availability_resolved_against_matching_inventory(self, available_as_spot):
+        compute = VerdaCompute.__new__(VerdaCompute)
+        compute.client = MagicMock()
+
+        def get_availabilities(is_spot):
+            names = ["SOME.INSTANCE"] if is_spot == available_as_spot else []
+            return [{"location_code": "FIN-01", "availabilities": names}]
+
+        compute.client.instances.get_availabilities.side_effect = get_availabilities
+
+        offers = compute._get_offers_with_availability([_offer(spot=False), _offer(spot=True)])
+        availability_by_spot = {o.instance.resources.spot: o.availability for o in offers}
+
+        assert availability_by_spot[available_as_spot] == InstanceAvailability.AVAILABLE
+        assert availability_by_spot[not available_as_spot] == InstanceAvailability.NOT_AVAILABLE
+
+    def test_queries_both_spot_and_on_demand_availability(self):
+        compute = VerdaCompute.__new__(VerdaCompute)
+        compute.client = MagicMock()
+        compute.client.instances.get_availabilities.return_value = []
+
+        compute._get_offers_with_availability([_offer(spot=True)])
+
+        requested_is_spot = {
+            call.kwargs.get("is_spot")
+            for call in compute.client.instances.get_availabilities.call_args_list
+        }
+        assert requested_is_spot == {True, False}
 
 
 class TestTerminateInstance:
