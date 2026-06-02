@@ -21,7 +21,6 @@ from dstack._internal.core.models.instances import (
 
 
 def _offer(spot: bool, name: str = "SOME.INSTANCE", region: str = "FIN-01") -> InstanceOffer:
-    # Availability is keyed by (name, region, spot) only; other resources are irrelevant.
     return InstanceOffer(
         backend=BackendType.VERDA,
         instance=InstanceType(
@@ -309,10 +308,6 @@ class TestCreateInstance:
 class TestGetOffersWithAvailability:
     @pytest.mark.parametrize("available_as_spot", [True, False])
     def test_availability_resolved_against_matching_inventory(self, available_as_spot):
-        # Verda reports spot and on-demand availability separately. The same instance type
-        # in the same region may be available as one but not the other. Each offer's
-        # availability must come from the inventory matching its own spot flag, not the
-        # other one. Parametrized to cover both directions; not specific to any GPU/instance.
         compute = VerdaCompute.__new__(VerdaCompute)
         compute.client = MagicMock()
 

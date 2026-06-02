@@ -78,9 +78,6 @@ class VerdaCompute(
     def _get_offers_with_availability(
         self, offers: List[InstanceOffer]
     ) -> List[InstanceOfferWithAvailability]:
-        # Verda reports spot and on-demand availability separately. Query both so that
-        # spot offers (e.g. B200 spot) are matched against spot inventory rather than
-        # being marked NOT_AVAILABLE based on on-demand inventory only.
         region_availabilities = {}
         for is_spot in (False, True):
             raw_availabilities: List[Dict] = self.client.instances.get_availabilities(
