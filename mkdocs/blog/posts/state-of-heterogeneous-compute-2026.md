@@ -1,7 +1,7 @@
 ---
 title: "The state of heterogeneous AI compute in 2026"
 date: 2026-06-02
-description: "A practical map for teams evaluating NVIDIA, AMD, TPUs, Trainium, and specialized AI accelerators."
+description: "How supply, software readiness, orchestration, and networking shape accelerator choices across NVIDIA, AMD, TPUs, Trainium, and specialized inference systems."
 slug: state-of-heterogeneous-compute-2026
 # categories:
 #   - Benchmarks
@@ -142,7 +142,7 @@ Orchestration does not make ROCm behave like CUDA or make a TPU workload portabl
 | Slurm | Strong for large batch clusters, queueing, accounting, policy, and topology-aware placement. The limits are cloud-native and container-native workflows: real deployments often depend on local modules, queues, prolog/epilog scripts, plugins, and launch conventions. NVIDIA's SchedMD acquisition also makes Slurm vendor independence something teams should watch. |
 | Emerging | AI-native control planes such as dstack and SkyPilot focus on provisioning, placement, portable task and service definitions, and running workloads across providers or clusters. They can integrate with Kubernetes, Slurm, clouds, or on-prem infrastructure, but still depend on each accelerator stack for kernels, images, quotas, and performance. |
 
-!!! note "Vendor independence"
+!!! info "Vendor independence"
     The orchestration and control-plane layer should not quietly become another accelerator dependency. NVIDIA acquired [Run:ai](https://blogs.nvidia.com/blog/runai/), a Kubernetes-based workload management platform, and [SchedMD](https://blogs.nvidia.com/blog/nvidia-acquires-schedmd/), the leading developer of Slurm. NVIDIA says Slurm will remain open-source and vendor-neutral, and its Run:ai messaging emphasizes choice and flexibility. Teams may still trust those projects, but heterogeneous compute makes vendor independence a practical requirement for the scheduler and control plane.
 
 ## Networking
