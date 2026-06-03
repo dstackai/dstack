@@ -52,6 +52,9 @@ UPLOAD_CODE_REQUEST_TIMEOUT = 60
 
 logger = get_logger(__name__)
 
+LocalAddress = Union[int, Path]
+"""A local TCP port or a Unix domain socket path the client connects to."""
+
 
 class RunnerClient:
     # `/api/upload_code` call is not required if there is no code
@@ -70,7 +73,7 @@ class RunnerClient:
         self._session, self._base_url = _make_session_and_base_url(port, hostname, uds)
 
     @classmethod
-    def from_address(cls, address: Union[int, Path]) -> Self:
+    def from_address(cls, address: LocalAddress) -> Self:
         """
         Builds a client from a TCP port (`int`) or a Unix domain socket path (`Path`).
         """
@@ -321,7 +324,7 @@ class ShimClient:
         self._session, self._base_url = _make_session_and_base_url(port, hostname, uds)
 
     @classmethod
-    def from_address(cls, address: Union[int, Path]) -> Self:
+    def from_address(cls, address: LocalAddress) -> Self:
         """
         Builds a client from a TCP port (`int`) or a Unix domain socket path (`Path`).
         """

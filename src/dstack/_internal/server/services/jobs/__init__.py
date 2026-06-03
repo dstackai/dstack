@@ -349,11 +349,11 @@ async def stop_runner(job_model: JobModel, instance_model: InstanceModel):
 
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT])
 def _stop_runner(
-    ports: dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
     job_model: JobModel,
 ):
     logger.debug("%s: stopping runner", fmt(job_model))
-    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     try:
         runner_client.stop()
     except requests.RequestException:

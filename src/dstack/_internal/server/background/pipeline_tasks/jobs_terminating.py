@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional, Sequence, TypedDict
@@ -853,8 +854,8 @@ async def _stop_container(
 
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
-def _shim_submit_stop(ports: dict[int, int], job_model: JobModel) -> bool:
-    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+def _shim_submit_stop(addresses: Mapping[int, client.LocalAddress], job_model: JobModel) -> bool:
+    shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
 
     resp = shim_client.healthcheck()
     if resp is None:

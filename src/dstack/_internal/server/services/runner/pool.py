@@ -47,8 +47,8 @@ class InstanceConnectionKey:
 
 class InstanceConnectionPool:
     def __init__(self):
-        self._connections: dict[InstanceConnectionKey, InstanceConnection]
-        self._access_locks: dict[InstanceConnectionKey, threading.Lock]
+        self._connections: dict[InstanceConnectionKey, InstanceConnection] = {}
+        self._access_locks: dict[InstanceConnectionKey, threading.Lock] = {}
         self._access_locks_lock = threading.Lock()
 
     def get_or_open(

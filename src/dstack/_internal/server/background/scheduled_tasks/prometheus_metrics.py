@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -145,6 +146,8 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[str]:
 
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
-def _pull_job_metrics(ports: dict[int, int], task_id: uuid.UUID) -> Optional[str]:
-    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+def _pull_job_metrics(
+    addresses: Mapping[int, client.LocalAddress], task_id: uuid.UUID
+) -> Optional[str]:
+    shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
     return shim_client.get_task_metrics(task_id)

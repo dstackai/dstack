@@ -1,7 +1,6 @@
 import functools
 from collections.abc import Mapping
-from pathlib import Path
-from typing import Callable, Dict, List, Literal, Optional, TypeVar, Union
+from typing import Callable, List, Literal, Optional, TypeVar, Union
 
 import requests
 from typing_extensions import Concatenate, ParamSpec
@@ -9,20 +8,19 @@ from typing_extensions import Concatenate, ParamSpec
 from dstack._internal.core.errors import DstackError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.runs import JobProvisioningData, JobRuntimeData
-from dstack._internal.server.services.runner.pool import instance_connection_pool
+from dstack._internal.server.services.runner.client import LocalAddress
+from dstack._internal.server.services.runner.pool import PrivateKeyOrPair, instance_connection_pool
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 P = ParamSpec("P")
 R = TypeVar("R")
-# A host private key or pair of (host private key, optional proxy jump private key)
-PrivateKeyOrPair = Union[str, tuple[str, Optional[str]]]
 
 
 def runner_ssh_tunnel(
     ports: List[int], retries: int = 3, retry_interval: float = 1
 ) -> Callable[
-    [Callable[Concatenate[Dict[int, int], P], R]],
+    [Callable[Concatenate[Mapping[int, LocalAddress], P], R]],
     Callable[
         Concatenate[PrivateKeyOrPair, JobProvisioningData, Optional[JobRuntimeData], P],
         Union[Literal[False], R],
@@ -37,7 +35,7 @@ def runner_ssh_tunnel(
     """
 
     def decorator(
-        func: Callable[Concatenate[Mapping[int, int | Path], P], R],
+        func: Callable[Concatenate[Mapping[int, LocalAddress], P], R],
     ) -> Callable[
         Concatenate[PrivateKeyOrPair, JobProvisioningData, Optional[JobRuntimeData], P],
         Union[Literal[False], R],

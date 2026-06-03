@@ -1,6 +1,7 @@
 import asyncio
 import enum
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, Iterable, Literal, Optional, Sequence, Union
@@ -1310,7 +1311,7 @@ def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> boo
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
 def _process_provisioning_with_shim(
-    ports: Dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
     run: Run,
     job_model: JobModel,
     jrd: Optional[JobRuntimeData],
@@ -1322,7 +1323,7 @@ def _process_provisioning_with_shim(
     ssh_key: Optional[str],
 ) -> bool:
     job_spec = get_job_spec(job_model)
-    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
 
     resp = shim_client.healthcheck()
     if resp is None:
@@ -1436,8 +1437,8 @@ class _SyncShimPullingStateResult:
 
 
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
-def _get_runner_availability(ports: Dict[int, int]) -> _RunnerAvailability:
-    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+def _get_runner_availability(addresses: Mapping[int, client.LocalAddress]) -> _RunnerAvailability:
+    runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     if runner_client.healthcheck() is None:
         return _RunnerAvailability.UNAVAILABLE
     return _RunnerAvailability.AVAILABLE
@@ -1445,11 +1446,11 @@ def _get_runner_availability(ports: Dict[int, int]) -> _RunnerAvailability:
 
 @runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
 def _sync_shim_pulling_state(
-    ports: Dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
     job_model: JobModel,
     jrd: Optional[JobRuntimeData] = None,
 ) -> Union[_SyncShimPullingStateResult, Literal[False]]:
-    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
     image_pull_progress: Optional[ImagePullProgress] = None
     if shim_client.is_api_v2_supported():
         task = shim_client.get_task(job_model.id)
@@ -1527,7 +1528,7 @@ class _SubmitJobToRunnerResult:
 
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
 def _submit_job_to_runner(
-    ports: Dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
     run: Run,
     job_model: JobModel,
     job: Job,
@@ -1552,7 +1553,7 @@ def _submit_job_to_runner(
     else:
         instance_env = None
 
-    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     if runner_client.healthcheck() is None:
         return _SubmitJobToRunnerResult(success=success_if_not_available)
 
@@ -1597,11 +1598,11 @@ class _ProcessRunningResult:
 
 @runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT])
 def _process_running(
-    ports: Dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
     run_model: RunModel,
     job_model: JobModel,
 ) -> Union[_ProcessRunningResult, Literal[False]]:
-    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     timestamp = job_model.runner_timestamp or 0
     resp = runner_client.pull(timestamp)
     logs_services.write_logs(
