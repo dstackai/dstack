@@ -1,7 +1,4 @@
 import functools
-import socket
-import time
-from collections.abc import Iterable
 from typing import Callable, Dict, List, Literal, Optional, TypeVar, Union
 
 import requests
@@ -10,9 +7,8 @@ from typing_extensions import Concatenate, ParamSpec
 from dstack._internal.core.errors import DstackError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.runs import JobProvisioningData, JobRuntimeData
-from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
+from dstack._internal.server.services.runner.pool import instance_connection_pool
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 P = ParamSpec("P")
@@ -47,8 +43,8 @@ def runner_ssh_tunnel(
         @functools.wraps(func)
         def wrapper(
             ssh_private_key: PrivateKeyOrPair,
-            job_provisioning_data: JobProvisioningData,
-            job_runtime_data: Optional[JobRuntimeData],
+            jpd: JobProvisioningData,
+            jrd: Optional[JobRuntimeData],
             *args: P.args,
             **kwargs: P.kwargs,
         ) -> Union[Literal[False], R]:
@@ -56,74 +52,24 @@ def runner_ssh_tunnel(
             Returns:
                 is successful
             """
-            # container:host mapping
-            container_ports_map = {port: port for port in ports}
-            if job_runtime_data is not None and job_runtime_data.ports is not None:
-                container_ports_map.update(job_runtime_data.ports)
-
-            if job_provisioning_data.backend == BackendType.LOCAL:
+            if jpd.backend == BackendType.LOCAL:
                 # without SSH
+                container_ports_map = {port: port for port in ports}
                 return func(container_ports_map, *args, **kwargs)
 
-            if isinstance(ssh_private_key, str):
-                ssh_proxy_private_key = None
-            else:
-                ssh_private_key, ssh_proxy_private_key = ssh_private_key
-            identity = FileContent(ssh_private_key)
-            if ssh_proxy_private_key is not None:
-                proxy_identity = FileContent(ssh_proxy_private_key)
-            else:
-                proxy_identity = None
-
-            ssh_proxies = []
-            if job_provisioning_data.ssh_proxy is not None:
-                ssh_proxies.append((job_provisioning_data.ssh_proxy, proxy_identity))
-
-            for attempt in range(retries):
-                last = attempt == retries - 1
-                # remote_host:local mapping
-                tunnel_ports_map = _reserve_ports(container_ports_map.values())
-                runner_ports_map = {
-                    container_port: tunnel_ports_map[host_port]
-                    for container_port, host_port in container_ports_map.items()
-                }
+            for attempt in range(2):  # cached, then one fresh reopen
+                conn = instance_connection_pool.get_or_open(ssh_private_key, jpd, jrd)
+                if conn is None:
+                    return False  # couldn't establish at all
+                sock_paths = {p: conn.forwarded_path(p) for p in ports}
                 try:
-                    with SSHTunnel(
-                        destination=(
-                            f"{job_provisioning_data.username}@{job_provisioning_data.hostname}"
-                        ),
-                        port=job_provisioning_data.ssh_port,
-                        forwarded_sockets=ports_to_forwarded_sockets(tunnel_ports_map),
-                        identity=identity,
-                        ssh_proxies=ssh_proxies,
-                        batch_mode=True,
-                    ):
-                        return func(runner_ports_map, *args, **kwargs)
-                except SSHError:
-                    pass  # error is logged in the tunnel
-                except (DstackError, requests.RequestException) as e:
-                    if last:
-                        logger.debug(
-                            "Cannot connect to %s's API: %s", job_provisioning_data.hostname, e
-                        )
-                if not last:
-                    time.sleep(retry_interval)
+                    return func(sock_paths, *args, **kwargs)
+                except (SSHError, requests.ConnectionError):
+                    instance_connection_pool.drop(conn.key)  # dead ssh connection, re-open
+                except (DstackError, requests.RequestException):
+                    return False  # reached runner, app-level fail; don't re-open ssh connection
             return False
 
         return wrapper
 
     return decorator
-
-
-def _reserve_ports(ports: Iterable[int]) -> dict[int, int]:
-    sockets = []
-    try:
-        for port in ports:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.bind(("localhost", 0))  # Bind to a free port provided by the host
-            sockets.append((port, s))
-        return {port: s.getsockname()[1] for port, s in sockets}
-    finally:
-        for _, s in sockets:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.close()
