@@ -1,4 +1,6 @@
 import functools
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Callable, Dict, List, Literal, Optional, TypeVar, Union
 
 import requests
@@ -35,7 +37,7 @@ def runner_ssh_tunnel(
     """
 
     def decorator(
-        func: Callable[Concatenate[Dict[int, int], P], R],
+        func: Callable[Concatenate[Mapping[int, int | Path], P], R],
     ) -> Callable[
         Concatenate[PrivateKeyOrPair, JobProvisioningData, Optional[JobRuntimeData], P],
         Union[Literal[False], R],

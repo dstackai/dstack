@@ -186,6 +186,7 @@ server = [
     "aiorwlock",
     "aiocache",
     "httpx>=0.28.0",
+    "requests-unixsocket>=0.4.1",
     "jinja2",
     "watchfiles",
     "sqlalchemy[asyncio]>=2.0.0",

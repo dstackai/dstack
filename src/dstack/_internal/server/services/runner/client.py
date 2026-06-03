@@ -1,11 +1,14 @@
+import urllib.parse
 import uuid
 from collections.abc import Generator
 from http import HTTPStatus
+from pathlib import Path
 from typing import BinaryIO, Dict, List, Literal, Optional, TypeVar, Union, overload
 
 import packaging.version
 import requests
 import requests.exceptions
+import requests_unixsocket
 from typing_extensions import Self
 
 from dstack._internal.core.errors import DstackError
@@ -42,6 +45,7 @@ from dstack._internal.server.schemas.runner import (
 )
 from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.path import PathLike
 
 REQUEST_TIMEOUT = 9
 UPLOAD_CODE_REQUEST_TIMEOUT = 60
@@ -59,12 +63,20 @@ class RunnerClient:
 
     def __init__(
         self,
-        port: int,
+        port: Optional[int] = None,
         hostname: str = "localhost",
+        uds: Optional[PathLike] = None,
     ):
-        self.secure = False
-        self.hostname = hostname
-        self.port = port
+        self._session, self._base_url = _make_session_and_base_url(port, hostname, uds)
+
+    @classmethod
+    def from_address(cls, address: Union[int, Path]) -> Self:
+        """
+        Builds a client from a TCP port (`int`) or a Unix domain socket path (`Path`).
+        """
+        if isinstance(address, int):
+            return cls(port=address)
+        return cls(uds=address)
 
     def get_version_string(self) -> str:
         if not self._negotiated:
@@ -90,7 +102,7 @@ class RunnerClient:
         return healthcheck_response
 
     def get_metrics(self) -> Optional[MetricsResponse]:
-        resp = requests.get(self._url("/api/metrics"), timeout=REQUEST_TIMEOUT)
+        resp = self._session.get(self._url("/api/metrics"), timeout=REQUEST_TIMEOUT)
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
@@ -134,7 +146,7 @@ class RunnerClient:
             log_quota_hour=quota if quota > 0 else None,
             run_spec=run.run_spec,
         )
-        resp = requests.post(
+        resp = self._session.post(
             # use .json() to encode enums
             self._url("/api/submit"),
             data=body.json(),
@@ -144,7 +156,7 @@ class RunnerClient:
         resp.raise_for_status()
 
     def upload_archive(self, id: uuid.UUID, file: Union[BinaryIO, bytes]):
-        resp = requests.post(
+        resp = self._session.post(
             self._url("/api/upload_archive"),
             files={"archive": (str(id), file)},
             timeout=UPLOAD_CODE_REQUEST_TIMEOUT,
@@ -152,13 +164,13 @@ class RunnerClient:
         resp.raise_for_status()
 
     def upload_code(self, file: Union[BinaryIO, bytes]):
-        resp = requests.post(
+        resp = self._session.post(
             self._url("/api/upload_code"), data=file, timeout=UPLOAD_CODE_REQUEST_TIMEOUT
         )
         resp.raise_for_status()
 
     def run_job(self) -> Optional[JobInfoResponse]:
-        resp = requests.post(self._url("/api/run"), timeout=REQUEST_TIMEOUT)
+        resp = self._session.post(self._url("/api/run"), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         if not _is_json_response(resp):
             # Old runner or runner failed to get job info
@@ -166,21 +178,21 @@ class RunnerClient:
         return JobInfoResponse.__response__.parse_obj(resp.json())
 
     def pull(self, timestamp: int) -> PullResponse:
-        resp = requests.get(
+        resp = self._session.get(
             self._url("/api/pull"), params={"timestamp": timestamp}, timeout=REQUEST_TIMEOUT
         )
         resp.raise_for_status()
         return PullResponse.__response__.parse_obj(resp.json())
 
     def stop(self):
-        resp = requests.post(self._url("/api/stop"), timeout=REQUEST_TIMEOUT)
+        resp = self._session.post(self._url("/api/stop"), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
 
     def _url(self, path: str) -> str:
-        return f"{'https' if self.secure else 'http'}://{self.hostname}:{self.port}/{path.lstrip('/')}"
+        return f"{self._base_url}/{path.lstrip('/')}"
 
     def _healthcheck(self) -> HealthcheckResponse:
-        resp = requests.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
+        resp = self._session.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         return HealthcheckResponse.__response__.parse_obj(resp.json())
 
@@ -302,11 +314,20 @@ class ShimClient:
 
     def __init__(
         self,
-        port: int,
+        port: Optional[int] = None,
         hostname: str = "localhost",
+        uds: Optional[PathLike] = None,
     ):
-        self._session = requests.Session()
-        self._base_url = f"http://{hostname}:{port}"
+        self._session, self._base_url = _make_session_and_base_url(port, hostname, uds)
+
+    @classmethod
+    def from_address(cls, address: Union[int, Path]) -> Self:
+        """
+        Builds a client from a TCP port (`int`) or a Unix domain socket path (`Path`).
+        """
+        if isinstance(address, int):
+            return cls(port=address)
+        return cls(uds=address)
 
     # Methods shared by all API versions
 
@@ -624,6 +645,24 @@ class ShimClient:
         # statuses and moving some cleanup defer calls to .Terminate() and/or .Remove()) and add
         # TaskStatus.RUNNING to the list of restart-safe task statuses for supported shim versions.
         return [TaskStatus.TERMINATED]
+
+
+def _make_session_and_base_url(
+    port: Optional[int], hostname: str, uds: Optional[PathLike]
+) -> tuple[requests.Session, str]:
+    """
+    Builds a session and base URL for HTTP over TCP (`port`) or over
+    a Unix domain socket (`uds`). Exactly one of the two must be specified.
+    """
+    if (port is None) == (uds is None):
+        raise ValueError("Either port or uds must be specified, not both")
+    session = requests.Session()
+    if uds is not None:
+        base_url = f"http+unix://{urllib.parse.quote(str(uds), safe='')}"
+        session.mount("http+unix://", requests_unixsocket.UnixAdapter())
+    else:
+        base_url = f"http://{hostname}:{port}"
+    return session, base_url
 
 
 def healthcheck_response_to_instance_check(
