@@ -18,8 +18,8 @@ from dstack._internal.core.services.ssh.tunnel import (
 from dstack._internal.server.settings import SERVER_DIR_PATH
 from dstack._internal.utils.path import FileContent
 
-# A host private key or pair of (host private key, optional proxy jump private key)
 PrivateKeyOrPair = Union[str, tuple[str, Optional[str]]]
+"""A host private key or pair of (host private key, optional proxy jump private key)"""
 
 CONNECTIONS_DIR = SERVER_DIR_PATH / "instance-connections"
 
@@ -75,12 +75,11 @@ class InstanceConnectionPool:
     def drop(self, key: InstanceConnectionKey) -> None:
         lock = self._get_access_lock(key)
         with lock:
-            # close?
             try:
-                self._connections.pop(key)
-                self._access_locks.pop(key)
+                conn = self._connections.pop(key)
             except KeyError:
-                pass
+                return
+            conn.close()
 
     def close_all(self) -> None: ...  # graceful shutdown
 
@@ -110,6 +109,7 @@ class InstanceConnection:
             / f"{self._key.hostname}:{self._key.port}"
             / str(self._key.ports_to_forward)
         )
+        self._connection_dir.mkdir(parents=True, exist_ok=True)
         # connection_dir can have a long path that won't be accepted by the ssh command,
         # so we create a short temporary symlink
         self._temp_dir, self._connection_symlink_dir = self._init_symlink_dir(self._connection_dir)
@@ -117,7 +117,7 @@ class InstanceConnection:
         self._container_to_host_port_map = InstanceConnection._get_container_to_host_port_map(
             jpd, jrd
         )
-        self._host_port_to_unix_socket_map = InstanceConnection._get_host_port_to_unix_socket_map(
+        self._host_port_to_uds_map = InstanceConnection._get_host_port_to_uds_map(
             connection_dir=self._connection_symlink_dir,
             ports_to_forward=self._key.ports_to_forward,
         )
@@ -126,7 +126,7 @@ class InstanceConnection:
             port=jpd.ssh_port,
             identity=_get_identity(ssh_private_key, jpd),
             control_sock_path=self._control_socket_path,
-            forwarded_sockets=self._get_forwarded_sockets(self._host_port_to_unix_socket_map),
+            forwarded_sockets=self._get_forwarded_sockets(self._host_port_to_uds_map),
             ssh_proxies=_get_proxies(ssh_private_key, jpd),
             options={
                 **SSH_DEFAULT_OPTIONS,
@@ -140,7 +140,7 @@ class InstanceConnection:
         self._tunnel.open()
 
     def forwarded_path(self, container_port: int) -> Path:
-        return self._host_port_to_unix_socket_map[self._container_to_host_port_map[container_port]]
+        return self._host_port_to_uds_map[self._container_to_host_port_map[container_port]]
 
     def close(self) -> None:
         self._tunnel.close()
@@ -167,20 +167,20 @@ class InstanceConnection:
         return port_map
 
     @staticmethod
-    def _get_host_port_to_unix_socket_map(
+    def _get_host_port_to_uds_map(
         connection_dir: Path,
         ports_to_forward: Collection[int],
     ) -> dict[int, Path]:
         return {port: connection_dir / str(port) for port in ports_to_forward}
 
     @staticmethod
-    def _get_forwarded_sockets(host_port_to_unix_socket_map: dict[int, Path]) -> list[SocketPair]:
+    def _get_forwarded_sockets(host_port_to_uds_map: dict[int, Path]) -> list[SocketPair]:
         return [
             SocketPair(
                 local=UnixSocket(path=path),
                 remote=IPSocket(host="localhost", port=port),
             )
-            for port, path in host_port_to_unix_socket_map.items()
+            for port, path in host_port_to_uds_map.items()
         ]
 
 
@@ -193,11 +193,16 @@ def _get_identity(ssh_private_key: PrivateKeyOrPair, jpd: JobProvisioningData) -
 def _get_proxies(
     ssh_private_key: PrivateKeyOrPair, jpd: JobProvisioningData
 ) -> list[tuple[SSHConnectionParams, FileContent]]:
-    if not isinstance(ssh_private_key, tuple):
+    if jpd.ssh_proxy is None:
         return []
 
-    _, ssh_proxy_private_key = ssh_private_key
-    if ssh_proxy_private_key is None or jpd.ssh_proxy is None:
-        return []
+    if isinstance(ssh_private_key, str):
+        ssh_proxy_private_key = ssh_private_key
+    else:
+        ssh_proxy_private_key = ssh_private_key[1]
+        if ssh_proxy_private_key is None:
+            # In case proxy key is None, fallback to main key (k8s case).
+            ssh_proxy_private_key = ssh_private_key[0]
+
     proxy_identity = FileContent(ssh_proxy_private_key)
     return [(jpd.ssh_proxy, proxy_identity)]
