@@ -43,8 +43,8 @@ def runner_ssh_tunnel(
         @functools.wraps(func)
         def wrapper(
             ssh_private_key: PrivateKeyOrPair,
-            jpd: JobProvisioningData,
-            jrd: Optional[JobRuntimeData],
+            job_provisioning_data: JobProvisioningData,
+            job_runtime_data: Optional[JobRuntimeData],
             *args: P.args,
             **kwargs: P.kwargs,
         ) -> Union[Literal[False], R]:
@@ -52,13 +52,17 @@ def runner_ssh_tunnel(
             Returns:
                 is successful
             """
-            if jpd.backend == BackendType.LOCAL:
+            if job_provisioning_data.backend == BackendType.LOCAL:
                 # without SSH
                 container_ports_map = {port: port for port in ports}
                 return func(container_ports_map, *args, **kwargs)
 
             for attempt in range(2):  # cached, then one fresh reopen
-                conn = instance_connection_pool.get_or_open(ssh_private_key, jpd, jrd)
+                conn = instance_connection_pool.get_or_open(
+                    ssh_private_key=ssh_private_key,
+                    jpd=job_provisioning_data,
+                    jrd=job_runtime_data,
+                )
                 if conn is None:
                     return False  # couldn't establish at all
                 sock_paths = {p: conn.forwarded_path(p) for p in ports}
