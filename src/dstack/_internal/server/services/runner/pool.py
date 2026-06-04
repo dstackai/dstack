@@ -74,6 +74,11 @@ class InstanceConnectionPool:
         jpd: JobProvisioningData,
         jrd: Optional[JobRuntimeData],
     ) -> Optional["InstanceConnection"]:
+        """
+        Starts a new SSH connection or returns an existing one.
+        Existing connections are checked for health periodically
+        so that subsequent calls to `get_or_open()` eventually return a healthy connection.
+        """
         key = InstanceConnectionKey.from_jpd(jpd, jrd)
         lock = self._get_access_lock(key)
         with lock:
@@ -180,7 +185,9 @@ class InstanceConnection:
             ssh_proxies=InstanceConnection._get_proxies(ssh_private_key, jpd),
             options={
                 **SSH_DEFAULT_OPTIONS,
-                "ServerAliveInterval": "30",
+                # Auto-close half-opened connections (the instance not responding).
+                "ServerAliveInterval": "10",
+                "ServerAliveCountMax": "3",
                 # Set ControlPersist to auto-close orphaned background ssh process
                 # in case dstack server shutdown is not graceful.
                 "ControlPersist": "2m",
