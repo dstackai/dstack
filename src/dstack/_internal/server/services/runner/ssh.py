@@ -99,7 +99,12 @@ def runner_ssh_tunnel(
                         conn.close()
                 return False
 
-            for _ in range(2):  # cached, then one fresh reopen
+            # First try a cached connection and, if it's dead, a new connection.
+            # Connections already cover against
+            # a) cleanly-existed master (ControlPersist reap); and
+            # b) stale control socket file left by killed master.
+            # but we still want a fast retry in case master dies mid-request.
+            for _ in range(2):
                 conn = instance_connection_pool.get_or_open(
                     ssh_private_key=ssh_private_key,
                     jpd=job_provisioning_data,

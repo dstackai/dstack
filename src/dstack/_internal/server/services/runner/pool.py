@@ -1,4 +1,5 @@
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -25,6 +26,9 @@ PrivateKeyOrPair = Union[str, tuple[str, Optional[str]]]
 """A host private key or pair of (host private key, optional proxy jump private key)"""
 
 CONNECTIONS_DIR = SERVER_DIR_PATH / "instance-connections"
+
+MIN_ALIVE_CHECK_INTERVAL = 30
+"""How often (at most) `InstanceConnection.is_alive()` runs `ssh -O check`, in seconds."""
 
 
 @dataclass(frozen=True)
@@ -77,7 +81,15 @@ class InstanceConnectionPool:
                 return None
             conn = self._connections.get(key)
             if conn is not None:
-                return conn
+                if conn.is_alive():
+                    return conn
+                # The master process is gone — evict and reopen.
+                logger.debug("Instance connection %s is dead, reopening", key)
+                self._connections.pop(key)
+                try:
+                    conn.close()
+                except Exception:
+                    logger.exception("Failed to close instance connection %s", key)
             conn = InstanceConnection(ssh_private_key, jpd, jrd)
             try:
                 conn.open()
@@ -147,6 +159,7 @@ class InstanceConnection:
         """
         self._key = InstanceConnectionKey.from_jpd(jpd, jrd)
         self._ephemeral = ephemeral
+        self._last_verified_at: float = 0.0
         self._temp_dir, self._effective_conn_dir = InstanceConnection._resolve_conn_dir(
             self._key, ephemeral
         )
@@ -177,6 +190,28 @@ class InstanceConnection:
 
     def open(self) -> None:
         self._tunnel.open()
+        self._last_verified_at = time.monotonic()
+
+    def is_alive(self) -> bool:
+        """
+        Verifies that the connection's SSH master process is alive:
+
+        1. The control socket exists (a stat). Catches cleanly exited masters (incl. ControlPersist).
+        2. `ssh -O check`. Catches killed masters that left a stale socket file behind.
+            Rate-limited to once per `MIN_ALIVE_CHECK_INTERVAL`.
+
+        Does not detect half-open TCP (ServerAliveInterval converts it into a clean exit)
+        or mid-request deaths (handled by the callers' drop-on-error pattern).
+        """
+        if not self._control_socket_path.exists():
+            return False
+        now = time.monotonic()
+        if now - self._last_verified_at < MIN_ALIVE_CHECK_INTERVAL:
+            return True
+        if not self._tunnel.check():
+            return False
+        self._last_verified_at = now
+        return True
 
     def forwarded_paths(self) -> dict[int, Path]:
         """Returns a mapping from container port to the local UDS path."""

@@ -252,6 +252,12 @@ class SSHTunnel:
                 proc.stdout,
             )
 
+    def check(self) -> bool:
+        proc = subprocess.run(
+            self.check_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        return proc.returncode == 0
+
     async def acheck(self) -> bool:
         proc = await asyncio.create_subprocess_exec(
             *self.check_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
