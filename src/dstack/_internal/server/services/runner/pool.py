@@ -52,6 +52,10 @@ class InstanceConnectionPool:
     """
     A pool of SSH connections to instances' host sshd (VM-based)
     or runner sshd (container-based) for forwarding shim and runner ports.
+
+    NOTE: The pool does not currently intended for arbitrary ports forwarding, only for shim and runner ports.
+    E.g. it cannot be used to forward services ports for probes or router-worker communication.
+    This simplified model allows forwarding the same ports for the given host:port and reusing the connection across all calls.
     """
 
     def __init__(self):
@@ -98,8 +102,8 @@ class InstanceConnectionPool:
     def close_all(self) -> None:
         """
         Closes all connections and prevents new ones from being opened.
-        Safe to call concurrently with in-flight `get_or_open` calls.
-        `get_or_open` returns `None` after `close_all`.
+        Safe to call concurrently with in-flight `get_or_open()` calls.
+        `get_or_open()` will return `None` after `close_all()`.
         """
         with self._access_locks_lock:
             self._closed = True
@@ -133,8 +137,13 @@ class InstanceConnection:
         An SSH connection to instance's host sshd (VM-based)
         or runner sshd (container-based) for forwarding shim and runner ports.
 
+        The same control socket is used for all connections to the same hostname:port,
+        unless jrd overrides the runner port mapped on host (blocks case).
+        In case of blocks, each job establishes a separate connection with a different runner port forwarded.
+        TODO: Re-use the same SSH connection for all blocks via `-O forward`/`-O cancel`.
+
         Args:
-            ephemeral: Creates a unique tmp dir for the uds. Use when connection re-use is not needed.
+            ephemeral: Creates a unique tmp dir for the UDS. Use when connection re-use is not needed.
         """
         self._key = InstanceConnectionKey.from_jpd(jpd, jrd)
         self._ephemeral = ephemeral
@@ -159,6 +168,8 @@ class InstanceConnection:
             options={
                 **SSH_DEFAULT_OPTIONS,
                 "ServerAliveInterval": "30",
+                # Set ControlPersist to auto-close orphaned background ssh process
+                # in case dstack server shutdown is not graceful.
                 "ControlPersist": "2m",
             },
             batch_mode=True,
@@ -202,7 +213,11 @@ class InstanceConnection:
             temp_dir = TemporaryDirectory()
             return temp_dir, Path(temp_dir.name)
 
-        conn_dir = CONNECTIONS_DIR / f"{key.hostname}:{key.port}" / str(key.ports_to_forward)
+        conn_dir = (
+            CONNECTIONS_DIR
+            / f"{key.hostname}:{key.port}"
+            / ",".join(map(str, key.ports_to_forward))
+        )
         conn_dir.mkdir(parents=True, exist_ok=True)
         # Connection_dir can have a long path that won't be accepted by the ssh command,
         # so we create a short temporary symlink.
