@@ -16,7 +16,7 @@ from dstack._internal.core.services.ssh.tunnel import (
     UnixSocket,
 )
 from dstack._internal.server.settings import SERVER_DIR_PATH
-from dstack._internal.utils.path import FileContent
+from dstack._internal.utils.path import FileContent, make_tmp_symlink_to_dir
 
 PrivateKeyOrPair = Union[str, tuple[str, Optional[str]]]
 """A host private key or pair of (host private key, optional proxy jump private key)"""
@@ -45,6 +45,8 @@ class InstanceConnectionKey:
         )
 
 
+# InstanceConnectionPool has sync interface because runner/shim clients and all the callers are sync.
+# TODO: Consider moving all of them to async for consistency with other pools/clients.
 class InstanceConnectionPool:
     def __init__(self):
         self._connections: dict[InstanceConnectionKey, InstanceConnection] = {}
@@ -102,23 +104,19 @@ class InstanceConnection:
         ssh_private_key: PrivateKeyOrPair,
         jpd: JobProvisioningData,
         jrd: Optional[JobRuntimeData],
+        ephemeral: bool = False,
     ) -> None:
         self._key = InstanceConnectionKey.from_jpd(jpd, jrd)
-        self._connection_dir = (
-            CONNECTIONS_DIR
-            / f"{self._key.hostname}:{self._key.port}"
-            / str(self._key.ports_to_forward)
+        self._ephemeral = ephemeral
+        self._temp_dir, self._effective_conn_dir = InstanceConnection._resolve_conn_dir(
+            self._key, ephemeral
         )
-        self._connection_dir.mkdir(parents=True, exist_ok=True)
-        # connection_dir can have a long path that won't be accepted by the ssh command,
-        # so we create a short temporary symlink
-        self._temp_dir, self._connection_symlink_dir = self._init_symlink_dir(self._connection_dir)
-        self._control_socket_path = self._connection_symlink_dir / "control.sock"
+        self._control_socket_path = self._effective_conn_dir / "control.sock"
         self._container_to_host_port_map = InstanceConnection._get_container_to_host_port_map(
             jpd, jrd
         )
         self._host_port_to_uds_map = InstanceConnection._get_host_port_to_uds_map(
-            connection_dir=self._connection_symlink_dir,
+            conn_dir=self._effective_conn_dir,
             ports_to_forward=self._key.ports_to_forward,
         )
         self._tunnel = SSHTunnel(
@@ -150,11 +148,19 @@ class InstanceConnection:
         return self._key
 
     @staticmethod
-    def _init_symlink_dir(connection_dir: Path) -> tuple[TemporaryDirectory, Path]:
-        temp_dir = TemporaryDirectory()
-        symlink_dir = Path(temp_dir.name) / "connection"
-        symlink_dir.symlink_to(connection_dir, target_is_directory=True)
-        return temp_dir, symlink_dir
+    def _resolve_conn_dir(
+        key: InstanceConnectionKey, ephemeral: bool
+    ) -> tuple[TemporaryDirectory, Path]:
+        if ephemeral:
+            temp_dir = TemporaryDirectory()
+            return temp_dir, Path(temp_dir.name) / "connection"
+
+        conn_dir = CONNECTIONS_DIR / f"{key.hostname}:{key.port}" / str(key.ports_to_forward)
+        conn_dir.mkdir(parents=True, exist_ok=True)
+        # Connection_dir can have a long path that won't be accepted by the ssh command,
+        # so we create a short temporary symlink.
+        temp_dir, conn_symlink_dir = make_tmp_symlink_to_dir(conn_dir, "connection")
+        return temp_dir, conn_symlink_dir
 
     @staticmethod
     def _get_container_to_host_port_map(
@@ -168,10 +174,10 @@ class InstanceConnection:
 
     @staticmethod
     def _get_host_port_to_uds_map(
-        connection_dir: Path,
+        conn_dir: Path,
         ports_to_forward: Collection[int],
     ) -> dict[int, Path]:
-        return {port: connection_dir / str(port) for port in ports_to_forward}
+        return {port: conn_dir / str(port) for port in ports_to_forward}
 
     @staticmethod
     def _get_forwarded_sockets(host_port_to_uds_map: dict[int, Path]) -> list[SocketPair]:
