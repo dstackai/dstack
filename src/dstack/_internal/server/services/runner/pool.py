@@ -23,8 +23,6 @@ PrivateKeyOrPair = Union[str, tuple[str, Optional[str]]]
 
 CONNECTIONS_DIR = SERVER_DIR_PATH / "instance-connections"
 
-DEFAULT_PORTS_TO_FORWARD = [DSTACK_SHIM_HTTP_PORT, DSTACK_RUNNER_HTTP_PORT]
-
 
 @dataclass(frozen=True)
 class InstanceConnectionKey:
@@ -37,7 +35,7 @@ class InstanceConnectionKey:
         jpd: JobProvisioningData, jrd: Optional[JobRuntimeData]
     ) -> "InstanceConnectionKey":
         assert jpd.hostname is not None and jpd.ssh_port is not None
-        container_to_host_port_map = InstanceConnection._get_container_to_host_port_map(jpd, jrd)
+        container_to_host_port_map = get_container_to_host_port_map(jpd, jrd)
         return InstanceConnectionKey(
             hostname=jpd.hostname,
             port=jpd.ssh_port,
@@ -48,6 +46,11 @@ class InstanceConnectionKey:
 # InstanceConnectionPool has sync interface because runner/shim clients and all the callers are sync.
 # TODO: Consider moving all of them to async for consistency with other pools/clients.
 class InstanceConnectionPool:
+    """
+    A pool of SSH connections to instances' host sshd (VM-based)
+    or runner sshd (container-based) for forwarding shim and runner ports.
+    """
+
     def __init__(self):
         self._connections: dict[InstanceConnectionKey, InstanceConnection] = {}
         self._access_locks: dict[InstanceConnectionKey, threading.Lock] = {}
@@ -106,15 +109,20 @@ class InstanceConnection:
         jrd: Optional[JobRuntimeData],
         ephemeral: bool = False,
     ) -> None:
+        """
+        An SSH connection to instance's host sshd (VM-based)
+        or runner sshd (container-based) for forwarding shim and runner ports.
+
+        Args:
+            ephemeral: Creates a unique tmp dir for the uds. Use when connection re-use is not needed.
+        """
         self._key = InstanceConnectionKey.from_jpd(jpd, jrd)
         self._ephemeral = ephemeral
         self._temp_dir, self._effective_conn_dir = InstanceConnection._resolve_conn_dir(
             self._key, ephemeral
         )
         self._control_socket_path = self._effective_conn_dir / "control.sock"
-        self._container_to_host_port_map = InstanceConnection._get_container_to_host_port_map(
-            jpd, jrd
-        )
+        self._container_to_host_port_map = get_container_to_host_port_map(jpd, jrd)
         self._host_port_to_uds_map = InstanceConnection._get_host_port_to_uds_map(
             conn_dir=self._effective_conn_dir,
             ports_to_forward=self._key.ports_to_forward,
@@ -137,8 +145,12 @@ class InstanceConnection:
     def open(self) -> None:
         self._tunnel.open()
 
-    def forwarded_path(self, container_port: int) -> Path:
-        return self._host_port_to_uds_map[self._container_to_host_port_map[container_port]]
+    def forwarded_paths(self) -> dict[int, Path]:
+        """Returns a mapping from container port to the local UDS path."""
+        return {
+            container_port: self._host_port_to_uds_map[host_port]
+            for container_port, host_port in self._container_to_host_port_map.items()
+        }
 
     def close(self) -> None:
         self._tunnel.close()
@@ -153,7 +165,7 @@ class InstanceConnection:
     ) -> tuple[TemporaryDirectory, Path]:
         if ephemeral:
             temp_dir = TemporaryDirectory()
-            return temp_dir, Path(str(temp_dir))
+            return temp_dir, Path(temp_dir.name)
 
         conn_dir = CONNECTIONS_DIR / f"{key.hostname}:{key.port}" / str(key.ports_to_forward)
         conn_dir.mkdir(parents=True, exist_ok=True)
@@ -166,16 +178,6 @@ class InstanceConnection:
             base_dir=SERVER_TMP_PATH,
         )
         return temp_dir, conn_symlink_dir
-
-    @staticmethod
-    def _get_container_to_host_port_map(
-        jpd: JobProvisioningData,
-        jrd: Optional[JobRuntimeData],
-    ) -> dict[int, int]:
-        port_map = {port: port for port in DEFAULT_PORTS_TO_FORWARD}
-        if jrd is not None and jrd.ports is not None:
-            port_map.update(jrd.ports)
-        return port_map
 
     @staticmethod
     def _get_host_port_to_uds_map(
@@ -193,6 +195,19 @@ class InstanceConnection:
             )
             for port, path in host_port_to_uds_map.items()
         ]
+
+
+def get_container_to_host_port_map(
+    jpd: JobProvisioningData,
+    jrd: Optional[JobRuntimeData],
+) -> dict[int, int]:
+    runner_host_port = DSTACK_RUNNER_HTTP_PORT
+    if jrd is not None and jrd.ports is not None:
+        runner_host_port = jrd.ports.get(DSTACK_RUNNER_HTTP_PORT, runner_host_port)
+    port_map = {DSTACK_RUNNER_HTTP_PORT: runner_host_port}
+    if jpd.dockerized:
+        port_map[DSTACK_SHIM_HTTP_PORT] = DSTACK_SHIM_HTTP_PORT
+    return port_map
 
 
 def _get_identity(ssh_private_key: PrivateKeyOrPair, jpd: JobProvisioningData) -> FileContent:

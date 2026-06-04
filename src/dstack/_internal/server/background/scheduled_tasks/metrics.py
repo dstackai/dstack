@@ -165,7 +165,7 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
     )
 
 
-@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
+@runner_ssh_tunnel(retries=1)
 def _pull_runner_metrics(
     addresses: Mapping[int, client.LocalAddress],
 ) -> Optional[MetricsResponse]:

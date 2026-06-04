@@ -145,7 +145,7 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[str]:
     return res
 
 
-@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
+@runner_ssh_tunnel(retries=1)
 def _pull_job_metrics(
     addresses: Mapping[int, client.LocalAddress], task_id: uuid.UUID
 ) -> Optional[str]:

@@ -347,7 +347,7 @@ async def stop_runner(job_model: JobModel, instance_model: InstanceModel):
         logger.debug("%s: failed to stop runner", fmt(job_model))
 
 
-@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT])
+@runner_ssh_tunnel()
 def _stop_runner(
     addresses: Mapping[int, client.LocalAddress],
     job_model: JobModel,
