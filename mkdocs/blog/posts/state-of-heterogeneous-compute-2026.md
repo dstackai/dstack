@@ -85,7 +85,7 @@ The vendor map below applies these checks by readiness breadth and adoption prof
 
 ### Adoption profiles
 
-Adoption profile means who can realistically use an accelerator path today.
+Adoption profile means who can realistically use a given accelerator today.
 
 | Adoption profile | Meaning |
 | :---- | :---- |
@@ -93,6 +93,10 @@ Adoption profile means who can realistically use an accelerator path today.
 | **Early adopters** | Can take on more validation work if the upside is large enough. |
 | **Cloud-committed teams** | Can build around one hyperscaler runtime and accept lower portability. |
 | **Specialized inference users** | Care most about supported models, latency, output speed, context, and price. |
+
+!!! info "Frontier buyers"
+
+    For frontier buyers such as Anthropic, OpenAI, and Meta, supply is part of accelerator strategy. At their scale, capacity commitments can justify using NVIDIA or AMD fleets alongside cloud-owned accelerators such as TPUs and Trainium, even when that requires additional validation and integration work.
 
 The chart maps readiness breadth on the x-axis and adoption profile on the y-axis.
 
@@ -110,6 +114,8 @@ Specialized inference users    |        Groq / Cerebras
 ```
 
 Use the chart as a starting point; the real position changes with the model, provider, region, quota, fabric, and serving or training stack.
+
+> Frontier buyers help push heterogeneous compute forward. But heterogeneous compute is not limited to frontier labs: supply and readiness now matter for teams choosing accelerators for training, fine-tuning, batch inference, and serving.
 
 ### Vendor categories
 
