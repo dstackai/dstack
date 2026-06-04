@@ -35,7 +35,7 @@ class InstanceConnectionKey:
         jpd: JobProvisioningData, jrd: Optional[JobRuntimeData]
     ) -> "InstanceConnectionKey":
         assert jpd.hostname is not None and jpd.ssh_port is not None
-        container_to_host_port_map = get_container_to_host_port_map(jpd, jrd)
+        container_to_host_port_map = InstanceConnection.get_container_to_host_port_map(jpd, jrd)
         return InstanceConnectionKey(
             hostname=jpd.hostname,
             port=jpd.ssh_port,
@@ -122,7 +122,9 @@ class InstanceConnection:
             self._key, ephemeral
         )
         self._control_socket_path = self._effective_conn_dir / "control.sock"
-        self._container_to_host_port_map = get_container_to_host_port_map(jpd, jrd)
+        self._container_to_host_port_map = InstanceConnection.get_container_to_host_port_map(
+            jpd, jrd
+        )
         self._host_port_to_uds_map = InstanceConnection._get_host_port_to_uds_map(
             conn_dir=self._effective_conn_dir,
             ports_to_forward=self._key.ports_to_forward,
@@ -130,10 +132,10 @@ class InstanceConnection:
         self._tunnel = SSHTunnel(
             destination=f"{jpd.username}@{jpd.hostname}",
             port=jpd.ssh_port,
-            identity=_get_identity(ssh_private_key, jpd),
+            identity=InstanceConnection._get_identity(ssh_private_key, jpd),
             control_sock_path=self._control_socket_path,
             forwarded_sockets=self._get_forwarded_sockets(self._host_port_to_uds_map),
-            ssh_proxies=_get_proxies(ssh_private_key, jpd),
+            ssh_proxies=InstanceConnection._get_proxies(ssh_private_key, jpd),
             options={
                 **SSH_DEFAULT_OPTIONS,
                 "ServerAliveInterval": "30",
@@ -158,6 +160,19 @@ class InstanceConnection:
     @property
     def key(self) -> InstanceConnectionKey:
         return self._key
+
+    @staticmethod
+    def get_container_to_host_port_map(
+        jpd: JobProvisioningData,
+        jrd: Optional[JobRuntimeData],
+    ) -> dict[int, int]:
+        runner_host_port = DSTACK_RUNNER_HTTP_PORT
+        if jrd is not None and jrd.ports is not None:
+            runner_host_port = jrd.ports.get(DSTACK_RUNNER_HTTP_PORT, runner_host_port)
+        port_map = {DSTACK_RUNNER_HTTP_PORT: runner_host_port}
+        if jpd.dockerized:
+            port_map[DSTACK_SHIM_HTTP_PORT] = DSTACK_SHIM_HTTP_PORT
+        return port_map
 
     @staticmethod
     def _resolve_conn_dir(
@@ -196,39 +211,26 @@ class InstanceConnection:
             for port, path in host_port_to_uds_map.items()
         ]
 
+    @staticmethod
+    def _get_identity(ssh_private_key: PrivateKeyOrPair, jpd: JobProvisioningData) -> FileContent:
+        if isinstance(ssh_private_key, tuple):
+            ssh_private_key, _ = ssh_private_key
+        return FileContent(ssh_private_key)
 
-def get_container_to_host_port_map(
-    jpd: JobProvisioningData,
-    jrd: Optional[JobRuntimeData],
-) -> dict[int, int]:
-    runner_host_port = DSTACK_RUNNER_HTTP_PORT
-    if jrd is not None and jrd.ports is not None:
-        runner_host_port = jrd.ports.get(DSTACK_RUNNER_HTTP_PORT, runner_host_port)
-    port_map = {DSTACK_RUNNER_HTTP_PORT: runner_host_port}
-    if jpd.dockerized:
-        port_map[DSTACK_SHIM_HTTP_PORT] = DSTACK_SHIM_HTTP_PORT
-    return port_map
+    @staticmethod
+    def _get_proxies(
+        ssh_private_key: PrivateKeyOrPair, jpd: JobProvisioningData
+    ) -> list[tuple[SSHConnectionParams, FileContent]]:
+        if jpd.ssh_proxy is None:
+            return []
 
+        if isinstance(ssh_private_key, str):
+            ssh_proxy_private_key = ssh_private_key
+        else:
+            ssh_proxy_private_key = ssh_private_key[1]
+            if ssh_proxy_private_key is None:
+                # In case proxy key is None, fallback to main key (k8s case).
+                ssh_proxy_private_key = ssh_private_key[0]
 
-def _get_identity(ssh_private_key: PrivateKeyOrPair, jpd: JobProvisioningData) -> FileContent:
-    if isinstance(ssh_private_key, tuple):
-        ssh_private_key, _ = ssh_private_key
-    return FileContent(ssh_private_key)
-
-
-def _get_proxies(
-    ssh_private_key: PrivateKeyOrPair, jpd: JobProvisioningData
-) -> list[tuple[SSHConnectionParams, FileContent]]:
-    if jpd.ssh_proxy is None:
-        return []
-
-    if isinstance(ssh_private_key, str):
-        ssh_proxy_private_key = ssh_private_key
-    else:
-        ssh_proxy_private_key = ssh_private_key[1]
-        if ssh_proxy_private_key is None:
-            # In case proxy key is None, fallback to main key (k8s case).
-            ssh_proxy_private_key = ssh_private_key[0]
-
-    proxy_identity = FileContent(ssh_proxy_private_key)
-    return [(jpd.ssh_proxy, proxy_identity)]
+        proxy_identity = FileContent(ssh_proxy_private_key)
+        return [(jpd.ssh_proxy, proxy_identity)]

@@ -13,7 +13,6 @@ from dstack._internal.server.services.runner.client import LocalAddress
 from dstack._internal.server.services.runner.pool import (
     InstanceConnection,
     PrivateKeyOrPair,
-    get_container_to_host_port_map,
     instance_connection_pool,
 )
 from dstack._internal.utils.logging import get_logger
@@ -66,7 +65,9 @@ def runner_ssh_tunnel(
             """
             if job_provisioning_data.backend == BackendType.LOCAL:
                 # without SSH
-                port_map = get_container_to_host_port_map(job_provisioning_data, job_runtime_data)
+                port_map = InstanceConnection.get_container_to_host_port_map(
+                    job_provisioning_data, job_runtime_data
+                )
                 return func(port_map, *args, **kwargs)
 
             if not job_provisioning_data.dockerized:
