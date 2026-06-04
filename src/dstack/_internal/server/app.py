@@ -57,6 +57,7 @@ from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
 from dstack._internal.server.services.proxy.deps import ServerProxyDependencyInjector
 from dstack._internal.server.services.proxy.routers import service_proxy
+from dstack._internal.server.services.runner.pool import instance_connection_pool
 from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import (
@@ -75,6 +76,7 @@ from dstack._internal.server.utils.routers import (
     get_client_version,
     get_server_client_error_details,
 )
+from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import check_required_ssh_version
 
@@ -209,6 +211,7 @@ async def lifespan(app: FastAPI):
     await gateway_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
     await service_conn_pool.remove_all()
+    await run_async(instance_connection_pool.close_all)
     await get_db().engine.dispose()
     # Let checked-out DB connections close as dispose() only closes checked-in connections
     await asyncio.sleep(3)

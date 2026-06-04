@@ -16,7 +16,10 @@ from dstack._internal.core.services.ssh.tunnel import (
     UnixSocket,
 )
 from dstack._internal.server.settings import SERVER_DIR_PATH, SERVER_TMP_PATH
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent, make_tmp_symlink_to_dir
+
+logger = get_logger(__name__)
 
 PrivateKeyOrPair = Union[str, tuple[str, Optional[str]]]
 """A host private key or pair of (host private key, optional proxy jump private key)"""
@@ -55,6 +58,7 @@ class InstanceConnectionPool:
         self._connections: dict[InstanceConnectionKey, InstanceConnection] = {}
         self._access_locks: dict[InstanceConnectionKey, threading.Lock] = {}
         self._access_locks_lock = threading.Lock()
+        self._closed = False
 
     def get_or_open(
         self,
@@ -65,6 +69,8 @@ class InstanceConnectionPool:
         key = InstanceConnectionKey.from_jpd(jpd, jrd)
         lock = self._get_access_lock(key)
         with lock:
+            if self._closed:
+                return None
             conn = self._connections.get(key)
             if conn is not None:
                 return conn
@@ -84,9 +90,23 @@ class InstanceConnectionPool:
                 conn = self._connections.pop(key)
             except KeyError:
                 return
-            conn.close()
+            try:
+                conn.close()
+            except Exception:
+                logger.exception("Failed to close instance connection %s", key)
 
-    def close_all(self) -> None: ...  # graceful shutdown
+    def close_all(self) -> None:
+        """
+        Closes all connections and prevents new ones from being opened.
+        Safe to call concurrently with in-flight `get_or_open` calls.
+        `get_or_open` returns `None` after `close_all`.
+        """
+        with self._access_locks_lock:
+            self._closed = True
+            keys = list(self._access_locks.keys())
+        logger.debug("Closing %d instance connection(s)", len(keys))
+        for key in keys:
+            self.drop(key)
 
     def _get_access_lock(self, key: InstanceConnectionKey) -> threading.Lock:
         with self._access_locks_lock:
