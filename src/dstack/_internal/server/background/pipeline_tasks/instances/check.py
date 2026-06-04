@@ -374,7 +374,7 @@ async def _get_backend_for_provisioning_wait(
     )
 
 
-@runner_ssh_tunnel(retries=1)
+@runner_ssh_tunnel
 def _check_instance_inner(
     addresses: Mapping[int, runner_client.LocalAddress],
     *,

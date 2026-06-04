@@ -16,7 +16,11 @@ from dstack._internal.core.services.ssh.tunnel import (
     SSHTunnel,
     UnixSocket,
 )
-from dstack._internal.server.settings import SERVER_DIR_PATH, SERVER_TMP_PATH
+from dstack._internal.server.settings import (
+    SERVER_DIR_PATH,
+    SERVER_SSH_CONNECT_TIMEOUT,
+    SERVER_TMP_PATH,
+)
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent, make_tmp_symlink_to_dir
 
@@ -185,6 +189,7 @@ class InstanceConnection:
             ssh_proxies=InstanceConnection._get_proxies(ssh_private_key, jpd),
             options={
                 **SSH_DEFAULT_OPTIONS,
+                "ConnectTimeout": str(SERVER_SSH_CONNECT_TIMEOUT),
                 # Auto-close half-opened connections (the instance not responding).
                 "ServerAliveInterval": "10",
                 "ServerAliveCountMax": "3",

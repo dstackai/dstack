@@ -1309,7 +1309,7 @@ def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> boo
     return False
 
 
-@runner_ssh_tunnel(retries=1)
+@runner_ssh_tunnel
 def _process_provisioning_with_shim(
     addresses: Mapping[int, client.LocalAddress],
     run: Run,
@@ -1436,7 +1436,7 @@ class _SyncShimPullingStateResult:
     image_pull_progress: Optional[ImagePullProgress] = None
 
 
-@runner_ssh_tunnel(retries=1)
+@runner_ssh_tunnel
 def _get_runner_availability(addresses: Mapping[int, client.LocalAddress]) -> _RunnerAvailability:
     runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     if runner_client.healthcheck() is None:
@@ -1444,7 +1444,7 @@ def _get_runner_availability(addresses: Mapping[int, client.LocalAddress]) -> _R
     return _RunnerAvailability.AVAILABLE
 
 
-@runner_ssh_tunnel()
+@runner_ssh_tunnel
 def _sync_shim_pulling_state(
     addresses: Mapping[int, client.LocalAddress],
     job_model: JobModel,
@@ -1526,7 +1526,7 @@ class _SubmitJobToRunnerResult:
     job_runtime_data: Optional[JobRuntimeData] = None
 
 
-@runner_ssh_tunnel(retries=1)
+@runner_ssh_tunnel
 def _submit_job_to_runner(
     addresses: Mapping[int, client.LocalAddress],
     run: Run,
@@ -1596,7 +1596,7 @@ class _ProcessRunningResult:
     job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
 
 
-@runner_ssh_tunnel()
+@runner_ssh_tunnel
 def _process_running(
     addresses: Mapping[int, client.LocalAddress],
     run_model: RunModel,

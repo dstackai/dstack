@@ -853,7 +853,7 @@ async def _stop_container(
     return True
 
 
-@runner_ssh_tunnel()
+@runner_ssh_tunnel
 def _shim_submit_stop(addresses: Mapping[int, client.LocalAddress], job_model: JobModel) -> bool:
     shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
 
