@@ -15,7 +15,7 @@ from dstack._internal.core.services.ssh.tunnel import (
     SSHTunnel,
     UnixSocket,
 )
-from dstack._internal.server.settings import SERVER_DIR_PATH
+from dstack._internal.server.settings import SERVER_DIR_PATH, SERVER_TMP_PATH
 from dstack._internal.utils.path import FileContent, make_tmp_symlink_to_dir
 
 PrivateKeyOrPair = Union[str, tuple[str, Optional[str]]]
@@ -153,13 +153,18 @@ class InstanceConnection:
     ) -> tuple[TemporaryDirectory, Path]:
         if ephemeral:
             temp_dir = TemporaryDirectory()
-            return temp_dir, Path(temp_dir.name) / "connection"
+            return temp_dir, Path(str(temp_dir))
 
         conn_dir = CONNECTIONS_DIR / f"{key.hostname}:{key.port}" / str(key.ports_to_forward)
         conn_dir.mkdir(parents=True, exist_ok=True)
         # Connection_dir can have a long path that won't be accepted by the ssh command,
         # so we create a short temporary symlink.
-        temp_dir, conn_symlink_dir = make_tmp_symlink_to_dir(conn_dir, "connection")
+        temp_dir, conn_symlink_dir = make_tmp_symlink_to_dir(
+            dirpath=conn_dir,
+            symlink_dirname="connection",
+            # Using dstack's own tmp dir to avoid age-based tmp cleanup.
+            base_dir=SERVER_TMP_PATH,
+        )
         return temp_dir, conn_symlink_dir
 
     @staticmethod

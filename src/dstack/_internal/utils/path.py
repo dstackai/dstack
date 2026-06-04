@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath, PurePosixPath
 from tempfile import TemporaryDirectory
-from typing import Union
+from typing import Optional, Union
 
 PathLike = Union[str, os.PathLike]
 
@@ -59,9 +59,9 @@ def is_absolute_posix_path(path: PathLike) -> bool:
 
 
 def make_tmp_symlink_to_dir(
-    dirpath: PathLike, symlink_dirname: str
+    dirpath: PathLike, symlink_dirname: str, base_dir: Optional[PathLike] = None
 ) -> tuple[TemporaryDirectory, Path]:
-    temp_dir = TemporaryDirectory()
+    temp_dir = TemporaryDirectory(dir=base_dir)
     symlink_dir = Path(temp_dir.name) / symlink_dirname
     symlink_dir.symlink_to(dirpath, target_is_directory=True)
     return temp_dir, symlink_dir

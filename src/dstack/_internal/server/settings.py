@@ -20,6 +20,11 @@ SERVER_CONFIG_FILE_PATH = SERVER_DIR_PATH / "config.yml"
 
 SERVER_DATA_DIR_PATH = SERVER_DIR_PATH / "data"
 SERVER_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
+
+SERVER_TMP_PATH = SERVER_DIR_PATH / "tmp"
+"""SERVER_TMP_PATH can be used as dstack's own /tmp when age-based cleaning for /tmp is not desirable"""
+SERVER_TMP_PATH.mkdir(parents=True, exist_ok=True)
+
 DATABASE_URL = os.getenv(
     "DSTACK_DATABASE_URL", f"sqlite+aiosqlite:///{str(SERVER_DATA_DIR_PATH.absolute())}/sqlite.db"
 )
