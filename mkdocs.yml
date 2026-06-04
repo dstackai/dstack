@@ -398,8 +398,9 @@ nav:
             - skill.md: https://dstack.ai/skill.md
   - Case studies: blog/case-studies.md
   - Benchmarks: blog/benchmarks.md
-  - Blog:
-      - blog/index.md
+  - Reports: blog/reports.md
+#  - Blog:
+#      - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
 #  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
 #  - GitHub: https://github.com/dstackai/dstack" target="_blank
