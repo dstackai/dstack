@@ -169,7 +169,8 @@ async def lifespan(app: FastAPI):
     )
     if settings.SERVER_S3_BUCKET is not None or settings.SERVER_GCS_BUCKET is not None:
         init_default_storage()
-    await run_async(instance_connection_pool.startup_cleanup)
+    if settings.SERVER_SSH_POOL_ENABLED:
+        await run_async(instance_connection_pool.startup_cleanup)
     scheduler = None
     pipeline_manager = None
     if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
@@ -212,7 +213,8 @@ async def lifespan(app: FastAPI):
     await gateway_connections_pool.remove_all()
     service_conn_pool = await get_injector_from_app(app).get_service_connection_pool()
     await service_conn_pool.remove_all()
-    await run_async(instance_connection_pool.close_all)
+    if settings.SERVER_SSH_POOL_ENABLED:
+        await run_async(instance_connection_pool.close_all)
     await get_db().engine.dispose()
     # Let checked-out DB connections close as dispose() only closes checked-in connections
     await asyncio.sleep(3)
