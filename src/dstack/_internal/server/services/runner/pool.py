@@ -63,7 +63,7 @@ class InstanceConnectionPool:
     A pool of SSH connections to instances' host sshd (VM-based)
     or runner sshd (container-based) for forwarding shim and runner ports.
 
-    NOTE: The pool does not currently intended for arbitrary ports forwarding, only for shim and runner ports.
+    NOTE: The pool is not currently intended for arbitrary ports forwarding, only for shim and runner ports.
     E.g. it cannot be used to forward services ports for probes or router-worker communication.
     This simplified model allows forwarding the same ports for the given host:port and reusing the connection across all calls.
 
@@ -76,7 +76,7 @@ class InstanceConnectionPool:
         # Use `WeakValueDictionary` for automatic GC of unused locks and avoid manual refcounting.
         # A lock is expected to exist only while a thread holds a strong reference to it.
         self._access_locks: WeakValueDictionary[InstanceConnectionKey, threading.Lock] = (
-            WeakValueDictionary({})
+            WeakValueDictionary()
         )
         self._access_locks_lock = threading.Lock()
         self._closed = False
@@ -203,7 +203,7 @@ class InstanceConnection:
         self._tunnel = SSHTunnel(
             destination=f"{jpd.username}@{jpd.hostname}",
             port=jpd.ssh_port,
-            identity=InstanceConnection._get_identity(ssh_private_key, jpd),
+            identity=InstanceConnection._get_identity(ssh_private_key),
             control_sock_path=self._control_socket_path,
             forwarded_sockets=self._get_forwarded_sockets(self._host_port_to_uds_map),
             ssh_proxies=InstanceConnection._get_proxies(ssh_private_key, jpd),
@@ -334,7 +334,7 @@ class InstanceConnection:
         ]
 
     @staticmethod
-    def _get_identity(ssh_private_key: PrivateKeyOrPair, jpd: JobProvisioningData) -> FileContent:
+    def _get_identity(ssh_private_key: PrivateKeyOrPair) -> FileContent:
         if isinstance(ssh_private_key, tuple):
             ssh_private_key, _ = ssh_private_key
         return FileContent(ssh_private_key)
