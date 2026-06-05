@@ -86,6 +86,7 @@ def runner_ssh_tunnel(
         # Connections already cover against
         # a) cleanly-exited master (ControlPersist reap); and
         # b) stale control socket file left by killed master.
+        # (Because we cannot rely solely on connection errors from `func` – it may swallow the errors.)
         # but we still want a fast retry in case master dies mid-request.
         for _ in range(2):
             conn = instance_connection_pool.get_or_open(

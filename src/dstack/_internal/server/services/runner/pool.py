@@ -66,6 +66,7 @@ class InstanceConnectionPool:
     NOTE: The pool is not currently intended for arbitrary ports forwarding, only for shim and runner ports.
     E.g. it cannot be used to forward services ports for probes or router-worker communication.
     This simplified model allows forwarding the same ports for the given host:port and reusing the connection across all calls.
+    TODO: Generalize to support arbitrary ports forwarding incl. job's ports.
 
     Incompatible with multiple server processes sharing the same server dir:
     connection dirs and control sockets are assumed to be owned by a single process.
@@ -166,6 +167,16 @@ instance_connection_pool = InstanceConnectionPool()
 
 
 class InstanceConnection:
+    """
+    An SSH connection to instance's host sshd (VM-based)
+    or runner sshd (container-based) for forwarding shim and runner ports.
+
+    The same control socket is used for all connections to the same hostname:port,
+    unless jrd overrides the runner port mapped on host (blocks case).
+    In case of blocks, each job establishes a separate connection with a different runner port forwarded.
+    TODO: Re-use the same SSH connection for all blocks via `-O forward`/`-O cancel`.
+    """
+
     def __init__(
         self,
         ssh_private_key: PrivateKeyOrPair,
@@ -174,14 +185,6 @@ class InstanceConnection:
         ephemeral: bool = False,
     ) -> None:
         """
-        An SSH connection to instance's host sshd (VM-based)
-        or runner sshd (container-based) for forwarding shim and runner ports.
-
-        The same control socket is used for all connections to the same hostname:port,
-        unless jrd overrides the runner port mapped on host (blocks case).
-        In case of blocks, each job establishes a separate connection with a different runner port forwarded.
-        TODO: Re-use the same SSH connection for all blocks via `-O forward`/`-O cancel`.
-
         Args:
             ephemeral: Creates a unique tmp dir for the UDS. Use when connection re-use is not needed.
         """
