@@ -241,6 +241,9 @@ class InstanceConnection:
 
     def close(self) -> None:
         self._tunnel.close()
+        # If the master was killed without cleaning up its control socket,
+        # remove the socket so that the master can re-open.
+        self._control_socket_path.unlink(missing_ok=True)
 
     @property
     def key(self) -> InstanceConnectionKey:
