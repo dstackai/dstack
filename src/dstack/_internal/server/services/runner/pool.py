@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -20,7 +21,6 @@ from dstack._internal.core.services.ssh.tunnel import (
 from dstack._internal.server.settings import (
     SERVER_DIR_PATH,
     SERVER_SSH_CONNECT_TIMEOUT,
-    SERVER_TMP_PATH,
 )
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent, make_tmp_symlink_to_dir
@@ -176,10 +176,11 @@ class InstanceConnection:
         self._key = InstanceConnectionKey.from_jpd(jpd, jrd)
         self._ephemeral = ephemeral
         self._last_verified_at: float = 0.0
-        self._temp_dir, self._effective_conn_dir = InstanceConnection._resolve_conn_dir(
-            self._key, ephemeral
+        self._temp_dir, self._effective_conn_dir, self._real_conn_dir = (
+            InstanceConnection._resolve_conn_dir(self._key, ephemeral)
         )
         self._control_socket_path = self._effective_conn_dir / "control.sock"
+        self._real_control_socket_path = self._real_conn_dir / "control.sock"
         self._container_to_host_port_map = InstanceConnection.get_container_to_host_port_map(
             jpd, jrd
         )
@@ -208,6 +209,12 @@ class InstanceConnection:
         )
 
     def open(self) -> None:
+        # A control socket left by a killed master or by a master that exited after
+        # its tmp symlink was deleted prevents ssh from becoming a mux master
+        # ("ControlSocket ... already exists, disabling multiplexing").
+        # Remove it unless it's served by a live master (then open() attaches to it).
+        if self._real_control_socket_path.exists() and not self._tunnel.check():
+            self._real_control_socket_path.unlink(missing_ok=True)
         self._tunnel.open()
         self._last_verified_at = time.monotonic()
 
@@ -229,6 +236,11 @@ class InstanceConnection:
             return True
         if not self._tunnel.check():
             return False
+        # Keep the symlink fresh so that age-based /tmp cleanup is less likely to remove it.
+        try:
+            os.utime(self._effective_conn_dir, follow_symlinks=False)
+        except OSError:
+            pass
         self._last_verified_at = now
         return True
 
@@ -265,10 +277,14 @@ class InstanceConnection:
     @staticmethod
     def _resolve_conn_dir(
         key: InstanceConnectionKey, ephemeral: bool
-    ) -> tuple[TemporaryDirectory, Path]:
+    ) -> tuple[TemporaryDirectory, Path, Path]:
+        """
+        Returns (temp dir to retain, dir to be used by ssh, real conn dir).
+        """
         if ephemeral:
             temp_dir = TemporaryDirectory()
-            return temp_dir, Path(temp_dir.name)
+            path = Path(temp_dir.name)
+            return temp_dir, path, path
 
         conn_dir = (
             CONNECTIONS_DIR
@@ -277,13 +293,13 @@ class InstanceConnection:
         conn_dir.mkdir(parents=True, exist_ok=True)
         # Connection_dir can have a long path that won't be accepted by the ssh command,
         # so we create a short temporary symlink.
+        # The symlink may be removed by age-based /tmp cleanup while the connection is still alive.
+        # The connection will be reopened with a fresh symlink, attaching to the still-running master.
         temp_dir, conn_symlink_dir = make_tmp_symlink_to_dir(
             dirpath=conn_dir,
             symlink_dirname="connection",
-            # Using dstack's own tmp dir to avoid age-based tmp cleanup.
-            base_dir=SERVER_TMP_PATH,
         )
-        return temp_dir, conn_symlink_dir
+        return temp_dir, conn_symlink_dir, conn_dir
 
     @staticmethod
     def _get_host_port_to_uds_map(
