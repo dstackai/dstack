@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Collection, Optional, Union
+from weakref import WeakValueDictionary
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import SSHError
@@ -68,7 +69,11 @@ class InstanceConnectionPool:
 
     def __init__(self):
         self._connections: dict[InstanceConnectionKey, InstanceConnection] = {}
-        self._access_locks: dict[InstanceConnectionKey, threading.Lock] = {}
+        # Use `WeakValueDictionary` for automatic GC of unused locks and avoid manual refcounting.
+        # A lock is expected to exist only while a thread holds a strong reference to it.
+        self._access_locks: WeakValueDictionary[InstanceConnectionKey, threading.Lock] = (
+            WeakValueDictionary({})
+        )
         self._access_locks_lock = threading.Lock()
         self._closed = False
 
@@ -128,7 +133,9 @@ class InstanceConnectionPool:
         """
         with self._access_locks_lock:
             self._closed = True
-            keys = list(self._access_locks.keys())
+            # self._connections holds cached connections, and
+            # self._access_locks may hold mid-open connections not yet cached.
+            keys = set(self._connections) | set(self._access_locks.keys())
         logger.debug("Closing %d instance connection(s)", len(keys))
         for key in keys:
             self.drop(key)
@@ -262,8 +269,7 @@ class InstanceConnection:
 
         conn_dir = (
             CONNECTIONS_DIR
-            / f"{key.hostname}:{key.port}"
-            / ",".join(map(str, key.ports_to_forward))
+            / f"{key.hostname}:{key.port},{','.join(map(str, key.ports_to_forward))}"
         )
         conn_dir.mkdir(parents=True, exist_ok=True)
         # Connection_dir can have a long path that won't be accepted by the ssh command,
@@ -281,7 +287,7 @@ class InstanceConnection:
         conn_dir: Path,
         ports_to_forward: Collection[int],
     ) -> dict[int, Path]:
-        return {port: conn_dir / str(port) for port in ports_to_forward}
+        return {port: conn_dir / f"{port}.sock" for port in ports_to_forward}
 
     @staticmethod
     def _get_forwarded_sockets(host_port_to_uds_map: dict[int, Path]) -> list[SocketPair]:
