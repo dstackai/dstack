@@ -108,8 +108,8 @@ class InstanceConnectionPool:
                     conn.close()
                 except Exception:
                     logger.exception("Failed to close instance connection %s", key)
-            conn = InstanceConnection(ssh_private_key, jpd, jrd)
             try:
+                conn = InstanceConnection(ssh_private_key, jpd, jrd)
                 conn.open()
             except SSHError:
                 # error logged in tunnel

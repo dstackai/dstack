@@ -384,8 +384,10 @@ class TestJobTerminatingWorker:
         await session.commit()
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
-            patch("dstack._internal.server.services.runner.client.ShimClient") as ShimClientMock,
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.ShimClient.from_address"
+            ) as ShimClientMock,
         ):
             shim_client_mock = ShimClientMock.return_value
             await worker.process(_job_to_pipeline_item(job))

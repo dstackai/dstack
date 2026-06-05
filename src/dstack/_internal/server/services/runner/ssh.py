@@ -67,13 +67,13 @@ def runner_ssh_tunnel(
             # as the `inactivity_duration` feature distinguishes user and server connections based on duration.
             # Do not re-use SSH connections for container-based backends.
             # TODO: Drop `inactivity_duration` dependence on connection duration and re-use connections.
-            conn = InstanceConnection(
-                ssh_private_key=ssh_private_key,
-                jpd=job_provisioning_data,
-                jrd=job_runtime_data,
-                ephemeral=True,
-            )
             try:
+                conn = InstanceConnection(
+                    ssh_private_key=ssh_private_key,
+                    jpd=job_provisioning_data,
+                    jrd=job_runtime_data,
+                    ephemeral=True,
+                )
                 conn.open()
             except SSHError:
                 return False
