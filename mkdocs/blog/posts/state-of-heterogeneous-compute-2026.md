@@ -50,7 +50,7 @@ An accelerator path is only relevant when the software stack is ready for the wo
 - Alternative stacks. AMD means ROCm, RCCL, PyTorch ROCm builds, containers, and serving support. TPUs mean XLA, JAX, PyTorch/XLA, Cloud TPU infrastructure, and TPU support in open serving stacks. Trainium means Neuron, framework integration, distributed training support, and AWS-managed deployment paths.
 - Serving layer. NVIDIA-led tools such as TensorRT-LLM, Triton Inference Server, and Dynamo matter for the NVIDIA path. vLLM, SGLang, and Shepherd Model Gateway matter because they push more serving work toward cross-vendor engines and gateways.
 - Kernels. FlashAttention-class work matters because support for the exact model, precision, and accelerator can change the result materially.
-- Specialized inference. Groq and Cerebras are evaluated through supported models, latency, output speed, context support, deployment path, and price rather than as general-purpose accelerator pools.
+- Specialized systems. Groq and Cerebras are evaluated through supported models, latency, output speed, context support, deployment path, and price rather than as general-purpose accelerator pools.
 
 ## Benchmarks
 
@@ -79,38 +79,37 @@ Readiness turns theoretical supply into usable capacity. The question is not whe
 | **Performance** | Public results close to the intended model, precision, system shape, and scale, followed by direct testing on the provider image and stack the team will use. |
 | **Orchestration** | Scheduling, quotas, monitoring, debugging, utilization, upgrades, failure recovery, support, and how portable the workload remains across providers or accelerator stacks. |
 
-The vendor map below applies these checks by readiness breadth and adoption profile.
+The vendor map below separates readiness breadth, deployment flexibility, and adoption profile.
 
 ## Vendors
 
 ### Adoption profiles
 
-Adoption profile means who can realistically use a given accelerator today.
+Adoption profile describes where an accelerator is practical today.
 
 | Adoption profile | Meaning |
 | :---- | :---- |
-| **General teams** | Need broad software support, public availability, familiar operations, and minimal rewrites. |
-| **Early adopters** | Can take on more validation work if the upside is large enough. |
-| **Cloud-committed teams** | Can build around one hyperscaler runtime and accept lower portability. |
-| **Specialized inference users** | Care most about supported models, latency, output speed, context, and price. |
+| **Broad adoption** | Broad software support, public availability, familiar operations, and minimal rewrites. |
+| **Early adopters** | More validation work is acceptable if the upside is large enough. |
+| **Cloud-committed** | One hyperscaler runtime is acceptable, with lower portability. |
+| **Specialized** | Supported models, latency, output speed, context, and price dominate. |
 
 !!! info "Frontier buyers"
 
     For frontier buyers such as Anthropic, OpenAI, and Meta, supply is part of accelerator strategy. At their scale, capacity commitments can justify using NVIDIA or AMD fleets alongside cloud-owned accelerators such as TPUs and Trainium, even when that requires additional validation and integration work.
 
-The chart maps readiness breadth on the x-axis and adoption profile on the y-axis.
+Deployment flexibility means whether the accelerator can be owned, rented, used through a specialized path, or used through one cloud stack. The chart maps that against readiness breadth.
 
 ```text
-                                      breadth of readiness
-adoption profile       narrower --------------------------------> broader
+                                      readiness breadth
+                         narrower ------------------------------> broader
+deployment flexibility
 
-General teams                  |                         AMD                      NVIDIA
+Higher: own or rent       |        Tenstorrent           AMD        NVIDIA
 
-Early adopter teams            |        Tenstorrent
+Medium: specialized       |        Groq / Cerebras
 
-Cloud-committed teams          |     Trainium        TPU
-
-Specialized inference users    |        Groq / Cerebras
+Lower: cloud-committed    |        Trainium        TPU
 ```
 
 Use the chart as a starting point; the real position changes with the model, provider, region, quota, fabric, and serving or training stack.
@@ -119,22 +118,22 @@ Use the chart as a starting point; the real position changes with the model, pro
 
 ### Vendor categories
 
-| Category | Vendors | What it means |
+| Category | Vendors | Why it is placed there |
 | :---- | :---- | :---- |
-| Own or rent | NVIDIA, AMD, Tenstorrent | Direct accelerator paths that can be installed or rented, depending on availability. NVIDIA and AMD have broader evidence; Tenstorrent is earlier. |
-| Vendor appliance | Groq, Cerebras | Specialized inference systems where the vendor stack is part of the deployment model, such as [GroqRack](https://groq.com/groqrack/) or [Cerebras CS-3](https://www.cerebras.ai/product-system). |
-| Cloud-only | Google TPUs, AWS Trainium | Cloud-owned accelerator stacks with their own compiler/runtime path, used through [Google Cloud TPU](https://cloud.google.com/tpu/docs) or [AWS Trainium](https://aws.amazon.com/ai/machine-learning/trainium/). |
+| Own or rent | NVIDIA, AMD, Tenstorrent | Higher deployment flexibility: these are direct accelerator paths that can be installed or rented outside a single hyperscaler stack. NVIDIA and AMD sit further right because CUDA/NCCL, ROCm/RCCL, vLLM, and SGLang have broader public evidence. Tenstorrent stays left because TT-Metal, TT-NN, TT-Lang, and TT-Forge are earlier and more vendor-led. |
+| Specialized | Groq, Cerebras | Medium deployment flexibility: not cloud-committed, but narrower and optimized for supported inference models. They sit left because readiness depends on latency, output speed, context, price, and vendor stack fit rather than broad CUDA/ROCm/XLA/Neuron or vLLM/SGLang coverage. |
+| Cloud-committed | Google TPUs, AWS Trainium | Lower deployment flexibility: these are cloud-owned stacks with their own compiler/runtime path. TPU sits to the right of Trainium because XLA, JAX, PyTorch/XLA, Cloud TPU infrastructure, and public benchmark evidence are broader. Trainium remains more AWS/Neuron-specific, even with PyTorch, JAX, Hugging Face, vLLM, and AWS deployment integrations. |
 
 ### Vendor readiness
 
 | Vendor | Fits | Readiness signal | Main constraint |
 | :---- | :---- | :---- | :---- |
 | **NVIDIA** | Direct accelerator use across training, fine-tuning, batch inference, and self-hosted online inference in public clouds and private clusters. | The depth of the [CUDA](https://docs.nvidia.com/cuda/) ecosystem: kernels, [NCCL](https://docs.nvidia.com/deeplearning/nccl/), [TensorRT-LLM](https://docs.nvidia.com/tensorrt-llm/), [Triton Inference Server](https://docs.nvidia.com/deeplearning/triton-inference-server/index.html), [NVIDIA Dynamo](https://www.nvidia.com/en-us/ai/dynamo/), PyTorch support, provider images, debugging tools, and operator experience. NVIDIA's [MLPerf Training v5.1 writeup](https://blogs.nvidia.com/blog/mlperf-training-benchmark-blackwell-ultra/) reports submitting on every test and sweeping all seven tests. The [Groq licensing and team deal](https://groq.com/newsroom/groq-and-nvidia-enter-non-exclusive-inference-technology-licensing-agreement-to-accelerate-ai-inference-at-global-scale) also points to NVIDIA expanding its inference roadmap beyond GPUs. | Supply, price, commitment terms, fabric availability, and dependency on an ecosystem that can become the default architecture if teams do not keep workloads portable. |
-| **AMD** | Teams that want a merchant GPU path outside an NVIDIA-only plan and can test the exact workload instead of assuming CUDA compatibility. | Whether the model runs well on [ROCm](https://rocm.docs.amd.com/en/latest/index.html) with the required precision, kernels, serving engine, provider image, [RCCL](https://rocm.docs.amd.com/projects/rccl/en/latest/index.html), and multi-GPU or multi-node shape. AMD's [MLPerf Inference v6.0 writeup](https://www.amd.com/en/blogs/2026/amd-delivers-breakthrough-mlperf-inference-6-0-results.html) reports MI355X surpassing one million tokens per second at multinode scale. | Software variance: ROCm version, framework path, model architecture, provider packaging, observability, and failure recovery can change the result. |
-| **Tenstorrent** | Early adopter teams evaluating a direct accelerator path that is not tied to CUDA or a hyperscaler-owned runtime. | The [Galaxy Blackhole and TT-Deploy launch](https://tenstorrent.com/newsroom/tt-deploy), where Tenstorrent says the system is shipping in volume and describes a stack built around TT-Metal, TT-NN, TT-Lang, and TT-Forge. | Public evidence is mostly vendor-led and workload-specific. Teams should validate model bring-up, framework coverage, kernel and compiler maturity, provider access, observability, and support before treating it as production capacity. |
-| **TPU** | Teams anchored in Google Cloud or willing to build around XLA, JAX, PyTorch/XLA, and Cloud TPU infrastructure. | Anthropic's [Google Cloud TPU expansion](https://www.anthropic.com/news/expanding-our-use-of-google-cloud-tpus-and-services) is a public scale signal. Google Cloud's [Trillium MLPerf Training 4.1 writeup](https://cloud.google.com/blog/products/compute/trillium-mlperf-41-training-benchmarks/) is a measurable benchmark signal. | Portability: checkpoint movement, compiler behavior, quota, region availability, model support, and operational differences from GPU clusters. |
-| **Trainium** | AWS-committed teams that can build around [Neuron](https://awsdocs-neuron.readthedocs-hosted.com/) rather than treating it as a drop-in GPU replacement. | Anthropic's [AWS compute expansion](https://www.anthropic.com/news/anthropic-amazon-compute) is a public scale signal. Readiness depends on Neuron compiler/runtime behavior, framework integration, distributed training support, deployment tooling, and known model support. | Cloud-specific compiler and runtime stack. Teams should test compilation behavior, throughput, observability, and migration cost before relying on it. |
-| **Groq and Cerebras** | Specialized inference cases for supported models, where latency, output speed, context, and price matter more than general accelerator access. | Service-level evidence: supported models, throughput, time to first token, context length, reliability, and price. Examples include Groq's [independent LLM benchmark note](https://groq.com/newsroom/groq-lpu-inference-engine-leads-in-first-independent-llm-benchmark) and Cerebras's [Llama 3.1 405B inference result](https://www.cerebras.ai/blog/llama-405b-inference). | Scope and independence. These systems are not general training infrastructure; Groq also sits closer to NVIDIA after its inference technology licensing and team deal, while Cerebras remains the cleaner independent specialized-inference example. |
+| **AMD** | Merchant GPU path outside an NVIDIA-only plan, with validation on the exact workload instead of assuming CUDA compatibility. | Whether the model runs well on [ROCm](https://rocm.docs.amd.com/en/latest/index.html) with the required precision, kernels, serving engine, provider image, [RCCL](https://rocm.docs.amd.com/projects/rccl/en/latest/index.html), and multi-GPU or multi-node shape. AMD's [MLPerf Inference v6.0 writeup](https://www.amd.com/en/blogs/2026/amd-delivers-breakthrough-mlperf-inference-6-0-results.html) reports MI355X surpassing one million tokens per second at multinode scale. | Software variance: ROCm version, framework path, model architecture, provider packaging, observability, and failure recovery can change the result. |
+| **Tenstorrent** | Early adopters evaluating a direct accelerator path that is not tied to CUDA or a hyperscaler-owned runtime. | The [Galaxy Blackhole and TT-Deploy launch](https://tenstorrent.com/newsroom/tt-deploy), where Tenstorrent says the system is shipping in volume and describes a stack built around TT-Metal, TT-NN, TT-Lang, and TT-Forge. | Public evidence is mostly vendor-led and workload-specific. Teams should validate model bring-up, framework coverage, kernel and compiler maturity, provider access, observability, and support before treating it as production capacity. |
+| **TPU** | Google Cloud-anchored workloads that can build around XLA, JAX, PyTorch/XLA, and Cloud TPU infrastructure. | Anthropic's [Google Cloud TPU expansion](https://www.anthropic.com/news/expanding-our-use-of-google-cloud-tpus-and-services) is a public scale signal. Google Cloud's [Trillium MLPerf Training 4.1 writeup](https://cloud.google.com/blog/products/compute/trillium-mlperf-41-training-benchmarks/) is a measurable benchmark signal. | Portability: checkpoint movement, compiler behavior, quota, region availability, model support, and operational differences from GPU clusters. |
+| **Trainium** | AWS-committed workloads that can build around [Neuron](https://awsdocs-neuron.readthedocs-hosted.com/) rather than treating it as a drop-in GPU replacement. | Anthropic's [AWS compute expansion](https://www.anthropic.com/news/anthropic-amazon-compute) is a public scale signal. Readiness depends on Neuron compiler/runtime behavior, framework integration, distributed training support, deployment tooling, and known model support. | Cloud-specific compiler and runtime stack. Teams should test compilation behavior, throughput, observability, and migration cost before relying on it. |
+| **Groq and Cerebras** | Specialized cases for supported inference models, where latency, output speed, context, and price matter more than general accelerator access. | Service-level evidence: supported models, throughput, time to first token, context length, reliability, and price. Examples include Groq's [independent LLM benchmark note](https://groq.com/newsroom/groq-lpu-inference-engine-leads-in-first-independent-llm-benchmark) and Cerebras's [Llama 3.1 405B inference result](https://www.cerebras.ai/blog/llama-405b-inference). | Scope and independence. These systems are not general training infrastructure; Groq also sits closer to NVIDIA after its inference technology licensing and team deal, while Cerebras remains the cleaner independent specialized example. |
 
 ## Orchestration
 
@@ -146,7 +145,7 @@ The role of orchestration is to absorb operational complexity: provisioning, pla
 | :---- | :---- |
 | Kubernetes | Strong substrate for containers, services, operators, and internal platforms. For AI, it often requires stitching together device plugins, vendor GPU operators, Dynamic Resource Allocation, Kueue or Volcano, Kubeflow, KubeRay, autoscaling, and serving layers. Kubernetes-native multi-cluster tooling helps when capacity is already Kubernetes, but it still leaves accelerator discovery, quotas, procurement, runtime images, and cross-cloud placement as platform work. |
 | Slurm | Strong for large batch clusters, queueing, accounting, policy, and topology-aware placement. The limits are cloud-native and container-native workflows: real deployments often depend on local modules, queues, prolog/epilog scripts, plugins, and launch conventions. NVIDIA's SchedMD acquisition also makes Slurm vendor independence something teams should watch. |
-| Emerging | AI-native control planes such as dstack and SkyPilot focus on making scattered accelerator capacity usable through higher-level workload definitions for training jobs, batch jobs, and services. They reduce the glue work created by fragmented clouds, clusters, accelerators, runtimes, and sites, which otherwise falls to platform teams. They still depend on each accelerator stack and serving runtime for kernels, images, collectives, routing, and performance. |
+| Emerging | AI-native control planes such as `dstack` and SkyPilot focus on making scattered accelerator capacity usable through higher-level workload definitions for training jobs, batch jobs, and services. They reduce the glue work created by fragmented clouds, clusters, accelerators, runtimes, and sites, which otherwise falls to platform teams. They still depend on each accelerator stack and serving runtime for kernels, images, collectives, routing, and performance. |
 
 Distributed inference makes this boundary especially important. Runtimes such as SGLang, Dynamo, vLLM, Mooncake, and NIXL own routing, batching, prefill/decode behavior, and KV cache movement; orchestration makes those topologies deployable and operable across compatible capacity.
 
