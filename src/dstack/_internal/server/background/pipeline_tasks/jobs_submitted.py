@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Optional, Sequence, Union
 
 from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only, selectinload
 
@@ -97,6 +98,7 @@ from dstack._internal.server.services.instances import (
     get_instance_offer,
     get_instance_provisioning_data,
     is_placeholder_instance,
+    profile_instances_have_qualified_fleet_selector,
     switch_instance_status,
 )
 from dstack._internal.server.services.jobs import (
@@ -523,7 +525,11 @@ async def _select_assignment(
     if fleet_model is None:
         return _NoFleetAssignment()
 
-    if fleet_instances_with_offers:
+    required_instance_offers = 1
+    if context.run.run_spec.merged_profile.instances is not None:
+        required_instance_offers = len(context.jobs_to_provision)
+
+    if len(fleet_instances_with_offers) >= required_instance_offers:
         return _ExistingInstanceAssignment(
             fleet_id=fleet_model.id,
             master_job_provisioning_data=preconditions.master_job_provisioning_data,
@@ -531,9 +537,8 @@ async def _select_assignment(
         )
 
     if context.run.run_spec.merged_profile.instances is not None:
-        # The run targets specific existing instances (nodes). Do not provision new
-        # capacity to satisfy a node selector that no available instance matches.
-        # `is not None` (not truthiness) so an empty list is also treated as targeting.
+        # The run targets specific existing instances. Do not provision new capacity
+        # if no selected fleet has enough matching available instances.
         return _NoFleetAssignment()
 
     return _NewCapacityAssignment(fleet_id=fleet_model.id)
@@ -649,10 +654,13 @@ async def _apply_assignment_result(
                 assignment=assignment,
                 fleet_model=fleet_model,
             )
-            if not current_instance_offers:
-                # If the reusable offers vanished under the fleet lock, retry full
-                # assignment later instead of forcing new-capacity provisioning in a
-                # fleet that may no longer be optimal.
+            required_instance_offers = 1
+            if context.run.run_spec.merged_profile.instances is not None:
+                required_instance_offers = len(context.jobs_to_provision)
+            if len(current_instance_offers) < required_instance_offers:
+                # If reusable offers vanished or are no longer enough under the fleet lock,
+                # retry full assignment later instead of forcing new-capacity provisioning
+                # in a fleet that may no longer be optimal.
                 await _reset_job_lock_for_retry(session=session, item=item)
                 return
 
@@ -699,6 +707,9 @@ async def _load_submitted_job_context(
     )
     job_model = res.unique().scalar_one()
     run = run_model_to_run(run_model)
+    if profile_instances_have_qualified_fleet_selector(run.run_spec.merged_profile):
+        await _load_fleet_project_if_needed(session=session, fleet_model=run_model.fleet)
+        await _load_fleet_project_if_needed(session=session, fleet_model=job_model.fleet)
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
     replica_jobs = find_jobs(run.jobs, replica_num=job_model.replica_num)
     return _SubmittedJobContext(
@@ -782,6 +793,20 @@ async def _fetch_run_model_for_submitted_job(
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one()
+
+
+async def _load_fleet_project_if_needed(
+    session: AsyncSession,
+    fleet_model: Optional[FleetModel],
+) -> None:
+    if fleet_model is None or "project" not in sa_inspect(fleet_model).unloaded:
+        return
+    await session.execute(
+        select(FleetModel)
+        .where(FleetModel.id == fleet_model.id)
+        .options(joinedload(FleetModel.project))
+        .execution_options(populate_existing=True)
+    )
 
 
 def _get_job_models_for_jobs(
@@ -902,6 +927,9 @@ async def _load_assignment_candidate_fleets(
             fleet_filters=fleet_filters,
             instance_filters=instance_filters,
             lock_instances=False,
+            load_fleet_project=profile_instances_have_qualified_fleet_selector(
+                context.run.run_spec.merged_profile
+            ),
         )
         return fleets_with_instances + fleets_without_instances
 
@@ -965,6 +993,9 @@ async def _lock_assignment_fleet_for_existing_instance_assignment(
         fleet_filters=fleet_filters,
         instance_filters=instance_filters,
         lock_instances=True,
+        load_fleet_project=profile_instances_have_qualified_fleet_selector(
+            context.run.run_spec.merged_profile
+        ),
     )
     if not fleets_with_instances:
         return None
@@ -988,6 +1019,9 @@ async def _lock_assignment_fleet_for_existing_instance_assignment(
         fleet_filters=fleet_filters,
         instance_filters=[*instance_filters, InstanceModel.id.in_(instance_ids)],
         lock_instances=True,
+        load_fleet_project=profile_instances_have_qualified_fleet_selector(
+            context.run.run_spec.merged_profile
+        ),
     )
     if not fleets_with_locked_instances:
         return None
@@ -1063,6 +1097,7 @@ def _get_current_reusable_instance_offers(
     fleet_model: FleetModel,
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     return get_instance_offers_in_fleet(
+        project=context.project,
         fleet_model=fleet_model,
         run_spec=context.run.run_spec,
         job=context.job,

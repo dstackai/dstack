@@ -7,15 +7,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import InstanceAvailability
-from dstack._internal.core.models.profiles import CreationPolicy, Profile
+from dstack._internal.core.models.profiles import (
+    CreationPolicy,
+    FleetInstanceSelector,
+    InstanceNameSelector,
+    Profile,
+)
 from dstack._internal.server.services.jobs import get_jobs_from_run_spec
 from dstack._internal.server.services.runs.plan import (
     _freeze_offer_identity_value,
     _get_backend_offer_identity,
     _get_backend_offers_in_fleet,
     _get_job_plan,
+    find_optimal_fleet_with_offers,
+    get_backend_offers_in_run_candidate_fleets,
+    get_run_candidate_fleet_models_filters,
+    select_run_candidate_fleet_models_with_filters,
 )
 from dstack._internal.server.testing.common import (
+    create_export,
     create_fleet,
     create_instance,
     create_project,
@@ -105,34 +115,7 @@ class TestGetJobPlan:
             profile=Profile(
                 name="default",
                 creation_policy=CreationPolicy.REUSE_OR_CREATE,
-                instances=["my-fleet-0"],
-            ),
-            job=jobs[0],
-            max_offers=None,
-        )
-
-        assert job_plan.total_offers == 1
-        assert job_plan.offers == [instance_offer]
-
-    @pytest.mark.asyncio
-    async def test_excludes_backend_offers_when_instances_empty_list(self) -> None:
-        # An explicit empty `instances` list must be treated the same as a non-empty
-        # selector (target existing instances only), not as "no targeting".
-        run_spec = get_run_spec(
-            repo_id="test-repo",
-            configuration=TaskConfiguration(image="debian", commands=["echo"]),
-        )
-        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
-        instance_offer = get_instance_offer_with_availability()
-        backend_offer = get_instance_offer_with_availability()
-
-        job_plan = _get_job_plan(
-            instance_offers=[(None, instance_offer)],
-            backend_offers=[(None, backend_offer)],
-            profile=Profile(
-                name="default",
-                creation_policy=CreationPolicy.REUSE_OR_CREATE,
-                instances=[],
+                instances=[InstanceNameSelector(name="my-fleet-0")],
             ),
             job=jobs[0],
             max_offers=None,
@@ -189,3 +172,157 @@ class TestGetBackendOffersInFleet:
             get_offers_by_requirements_mock.await_args.kwargs["master_job_provisioning_data"]
             is None
         )
+
+
+class TestSelectRunCandidateFleetModelsWithFilters:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("selector", "expected_fleet_project_name"),
+        [
+            ("same-fleet", "importer-project"),
+            ("exporter-project/same-fleet", "exporter-project"),
+        ],
+    )
+    async def test_fleet_instance_selector_narrows_candidate_fleets(
+        self,
+        test_db,
+        session: AsyncSession,
+        selector: str,
+        expected_fleet_project_name: str,
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user, name="importer-project")
+        exporter_project = await create_project(
+            session=session, owner=user, name="exporter-project"
+        )
+        local_fleet = await create_fleet(session=session, project=project, name="same-fleet")
+        exported_fleet = await create_fleet(
+            session=session, project=exporter_project, name="same-fleet"
+        )
+        unrelated_fleet = await create_fleet(
+            session=session, project=project, name="unrelated-fleet"
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=local_fleet,
+            instance_num=1,
+        )
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=exported_fleet,
+            instance_num=1,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=unrelated_fleet,
+            instance_num=1,
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[project],
+            exported_fleets=[exported_fleet],
+        )
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=TaskConfiguration(image="debian", commands=["echo"]),
+            profile=Profile(instances=[FleetInstanceSelector(fleet=selector, instance=1)]),
+        )
+        fleet_filters, instance_filters = await get_run_candidate_fleet_models_filters(
+            session=session,
+            project=project,
+            run_model=None,
+            run_spec=run_spec,
+        )
+
+        (
+            fleets_with_instances,
+            fleets_without_instances,
+        ) = await select_run_candidate_fleet_models_with_filters(
+            session=session,
+            fleet_filters=fleet_filters,
+            instance_filters=instance_filters,
+            lock_instances=False,
+            load_fleet_project=True,
+        )
+
+        assert [fleet.project.name for fleet in fleets_with_instances] == [
+            expected_fleet_project_name
+        ]
+        assert fleets_without_instances == []
+
+
+class TestFindOptimalFleetWithOffers:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_skips_backend_offers_when_instances_specified(
+        self, test_db, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="debian", commands=["echo"]),
+            profile=Profile(instances=[InstanceNameSelector(name="missing-instance")]),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        get_backend_offers_in_fleet_mock = AsyncMock()
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan._get_backend_offers_in_fleet",
+            get_backend_offers_in_fleet_mock,
+        )
+
+        fleet_model, instance_offers, backend_offers = await find_optimal_fleet_with_offers(
+            project=project,
+            fleet_models=[fleet],
+            run_model=None,
+            run_spec=run_spec,
+            job=jobs[0],
+            master_job_provisioning_data=None,
+            volumes=None,
+            exclude_not_available=False,
+        )
+
+        assert fleet_model == fleet
+        assert instance_offers == []
+        assert backend_offers == []
+        get_backend_offers_in_fleet_mock.assert_not_awaited()
+
+
+class TestGetBackendOffersInRunCandidateFleets:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_skips_backend_offers_when_instances_specified(
+        self, test_db, session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="debian", commands=["echo"]),
+            profile=Profile(instances=[InstanceNameSelector(name="missing-instance")]),
+        )
+        jobs = await get_jobs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=0)
+        select_candidate_fleet_models_mock = AsyncMock()
+        monkeypatch.setattr(
+            "dstack._internal.server.services.runs.plan._select_candidate_fleet_models",
+            select_candidate_fleet_models_mock,
+        )
+
+        offers = await get_backend_offers_in_run_candidate_fleets(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+            job=jobs[0],
+            volumes=None,
+        )
+
+        assert offers == []
+        select_candidate_fleet_models_mock.assert_not_awaited()

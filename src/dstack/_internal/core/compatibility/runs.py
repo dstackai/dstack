@@ -83,6 +83,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     spec_excludes: IncludeExcludeDictType = {}
     configuration_excludes: IncludeExcludeDictType = {}
     profile_excludes = get_profile_excludes(run_spec.profile)
+    for field in get_profile_excludes(run_spec.configuration):
+        configuration_excludes[field] = True
 
     if run_spec.configuration.backend_options is None:
         configuration_excludes["backend_options"] = True

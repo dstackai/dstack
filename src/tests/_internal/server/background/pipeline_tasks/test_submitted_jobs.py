@@ -17,7 +17,7 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.profiles import InstanceNameSelector, Profile
 from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
@@ -1190,7 +1190,7 @@ class TestJobSubmittedWorker:
         )
         run_spec = get_run_spec(
             repo_id=repo.name,
-            profile=Profile(name="default", instances=["my-fleet-1"]),
+            profile=Profile(name="default", instances=[InstanceNameSelector(name="my-fleet-1")]),
         )
         run = await create_run(
             session=session,
@@ -1208,6 +1208,65 @@ class TestJobSubmittedWorker:
         assert job.instance is not None and job.instance.id == instance_1.id
         assert job.fleet_id == fleet.id
 
+    async def test_does_not_assign_targeted_multinode_job_without_enough_instances(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project, name="my-fleet")
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=0,
+            name="my-fleet-0",
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="debian", nodes=2),
+            profile=Profile(
+                name="default",
+                instances=[
+                    InstanceNameSelector(name="my-fleet-0"),
+                    InstanceNameSelector(name="my-fleet-1"),
+                ],
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        master_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            waiting_master_job=False,
+        )
+        await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            waiting_master_job=True,
+        )
+
+        await _process_job(session=session, worker=worker, job_model=master_job)
+
+        master_job = await _get_job(session, master_job.id)
+        await session.refresh(instance)
+        assert master_job.status == JobStatus.TERMINATING
+        assert (
+            master_job.termination_reason
+            == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        )
+        assert not master_job.instance_assigned
+        assert master_job.instance is None
+        assert instance.status == InstanceStatus.IDLE
+
     async def test_does_not_provision_new_capacity_when_instances_specified(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
     ):
@@ -1218,7 +1277,10 @@ class TestJobSubmittedWorker:
         await create_fleet(session=session, project=project)
         run_spec = get_run_spec(
             repo_id=repo.name,
-            profile=Profile(name="default", instances=["missing-instance"]),
+            profile=Profile(
+                name="default",
+                instances=[InstanceNameSelector(name="missing-instance")],
+            ),
         )
         run = await create_run(
             session=session,

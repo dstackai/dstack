@@ -234,6 +234,46 @@ class Schedule(CoreModel):
         return self.cron
 
 
+class InstanceNameSelector(CoreModel):
+    name: Annotated[str, Field(description="The fleet instance name", min_length=1)]
+
+
+class InstanceHostnameSelector(CoreModel):
+    hostname: Annotated[
+        str, Field(description="The fleet instance hostname or IP address", min_length=1)
+    ]
+
+
+def _validate_fleet_instance_selector_fleet(v: str) -> str:
+    EntityReference.parse(v)
+    return v
+
+
+class FleetInstanceSelector(CoreModel):
+    fleet: Annotated[
+        str,
+        Field(
+            description=(
+                "The fleet name. For fleets owned by the current project, specify the fleet name."
+                " For a fleet from another project, specify `<project name>/<fleet name>`"
+            ),
+            min_length=1,
+        ),
+    ]
+    instance: Annotated[int, Field(description="The fleet instance number", ge=0)]
+
+    _validate_fleet = validator("fleet", allow_reuse=True)(_validate_fleet_instance_selector_fleet)
+
+
+InstanceSelector = Union[InstanceNameSelector, InstanceHostnameSelector, FleetInstanceSelector]
+
+
+def parse_instance_selector(v: Union[InstanceSelector, str]) -> InstanceSelector:
+    if isinstance(v, str):
+        return InstanceNameSelector(name=v)
+    return v
+
+
 class ProfileParamsConfig(CoreConfig):
     @staticmethod
     def schema_extra(schema: Dict[str, Any]):
@@ -248,6 +288,10 @@ class ProfileParamsConfig(CoreConfig):
         add_extra_schema_types(
             schema["properties"]["idle_duration"],
             extra_types=[{"type": "string"}],
+        )
+        add_extra_schema_types(
+            schema["properties"]["instances"]["items"],
+            extra_types=[{"type": "string", "minLength": 1}],
         )
 
 
@@ -387,20 +431,21 @@ class ProfileParams(CoreModel):
             description=(
                 "The fleets considered for reuse."
                 " For fleets owned by the current project, specify fleet names."
-                " For imported fleets, specify `<project name>/<fleet name>`"
+                " For fleets from another project, specify `<project name>/<fleet name>`"
             ),
         ),
     ] = None
     instances: Annotated[
-        Optional[List[str]],
+        Optional[List[InstanceSelector]],
         Field(
             description=(
-                "The specific fleet instances (nodes) to consider for reuse."
-                " Each value matches an instance by its name (e.g. `my-fleet-0`)"
-                " or by its hostname/IP address."
+                "The specific fleet instances to consider for reuse."
+                " Each value can be an instance name string (e.g. `my-fleet-0`)"
+                " or an object with `name`, `hostname`, or `fleet` and `instance`."
                 " When set, the run is only placed on a matching existing instance"
                 " and no new instances are provisioned"
             ),
+            min_items=1,
         ),
     ] = None
     tags: Annotated[
@@ -428,6 +473,9 @@ class ProfileParams(CoreModel):
         parse_idle_duration
     )
     _validate_fleets = validator("fleets", allow_reuse=True, each_item=True)(EntityReference.parse)
+    _validate_instances = validator("instances", pre=True, allow_reuse=True, each_item=True)(
+        parse_instance_selector
+    )
     _validate_tags = validator("tags", pre=True, allow_reuse=True)(tags_validator)
     _validate_backend_options = validator("backend_options", allow_reuse=True)(
         validate_backend_options

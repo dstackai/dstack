@@ -11,7 +11,7 @@ from dstack._internal.core.models.configurations import (
     TaskConfiguration,
 )
 from dstack._internal.core.models.files import FileArchiveMapping
-from dstack._internal.core.models.profiles import Profile, ProfileRetry
+from dstack._internal.core.models.profiles import InstanceNameSelector, Profile, ProfileRetry
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.server.services.runs.spec import (
@@ -110,7 +110,10 @@ class TestValidateRunSpecInstances:
         run_spec = get_run_spec(
             repo_id="test-repo",
             configuration=TaskConfiguration(commands=["echo"], nodes=2),
-            profile=Profile(name="default", instances=["my-fleet-0"]),
+            profile=Profile(
+                name="default",
+                instances=[InstanceNameSelector(name="my-fleet-0")],
+            ),
         )
 
         with pytest.raises(ServerClientError, match="instances"):
@@ -120,7 +123,13 @@ class TestValidateRunSpecInstances:
         run_spec = get_run_spec(
             repo_id="test-repo",
             configuration=TaskConfiguration(commands=["echo"], nodes=2),
-            profile=Profile(name="default", instances=["my-fleet-0", "my-fleet-1"]),
+            profile=Profile(
+                name="default",
+                instances=[
+                    InstanceNameSelector(name="my-fleet-0"),
+                    InstanceNameSelector(name="my-fleet-1"),
+                ],
+            ),
         )
 
         validate_run_spec_and_set_defaults(self._user(), run_spec)
@@ -129,7 +138,10 @@ class TestValidateRunSpecInstances:
         run_spec = get_run_spec(
             repo_id="test-repo",
             configuration=DevEnvironmentConfiguration(ide="vscode"),
-            profile=Profile(name="default", instances=["my-fleet-3"]),
+            profile=Profile(
+                name="default",
+                instances=[InstanceNameSelector(name="my-fleet-3")],
+            ),
         )
 
         validate_run_spec_and_set_defaults(self._user(), run_spec)

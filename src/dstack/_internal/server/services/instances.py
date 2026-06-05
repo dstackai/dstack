@@ -6,6 +6,7 @@ from typing import Dict, List, Literal, Optional, Union
 
 import gpuhunt
 from sqlalchemy import and_, exists, false, or_, select
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
 
@@ -16,6 +17,7 @@ from dstack._internal.core.backends.base.offers import (
 from dstack._internal.core.backends.features import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.health import HealthCheck, HealthEvent, HealthStatus
 from dstack._internal.core.models.instances import (
@@ -34,6 +36,10 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import (
     DEFAULT_FLEET_TERMINATION_IDLE_TIME,
+    FleetInstanceSelector,
+    InstanceHostnameSelector,
+    InstanceNameSelector,
+    InstanceSelector,
     Profile,
     TerminationPolicy,
 )
@@ -375,20 +381,99 @@ def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, O
     return host_private_key, proxy_private_keys[0]
 
 
-def instance_matches_selectors(instance: InstanceModel, selectors: List[str]) -> bool:
+def profile_instances_have_qualified_fleet_selector(profile: Profile) -> bool:
+    if profile.instances is None:
+        return False
+    for selector in profile.instances:
+        if isinstance(selector, FleetInstanceSelector):
+            if EntityReference.parse(selector.fleet).project is not None:
+                return True
+    return False
+
+
+def instance_matches_selectors(
+    instance: InstanceModel,
+    selectors: List[InstanceSelector],
+    *,
+    project: Optional[ProjectModel] = None,
+    fleet: Optional[FleetModel] = None,
+) -> bool:
     """
-    Check if an instance matches any of the given node selectors.
-    A selector matches the instance name or its hostname/IP address
-    (cloud public IP or SSH host).
+    Check if an instance matches any of the given instance selectors.
     """
-    candidates = {instance.name.lower()}
+    return any(
+        instance_matches_selector(
+            instance,
+            selector,
+            project=project,
+            fleet=fleet,
+        )
+        for selector in selectors
+    )
+
+
+def instance_matches_selector(
+    instance: InstanceModel,
+    selector: InstanceSelector,
+    *,
+    project: Optional[ProjectModel] = None,
+    fleet: Optional[FleetModel] = None,
+) -> bool:
+    if isinstance(selector, InstanceNameSelector):
+        return instance.name.lower() == selector.name.lower()
+    if isinstance(selector, InstanceHostnameSelector):
+        return instance_matches_hostname_selector(instance, selector)
+    if isinstance(selector, FleetInstanceSelector):
+        return instance_matches_fleet_instance_selector(
+            instance,
+            selector,
+            project=project,
+            fleet=fleet,
+        )
+    return False
+
+
+def instance_matches_hostname_selector(
+    instance: InstanceModel, selector: InstanceHostnameSelector
+) -> bool:
+    candidates = set()
     jpd = get_instance_provisioning_data(instance)
     if jpd is not None and jpd.hostname is not None:
         candidates.add(jpd.hostname.lower())
     rci = get_instance_remote_connection_info(instance)
     if rci is not None:
         candidates.add(rci.host.lower())
-    return any(selector.lower() in candidates for selector in selectors)
+    return selector.hostname.lower() in candidates
+
+
+def instance_matches_fleet_instance_selector(
+    instance: InstanceModel,
+    selector: FleetInstanceSelector,
+    *,
+    project: Optional[ProjectModel] = None,
+    fleet: Optional[FleetModel] = None,
+) -> bool:
+    fleet_ref = EntityReference.parse(selector.fleet)
+
+    if fleet is None:
+        # Avoid triggering a lazy load in async code.
+        if "fleet" in sa_inspect(instance).unloaded or instance.fleet is None:
+            return False
+        fleet = instance.fleet
+
+    if fleet.name.lower() != fleet_ref.name.lower():
+        return False
+    if instance.instance_num != selector.instance:
+        return False
+
+    if fleet_ref.project is None:
+        if project is not None and fleet.project_id != project.id:
+            return False
+        return True
+
+    if "project" in sa_inspect(fleet).unloaded or fleet.project is None:
+        return False
+    return fleet.project.name.lower() == fleet_ref.project.lower()
 
 
 def instance_matches_constraints(
@@ -439,6 +524,8 @@ def filter_instances(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[List[Volume]]] = None,
     shared: bool = False,
+    project: Optional[ProjectModel] = None,
+    fleet: Optional[FleetModel] = None,
 ) -> List[InstanceModel]:
     backend_types: Optional[list[BackendType]] = profile.backends
     regions: Optional[list[str]] = profile.regions
@@ -485,7 +572,10 @@ def filter_instances(
         if instance.unreachable:
             continue
         if instance_selectors is not None and not instance_matches_selectors(
-            instance, instance_selectors
+            instance,
+            instance_selectors,
+            project=project,
+            fleet=fleet,
         ):
             continue
         if instance.health.is_failure():
@@ -529,6 +619,8 @@ def get_shared_instances_with_offers(
     idle_only: bool = False,
     multinode: bool = False,
     volumes: Optional[List[List[Volume]]] = None,
+    project: Optional[ProjectModel] = None,
+    fleet: Optional[FleetModel] = None,
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
     query_filter = requirements_to_query_filter(requirements)
@@ -538,6 +630,8 @@ def get_shared_instances_with_offers(
         multinode=multinode,
         volumes=volumes,
         shared=True,
+        project=project,
+        fleet=fleet,
     )
     for instance in filtered_instances:
         if idle_only and instance.status not in [InstanceStatus.IDLE, InstanceStatus.BUSY]:
@@ -567,7 +661,12 @@ def get_shared_instances_with_offers(
 async def get_pool_instances(
     session: AsyncSession,
     project: ProjectModel,
+    *,
+    load_fleet_project: bool = False,
 ) -> List[InstanceModel]:
+    fleet_load = joinedload(InstanceModel.fleet)
+    if load_fleet_project:
+        fleet_load = fleet_load.joinedload(FleetModel.project)
     res = await session.execute(
         select(InstanceModel)
         .where(
@@ -581,7 +680,7 @@ async def get_pool_instances(
             ),
             InstanceModel.deleted == False,
         )
-        .options(joinedload(InstanceModel.fleet))
+        .options(fleet_load)
     )
     instance_models = list(res.unique().scalars().all())
     return instance_models

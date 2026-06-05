@@ -10,6 +10,8 @@ def get_profile_excludes(profile: Optional[ProfileParams]) -> IncludeExcludeSetT
         return excludes
     if profile.backend_options is None:
         excludes.add("backend_options")
+    if profile.instances is None:
+        excludes.add("instances")
     return excludes
 
 
