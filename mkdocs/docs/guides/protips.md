@@ -499,6 +499,30 @@ The `offer` command allows you to filter and group offers with various [advanced
 
 `dstack` tracks essential metrics accessible via the CLI and UI. To access advanced metrics like DCGM, configure the server to export metrics to Prometheus. See [Metrics](../concepts/metrics.md) for details.
 
+## Pull progress
+
+When using a VM-based backend or an SSH instance, you can see the Docker image pull progress in the CLI while the job is in the `pulling` state.
+
+<div class="termy">
+
+```shell
+$ dstack apply -y
+
+Launching orange-yak-1...
+ NAME          BACKEND          STATUS                    SUBMITTED  
+ orange-yak-1  aws (eu-west-3)  pulling 1.19/3.44/4.76GB  3 mins ago
+```
+
+</div>
+
+The three slash-separated indicators represent:
+
+- Image data already extracted.
+- Image data already downloaded.
+- Total target image size.
+
+The exact total size is not always known initially, in which case a lower estimate is displayed with the `≥` sign. All values exclude any image layers already cached on the host prior to the pull.
+
 ## Service quotas
 
 If you're using your own AWS, GCP, Azure, or OCI accounts, before you can use GPUs or spot instances, you have to request the

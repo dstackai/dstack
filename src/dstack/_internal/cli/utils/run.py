@@ -339,6 +339,7 @@ def _format_pull_progress(progress: ImagePullProgress) -> str:
         def f(x: int) -> str:
             return f"{x / 2**20:.0f}"
 
+    # NOTE: The format is documented in protips.md. Keep in sync.
     total_sign = "≥" if not progress.is_total_bytes_final else ""
     return f"{f(progress.extracted_bytes)}/{f(progress.downloaded_bytes)}/{total_sign}{f(progress.total_bytes)}{unit}"
 
