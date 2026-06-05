@@ -1,4 +1,5 @@
 import os
+import shutil
 import threading
 import time
 from dataclasses import dataclass
@@ -65,6 +66,9 @@ class InstanceConnectionPool:
     NOTE: The pool does not currently intended for arbitrary ports forwarding, only for shim and runner ports.
     E.g. it cannot be used to forward services ports for probes or router-worker communication.
     This simplified model allows forwarding the same ports for the given host:port and reusing the connection across all calls.
+
+    Incompatible with multiple server processes sharing the same server dir:
+    connection dirs and control sockets are assumed to be owned by a single process.
     """
 
     def __init__(self):
@@ -124,6 +128,14 @@ class InstanceConnectionPool:
                 conn.close()
             except Exception:
                 logger.exception("Failed to close instance connection %s", key)
+
+    def startup_cleanup(self) -> None:
+        """
+        Removes connection dirs left by a previous server process (e.g. after SIGKILL).
+        Must be called on server startup before the pool is used.
+        Leftover live masters are reaped by `ControlPersist`.
+        """
+        shutil.rmtree(CONNECTIONS_DIR, ignore_errors=True)
 
     def close_all(self) -> None:
         """
@@ -253,9 +265,12 @@ class InstanceConnection:
 
     def close(self) -> None:
         self._tunnel.close()
-        # If the master was killed without cleaning up its control socket,
-        # remove the socket so that the master can re-open.
-        self._control_socket_path.unlink(missing_ok=True)
+        # Remove a stale control.sock left by a killed master, forwarded UDS files
+        # (ssh does not unlink them on exit), and the dir itself, so that
+        # CONNECTIONS_DIR does not accumulate dirs of gone instances.
+        # A master that survives close() because it is unreachable via a deleted
+        # symlink is reaped by ControlPersist.
+        shutil.rmtree(self._real_conn_dir, ignore_errors=True)
 
     @property
     def key(self) -> InstanceConnectionKey:
@@ -294,7 +309,7 @@ class InstanceConnection:
         # Connection_dir can have a long path that won't be accepted by the ssh command,
         # so we create a short temporary symlink.
         # The symlink may be removed by age-based /tmp cleanup while the connection is still alive.
-        # The connection will be reopened with a fresh symlink, attaching to the still-running master.
+        # The connection dir will be removed and the connection is re-opened.
         temp_dir, conn_symlink_dir = make_tmp_symlink_to_dir(
             dirpath=conn_dir,
             symlink_dirname="connection",

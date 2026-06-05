@@ -62,7 +62,7 @@ def runner_ssh_tunnel(
             )
             return func(port_map, *args, **kwargs)
 
-        if settings.SERVER_SSH_POOL_DISABLED or not job_provisioning_data.dockerized:
+        if not settings.SERVER_SSH_POOL_ENABLED or not job_provisioning_data.dockerized:
             # Connections from dstack-server to runner's sshd are expected to be short
             # as the `inactivity_duration` feature distinguishes user and server connections based on duration.
             # Do not re-use SSH connections for container-based backends.

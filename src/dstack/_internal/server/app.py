@@ -169,6 +169,7 @@ async def lifespan(app: FastAPI):
     )
     if settings.SERVER_S3_BUCKET is not None or settings.SERVER_GCS_BUCKET is not None:
         init_default_storage()
+    await run_async(instance_connection_pool.startup_cleanup)
     scheduler = None
     pipeline_manager = None
     if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:
