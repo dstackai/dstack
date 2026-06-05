@@ -80,6 +80,9 @@ class ServerCommand(BaseCommand):
             os.environ["DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT"] = "1"
         if args.token:
             os.environ["DSTACK_SERVER_ADMIN_TOKEN"] = args.token
+        # Hide noisy "Other threads are currently calling into gRPC, skipping fork() handlers"
+        # messages in server logs. Users can still change this with GRPC_VERBOSITY.
+        os.environ.setdefault("GRPC_VERBOSITY", "ERROR")
         uvicorn_log_level = os.getenv("DSTACK_SERVER_UVICORN_LOG_LEVEL", "ERROR").lower()
         reload_disabled = os.getenv("DSTACK_SERVER_RELOAD_DISABLED") is not None
 
