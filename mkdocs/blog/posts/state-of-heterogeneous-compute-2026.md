@@ -3,6 +3,7 @@ title: "The state of heterogeneous AI compute in 2026"
 date: 2026-06-05
 description: "How supply, software readiness, orchestration, and networking shape accelerator choices across NVIDIA, AMD, TPUs, Trainium, and specialized inference systems."
 slug: state-of-heterogeneous-compute-2026
+image: https://dstack.ai/static-assets/static-assets/images/state-of-heterogeneous-compute-2026.png
 categories:
   - Reports
 ---
@@ -100,17 +101,7 @@ Adoption profile describes where an accelerator is practical today.
 
 Deployment flexibility means whether the accelerator can be owned, rented, used through a specialized path, or used through one cloud stack. The chart maps that against readiness breadth.
 
-```text
-                                      readiness breadth
-                         narrower ------------------------------> broader
-deployment flexibility
-
-Higher: own or rent       |        Tenstorrent           AMD        NVIDIA
-
-Medium: specialized       |        Groq / Cerebras
-
-Lower: cloud-committed    |        Trainium        TPU
-```
+<img src="https://dstack.ai/static-assets/static-assets/images/state-of-heterogeneous-compute-2026.png" width="750"/>
 
 Use the chart as a starting point; the real position changes with the model, provider, region, quota, fabric, and serving or training stack.
 
