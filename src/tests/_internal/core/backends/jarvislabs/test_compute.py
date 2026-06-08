@@ -51,6 +51,7 @@ def _gpu_offer(
     gpu_memory_mib: int = 80 * 1024,
     disk_size_mib: int = 250 * 1024,
     spot: bool = False,
+    backend_data: dict | None = None,
 ) -> InstanceOfferWithAvailability:
     return InstanceOfferWithAvailability(
         backend=BackendType.JARVISLABS,
@@ -66,6 +67,7 @@ def _gpu_offer(
         ),
         region="india-noida-01",
         price=1.49,
+        backend_data=backend_data or {},
         availability=InstanceAvailability.AVAILABLE,
     )
 
@@ -99,10 +101,32 @@ def _cpu_catalog_offer(*, disk_size_mib: int = 10 * 1024) -> InstanceOffer:
     )
 
 
-def test_get_jarvislabs_gpu_type_reconstructs_a100_80gb():
-    assert _get_jarvislabs_gpu_type(_gpu_offer()) == "A100-80GB"
-    assert _get_jarvislabs_gpu_type(_gpu_offer(gpu_memory_mib=40 * 1024)) == "A100"
+def test_get_jarvislabs_gpu_type_uses_backend_data_or_gpu_name():
+    assert (
+        _get_jarvislabs_gpu_type(_gpu_offer(backend_data={"gpu_type": "A100-80GB"})) == "A100-80GB"
+    )
+    assert _get_jarvislabs_gpu_type(_gpu_offer()) == "A100"
     assert _get_jarvislabs_gpu_type(_gpu_offer(gpu_name="H100")) == "H100"
+    assert (
+        _get_jarvislabs_gpu_type(
+            _gpu_offer(
+                gpu_name="RTXPRO6000",
+                gpu_memory_mib=96 * 1024,
+                backend_data={"gpu_type": "RTX-PRO6000"},
+            )
+        )
+        == "RTX-PRO6000"
+    )
+
+
+def test_get_jarvislabs_gpu_type_prefers_backend_data():
+    offer = _gpu_offer(
+        gpu_name="RTXPRO6000",
+        gpu_memory_mib=96 * 1024,
+        backend_data={"gpu_type": "RTX PRO 6000"},
+    )
+
+    assert _get_jarvislabs_gpu_type(offer) == "RTX PRO 6000"
 
 
 def test_get_disk_size_gb_clamps_to_jarvislabs_vm_minimum():
@@ -153,7 +177,9 @@ def test_create_gpu_instance_registers_ssh_key_and_creates_gpu_vm():
         "dstack._internal.core.backends.jarvislabs.compute.generate_unique_instance_name",
         return_value="dstack-test",
     ):
-        provisioning_data = compute.create_instance(_gpu_offer(), _instance_config(), None)
+        provisioning_data = compute.create_instance(
+            _gpu_offer(backend_data={"gpu_type": "A100-80GB"}), _instance_config(), None
+        )
 
     compute.api_client.add_ssh_key_if_needed.assert_called_once_with("ssh-rsa AAAA test")
     compute.api_client.create_gpu_vm.assert_called_once_with(
@@ -179,12 +205,41 @@ def test_create_gpu_instance_passes_spot_flag():
         "dstack._internal.core.backends.jarvislabs.compute.generate_unique_instance_name",
         return_value="dstack-test",
     ):
-        compute.create_instance(_gpu_offer(spot=True), _instance_config(), None)
+        compute.create_instance(
+            _gpu_offer(spot=True, backend_data={"gpu_type": "A100-80GB"}),
+            _instance_config(),
+            None,
+        )
 
     compute.api_client.create_gpu_vm.assert_called_once_with(
         gpu_type="A100-80GB",
         num_gpus=1,
         is_spot=True,
+        storage=250,
+        region="india-noida-01",
+        name="dstack-test",
+    )
+
+
+def test_create_rtx_pro_6000_instance_uses_jarvislabs_gpu_type_from_backend_data():
+    compute = _compute()
+    compute.api_client.create_gpu_vm.return_value = "123"
+    offer = _gpu_offer(
+        gpu_name="RTXPRO6000",
+        gpu_memory_mib=96 * 1024,
+        backend_data={"gpu_type": "RTX-PRO6000"},
+    )
+
+    with patch(
+        "dstack._internal.core.backends.jarvislabs.compute.generate_unique_instance_name",
+        return_value="dstack-test",
+    ):
+        compute.create_instance(offer, _instance_config(), None)
+
+    compute.api_client.create_gpu_vm.assert_called_once_with(
+        gpu_type="RTX-PRO6000",
+        num_gpus=1,
+        is_spot=False,
         storage=250,
         region="india-noida-01",
         name="dstack-test",

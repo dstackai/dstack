@@ -2,10 +2,11 @@ import shlex
 import subprocess
 import tempfile
 from collections.abc import Iterable
-from typing import List, Optional
+from typing import List, Optional, cast
 
 import gpuhunt
 from gpuhunt.providers.jarvislabs import JarvisLabsProvider
+from typing_extensions import NotRequired, TypedDict
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
@@ -45,6 +46,12 @@ DEFAULT_USERNAME = "ubuntu"
 SSH_CONNECT_TIMEOUT_SECONDS = 10
 SSH_SETUP_TIMEOUT_SECONDS = 240
 SSH_LAUNCH_TIMEOUT_SECONDS = 60
+
+
+class JarvisLabsOfferBackendData(TypedDict):
+    # Set by gpuhunt when normalized GPU identity differs from the JarvisLabs VM
+    # create token, e.g. "RTX-PRO6000" normalized to "RTXPRO6000".
+    gpu_type: NotRequired[str]
 
 
 class JarvisLabsCompute(
@@ -176,11 +183,20 @@ class JarvisLabsCompute(
 
 
 def _get_jarvislabs_gpu_type(instance_offer: InstanceOfferWithAvailability) -> str:
+    gpu_type = _get_jarvislabs_gpu_type_from_backend_data(instance_offer.backend_data)
+    if gpu_type is not None:
+        return gpu_type
+
     gpu = instance_offer.instance.resources.gpus[0]
-    memory_gb = round(gpu.memory_mib / 1024)
-    if gpu.name == "A100" and memory_gb == 80:
-        return "A100-80GB"
     return gpu.name
+
+
+def _get_jarvislabs_gpu_type_from_backend_data(backend_data: dict) -> Optional[str]:
+    offer_backend_data = cast(JarvisLabsOfferBackendData, backend_data)
+    gpu_type = offer_backend_data.get("gpu_type")
+    if not isinstance(gpu_type, str) or not gpu_type:
+        return None
+    return gpu_type
 
 
 def _get_disk_size_gb(instance_offer: InstanceOfferWithAvailability) -> int:

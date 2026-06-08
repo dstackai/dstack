@@ -1,5 +1,6 @@
 import pytest
 import requests
+from gpuhunt.providers.jarvislabs import API_URL
 
 from dstack._internal.core.backends.jarvislabs.api_client import (
     JarvisLabsAPIClient,
@@ -9,13 +10,13 @@ from dstack._internal.core.errors import BackendError, BackendInvalidCredentials
 
 
 def test_validate_api_key_returns_false_on_unauthorized(requests_mock):
-    requests_mock.get("https://backendprod.jarvislabs.net/users/user_info", status_code=401)
+    requests_mock.get(f"{API_URL}/users/user_info", status_code=401)
 
     assert JarvisLabsAPIClient("bad").validate_api_key() is False
 
 
 def test_get_user_info_raises_invalid_credentials_on_forbidden(requests_mock):
-    requests_mock.get("https://backendprod.jarvislabs.net/users/user_info", status_code=403)
+    requests_mock.get(f"{API_URL}/users/user_info", status_code=403)
 
     with pytest.raises(BackendInvalidCredentialsError):
         JarvisLabsAPIClient("bad").get_user_info()
@@ -23,7 +24,7 @@ def test_get_user_info_raises_invalid_credentials_on_forbidden(requests_mock):
 
 def test_make_request_wraps_request_errors(requests_mock):
     requests_mock.get(
-        "https://backendprod.jarvislabs.net/users/user_info",
+        f"{API_URL}/users/user_info",
         exc=requests.ConnectTimeout("timed out"),
     )
 
@@ -32,7 +33,7 @@ def test_make_request_wraps_request_errors(requests_mock):
 
 
 def test_get_user_info_rejects_non_json_success_response(requests_mock):
-    requests_mock.get("https://backendprod.jarvislabs.net/users/user_info", text="ok")
+    requests_mock.get(f"{API_URL}/users/user_info", text="ok")
 
     with pytest.raises(BackendError, match="Unexpected non-JSON JarvisLabs response"):
         JarvisLabsAPIClient("token").get_user_info()
@@ -41,7 +42,7 @@ def test_get_user_info_rejects_non_json_success_response(requests_mock):
 def test_add_ssh_key_if_needed_reuses_existing_key(requests_mock):
     public_key = "ssh-rsa AAAA test-comment"
     requests_mock.get(
-        "https://backendprod.jarvislabs.net/ssh/",
+        f"{API_URL}/ssh/",
         json=[{"ssh_key": "ssh-rsa AAAA another-comment", "key_name": "existing"}],
     )
 
@@ -52,8 +53,8 @@ def test_add_ssh_key_if_needed_reuses_existing_key(requests_mock):
 
 def test_add_ssh_key_if_needed_adds_missing_key(requests_mock):
     public_key = "ssh-rsa AAAA test-comment"
-    requests_mock.get("https://backendprod.jarvislabs.net/ssh/", json=[])
-    requests_mock.post("https://backendprod.jarvislabs.net/ssh/", json={"success": True})
+    requests_mock.get(f"{API_URL}/ssh/", json=[])
+    requests_mock.post(f"{API_URL}/ssh/", json={"success": True})
 
     JarvisLabsAPIClient("token").add_ssh_key_if_needed(public_key)
 
@@ -95,6 +96,25 @@ def test_create_gpu_vm_posts_to_regional_vm_endpoint(requests_mock):
         "fs_id": None,
         "arguments": "",
     }
+
+
+def test_create_gpu_vm_posts_chennai_region_to_chennai_endpoint(requests_mock):
+    requests_mock.post(
+        "https://backendc.jarvislabs.net/templates/vm/create",
+        json={"machine_id": 123},
+    )
+
+    JarvisLabsAPIClient("token").create_gpu_vm(
+        gpu_type="RTX-PRO6000",
+        num_gpus=1,
+        is_spot=False,
+        storage=100,
+        region="india-chennai-01",
+        name="dstack-test",
+    )
+
+    assert requests_mock.last_request.json()["gpu_type"] == "RTX-PRO6000"
+    assert requests_mock.last_request.json()["region"] == "india-chennai-01"
 
 
 def test_create_gpu_vm_rejects_unsupported_region(requests_mock):
@@ -158,7 +178,7 @@ def test_create_cpu_vm_posts_to_regional_cpu_vm_endpoint(requests_mock):
 
 def test_destroy_instance_uses_cpu_vm_endpoint_for_cpu_vm(requests_mock):
     requests_mock.get(
-        "https://backendprod.jarvislabs.net/users/fetch/456",
+        f"{API_URL}/users/fetch/456",
         json={
             "success": True,
             "instance": {

@@ -80,6 +80,8 @@ ignore-case = true
 
 [tool.uv.sources]
 dstack-plugin-server = { path = "examples/plugins/example_plugin_server", editable = true }
+# TODO: Switch back to a released gpuhunt version after the JarvisLabs RTX PRO 6000 changes are released.
+gpuhunt = { git = "https://github.com/dstackai/gpuhunt.git", rev = "jarvislabs-rtx-pro-6000" }
 
 [tool.ruff]
 target-version = "py310"
