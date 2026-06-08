@@ -378,7 +378,13 @@ async def find_optimal_fleet_with_offers(
                 min_instance_offer_price=_get_min_instance_or_backend_offer_price(
                     available_instance_offers
                 ),
-                has_pool_capacity=nodes_required_num <= len(available_instance_offers),
+                # Require at least one available instance so that fleets without matching
+                # instances are not treated as having capacity when nodes_required_num is 0
+                # (e.g. a service scaling from zero replicas).
+                has_pool_capacity=(
+                    len(available_instance_offers) > 0
+                    and nodes_required_num <= len(available_instance_offers)
+                ),
             )
         )
 
