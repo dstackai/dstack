@@ -25,7 +25,8 @@ import (
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.
-var Version string
+// The "latest" default marks a dev build; the server treats it as the newest version.
+var Version = "latest"
 
 // https://everything.curl.dev/usingcurl/proxies/env.html
 // https://cs.opensource.google/go/x/net/+/657eb1317b5dd33038d683297c6be9cae05fa97d:http/httpproxy/proxy.go
