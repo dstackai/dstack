@@ -45,7 +45,7 @@ class InstanceConnectionKey:
 
     @staticmethod
     def from_jpd(
-        jpd: JobProvisioningData, jrd: Optional[JobRuntimeData]
+        jpd: JobProvisioningData, jrd: Optional[JobRuntimeData] = None
     ) -> "InstanceConnectionKey":
         assert jpd.hostname is not None and jpd.ssh_port is not None
         container_to_host_port_map = InstanceConnection.get_container_to_host_port_map(jpd, jrd)
