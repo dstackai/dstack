@@ -3,7 +3,12 @@ from typing import List
 from rich.table import Table
 
 from dstack._internal.cli.models.gateways import GatewayCommandOutput
-from dstack._internal.cli.utils.common import add_row_from_dict, console, format_entity_reference
+from dstack._internal.cli.utils.common import (
+    add_row_from_dict,
+    console,
+    format_backend,
+    format_entity_reference,
+)
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.gateways import Gateway
@@ -92,7 +97,7 @@ def get_gateways_table(
             )
         row = {
             "NAME": name,
-            "BACKEND": f"{gateway.configuration.backend.value} ({gateway.configuration.region})",
+            "BACKEND": format_backend(gateway.configuration.backend, gateway.configuration.region),
             "HOSTNAME": gateway.hostname,
             "DOMAIN": domain,
             "DEFAULT": "✓" if gateway.default else "",
