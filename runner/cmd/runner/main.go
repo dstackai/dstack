@@ -1,3 +1,7 @@
+//go:build linux
+
+// dstack-runner is supported only in Linux environments.
+
 package main
 
 import (
