@@ -2,7 +2,12 @@ from typing import Any, List, Optional
 
 from rich.table import Table
 
-from dstack._internal.cli.utils.common import add_row_from_dict, console, format_entity_reference
+from dstack._internal.cli.utils.common import (
+    add_row_from_dict,
+    console,
+    format_backend,
+    format_entity_reference,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import Fleet, FleetNodesSpec, FleetStatus
 from dstack._internal.core.models.instances import Instance, InstanceStatus
@@ -93,9 +98,9 @@ def get_fleets_table(
             # Format backend with region (and AZ in verbose mode)
             if verbose and instance.availability_zone:
                 # In verbose mode, show AZ instead of region (AZ is more specific)
-                backend_with_region = _format_backend(instance.backend, instance.availability_zone)
+                backend_with_region = format_backend(instance.backend, instance.availability_zone)
             else:
-                backend_with_region = _format_backend(instance.backend, instance.region)
+                backend_with_region = format_backend(instance.backend, instance.region)
 
             # Get spot info from instance resources (not applicable to SSH)
             if is_ssh_instance:
@@ -246,17 +251,6 @@ def _format_instance_status(instance: Instance) -> str:
     is_finished = status == InstanceStatus.TERMINATED
     status_style = f"bold {color}" if not is_finished else color
     return f"[{status_style}]{status_text}{health_suffix}[/]"
-
-
-def _format_backend(backend: Optional[BackendType], region: Optional[str]) -> str:
-    if backend is None:
-        return "-"
-    backend_str = backend.value
-    if backend == BackendType.REMOTE:
-        backend_str = "ssh"
-    if region:
-        backend_str += f" ({region})"
-    return backend_str
 
 
 def _format_price(price: Optional[float]) -> str:

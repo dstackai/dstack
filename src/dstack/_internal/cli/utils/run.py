@@ -12,9 +12,9 @@ from dstack._internal.cli.utils.common import (
     NO_OFFERS_WARNING,
     add_row_from_dict,
     console,
+    format_backend,
     format_instance_availability,
 )
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -187,12 +187,9 @@ def print_run_plan(
         instance = offer.instance.name
         if offer.total_blocks > 1:
             instance += f" ({offer.blocks}/{offer.total_blocks})"
-        offer_backend = offer.backend.replace("remote", "ssh")
-        if offer.region:
-            offer_backend = f"{offer_backend} ({offer.region})"
         offers.add_row(
             f"{i}",
-            offer_backend,
+            format_backend(offer.backend, offer.region),
             r.pretty_format(include_spot=True),
             instance,
             f"${offer.price:.4f}".rstrip("0").rstrip("."),
@@ -415,15 +412,6 @@ def _format_price(price: float, is_spot: bool) -> str:
     return price_str
 
 
-def _format_backend(backend_type: BackendType, region: str) -> str:
-    backend_str = backend_type.value
-    if backend_type == BackendType.REMOTE:
-        backend_str = "ssh"
-    if not region:
-        return backend_str
-    return f"{backend_str} ({region})"
-
-
 def _format_instance_type(
     instance_type: InstanceType,
     shared_offer: Optional[InstanceOfferWithAvailability],
@@ -563,7 +551,7 @@ def get_runs_table(
                 resources = instance_type.resources
                 job_row.update(
                     {
-                        "BACKEND": _format_backend(jpd.backend, jpd.region),
+                        "BACKEND": format_backend(jpd.backend, jpd.region),
                         "RESOURCES": resources.pretty_format(include_spot=False),
                         "GPU": resources.pretty_format(gpu_only=True, include_spot=False),
                         "INSTANCE TYPE": _format_instance_type(
