@@ -23,7 +23,8 @@ import (
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.
-var Version string
+// The "latest" default marks a dev build; the server treats it as the newest version.
+var Version = "latest"
 
 func main() {
 	os.Exit(mainInner())
