@@ -20,6 +20,7 @@ SERVER_CONFIG_FILE_PATH = SERVER_DIR_PATH / "config.yml"
 
 SERVER_DATA_DIR_PATH = SERVER_DIR_PATH / "data"
 SERVER_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
+
 DATABASE_URL = os.getenv(
     "DSTACK_DATABASE_URL", f"sqlite+aiosqlite:///{str(SERVER_DATA_DIR_PATH.absolute())}/sqlite.db"
 )
@@ -147,6 +148,11 @@ SERVER_TEMPLATES_REPO = os.getenv("DSTACK_SERVER_TEMPLATES_REPO")
 SERVER_LOG_QUOTA_PER_JOB_HOUR = int(
     os.getenv("DSTACK_SERVER_LOG_QUOTA_PER_JOB_HOUR", 50 * 1024 * 1024)  # 50 MB
 )
+
+# TODO: Replace DSTACK_SERVER_SSH_POOL_ENABLED with DSTACK_SERVER_SSH_POOL_DISABLED
+# as pool becomes opt-out and document the env var.
+SERVER_SSH_POOL_ENABLED = os.getenv("DSTACK_SERVER_SSH_POOL_ENABLED") is not None
+SERVER_SSH_CONNECT_TIMEOUT = int(os.getenv("DSTACK_SERVER_SSH_CONNECT_TIMEOUT", 3))
 
 # Development settings
 

@@ -36,6 +36,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
 )
 from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint, VolumeStatus
+from dstack._internal.core.services.ssh.tunnel import SSHTunnel
 from dstack._internal.server import settings as server_settings
 from dstack._internal.server.background.pipeline_tasks.jobs_running import (
     ROUTER_PROVISIONING_WAIT_TIMEOUT_SECONDS,
@@ -61,7 +62,6 @@ from dstack._internal.server.schemas.runner import (
     TaskStatus,
 )
 from dstack._internal.server.services.runner.client import RunnerClient, ShimClient
-from dstack._internal.server.services.runner.ssh import SSHTunnel
 from dstack._internal.server.services.runs.replicas import RouterEnvStatus
 from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.testing.common import (
@@ -116,7 +116,7 @@ def worker() -> JobRunningWorker:
 @pytest.fixture
 def ssh_tunnel_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
     mock = MagicMock(spec_set=SSHTunnel)
-    monkeypatch.setattr("dstack._internal.server.services.runner.ssh.SSHTunnel", mock)
+    monkeypatch.setattr("dstack._internal.server.services.runner.pool.SSHTunnel", mock)
     return mock
 
 
@@ -126,7 +126,8 @@ def shim_client_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
     mock.healthcheck.return_value = HealthcheckResponse(service="dstack-shim", version="latest")
     mock.get_task.return_value.image_pull_progress = None
     monkeypatch.setattr(
-        "dstack._internal.server.services.runner.client.ShimClient", Mock(return_value=mock)
+        "dstack._internal.server.services.runner.client.ShimClient.from_address",
+        Mock(return_value=mock),
     )
     return mock
 
@@ -138,7 +139,8 @@ def runner_client_mock(monkeypatch: pytest.MonkeyPatch) -> Mock:
         service="dstack-runner", version="0.0.1.dev2"
     )
     monkeypatch.setattr(
-        "dstack._internal.server.services.runner.client.RunnerClient", Mock(return_value=mock)
+        "dstack._internal.server.services.runner.client.RunnerClient.from_address",
+        Mock(return_value=mock),
     )
     return mock
 
@@ -481,9 +483,9 @@ class TestJobRunningWorker:
         )
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
             patch(
-                "dstack._internal.server.services.runner.client.RunnerClient"
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
             ) as runner_client_cls,
             patch(
                 "dstack._internal.server.background.pipeline_tasks.jobs_running._get_job_file_archives",
@@ -561,7 +563,7 @@ class TestJobRunningWorker:
         before_processed_at = job.last_processed_at
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
             patch.object(RunnerClient, "_healthcheck") as healthcheck_mock,
             patch.object(RunnerClient, "submit_job") as submit_job_mock,
             patch.object(RunnerClient, "upload_code") as upload_code_mock,
@@ -1067,14 +1069,13 @@ class TestJobRunningWorker:
         )
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
-            patch("dstack._internal.server.services.runner.ssh.time.sleep"),
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
         ):
             from dstack._internal.core.errors import SSHError
 
             ssh_tunnel_cls.side_effect = SSHError
             await _process_job(session, worker, job)
-            assert ssh_tunnel_cls.call_count == 3
+            assert ssh_tunnel_cls.call_count == 1
 
         await session.refresh(job)
         events = await list_events(session)
@@ -1084,15 +1085,14 @@ class TestJobRunningWorker:
         assert events[0].message == "Job became unreachable"
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
-            patch("dstack._internal.server.services.runner.ssh.time.sleep"),
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
             freeze_time(job.disconnected_at + timedelta(minutes=5)),
         ):
             from dstack._internal.core.errors import SSHError
 
             ssh_tunnel_cls.side_effect = SSHError
             await _process_job(session, worker, job)
-            assert ssh_tunnel_cls.call_count == 3
+            assert ssh_tunnel_cls.call_count == 1
 
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATING
@@ -1168,11 +1168,12 @@ class TestJobRunningWorker:
             instance_assigned=True,
         )
         monkeypatch.setattr(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel", Mock(return_value=MagicMock())
+            "dstack._internal.server.services.runner.pool.SSHTunnel",
+            Mock(return_value=MagicMock()),
         )
         shim_client_mock = Mock()
         monkeypatch.setattr(
-            "dstack._internal.server.services.runner.client.ShimClient",
+            "dstack._internal.server.services.runner.client.ShimClient.from_address",
             Mock(return_value=shim_client_mock),
         )
         shim_client_mock.healthcheck.return_value = HealthcheckResponse(
@@ -1243,9 +1244,9 @@ class TestJobRunningWorker:
         await session.commit()
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel"),
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel"),
             patch(
-                "dstack._internal.server.services.runner.client.RunnerClient"
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
             ) as runner_client_cls,
         ):
             runner_client_mock = runner_client_cls.return_value
@@ -1342,9 +1343,9 @@ class TestJobRunningWorker:
 
         with (
             patch.object(server_settings, "SERVER_DIR_PATH", tmp_path),
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
             patch(
-                "dstack._internal.server.services.runner.client.RunnerClient"
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
             ) as runner_client_cls,
         ):
             runner_client_mock = runner_client_cls.return_value
@@ -1365,9 +1366,9 @@ class TestJobRunningWorker:
         await session.commit()
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
             patch(
-                "dstack._internal.server.services.runner.client.RunnerClient"
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
             ) as runner_client_cls,
         ):
             runner_client_mock = runner_client_cls.return_value
@@ -1411,12 +1412,11 @@ class TestJobRunningWorker:
         )
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
-            patch("dstack._internal.server.services.runner.ssh.time.sleep"),
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
         ):
             ssh_tunnel_cls.side_effect = SSHError
             await _process_job(session, worker, job)
-            assert ssh_tunnel_cls.call_count == 3
+            assert ssh_tunnel_cls.call_count == 1
 
         await session.refresh(job)
         events = await list_events(session)
@@ -1426,13 +1426,12 @@ class TestJobRunningWorker:
         assert events[0].message == "Job became unreachable"
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
-            patch("dstack._internal.server.services.runner.ssh.time.sleep"),
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
             freeze_time(job.disconnected_at + timedelta(minutes=5)),
         ):
             ssh_tunnel_cls.side_effect = SSHError
             await _process_job(session, worker, job)
-            assert ssh_tunnel_cls.call_count == 3
+            assert ssh_tunnel_cls.call_count == 1
 
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATING
@@ -1537,9 +1536,9 @@ class TestJobRunningWorker:
             instance_assigned=True,
         )
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
             patch(
-                "dstack._internal.server.services.runner.client.RunnerClient"
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
             ) as runner_client_cls,
         ):
             runner_client_mock = runner_client_cls.return_value
@@ -1649,9 +1648,9 @@ class TestJobRunningWorker:
             )
 
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as ssh_tunnel_cls,
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as ssh_tunnel_cls,
             patch(
-                "dstack._internal.server.services.runner.client.RunnerClient"
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
             ) as runner_client_cls,
         ):
             runner_client_mock = runner_client_cls.return_value
@@ -2127,7 +2126,8 @@ class TestJobRunningWorker:
             session=session,
             run=run,
             status=job_status,
-            job_provisioning_data=get_job_provisioning_data(dockerized=False),
+            # dockerized=True so that the shim port is forwarded for the PULLING case
+            job_provisioning_data=get_job_provisioning_data(dockerized=True),
             instance=instance,
             instance_assigned=True,
         )

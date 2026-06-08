@@ -543,7 +543,7 @@ class BaseTestMaybeInstallComponents:
         mock.list_tasks.return_value = TaskListResponse(tasks=[])
         mock.is_safe_to_restart.return_value = False
         monkeypatch.setattr(
-            "dstack._internal.server.services.runner.client.ShimClient",
+            "dstack._internal.server.services.runner.client.ShimClient.from_address",
             Mock(return_value=mock),
         )
         return mock

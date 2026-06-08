@@ -73,12 +73,14 @@ class TestCollectPrometheusMetrics:
 
     @pytest.fixture
     def ssh_tunnel_mock(self) -> Generator[Mock, None, None]:
-        with patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock:
+        with patch("dstack._internal.server.services.runner.pool.SSHTunnel") as SSHTunnelMock:
             yield SSHTunnelMock
 
     @pytest.fixture
     def shim_client_mock(self) -> Generator[Mock, None, None]:
-        with patch("dstack._internal.server.services.runner.client.ShimClient") as ShimClientMock:
+        with patch(
+            "dstack._internal.server.services.runner.client.ShimClient.from_address"
+        ) as ShimClientMock:
             yield ShimClientMock.return_value
 
     @freeze_time(datetime(2023, 1, 2, 3, 5, 20, tzinfo=timezone.utc))

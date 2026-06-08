@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections.abc import Mapping
 from datetime import timedelta
 from typing import Optional
 
@@ -373,15 +374,15 @@ async def _get_backend_for_provisioning_wait(
     )
 
 
-@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
+@runner_ssh_tunnel
 def _check_instance_inner(
-    ports: dict[int, int],
+    addresses: Mapping[int, runner_client.LocalAddress],
     *,
     instance: InstanceModel,
     check_instance_health: bool = False,
 ) -> InstanceCheck:
     instance_health_response: Optional[InstanceHealthResponse] = None
-    shim_client = runner_client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    shim_client = runner_client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
     method = shim_client.healthcheck
     try:
         healthcheck_response = method(unmask_exceptions=True)
