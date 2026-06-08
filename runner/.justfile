@@ -39,6 +39,9 @@ export shim_download_url := "s3://" + s3_bucket + "/" + version + "/binaries/dst
 export shim_os := ""
 export shim_arch := ""
 
+# Go toolchain image for running tests in a container (keep in sync with go.mod)
+export go_version := env("DSTACK_GO_VERSION", "1.25")
+
 # Build runner
 [private]
 build-runner-binary:
@@ -78,9 +81,22 @@ clean-runner:
     rm -f {{source_directory()}}/cmd/shim/shim
     echo "Build artifacts cleaned!"
 
-# Run tests for runner and shim
+# Run tests for runner and shim (native; requires a Linux host)
 test-runner:
     cd {{source_directory()}} && go test -v ./...
+
+# Run tests for runner and shim in a Linux container (use on macOS/Windows, where native builds are not available)
+# Examples:
+#   just test-runner-in-container                              # short suite, all packages
+#   just test-runner-in-container -run TestPullImage ./internal/shim/
+test-runner-in-container *args="-short ./...":
+    docker run --rm -t \
+        -v {{source_directory()}}:/src -w /src \
+        -v dstack-go-mod:/go/pkg/mod \
+        -v dstack-go-build:/root/.cache/go-build \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        golang:{{go_version}} \
+        go test -race {{args}}
 
 # Validate shim is built for linux/amd64
 [private]
