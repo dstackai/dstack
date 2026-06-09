@@ -130,6 +130,12 @@ class InstanceConnectionPool:
             except Exception:
                 logger.exception("Failed to close instance connection %s", key)
 
+    def drop_by_jpd(self, jpd: JobProvisioningData, jrd: Optional[JobRuntimeData] = None):
+        if jpd.hostname is None or jpd.ssh_port is None:
+            return
+        key = InstanceConnectionKey.from_jpd(jpd, jrd)
+        self.drop(key)
+
     def startup_cleanup(self) -> None:
         """
         Removes connection dirs left by a previous server process (e.g. after SIGKILL).
