@@ -199,9 +199,9 @@ If a [gateway](../../docs/concepts/gateways.md) is configured, the service endpo
 
 ## Why this matters
 
-Dynamo brings system-level inference optimizations such as disaggregated serving, KV-aware routing, and fast KV cache transfer to multi-node deployments. `dstack` provides the orchestration layer around it: provisioning the right instances, keeping router and workers in the same cluster, exposing one endpoint, running health probes, and scaling the worker groups independently.
+Dynamo brings system-level inference optimizations such as disaggregated serving, KV-aware routing, KV cache transfer, and coordination across workers. `dstack` complements it with orchestration for provisioning compute, cluster placement, service exposure, health probes, and independent scaling of worker groups.
 
-For teams running inference, this removes another layer of glue code from the deployment path. The same `dstack` primitives used for training and development, including [fleets](../../docs/concepts/fleets.md), [services](../../docs/concepts/services.md), and [gateways](../../docs/concepts/gateways.md), can now orchestrate Dynamo-based inference across GPU clouds, Kubernetes clusters, and on-prem environments.
+With native Dynamo support, `dstack` streamlines high-throughput inference with leading open-source serving frameworks, while avoiding custom deployment glue. The same `dstack` orchestration layer can be used for training, inference, and development across GPU clouds, Kubernetes clusters, and on-prem fleets.
 
 ## What's next?
 
