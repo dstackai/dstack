@@ -817,6 +817,16 @@ class TestDevEnvironmentConfigurationParams:
         assert params.ide == "cursor"
         assert params.version == "0.40.0"
 
+    def test_zed_ide_allowed(self):
+        params = DevEnvironmentConfigurationParams(ide="zed")
+        assert params.ide == "zed"
+        assert params.version is None
+
+    def test_zed_version_not_validated(self):
+        params = DevEnvironmentConfigurationParams(ide="zed", version="0.100.0")
+        assert params.ide == "zed"
+        assert params.version == "0.100.0"
+
     def test_ide_optional(self):
         params = DevEnvironmentConfigurationParams()
         assert params.ide is None

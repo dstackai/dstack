@@ -685,9 +685,9 @@ class ConfigurationWithCommandsParams(CoreModel):
 
 class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[
-        Optional[Union[Literal["vscode"], Literal["cursor"], Literal["windsurf"]]],
+        Optional[Union[Literal["vscode"], Literal["cursor"], Literal["windsurf"], Literal["zed"]]],
         Field(
-            description="The IDE to pre-install. Supported values include `vscode`, `cursor`, and `windsurf`. Defaults to no IDE (SSH only)"
+            description="The IDE to pre-install. Supported values include `vscode`, `cursor`, `windsurf`, and `zed`. Defaults to no IDE (SSH only)"
         ),
     ] = None
     version: Annotated[
