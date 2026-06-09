@@ -20,7 +20,6 @@ from dstack._internal.core.backends.configurators import (
     get_configurator,
     list_available_backend_types,
 )
-from dstack._internal.core.backends.local.backend import LocalBackend
 from dstack._internal.core.backends.models import (
     AnyBackendConfigWithCreds,
     AnyBackendConfigWithoutCreds,
@@ -43,7 +42,6 @@ from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.offers import merge_offer_iterables
-from dstack._internal.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -400,8 +398,6 @@ async def get_project_backend_with_model_by_type_or_error(
 async def get_project_backends(project: ProjectModel) -> List[Backend]:
     backends_with_models = await get_project_backends_with_models(project)
     backends = [b for _, b in backends_with_models]
-    if LOCAL_BACKEND_ENABLED:
-        backends.append(LocalBackend())
     return backends
 
 

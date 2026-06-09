@@ -42,7 +42,6 @@ class BackendType(str, enum.Enum):
     JARVISLABS = "jarvislabs"
     KUBERNETES = "kubernetes"
     LAMBDA = "lambda"
-    LOCAL = "local"
     REMOTE = "remote"
     NEBIUS = "nebius"
     OCI = "oci"

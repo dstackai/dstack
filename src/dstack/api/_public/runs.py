@@ -398,7 +398,6 @@ class Run(ABC):
                     dockerized=provisioning_data.dockerized,
                     ssh_proxy=provisioning_data.ssh_proxy,
                     service_port=service_port,
-                    local_backend=provisioning_data.backend == BackendType.LOCAL,
                     bind_address=bind_address,
                 )
 

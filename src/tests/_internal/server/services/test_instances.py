@@ -358,7 +358,7 @@ class TestInstanceModelToInstance:
         expected_instance = Instance(
             id=instance_id,
             project_name=project.name,
-            backend=BackendType.LOCAL,
+            backend=BackendType.AWS,
             instance_type=InstanceType(
                 name="instance", resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[])
             ),
@@ -383,8 +383,8 @@ class TestInstanceModelToInstance:
             unreachable=False,
             health=HealthStatus.WARNING,
             project=project,
-            job_provisioning_data='{"ssh_proxy":null, "backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
-            offer='{"price":"LOCAL", "price":1.0, "backend":"local", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+            job_provisioning_data='{"ssh_proxy":null, "backend":"aws","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+            offer='{"price":1.0, "backend":"aws", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
             total_blocks=1,
             busy_blocks=0,
         )

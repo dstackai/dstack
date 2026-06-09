@@ -13,7 +13,6 @@ from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError, SSHError
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
@@ -749,8 +748,6 @@ async def _process_provisioning_status(
             assert context.run.run_spec.ssh_key_pub is not None
             user_ssh_key = context.run.run_spec.ssh_key_pub.strip()
             public_keys.append(user_ssh_key)
-        if job_provisioning_data.backend == BackendType.LOCAL:
-            user_ssh_key = None
         success = await run_async(
             _process_provisioning_with_shim,
             server_ssh_private_keys,

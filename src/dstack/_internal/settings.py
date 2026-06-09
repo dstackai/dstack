@@ -32,10 +32,6 @@ CLI_FILE_LOG_LEVEL = os.getenv("DSTACK_CLI_FILE_LOG_LEVEL", "DEBUG").upper()
 # Can be used to disable control characters (e.g. for testing).
 CLI_RICH_FORCE_TERMINAL = environ.get_bool("DSTACK_CLI_RICH_FORCE_TERMINAL")
 
-# Development settings
-
-LOCAL_BACKEND_ENABLED = os.getenv("DSTACK_LOCAL_BACKEND_ENABLED") is not None
-
 
 class FeatureFlags:
     """

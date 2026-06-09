@@ -34,8 +34,8 @@ class TestProfileArgs:
 
     def test_backends(self):
         profile = Profile(name="test")
-        modified, _ = apply_args(profile, ["-b", "local", "--backend", "aws"])
-        profile.backends = ["local", "aws"]
+        modified, _ = apply_args(profile, ["-b", "gcp", "--backend", "aws"])
+        profile.backends = ["gcp", "aws"]
         assert profile.dict() == modified.dict()
 
     def test_spot_policy_spot(self):
