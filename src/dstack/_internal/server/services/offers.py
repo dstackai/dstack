@@ -68,7 +68,7 @@ async def get_offers_by_requirements(
             backend_types = BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT]
 
-    if profile.reservation is not None:
+    if requirements.reservation is not None:
         if backend_types is None:
             backend_types = BACKENDS_WITH_RESERVATION_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_RESERVATION_SUPPORT]

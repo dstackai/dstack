@@ -127,6 +127,9 @@ class JobConfigurator(ABC):
     def _spot_policy(self) -> SpotPolicy:
         pass
 
+    def _reservation(self) -> Optional[str]:
+        return self.run_spec.merged_profile.reservation
+
     @abstractmethod
     def _ports(self) -> List[PortMapping]:
         pass
@@ -334,7 +337,7 @@ class JobConfigurator(ABC):
             resources=resources,
             max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
-            reservation=self.run_spec.merged_profile.reservation,
+            reservation=self._reservation(),
             multinode=jobs_per_replica > 1,
             backend_options=self.run_spec.merged_profile.backend_options,
         )

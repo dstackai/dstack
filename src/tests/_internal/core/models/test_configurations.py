@@ -142,6 +142,46 @@ class TestParseConfiguration:
         ):
             parse_run_configuration(conf)
 
+    def test_spot_policy_set_at_both_service_and_group_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="`spot_policy` is set at both",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "spot_policy": "spot",
+                    "replicas": [
+                        {
+                            "count": 1,
+                            "commands": ["x"],
+                            "spot_policy": "on-demand",
+                        },
+                    ],
+                }
+            )
+
+    def test_reservation_set_at_both_service_and_group_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="`reservation` is set at both",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "image": "x",
+                    "reservation": "svc-res",
+                    "replicas": [
+                        {
+                            "count": 1,
+                            "reservation": "grp-res",
+                        },
+                    ],
+                }
+            )
+
     @pytest.mark.parametrize("shell", [None, "sh", "bash", "/usr/bin/zsh"])
     def test_shell_valid(self, shell: Optional[str]):
         conf = {

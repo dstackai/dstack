@@ -1678,6 +1678,70 @@ class TestGetRunPlan:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_service_reservation_group_filters_backends_by_reservation_support(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                port=8080,
+                gateway=False,
+                image="nginx",
+                replicas=[
+                    ReplicaGroup(
+                        name="reserved-group",
+                        count=Range[int](min=1, max=1),
+                        reservation="my-reservation-id",
+                    ),
+                    ReplicaGroup(
+                        count=Range[int](min=1, max=1),
+                        name="unreserved-group",
+                    ),
+                ],
+            ),
+        )
+        body = {"run_spec": json.loads(run_spec.json())}
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            aws_backend_mock = Mock()
+            aws_backend_mock.TYPE = BackendType.AWS
+            aws_backend_mock.compute.return_value.get_offers.return_value = [
+                get_instance_offer_with_availability(backend=BackendType.AWS, price=2)
+            ]
+            verda_backend_mock = Mock()
+            verda_backend_mock.TYPE = BackendType.VERDA
+            verda_backend_mock.compute.return_value.get_offers.return_value = [
+                get_instance_offer_with_availability(backend=BackendType.VERDA, price=1)
+            ]
+            m.return_value = [aws_backend_mock, verda_backend_mock]
+
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        reserved_job_plan, unreserved_job_plan = response.json()["job_plans"]
+
+        # Verda offer not included for `reserved-group`, since Verda does not support reservations
+        assert reserved_job_plan["offers"][0]["backend"] == "aws"
+        assert len(reserved_job_plan["offers"]) == 1
+
+        assert unreserved_job_plan["offers"][0]["backend"] == "verda"
+        assert unreserved_job_plan["offers"][1]["backend"] == "aws"
+        assert len(unreserved_job_plan["offers"]) == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_run_plan_docker_true(
         self,
         test_db,
