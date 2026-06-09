@@ -3748,18 +3748,18 @@ class TestSubmitService:
         repo = await create_repo(session=session, project_id=project.id)
         backend = await create_backend(session=session, project_id=project.id)
         for gateway_name, is_default in existing_gateways:
-            gateway_compute = await create_gateway_compute(
-                session=session,
-                backend_id=backend.id,
-            )
             gateway = await create_gateway(
                 session=session,
                 project_id=project.id,
                 backend_id=backend.id,
-                gateway_compute_id=gateway_compute.id,
                 status=GatewayStatus.RUNNING,
                 name=gateway_name,
                 wildcard_domain=f"{gateway_name}.example",
+            )
+            await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                gateway_id=gateway.id,
             )
             if is_default:
                 project.default_gateway_id = gateway.id
@@ -3844,16 +3844,15 @@ class TestSubmitService:
             session=session, owner=exporter_user, name="exporter-project"
         )
         backend = await create_backend(session=session, project_id=exporter_project.id)
-        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
         gateway = await create_gateway(
             session=session,
             project_id=exporter_project.id,
             backend_id=backend.id,
-            gateway_compute_id=gateway_compute.id,
             status=GatewayStatus.RUNNING,
             name="exported-gateway",
             wildcard_domain="exported-gateway.example",
         )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
 
         importer_user = await create_user(
             session=session, global_role=GlobalRole.USER, name="importer_user"
@@ -3929,14 +3928,13 @@ class TestSubmitService:
         user = await create_user(session=session, global_role=GlobalRole.USER)
         gateway_project = await create_project(session=session, owner=user, name="gateway-project")
         backend = await create_backend(session=session, project_id=gateway_project.id)
-        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
         gateway = await create_gateway(
             session=session,
             project_id=gateway_project.id,
             backend_id=backend.id,
-            gateway_compute_id=gateway_compute.id,
             status=GatewayStatus.RUNNING,
         )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
 
         service_project = await create_project(session=session, owner=user, name="service-project")
         # The project's default_gateway_id may point to the gateway (e.g., if the gateway was
@@ -3982,16 +3980,15 @@ class TestSubmitService:
             session=session, owner=exporter_user, name="exporter-project"
         )
         backend = await create_backend(session=session, project_id=exporter_project.id)
-        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
         gateway = await create_gateway(
             session=session,
             project_id=exporter_project.id,
             backend_id=backend.id,
-            gateway_compute_id=gateway_compute.id,
             status=GatewayStatus.RUNNING,
             name="exported-gateway",
             wildcard_domain="${{ run.project_name }}.example.com",
         )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
 
         importer_user = await create_user(
             session=session, global_role=GlobalRole.USER, name="importer_user"
@@ -4041,16 +4038,15 @@ class TestSubmitService:
             session=session, owner=exporter_user, name="exporter-project"
         )
         backend = await create_backend(session=session, project_id=exporter_project.id)
-        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
         gateway = await create_gateway(
             session=session,
             project_id=exporter_project.id,
             backend_id=backend.id,
-            gateway_compute_id=gateway_compute.id,
             status=GatewayStatus.RUNNING,
             name="exported-gateway",
             wildcard_domain="${{ run.unknown_variable }}.example.com",
         )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
 
         importer_user = await create_user(
             session=session, global_role=GlobalRole.USER, name="importer_user"
@@ -4108,15 +4104,14 @@ class TestSubmitService:
         )
         repo = await create_repo(session=session, project_id=project.id)
         backend = await create_backend(session=session, project_id=project.id)
-        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
         gateway = await create_gateway(
             session=session,
             project_id=project.id,
             backend_id=backend.id,
-            gateway_compute_id=gateway_compute.id,
             status=GatewayStatus.RUNNING,
             wildcard_domain="example.com",
         )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
         project.default_gateway_id = gateway.id
         await session.commit()
 
@@ -4158,16 +4153,15 @@ class TestSubmitService:
         )
         repo = await create_repo(session=session, project_id=project.id)
         backend = await create_backend(session=session, project_id=project.id)
-        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
         gateway = await create_gateway(
             session=session,
             project_id=project.id,
             backend_id=backend.id,
-            gateway_compute_id=gateway_compute.id,
             status=GatewayStatus.RUNNING,
             wildcard_domain="example.com",
             forbid_new_services=True,
         )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
         project.default_gateway_id = gateway.id
         await session.commit()
 
@@ -4196,17 +4190,16 @@ class TestSubmitService:
         )
         repo = await create_repo(session=session, project_id=project.id)
         backend = await create_backend(session=session, project_id=project.id)
-        gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
-        await create_gateway(
+        gateway = await create_gateway(
             session=session,
             project_id=project.id,
             backend_id=backend.id,
-            gateway_compute_id=gateway_compute.id,
             status=GatewayStatus.RUNNING,
             name="restricted-gateway",
             wildcard_domain="example.com",
             forbid_new_services=True,
         )
+        await create_gateway_compute(session=session, backend_id=backend.id, gateway_id=gateway.id)
 
         response = await client.post(
             "/api/project/test-project/runs/submit",

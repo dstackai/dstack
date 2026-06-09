@@ -28,7 +28,7 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services import events
-from dstack._internal.server.services.gateways import get_or_add_gateway_connection
+from dstack._internal.server.services.gateways import get_combined_gateway_stats
 from dstack._internal.server.services.jobs import emit_job_status_change_event
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
@@ -313,8 +313,9 @@ async def _load_pending_context(
 
     gateway_stats = None
     if run_spec.configuration.type == "service" and run_model.gateway_id is not None:
-        _, conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
-        gateway_stats = await conn.get_stats(run_model.project.name, run_model.run_name)
+        gateway_stats = await get_combined_gateway_stats(
+            session, run_model.gateway_id, run_model.project.name, run_model.run_name
+        )
 
     return pending.PendingContext(
         run_model=run_model,
@@ -494,8 +495,9 @@ async def _load_active_context(
 
     gateway_stats = None
     if run_spec.configuration.type == "service" and run_model.gateway_id is not None:
-        _, conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
-        gateway_stats = await conn.get_stats(run_model.project.name, run_model.run_name)
+        gateway_stats = await get_combined_gateway_stats(
+            session, run_model.gateway_id, run_model.project.name, run_model.run_name
+        )
 
     return active.ActiveContext(
         run_model=run_model,

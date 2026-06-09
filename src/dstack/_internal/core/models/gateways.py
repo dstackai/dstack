@@ -11,6 +11,8 @@ from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.utils.tags import tags_validator
 
+GATEWAY_REPLICAS_DEFAULT = 1
+
 
 class GatewayStatus(str, Enum):
     SUBMITTED = "submitted"
@@ -90,6 +92,13 @@ class GatewayConfiguration(CoreModel):
             " Set to `null` to disable. Defaults to `type: lets-encrypt`"
         ),
     ] = LetsEncryptGatewayCertificate()
+    replicas: Annotated[
+        Optional[int],
+        Field(
+            description=f"The number of gateway replicas. Defaults to `{GATEWAY_REPLICAS_DEFAULT}`",
+            ge=1,
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(
@@ -109,6 +118,14 @@ class GatewaySpec(CoreModel):
     configuration_path: Optional[str] = None
 
 
+class GatewayReplica(CoreModel):
+    hostname: str
+    replica_num: int
+    backend: BackendType
+    region: str
+    created_at: datetime.datetime
+
+
 class Gateway(CoreModel):
     # TODO(0.21): Make `id` required.
     id: Optional[uuid.UUID] = None
@@ -121,14 +138,13 @@ class Gateway(CoreModel):
     status: GatewayStatus
     status_message: Optional[str]
     hostname: Optional[str]
-    """`hostname` is the IP address or hostname the user should set up the domain for.
-    Could be the same as `ip_address` but also different, for example a gateway behind ALB.
+    """Hostname of the load balancer.
+    Unset if there is no load balancer, in which case users are expected to point the gateway's
+    wildcard domain name to `replicas[i].hostname`.
     """
-    ip_address: Optional[str]
-    """`ip_address` is the IP address of the gateway instance."""
-    instance_id: Optional[str]
     wildcard_domain: Optional[str]
     default: bool
+    replicas: list[GatewayReplica] = []
     backend: Optional[BackendType] = None
     """`backend` duplicates a configuration field on the top level for backward compatibility
     with 0.19.x clients that expect it to be required.
@@ -139,6 +155,10 @@ class Gateway(CoreModel):
     with 0.19.x clients that expect it to be required.
     Remove after 0.21.
     """
+    ip_address: Optional[str] = None
+    """Deprecated in favor of `replicas[i].hostname`, only set for pre-0.20.25 clients."""
+    instance_id: Optional[str] = None
+    """Deprecated, unused, kept for pre-0.20.25 clients."""
 
 
 class GatewayPlan(CoreModel):

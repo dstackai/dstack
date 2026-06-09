@@ -1,3 +1,9 @@
+declare interface IGatewayReplica {
+    hostname: string,
+    backend: string,
+    region: string,
+}
+
 declare interface IGateway {
     backend: string,
     name: string,
@@ -5,8 +11,10 @@ declare interface IGateway {
     ip_address: string,
     instance_id: string,
     region:string
+    hostname?: string,
     wildcard_domain?: string
     default: boolean
+    replicas: IGatewayReplica[],
     created_at?: number,
 }
 

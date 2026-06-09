@@ -16,7 +16,7 @@ from dstack._internal.server import models
 from dstack._internal.server.background.pipeline_tasks.base import ItemUpdateMap
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.services import events
-from dstack._internal.server.services.gateways import get_or_add_gateway_connection
+from dstack._internal.server.services.gateways import get_or_add_gateway_connections
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runs import _get_next_triggered_at, get_run_spec
 from dstack._internal.utils.common import get_or_error
@@ -148,24 +148,37 @@ async def _unregister_service(run_model: models.RunModel) -> Optional[ServiceUnr
         return None
 
     async with get_session_ctx() as session:
-        gateway, conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
+        gateway, connections = await get_or_add_gateway_connections(session, run_model.gateway_id)
         gateway_target = events.Target.from_model(gateway)
 
-    try:
-        logger.debug("%s: unregistering service", fmt(run_model))
-        async with conn.client() as client:
-            await client.unregister_service(
-                project=run_model.project.name,
-                run_name=run_model.run_name,
+    gateway_errors = []
+    for conn in connections:
+        try:
+            logger.debug(
+                "%s: unregistering service on gateway replica %s", fmt(run_model), conn.ip_address
             )
+            async with conn.client() as client:
+                await client.unregister_service(
+                    project=run_model.project.name,
+                    run_name=run_model.run_name,
+                )
+        except GatewayError as e:
+            # Ignore if the service is not registered on this replica.
+            logger.warning(
+                "%s: unregistering service on gateway replica %s: %s",
+                fmt(run_model),
+                conn.ip_address,
+                e,
+            )
+            gateway_errors.append(str(e))
+        except (httpx.RequestError, SSHError) as e:
+            logger.debug("Gateway request failed", exc_info=True)
+            raise GatewayError(repr(e))
+
+    if gateway_errors:
+        event_message = f"Gateway error when unregistering service: {'; '.join(gateway_errors)}"
+    else:
         event_message = "Service unregistered from gateway"
-    except GatewayError as e:
-        # Ignore if the service is not registered.
-        logger.warning("%s: unregistering service: %s", fmt(run_model), e)
-        event_message = f"Gateway error when unregistering service: {e}"
-    except (httpx.RequestError, SSHError) as e:
-        logger.debug("Gateway request failed", exc_info=True)
-        raise GatewayError(repr(e))
     return ServiceUnregistration(
         event_message=event_message,
         gateway_target=gateway_target,

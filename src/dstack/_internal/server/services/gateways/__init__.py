@@ -10,7 +10,7 @@ from typing import List, Optional, Sequence
 import httpx
 from sqlalchemy import exists, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
@@ -32,15 +32,19 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.gateways import (
+    GATEWAY_REPLICAS_DEFAULT,
     AnyGatewayRouterConfig,
     Gateway,
     GatewayComputeConfiguration,
     GatewayConfiguration,
+    GatewayReplica,
     GatewaySpec,
     GatewayStatus,
     LetsEncryptGatewayCertificate,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.proxy.gateway.const import SERVICE_SCALING_WINDOWS
+from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, Stat
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
@@ -169,6 +173,8 @@ async def create_gateway_compute(
     project_name: str,
     backend_compute: Compute,
     configuration: GatewayConfiguration,
+    replica_num: int,
+    gateway_id: Optional[uuid.UUID] = None,
     backend_id: Optional[uuid.UUID] = None,
 ) -> GatewayComputeModel:
     assert isinstance(backend_compute, ComputeWithGatewaySupport)
@@ -180,7 +186,7 @@ async def create_gateway_compute(
 
     compute_configuration = GatewayComputeConfiguration(
         project_name=project_name,
-        instance_name=configuration.name,
+        instance_name=f"{configuration.name}-{replica_num}",
         backend=configuration.backend,
         region=configuration.region,
         instance_type=configuration.instance_type,
@@ -197,7 +203,9 @@ async def create_gateway_compute(
     )
 
     return GatewayComputeModel(
+        gateway_id=gateway_id,
         backend_id=backend_id,
+        replica_num=replica_num,
         region=gpd.region,
         ip_address=gpd.ip_address,
         instance_id=gpd.instance_id,
@@ -467,6 +475,7 @@ async def list_project_gateway_models(
         stmt = stmt.where(GatewayModel.project_id == project.id)
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+        stmt = stmt.options(selectinload(GatewayModel.gateway_computes))
     if load_backend_type:
         stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
@@ -495,6 +504,7 @@ async def get_project_gateway_model_by_reference(
         )
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+        stmt = stmt.options(selectinload(GatewayModel.gateway_computes))
     if load_backend_type:
         stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
@@ -529,6 +539,7 @@ async def get_project_gateway_model_by_name_for_update(
                 select(GatewayModel)
                 .where(GatewayModel.id.in_([gateway_id]), *filters)
                 .options(joinedload(GatewayModel.gateway_compute))
+                .options(selectinload(GatewayModel.gateway_computes))
                 .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
                 .with_for_update(key_share=True, of=GatewayModel)
             )
@@ -555,6 +566,7 @@ async def get_project_default_gateway_model(
     )
     if load_gateway_compute:
         stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
+        stmt = stmt.options(selectinload(GatewayModel.gateway_computes))
     if load_backend_type:
         stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
@@ -571,30 +583,71 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 
 
 # TODO: Connect to gateway outside session
-async def get_or_add_gateway_connection(
+async def get_or_add_gateway_connections(
     session: AsyncSession, gateway_id: uuid.UUID
-) -> tuple[GatewayModel, GatewayConnection]:
-    gateway = await session.get(
-        GatewayModel,
-        gateway_id,
-        options=[joinedload(GatewayModel.gateway_compute)],
-        populate_existing=True,
+) -> tuple[GatewayModel, List[GatewayConnection]]:
+    res = await session.execute(
+        select(GatewayModel)
+        .where(GatewayModel.id == gateway_id)
+        .options(joinedload(GatewayModel.gateway_compute))
+        .options(selectinload(GatewayModel.gateway_computes))
     )
+    gateway = res.scalar_one_or_none()
     if gateway is None:
         raise GatewayError("Gateway not found")
-    if gateway.gateway_compute is None:
+    computes = get_gateway_compute_models(gateway)
+    if not computes:
         raise GatewayError("Gateway compute not found")
+    connections: List[GatewayConnection] = []
+    for compute in computes:
+        try:
+            conn = await gateway_connections_pool.get_or_add(
+                hostname=compute.ip_address,
+                id_rsa=compute.ssh_private_key,
+            )
+            connections.append(conn)
+        except Exception as e:
+            logger.warning("Failed to connect to gateway %s: %s", compute.ip_address, e)
+            raise GatewayError("Failed to connect to gateway")
+    return gateway, connections
+
+
+async def get_combined_gateway_stats(
+    session: AsyncSession,
+    gateway_id: uuid.UUID,
+    project_name: str,
+    run_name: str,
+) -> Optional[PerWindowStats]:
+    """
+    Return stats for *run_name* aggregated across all replicas of *gateway_id*.
+    """
     try:
-        conn = await gateway_connections_pool.get_or_add(
-            hostname=gateway.gateway_compute.ip_address,
-            id_rsa=gateway.gateway_compute.ssh_private_key,
+        _, connections = await get_or_add_gateway_connections(session, gateway_id)
+    except GatewayError:
+        return None
+    per_replica: list[PerWindowStats] = []
+    for conn in connections:
+        stats = await conn.get_stats(project_name, run_name)
+        if stats is None:  # Stats not fetched yet
+            return None
+        per_replica.append(stats)
+    return _merge_per_window_stats(per_replica) if per_replica else None
+
+
+def _merge_per_window_stats(stats_per_gateway_replica: list[PerWindowStats]) -> PerWindowStats:
+    merged: PerWindowStats = {}
+    for window in SERVICE_SCALING_WINDOWS:
+        total_requests = 0
+        total_time_of_all_requests = 0.0
+        for gateway_replica_stats in stats_per_gateway_replica:
+            stat = gateway_replica_stats[window]
+            total_requests += stat.requests
+            total_time_of_all_requests += stat.requests * stat.request_time
+        merged[window] = Stat(
+            requests=total_requests,
+            request_time=(total_time_of_all_requests / total_requests if total_requests else 0.0),
         )
-    except Exception as e:
-        logger.warning(
-            "Failed to connect to gateway %s: %s", gateway.gateway_compute.ip_address, e
-        )
-        raise GatewayError("Failed to connect to gateway")
-    return gateway, conn
+    return merged
 
 
 async def init_gateways(session: AsyncSession):
@@ -732,6 +785,14 @@ async def configure_gateway(
     logger.info("Gateway %s configured", connection.ip_address)
 
 
+def get_gateway_compute_models(gateway_model: GatewayModel) -> List[GatewayComputeModel]:
+    if gateway_model.gateway_computes:  # 0.20.25+ gateway
+        return list(gateway_model.gateway_computes)
+    if gateway_model.gateway_compute is not None:  # pre-0.20.25 gateway
+        return [gateway_model.gateway_compute]
+    return []
+
+
 def get_gateway_configuration(gateway_model: GatewayModel) -> GatewayConfiguration:
     if gateway_model.configuration is not None:
         return GatewayConfiguration.__response__.parse_raw(gateway_model.configuration)
@@ -746,22 +807,19 @@ def get_gateway_configuration(gateway_model: GatewayModel) -> GatewayConfigurati
 
 
 def get_gateway_compute_configuration(
+    gateway_compute: GatewayComputeModel,
     gateway_model: GatewayModel,
-) -> Optional[GatewayComputeConfiguration]:
-    if gateway_model.gateway_compute is None:
-        return None
-    if gateway_model.gateway_compute.configuration is not None:
-        return GatewayComputeConfiguration.__response__.parse_raw(
-            gateway_model.gateway_compute.configuration
-        )
+) -> GatewayComputeConfiguration:
+    if gateway_compute.configuration is not None:
+        return GatewayComputeConfiguration.__response__.parse_raw(gateway_compute.configuration)
     # Handle gateways created before GatewayComputeConfiguration was introduced
     return GatewayComputeConfiguration(
         project_name=gateway_model.project.name,
-        instance_name=gateway_model.gateway_compute.instance_id,
+        instance_name=gateway_compute.instance_id,
         backend=gateway_model.backend.type,
-        region=gateway_model.gateway_compute.region,
+        region=gateway_compute.region,
         public_ip=True,
-        ssh_key_pub=gateway_model.gateway_compute.ssh_public_key,
+        ssh_key_pub=gateway_compute.ssh_public_key,
         certificate=LetsEncryptGatewayCertificate(),
     )
 
@@ -775,28 +833,34 @@ def gateway_model_to_gateway(
         default_gateway_id: ID of the default gateway in the project where `gateway_model` is being
             viewed. Can be different from `gateway_model.project` if the gateway is imported.
     """
-    ip_address = ""
-    instance_id = ""
-    hostname = ""
-    if gateway_model.gateway_compute is not None:
-        ip_address = gateway_model.gateway_compute.ip_address
-        instance_id = gateway_model.gateway_compute.instance_id
-        hostname = gateway_model.gateway_compute.hostname
-        if hostname is None:
-            hostname = ip_address
     backend_type = gateway_model.backend.type
     if gateway_model.backend.type == BackendType.DSTACK:
         backend_type = BackendType.AWS
     is_default = default_gateway_id == gateway_model.id
     configuration = get_gateway_configuration(gateway_model)
     configuration.default = is_default
+
+    compute_models = sorted(get_gateway_compute_models(gateway_model), key=lambda c: c.replica_num)
+    gateway_hostname = None
+    replicas = []
+    for compute in compute_models:
+        compute_configuration = get_gateway_compute_configuration(compute, gateway_model)
+        replicas.append(
+            GatewayReplica(
+                hostname=compute.ip_address,
+                replica_num=compute.replica_num,
+                backend=compute_configuration.backend,
+                region=compute_configuration.region,
+                created_at=compute.created_at,
+            )
+        )
+        gateway_hostname = compute.hostname
+
     return Gateway(
         id=gateway_model.id,
         name=gateway_model.name,
         project_name=gateway_model.project.name,
-        ip_address=ip_address,
-        instance_id=instance_id,
-        hostname=hostname,
+        hostname=gateway_hostname,
         backend=backend_type,
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
@@ -805,6 +869,7 @@ def gateway_model_to_gateway(
         status=gateway_model.status,
         status_message=gateway_model.status_message,
         configuration=configuration,
+        replicas=replicas,
     )
 
 
@@ -838,6 +903,10 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
             f" {[b.value for b in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT]}."
         )
 
+    replicas = (
+        configuration.replicas if configuration.replicas is not None else GATEWAY_REPLICAS_DEFAULT
+    )
+
     if configuration.certificate is not None:
         if configuration.certificate.type == "lets-encrypt" and not configuration.public_ip:
             raise ServerClientError(
@@ -845,3 +914,13 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
             )
         if configuration.certificate.type == "acm" and configuration.backend != BackendType.AWS:
             raise ServerClientError("acm certificate type is supported for aws backend only")
+        if replicas > 1:
+            raise ServerClientError(
+                "Replicated gateways do not support certificates."
+                " Set either `certificate: null` or `replicas: 1` in the gateway configuration"
+            )
+
+    if configuration.router is not None and replicas > 1:
+        raise ServerClientError(
+            "The deprecated `router` property is not supported for multi-replica gateways"
+        )
