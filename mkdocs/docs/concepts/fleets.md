@@ -103,7 +103,7 @@ To create a fleet, define its configuration in a YAML file. The filename must en
     `dstack apply` automatically connects to on-prem servers, installs the required dependencies, and adds them to the created fleet.
 
     ??? info "Host requirements"
-        1.&nbsp;Hosts must be pre-installed with Docker.
+        1.&nbsp;Hosts must be Linux-based and have Docker pre-installed.
 
         === "NVIDIA"
             2.&nbsp;Hosts with NVIDIA GPUs must also be pre-installed with CUDA 12.1 and

@@ -169,7 +169,6 @@ class SSHAttach(BaseSSHAttach):
         container_user: str,
         dockerized: bool,
         ssh_proxy: Optional[SSHConnectionParams] = None,
-        local_backend: bool = False,
         service_port: Optional[int] = None,
         bind_address: Optional[str] = None,
     ):
@@ -182,17 +181,7 @@ class SSHAttach(BaseSSHAttach):
             bind_address=bind_address,
         )
         hosts = self.hosts
-        if local_backend:
-            hosts[run_name] = {
-                "HostName": hostname,
-                "Port": container_ssh_port,
-                "User": container_user,
-                "IdentityFile": self.identity_file,
-                "IdentitiesOnly": "yes",
-                "StrictHostKeyChecking": "no",
-                "UserKnownHostsFile": "/dev/null",
-            }
-        elif dockerized:
+        if dockerized:
             if ssh_proxy is not None:
                 # SSH instance with jump host
                 # dstack has no IdentityFile for jump host, it must be either preconfigured

@@ -93,7 +93,7 @@ class TestResolveProvisioningImageName:
     @pytest.mark.parametrize("suffix", ["-base", "-devel"])
     @pytest.mark.parametrize(
         "backend",
-        [BackendType.GCP, BackendType.AZURE, BackendType.LAMBDA, BackendType.LOCAL],
+        [BackendType.GCP, BackendType.AZURE, BackendType.LAMBDA],
     )
     @pytest.mark.parametrize(
         "instance_type",

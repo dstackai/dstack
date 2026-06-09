@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
-	rt "runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -966,9 +965,6 @@ func (d *DockerRunner) startContainer(ctx context.Context, task *Task) error {
 	if err != nil {
 		return fmt.Errorf("inspect container: %w", err)
 	}
-	// FIXME: container_.NetworkSettings.Ports values (bindings) are not immediately available
-	// on macOS, so ports can be empty with local backend.
-	// Workaround: restart shim after submitting the run.
 	task.ports = extractPorts(ctx, container_.NetworkSettings.Ports)
 	return nil
 }
@@ -1083,10 +1079,7 @@ func extractPorts(ctx context.Context, portMap nat.PortMap) []PortMapping {
 }
 
 func getNetworkMode(networkMode NetworkMode) container.NetworkMode {
-	if rt.GOOS == "linux" {
-		return container.NetworkMode(networkMode)
-	}
-	return "default"
+	return container.NetworkMode(networkMode)
 }
 
 func configureGpuDevices(hostConfig *container.HostConfig, gpuDevices []GPUDevice) {

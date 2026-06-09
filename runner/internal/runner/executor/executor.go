@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -90,34 +89,19 @@ type RunExecutor struct {
 	connectionTracker ConnectionTracker
 }
 
-// stubConnectionTracker is a no-op implementation for when procfs is not available (only required for tests on darwin)
-type stubConnectionTracker struct{}
-
-func (s *stubConnectionTracker) GetNoConnectionsSecs() int64   { return 0 }
-func (s *stubConnectionTracker) Track(ticker <-chan time.Time) {}
-func (s *stubConnectionTracker) Stop()                         {}
-
 func NewRunExecutor(tempDir string, dstackDir string, currentUser linuxuser.User, sshd ssh.SshdManager) (*RunExecutor, error) {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
 
-	// Try to initialize procfs, but don't fail if it's not available (e.g., on macOS)
-	var connectionTracker ConnectionTracker
-
-	if runtime.GOOS == "linux" {
-		proc, err := procfs.NewDefaultFS()
-		if err != nil {
-			return nil, fmt.Errorf("initialize procfs: %w", err)
-		}
-		connectionTracker = connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
-			Port:            uint64(sshd.Port()),
-			MinConnDuration: 10 * time.Second, // shorter connections are likely from dstack-server
-			Procfs:          proc,
-		})
-	} else {
-		// Use stub connection tracker (only required for tests on darwin)
-		connectionTracker = &stubConnectionTracker{}
+	proc, err := procfs.NewDefaultFS()
+	if err != nil {
+		return nil, fmt.Errorf("initialize procfs: %w", err)
 	}
+	connectionTracker := connections.NewConnectionTracker(connections.ConnectionTrackerConfig{
+		Port:            uint64(sshd.Port()),
+		MinConnDuration: 10 * time.Second, // shorter connections are likely from dstack-server
+		Procfs:          proc,
+	})
 
 	return &RunExecutor{
 		tempDir:     tempDir,

@@ -1,7 +1,6 @@
 from collections.abc import Iterable
 
 from dstack._internal.core.consts import DSTACK_RUNNER_SSH_PORT
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh.tunnel import SSH_DEFAULT_OPTIONS, SocketPair, SSHTunnel
 from dstack._internal.server.models import JobModel
@@ -44,14 +43,13 @@ def get_container_ssh_credentials(job: JobModel) -> list[tuple[SSHConnectionPara
     job_project_key = FileContent(job.project.ssh_private_key)
 
     if jpd.dockerized:
-        if jpd.backend != BackendType.LOCAL:
-            instance_proxy = SSHConnectionParams(
-                hostname=jpd.hostname,
-                username=jpd.username,
-                port=jpd.ssh_port,
-            )
-            instance_project_key = FileContent(instance.project.ssh_private_key)
-            hosts.append((instance_proxy, instance_project_key))
+        instance_proxy = SSHConnectionParams(
+            hostname=jpd.hostname,
+            username=jpd.username,
+            port=jpd.ssh_port,
+        )
+        instance_project_key = FileContent(instance.project.ssh_private_key)
+        hosts.append((instance_proxy, instance_project_key))
         ssh_port = DSTACK_RUNNER_SSH_PORT
         jrd = get_job_runtime_data(job)
         if jrd is not None and jrd.ports is not None:

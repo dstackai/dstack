@@ -6,7 +6,6 @@ import requests
 from typing_extensions import Concatenate, ParamSpec
 
 from dstack._internal.core.errors import DstackError, SSHError
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.runs import JobProvisioningData, JobRuntimeData
 from dstack._internal.server import settings
 from dstack._internal.server.services.runner.client import LocalAddress
@@ -53,13 +52,6 @@ def runner_ssh_tunnel(
         Returns:
             is successful
         """
-        if job_provisioning_data.backend == BackendType.LOCAL:
-            # without SSH
-            port_map = InstanceConnection.get_container_to_host_port_map(
-                job_provisioning_data, job_runtime_data
-            )
-            return func(port_map, *args, **kwargs)
-
         if not settings.SERVER_SSH_POOL_ENABLED or not job_provisioning_data.dockerized:
             # Connections from dstack-server to runner's sshd are expected to be short
             # as the `inactivity_duration` feature distinguishes user and server connections based on duration.
