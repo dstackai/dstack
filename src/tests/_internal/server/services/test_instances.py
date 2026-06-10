@@ -2,7 +2,6 @@ import uuid
 from unittest.mock import Mock, call
 
 import pytest
-from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.instances as instances_services
@@ -233,6 +232,7 @@ class TestFilterInstances:
         res = instances_services.filter_instances(
             instances=instances,
             profile=Profile(name="test", instances=[InstanceNameSelector(name="my-cluster-1")]),
+            project=project,
         )
         assert res == [instance1]
 
@@ -249,6 +249,7 @@ class TestFilterInstances:
         res = instances_services.filter_instances(
             instances=[instance0],
             profile=Profile(name="test", instances=[InstanceNameSelector(name="MY-CLUSTER-0")]),
+            project=project,
         )
         assert res == [instance0]
 
@@ -276,6 +277,7 @@ class TestFilterInstances:
                 name="test",
                 instances=[InstanceHostnameSelector(hostname="10.0.0.8")],
             ),
+            project=project,
         )
         assert res == [instance1]
 
@@ -306,6 +308,7 @@ class TestFilterInstances:
                 name="test",
                 instances=[InstanceHostnameSelector(hostname="10.0.0.8")],
             ),
+            project=project,
         )
         assert res == [instance1]
 
@@ -323,6 +326,7 @@ class TestFilterInstances:
         res = instances_services.filter_instances(
             instances=[instance],
             profile=Profile.parse_obj({"name": "test", "instances": ["10.0.0.8"]}),
+            project=project,
         )
         assert res == []
 
@@ -350,6 +354,7 @@ class TestFilterInstances:
                 name="test",
                 instances=[InstanceHostnameSelector(hostname="192.168.1.11")],
             ),
+            project=project,
         )
         assert res == [instance1]
 
@@ -379,36 +384,23 @@ class TestFilterInstances:
                 name="test",
                 instances=[FleetInstanceSelector(fleet="my-fleet", instance=1)],
             ),
+            project=project,
         )
         assert res == [instance1]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_filters_by_fleet_and_instance_number_without_loading_instance_fleet(
-        self, test_db, session: AsyncSession
-    ):
+    async def test_selectors_require_project(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
-        fleet = await create_fleet(session=session, project=project, name="my-fleet")
-        instance = await create_instance(
-            session=session,
-            project=project,
-            fleet=fleet,
-            instance_num=1,
-            name="worker-b",
-        )
-        session.expire(instance, ["fleet"])
-        assert "fleet" in sa_inspect(instance).unloaded
-
-        res = instances_services.filter_instances(
-            instances=[instance],
-            profile=Profile(
-                name="test",
-                instances=[FleetInstanceSelector(fleet="my-fleet", instance=1)],
-            ),
-            fleet=fleet,
-        )
-        assert res == [instance]
+        instance = await create_instance(session=session, project=project)
+        with pytest.raises(ValueError, match="project"):
+            instances_services.filter_instances(
+                instances=[instance],
+                profile=Profile(
+                    name="test", instances=[InstanceNameSelector(name="instance")]
+                ),
+            )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -503,6 +495,7 @@ class TestFilterInstances:
             instances=[instance0, instance1],
             profile=Profile(name="test", instances=[InstanceNameSelector(name="my-fleet-1")]),
             multinode=True,
+            project=project,
         )
         assert res == [instance1]
 
@@ -528,6 +521,7 @@ class TestFilterInstances:
             instances=[instance0, instance1],
             profile=Profile(name="test", instances=[InstanceNameSelector(name="my-fleet-1")]),
             shared=True,
+            project=project,
         )
         assert res == [instance1]
 

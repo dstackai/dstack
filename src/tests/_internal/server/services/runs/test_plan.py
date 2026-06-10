@@ -247,7 +247,6 @@ class TestSelectRunCandidateFleetModelsWithFilters:
             fleet_filters=fleet_filters,
             instance_filters=instance_filters,
             lock_instances=False,
-            load_fleet_project=True,
         )
 
         assert [fleet.project.name for fleet in fleets_with_instances] == [

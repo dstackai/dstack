@@ -6,9 +6,9 @@ from typing import Dict, List, Literal, Optional, Union
 
 import gpuhunt
 from sqlalchemy import and_, exists, false, or_, select
-from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm.attributes import set_committed_value
 
 from dstack._internal.core.backends.base.offers import (
     offer_to_catalog_item,
@@ -380,33 +380,21 @@ def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, O
     return host_private_key, proxy_private_keys[0]
 
 
-def profile_instances_have_qualified_fleet_selector(profile: Profile) -> bool:
-    if profile.instances is None:
-        return False
-    for selector in profile.instances:
-        if isinstance(selector, FleetInstanceSelector):
-            if selector.fleet.project is not None:
-                return True
-    return False
-
-
 def instance_matches_selectors(
     instance: InstanceModel,
     selectors: List[InstanceSelector],
     *,
-    project: Optional[ProjectModel] = None,
-    fleet: Optional[FleetModel] = None,
+    project: ProjectModel,
 ) -> bool:
     """
     Check if an instance matches any of the given instance selectors.
+
+    Unqualified fleet references are interpreted as fleets of `project`.
+    `instance.fleet` (and `fleet.project` for project-qualified references)
+    must be loaded.
     """
     return any(
-        instance_matches_selector(
-            instance,
-            selector,
-            project=project,
-            fleet=fleet,
-        )
+        instance_matches_selector(instance, selector, project=project)
         for selector in selectors
     )
 
@@ -415,20 +403,14 @@ def instance_matches_selector(
     instance: InstanceModel,
     selector: InstanceSelector,
     *,
-    project: Optional[ProjectModel] = None,
-    fleet: Optional[FleetModel] = None,
+    project: ProjectModel,
 ) -> bool:
     if isinstance(selector, InstanceNameSelector):
         return instance.name.lower() == selector.name.lower()
     if isinstance(selector, InstanceHostnameSelector):
         return instance_matches_hostname_selector(instance, selector)
     if isinstance(selector, FleetInstanceSelector):
-        return instance_matches_fleet_instance_selector(
-            instance,
-            selector,
-            project=project,
-            fleet=fleet,
-        )
+        return _instance_matches_fleet_instance_selector(instance, selector, project=project)
     return False
 
 
@@ -448,34 +430,32 @@ def instance_matches_hostname_selector(
     return selector.hostname.lower() in candidates
 
 
-def instance_matches_fleet_instance_selector(
+def _instance_matches_fleet_instance_selector(
     instance: InstanceModel,
     selector: FleetInstanceSelector,
     *,
-    project: Optional[ProjectModel] = None,
-    fleet: Optional[FleetModel] = None,
+    project: ProjectModel,
 ) -> bool:
-    fleet_ref = selector.fleet
-
+    fleet = instance.fleet
     if fleet is None:
-        # Avoid triggering a lazy load in async code.
-        if "fleet" in sa_inspect(instance).unloaded or instance.fleet is None:
-            return False
-        fleet = instance.fleet
-
-    if fleet.name.lower() != fleet_ref.name.lower():
+        return False
+    if fleet.name.lower() != selector.fleet.name.lower():
         return False
     if instance.instance_num != selector.instance:
         return False
+    if selector.fleet.project is None:
+        return fleet.project_id == project.id
+    return fleet.project.name.lower() == selector.fleet.project.lower()
 
-    if fleet_ref.project is None:
-        if project is not None and fleet.project_id != project.id:
-            return False
-        return True
 
-    if "project" in sa_inspect(fleet).unloaded or fleet.project is None:
-        return False
-    return fleet.project.name.lower() == fleet_ref.project.lower()
+def populate_instances_fleet(fleet_model: FleetModel) -> None:
+    """
+    Set `instance.fleet` for instances fetched through `FleetModel.instances`.
+    SQLAlchemy does not populate the reverse many-to-one on load, and instance
+    selector matching requires it to be loaded.
+    """
+    for instance in fleet_model.instances:
+        set_committed_value(instance, "fleet", fleet_model)
 
 
 def instance_matches_constraints(
@@ -527,7 +507,6 @@ def filter_instances(
     volumes: Optional[List[List[Volume]]] = None,
     shared: bool = False,
     project: Optional[ProjectModel] = None,
-    fleet: Optional[FleetModel] = None,
 ) -> List[InstanceModel]:
     backend_types: Optional[list[BackendType]] = profile.backends
     regions: Optional[list[str]] = profile.regions
@@ -568,6 +547,8 @@ def filter_instances(
 
     instance_types = profile.instance_types
     instance_selectors = profile.instances
+    if instance_selectors is not None and project is None:
+        raise ValueError("project must be provided when profile.instances is set")
 
     filtered_instances: List[InstanceModel] = []
     for instance in instances:
@@ -576,8 +557,7 @@ def filter_instances(
         if instance_selectors is not None and not instance_matches_selectors(
             instance,
             instance_selectors,
-            project=project,
-            fleet=fleet,
+            project=common_utils.get_or_error(project),
         ):
             continue
         if instance.health.is_failure():
@@ -622,7 +602,6 @@ def get_shared_instances_with_offers(
     multinode: bool = False,
     volumes: Optional[List[List[Volume]]] = None,
     project: Optional[ProjectModel] = None,
-    fleet: Optional[FleetModel] = None,
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     instances_with_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
     query_filter = requirements_to_query_filter(requirements)
@@ -633,7 +612,6 @@ def get_shared_instances_with_offers(
         volumes=volumes,
         shared=True,
         project=project,
-        fleet=fleet,
     )
     for instance in filtered_instances:
         if idle_only and instance.status not in [InstanceStatus.IDLE, InstanceStatus.BUSY]:
@@ -663,12 +641,7 @@ def get_shared_instances_with_offers(
 async def get_pool_instances(
     session: AsyncSession,
     project: ProjectModel,
-    *,
-    load_fleet_project: bool = False,
 ) -> List[InstanceModel]:
-    fleet_load = joinedload(InstanceModel.fleet)
-    if load_fleet_project:
-        fleet_load = fleet_load.joinedload(FleetModel.project)
     res = await session.execute(
         select(InstanceModel)
         .where(
@@ -682,7 +655,11 @@ async def get_pool_instances(
             ),
             InstanceModel.deleted == False,
         )
-        .options(fleet_load)
+        .options(
+            joinedload(InstanceModel.fleet)
+            .joinedload(FleetModel.project)
+            .load_only(ProjectModel.name)
+        )
     )
     instance_models = list(res.unique().scalars().all())
     return instance_models

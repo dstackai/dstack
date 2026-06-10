@@ -49,7 +49,7 @@ from dstack._internal.server.services.instances import (
     get_pool_instances,
     get_shared_instances_with_offers,
     is_placeholder_instance,
-    profile_instances_have_qualified_fleet_selector,
+    populate_instances_fleet,
 )
 from dstack._internal.server.services.jobs import (
     get_instances_ids_with_detaching_volumes,
@@ -284,16 +284,18 @@ async def select_run_candidate_fleet_models_with_filters(
     fleet_filters: list,
     instance_filters: list,
     lock_instances: bool,
-    load_fleet_project: bool = False,
 ) -> tuple[list[FleetModel], list[FleetModel]]:
     # Selecting fleets in two queries since Postgres does not allow
     # locking nullable side of an outer join. So, first lock instances with inner join.
     # Then select left out fleets without instances.
-    with_instances_options = [contains_eager(FleetModel.instances)]
-    without_instances_options = [noload(FleetModel.instances)]
-    if load_fleet_project:
-        with_instances_options.append(contains_eager(FleetModel.project))
-        without_instances_options.append(contains_eager(FleetModel.project))
+    with_instances_options = [
+        contains_eager(FleetModel.instances),
+        contains_eager(FleetModel.project).load_only(ProjectModel.name),
+    ]
+    without_instances_options = [
+        noload(FleetModel.instances),
+        contains_eager(FleetModel.project).load_only(ProjectModel.name),
+    ]
     stmt = (
         select(FleetModel)
         .join(FleetModel.project)  # can be referenced by fleet_filters
@@ -331,6 +333,8 @@ async def select_run_candidate_fleet_models_with_filters(
         .execution_options(populate_existing=True)
     )
     fleet_models_without_instances = list(res.unique().scalars().all())
+    for fleet_model in fleet_models_with_instances:
+        populate_instances_fleet(fleet_model)
     return fleet_models_with_instances, fleet_models_without_instances
 
 
@@ -537,9 +541,6 @@ async def _select_candidate_fleet_models(
         fleet_filters=fleet_filters,
         instance_filters=instance_filters,
         lock_instances=False,
-        load_fleet_project=profile_instances_have_qualified_fleet_selector(
-            run_spec.merged_profile
-        ),
     )
     return fleet_models_with_instances + fleet_models_without_instances
 
@@ -565,7 +566,6 @@ def get_instance_offers_in_fleet(
         volumes=volumes,
         shared=False,
         project=project,
-        fleet=fleet_model,
     )
     instances_with_offers = _get_offers_from_instances(nonshared_instances)
     shared_instances_with_offers = get_shared_instances_with_offers(
@@ -575,7 +575,6 @@ def get_instance_offers_in_fleet(
         multinode=multinode,
         volumes=volumes,
         project=project,
-        fleet=fleet_model,
     )
     instances_with_offers.extend(shared_instances_with_offers)
     instances_with_offers.sort(key=lambda o: o[0].price or 0)
@@ -678,13 +677,7 @@ async def _get_pool_offers(
 ) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
     pool_offers: list[tuple[InstanceModel, InstanceOfferWithAvailability]] = []
     detaching_instances_ids = await get_instances_ids_with_detaching_volumes(session)
-    pool_instances = await get_pool_instances(
-        session,
-        project,
-        load_fleet_project=profile_instances_have_qualified_fleet_selector(
-            run_spec.merged_profile
-        ),
-    )
+    pool_instances = await get_pool_instances(session, project)
     pool_instances = [i for i in pool_instances if i.id not in detaching_instances_ids]
     multinode = is_multinode_job(job)
     shared_instances_with_offers = get_shared_instances_with_offers(
