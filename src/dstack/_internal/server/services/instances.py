@@ -438,8 +438,11 @@ def instance_matches_hostname_selector(
 ) -> bool:
     candidates = set()
     jpd = get_instance_provisioning_data(instance)
-    if jpd is not None and jpd.hostname is not None:
-        candidates.add(jpd.hostname.lower())
+    if jpd is not None:
+        if jpd.hostname is not None:
+            candidates.add(jpd.hostname.lower())
+        if jpd.internal_ip is not None:
+            candidates.add(jpd.internal_ip.lower())
     rci = get_instance_remote_connection_info(instance)
     if rci is not None:
         candidates.add(rci.host.lower())

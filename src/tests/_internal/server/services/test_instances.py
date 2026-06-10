@@ -281,6 +281,36 @@ class TestFilterInstances:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_filters_by_internal_ip(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
+        instance0 = await create_instance(
+            session=session,
+            project=project,
+            name="my-cluster-0",
+            job_provisioning_data=get_job_provisioning_data(
+                hostname="203.0.113.7", internal_ip="10.0.0.7"
+            ),
+        )
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            name="my-cluster-1",
+            job_provisioning_data=get_job_provisioning_data(
+                hostname="203.0.113.8", internal_ip="10.0.0.8"
+            ),
+        )
+        res = instances_services.filter_instances(
+            instances=[instance0, instance1],
+            profile=Profile(
+                name="test",
+                instances=[InstanceHostnameSelector(hostname="10.0.0.8")],
+            ),
+        )
+        assert res == [instance1]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_string_selector_does_not_match_hostname(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
