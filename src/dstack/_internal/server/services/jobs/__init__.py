@@ -338,13 +338,13 @@ async def stop_runner(job_model: JobModel, instance_model: InstanceModel):
     `instance_model.project` must be loaded because SSH key resolution uses the project keys.
     """
     ssh_private_keys = get_instance_ssh_private_keys(instance_model)
-    try:
-        jpd = get_job_provisioning_data(job_model)
-        if jpd is not None:
-            jrd = get_job_runtime_data(job_model)
+    jpd = get_job_provisioning_data(job_model)
+    if jpd is not None:
+        jrd = get_job_runtime_data(job_model)
+        try:
             await run_async(_stop_runner, ssh_private_keys, jpd, jrd, job_model)
-    except SSHError:
-        logger.debug("%s: failed to stop runner", fmt(job_model))
+        except SSHError:
+            logger.debug("%s: failed to stop runner", fmt(job_model))
 
 
 @runner_ssh_tunnel
