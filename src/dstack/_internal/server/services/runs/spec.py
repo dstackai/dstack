@@ -116,7 +116,10 @@ def validate_run_spec_and_set_defaults(
                 f"Probe timeout cannot be longer than {settings.MAX_PROBE_TIMEOUT}s"
             )
     instances = run_spec.merged_profile.instances
-    if instances is not None:
+    # Only multinode tasks require a dedicated instance per node. Service
+    # replicas may share one instance with enough idle blocks, so they are
+    # not validated against the instance count.
+    if instances is not None and run_spec.configuration.type == "task":
         nodes_required_num = get_nodes_required_num(run_spec)
         if len(instances) < nodes_required_num:
             raise ServerClientError(

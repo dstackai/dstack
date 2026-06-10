@@ -146,6 +146,20 @@ class TestValidateRunSpecInstances:
 
         validate_run_spec_and_set_defaults(self._user(), run_spec)
 
+    def test_allows_fewer_instances_than_service_replicas(self):
+        # Service replicas can share a multi-block instance, so the
+        # instance-count check applies only to multinode tasks.
+        run_spec = get_run_spec(
+            repo_id="test-repo",
+            configuration=ServiceConfiguration(commands=["echo"], port=8000, replicas=2),
+            profile=Profile(
+                name="default",
+                instances=[InstanceNameSelector(name="my-fleet-0")],
+            ),
+        )
+
+        validate_run_spec_and_set_defaults(self._user(), run_spec)
+
 
 class TestCheckCanUpdateConfigurationRouterType:
     def test_sglang_to_dynamo_router_type_change_is_rejected(self):
