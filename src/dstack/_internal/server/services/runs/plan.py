@@ -437,9 +437,11 @@ async def find_optimal_fleet_with_offers(
             )
         )
 
-    # If `instances` is set, backend offers cannot satisfy the run. Otherwise,
-    # keep the existing optimization that skips backend requests when pool
-    # capacity is already enough.
+    # Backend offers cannot satisfy a run that targets specific `instances`,
+    # so they are always skipped for such runs. Otherwise, if any candidate
+    # fleet has pool capacity, the optimal fleet will be one of those, so
+    # backend offers from any fleet won't affect selection — skip them
+    # entirely when allowed.
     skip_backend_offers = run_spec.merged_profile.instances is not None or (
         skip_backend_offers_on_pool_capacity
         and any(candidate.has_pool_capacity for candidate in candidates)
