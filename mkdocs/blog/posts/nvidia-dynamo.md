@@ -70,7 +70,7 @@ replicas:
       - pip install "ai-dynamo[sglang]==1.1.1"
       - git clone https://github.com/ai-dynamo/dynamo.git
       # Brings up the NATS / etcd compose stack and runs the Dynamo HTTP frontend.
-      - docker compose -f dynamo/deploy/docker-compose.yml up -d
+      - docker compose -f dynamo/dev/docker-compose.yml up -d
       - |
         python3 -m dynamo.frontend \
           --http-host 0.0.0.0 --http-port 8000 \
@@ -195,7 +195,7 @@ If a [gateway](../../docs/concepts/gateways.md) is configured, the service endpo
     - The router replica group must use `count: 1`.
     - Services with a Dynamo router cannot configure `retry`, because workers cache the router's internal IP at provisioning time.
     - In-place updates are blocked when they would replace the Dynamo router replica. If the router gets a new internal IP, already-running workers would still point to the old etcd and NATS endpoints. Stop the run and apply again for router-affecting changes.
-    - Autoscaling supports the RPS metric. TTFT and ITL-based autoscaling support is coming soon.
+    - The `scaling` blocks use [`dstack` service autoscaling](../../docs/reference/dstack.yml/service.md#scaling), which currently scales replica groups based on `rps`. Support for scaling based on inference metrics such as TTFT and ITL is planned.
 
 ## Why this matters
 
