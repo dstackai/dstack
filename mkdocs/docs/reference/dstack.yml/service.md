@@ -114,6 +114,35 @@ The `service` configuration type allows running [services](../../concepts/servic
       type:
         required: true
 
+### `instances[n]` { #_instances data-toc-label="instances" }
+
+=== "Instance name"
+
+    #SCHEMA# dstack._internal.core.models.profiles.InstanceNameSelector
+        overrides:
+          show_root_heading: false
+
+=== "Hostname"
+
+    #SCHEMA# dstack._internal.core.models.profiles.InstanceHostnameSelector
+        overrides:
+          show_root_heading: false
+
+=== "Fleet instance"
+
+    #SCHEMA# dstack._internal.core.models.profiles.FleetInstanceSelector
+        overrides:
+          show_root_heading: false
+
+??? info "Short syntax"
+
+    The short syntax for `instances` is a list of instance names:
+
+    ```yaml
+    instances:
+      - my-fleet-0
+    ```
+
 ### `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpec
