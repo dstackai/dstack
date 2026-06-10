@@ -902,3 +902,86 @@ class TestJobTerminatingWorker:
         assert job.lock_owner == JobTerminatingPipeline.__name__
         assert instance.lock_token == job_lock_token
         assert instance.lock_owner == _get_related_instance_lock_owner(job.id)
+
+    async def test_stops_job_gracefully_without_provisioning_data_hostname(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        # Regression test for https://github.com/dstackai/dstack/issues/3950.
+        # Stopping a job that is still provisioning (no hostname/ssh_port yet) must not raise
+        # when the graceful stop tries to open an SSH tunnel to the runner.
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        jpd = get_job_provisioning_data(dockerized=True)
+        jpd.hostname = None
+        jpd.ssh_port = None
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+            job_provisioning_data=jpd,
+            instance=instance,
+        )
+        job.graceful_termination_attempts = 0
+        _lock_job(job)
+        await session.commit()
+
+        await worker.process(_job_to_pipeline_item(job))
+
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
+        assert job.graceful_termination_attempts == 1
+        assert job.remove_at is not None
+        assert job.instance_id == instance.id
+
+    async def test_terminates_job_without_provisioning_data_hostname(
+        self, test_db, session: AsyncSession, worker: JobTerminatingWorker
+    ):
+        # Regression test for https://github.com/dstackai/dstack/issues/3950.
+        # The container stop is skipped (and must not raise) when the job has no hostname/ssh_port.
+        # Dangling containers are cleared later on instance checks by `remove_dangling_tasks_from_instance()`.
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            status=InstanceStatus.BUSY,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(session=session, project=project, repo=repo, user=user)
+        jpd = get_job_provisioning_data(dockerized=True)
+        jpd.hostname = None
+        jpd.ssh_port = None
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.TERMINATING,
+            termination_reason=JobTerminationReason.TERMINATED_BY_USER,
+            job_provisioning_data=jpd,
+            instance=instance,
+        )
+        job.graceful_termination_attempts = 1
+        job.remove_at = get_current_datetime() - timedelta(minutes=1)
+        _lock_job(job)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.jobs_terminating._stop_container",
+            new=AsyncMock(return_value=True),
+        ) as stop_container:
+            await worker.process(_job_to_pipeline_item(job))
+
+        stop_container.assert_not_awaited()
+
+        await session.refresh(job)
+        await session.refresh(instance)
+        assert job.status == JobStatus.TERMINATED
+        assert job.instance_id is None
+        assert instance.status == InstanceStatus.IDLE

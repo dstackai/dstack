@@ -52,6 +52,11 @@ def runner_ssh_tunnel(
         Returns:
             is successful
         """
+        if job_provisioning_data.hostname is None or job_provisioning_data.ssh_port is None:
+            # The callers may try to establish tunnels even if hostname/ssh_port is missing
+            # and rely on `False` being returned in this case.
+            return False
+
         if not settings.SERVER_SSH_POOL_ENABLED or not job_provisioning_data.dockerized:
             # Connections from dstack-server to runner's sshd are expected to be short
             # as the `inactivity_duration` feature distinguishes user and server connections based on duration.

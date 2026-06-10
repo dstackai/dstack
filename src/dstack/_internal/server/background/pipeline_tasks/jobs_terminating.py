@@ -660,10 +660,12 @@ async def _process_terminating_job(
 
     jrd = get_job_runtime_data(job_model)
     jpd = get_job_provisioning_data(job_model)
-    if jpd is not None:
+    if jpd is not None and jpd.hostname is not None and jpd.ssh_port is not None:
         logger.debug("%s: stopping container", fmt(job_model))
         ssh_private_keys = get_instance_ssh_private_keys(instance_model)
         if not await _stop_container(job_model, jpd, ssh_private_keys):
+            # Dangling containers (tasks) are cleared periodically on instance checks by
+            # `remove_dangling_tasks_from_instance()`
             logger.warning(
                 (
                     "%s: could not stop container, possibly due to a communication error."
