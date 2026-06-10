@@ -229,7 +229,7 @@ async def get_run_candidate_fleet_models_filters(
                 *[
                     _get_fleet_reference_condition(
                         project=project,
-                        ref=EntityReference.parse(selector.fleet),
+                        ref=selector.fleet,
                     )
                     for selector in fleet_instance_selectors
                 ]
@@ -241,7 +241,7 @@ async def get_run_candidate_fleet_models_filters(
                     and_(
                         _get_fleet_reference_condition(
                             project=project,
-                            ref=EntityReference.parse(selector.fleet),
+                            ref=selector.fleet,
                         ),
                         InstanceModel.instance_num == selector.instance,
                     )

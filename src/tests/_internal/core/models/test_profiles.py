@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from dstack._internal.core.backends.vastai.profile_options import VastAIProfileOptions
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.profiles import (
     FleetInstanceSelector,
     InstanceHostnameSelector,
@@ -81,3 +82,28 @@ class TestProfileInstances:
     def test_empty_instances_list_is_rejected(self):
         with pytest.raises(ValidationError):
             Profile.parse_obj({"instances": []})
+
+    def test_parses_fleet_selector_string_to_entity_reference(self):
+        profile = Profile.parse_obj(
+            {"name": "test", "instances": [{"fleet": "main/my-fleet", "instance": 0}]}
+        )
+        assert profile.instances == [
+            FleetInstanceSelector(
+                fleet=EntityReference(project="main", name="my-fleet"), instance=0
+            )
+        ]
+
+    def test_parses_fleet_selector_object_notation(self):
+        profile = Profile.parse_obj(
+            {
+                "name": "test",
+                "instances": [
+                    {"fleet": {"project": "main", "name": "my-fleet"}, "instance": 0}
+                ],
+            }
+        )
+        assert profile.instances == [
+            FleetInstanceSelector(
+                fleet=EntityReference(project="main", name="my-fleet"), instance=0
+            )
+        ]

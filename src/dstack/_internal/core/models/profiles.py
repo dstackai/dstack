@@ -244,25 +244,37 @@ class InstanceHostnameSelector(CoreModel):
     ]
 
 
-def _validate_fleet_instance_selector_fleet(v: str) -> str:
-    EntityReference.parse(v)
+def _parse_fleet_instance_selector_fleet(v: Any) -> Any:
+    if isinstance(v, str):
+        return EntityReference.parse(v)
     return v
 
 
-class FleetInstanceSelector(CoreModel):
+class FleetInstanceSelectorConfig(CoreConfig):
+    @staticmethod
+    def schema_extra(schema: Dict[str, Any]):
+        add_extra_schema_types(
+            schema["properties"]["fleet"],
+            extra_types=[{"type": "string", "minLength": 1}],
+        )
+
+
+class FleetInstanceSelector(generate_dual_core_model(FleetInstanceSelectorConfig)):
     fleet: Annotated[
-        str,
+        EntityReference,
         Field(
             description=(
-                "The fleet name. For fleets owned by the current project, specify the fleet name."
-                " For a fleet from another project, specify `<project name>/<fleet name>`"
+                "The fleet reference. For fleets owned by the current project, specify"
+                " the fleet name. For a fleet from another project, specify"
+                " `<project name>/<fleet name>` or an object with `project` and `name`"
             ),
-            min_length=1,
         ),
     ]
     instance: Annotated[int, Field(description="The fleet instance number", ge=0)]
 
-    _validate_fleet = validator("fleet", allow_reuse=True)(_validate_fleet_instance_selector_fleet)
+    _validate_fleet = validator("fleet", pre=True, allow_reuse=True)(
+        _parse_fleet_instance_selector_fleet
+    )
 
 
 InstanceSelector = Union[InstanceNameSelector, InstanceHostnameSelector, FleetInstanceSelector]

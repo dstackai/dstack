@@ -17,7 +17,6 @@ from dstack._internal.core.backends.base.offers import (
 from dstack._internal.core.backends.features import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.health import HealthCheck, HealthEvent, HealthStatus
 from dstack._internal.core.models.instances import (
@@ -386,7 +385,7 @@ def profile_instances_have_qualified_fleet_selector(profile: Profile) -> bool:
         return False
     for selector in profile.instances:
         if isinstance(selector, FleetInstanceSelector):
-            if EntityReference.parse(selector.fleet).project is not None:
+            if selector.fleet.project is not None:
                 return True
     return False
 
@@ -456,7 +455,7 @@ def instance_matches_fleet_instance_selector(
     project: Optional[ProjectModel] = None,
     fleet: Optional[FleetModel] = None,
 ) -> bool:
-    fleet_ref = EntityReference.parse(selector.fleet)
+    fleet_ref = selector.fleet
 
     if fleet is None:
         # Avoid triggering a lazy load in async code.
