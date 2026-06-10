@@ -703,9 +703,7 @@ async def _load_submitted_job_context(
             )
         )
         .options(
-            joinedload(JobModel.fleet)
-            .joinedload(FleetModel.project)
-            .load_only(ProjectModel.name)
+            joinedload(JobModel.fleet).joinedload(FleetModel.project).load_only(ProjectModel.name)
         )
         .execution_options(populate_existing=True)
     )
@@ -794,9 +792,7 @@ async def _fetch_run_model_for_submitted_job(
             )
         )
         .options(
-            joinedload(RunModel.fleet)
-            .joinedload(FleetModel.project)
-            .load_only(ProjectModel.name)
+            joinedload(RunModel.fleet).joinedload(FleetModel.project).load_only(ProjectModel.name)
         )
         .options(contains_eager(RunModel.jobs, alias=job_alias))
         .execution_options(populate_existing=True)

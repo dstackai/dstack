@@ -397,9 +397,7 @@ class TestFilterInstances:
         with pytest.raises(ValueError, match="project"):
             instances_services.filter_instances(
                 instances=[instance],
-                profile=Profile(
-                    name="test", instances=[InstanceNameSelector(name="instance")]
-                ),
+                profile=Profile(name="test", instances=[InstanceNameSelector(name="instance")]),
             )
 
     @pytest.mark.asyncio

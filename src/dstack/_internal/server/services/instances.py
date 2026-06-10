@@ -394,8 +394,7 @@ def instance_matches_selectors(
     must be loaded.
     """
     return any(
-        instance_matches_selector(instance, selector, project=project)
-        for selector in selectors
+        instance_matches_selector(instance, selector, project=project) for selector in selectors
     )
 
 
