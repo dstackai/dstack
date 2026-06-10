@@ -2,6 +2,8 @@ package components
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,17 +23,16 @@ const (
 	downloadTimeout = 10 * time.Minute
 	cacheSuffix     = ".cache"
 	etagSuffix      = ".etag"
+	// Max per-version caches kept next to a binary (bounds disk use).
+	maxCachedVersions = 5
 )
 
-// downloadFile ensures that path contains the artifact served at url.
+// downloadFile ensures path holds the artifact at url.
 //
-// To avoid re-transferring bytes that were already fetched (e.g. when the caller
-// repeatedly forces installs of the same artifact), the downloaded bytes are cached
-// next to path and revalidated with the object's ETag via a conditional request: an
-// unchanged artifact is answered with 304 Not Modified and no body is transferred.
-// The cached bytes are then installed to path via chmod+rename; if that finalization
-// fails, a later call retries it from the cache without re-downloading. Without
-// force, an already-installed path is left untouched (preserving prior behavior).
+// Bytes are cached next to path (one cache per URL, validated by ETag), so a repeated
+// or forced install of an unchanged version returns 304 and transfers nothing. Cached
+// bytes are then chmod+renamed into place; a failed rename retries from cache without
+// re-downloading. With force=false an existing path is left as-is.
 func downloadFile(ctx context.Context, url string, path string, mode os.FileMode, force bool) error {
 	if !force {
 		if _, err := os.Stat(path); err == nil {
@@ -41,17 +43,22 @@ func downloadFile(ctx context.Context, url string, path string, mode os.FileMode
 		}
 	}
 
-	cachePath := path + cacheSuffix
-	etagPath := path + etagSuffix
+	// One cache file per URL so several versions can coexist. With a single shared
+	// cache, a request for a different version would overwrite it and force a
+	// re-download every time the requested version changes.
+	key := urlKey(url)
+	cachePath := fmt.Sprintf("%s.%s%s", path, key, cacheSuffix)
+	etagPath := fmt.Sprintf("%s.%s%s", path, key, etagSuffix)
 
 	downloaded, err := ensureCached(ctx, url, cachePath, etagPath)
 	if err != nil {
 		return err
 	}
+	if downloaded {
+		pruneCaches(ctx, path, maxCachedVersions)
+	}
 
-	// If the artifact has not changed and path already matches the cache, there is
-	// nothing to do. Otherwise (first install, changed artifact, or a previous
-	// finalization that failed) install the cached bytes -- without re-downloading.
+	// Install the cached bytes; skip if path already matches the cache.
 	if !downloaded {
 		installed, err := sameSize(path, cachePath)
 		if err != nil {
@@ -64,9 +71,8 @@ func downloadFile(ctx context.Context, url string, path string, mode os.FileMode
 	return installFile(ctx, cachePath, path, mode)
 }
 
-// ensureCached makes sure cachePath holds the current bytes of the artifact at url,
-// transferring the body only if the cached copy is missing or stale (validated with
-// the stored ETag). It reports whether a new copy was actually downloaded.
+// ensureCached makes cachePath hold url's current bytes, downloading only if the cache
+// is missing or stale (per the stored ETag). Reports whether it downloaded.
 func ensureCached(ctx context.Context, url string, cachePath string, etagPath string) (downloaded bool, err error) {
 	ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()
@@ -75,7 +81,7 @@ func ensureCached(ctx context.Context, url string, cachePath string, etagPath st
 	if err != nil {
 		return false, fmt.Errorf("create download request: %w", err)
 	}
-	// Revalidate the cached copy only if we have both the bytes and a validator for them.
+	// Revalidate only if we have both cached bytes and an ETag for them.
 	if exists, _ := fileExists(cachePath); exists {
 		if etag := readETag(etagPath); etag != "" {
 			req.Header.Set("If-None-Match", etag)
@@ -97,20 +103,19 @@ func ensureCached(ctx context.Context, url string, cachePath string, etagPath st
 		log.Debug(ctx, "cached artifact is up to date, skipping download", "url", url)
 		return false, nil
 	case http.StatusOK:
-		// download below
+		// fall through to download
 	default:
 		return false, fmt.Errorf("unexpected status code %s downloading from %s", resp.Status, url)
 	}
 
-	log.Debug(ctx, "downloading", "url", url, "cache", cachePath)
+	log.Debug(ctx, "downloading", "path", cachePath, "url", url)
 	written, err := writeAtomic(ctx, cachePath, resp.Body)
 	if err != nil {
 		return false, err
 	}
-	log.Debug(ctx, "artifact downloaded", "cache", cachePath, "bytes", written)
+	log.Debug(ctx, "file has been downloaded", "path", cachePath, "bytes", written)
 
-	// Store the validator for next time (best effort). If it is missing, the next
-	// run simply revalidates with a full GET -- safe, at most one extra download.
+	// Remember the ETag for next time (best effort; if absent, next run does a full GET).
 	if etag := resp.Header.Get("ETag"); etag != "" {
 		if werr := os.WriteFile(etagPath, []byte(etag), 0o644); werr != nil {
 			log.Warning(ctx, "failed to store etag", "path", etagPath, "err", werr)
@@ -121,8 +126,7 @@ func ensureCached(ctx context.Context, url string, cachePath string, etagPath st
 	return true, nil
 }
 
-// installFile copies src to dst with the given mode using an atomic rename. It never
-// touches the network, so it is safe and cheap to retry.
+// installFile copies src to dst (with mode) via an atomic rename. No network, safe to retry.
 func installFile(ctx context.Context, src string, dst string, mode os.FileMode) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -143,8 +147,8 @@ func writeAtomic(ctx context.Context, dst string, r io.Reader) (int64, error) {
 	return writeAtomicMode(ctx, dst, r, 0)
 }
 
-// writeAtomicMode streams r into dst via a temp file and an atomic rename, applying
-// mode before the rename when mode is non-zero.
+// writeAtomicMode streams r into dst via a temp file and an atomic rename, setting the
+// file mode (when non-zero) before the rename.
 func writeAtomicMode(ctx context.Context, dst string, r io.Reader, mode os.FileMode) (int64, error) {
 	dir, name := filepath.Split(dst)
 	tmp, err := os.CreateTemp(dir, fmt.Sprintf(".*-%s", name))
@@ -171,13 +175,52 @@ func writeAtomicMode(ctx context.Context, dst string, r io.Reader, mode os.FileM
 	return written, nil
 }
 
-// cleanupTemp removes a temp file best-effort. After a successful rename the file is
-// already gone, so a not-exist error is expected and ignored.
+// cleanupTemp best-effort removes the temp file (already gone after a successful rename).
 func cleanupTemp(ctx context.Context, f *os.File) {
-	_ = f.Close() // best effort; may already be closed
+	_ = f.Close() // may already be closed
 	if err := os.Remove(f.Name()); err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Error(ctx, "remove temp file", "err", err)
 	}
+}
+
+// pruneCaches keeps the `keep` newest per-version caches next to path (and their .etag),
+// removing the rest.
+func pruneCaches(ctx context.Context, path string, keep int) {
+	matches, err := filepath.Glob(path + ".*" + cacheSuffix)
+	if err != nil || len(matches) <= keep {
+		return
+	}
+	type cacheFile struct {
+		name string
+		mod  time.Time
+	}
+	files := make([]cacheFile, 0, len(matches))
+	for _, m := range matches {
+		fi, err := os.Stat(m)
+		if err != nil {
+			continue
+		}
+		files = append(files, cacheFile{m, fi.ModTime()})
+	}
+	if len(files) <= keep {
+		return
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].mod.After(files[j].mod) })
+	for _, f := range files[keep:] {
+		if err := os.Remove(f.name); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Warning(ctx, "prune cache: remove", "path", f.name, "err", err)
+		}
+		etag := strings.TrimSuffix(f.name, cacheSuffix) + etagSuffix
+		if err := os.Remove(etag); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Warning(ctx, "prune cache: remove etag", "path", etag, "err", err)
+		}
+	}
+}
+
+// urlKey returns a short, filesystem-safe key derived from url, used to name its cache file.
+func urlKey(url string) string {
+	sum := sha256.Sum256([]byte(url))
+	return hex.EncodeToString(sum[:])[:16]
 }
 
 func fileExists(path string) (bool, error) {
@@ -198,9 +241,8 @@ func readETag(path string) string {
 	return strings.TrimSpace(string(data))
 }
 
-// sameSize reports whether both paths exist and have the same size. It is a cheap
-// check for whether dst was already installed from the cache (the artifacts are
-// content-addressed by version, so a size match is a reliable proxy here).
+// sameSize reports whether a and b both exist with the same size -- a cheap "is path
+// already this cached binary?" check (different versions differ in size).
 func sameSize(a string, b string) (bool, error) {
 	ai, err := os.Stat(a)
 	if errors.Is(err, os.ErrNotExist) {
