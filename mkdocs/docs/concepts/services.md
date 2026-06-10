@@ -446,7 +446,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
           - pip install "ai-dynamo[sglang]==1.1.1"
           - git clone https://github.com/ai-dynamo/dynamo.git
           # Brings up the NATS / etcd compose stack and runs the Dynamo HTTP frontend.
-          - docker compose -f dynamo/deploy/docker-compose.yml up -d
+          - docker compose -f dynamo/dev/docker-compose.yml up -d
           - |
             python3 -m dynamo.frontend \
               --http-host 0.0.0.0 --http-port 8000 \
