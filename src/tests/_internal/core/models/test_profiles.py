@@ -107,3 +107,10 @@ class TestProfileInstances:
                 fleet=EntityReference(project="main", name="my-fleet"), instance=0
             )
         ]
+
+    @pytest.mark.parametrize("fleet", ["", "a/b/c", "/my-fleet", "my-project/"])
+    def test_rejects_invalid_fleet_selector_reference(self, fleet: str):
+        with pytest.raises(ValidationError):
+            Profile.parse_obj(
+                {"name": "test", "instances": [{"fleet": fleet, "instance": 0}]}
+            )
