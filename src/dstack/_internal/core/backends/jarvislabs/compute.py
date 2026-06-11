@@ -2,10 +2,11 @@ import shlex
 import subprocess
 import tempfile
 from collections.abc import Iterable
-from typing import List, Optional
+from typing import List, Optional, cast
 
 import gpuhunt
 from gpuhunt.providers.jarvislabs import JarvisLabsProvider
+from typing_extensions import NotRequired, TypedDict
 
 from dstack._internal.core.backends.base.backend import Compute
 from dstack._internal.core.backends.base.compute import (
@@ -25,6 +26,7 @@ from dstack._internal.core.backends.jarvislabs.api_client import JarvisLabsAPICl
 from dstack._internal.core.backends.jarvislabs.models import JarvisLabsConfig
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -45,6 +47,22 @@ DEFAULT_USERNAME = "ubuntu"
 SSH_CONNECT_TIMEOUT_SECONDS = 10
 SSH_SETUP_TIMEOUT_SECONDS = 240
 SSH_LAUNCH_TIMEOUT_SECONDS = 60
+
+
+class JarvisLabsOfferBackendData(TypedDict):
+    # Set by gpuhunt when normalized GPU identity differs from the JarvisLabs VM
+    # create token, e.g. "RTX-PRO6000" normalized to "RTXPRO6000".
+    gpu_type: NotRequired[str]
+
+
+class JarvisLabsInstanceBackendData(CoreModel):
+    ssh_key_ids: Optional[List[str]] = None
+
+    @classmethod
+    def load(cls, raw: Optional[str]) -> "JarvisLabsInstanceBackendData":
+        if raw is None:
+            return cls()
+        return cls.__response__.parse_raw(raw)
 
 
 class JarvisLabsCompute(
@@ -85,9 +103,19 @@ class JarvisLabsCompute(
         instance_name = generate_unique_instance_name(
             instance_config, max_length=MAX_INSTANCE_NAME_LEN
         )
-        self.api_client.add_ssh_key_if_needed(instance_config.ssh_keys[0].public)
+        ssh_key_ids: List[str] = []
         instance_id = None
         try:
+            # TODO: JarvisLabs has a default 10 SSH key limit. Consider project-level
+            # key reuse if per-instance keys become a bottleneck.
+            for idx, ssh_public_key in enumerate(instance_config.get_public_keys()):
+                ssh_key_ids.append(
+                    _create_ssh_key(
+                        client=self.api_client,
+                        name=f"{instance_name}-{idx}.key",
+                        public_key=ssh_public_key,
+                    )
+                )
             if instance_offer.instance.resources.gpus:
                 instance_id = self.api_client.create_gpu_vm(
                     gpu_type=_get_jarvislabs_gpu_type(instance_offer),
@@ -117,6 +145,13 @@ class JarvisLabsCompute(
                     logger.exception(
                         "Could not destroy failed JarvisLabs instance %s", instance_id
                     )
+            try:
+                _delete_ssh_keys(self.api_client, ssh_key_ids)
+            except Exception:
+                logger.exception(
+                    "Could not delete JarvisLabs SSH keys %s after provisioning failure",
+                    ssh_key_ids,
+                )
             raise
         return JobProvisioningData(
             backend=instance_offer.backend,
@@ -130,7 +165,7 @@ class JarvisLabsCompute(
             ssh_port=22,
             dockerized=True,
             ssh_proxy=None,
-            backend_data=None,
+            backend_data=JarvisLabsInstanceBackendData(ssh_key_ids=ssh_key_ids).json(),
         )
 
     def update_provisioning_data(
@@ -172,15 +207,37 @@ class JarvisLabsCompute(
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
+        backend_data_parsed = JarvisLabsInstanceBackendData.load(backend_data)
         self.api_client.destroy_instance(machine_id=instance_id, region=region)
+        _delete_ssh_keys(self.api_client, backend_data_parsed.ssh_key_ids)
+
+
+def _create_ssh_key(client: JarvisLabsAPIClient, name: str, public_key: str) -> str:
+    return client.create_ssh_key(public_key=public_key, key_name=name)
+
+
+def _delete_ssh_keys(client: JarvisLabsAPIClient, ssh_key_ids: Optional[List[str]]) -> None:
+    if not ssh_key_ids:
+        return
+    for ssh_key_id in ssh_key_ids:
+        client.delete_ssh_key(ssh_key_id)
 
 
 def _get_jarvislabs_gpu_type(instance_offer: InstanceOfferWithAvailability) -> str:
+    gpu_type = _get_jarvislabs_gpu_type_from_backend_data(instance_offer.backend_data)
+    if gpu_type is not None:
+        return gpu_type
+
     gpu = instance_offer.instance.resources.gpus[0]
-    memory_gb = round(gpu.memory_mib / 1024)
-    if gpu.name == "A100" and memory_gb == 80:
-        return "A100-80GB"
     return gpu.name
+
+
+def _get_jarvislabs_gpu_type_from_backend_data(backend_data: dict) -> Optional[str]:
+    offer_backend_data = cast(JarvisLabsOfferBackendData, backend_data)
+    gpu_type = offer_backend_data.get("gpu_type")
+    if not isinstance(gpu_type, str) or not gpu_type:
+        return None
+    return gpu_type
 
 
 def _get_disk_size_gb(instance_offer: InstanceOfferWithAvailability) -> int:
