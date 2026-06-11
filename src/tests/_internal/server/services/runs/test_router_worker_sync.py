@@ -5,10 +5,10 @@ import pytest
 
 from dstack._internal.server.services.runs.router_worker_sync import (
     _get_connection_mode_from_workers,
-    _get_grpc_worker_payload,
+    _get_grpc_worker,
     _get_runtime_type_from_workers,
-    _get_worker_payload,
-    _grpc_server_info_to_worker_payload,
+    _get_worker,
+    _grpc_server_info_to_worker,
 )
 
 
@@ -47,13 +47,13 @@ class TestRuntimeTypeFromRouterWorkers:
         assert _get_runtime_type_from_workers(current) is None
 
 
-class TestGrpcServerInfoToWorkerPayload:
+class TestGrpcServerInfoToWorker:
     def test_vllm_prefill(self):
         response = MagicMock(kv_role="kv_producer", kv_connector="NixlConnector")
-        payload = _grpc_server_info_to_worker_payload("grpc://10.0.0.1:50051", "vllm", response)
-        assert payload["worker_type"] == "prefill"
-        assert payload["runtime_type"] == "vllm"
-        assert payload["kv_role"] == "kv_producer"
+        worker = _grpc_server_info_to_worker("grpc://10.0.0.1:50051", "vllm", response)
+        assert worker["worker_type"] == "prefill"
+        assert worker.get("runtime_type") == "vllm"
+        assert worker.get("kv_role") == "kv_producer"
 
     def test_sglang_prefill(self):
         server_args = MagicMock()
@@ -65,10 +65,8 @@ class TestGrpcServerInfoToWorkerPayload:
                 "disaggregation_bootstrap_port": 8998,
             },
         ):
-            payload = _grpc_server_info_to_worker_payload(
-                "grpc://10.0.0.1:8000", "sglang", response
-            )
-        assert payload == {
+            worker = _grpc_server_info_to_worker("grpc://10.0.0.1:8000", "sglang", response)
+        assert worker == {
             "url": "grpc://10.0.0.1:8000",
             "worker_type": "prefill",
             "connection_mode": "grpc",
@@ -116,7 +114,7 @@ def _fake_sglang_grpc_proto(*, server_info: MagicMock):
 
 
 @pytest.mark.asyncio
-async def test_get_grpc_worker_payload_ready():
+async def test_get_grpc_worker_ready():
     job = MagicMock()
     channel = MagicMock()
 
@@ -133,14 +131,14 @@ async def test_get_grpc_worker_payload_ready():
             _fake_grpc_client,
         ),
     ):
-        result = await _get_grpc_worker_payload(
+        result = await _get_grpc_worker(
             job,
             worker_url="grpc://10.0.0.1:50051",
             runtime_type="vllm",
         )
 
     assert result["status"] == "ready"
-    assert result["payload"] == {
+    assert result["worker"] == {
         "url": "grpc://10.0.0.1:50051",
         "worker_type": "prefill",
         "connection_mode": "grpc",
@@ -151,7 +149,7 @@ async def test_get_grpc_worker_payload_ready():
 
 
 @pytest.mark.asyncio
-async def test_get_grpc_worker_payload_not_ready_on_error():
+async def test_get_grpc_worker_not_ready_on_error():
     job = MagicMock()
 
     @asynccontextmanager
@@ -163,13 +161,13 @@ async def test_get_grpc_worker_payload_not_ready_on_error():
         "dstack._internal.server.services.runs.router_worker_sync.get_service_replica_grpc_client",
         _failing_client,
     ):
-        result = await _get_grpc_worker_payload(job, worker_url="grpc://10.0.0.1:50051")
+        result = await _get_grpc_worker(job, worker_url="grpc://10.0.0.1:50051")
 
-    assert result == {"status": "not_ready", "payload": None}
+    assert result == {"status": "not_ready", "worker": None}
 
 
 @pytest.mark.asyncio
-async def test_get_grpc_worker_payload_sglang_bootstrap():
+async def test_get_grpc_worker_sglang_bootstrap():
     job = MagicMock()
     channel = MagicMock()
     sglang_server_info = MagicMock(server_args=MagicMock())
@@ -193,10 +191,10 @@ async def test_get_grpc_worker_payload_sglang_bootstrap():
             _fake_grpc_client,
         ),
     ):
-        result = await _get_grpc_worker_payload(job, worker_url="grpc://10.0.0.1:8000")
+        result = await _get_grpc_worker(job, worker_url="grpc://10.0.0.1:8000")
 
     assert result["status"] == "ready"
-    assert result["payload"] == {
+    assert result["worker"] == {
         "url": "grpc://10.0.0.1:8000",
         "worker_type": "prefill",
         "connection_mode": "grpc",
@@ -206,22 +204,22 @@ async def test_get_grpc_worker_payload_sglang_bootstrap():
 
 
 @pytest.mark.asyncio
-async def test_get_worker_payload_grpc_preference_skips_http():
+async def test_get_worker_grpc_preference_skips_http():
     job = MagicMock()
-    grpc_not_ready = {"status": "not_ready", "payload": None}
+    grpc_not_ready = {"status": "not_ready", "worker": None}
 
     with (
         patch(
-            "dstack._internal.server.services.runs.router_worker_sync._get_grpc_worker_payload",
+            "dstack._internal.server.services.runs.router_worker_sync._get_grpc_worker",
             new_callable=AsyncMock,
             return_value=grpc_not_ready,
         ) as grpc_mock,
         patch(
-            "dstack._internal.server.services.runs.router_worker_sync._get_http_worker_payload",
+            "dstack._internal.server.services.runs.router_worker_sync._get_http_worker",
             new_callable=AsyncMock,
         ) as http_mock,
     ):
-        result = await _get_worker_payload(
+        result = await _get_worker(
             job,
             http_worker_url="http://10.0.0.1:8000",
             grpc_worker_url="grpc://10.0.0.1:8000",

@@ -1,7 +1,5 @@
 """SSH-tunneled gRPC channel target to a job's service port (UDS)."""
 
-from __future__ import annotations
-
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import timedelta
