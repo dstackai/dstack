@@ -106,6 +106,8 @@ class JarvisLabsCompute(
         ssh_key_ids: List[str] = []
         instance_id = None
         try:
+            # TODO: JarvisLabs has a default 10 SSH key limit. Consider project-level
+            # key reuse if per-instance keys become a bottleneck.
             for idx, ssh_public_key in enumerate(instance_config.get_public_keys()):
                 ssh_key_ids.append(
                     _create_ssh_key(
