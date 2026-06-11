@@ -25,7 +25,7 @@ def get_network_subnets(
     )
     for subnet in subnets:
         if private:
-            if _is_eligible_private_subnet(
+            if is_eligible_private_subnet(
                 network_client=network_client,
                 resource_group=resource_group,
                 network_name=network_name,
@@ -54,7 +54,7 @@ def _is_eligible_public_subnet(
     return True
 
 
-def _is_eligible_private_subnet(
+def is_eligible_private_subnet(
     network_client: network_mgmt.NetworkManagementClient,
     resource_group: str,
     network_name: str,

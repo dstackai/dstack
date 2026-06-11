@@ -10,6 +10,7 @@ from dstack._internal.core.backends.azure.models import (
 from dstack._internal.core.errors import (
     BackendAuthError,
     BackendInvalidCredentialsError,
+    ServerClientError,
 )
 
 
@@ -59,3 +60,72 @@ class TestAzureConfigurator:
             ["creds", "client_id"],
             ["creds", "client_secret"],
         ]
+
+
+class TestCheckConfigVpc:
+    def _make_config(self, **kwargs):
+        return AzureBackendConfigWithCreds(
+            creds=AzureClientCreds(tenant_id="t", client_id="c", client_secret="s"),
+            tenant_id="ten1",
+            subscription_id="sub1",
+            **kwargs,
+        )
+
+    def _check(self, config):
+        with (
+            patch("azure.mgmt.network.NetworkManagementClient"),
+            patch(
+                "dstack._internal.core.backends.azure.compute.get_resource_group_network_subnet_or_error"
+            ),
+        ):
+            AzureConfigurator()._check_config_vpc(config, Mock())
+
+    def test_public_ips_false_requires_network_config(self):
+        config = self._make_config(regions=["westeurope"], public_ips=False)
+        with pytest.raises(ServerClientError, match="`vpc_ids` or `subnet_ids` must be specified"):
+            AzureConfigurator()._check_config_vpc(config, Mock())
+
+    def test_public_ips_false_with_vpc_ids_ok(self):
+        config = self._make_config(
+            regions=["westeurope"], public_ips=False, vpc_ids={"westeurope": "rg/net"}
+        )
+        self._check(config)
+
+    def test_public_ips_false_with_subnet_ids_ok(self):
+        config = self._make_config(
+            regions=["westeurope"], public_ips=False, subnet_ids={"westeurope": "rg/net/subnet"}
+        )
+        self._check(config)
+
+    def test_overlap_raises(self):
+        config = self._make_config(
+            regions=["westeurope", "eastus"],
+            vpc_ids={"westeurope": "rg/net", "eastus": "rg/net2"},
+            subnet_ids={"westeurope": "rg/net/subnet"},
+        )
+        with pytest.raises(ServerClientError, match="westeurope"):
+            AzureConfigurator()._check_config_vpc(config, Mock())
+
+    def test_uncovered_region_raises_with_vpc_ids(self):
+        config = self._make_config(
+            regions=["westeurope", "eastus"],
+            vpc_ids={"westeurope": "rg/net"},
+        )
+        with pytest.raises(ServerClientError, match="eastus"):
+            AzureConfigurator()._check_config_vpc(config, Mock())
+
+    def test_uncovered_region_raises_with_subnet_ids(self):
+        config = self._make_config(
+            regions=["westeurope", "eastus"],
+            subnet_ids={"westeurope": "rg/net/subnet"},
+        )
+        with pytest.raises(ServerClientError, match="eastus"):
+            AzureConfigurator()._check_config_vpc(config, Mock())
+
+    def test_mixed_vpc_and_subnet_ids_covers_all_regions(self):
+        config = self._make_config(
+            regions=["westeurope", "eastus"],
+            vpc_ids={"westeurope": "rg/net"},
+            subnet_ids={"eastus": "rg/net/subnet"},
+        )
+        self._check(config)
