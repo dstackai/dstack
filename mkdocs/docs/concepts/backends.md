@@ -403,9 +403,23 @@ There are two ways to configure Azure: using a client secret or using the defaul
           - type: azure
             creds:
               type: default
-        regions: [westeurope]
-        vpc_ids:
-          westeurope: myNetworkResourceGroup/myNetworkName
+            regions: [westeurope]
+            vpc_ids:
+              westeurope: myNetworkResourceGroup/myNetworkName
+    ```
+
+    Alternatively, specify `subnet_ids` to target specific subnets:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: azure
+            creds:
+              type: default
+            regions: [westeurope]
+            subnet_ids:
+              westeurope: myNetworkResourceGroup/myNetworkName/mySubnetName
     ```
 
 
