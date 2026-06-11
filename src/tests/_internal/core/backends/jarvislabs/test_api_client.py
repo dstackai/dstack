@@ -64,6 +64,57 @@ def test_add_ssh_key_if_needed_adds_missing_key(requests_mock):
     }
 
 
+def test_create_ssh_key_adds_key_and_returns_created_key_id(requests_mock):
+    public_key = "ssh-rsa AAAA test-comment"
+    requests_mock.post(f"{API_URL}/ssh/", json={"success": True})
+    requests_mock.get(
+        f"{API_URL}/ssh/",
+        json=[
+            {
+                "ssh_key": "ssh-rsa AAAA another-comment",
+                "key_name": "dstack-test-0.key",
+                "key_id": "key-id",
+            }
+        ],
+    )
+
+    key_id = JarvisLabsAPIClient("token").create_ssh_key(
+        public_key=public_key,
+        key_name="dstack-test-0.key",
+    )
+
+    assert key_id == "key-id"
+    assert requests_mock.request_history[0].json() == {
+        "ssh_key": public_key,
+        "key_name": "dstack-test-0.key",
+    }
+
+
+def test_create_ssh_key_raises_if_created_key_id_is_missing(requests_mock):
+    requests_mock.post(f"{API_URL}/ssh/", json={"success": True})
+    requests_mock.get(f"{API_URL}/ssh/", json=[])
+
+    with pytest.raises(BackendError, match="Failed to find created JarvisLabs SSH key"):
+        JarvisLabsAPIClient("token").create_ssh_key(
+            public_key="ssh-rsa AAAA test-comment",
+            key_name="dstack-test-0.key",
+        )
+
+
+def test_delete_ssh_key_deletes_key(requests_mock):
+    requests_mock.delete(f"{API_URL}/ssh/key-id", json={"success": True})
+
+    JarvisLabsAPIClient("token").delete_ssh_key("key-id")
+
+    assert requests_mock.last_request.method == "DELETE"
+
+
+def test_delete_ssh_key_ignores_missing_key(requests_mock):
+    requests_mock.delete(f"{API_URL}/ssh/key-id", status_code=404, json={"detail": "not found"})
+
+    JarvisLabsAPIClient("token").delete_ssh_key("key-id")
+
+
 def test_create_gpu_vm_posts_to_regional_vm_endpoint(requests_mock):
     requests_mock.post(
         "https://backendn.jarvislabs.net/templates/vm/create",

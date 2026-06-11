@@ -26,6 +26,7 @@ from dstack._internal.core.backends.jarvislabs.api_client import JarvisLabsAPICl
 from dstack._internal.core.backends.jarvislabs.models import JarvisLabsConfig
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -52,6 +53,16 @@ class JarvisLabsOfferBackendData(TypedDict):
     # Set by gpuhunt when normalized GPU identity differs from the JarvisLabs VM
     # create token, e.g. "RTX-PRO6000" normalized to "RTXPRO6000".
     gpu_type: NotRequired[str]
+
+
+class JarvisLabsInstanceBackendData(CoreModel):
+    ssh_key_ids: Optional[List[str]] = None
+
+    @classmethod
+    def load(cls, raw: Optional[str]) -> "JarvisLabsInstanceBackendData":
+        if raw is None:
+            return cls()
+        return cls.__response__.parse_raw(raw)
 
 
 class JarvisLabsCompute(
@@ -92,9 +103,17 @@ class JarvisLabsCompute(
         instance_name = generate_unique_instance_name(
             instance_config, max_length=MAX_INSTANCE_NAME_LEN
         )
-        self.api_client.add_ssh_key_if_needed(instance_config.ssh_keys[0].public)
+        ssh_key_ids: List[str] = []
         instance_id = None
         try:
+            for idx, ssh_public_key in enumerate(instance_config.get_public_keys()):
+                ssh_key_ids.append(
+                    _create_ssh_key(
+                        client=self.api_client,
+                        name=f"{instance_name}-{idx}.key",
+                        public_key=ssh_public_key,
+                    )
+                )
             if instance_offer.instance.resources.gpus:
                 instance_id = self.api_client.create_gpu_vm(
                     gpu_type=_get_jarvislabs_gpu_type(instance_offer),
@@ -124,6 +143,13 @@ class JarvisLabsCompute(
                     logger.exception(
                         "Could not destroy failed JarvisLabs instance %s", instance_id
                     )
+            try:
+                _delete_ssh_keys(self.api_client, ssh_key_ids)
+            except Exception:
+                logger.exception(
+                    "Could not delete JarvisLabs SSH keys %s after provisioning failure",
+                    ssh_key_ids,
+                )
             raise
         return JobProvisioningData(
             backend=instance_offer.backend,
@@ -137,7 +163,7 @@ class JarvisLabsCompute(
             ssh_port=22,
             dockerized=True,
             ssh_proxy=None,
-            backend_data=None,
+            backend_data=JarvisLabsInstanceBackendData(ssh_key_ids=ssh_key_ids).json(),
         )
 
     def update_provisioning_data(
@@ -179,7 +205,20 @@ class JarvisLabsCompute(
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
+        backend_data_parsed = JarvisLabsInstanceBackendData.load(backend_data)
         self.api_client.destroy_instance(machine_id=instance_id, region=region)
+        _delete_ssh_keys(self.api_client, backend_data_parsed.ssh_key_ids)
+
+
+def _create_ssh_key(client: JarvisLabsAPIClient, name: str, public_key: str) -> str:
+    return client.create_ssh_key(public_key=public_key, key_name=name)
+
+
+def _delete_ssh_keys(client: JarvisLabsAPIClient, ssh_key_ids: Optional[List[str]]) -> None:
+    if not ssh_key_ids:
+        return
+    for ssh_key_id in ssh_key_ids:
+        client.delete_ssh_key(ssh_key_id)
 
 
 def _get_jarvislabs_gpu_type(instance_offer: InstanceOfferWithAvailability) -> str:

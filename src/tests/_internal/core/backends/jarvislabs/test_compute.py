@@ -1,16 +1,17 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
 from dstack._internal.core.backends.jarvislabs.compute import (
     CONFIGURABLE_DISK_SIZE,
     JarvisLabsCompute,
+    JarvisLabsInstanceBackendData,
     _get_disk_size_gb,
     _get_jarvislabs_gpu_type,
     _get_ssh_username,
 )
 from dstack._internal.core.backends.jarvislabs.models import JarvisLabsConfig, JarvisLabsCreds
-from dstack._internal.core.errors import NoCapacityError, ProvisioningError
+from dstack._internal.core.errors import BackendError, NoCapacityError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -32,16 +33,17 @@ def _compute() -> JarvisLabsCompute:
         JarvisLabsConfig(creds=JarvisLabsCreds(api_key="test"), regions=["india-noida-01"])
     )
     compute.api_client = MagicMock()
+    compute.api_client.create_ssh_key.return_value = "ssh-key-id"
     compute.api_client.get_instance_status.return_value = {"status": "Running"}
     return compute
 
 
-def _instance_config() -> InstanceConfiguration:
+def _instance_config(ssh_keys: list[SSHKey] | None = None) -> InstanceConfiguration:
     return InstanceConfiguration(
         project_name="test-project",
         instance_name="jarvislabs-test",
         user="test-user",
-        ssh_keys=[SSHKey(public="ssh-rsa AAAA test")],
+        ssh_keys=ssh_keys or [SSHKey(public="ssh-rsa AAAA test")],
     )
 
 
@@ -169,7 +171,7 @@ def test_get_offers_reuses_all_offers_cache_and_modifies_disk_size():
     compute.get_all_offers_with_availability.assert_called_once()
 
 
-def test_create_gpu_instance_registers_ssh_key_and_creates_gpu_vm():
+def test_create_gpu_instance_creates_ssh_key_and_gpu_vm():
     compute = _compute()
     compute.api_client.create_gpu_vm.return_value = "123"
 
@@ -181,7 +183,10 @@ def test_create_gpu_instance_registers_ssh_key_and_creates_gpu_vm():
             _gpu_offer(backend_data={"gpu_type": "A100-80GB"}), _instance_config(), None
         )
 
-    compute.api_client.add_ssh_key_if_needed.assert_called_once_with("ssh-rsa AAAA test")
+    compute.api_client.create_ssh_key.assert_called_once_with(
+        public_key="ssh-rsa AAAA test",
+        key_name="dstack-test-0.key",
+    )
     compute.api_client.create_gpu_vm.assert_called_once_with(
         gpu_type="A100-80GB",
         num_gpus=1,
@@ -193,7 +198,8 @@ def test_create_gpu_instance_registers_ssh_key_and_creates_gpu_vm():
     assert provisioning_data.instance_id == "123"
     assert provisioning_data.username == "ubuntu"
     assert provisioning_data.dockerized is True
-    assert provisioning_data.backend_data is None
+    backend_data = JarvisLabsInstanceBackendData.load(provisioning_data.backend_data)
+    assert backend_data.ssh_key_ids == ["ssh-key-id"]
     compute.api_client.get_instance_status.assert_not_called()
 
 
@@ -246,7 +252,7 @@ def test_create_rtx_pro_6000_instance_uses_jarvislabs_gpu_type_from_backend_data
     )
 
 
-def test_create_cpu_instance_registers_ssh_key_and_creates_cpu_vm():
+def test_create_cpu_instance_creates_ssh_key_and_cpu_vm():
     compute = _compute()
     compute.api_client.create_cpu_vm.return_value = "456"
 
@@ -256,7 +262,10 @@ def test_create_cpu_instance_registers_ssh_key_and_creates_cpu_vm():
     ):
         provisioning_data = compute.create_instance(_cpu_offer(), _instance_config(), None)
 
-    compute.api_client.add_ssh_key_if_needed.assert_called_once_with("ssh-rsa AAAA test")
+    compute.api_client.create_ssh_key.assert_called_once_with(
+        public_key="ssh-rsa AAAA test",
+        key_name="dstack-cpu-0.key",
+    )
     compute.api_client.create_cpu_vm.assert_called_once_with(
         vcpus=4,
         ram_gb=16,
@@ -265,7 +274,8 @@ def test_create_cpu_instance_registers_ssh_key_and_creates_cpu_vm():
         name="dstack-cpu",
     )
     assert provisioning_data.instance_id == "456"
-    assert provisioning_data.backend_data is None
+    backend_data = JarvisLabsInstanceBackendData.load(provisioning_data.backend_data)
+    assert backend_data.ssh_key_ids == ["ssh-key-id"]
 
 
 def test_update_provisioning_data_sets_hostname_and_starts_runner():
@@ -346,7 +356,7 @@ def test_get_ssh_username_parses_jarvislabs_ssh_command():
     assert _get_ssh_username({}) == "ubuntu"
 
 
-def test_terminate_instance_delegates_to_api_client():
+def test_terminate_instance_delegates_to_api_client_without_backend_data():
     compute = _compute()
 
     compute.terminate_instance("123", "india-noida-01")
@@ -355,9 +365,28 @@ def test_terminate_instance_delegates_to_api_client():
         machine_id="123",
         region="india-noida-01",
     )
+    compute.api_client.delete_ssh_key.assert_not_called()
 
 
-def test_create_instance_propagates_create_failure_without_cleanup():
+def test_terminate_instance_deletes_created_ssh_keys():
+    compute = _compute()
+    backend_data = JarvisLabsInstanceBackendData(
+        ssh_key_ids=["ssh-key-id-1", "ssh-key-id-2"]
+    ).json()
+
+    compute.terminate_instance("123", "india-noida-01", backend_data)
+
+    compute.api_client.destroy_instance.assert_called_once_with(
+        machine_id="123",
+        region="india-noida-01",
+    )
+    assert compute.api_client.delete_ssh_key.call_args_list == [
+        call("ssh-key-id-1"),
+        call("ssh-key-id-2"),
+    ]
+
+
+def test_create_instance_cleans_up_ssh_key_on_create_failure():
     compute = _compute()
     compute.api_client.create_gpu_vm.side_effect = NoCapacityError(
         "L4 not available at this moment, please try again later"
@@ -371,6 +400,31 @@ def test_create_instance_propagates_create_failure_without_cleanup():
             compute.create_instance(_gpu_offer(spot=True), _instance_config(), None)
 
     compute.api_client.destroy_instance.assert_not_called()
+    compute.api_client.delete_ssh_key.assert_called_once_with("ssh-key-id")
+
+
+def test_create_instance_cleans_up_created_ssh_key_if_later_ssh_key_create_fails():
+    compute = _compute()
+    compute.api_client.create_ssh_key.side_effect = [
+        "ssh-key-id-1",
+        BackendError("ssh create failed"),
+    ]
+    instance_config = _instance_config(
+        ssh_keys=[
+            SSHKey(public="ssh-rsa AAAA test-1"),
+            SSHKey(public="ssh-rsa BBBB test-2"),
+        ]
+    )
+
+    with patch(
+        "dstack._internal.core.backends.jarvislabs.compute.generate_unique_instance_name",
+        return_value="dstack-test",
+    ):
+        with pytest.raises(BackendError, match="ssh create failed"):
+            compute.create_instance(_gpu_offer(), instance_config, None)
+
+    compute.api_client.create_gpu_vm.assert_not_called()
+    compute.api_client.delete_ssh_key.assert_called_once_with("ssh-key-id-1")
 
 
 def test_update_provisioning_data_raises_provisioning_error_from_failed_capacity_status():
