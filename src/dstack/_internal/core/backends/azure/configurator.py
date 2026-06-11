@@ -253,11 +253,11 @@ class AzureConfigurator(
                 if config.regions is None:
                     raise ServerClientError(
                         f"Networking not configured for regions {not_configured_locations}. "
-                        f"Configure either `vpc_ids` or `subnet_ids` for all regions or specify `regions`."
+                        "Configure either `vpc_ids` or `subnet_ids` for all regions or specify `regions`."
                     )
                 raise ServerClientError(
                     f"Networking not configured for regions {not_configured_locations}. "
-                    f"Configure either `vpc_ids` or `subnet_ids` for all regions specified in `regions`."
+                    "Configure either `vpc_ids` or `subnet_ids` for all regions specified in `regions`."
                 )
             network_client = network_mgmt.NetworkManagementClient(
                 credential=credential,
