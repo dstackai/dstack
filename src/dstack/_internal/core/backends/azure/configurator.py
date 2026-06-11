@@ -125,7 +125,7 @@ class AzureConfigurator(
             subscription_id=config.subscription_id,
             resource_group=config.resource_group,
             locations=config.regions,
-            create_default_network=config.vpc_ids is None,
+            create_default_network=config.vpc_ids is None and config.subnet_ids is None,
         )
         return BackendRecord(
             config=AzureStoredConfig(
@@ -226,23 +226,38 @@ class AzureConfigurator(
         if config.subscription_id is None:
             return None
         allocate_public_ip = config.public_ips if config.public_ips is not None else True
-        if config.public_ips is False and config.vpc_ids is None:
-            raise ServerClientError(msg="`vpc_ids` must be specified if `public_ips: false`.")
+        if config.public_ips is False and config.vpc_ids is None and config.subnet_ids is None:
+            raise ServerClientError(
+                msg="`vpc_ids` or `subnet_ids` must be specified if `public_ips: false`."
+            )
+        if config.vpc_ids is not None and config.subnet_ids is not None:
+            overlap = sorted(set(config.vpc_ids.keys()) & set(config.subnet_ids.keys()))
+            if overlap:
+                raise ServerClientError(
+                    f"Regions {overlap} are configured in both `vpc_ids` and `subnet_ids`."
+                    " Each region must be specified in only one of them."
+                )
         locations = config.regions
         if locations is None:
             locations = DEFAULT_LOCATIONS
-        if config.vpc_ids is not None:
-            vpc_ids_locations = list(config.vpc_ids.keys())
-            not_configured_locations = [loc for loc in locations if loc not in vpc_ids_locations]
+        if config.vpc_ids is not None or config.subnet_ids is not None:
+            configured_locations = set()
+            if config.vpc_ids is not None:
+                configured_locations |= set(config.vpc_ids.keys())
+            if config.subnet_ids is not None:
+                configured_locations |= set(config.subnet_ids.keys())
+            not_configured_locations = [
+                loc for loc in locations if loc not in configured_locations
+            ]
             if len(not_configured_locations) > 0:
                 if config.regions is None:
                     raise ServerClientError(
-                        f"`vpc_ids` not configured for regions {not_configured_locations}. "
-                        "Configure `vpc_ids` for all regions or specify `regions`."
+                        f"Networking not configured for regions {not_configured_locations}. "
+                        f"Configure either `vpc_ids` or `subnet_ids` for all regions or specify `regions`."
                     )
                 raise ServerClientError(
-                    f"`vpc_ids` not configured for regions {not_configured_locations}. "
-                    "Configure `vpc_ids` for all regions specified in `regions`."
+                    f"Networking not configured for regions {not_configured_locations}. "
+                    f"Configure either `vpc_ids` or `subnet_ids` for all regions specified in `regions`."
                 )
             network_client = network_mgmt.NetworkManagementClient(
                 credential=credential,
@@ -256,6 +271,7 @@ class AzureConfigurator(
                         network_client=network_client,
                         resource_group=None,
                         vpc_ids=config.vpc_ids,
+                        subnet_ids=config.subnet_ids,
                         location=location,
                         allocate_public_ip=allocate_public_ip,
                     )

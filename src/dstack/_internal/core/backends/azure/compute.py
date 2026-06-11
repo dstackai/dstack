@@ -143,6 +143,7 @@ class AzureCompute(
             network_client=self._network_client,
             resource_group=self.config.resource_group,
             vpc_ids=self.config.vpc_ids,
+            subnet_ids=self.config.subnet_ids,
             location=location,
             allocate_public_ip=allocate_public_ip,
         )
@@ -252,6 +253,7 @@ class AzureCompute(
             network_client=self._network_client,
             resource_group=self.config.resource_group,
             vpc_ids=self.config.vpc_ids,
+            subnet_ids=self.config.subnet_ids,
             location=configuration.region,
             allocate_public_ip=True,
         )
@@ -326,9 +328,38 @@ def get_resource_group_network_subnet_or_error(
     network_client: network_mgmt.NetworkManagementClient,
     resource_group: Optional[str],
     vpc_ids: Optional[Dict[str, str]],
+    subnet_ids: Optional[Dict[str, str]],
     location: str,
     allocate_public_ip: bool,
 ) -> Tuple[str, str, str]:
+    if subnet_ids is not None and location in subnet_ids:
+        subnet_id = subnet_ids[location]
+        try:
+            net_resource_group, network_name, subnet_name = _parse_config_subnet_id(subnet_id)
+        except Exception:
+            raise ComputeError(
+                "Subnet specified in incorrect format."
+                " Supported format for `subnet_ids` values: 'networkResourceGroupName/networkName/subnetName'"
+            )
+        try:
+            subnet = network_client.subnets.get(net_resource_group, network_name, subnet_name)
+        except ResourceNotFoundError:
+            raise ComputeError(
+                f"Subnet {subnet_name} not found in network {network_name}"
+                f" in resource group {net_resource_group}"
+            )
+        if not allocate_public_ip and not azure_resources.is_eligible_private_subnet(
+            network_client=network_client,
+            resource_group=net_resource_group,
+            network_name=network_name,
+            subnet=subnet,
+        ):
+            raise ComputeError(
+                f"Subnet {subnet_name} in network {network_name} does not have outbound internet connectivity."
+                " Ensure a NAT Gateway is attached or VNet peering is configured."
+            )
+        return net_resource_group, network_name, subnet_name
+
     if vpc_ids is not None:
         vpc_id = vpc_ids.get(location)
         if vpc_id is None:
@@ -386,6 +417,11 @@ def parse_vm_managed_identity(
 def _parse_config_vpc_id(vpc_id: str) -> Tuple[str, str]:
     resource_group, network_name = vpc_id.split("/")
     return resource_group, network_name
+
+
+def _parse_config_subnet_id(subnet_id: str) -> Tuple[str, str, str]:
+    resource_group, network_name, subnet_name = subnet_id.split("/")
+    return resource_group, network_name, subnet_name
 
 
 class VMImageVariant(enum.Enum):
