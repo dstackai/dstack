@@ -43,7 +43,7 @@ jobs:
     defaults:
       run:
         working-directory: docker
-    runs-on: ubuntu-latest
+    runs-on: dstack-ubuntu-latest-32-cores
     strategy:
       matrix:
         flavor: ["base", "devel", "devel-efa"]
