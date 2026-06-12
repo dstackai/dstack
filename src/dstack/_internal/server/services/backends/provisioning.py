@@ -12,7 +12,7 @@ from dstack._internal.utils.docker import parse_image_name
 
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types
 _AWS_EFA_ENABLED_INSTANCE_TYPE_PATTERNS = [
-    # TODO: p6-b200 isn't supported yet in gpuhunt
+    r"^p6-b300\.(48xlarge)$",
     r"^p6-b200\.(48xlarge)$",
     r"^p5\.(4xlarge|48xlarge)$",
     r"^p5e\.(48xlarge)$",
