@@ -215,6 +215,7 @@ def get_dev_env_run_plan_dict(
             "fleets": None,
             "tags": None,
             "backend_options": None,
+            "instances": None,
             "priority": 0,
         },
         "configuration_path": "dstack.yaml",
@@ -241,6 +242,7 @@ def get_dev_env_run_plan_dict(
             "fleets": None,
             "tags": None,
             "backend_options": None,
+            "instances": None,
         },
         "repo_code_hash": None,
         "repo_data": {
@@ -460,6 +462,7 @@ def get_dev_env_run_dict(
                 "fleets": None,
                 "tags": None,
                 "backend_options": None,
+                "instances": None,
                 "priority": 0,
             },
             "configuration_path": "dstack.yaml",
@@ -486,6 +489,7 @@ def get_dev_env_run_dict(
                 "fleets": None,
                 "tags": None,
                 "backend_options": None,
+                "instances": None,
             },
             "repo_code_hash": None,
             "repo_data": {

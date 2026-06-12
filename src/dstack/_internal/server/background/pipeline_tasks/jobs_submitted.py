@@ -131,6 +131,7 @@ from dstack._internal.server.services.runs.plan import (
     get_instance_offers_in_fleet,
     get_run_candidate_fleet_models_filters,
     get_run_profile_and_requirements_in_fleet,
+    get_targeted_instance_offers,
     select_run_candidate_fleet_models_with_filters,
 )
 from dstack._internal.server.services.runs.spec import (
@@ -494,6 +495,12 @@ async def _process_assignment(context: _SubmittedJobContext) -> _AssignmentResul
     if not isinstance(preconditions, _ProcessedPreconditions):
         return preconditions
 
+    if context.run.run_spec.merged_profile.instances is not None:
+        return await _select_targeted_instance_assignment(
+            context=context,
+            preconditions=preconditions,
+        )
+
     candidate_fleet_models = await _load_assignment_candidate_fleets(context=context)
     return await _select_assignment(
         context=context,
@@ -531,6 +538,30 @@ async def _select_assignment(
         )
 
     return _NewCapacityAssignment(fleet_id=fleet_model.id)
+
+
+async def _select_targeted_instance_assignment(
+    context: _SubmittedJobContext,
+    preconditions: _ProcessedPreconditions,
+) -> _AssignmentResult:
+    async with get_session_ctx() as session:
+        instance_offers = await get_targeted_instance_offers(
+            session=session,
+            project=context.project,
+            run_spec=context.run.run_spec,
+            job=context.job,
+            master_job_provisioning_data=preconditions.master_job_provisioning_data,
+            volumes=preconditions.prepared_job_volumes.volumes,
+            exclude_not_available=True,
+            fleet_id=context.run_model.fleet_id,
+        )
+    if len(instance_offers) < _get_required_targeted_instance_offers(context):
+        return _NoFleetAssignment()
+    return _ExistingInstanceAssignment(
+        fleet_id=get_or_error(instance_offers[0][0].fleet_id),
+        master_job_provisioning_data=preconditions.master_job_provisioning_data,
+        volumes=preconditions.prepared_job_volumes.volumes,
+    )
 
 
 async def _apply_assignment_result(
@@ -621,6 +652,28 @@ async def _apply_assignment_result(
             return
 
         async with AsyncExitStack() as exit_stack:
+            if context.run.run_spec.merged_profile.instances is not None:
+                current_instance_offers = await _lock_targeted_instance_offers_for_assignment(
+                    exit_stack=exit_stack,
+                    session=session,
+                    context=context,
+                    assignment=assignment,
+                )
+                if len(current_instance_offers) < _get_required_targeted_instance_offers(context):
+                    await _reset_job_lock_for_retry(session=session, item=item)
+                    return
+
+                instance_model, current_offer = current_instance_offers[0]
+                _assign_instance_to_job(
+                    session=session,
+                    job_model=job_model,
+                    instance_model=instance_model,
+                    offer=current_offer,
+                    multinode=context.multinode,
+                )
+                await _mark_job_processed(session=session, job_model=job_model)
+                return
+
             fleet_model = await _lock_assignment_fleet_for_existing_instance_assignment(
                 exit_stack=exit_stack,
                 session=session,
@@ -905,6 +958,16 @@ async def _apply_no_fleet_selection(
     job_model: JobModel,
     run: Run,
 ) -> None:
+    if run.run_spec.merged_profile.instances is not None:
+        logger.debug("%s: failed to use specified instances", fmt(job_model))
+        await _terminate_submitted_job(
+            session=session,
+            job_model=job_model,
+            reason=JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+            message="Failed to use specified instances",
+        )
+        return
+
     if run.run_spec.merged_profile.fleets is not None:
         logger.debug("%s: failed to use specified fleets", fmt(job_model))
         await _terminate_submitted_job(
@@ -924,6 +987,45 @@ async def _apply_no_fleet_selection(
             "No matching fleet found. Possible reasons: "
             "https://dstack.ai/docs/guides/troubleshooting/#no-fleets"
         ),
+    )
+
+
+async def _lock_targeted_instance_offers_for_assignment(
+    exit_stack: AsyncExitStack,
+    session: AsyncSession,
+    context: _SubmittedJobContext,
+    assignment: _ExistingInstanceAssignment,
+) -> list[tuple[InstanceModel, InstanceOfferWithAvailability]]:
+    instance_offers = await get_targeted_instance_offers(
+        session=session,
+        project=context.project,
+        run_spec=context.run.run_spec,
+        job=context.job,
+        master_job_provisioning_data=assignment.master_job_provisioning_data,
+        volumes=assignment.volumes,
+        exclude_not_available=True,
+        fleet_id=assignment.fleet_id,
+        lock_instances=True,
+    )
+    instance_ids = sorted(instance.id for instance, _ in instance_offers)
+    if not instance_ids or not is_db_sqlite():
+        return instance_offers
+
+    await sqlite_commit(session)
+    await exit_stack.enter_async_context(
+        get_locker(get_db().dialect_name).lock_ctx(InstanceModel.__tablename__, instance_ids)
+    )
+    return await get_targeted_instance_offers(
+        session=session,
+        project=context.project,
+        run_spec=context.run.run_spec,
+        job=context.job,
+        master_job_provisioning_data=assignment.master_job_provisioning_data,
+        volumes=assignment.volumes,
+        exclude_not_available=True,
+        fleet_id=assignment.fleet_id,
+        instance_ids=instance_ids,
+        lock_instances=True,
     )
 
 
@@ -2044,6 +2146,12 @@ def _select_jobs_to_provision(job: Job, replica_jobs: list[Job], job_model: JobM
     if is_multinode_job(job) and is_master_job(job) and job_model.waiting_master_job is not None:
         jobs_to_provision = replica_jobs
     return jobs_to_provision
+
+
+def _get_required_targeted_instance_offers(context: _SubmittedJobContext) -> int:
+    if is_multinode_job(context.job) and is_master_job(context.job):
+        return len(context.jobs_to_provision)
+    return 1
 
 
 def _release_replica_jobs_from_master_wait(
