@@ -1144,6 +1144,39 @@ class TestGetRun:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
+        ("ide", "ide_name", "attached_ide_url", "proxied_ide_url_tmpl"),
+        [
+            pytest.param(
+                "vscode",
+                "VS Code",
+                "vscode://vscode-remote/ssh-remote+dev-env/test",
+                "vscode://vscode-remote/ssh-remote+{auth}/test",
+                id="vscode",
+            ),
+            pytest.param(
+                "cursor",
+                "Cursor",
+                "cursor://vscode-remote/ssh-remote+dev-env/test",
+                "cursor://vscode-remote/ssh-remote+{auth}/test",
+                id="cursor",
+            ),
+            pytest.param(
+                "windsurf",
+                "Windsurf",
+                "windsurf://vscode-remote/ssh-remote+dev-env/test",
+                "windsurf://vscode-remote/ssh-remote+{auth}/test",
+                id="windsurf",
+            ),
+            pytest.param(
+                "zed",
+                "Zed",
+                "zed://ssh/dev-env/test",
+                "zed://ssh/{auth}/test",
+                id="zed",
+            ),
+        ],
+    )
+    @pytest.mark.parametrize(
         "sshproxy",
         [
             pytest.param(False, id="without-sshproxy"),
@@ -1158,6 +1191,10 @@ class TestGetRun:
         session: AsyncSession,
         client: AsyncClient,
         sshproxy: bool,
+        ide: str,
+        ide_name: str,
+        attached_ide_url: str,
+        proxied_ide_url_tmpl: str,
     ):
         monkeypatch.setattr("dstack._internal.server.settings.SSHPROXY_ENABLED", sshproxy)
         monkeypatch.setattr("dstack._internal.server.settings.SSHPROXY_HOSTNAME", "example.com")
@@ -1174,7 +1211,7 @@ class TestGetRun:
         run_spec = get_run_spec(
             repo_id=repo.name,
             run_name="dev-env",
-            configuration=DevEnvironmentConfiguration(ide="cursor"),
+            configuration=DevEnvironmentConfiguration(ide=ide),
         )
         run = await create_run(
             session=session,
@@ -1194,10 +1231,11 @@ class TestGetRun:
             json={"run_name": run.run_name},
         )
         assert response.status_code == 200, response.json()
+        proxied_authority = f"{job.id.hex}@example.com:2222"
         assert response.json()["jobs"][0]["job_connection_info"] == {
-            "ide_name": "Cursor",
-            "attached_ide_url": "cursor://vscode-remote/ssh-remote+dev-env/test",
-            "proxied_ide_url": f"cursor://vscode-remote/ssh-remote+{job.id.hex}@example.com:2222/test"
+            "ide_name": ide_name,
+            "attached_ide_url": attached_ide_url,
+            "proxied_ide_url": proxied_ide_url_tmpl.format(auth=proxied_authority)
             if sshproxy
             else None,
             "attached_ssh_command": ["ssh", "dev-env"],

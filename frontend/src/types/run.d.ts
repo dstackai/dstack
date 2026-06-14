@@ -315,9 +315,21 @@ declare interface IJobSubmission {
     probes?: Array<{ success_streak: number }>;
 }
 
+declare interface IJobConnectionInfo {
+    ide_name?: string | null;
+    attached_ide_url?: string | null;
+    proxied_ide_url?: string | null;
+    attached_ssh_command?: string[] | null;
+    proxied_ssh_command?: string[] | null;
+    sshproxy_hostname?: string | null;
+    sshproxy_port?: number | null;
+    sshproxy_upstream_id?: string | null;
+}
+
 declare interface IJob {
     job_spec: IJobSpec;
     job_submissions: IJobSubmission[];
+    job_connection_info?: IJobConnectionInfo | null;
 }
 
 declare interface ISchedule {
