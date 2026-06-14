@@ -14,7 +14,7 @@ declare type TGPUResources = IGPUSpecRequest & {
     name?: string | string[];
 };
 
-declare type TIde = 'cursor' | 'vscode' | 'windsurf';
+declare type TIde = 'cursor' | 'vscode' | 'windsurf' | 'zed';
 
 declare type TVolumeMountPointRequest = {
     name: string | string[];
