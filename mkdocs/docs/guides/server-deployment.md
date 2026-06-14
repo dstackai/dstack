@@ -165,6 +165,9 @@ If you're using a smaller DB instance, you may need to set lower `DSTACK_DB_POOL
        
        If you encounter errors, please [submit an issue](https://github.com/dstackai/dstack/issues/new/choose).
 
+> For a local setup running PostgreSQL and the [SSH proxy](#ssh-proxy) together, see the example
+> [`docker-compose.yml`](https://github.com/dstackai/dstack/blob/master/docker/server/docker-compose.yml).
+
 ## Logs storage
 
 By default, `dstack` stores workload logs locally in `~/.dstack/server/projects/<project_name>/logs`.
@@ -369,6 +372,9 @@ To enable SSH proxy integration on the `dstack` server side, set the following e
 
 * `DSTACK_SSHPROXY_API_TOKEN` – a token used to authenticate SSH proxy API requests, must be the same value as when deploying `dstack-sshproxy`.
 * `DSTACK_SERVER_SSHPROXY_ADDRESS` – an address where SSH proxy is available to `dstack` users, in the `HOSTNAME[:PORT]` form, where `HOSTNAME` is a domain name or an IP address, and `PORT`, if not specified, defaults to 22.
+
+> For a local setup running [PostgreSQL](#postgresql) and the SSH proxy together, see the example
+> [`docker-compose.yml`](https://github.com/dstackai/dstack/blob/master/docker/server/docker-compose.yml).
 
 ## Encryption
 

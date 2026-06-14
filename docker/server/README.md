@@ -22,6 +22,27 @@ The admin user token is 'bbae0f28-d3dd-4820-bf61-8f4bb40815da'
 For more details on server configuration options, see the
 [server deployment](https://dstack.ai/docs/guides/server-deployment.md) guide.
 
+### Run with PostgreSQL and the SSH proxy
+
+In production, the `dstack` server is usually run with
+[PostgreSQL](https://dstack.ai/docs/guides/server-deployment#postgresql) instead of the default
+SQLite, and with the [SSH proxy](https://dstack.ai/docs/guides/server-deployment#ssh-proxy). The
+[`docker-compose.yml`](https://github.com/dstackai/dstack/blob/master/docker/server/docker-compose.yml)
+runs that combination locally, so you can try or test a production-like server on your own machine.
+A full production deployment would also configure external
+[logs storage](https://dstack.ai/docs/guides/server-deployment#logs-storage) and
+[file storage](https://dstack.ai/docs/guides/server-deployment#file-storage).
+
+```shell
+docker compose -f docker/server/docker-compose.yml up
+```
+
+This starts PostgreSQL, the `dstack` server at `http://localhost:3000`, and the SSH proxy at
+`localhost:30022`. The admin token is printed to the logs (`docker compose logs server`).
+
+To access the server from the CLI, add it as a project with `dstack project add`, using the
+admin token from the logs (see [Set up the CLI](#set-up-the-cli) below).
+
 ## Set up the CLI
 
 To point the CLI to the `dstack` server, configure it

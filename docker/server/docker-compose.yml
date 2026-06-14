@@ -1,0 +1,73 @@
+name: dstack
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DSTACK_POSTGRES_USER:-dstack}
+      POSTGRES_PASSWORD: ${DSTACK_POSTGRES_PASSWORD:-dstack}
+      POSTGRES_DB: ${DSTACK_POSTGRES_DB:-dstack}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    image: dstackai/dstack:latest     # multi-arch — no platform override needed
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSTACK_DATABASE_URL: postgresql+asyncpg://${DSTACK_POSTGRES_USER:-dstack}:${DSTACK_POSTGRES_PASSWORD:-dstack}@postgres:5432/${DSTACK_POSTGRES_DB:-dstack}
+      DSTACK_SERVER_LOG_FORMAT: rich   # human-readable console logs (image defaults to json)
+      # Shared secret between the server and the SSH proxy. The default works locally;
+      # override with a real secret for non-local deployments.
+      DSTACK_SSHPROXY_API_TOKEN: ${DSTACK_SSHPROXY_API_TOKEN:-dstack-sshproxy-token}
+      # Address clients use to reach the SSH proxy. `localhost:30022` is correct for a
+      # client on the same host; use a publicly reachable address for multi-host setups.
+      DSTACK_SERVER_SSHPROXY_ADDRESS: localhost:30022
+    volumes:
+      - server-data:/root/.dstack/server   # config.yml + run logs (Postgres holds the rest)
+    ports:
+      - "3000:3000"
+
+  # One-shot init: generates the SSH proxy's host key into a shared volume so no manual
+  # ssh-keygen is needed. The proxy refuses to start without a host key.
+  sshproxy-keygen:
+    image: alpine:3
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache openssh-keygen >/dev/null
+        [ -f /keys/host_key ] || ssh-keygen -t ed25519 -f /keys/host_key -N "" -C dstack-sshproxy
+    volumes:
+      - sshproxy-keys:/keys
+
+  sshproxy:
+    image: dstackai/sshproxy:latest
+    platform: linux/amd64             # image is amd64-only; emulated on Apple Silicon
+    restart: unless-stopped
+    depends_on:
+      sshproxy-keygen:
+        condition: service_completed_successfully
+      server:
+        condition: service_started
+    environment:
+      DSTACK_SSHPROXY_API_URL: http://server:3000
+      DSTACK_SSHPROXY_API_TOKEN: ${DSTACK_SSHPROXY_API_TOKEN:-dstack-sshproxy-token}
+    command: ["--host-key", "/keys/host_key"]
+    volumes:
+      - sshproxy-keys:/keys
+    ports:
+      - "30022:30022"
+
+volumes:
+  postgres-data:
+  server-data:
+  sshproxy-keys:
