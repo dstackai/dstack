@@ -356,19 +356,26 @@ The bucket must be created beforehand. `dstack` won't try to create it.
 
 ## SSH proxy
 
-[`dstack-sshproxy`](https://github.com/dstackai/sshproxy) is an optional component that provides direct SSH access to workloads.
+To connect to a run over SSH, `dstack` establishes a connection to the job's container, routed through the job's host and, for [SSH fleets](../concepts/fleets.md#ssh-fleets) with a head node, through that head node.
 
-Without SSH proxy, in order to connect to a job via SSH or use an IDE URL, the `dstack attach` CLI command must be used, which configures user's SSH client in a backend-specific way for each job.
+[`dstack-sshproxy`](https://github.com/dstackai/sshproxy) is an optional service that you deploy alongside the `dstack` server. When it's enabled, `dstack attach` connects to the proxy instead of to the job's host (and the head node if the SSH fleet has one).
 
-When SSH proxy is deployed, there is one well-known entry point – a proxy address – for all `dstack` jobs, which can be used for SSH access without any additional steps on the user's side (such as installing `dstack` and executing `dstack attach` each time). All the user has to do is to upload their public key to the `dstack` server once – there is a dedicated “SSH keys” tab on the user's page of the control plane UI.
+This lets you:
 
+- Restrict users to the job's container. Without the proxy, an attached user can SSH into the host, not just the container.
+- Reach runs on SSH fleets with a head node without giving users the head node's SSH key.
+- Let users connect to runs without `dstack attach`. This requires uploading their public SSH key(s) to the `dstack` server.
 
-To deploy SSH proxy, see `dstack-sshproxy` [Deployment guide](https://github.com/dstackai/sshproxy/blob/main/DEPLOYMENT.md).
+<!-- TODO: once connecting through the proxy without `dstack attach` is exposed in the UI/CLI, document the steps in this section. -->
 
-To enable SSH proxy integration on the `dstack` server side, set the following environment variables:
+### Deployment
 
-* `DSTACK_SSHPROXY_API_TOKEN` – a token used to authenticate SSH proxy API requests, must be the same value as when deploying `dstack-sshproxy`.
-* `DSTACK_SERVER_SSHPROXY_ADDRESS` – an address where SSH proxy is available to `dstack` users, in the `HOSTNAME[:PORT]` form, where `HOSTNAME` is a domain name or an IP address, and `PORT`, if not specified, defaults to 22.
+To deploy the SSH proxy, follow its [deployment guide](https://github.com/dstackai/sshproxy/blob/main/DEPLOYMENT.md). Then connect the `dstack` server to it by setting the following environment variables:
+
+* `DSTACK_SSHPROXY_API_TOKEN` – the token used to authenticate requests to the SSH proxy. It must match the token the SSH proxy is deployed with.
+* `DSTACK_SERVER_SSHPROXY_ADDRESS` – the address where users reach the SSH proxy, in the `HOSTNAME[:PORT]` form (`PORT` defaults to 22).
+
+<!-- TODO: once the Tenant isolation guide (#3913) is merged, document blocking host SSH access here (DSTACK_SERVER_SSHPROXY_ENFORCED) with a link to that guide. -->
 
 ## Encryption
 
