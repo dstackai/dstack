@@ -16,15 +16,11 @@ RUN cuda_version=$(echo ${CUDA_VERSION} | awk -F . '{ print $1"-"$2 }') \
     && apt-get install -y --no-install-recommends \
         cuda-libraries-dev-${cuda_version} \
         cuda-nvcc-${cuda_version} \
-        libhwloc-dev \
-        autoconf \
-        automake \
-        libtool \
     && rm -rf /var/lib/apt/lists/*
 
 # EFA
 
-ARG EFA_VERSION=1.38.1
+ARG EFA_VERSION=1.48.0
 
 RUN cd /tmp \
     && apt-get update \
@@ -36,33 +32,13 @@ RUN cd /tmp \
 
 # NCCL
 
-ARG NCCL_VERSION=2.26.2-1
+ARG NCCL_VERSION=2.27.7-1
 
 RUN cd /tmp \
     && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION} \
     && cd nccl \
     && make -j$(nproc) src.build BUILDDIR=${NCCL_HOME} \
     && rm -rf /tmp/nccl
-
-# AWS OFI NCCL
-
-ARG OFI_VERSION=1.14.0
-
-RUN cd /tmp \
-    && git clone https://github.com/aws/aws-ofi-nccl.git -b v${OFI_VERSION} \
-    && cd aws-ofi-nccl \
-    && ./autogen.sh \
-    && ./configure \
-        --with-cuda=${CUDA_HOME} \
-        --with-libfabric=${LIBFABRIC_PATH} \
-        --with-mpi=${OPEN_MPI_PATH} \
-        --with-cuda=${CUDA_HOME} \
-        --with-nccl=${NCCL_HOME} \
-        --disable-tests \
-        --prefix=${NCCL_HOME} \
-    && make -j$(nproc) \
-    && make install \
-    && rm -rf /tmp/aws-ofi-nccl /var/lib/apt/lists/*
 
 # NCCL Tests
 
