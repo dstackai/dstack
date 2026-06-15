@@ -12,9 +12,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.configurator import Configurator
 from dstack._internal.core.backends.configurators import list_available_configurator_classes
-from dstack._internal.core.backends.local.compute import LocalCompute
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.settings import LOCAL_BACKEND_ENABLED
 
 _configurator_classes = list_available_configurator_classes()
 
@@ -27,8 +25,6 @@ def _get_backends_with_compute_feature(
         (configurator_class.TYPE, configurator_class.BACKEND_CLASS.COMPUTE_CLASS)
         for configurator_class in configurator_classes
     ]
-    if LOCAL_BACKEND_ENABLED:
-        backend_types_and_computes.append((BackendType.LOCAL, LocalCompute))
     backend_types = []
     for backend_type, compute_class in backend_types_and_computes:
         if issubclass(compute_class, compute_feature_class):

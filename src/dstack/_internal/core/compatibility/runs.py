@@ -83,6 +83,8 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
     spec_excludes: IncludeExcludeDictType = {}
     configuration_excludes: IncludeExcludeDictType = {}
     profile_excludes = get_profile_excludes(run_spec.profile)
+    for field in get_profile_excludes(run_spec.configuration):
+        configuration_excludes[field] = True
 
     if run_spec.configuration.backend_options is None:
         configuration_excludes["backend_options"] = True
@@ -122,6 +124,10 @@ def get_run_spec_excludes(run_spec: RunSpec) -> IncludeExcludeDictType:
                 replica_group_excludes["nvcc"] = True
             if all(g.privileged is None for g in replicas):
                 replica_group_excludes["privileged"] = True
+            if all(g.spot_policy is None for g in replicas):
+                replica_group_excludes["spot_policy"] = True
+            if all(g.reservation is None for g in replicas):
+                replica_group_excludes["reservation"] = True
             if replica_group_excludes:
                 configuration_excludes["replicas"] = {"__all__": replica_group_excludes}
 

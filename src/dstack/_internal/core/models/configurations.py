@@ -25,6 +25,7 @@ from dstack._internal.core.models.gateways import GatewayConfiguration
 from dstack._internal.core.models.profiles import (
     ProfileParams,
     ProfileParamsConfig,
+    SpotPolicy,
     parse_duration,
     parse_off_duration,
 )
@@ -685,9 +686,9 @@ class ConfigurationWithCommandsParams(CoreModel):
 
 class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[
-        Optional[Union[Literal["vscode"], Literal["cursor"], Literal["windsurf"]]],
+        Optional[Union[Literal["vscode"], Literal["cursor"], Literal["windsurf"], Literal["zed"]]],
         Field(
-            description="The IDE to pre-install. Supported values include `vscode`, `cursor`, and `windsurf`. Defaults to no IDE (SSH only)"
+            description="The IDE to pre-install. Supported values include `vscode`, `cursor`, `windsurf`, and `zed`. Defaults to no IDE (SSH only)"
         ),
     ] = None
     version: Annotated[
@@ -836,6 +837,24 @@ class ReplicaGroup(CoreModel):
         ResourcesSpec,
         Field(description="The resources requirements for replicas in this group"),
     ] = ResourcesSpec()
+    spot_policy: Annotated[
+        Optional[SpotPolicy],
+        Field(
+            description=(
+                "The policy for provisioning spot or on-demand instances for replicas in this group:"
+                f" {list_enum_values_for_annotation(SpotPolicy)}"
+            )
+        ),
+    ] = None
+    reservation: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The existing reservation to use for replicas in this group."
+                " Supports AWS Capacity Reservations, AWS Capacity Blocks, and GCP reservations"
+            )
+        ),
+    ] = None
 
     commands: Annotated[
         CommandsList,
@@ -1144,7 +1163,7 @@ class ServiceConfigurationParams(CoreModel):
     @root_validator()
     def validate_no_mixed_service_and_group_container_fields(cls, values):
         """
-        When replicas is a list (image, docker, privileged) may be set
+        When replicas is a list, certain fields may be set
         at the service level OR in replica groups, never both. Mixing is
         rejected — including partial mixing, where only some groups set a
         field the service also sets — because it leaves precedence ambiguous.
@@ -1178,6 +1197,16 @@ class ServiceConfigurationParams(CoreModel):
                 "nvcc",
                 values.get("nvcc") is True,
                 lambda g: g.nvcc is not None,
+            ),
+            (
+                "spot_policy",
+                values.get("spot_policy") is not None,
+                lambda g: g.spot_policy is not None,
+            ),
+            (
+                "reservation",
+                values.get("reservation") is not None,
+                lambda g: g.reservation is not None,
             ),
         ]
 

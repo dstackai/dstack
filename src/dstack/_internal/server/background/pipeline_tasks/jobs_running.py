@@ -1,6 +1,7 @@
 import asyncio
 import enum
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, Iterable, Literal, Optional, Sequence, Union
@@ -12,7 +13,6 @@ from sqlalchemy.orm import aliased, contains_eager, joinedload, load_only
 
 from dstack._internal.core.consts import DSTACK_RUNNER_HTTP_PORT, DSTACK_SHIM_HTTP_PORT
 from dstack._internal.core.errors import GatewayError, SSHError
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import NetworkMode, RegistryAuth
 from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
@@ -321,6 +321,12 @@ class JobRunningWorker(Worker[JobRunningPipelineItem]):
             job_model=context.job_model,
             result=result,
         )
+        new_status = result.job_update_map.get("status")
+        if new_status == JobStatus.PULLING:
+            self._pipeline_hinter.hint_fetch(JobModel.__name__)
+        # Hint run pipeline for fast run transition to RUNNING status.
+        if new_status == JobStatus.RUNNING and context.job_model.run.status != RunStatus.RUNNING:
+            self._pipeline_hinter.hint_fetch(RunModel.__name__)
 
 
 @dataclass
@@ -609,7 +615,9 @@ async def _refetch_locked_job_model(
         )
         .options(joinedload(JobModel.instance).joinedload(InstanceModel.project))
         .options(joinedload(JobModel.probes).load_only(ProbeModel.success_streak))
-        .options(joinedload(JobModel.run).load_only(RunModel.id, RunModel.run_spec))
+        .options(
+            joinedload(JobModel.run).load_only(RunModel.id, RunModel.run_spec, RunModel.status)
+        )
         .execution_options(populate_existing=True)
     )
     return res.unique().scalar_one_or_none()
@@ -740,8 +748,6 @@ async def _process_provisioning_status(
             assert context.run.run_spec.ssh_key_pub is not None
             user_ssh_key = context.run.run_spec.ssh_key_pub.strip()
             public_keys.append(user_ssh_key)
-        if job_provisioning_data.backend == BackendType.LOCAL:
-            user_ssh_key = None
         success = await run_async(
             _process_provisioning_with_shim,
             server_ssh_private_keys,
@@ -980,6 +986,18 @@ async def _apply_process_result(
 
         if result.new_probe_models:
             session.add_all(result.new_probe_models)
+
+        # Set RunModel.skip_min_processing_interval for fast run transition to RUNNING status.
+        # Cross-pipeline write is ok: worst case skip_min_processing_interval is overridden.
+        if (
+            result.job_update_map.get("status") == JobStatus.RUNNING
+            and job_model.run.status != RunStatus.RUNNING
+        ):
+            await session.execute(
+                update(RunModel)
+                .where(RunModel.id == job_model.run_id)
+                .values(skip_min_processing_interval=True)
+            )
 
         _emit_result_events(session=session, job_model=job_model, result=result)
 
@@ -1288,9 +1306,9 @@ def _should_wait_for_other_nodes(run: Run, job: Job, job_model: JobModel) -> boo
     return False
 
 
-@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT], retries=1)
+@runner_ssh_tunnel
 def _process_provisioning_with_shim(
-    ports: Dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
     run: Run,
     job_model: JobModel,
     jrd: Optional[JobRuntimeData],
@@ -1302,7 +1320,7 @@ def _process_provisioning_with_shim(
     ssh_key: Optional[str],
 ) -> bool:
     job_spec = get_job_spec(job_model)
-    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
 
     resp = shim_client.healthcheck()
     if resp is None:
@@ -1415,21 +1433,21 @@ class _SyncShimPullingStateResult:
     image_pull_progress: Optional[ImagePullProgress] = None
 
 
-@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
-def _get_runner_availability(ports: Dict[int, int]) -> _RunnerAvailability:
-    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+@runner_ssh_tunnel
+def _get_runner_availability(addresses: Mapping[int, client.LocalAddress]) -> _RunnerAvailability:
+    runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     if runner_client.healthcheck() is None:
         return _RunnerAvailability.UNAVAILABLE
     return _RunnerAvailability.AVAILABLE
 
 
-@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
+@runner_ssh_tunnel
 def _sync_shim_pulling_state(
-    ports: Dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
     job_model: JobModel,
     jrd: Optional[JobRuntimeData] = None,
 ) -> Union[_SyncShimPullingStateResult, Literal[False]]:
-    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+    shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
     image_pull_progress: Optional[ImagePullProgress] = None
     if shim_client.is_api_v2_supported():
         task = shim_client.get_task(job_model.id)
@@ -1505,9 +1523,9 @@ class _SubmitJobToRunnerResult:
     job_runtime_data: Optional[JobRuntimeData] = None
 
 
-@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
+@runner_ssh_tunnel
 def _submit_job_to_runner(
-    ports: Dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
     run: Run,
     job_model: JobModel,
     job: Job,
@@ -1532,7 +1550,7 @@ def _submit_job_to_runner(
     else:
         instance_env = None
 
-    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     if runner_client.healthcheck() is None:
         return _SubmitJobToRunnerResult(success=success_if_not_available)
 
@@ -1575,13 +1593,13 @@ class _ProcessRunningResult:
     job_update_map: _JobUpdateMap = field(default_factory=_JobUpdateMap)
 
 
-@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT])
+@runner_ssh_tunnel
 def _process_running(
-    ports: Dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
     run_model: RunModel,
     job_model: JobModel,
 ) -> Union[_ProcessRunningResult, Literal[False]]:
-    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     timestamp = job_model.runner_timestamp or 0
     resp = runner_client.pull(timestamp)
     logs_services.write_logs(

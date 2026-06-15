@@ -751,11 +751,13 @@ def get_fleet_configuration(
     name: str = "test-fleet",
     nodes: FleetNodesSpec = FleetNodesSpec(min=1, target=1, max=1),
     placement: Optional[InstanceGroupPlacement] = None,
+    backends: Optional[list[BackendType]] = None,
 ) -> FleetConfiguration:
     return FleetConfiguration(
         name=name,
         nodes=nodes,
         placement=placement,
+        backends=backends,
     )
 
 

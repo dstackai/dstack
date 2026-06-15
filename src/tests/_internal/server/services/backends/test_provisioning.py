@@ -47,8 +47,8 @@ class TestResolveProvisioningImageName:
     )
     def test_patch_aws_efa_instance_with_suffix(self, suffix: str, instance_type: str) -> None:
         image_name = (
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
-            f"-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+            f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}{suffix}"
+            f"-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
         )
         result = self._call_resolve_provisioning_image(
             image_name,
@@ -56,8 +56,8 @@ class TestResolveProvisioningImageName:
             instance_type,
         )
         expected = (
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}"
-            f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+            f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}"
+            f"-devel-efa-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
         )
         assert result == expected
 
@@ -76,8 +76,8 @@ class TestResolveProvisioningImageName:
     )
     def test_patch_all_efa_instance_types(self, instance_type: str, suffix: str) -> None:
         image_name = (
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
-            f"-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+            f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}{suffix}"
+            f"-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
         )
         result = self._call_resolve_provisioning_image(
             image_name,
@@ -85,15 +85,15 @@ class TestResolveProvisioningImageName:
             instance_type,
         )
         expected = (
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}"
-            f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+            f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}"
+            f"-devel-efa-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
         )
         assert result == expected
 
     @pytest.mark.parametrize("suffix", ["-base", "-devel"])
     @pytest.mark.parametrize(
         "backend",
-        [BackendType.GCP, BackendType.AZURE, BackendType.LAMBDA, BackendType.LOCAL],
+        [BackendType.GCP, BackendType.AZURE, BackendType.LAMBDA],
     )
     @pytest.mark.parametrize(
         "instance_type",
@@ -106,8 +106,8 @@ class TestResolveProvisioningImageName:
         instance_type: str,
     ) -> None:
         image_name = (
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
-            f"-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+            f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}{suffix}"
+            f"-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
         )
         result = self._call_resolve_provisioning_image(image_name, backend, instance_type)
         assert result == image_name
@@ -118,7 +118,7 @@ class TestResolveProvisioningImageName:
         ["t3.micro", "m5.large", "c5.xlarge", "r5.2xlarge", "m6i.large", "g6.xlarge"],
     )
     def test_no_patch_non_efa_aws_instances(self, instance_type: str, suffix: str) -> None:
-        image_name = f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
+        image_name = f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}{suffix}"
         result = self._call_resolve_provisioning_image(
             image_name,
             BackendType.AWS,
@@ -137,9 +137,9 @@ class TestResolveProvisioningImageName:
             "nvidia/cuda:11.8-runtime-ubuntu20.04",
             "python:3.9-slim",
             "custom/image:latest",
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-custom",
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-devel-efa",
-            f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}",
+            f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}-custom",
+            f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}-devel-efa",
+            f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}",
         ],
     )
     def test_no_patch_other_images(self, instance_type: str, image_name: str) -> None:
@@ -154,12 +154,12 @@ class TestResolveProvisioningImageName:
     def test_patch_aws_efa_image_with_registry_prefix(self, suffix: str) -> None:
         registry = "registry.example"
         image_name = (
-            f"{registry}/{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}{suffix}"
-            f"-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+            f"{registry}/{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}{suffix}"
+            f"-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
         )
         result = self._call_resolve_provisioning_image(image_name, BackendType.AWS, "p5.48xlarge")
         expected = (
-            f"{registry}/{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}"
-            f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+            f"{registry}/{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}"
+            f"-devel-efa-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
         )
         assert result == expected

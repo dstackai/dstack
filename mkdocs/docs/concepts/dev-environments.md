@@ -65,6 +65,8 @@ To connect via SSH, use: `ssh vscode`
 
 `dstack apply` automatically provisions an instance and sets up an IDE on it.
 
+The `ide` property supports `vscode`, `cursor`, `windsurf`, and `zed`.
+
 ??? info "SSH-only"
     The `ide` property is optional. If omitted, no IDE is pre-installed, but the dev environment
     is still accessible via SSH:

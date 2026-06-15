@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePath, PurePosixPath
+from tempfile import TemporaryDirectory
 from typing import Union
 
 PathLike = Union[str, os.PathLike]
@@ -55,3 +56,12 @@ def is_absolute_posix_path(path: PathLike) -> bool:
     if str(path).startswith("~"):
         return True
     return PurePosixPath(path).is_absolute()
+
+
+def make_tmp_symlink_to_dir(
+    dirpath: PathLike, symlink_dirname: str
+) -> tuple[TemporaryDirectory, Path]:
+    temp_dir = TemporaryDirectory()
+    symlink_dir = Path(temp_dir.name) / symlink_dirname
+    symlink_dir.symlink_to(dirpath, target_is_directory=True)
+    return temp_dir, symlink_dir

@@ -12,6 +12,7 @@ from rich.theme import Theme
 from dstack._internal import settings
 from dstack._internal.cli.utils.rich import DstackRichHandler
 from dstack._internal.core.errors import CLIError, DstackError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.utils.common import get_dstack_dir, parse_since
 
@@ -162,3 +163,14 @@ def format_instance_availability(v: InstanceAvailability) -> str:
     if v in (InstanceAvailability.UNKNOWN, InstanceAvailability.AVAILABLE):
         return ""
     return v.value.replace("_", " ").lower()
+
+
+def format_backend(backend: Optional[BackendType], region: Optional[str]) -> str:
+    if backend is None:
+        return "-"
+    backend_str = backend.value
+    if backend == BackendType.REMOTE:
+        backend_str = "ssh"
+    if region:
+        backend_str += f" ({region})"
+    return backend_str

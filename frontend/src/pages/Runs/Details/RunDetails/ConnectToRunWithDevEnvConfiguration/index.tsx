@@ -42,12 +42,12 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
     const [sshCommand, copySSHCommand] = getSSHCommand(run);
 
     const configuration = run.run_spec.configuration as TDevEnvironmentConfiguration;
-    const latestSubmission = run.jobs[0]?.job_submissions?.slice(-1)[0];
-    const workingDir = latestSubmission?.job_runtime_data?.working_dir ?? '/';
     const hasIDE = !!configuration.ide;
-    const openInIDEUrl = hasIDE
-        ? `${configuration.ide}://vscode-remote/ssh-remote+${run.run_spec.run_name}${workingDir}`
-        : undefined;
+    // The IDE deep link is built server-side, per IDE, in JobConnectionInfo.attached_ide_url
+    // (e.g. `zed://ssh/...` for Zed vs `...//vscode-remote/ssh-remote+...` for VS Code forks).
+    // It is set once the job is running and reachable via the SSH config alias created by
+    // `dstack attach`. The UI always talks to a same-version server, so no fallback is needed.
+    const openInIDEUrl = run.jobs[0]?.job_connection_info?.attached_ide_url ?? undefined;
     const ideDisplayName = hasIDE ? getIDEDisplayName(configuration.ide!) : undefined;
 
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: run.project_name });
@@ -222,6 +222,7 @@ export const ConnectToRunWithDevEnvConfiguration: FC<{ run: IRun }> = ({ run }) 
                                           <Button
                                               variant="primary"
                                               external={true}
+                                              disabled={!openInIDEUrl}
                                               onClick={() => window.open(openInIDEUrl, '_blank')}
                                           >
                                               Open in {ideDisplayName}

@@ -14,19 +14,28 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.profiles import (
+    FleetInstanceSelector,
+    InstanceHostnameSelector,
+    InstanceNameSelector,
+    Profile,
+)
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.schemas.runner import TaskListItem, TaskListResponse, TaskStatus
 from dstack._internal.server.services.runner.client import ShimClient
 from dstack._internal.server.testing.common import (
+    create_export,
+    create_fleet,
     create_instance,
     create_job,
     create_project,
     create_repo,
     create_run,
     create_user,
+    get_job_provisioning_data,
     get_kubernetes_volume_configuration,
+    get_remote_connection_info,
     get_volume,
     get_volume_configuration,
     get_volume_provisioning_data,
@@ -234,6 +243,126 @@ class TestFilterInstances:
         assert res == [kubernetes_instance]
 
 
+class TestSelectInstancesBySelectors:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_selects_by_instance_name(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        fleet = await create_fleet(session=session, project=project)
+        await create_instance(session=session, project=project, fleet=fleet, name="worker-0")
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            name="worker-1",
+        )
+
+        res = await instances_services.select_instances_by_selectors(
+            session=session,
+            project=project,
+            selectors=[InstanceNameSelector(name="worker-1")],
+        )
+
+        assert res == [instance]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_selects_by_cloud_hostname_and_internal_ip(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            job_provisioning_data=get_job_provisioning_data(
+                hostname="203.0.113.8",
+                internal_ip="10.0.0.8",
+            ),
+        )
+
+        res = await instances_services.select_instances_by_selectors(
+            session=session,
+            project=project,
+            selectors=[InstanceHostnameSelector(hostname="10.0.0.8")],
+        )
+
+        assert res == [instance]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_selects_by_ssh_host(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            remote_connection_info=get_remote_connection_info(host="192.168.1.11"),
+        )
+
+        res = await instances_services.select_instances_by_selectors(
+            session=session,
+            project=project,
+            selectors=[InstanceHostnameSelector(hostname="192.168.1.11")],
+        )
+
+        assert res == [instance]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        ("selector", "expected_name"),
+        [
+            ("same-fleet", "local-worker"),
+            ("exporter-project/same-fleet", "exported-worker"),
+        ],
+    )
+    async def test_fleet_instance_selector_respects_project_reference(
+        self,
+        test_db,
+        session: AsyncSession,
+        selector: str,
+        expected_name: str,
+    ):
+        user = await create_user(session=session)
+        project = await create_project(session=session, owner=user, name="importer-project")
+        exporter_project = await create_project(
+            session=session, owner=user, name="exporter-project"
+        )
+        local_fleet = await create_fleet(session=session, project=project, name="same-fleet")
+        exported_fleet = await create_fleet(
+            session=session, project=exporter_project, name="same-fleet"
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=local_fleet,
+            instance_num=1,
+            name="local-worker",
+        )
+        await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=exported_fleet,
+            instance_num=1,
+            name="exported-worker",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[project],
+            exported_fleets=[exported_fleet],
+        )
+
+        res = await instances_services.select_instances_by_selectors(
+            session=session,
+            project=project,
+            selectors=[FleetInstanceSelector(fleet=selector, instance=1)],
+        )
+
+        assert [instance.name for instance in res] == [expected_name]
+
+
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("image_config_mock")
 @pytest.mark.usefixtures("turn_off_keep_shim_tasks_setting")
@@ -358,7 +487,7 @@ class TestInstanceModelToInstance:
         expected_instance = Instance(
             id=instance_id,
             project_name=project.name,
-            backend=BackendType.LOCAL,
+            backend=BackendType.AWS,
             instance_type=InstanceType(
                 name="instance", resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[])
             ),
@@ -383,8 +512,8 @@ class TestInstanceModelToInstance:
             unreachable=False,
             health=HealthStatus.WARNING,
             project=project,
-            job_provisioning_data='{"ssh_proxy":null, "backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
-            offer='{"price":"LOCAL", "price":1.0, "backend":"local", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+            job_provisioning_data='{"ssh_proxy":null, "backend":"aws","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+            offer='{"price":1.0, "backend":"aws", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
             total_blocks=1,
             busy_blocks=0,
         )

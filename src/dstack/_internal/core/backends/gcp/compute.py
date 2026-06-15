@@ -16,7 +16,7 @@ from gpuhunt import KNOWN_TPUS
 
 import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
-from dstack import version
+from dstack._internal import settings
 from dstack._internal.core.backends.base.compute import (
     Compute,
     ComputeTTLCache,
@@ -1133,12 +1133,12 @@ def _get_image(instance_type_name: str, gpu_name: Optional[str]) -> GCPImage:
         )
     elif gpu_name is not None:
         if not requires_nvidia_proprietary_kernel_modules(gpu_name):
-            image_name = f"dstack-cuda-{version.base_image}"
+            image_name = f"dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         else:
             image_name = f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
         is_ufw_installed = True
     else:
-        image_name = f"dstack-{version.base_image}"
+        image_name = f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         is_ufw_installed = True
     image_name = image_name.replace(".", "-")
     return GCPImage(

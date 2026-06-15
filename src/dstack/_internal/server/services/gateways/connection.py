@@ -1,9 +1,7 @@
 import contextlib
 import shutil
 import uuid
-from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import AsyncIterator, Optional, Tuple
+from typing import AsyncIterator, Optional
 
 import aiorwlock
 
@@ -22,7 +20,7 @@ from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats
 from dstack._internal.server.services.gateways.client import GatewayClient
 from dstack._internal.server.settings import SERVER_DIR_PATH
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.path import FileContent
+from dstack._internal.utils.path import FileContent, make_tmp_symlink_to_dir
 
 logger = get_logger(__name__)
 CONNECTIONS_DIR = SERVER_DIR_PATH / "gateway-connections"
@@ -47,7 +45,9 @@ class GatewayConnection:
         self.connection_dir = CONNECTIONS_DIR / ip_address
         # connection_dir can have a long path that won't be accepted by the ssh command,
         # so we create a short temporary symlink
-        self.temp_dir, self.connection_symlink_dir = self._init_symlink_dir(self.connection_dir)
+        self.temp_dir, self.connection_symlink_dir = make_tmp_symlink_to_dir(
+            self.connection_dir, "connection"
+        )
         self.gateway_socket_path = self.connection_symlink_dir / "gateway.sock"
         self.tunnel = SSHTunnel(
             destination=f"ubuntu@{ip_address}",
@@ -68,13 +68,6 @@ class GatewayConnection:
         )
         self.tunnel_id = uuid.uuid4()
         self._client = GatewayClient(uds=str(self.gateway_socket_path))
-
-    @staticmethod
-    def _init_symlink_dir(connection_dir: Path) -> Tuple[TemporaryDirectory, Path]:
-        temp_dir = TemporaryDirectory()
-        symlink_dir = Path(temp_dir.name) / "connection"
-        symlink_dir.symlink_to(connection_dir, target_is_directory=True)
-        return temp_dir, symlink_dir
 
     async def check_or_restart(self) -> bool:
         async with self._lock.writer_lock:

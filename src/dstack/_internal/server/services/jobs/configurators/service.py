@@ -113,7 +113,16 @@ class ServiceJobConfigurator(JobConfigurator):
         return None
 
     def _spot_policy(self) -> SpotPolicy:
+        group = self._current_replica_group()
+        if group is not None and group.spot_policy is not None:
+            return group.spot_policy
         return self.run_spec.merged_profile.spot_policy or SpotPolicy.ONDEMAND
+
+    def _reservation(self) -> Optional[str]:
+        group = self._current_replica_group()
+        if group is not None and group.reservation is not None:
+            return group.reservation
+        return super()._reservation()
 
     def _ports(self) -> List[PortMapping]:
         return []

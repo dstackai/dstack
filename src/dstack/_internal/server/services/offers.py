@@ -1,6 +1,7 @@
+import heapq
 import itertools
 from collections.abc import Container, Iterable, Iterator
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple, TypeVar, Union
 
 import gpuhunt
 
@@ -67,7 +68,7 @@ async def get_offers_by_requirements(
             backend_types = BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_INSTANCE_VOLUMES_SUPPORT]
 
-    if profile.reservation is not None:
+    if requirements.reservation is not None:
         if backend_types is None:
             backend_types = BACKENDS_WITH_RESERVATION_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_RESERVATION_SUPPORT]
@@ -114,6 +115,21 @@ async def get_offers_by_requirements(
     # We have to do this after taking max_offers to avoid processing all offers
     # if all/most offers are unavailable.
     return sorted(offers, key=lambda i: not i[1].availability.is_available())
+
+
+T = TypeVar("T")
+
+
+def merge_offer_iterables(
+    *iterables: Iterable[tuple[T, InstanceOfferWithAvailability]],
+) -> Iterable[tuple[T, InstanceOfferWithAvailability]]:
+    """
+    Merge offers from different sources (e.g., different backends, different fleets).
+
+    Some backends produce offers that are not sorted by price (e.g., `vastai` sorts by pod score).
+    That backend-specific order is preserved.
+    """
+    return heapq.merge(*iterables, key=lambda i: i[1].price)
 
 
 def is_divisible_into_blocks(

@@ -64,9 +64,9 @@ class TestCollectMetrics:
             instance=instance,
         )
         with (
-            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch("dstack._internal.server.services.runner.pool.SSHTunnel") as SSHTunnelMock,
             patch(
-                "dstack._internal.server.services.runner.client.RunnerClient"
+                "dstack._internal.server.services.runner.client.RunnerClient.from_address"
             ) as RunnerClientMock,
         ):
             runner_client_mock = RunnerClientMock.return_value

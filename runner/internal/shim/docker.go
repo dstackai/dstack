@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
-	rt "runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -56,15 +55,24 @@ const (
 // https://github.com/moby/moby/blob/e77ff99ede5ee5952b3a9227863552ae6e5b6fb1/pkg/jsonmessage/jsonmessage.go#L144
 // All fields are optional.
 type PullMessage struct {
-	Id             string `json:"id"` // layer id
-	Status         string `json:"status"`
-	ProgressDetail struct {
-		Current uint64 `json:"current"` // bytes
-		Total   uint64 `json:"total"`   // bytes
-	} `json:"progressDetail"`
-	ErrorDetail struct {
+	Id             string         `json:"id"` // layer id
+	Status         string         `json:"status"`
+	ProgressDetail ProgressDetail `json:"progressDetail"`
+	ErrorDetail    struct {
 		Message string `json:"message"`
 	} `json:"errorDetail"`
+}
+
+type ProgressDetail struct {
+	Current uint64 `json:"current"`
+	Total   uint64 `json:"total"`
+	Units   string `json:"units"`
+}
+
+func (p *ProgressDetail) isUnitBytes() bool {
+	// > Units is the unit to print for progress. It defaults to "bytes" if empty
+	// https://github.com/moby/moby/blob/8151a55a776f5f83f68bcf0030c19031439ea357/api/types/jsonstream/progress.go#L9
+	return p.Units == "bytes" || p.Units == ""
 }
 
 type layerProgress struct {
@@ -94,14 +102,18 @@ func (t *PullTracker) Update(msg PullMessage) {
 	case "Pulling fs layer", "Waiting", "Verifying Checksum", "Already exists":
 		// no bytes to update, just track status
 	case "Downloading":
-		layer.DownloadedBytes = msg.ProgressDetail.Current
-		layer.TotalBytes = msg.ProgressDetail.Total
+		if msg.ProgressDetail.isUnitBytes() {
+			layer.DownloadedBytes = msg.ProgressDetail.Current
+			layer.TotalBytes = msg.ProgressDetail.Total
+		}
 	case "Download complete":
 		layer.DownloadedBytes = layer.TotalBytes
 	case "Extracting":
-		layer.ExtractedBytes = msg.ProgressDetail.Current
-		layer.DownloadedBytes = msg.ProgressDetail.Total
-		layer.TotalBytes = msg.ProgressDetail.Total
+		if msg.ProgressDetail.isUnitBytes() {
+			layer.ExtractedBytes = msg.ProgressDetail.Current
+			layer.DownloadedBytes = msg.ProgressDetail.Total
+			layer.TotalBytes = msg.ProgressDetail.Total
+		}
 	case "Pull complete":
 		layer.ExtractedBytes = layer.TotalBytes
 		layer.DownloadedBytes = layer.TotalBytes
@@ -135,6 +147,7 @@ type DockerRunner struct {
 	client       *docker.Client
 	dockerParams DockerParameters
 	dockerInfo   dockersystem.Info
+	baseEnv      []string
 	gpus         []host.GpuInfo
 	gpuVendor    gpu.GpuVendor
 	gpuLock      *GpuLock
@@ -149,6 +162,15 @@ func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*Docke
 	dockerInfo, err := client.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get docker info: %w", err)
+	}
+
+	// Copy variables once rather than on a per-task basis
+	// We don't expect variables to change during the shim's lifetime
+	baseEnv := []string{}
+	for _, name := range dockerParams.DockerPassEnv() {
+		if value, ok := os.LookupEnv(name); ok {
+			baseEnv = append(baseEnv, fmt.Sprintf("%s=%s", name, value))
+		}
 	}
 
 	var gpuVendor gpu.GpuVendor
@@ -167,6 +189,7 @@ func NewDockerRunner(ctx context.Context, dockerParams DockerParameters) (*Docke
 		client:       client,
 		dockerParams: dockerParams,
 		dockerInfo:   dockerInfo,
+		baseEnv:      baseEnv,
 		gpus:         gpus,
 		gpuVendor:    gpuVendor,
 		gpuLock:      gpuLock,
@@ -861,8 +884,9 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 
 	// Set the environment variables
 	envVars := []string{}
-	if d.dockerParams.DockerPJRTDevice() != "" {
-		envVars = append(envVars, fmt.Sprintf("PJRT_DEVICE=%s", d.dockerParams.DockerPJRTDevice()))
+	envVars = append(envVars, d.baseEnv...)
+	if pjrtDevice := d.dockerParams.DockerPJRTDevice(); pjrtDevice != "" {
+		envVars = append(envVars, fmt.Sprintf("PJRT_DEVICE=%s", pjrtDevice))
 	}
 
 	// Override /dev/shm with tmpfs mount with `exec` option (the default is `noexec`)
@@ -941,9 +965,6 @@ func (d *DockerRunner) startContainer(ctx context.Context, task *Task) error {
 	if err != nil {
 		return fmt.Errorf("inspect container: %w", err)
 	}
-	// FIXME: container_.NetworkSettings.Ports values (bindings) are not immediately available
-	// on macOS, so ports can be empty with local backend.
-	// Workaround: restart shim after submitting the run.
 	task.ports = extractPorts(ctx, container_.NetworkSettings.Ports)
 	return nil
 }
@@ -1058,10 +1079,7 @@ func extractPorts(ctx context.Context, portMap nat.PortMap) []PortMapping {
 }
 
 func getNetworkMode(networkMode NetworkMode) container.NetworkMode {
-	if rt.GOOS == "linux" {
-		return container.NetworkMode(networkMode)
-	}
-	return "default"
+	return container.NetworkMode(networkMode)
 }
 
 func configureGpuDevices(hostConfig *container.HostConfig, gpuDevices []GPUDevice) {
@@ -1234,6 +1252,16 @@ func getContainerLastLogs(ctx context.Context, client docker.APIClient, containe
 }
 
 /* DockerParameters interface implementation for CLIArgs */
+
+func (c *CLIArgs) DockerPassEnv() []string {
+	names := []string{}
+	for _, name := range strings.Split(c.Docker.PassEnv, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
 
 func (c *CLIArgs) DockerPrivileged() bool {
 	return c.Docker.Privileged

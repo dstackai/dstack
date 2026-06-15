@@ -10,6 +10,7 @@ from dstack._internal.core.models.configurations import (
     ReplicaGroup,
     ServiceConfiguration,
 )
+from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.services import OpenAIChatModel
 from dstack._internal.server.services.docker import ImageConfig
@@ -118,7 +119,7 @@ def _make_run_spec(replicas, **service_kwargs):
 @pytest.mark.usefixtures("image_config_mock")
 class TestPerGroupOverrides:
     """Verifies that ServiceJobConfigurator picks up per-replica-group
-    image-source fields (image, docker, python, nvcc, privileged)."""
+    image-source fields (image, docker, python, nvcc, privileged, etc)."""
 
     async def test_image_name_uses_group_image(self):
         run_spec = _make_run_spec(
@@ -331,3 +332,103 @@ class TestPerGroupOverrides:
         configurator = ServiceJobConfigurator(run_spec, replica_group_name="a")
         await configurator._user()
         mock_get_image_config.assert_not_called()
+
+    async def test_spot_policy_uses_group_value(self):
+        run_spec = _make_run_spec(
+            replicas=[
+                ReplicaGroup(
+                    name="a",
+                    count=Range(min=1, max=1),
+                    commands=["x"],
+                    spot_policy=SpotPolicy.SPOT,
+                )
+            ],
+        )
+        configurator = ServiceJobConfigurator(run_spec, replica_group_name="a")
+        assert configurator._spot_policy() == SpotPolicy.SPOT
+
+    async def test_spot_policy_defaults_to_ondemand_when_group_unset(self):
+        run_spec = _make_run_spec(
+            replicas=[
+                ReplicaGroup(
+                    name="a",
+                    count=Range(min=1, max=1),
+                    commands=["x"],
+                )
+            ],
+        )
+        configurator = ServiceJobConfigurator(run_spec, replica_group_name="a")
+        assert configurator._spot_policy() == SpotPolicy.ONDEMAND
+
+    async def test_different_groups_different_spot_policies(self):
+        run_spec = _make_run_spec(
+            replicas=[
+                ReplicaGroup(
+                    name="spot",
+                    count=Range(min=1, max=1),
+                    commands=["x"],
+                    spot_policy=SpotPolicy.SPOT,
+                ),
+                ReplicaGroup(
+                    name="od",
+                    count=Range(min=1, max=1),
+                    commands=["y"],
+                    spot_policy=SpotPolicy.ONDEMAND,
+                ),
+            ],
+        )
+        assert (
+            ServiceJobConfigurator(run_spec, replica_group_name="spot")._spot_policy()
+            == SpotPolicy.SPOT
+        )
+        assert (
+            ServiceJobConfigurator(run_spec, replica_group_name="od")._spot_policy()
+            == SpotPolicy.ONDEMAND
+        )
+
+    async def test_reservation_uses_group_value(self):
+        run_spec = _make_run_spec(
+            replicas=[
+                ReplicaGroup(
+                    name="a",
+                    count=Range(min=1, max=1),
+                    commands=["x"],
+                    reservation="my-reservation",
+                )
+            ],
+        )
+        configurator = ServiceJobConfigurator(run_spec, replica_group_name="a")
+        assert configurator._reservation() == "my-reservation"
+
+    async def test_reservation_defaults_to_none_when_group_unset(self):
+        run_spec = _make_run_spec(
+            replicas=[
+                ReplicaGroup(
+                    name="a",
+                    count=Range(min=1, max=1),
+                    commands=["x"],
+                )
+            ],
+        )
+        configurator = ServiceJobConfigurator(run_spec, replica_group_name="a")
+        assert configurator._reservation() is None
+
+    async def test_different_groups_different_reservations(self):
+        run_spec = _make_run_spec(
+            replicas=[
+                ReplicaGroup(
+                    name="a",
+                    count=Range(min=1, max=1),
+                    commands=["x"],
+                    reservation="res-a",
+                ),
+                ReplicaGroup(
+                    name="b",
+                    count=Range(min=1, max=1),
+                    commands=["y"],
+                    reservation="res-b",
+                ),
+            ],
+        )
+        assert ServiceJobConfigurator(run_spec, replica_group_name="a")._reservation() == "res-a"
+        assert ServiceJobConfigurator(run_spec, replica_group_name="b")._reservation() == "res-b"

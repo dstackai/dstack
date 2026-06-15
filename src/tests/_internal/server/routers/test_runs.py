@@ -22,6 +22,7 @@ from dstack._internal.core.models.configurations import (
     ScalingSpec,
     ServiceConfiguration,
     TaskConfiguration,
+    parse_run_configuration,
 )
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.gateways import GatewayStatus
@@ -69,6 +70,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     get_auth_headers,
+    get_fleet_configuration,
     get_fleet_spec,
     get_instance_offer_with_availability,
     get_job_provisioning_data,
@@ -150,7 +152,7 @@ def get_dev_env_run_plan_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = f"dstackai/base:{settings.DSTACK_BASE_IMAGE_VERSION}-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        image_name = f"dstackai/base:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}-base-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
 
     run_spec = {
         "configuration": {
@@ -193,7 +195,7 @@ def get_dev_env_run_plan_dict(
                 },
             ],
             "files": [],
-            "backends": ["local", "aws", "azure", "gcp", "lambda", "runpod"],
+            "backends": ["aws", "azure", "gcp", "lambda", "runpod"],
             "regions": ["us"],
             "availability_zones": None,
             "instance_types": None,
@@ -213,12 +215,13 @@ def get_dev_env_run_plan_dict(
             "fleets": None,
             "tags": None,
             "backend_options": None,
+            "instances": None,
             "priority": 0,
         },
         "configuration_path": "dstack.yaml",
         "file_archives": [],
         "profile": {
-            "backends": ["local", "aws", "azure", "gcp", "lambda", "runpod"],
+            "backends": ["aws", "azure", "gcp", "lambda", "runpod"],
             "regions": ["us"],
             "availability_zones": None,
             "instance_types": None,
@@ -239,6 +242,7 @@ def get_dev_env_run_plan_dict(
             "fleets": None,
             "tags": None,
             "backend_options": None,
+            "instances": None,
         },
         "repo_code_hash": None,
         "repo_data": {
@@ -386,7 +390,7 @@ def get_dev_env_run_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.12-base-ubuntu22.04"
+        image_name = "dstackai/base:0.13-base-ubuntu22.04"
 
     return {
         "id": run_id,
@@ -438,7 +442,7 @@ def get_dev_env_run_dict(
                     },
                 ],
                 "files": [],
-                "backends": ["local", "aws", "azure", "gcp", "lambda"],
+                "backends": ["aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
                 "availability_zones": None,
                 "instance_types": None,
@@ -458,12 +462,13 @@ def get_dev_env_run_dict(
                 "fleets": None,
                 "tags": None,
                 "backend_options": None,
+                "instances": None,
                 "priority": 0,
             },
             "configuration_path": "dstack.yaml",
             "file_archives": [],
             "profile": {
-                "backends": ["local", "aws", "azure", "gcp", "lambda"],
+                "backends": ["aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
                 "availability_zones": None,
                 "instance_types": None,
@@ -484,6 +489,7 @@ def get_dev_env_run_dict(
                 "fleets": None,
                 "tags": None,
                 "backend_options": None,
+                "instances": None,
             },
             "repo_code_hash": None,
             "repo_data": {
@@ -1142,6 +1148,39 @@ class TestGetRun:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
+        ("ide", "ide_name", "attached_ide_url", "proxied_ide_url_tmpl"),
+        [
+            pytest.param(
+                "vscode",
+                "VS Code",
+                "vscode://vscode-remote/ssh-remote+dev-env/test",
+                "vscode://vscode-remote/ssh-remote+{auth}/test",
+                id="vscode",
+            ),
+            pytest.param(
+                "cursor",
+                "Cursor",
+                "cursor://vscode-remote/ssh-remote+dev-env/test",
+                "cursor://vscode-remote/ssh-remote+{auth}/test",
+                id="cursor",
+            ),
+            pytest.param(
+                "windsurf",
+                "Windsurf",
+                "windsurf://vscode-remote/ssh-remote+dev-env/test",
+                "windsurf://vscode-remote/ssh-remote+{auth}/test",
+                id="windsurf",
+            ),
+            pytest.param(
+                "zed",
+                "Zed",
+                "zed://ssh/dev-env/test",
+                "zed://ssh/{auth}/test",
+                id="zed",
+            ),
+        ],
+    )
+    @pytest.mark.parametrize(
         "sshproxy",
         [
             pytest.param(False, id="without-sshproxy"),
@@ -1156,6 +1195,10 @@ class TestGetRun:
         session: AsyncSession,
         client: AsyncClient,
         sshproxy: bool,
+        ide: str,
+        ide_name: str,
+        attached_ide_url: str,
+        proxied_ide_url_tmpl: str,
     ):
         monkeypatch.setattr("dstack._internal.server.settings.SSHPROXY_ENABLED", sshproxy)
         monkeypatch.setattr("dstack._internal.server.settings.SSHPROXY_HOSTNAME", "example.com")
@@ -1172,7 +1215,7 @@ class TestGetRun:
         run_spec = get_run_spec(
             repo_id=repo.name,
             run_name="dev-env",
-            configuration=DevEnvironmentConfiguration(ide="cursor"),
+            configuration=DevEnvironmentConfiguration(ide=ide),
         )
         run = await create_run(
             session=session,
@@ -1192,10 +1235,11 @@ class TestGetRun:
             json={"run_name": run.run_name},
         )
         assert response.status_code == 200, response.json()
+        proxied_authority = f"{job.id.hex}@example.com:2222"
         assert response.json()["jobs"][0]["job_connection_info"] == {
-            "ide_name": "Cursor",
-            "attached_ide_url": "cursor://vscode-remote/ssh-remote+dev-env/test",
-            "proxied_ide_url": f"cursor://vscode-remote/ssh-remote+{job.id.hex}@example.com:2222/test"
+            "ide_name": ide_name,
+            "attached_ide_url": attached_ide_url,
+            "proxied_ide_url": proxied_ide_url_tmpl.format(auth=proxied_authority)
             if sshproxy
             else None,
             "attached_ssh_command": ["ssh", "dev-env"],
@@ -1676,6 +1720,70 @@ class TestGetRunPlan:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_service_reservation_group_filters_backends_by_reservation_support(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.nodes = FleetNodesSpec(min=0, target=0, max=None)
+        await create_fleet(session=session, project=project, spec=fleet_spec)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                port=8080,
+                gateway=False,
+                image="nginx",
+                replicas=[
+                    ReplicaGroup(
+                        name="reserved-group",
+                        count=Range[int](min=1, max=1),
+                        reservation="my-reservation-id",
+                    ),
+                    ReplicaGroup(
+                        count=Range[int](min=1, max=1),
+                        name="unreserved-group",
+                    ),
+                ],
+            ),
+        )
+        body = {"run_spec": json.loads(run_spec.json())}
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            aws_backend_mock = Mock()
+            aws_backend_mock.TYPE = BackendType.AWS
+            aws_backend_mock.compute.return_value.get_offers.return_value = [
+                get_instance_offer_with_availability(backend=BackendType.AWS, price=2)
+            ]
+            verda_backend_mock = Mock()
+            verda_backend_mock.TYPE = BackendType.VERDA
+            verda_backend_mock.compute.return_value.get_offers.return_value = [
+                get_instance_offer_with_availability(backend=BackendType.VERDA, price=1)
+            ]
+            m.return_value = [aws_backend_mock, verda_backend_mock]
+
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        reserved_job_plan, unreserved_job_plan = response.json()["job_plans"]
+
+        # Verda offer not included for `reserved-group`, since Verda does not support reservations
+        assert reserved_job_plan["offers"][0]["backend"] == "aws"
+        assert len(reserved_job_plan["offers"]) == 1
+
+        assert unreserved_job_plan["offers"][0]["backend"] == "verda"
+        assert unreserved_job_plan["offers"][1]["backend"] == "aws"
+        assert len(unreserved_job_plan["offers"]) == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_run_plan_docker_true(
         self,
         test_db,
@@ -2058,6 +2166,152 @@ class TestGetRunPlan:
         response_json = response.json()
         assert response_json["project_name"] == "importer"
         assert len(response_json["job_plans"][0]["offers"]) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize(
+        "configuration",
+        [
+            pytest.param({"type": "dev-environment"}, id="regular-configuration"),
+            pytest.param(
+                {"type": "task", "commands": [":"], "image": "scratch"},
+                id="special-configuration-used-by-dstack-offer-cli-command",
+            ),
+            pytest.param(
+                {"type": "task", "commands": [":"], "image": "scratch", "fleets": ["test-fleet"]},
+                id="special-configuration-used-by-dstack-offer-cli-command-with-fleets",  # --fleet
+            ),
+        ],
+    )
+    async def test_preserves_backend_specific_offer_order(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        configuration: dict,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(conf=get_fleet_configuration(name="test-fleet")),
+        )
+
+        run_spec = get_run_spec(
+            repo_id=repo.name, configuration=parse_run_configuration(configuration)
+        )
+        body = {"run_spec": run_spec.dict()}
+
+        backend_mock_aws = Mock()
+        backend_mock_aws.TYPE = BackendType.AWS
+        backend_mock_aws.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0),
+            get_instance_offer_with_availability(backend=BackendType.AWS, price=4.0),
+        ]
+        backend_mock_vastai = Mock()
+        backend_mock_vastai.TYPE = BackendType.VASTAI
+        backend_mock_vastai.compute.return_value.get_offers.return_value = [
+            # not ordered by price - custom order should be preserved
+            get_instance_offer_with_availability(backend=BackendType.VASTAI, price=3.0),
+            get_instance_offer_with_availability(backend=BackendType.VASTAI, price=2.0),
+        ]
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock_aws, backend_mock_vastai]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        offers = [(o["backend"], o["price"]) for o in response.json()["job_plans"][0]["offers"]]
+        expected_offers = [
+            (BackendType.AWS.value, 1.0),
+            (BackendType.VASTAI.value, 3.0),
+            (BackendType.VASTAI.value, 2.0),
+            (BackendType.AWS.value, 4.0),
+        ]
+        assert offers == expected_offers
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_offer_cli_preserves_backend_specific_offer_order_across_fleets(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(name="fleet-aws", backends=[BackendType.AWS])
+            ),
+        )
+        await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                conf=get_fleet_configuration(name="fleet-vastai", backends=[BackendType.VASTAI])
+            ),
+        )
+
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                commands=[":"],
+                image="scratch",
+                fleets=["fleet-aws", "fleet-vastai"],
+            ),
+        )
+        body = {"run_spec": run_spec.dict()}
+
+        backend_mock_aws = Mock()
+        backend_mock_aws.TYPE = BackendType.AWS
+        backend_mock_aws.compute.return_value.get_offers.return_value = [
+            get_instance_offer_with_availability(backend=BackendType.AWS, price=1.0),
+            get_instance_offer_with_availability(backend=BackendType.AWS, price=4.0),
+        ]
+        backend_mock_vastai = Mock()
+        backend_mock_vastai.TYPE = BackendType.VASTAI
+        backend_mock_vastai.compute.return_value.get_offers.return_value = [
+            # not ordered by price - custom order should be preserved
+            get_instance_offer_with_availability(backend=BackendType.VASTAI, price=3.0),
+            get_instance_offer_with_availability(backend=BackendType.VASTAI, price=2.0),
+        ]
+
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            m.return_value = [backend_mock_aws, backend_mock_vastai]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+
+        assert response.status_code == 200, response.json()
+        offers = [(o["backend"], o["price"]) for o in response.json()["job_plans"][0]["offers"]]
+        expected_offers = [
+            (BackendType.AWS.value, 1.0),
+            (BackendType.VASTAI.value, 3.0),
+            (BackendType.VASTAI.value, 2.0),
+            (BackendType.AWS.value, 4.0),
+        ]
+        assert offers == expected_offers
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

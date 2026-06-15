@@ -142,6 +142,46 @@ class TestParseConfiguration:
         ):
             parse_run_configuration(conf)
 
+    def test_spot_policy_set_at_both_service_and_group_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="`spot_policy` is set at both",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "spot_policy": "spot",
+                    "replicas": [
+                        {
+                            "count": 1,
+                            "commands": ["x"],
+                            "spot_policy": "on-demand",
+                        },
+                    ],
+                }
+            )
+
+    def test_reservation_set_at_both_service_and_group_rejected(self):
+        with pytest.raises(
+            ConfigurationError,
+            match="`reservation` is set at both",
+        ):
+            parse_run_configuration(
+                {
+                    "type": "service",
+                    "port": 8000,
+                    "image": "x",
+                    "reservation": "svc-res",
+                    "replicas": [
+                        {
+                            "count": 1,
+                            "reservation": "grp-res",
+                        },
+                    ],
+                }
+            )
+
     @pytest.mark.parametrize("shell", [None, "sh", "bash", "/usr/bin/zsh"])
     def test_shell_valid(self, shell: Optional[str]):
         conf = {
@@ -816,6 +856,16 @@ class TestDevEnvironmentConfigurationParams:
         params = DevEnvironmentConfigurationParams(ide="cursor", version="0.40.0")
         assert params.ide == "cursor"
         assert params.version == "0.40.0"
+
+    def test_zed_ide_allowed(self):
+        params = DevEnvironmentConfigurationParams(ide="zed")
+        assert params.ide == "zed"
+        assert params.version is None
+
+    def test_zed_version_not_validated(self):
+        params = DevEnvironmentConfigurationParams(ide="zed", version="0.100.0")
+        assert params.ide == "zed"
+        assert params.version == "0.100.0"
 
     def test_ide_optional(self):
         params = DevEnvironmentConfigurationParams()

@@ -145,6 +145,7 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVER_SSHPROXY_ADDRESS`{ #DSTACK_SERVER_SSHPROXY_ADDRESS } – Address of the SSH proxy exposed to users, in `HOSTNAME[:PORT]` form. `PORT` defaults to `22` if omitted. Required together with `DSTACK_SSHPROXY_API_TOKEN` to enable SSH proxy integration.
 - `DSTACK_SERVER_SSHPROXY_ENFORCED`{ #DSTACK_SERVER_SSHPROXY_ENFORCED } – When set to any value, restricts all SSH connections to go through the SSH proxy.
 - `DSTACK_SERVER_JOB_NETWORK_MODE`{ #DSTACK_SERVER_JOB_NETWORK_MODE } – Controls the network mode assigned to jobs. Accepts an integer value: `1` forces bridge networking for single-node jobs while distributed tasks still use host networking; `2` uses host networking whenever the job occupies a full instance (default); `3` forces bridge networking for all jobs including distributed tasks.
+- `DSTACK_SERVER_SSH_CONNECT_TIMEOUT`{ #DSTACK_SERVER_SSH_CONNECT_TIMEOUT } – The SSH `ConnectTimeout` for server-instance connections, in seconds. Defaults to `3`. Increase if there are high-latency links between the server and instances.
 
 ??? info "Internal environment variables"
      The following environment variables are intended for development purposes:
@@ -160,7 +161,6 @@ For more details on the options below, refer to the [server deployment](../guide
      * `DSTACK_SHIM_DOWNLOAD_URL` – Overrides `dstack-shim` binary download URL. The URL can contain `{version}` and/or `{arch}` placeholders,
       see `DSTACK_RUNNER_DOWNLOAD_URL` for the details.
      * `DSTACK_DEFAULT_CREDS_DISABLED` – Disables default credentials detection if set. Defaults to `None`.
-     * `DSTACK_LOCAL_BACKEND_ENABLED` – Enables local backend for debug if set. Defaults to `None`.
 
 ## CLI
 

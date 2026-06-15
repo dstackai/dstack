@@ -5,5 +5,6 @@
 
 __version__ = "0.0.0"
 __is_release__ = False
-base_image = "0.12"
-base_image_ubuntu_version = "22.04"
+docker_base_image = "0.13"
+docker_base_image_ubuntu_version = "22.04"
+vm_base_image = "0.13"

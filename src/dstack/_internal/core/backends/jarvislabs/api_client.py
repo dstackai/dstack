@@ -51,6 +51,32 @@ class JarvisLabsAPIClient:
         )
         _raise_if_unsuccessful(resp, "Failed to add JarvisLabs SSH key")
 
+    def create_ssh_key(self, public_key: str, key_name: str) -> str:
+        self.add_ssh_key(public_key=public_key, key_name=key_name)
+        key_id = self.find_ssh_key_id(public_key=public_key, key_name=key_name)
+        if key_id is None:
+            raise BackendError("Failed to find created JarvisLabs SSH key")
+        return key_id
+
+    def find_ssh_key_id(self, public_key: str, key_name: str) -> Optional[str]:
+        normalized_key = _normalize_public_key(public_key)
+        for ssh_key in self.list_ssh_keys():
+            if str(ssh_key.get("key_name", "")) != key_name:
+                continue
+            if _normalize_public_key(str(ssh_key.get("ssh_key", ""))) != normalized_key:
+                continue
+            key_id = ssh_key.get("key_id")
+            if key_id is not None:
+                return str(key_id)
+        return None
+
+    def delete_ssh_key(self, key_id: str) -> None:
+        try:
+            resp = self._make_request("DELETE", f"ssh/{key_id}")
+        except JarvisLabsNotFoundError:
+            return
+        _raise_if_unsuccessful(resp, "Failed to delete JarvisLabs SSH key")
+
     def add_ssh_key_if_needed(self, public_key: str) -> None:
         normalized_key = _normalize_public_key(public_key)
         for ssh_key in self.list_ssh_keys():

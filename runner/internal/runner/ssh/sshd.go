@@ -23,10 +23,16 @@ type SshdManager interface {
 	AddAuthorizedKeys(context.Context, ...string) error
 }
 
-var hostKeys = [...]string{
-	"ssh_host_rsa_key",
-	"ssh_host_ecdsa_key",
-	"ssh_host_ed25519_key",
+// Host keys generated and configured for sshd. RSA is intentionally omitted:
+// ssh-keygen -A's RSA-3072 generation dominates runner startup (~1000ms vs
+// <50ms for ECDSA + Ed25519 combined). Both ECDSA and Ed25519 are
+// universally supported by modern SSH clients (OpenSSH >= 6.5).
+var hostKeys = [...]struct {
+	name    string
+	keyType string
+}{
+	{name: "ssh_host_ecdsa_key", keyType: "ecdsa"},
+	{name: "ssh_host_ed25519_key", keyType: "ed25519"},
 }
 
 // Implements SshdManager
@@ -163,14 +169,14 @@ func generateHostKeys(ctx context.Context, confDir string) error {
 		return err
 	}
 
-	// TODO: specify the full path if a custom OpenSSH build is used
-	cmd := exec.CommandContext(ctx, "ssh-keygen", "-A", "-f", tmpDir)
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
-	for _, key := range hostKeys {
-		if err := copyHostKey(keyDir, confDir, key); err != nil {
+	for _, k := range hostKeys {
+		// TODO: specify the full path if a custom OpenSSH build is used
+		cmd := exec.CommandContext(ctx, "ssh-keygen",
+			"-t", k.keyType, "-q", "-N", "", "-f", path.Join(keyDir, k.name))
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("generate %s host key: %w", k.keyType, err)
+		}
+		if err := copyHostKey(keyDir, confDir, k.name); err != nil {
 			return err
 		}
 	}
@@ -251,8 +257,8 @@ func createSshdConfig(ctx context.Context, confDir string, port int, logLevel st
 		"ClientAliveInterval 30",
 		"ClientAliveCountMax 4",
 	}
-	for _, hostKey := range hostKeys {
-		lines = append(lines, fmt.Sprintf("HostKey %s/%s", confDir, hostKey))
+	for _, k := range hostKeys {
+		lines = append(lines, fmt.Sprintf("HostKey %s/%s", confDir, k.name))
 	}
 	for _, line := range lines {
 		if _, err := fmt.Fprintln(file, line); err != nil {

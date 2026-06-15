@@ -14,21 +14,6 @@
         $crisp.push(["do", "chat:hide"]);
     })();
 </script>
-<script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
-<script>
-    var typed = new Typed('#typed', {
-        strings: ['for AI infrastructure', 'for model training', 'for model inference',
-            // 'for sandboxes', 
-            'across GPU clouds', 'across Kubernetes', 'for bare-metal clusters',
-            'for AI researchers', 'for ML engineers',
-            'on NVIDIA GPUs', 'on AMD GPUs', 'on any GPU or CPU', 'without vendor lock-in',
-        ],
-        backDelay: 1800,
-        typeSpeed: 85,
-        backSpeed: 60,
-        loop: true,
-    });
-</script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         var highlighters = {
@@ -288,12 +273,11 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1 class="glitch" data-text="Agentic orchestration" style="min-height: 2.4em;">Agentic orchestration<br><span id="typed" style="white-space: nowrap;"></span></h1>
+                <h1 style="min-height: 2.4em;">The orchestration stack<br>for AI infrastructure</h1>
 
                 <p>
-                    <span class="highlight">dstack</span> is an open-source control plane for agents and engineers to provision compute and run training, inference, and sandboxes across 
-                    <span class="nowrap-token"><span class="highlight">NVIDIA</span>,</span> <span class="nowrap-token"><span class="highlight">AMD</span>,</span> 
-                    <span class="nowrap-token"><span class="highlight">TPU</span>,</span> and <span class="highlight">Tenstorrent</span> GPUs—on clouds, Kubernetes, and bare-metal clusters.
+                    <span class="highlight">dstack</span> is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters.
+                    It streamlines development, training, and inference, and is compatible with any hardware, open-source tools, and frameworks.
                 </p>
             </div>
 
@@ -327,20 +311,19 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>A unified control plane for compute orchestration</h2>
+                    <h2>One control plane for AI compute</h2>
                     <p>
-                        Managing AI infrastructure requires fine-grained primitives for compute provisioning, 
-                        with native integration across GPU vendors, clouds, and open-source frameworks.
+                        Managing AI infrastructure requires first-class primitives for accelerator provisioning,
+                        workload scheduling, and observability across clouds, clusters, and open-source frameworks.
                     </p>
 
                     <p>
-                        <span class="highlight">dstack</span> is a unified control plane for provisioning 
-                        clusters and running training, inference, and sandboxes across clouds, Kubernetes, 
-                        and bare-metal clusters.
+                        <span class="highlight">dstack</span> unifies fleets, dev environments, tasks, services,
+                        volumes, and gateways in one control plane for AI workloads.
                     </p>
                     
                     <p>
-                        It’s built for containerized workloads and designed for both engineers and agents. 
+                        It’s built for containerized AI workloads with a simple CLI, UI, and API.
                         No <span class="highlight">Kubernetes</span> or <span class="highlight">Slurm</span> hassle required.
                     </p>
 
@@ -392,7 +375,7 @@ backends: [aws]</code></pre>
                 </div>
 
                 <div class="block margin left">
-                    <h2>Provision compute in any GPU cloud</h2>
+                    <h2>Provision GPU fleets across clouds</h2>
 
                     <div class="supported_clouds_inline">
                         <a href="/docs/concepts/backends#aws" target="_blank"><img width="33" src="/assets/images/aws-logo.svg"></a>
@@ -439,7 +422,7 @@ backends: [aws]</code></pre>
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>Bring your existing GPU clusters</h2>
+                    <h2>Bring your own clusters</h2>
                     
                     <p>
                         Have bare-metal servers or pre-provisioned VMs? Use <span class="highlight">SSH fleets</span> to connect them to <span class="highlight">dstack</span>.
@@ -540,9 +523,9 @@ resources:
                 </div>
 
                 <div class="block margin left">
-                    <h2>Run dev environments</h2>
+                    <h2>Launch GPU dev environments</h2>
                     <p>
-                        If you or your agent need a development environment with a GPU, let <span class="highlight">dstack</span> create you a <span class="highlight">dev environment</span>.
+                        If you need a remote development environment with a GPU, let <span class="highlight">dstack</span> create you a <span class="highlight">dev environment</span>.
                     </p>
 
                     <p>If you plan to work with it yourself, you can access it using your desktop IDE such as <span class="highlight">VS
@@ -564,7 +547,7 @@ resources:
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin right">
-                    <h2>Run training or batch jobs at any scale</h2>
+                    <h2>Run training and batch jobs at scale</h2>
 
                     <p>
                         Run training or batch workloads on a single GPU, or scale to multi-GPU and multi-node clusters using simple <span class="highlight">task</span> configurations.
@@ -665,7 +648,7 @@ resources:
                 </div>
 
                 <div class="block margin left">
-                    <h2>Run high-performance model inference</h2>
+                    <h2>Deploy production inference services</h2>
 
                     <p>
                         With <span class="highlight">dstack</span>, you can deploy models as secure,
@@ -912,17 +895,14 @@ resources:
 
                     <div class="cell">
                         <div class="photo">
-                            <img src="assets/images/quotes/cudopete.png"/>
+                            <img src="assets/images/quotes/jon.jpeg"/>
                         </div>
-                        <h3>Peter Hill</h3>
+                        <h3>Jon Stevens</h3>
 
-                        <h4>Co-Founder @CUDO Compute</h4>
+                        <h4>CEO @Hot Aisle</h4>
 
                         <p>
-                            <span class="highlight">dstack</span> simplifies infrastructure provisioning and AI
-                            development.
-                            If your team is on the lookout for an AI platform, I
-                            wholeheartedly recommend <span class="highlight">dstack</span>.
+                            <span class="highlight">dstack</span> 's advantages over <span class="highlight">Slurm</span> are clear: it's a modern, ground-up approach to running workloads at scale. If you're choosing an orchestration platform, <span class="highlight">dstack</span> is the place to start.
                         </p>
                     </div>
                 </div>

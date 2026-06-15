@@ -12,7 +12,7 @@ from dstack._internal.utils.docker import parse_image_name
 
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types
 _AWS_EFA_ENABLED_INSTANCE_TYPE_PATTERNS = [
-    # TODO: p6-b200 isn't supported yet in gpuhunt
+    r"^p6-b300\.(48xlarge)$",
     r"^p6-b200\.(48xlarge)$",
     r"^p5\.(4xlarge|48xlarge)$",
     r"^p5e\.(48xlarge)$",
@@ -118,12 +118,18 @@ def _patch_base_image_for_aws_efa(
     if not is_efa_enabled:
         return image_name
 
-    if parse_image_name(image_name).repo != settings.DSTACK_BASE_IMAGE:
+    if parse_image_name(image_name).repo != settings.DSTACK_DOCKER_BASE_IMAGE:
         return image_name
 
-    if image_name.endswith(f"-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
-        return image_name[:-17] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-    if image_name.endswith(f"-devel-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
-        return image_name[:-18] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+    if image_name.endswith(f"-base-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"):
+        return (
+            image_name[:-17]
+            + f"-devel-efa-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
+        )
+    if image_name.endswith(f"-devel-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"):
+        return (
+            image_name[:-18]
+            + f"-devel-efa-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
+        )
 
     return image_name

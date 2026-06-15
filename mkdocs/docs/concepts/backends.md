@@ -403,16 +403,30 @@ There are two ways to configure Azure: using a client secret or using the defaul
           - type: azure
             creds:
               type: default
-        regions: [westeurope]
-        vpc_ids:
-          westeurope: myNetworkResourceGroup/myNetworkName
+            regions: [westeurope]
+            vpc_ids:
+              westeurope: myNetworkResourceGroup/myNetworkName
+    ```
+
+    Alternatively, specify `subnet_ids` to target specific subnets:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: azure
+            creds:
+              type: default
+            regions: [westeurope]
+            subnet_ids:
+              westeurope: myNetworkResourceGroup/myNetworkName/mySubnetName
     ```
 
 
 ??? info "Private subnets"
     By default, `dstack` provisions instances with public IPs and permits inbound SSH traffic.
     If you want `dstack` to use private subnets and provision instances without public IPs,
-    specify custom networks using `vpc_ids` and set `public_ips` to `false`.
+    specify custom networks using `vpc_ids` or `subnet_ids`, and set `public_ips` to `false`.
 
     ```yaml
     projects:

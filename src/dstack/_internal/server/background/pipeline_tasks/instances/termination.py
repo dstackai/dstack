@@ -11,6 +11,9 @@ from dstack._internal.server.background.pipeline_tasks.instances.common import (
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.instances import get_instance_provisioning_data
+from dstack._internal.server.services.runner.pool import (
+    instance_connection_pool,
+)
 from dstack._internal.utils.common import get_current_datetime, run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -76,6 +79,9 @@ async def terminate_instance(instance_model: InstanceModel) -> ProcessResult:
                     exc,
                     exc_info=not isinstance(exc, BackendError),
                 )
+
+    if job_provisioning_data is not None:
+        instance_connection_pool.drop_by_jpd(job_provisioning_data)
 
     result.instance_update_map["deleted"] = True
     result.instance_update_map["deleted_at"] = NOW_PLACEHOLDER

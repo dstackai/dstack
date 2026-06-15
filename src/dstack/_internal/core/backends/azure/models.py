@@ -51,13 +51,23 @@ class AzureBackendConfig(CoreModel):
             )
         ),
     ] = None
+    subnet_ids: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The mapping from configured Azure locations to subnet IDs."
+                " A subnet ID must have a format `networkResourceGroup/networkName/subnetName`."
+                " Cannot be configured for the same region as `vpc_ids`"
+            )
+        ),
+    ] = None
     public_ips: Annotated[
         Optional[bool],
         Field(
             description=(
                 "A flag to enable/disable public IP assigning on instances."
-                " `public_ips: false` requires `vpc_ids` that specifies custom networks with outbound internet connectivity"
-                " provided by NAT Gateway or other mechanism."
+                " `public_ips: false` requires `vpc_ids` or `subnet_ids` that specifies custom networks"
+                " with outbound internet connectivity provided by NAT Gateway or other mechanism."
                 " Defaults to `true`"
             )
         ),

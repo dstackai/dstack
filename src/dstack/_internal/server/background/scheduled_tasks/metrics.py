@@ -1,6 +1,7 @@
 import asyncio
 import json
-from typing import Dict, List, Optional
+from collections.abc import Mapping
+from typing import List, Optional
 
 from sqlalchemy import Delete, delete, select
 from sqlalchemy.orm import joinedload
@@ -164,9 +165,9 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
     )
 
 
-@runner_ssh_tunnel(ports=[DSTACK_RUNNER_HTTP_PORT], retries=1)
+@runner_ssh_tunnel
 def _pull_runner_metrics(
-    ports: Dict[int, int],
+    addresses: Mapping[int, client.LocalAddress],
 ) -> Optional[MetricsResponse]:
-    runner_client = client.RunnerClient(port=ports[DSTACK_RUNNER_HTTP_PORT])
+    runner_client = client.RunnerClient.from_address(addresses[DSTACK_RUNNER_HTTP_PORT])
     return runner_client.get_metrics()

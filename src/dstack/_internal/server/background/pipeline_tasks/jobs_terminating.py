@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional, Sequence, TypedDict
@@ -659,10 +660,12 @@ async def _process_terminating_job(
 
     jrd = get_job_runtime_data(job_model)
     jpd = get_job_provisioning_data(job_model)
-    if jpd is not None:
+    if jpd is not None and jpd.hostname is not None and jpd.ssh_port is not None:
         logger.debug("%s: stopping container", fmt(job_model))
         ssh_private_keys = get_instance_ssh_private_keys(instance_model)
         if not await _stop_container(job_model, jpd, ssh_private_keys):
+            # Dangling containers (tasks) are cleared periodically on instance checks by
+            # `remove_dangling_tasks_from_instance()`
             logger.warning(
                 (
                     "%s: could not stop container, possibly due to a communication error."
@@ -852,9 +855,9 @@ async def _stop_container(
     return True
 
 
-@runner_ssh_tunnel(ports=[DSTACK_SHIM_HTTP_PORT])
-def _shim_submit_stop(ports: dict[int, int], job_model: JobModel) -> bool:
-    shim_client = client.ShimClient(port=ports[DSTACK_SHIM_HTTP_PORT])
+@runner_ssh_tunnel
+def _shim_submit_stop(addresses: Mapping[int, client.LocalAddress], job_model: JobModel) -> bool:
+    shim_client = client.ShimClient.from_address(addresses[DSTACK_SHIM_HTTP_PORT])
 
     resp = shim_client.healthcheck()
     if resp is None:

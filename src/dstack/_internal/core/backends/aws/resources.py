@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 import botocore.client
 import botocore.exceptions
 
-import dstack.version as version
+from dstack._internal import settings
 from dstack._internal.core.backends.aws.models import AWSOSImageConfig
 from dstack._internal.core.errors import BackendError, ComputeError, ComputeResourceNotFoundError
 from dstack._internal.utils.logging import get_logger
@@ -37,7 +37,7 @@ def get_image_id_and_username(
         image_owner = DLAMI_OWNER_ACCOUNT_ID
         username = "ubuntu"
     else:
-        image_name = f"dstack-{version.base_image}"
+        image_name = f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         image_owner = DSTACK_ACCOUNT_ID
         username = "ubuntu"
     response = ec2_client.describe_images(
@@ -191,40 +191,13 @@ def create_instances_struct(
     # AWS allows specifying either NetworkInterfaces for specific subnet_id
     # or instance-level SecurityGroupIds in case of no specific subnet_id, not both.
     if subnet_id is not None:
-        # AWS does not auto-assign a public IPv4 to instances launched with multiple network
-        # interfaces ("AssociatePublicIpAddress [...] You cannot specify more than one network
-        # interface in the request"). For multi-EFA instance types (e.g. p4d, p5, trn1), we
-        # therefore launch all EFA NICs without `AssociatePublicIpAddress` and, when
-        # `public_ips: true`, attach an Elastic IP after launch in `update_provisioning_data`.
-        multi_eni = max_efa_interfaces > 1
-        struct["NetworkInterfaces"] = [
-            {
-                "AssociatePublicIpAddress": allocate_public_ip and not multi_eni,
-                "DeviceIndex": 0,
-                "SubnetId": subnet_id,
-                "Groups": [security_group_id],
-                "InterfaceType": "efa" if max_efa_interfaces > 0 else "interface",
-            },
-        ]
-
-        if multi_eni:
-            for i in range(1, max_efa_interfaces):
-                # Set to efa-only to use interfaces exclusively for GPU-to-GPU communication
-                interface_type = "efa-only"
-                if instance_type == "p5.48xlarge":
-                    # EFA configuration for P5 instances:
-                    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa-acc-inst-types.html#efa-for-p5
-                    interface_type = "efa" if i % 4 == 0 else "efa-only"
-                struct["NetworkInterfaces"].append(
-                    {
-                        "AssociatePublicIpAddress": False,
-                        "NetworkCardIndex": i,
-                        "DeviceIndex": 1,
-                        "SubnetId": subnet_id,
-                        "Groups": [security_group_id],
-                        "InterfaceType": interface_type,
-                    }
-                )
+        struct["NetworkInterfaces"] = _create_network_interfaces_struct(
+            instance_type=instance_type,
+            subnet_id=subnet_id,
+            security_group_id=security_group_id,
+            allocate_public_ip=allocate_public_ip,
+            max_efa_interfaces=max_efa_interfaces,
+        )
     else:
         struct["SecurityGroupIds"] = [security_group_id]
 
@@ -630,6 +603,64 @@ def _is_private_subnet_with_internet_egress(
                     return True
 
     return False
+
+
+def _create_network_interfaces_struct(
+    instance_type: str,
+    subnet_id: str,
+    security_group_id: str,
+    allocate_public_ip: bool,
+    max_efa_interfaces: int,
+) -> List[Dict[str, Any]]:
+    # AWS does not auto-assign a public IPv4 to instances launched with multiple network
+    # interfaces ("AssociatePublicIpAddress [...] You cannot specify more than one network
+    # interface in the request"). For multi-EFA instance types (e.g. p4d, p5, p6, trn1), we
+    # therefore launch all EFA NICs without `AssociatePublicIpAddress` and, when
+    # `public_ips: true`, attach an Elastic IP after launch in `update_provisioning_data`.
+    multi_eni = max_efa_interfaces > 1
+    primary_supports_efa = _primary_nic_supports_efa(instance_type)
+    network_interfaces: List[Dict[str, Any]] = [
+        {
+            "AssociatePublicIpAddress": allocate_public_ip and not multi_eni,
+            "DeviceIndex": 0,
+            "SubnetId": subnet_id,
+            "Groups": [security_group_id],
+            "InterfaceType": "efa"
+            if max_efa_interfaces > 0 and primary_supports_efa
+            else "interface",
+        },
+    ]
+
+    if multi_eni:
+        last_card_index = max_efa_interfaces
+        if not primary_supports_efa:
+            last_card_index += 1
+        for i in range(1, last_card_index):
+            # Set to efa-only to use interfaces exclusively for GPU-to-GPU communication
+            interface_type = "efa-only"
+            if instance_type == "p5.48xlarge":
+                # EFA configuration for P5 instances:
+                # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa-acc-inst-types.html#efa-for-p5
+                interface_type = "efa" if i % 4 == 0 else "efa-only"
+            network_interfaces.append(
+                {
+                    "AssociatePublicIpAddress": False,
+                    "NetworkCardIndex": i,
+                    "DeviceIndex": 1,
+                    "SubnetId": subnet_id,
+                    "Groups": [security_group_id],
+                    "InterfaceType": interface_type,
+                }
+            )
+    return network_interfaces
+
+
+def _primary_nic_supports_efa(instance_type: str) -> bool:
+    """For most EFA-supported instance types, primary network card (index 0) supports
+    attaching both ENA and EFA. But some may support only one interface (ENA),
+    and all EFA interfaces are placed on the secondary network cards (1..max_efa_interfaces).
+    """
+    return instance_type not in {"p6-b300.48xlarge"}
 
 
 def get_reservation(

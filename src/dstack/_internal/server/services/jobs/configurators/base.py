@@ -87,7 +87,7 @@ def get_default_image(nvcc: bool = False) -> str:
     Args:
         nvcc: If True, returns 'devel' variant, otherwise 'base'.
     """
-    return f"{settings.DSTACK_BASE_IMAGE}:{settings.DSTACK_BASE_IMAGE_VERSION}-{'devel' if nvcc else 'base'}-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+    return f"{settings.DSTACK_DOCKER_BASE_IMAGE}:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}-{'devel' if nvcc else 'base'}-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
 
 
 class JobConfigurator(ABC):
@@ -126,6 +126,9 @@ class JobConfigurator(ABC):
     @abstractmethod
     def _spot_policy(self) -> SpotPolicy:
         pass
+
+    def _reservation(self) -> Optional[str]:
+        return self.run_spec.merged_profile.reservation
 
     @abstractmethod
     def _ports(self) -> List[PortMapping]:
@@ -334,7 +337,7 @@ class JobConfigurator(ABC):
             resources=resources,
             max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
-            reservation=self.run_spec.merged_profile.reservation,
+            reservation=self._reservation(),
             multinode=jobs_per_replica > 1,
             backend_options=self.run_spec.merged_profile.backend_options,
         )
