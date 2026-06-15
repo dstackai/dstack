@@ -184,7 +184,7 @@ fleets:
 </div>
 
 !!! info "Tenant isolation"
-    Exported fleets share the same access model as regular fleets. See [Tenant isolation](fleets.md#tenant-isolation) for details.
+    Exported fleets share the same access model as regular fleets. See [Tenant isolation](../guides/tenant-isolation.md) for details.
 
 !!! info "What's next?"
     1. Check the [`dstack export` CLI reference](../reference/cli/dstack/export.md)
