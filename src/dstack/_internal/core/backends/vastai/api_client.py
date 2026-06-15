@@ -135,7 +135,13 @@ class VastAIAPIClient:
             return False
 
     def _url(self, path):
-        return f"{self.api_url}/{path.lstrip('/')}?api_key={self.api_key}"
+        base = self.api_url
+        # Vast.ai deprecated /api/v0/instances/ (HTTP 410). /api/v1/instances/
+        # returns a schema-compatible response (success flag + instances list).
+        # /bundles/ and /asks/ remain on v0; v1 is not yet published for them.
+        if path.lstrip("/").startswith("instances/"):
+            base = base.replace("/api/v0", "/api/v1")
+        return f"{base}/{path.lstrip('/')}?api_key={self.api_key}"
 
     def _invalidate_cache(self):
         with self.lock:
