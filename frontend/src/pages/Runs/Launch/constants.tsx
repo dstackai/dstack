@@ -80,12 +80,17 @@ export const IDE_OPTIONS = [
         label: 'Windsurf',
         value: 'windsurf',
     },
+    {
+        label: 'Zed',
+        value: 'zed',
+    },
 ] as const;
 
 export const IDE_DISPLAY_NAMES: Record<string, string> = {
     cursor: 'Cursor',
     vscode: 'VS Code',
     windsurf: 'Windsurf',
+    zed: 'Zed',
 };
 
 export const getIDEDisplayName = (ide: string): string => {
