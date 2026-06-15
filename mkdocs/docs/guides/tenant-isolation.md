@@ -7,8 +7,9 @@ description: Restricting access to hosts managed by dstack
 
 `dstack` assumes mutual trust between users of the same project. While users' jobs run in Docker containers, users and their containers may have broad access to the underlying hosts. This guide explains how to restrict access to the host when stronger boundaries are required.
 
-!!! info "Disclaimer"
-    Even with all precautions, complete isolation on shared hardware is hardly achievable — container escape vulnerabilities are common. The best way to provide true isolation between users is to place them in different `dstack` projects and not share hardware between them.
+!!! info "Isolation guarantees"
+    The methods described in this guide should be treated as best-effort hardening measures, not as a guarantee of isolation between users, as isolation ultimately depends on the underlying hardware and software. For the strongest isolation, place users in separate `dstack` projects and avoid sharing hardware between them.
+
 
 ## Host SSH access
 
@@ -40,28 +41,6 @@ Running a container in privileged mode gives it full access to the host kernel, 
 | `replicas[i].docker: true` | Services with replica groups |
 
 To block runs that request privileged mode, write a [REST plugin](../reference/plugins/rest/index.md) or a [Python plugin](../reference/plugins/python/index.md) with an apply policy.
-
-<div editor-title="src/isolation_plugin/__init__.py">
-
-```python
-class NoPrivilegedPolicy(ApplyPolicy):
-    def on_run_apply(self, user: str, project: str, spec: RunSpec) -> RunSpec:
-        conf = spec.configuration
-
-        if conf.privileged or conf.docker:
-            raise ValueError("Privileged mode and Docker-in-Docker are not allowed")
-
-        if isinstance(conf, ServiceConfiguration) and isinstance(conf.replicas, list):
-            for group in conf.replicas:
-                if group.privileged or group.docker:
-                    raise ValueError(
-                        f"Replica group '{group.name}' requests privileged mode, which is not allowed"
-                    )
-
-        return spec
-```
-
-</div>
 
 ## Instance volumes
 

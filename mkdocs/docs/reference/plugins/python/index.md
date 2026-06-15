@@ -100,7 +100,15 @@ class ExamplePolicy(ApplyPolicy):
             "team": "my_team",
         }
         # Forbid something
-        if spec.configuration.privileged:
+        if (
+            spec.configuration.privileged
+            or spec.configuration.docker
+            or (
+                isinstance(spec.configuration, Service)
+                and isinstance(spec.configuration.replicas, list)
+                and any(r.privileged or r.docker for r in spec.configuration.replicas)
+            )
+        ):
             logger.warning("User %s tries to run privileged containers", user)
             raise ValueError("Running privileged containers is forbidden")
         # Set some service-specific properties
