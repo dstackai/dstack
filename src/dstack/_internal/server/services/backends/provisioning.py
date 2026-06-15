@@ -118,12 +118,18 @@ def _patch_base_image_for_aws_efa(
     if not is_efa_enabled:
         return image_name
 
-    if parse_image_name(image_name).repo != settings.DSTACK_BASE_IMAGE:
+    if parse_image_name(image_name).repo != settings.DSTACK_DOCKER_BASE_IMAGE:
         return image_name
 
-    if image_name.endswith(f"-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
-        return image_name[:-17] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
-    if image_name.endswith(f"-devel-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"):
-        return image_name[:-18] + f"-devel-efa-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+    if image_name.endswith(f"-base-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"):
+        return (
+            image_name[:-17]
+            + f"-devel-efa-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
+        )
+    if image_name.endswith(f"-devel-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"):
+        return (
+            image_name[:-18]
+            + f"-devel-efa-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
+        )
 
     return image_name

@@ -131,7 +131,7 @@ class TestGetImageIdAndUsername:
         caplog: pytest.LogCaptureFixture,
         ec2_client_mock: Mock,
     ):
-        monkeypatch.setattr("dstack.version.base_image", "0.0")
+        monkeypatch.setattr("dstack._internal.settings.DSTACK_VM_BASE_IMAGE_VERSION", "0.0")
         caplog.set_level(logging.WARNING)
         ec2_client_mock.describe_images.return_value = {
             "Images": [
@@ -169,7 +169,7 @@ class TestGetImageIdAndUsername:
         expected_name: str,
         expected_owner: str,
     ):
-        monkeypatch.setattr("dstack.version.base_image", "0.0")
+        monkeypatch.setattr("dstack._internal.settings.DSTACK_VM_BASE_IMAGE_VERSION", "0.0")
         _, username = get_image_id_and_username(
             ec2_client_mock,
             gpu_name="A10G" if cuda else None,

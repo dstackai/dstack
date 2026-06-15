@@ -651,8 +651,8 @@ class TestJobRunningWorker:
             registry_username="",
             registry_password="",
             image_name=(
-                f"dstackai/base:{settings.DSTACK_BASE_IMAGE_VERSION}-"
-                f"base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+                f"dstackai/base:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}-"
+                f"base-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
             ),
             container_user="root",
             privileged=False,
@@ -745,8 +745,8 @@ class TestJobRunningWorker:
             registry_username="",
             registry_password="",
             image_name=(
-                f"dstackai/base:{settings.DSTACK_BASE_IMAGE_VERSION}-"
-                f"base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+                f"dstackai/base:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}-"
+                f"base-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
             ),
             container_user="root",
             privileged=privileged,

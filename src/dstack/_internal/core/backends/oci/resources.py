@@ -22,7 +22,7 @@ from typing import (
 import oci
 from oci.object_storage.models import CreatePreauthenticatedRequestDetails
 
-from dstack import version
+from dstack._internal import settings
 from dstack._internal.core.backends.base.compute import requires_nvidia_proprietary_kernel_modules
 from dstack._internal.core.backends.oci.region import OCIRegionClient
 from dstack._internal.core.consts import DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES
@@ -356,10 +356,10 @@ def terminate_instance_if_exists(client: oci.core.ComputeClient, instance_id: st
 def get_marketplace_listing_and_package(
     gpu_name: Optional[str], client: oci.marketplace.MarketplaceClient
 ) -> Tuple[oci.marketplace.models.Listing, oci.marketplace.models.ImageListingPackage]:
-    listing_name = f"dstack-{version.base_image}"
+    listing_name = f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
     if gpu_name is not None:
         if not requires_nvidia_proprietary_kernel_modules(gpu_name):
-            listing_name = f"dstack-cuda-{version.base_image}"
+            listing_name = f"dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         else:
             listing_name = f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
 

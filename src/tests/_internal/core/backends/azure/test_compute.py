@@ -1,6 +1,6 @@
 import pytest
 
-from dstack import version
+from dstack._internal import settings
 from dstack._internal.core.backends.azure.compute import VMImageVariant
 from dstack._internal.core.models.instances import Gpu, InstanceType, Resources
 
@@ -55,9 +55,9 @@ class TestVMImageVariant:
     @pytest.mark.parametrize(
         ["variant", "expected_name"],
         [
-            [VMImageVariant.GRID, f"dstack-grid-{version.base_image}"],
-            [VMImageVariant.CUDA, f"dstack-cuda-{version.base_image}"],
-            [VMImageVariant.STANDARD, f"dstack-{version.base_image}"],
+            [VMImageVariant.GRID, f"dstack-grid-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"],
+            [VMImageVariant.CUDA, f"dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"],
+            [VMImageVariant.STANDARD, f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"],
         ],
     )
     def test_get_image_name(self, variant: VMImageVariant, expected_name: str):

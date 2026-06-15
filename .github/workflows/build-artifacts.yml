@@ -216,12 +216,14 @@ jobs:
             VERSION=${{ inputs.version }}
             IS_RELEASE=True
           fi
-          BASE_IMAGE=$(cat src/dstack/version.py | grep "base_image = ")
-          BASE_IMAGE_UBUNTU_VERSION=$(cat src/dstack/version.py | grep "base_image_ubuntu_version = ")
+          DOCKER_BASE_IMAGE=$(cat src/dstack/version.py | grep "docker_base_image = ")
+          DOCKER_BASE_IMAGE_UBUNTU_VERSION=$(cat src/dstack/version.py | grep "docker_base_image_ubuntu_version = ")
+          VM_BASE_IMAGE=$(cat src/dstack/version.py | grep "vm_base_image = ")
           echo "__version__ = \"$VERSION\"" > src/dstack/version.py
           echo "__is_release__ = $IS_RELEASE" >> src/dstack/version.py
-          echo $BASE_IMAGE >> src/dstack/version.py
-          echo $BASE_IMAGE_UBUNTU_VERSION >> src/dstack/version.py
+          echo $DOCKER_BASE_IMAGE >> src/dstack/version.py
+          echo $DOCKER_BASE_IMAGE_UBUNTU_VERSION >> src/dstack/version.py
+          echo $VM_BASE_IMAGE >> src/dstack/version.py
           cp README.md src
           uv build
       - uses: actions/upload-artifact@v4

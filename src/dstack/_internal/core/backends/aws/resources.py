@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 import botocore.client
 import botocore.exceptions
 
-import dstack.version as version
+from dstack._internal import settings
 from dstack._internal.core.backends.aws.models import AWSOSImageConfig
 from dstack._internal.core.errors import BackendError, ComputeError, ComputeResourceNotFoundError
 from dstack._internal.utils.logging import get_logger
@@ -37,7 +37,7 @@ def get_image_id_and_username(
         image_owner = DLAMI_OWNER_ACCOUNT_ID
         username = "ubuntu"
     else:
-        image_name = f"dstack-{version.base_image}"
+        image_name = f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         image_owner = DSTACK_ACCOUNT_ID
         username = "ubuntu"
     response = ec2_client.describe_images(
