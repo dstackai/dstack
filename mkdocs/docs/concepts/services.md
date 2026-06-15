@@ -364,6 +364,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
 
     replicas:
       - count: 1
+        # For now replica group with router must have count: 1
         python: "3.12"
         commands:
           - pip install smg
