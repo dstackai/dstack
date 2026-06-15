@@ -33,7 +33,6 @@ from azure.mgmt.compute.models import (
     VirtualMachinePublicIPAddressConfiguration,
 )
 
-from dstack import version
 from dstack._internal import settings
 from dstack._internal.core.backends.azure import resources as azure_resources
 from dstack._internal.core.backends.azure import utils as azure_utils
@@ -444,13 +443,13 @@ class VMImageVariant(enum.Enum):
 
     def get_image_name(self) -> str:
         if self is self.GRID:
-            return f"dstack-grid-{version.base_image}"
+            return f"dstack-grid-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         elif self is self.CUDA:
-            return f"dstack-cuda-{version.base_image}"
+            return f"dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         elif self is self.CUDA_WITH_PROPRIETARY_KERNEL_MODULES:
             return f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
         elif self is self.STANDARD:
-            return f"dstack-{version.base_image}"
+            return f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         else:
             raise ValueError(f"Unexpected image variant {self!r}")
 

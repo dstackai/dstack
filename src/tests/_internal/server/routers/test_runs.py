@@ -152,7 +152,7 @@ def get_dev_env_run_plan_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = f"dstackai/base:{settings.DSTACK_BASE_IMAGE_VERSION}-base-ubuntu{settings.DSTACK_BASE_IMAGE_UBUNTU_VERSION}"
+        image_name = f"dstackai/base:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}-base-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
 
     run_spec = {
         "configuration": {
