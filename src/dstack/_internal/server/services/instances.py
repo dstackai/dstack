@@ -2,12 +2,12 @@ import operator
 import uuid
 from collections.abc import Container, Iterable
 from datetime import datetime
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Sequence, Union
 
 import gpuhunt
 from sqlalchemy import and_, exists, false, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, load_only
+from sqlalchemy.orm import contains_eager, joinedload, load_only
 
 from dstack._internal.core.backends.base.offers import (
     offer_to_catalog_item,
@@ -16,6 +16,7 @@ from dstack._internal.core.backends.base.offers import (
 from dstack._internal.core.backends.features import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import EntityReference
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.health import HealthCheck, HealthEvent, HealthStatus
 from dstack._internal.core.models.instances import (
@@ -34,6 +35,10 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import (
     DEFAULT_FLEET_TERMINATION_IDLE_TIME,
+    FleetInstanceSelector,
+    InstanceHostnameSelector,
+    InstanceNameSelector,
+    InstanceSelector,
     Profile,
     TerminationPolicy,
 )
@@ -373,6 +378,178 @@ def get_instance_ssh_private_keys(instance_model: InstanceModel) -> tuple[str, O
     if not proxy_private_keys:
         raise ValueError("No instance SSH proxy private key found")
     return host_private_key, proxy_private_keys[0]
+
+
+async def select_instances_by_selectors(
+    session: AsyncSession,
+    project: ProjectModel,
+    selectors: Sequence[InstanceSelector],
+    *,
+    fleets: Optional[Sequence[Union[EntityReference, str]]] = None,
+    detaching_instance_ids: Optional[Sequence[uuid.UUID]] = None,
+    fleet_id: Optional[uuid.UUID] = None,
+    instance_ids: Optional[Sequence[uuid.UUID]] = None,
+    lock_instances: bool = False,
+) -> list[InstanceModel]:
+    if instance_ids is not None and len(instance_ids) == 0:
+        return []
+    is_instance_imported_subquery = exists().where(
+        ImportModel.project_id == project.id,
+        ImportModel.export_id == ExportedFleetModel.export_id,
+        ExportedFleetModel.fleet_id == InstanceModel.fleet_id,
+    )
+    filters = [
+        or_(
+            InstanceModel.project_id == project.id,
+            is_instance_imported_subquery,
+        ),
+        FleetModel.deleted == False,
+        InstanceModel.deleted == False,
+    ]
+    if detaching_instance_ids is not None:
+        filters.append(InstanceModel.id.not_in(detaching_instance_ids))
+    if fleet_id is not None:
+        filters.append(InstanceModel.fleet_id == fleet_id)
+    if instance_ids is not None:
+        filters.append(InstanceModel.id.in_(instance_ids))
+    if fleets is not None:
+        filters.append(
+            or_(
+                *[
+                    _get_fleet_reference_condition(project, EntityReference.parse(fleet))
+                    for fleet in fleets
+                ]
+            )
+        )
+    selector_conditions = _get_instance_selector_conditions(project, selectors)
+    if selector_conditions:
+        filters.append(or_(*selector_conditions))
+
+    stmt = (
+        select(InstanceModel)
+        .join(InstanceModel.fleet)
+        .join(FleetModel.project)
+        .where(*filters)
+        .options(
+            contains_eager(InstanceModel.fleet)
+            .load_only(FleetModel.id, FleetModel.name, FleetModel.project_id, FleetModel.spec)
+            .contains_eager(FleetModel.project)
+            .load_only(ProjectModel.name)
+        )
+    )
+    if lock_instances:
+        stmt = stmt.where(InstanceModel.lock_expires_at.is_(None))
+        stmt = stmt.order_by(InstanceModel.id).with_for_update(
+            skip_locked=True, key_share=True, of=InstanceModel
+        )
+    res = await session.execute(stmt)
+    instances = list(res.unique().scalars().all())
+    return [
+        instance
+        for instance in instances
+        if instance_matches_selectors(instance, selectors, project=project)
+    ]
+
+
+def instance_matches_selectors(
+    instance: InstanceModel,
+    selectors: Sequence[InstanceSelector],
+    *,
+    project: ProjectModel,
+) -> bool:
+    return any(
+        instance_matches_selector(instance, selector, project=project) for selector in selectors
+    )
+
+
+def instance_matches_selector(
+    instance: InstanceModel,
+    selector: InstanceSelector,
+    *,
+    project: ProjectModel,
+) -> bool:
+    if isinstance(selector, InstanceNameSelector):
+        return instance.name == selector.name
+    if isinstance(selector, InstanceHostnameSelector):
+        return instance_matches_hostname_selector(instance, selector)
+    if isinstance(selector, FleetInstanceSelector):
+        return _instance_matches_fleet_instance_selector(instance, selector, project=project)
+    return False
+
+
+def instance_matches_hostname_selector(
+    instance: InstanceModel, selector: InstanceHostnameSelector
+) -> bool:
+    candidates = set()
+    jpd = get_instance_provisioning_data(instance)
+    if jpd is not None:
+        if jpd.hostname is not None:
+            candidates.add(jpd.hostname.lower())
+        if jpd.internal_ip is not None:
+            candidates.add(jpd.internal_ip.lower())
+    rci = get_instance_remote_connection_info(instance)
+    if rci is not None:
+        candidates.add(rci.host.lower())
+    return selector.hostname.lower() in candidates
+
+
+def _instance_matches_fleet_instance_selector(
+    instance: InstanceModel,
+    selector: FleetInstanceSelector,
+    *,
+    project: ProjectModel,
+) -> bool:
+    fleet = instance.fleet
+    if fleet is None:
+        return False
+    if fleet.name != selector.fleet.name:
+        return False
+    if instance.instance_num != selector.instance:
+        return False
+    if selector.fleet.project is None:
+        return fleet.project_id == project.id
+    return fleet.project.name == selector.fleet.project
+
+
+def _get_instance_selector_conditions(
+    project: ProjectModel,
+    selectors: Sequence[InstanceSelector],
+) -> list:
+    conditions = []
+    for selector in selectors:
+        if isinstance(selector, InstanceNameSelector):
+            conditions.append(InstanceModel.name == selector.name)
+        elif isinstance(selector, InstanceHostnameSelector):
+            conditions.append(_get_hostname_selector_condition(selector))
+        elif isinstance(selector, FleetInstanceSelector):
+            conditions.append(
+                and_(
+                    _get_fleet_reference_condition(project, selector.fleet),
+                    InstanceModel.instance_num == selector.instance,
+                )
+            )
+    return conditions
+
+
+def _get_fleet_reference_condition(project: ProjectModel, ref: EntityReference):
+    if ref.project is None:
+        return and_(
+            FleetModel.name == ref.name,
+            FleetModel.project_id == project.id,
+        )
+    return and_(
+        FleetModel.name == ref.name,
+        ProjectModel.name == ref.project,
+    )
+
+
+def _get_hostname_selector_condition(selector: InstanceHostnameSelector):
+    # This is only a DB prefilter. `instance_matches_selector` parses these JSON columns
+    # and performs the exact hostname/internal IP comparison in memory.
+    return or_(
+        InstanceModel.job_provisioning_data.icontains(selector.hostname, autoescape=True),
+        InstanceModel.remote_connection_info.icontains(selector.hostname, autoescape=True),
+    )
 
 
 def instance_matches_constraints(

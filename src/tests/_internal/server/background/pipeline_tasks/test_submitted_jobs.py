@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from datetime import timedelta
 from typing import cast
-from unittest.mock import Mock, call, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 
 import pytest
 from sqlalchemy import select
@@ -11,14 +11,21 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import RegistryAuth
-from dstack._internal.core.models.configurations import TaskConfiguration
+from dstack._internal.core.models.common import EntityReference, NetworkMode, RegistryAuth
+from dstack._internal.core.models.configurations import ServiceConfiguration, TaskConfiguration
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetNodesSpec, InstanceGroupPlacement
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.placement import PlacementGroup
-from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.runs import JobStatus, JobTerminationReason
+from dstack._internal.core.models.profiles import (
+    FleetInstanceSelector,
+    InstanceHostnameSelector,
+    InstanceNameSelector,
+    InstanceSelector,
+    Profile,
+)
+from dstack._internal.core.models.resources import CPUSpec, Memory, Range, ResourcesSpec
+from dstack._internal.core.models.runs import JobRuntimeData, JobStatus, JobTerminationReason
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     VolumeAttachmentData,
@@ -61,6 +68,7 @@ from dstack._internal.server.testing.common import (
     get_instance_offer_with_availability,
     get_job_provisioning_data,
     get_placement_group_provisioning_data,
+    get_remote_connection_info,
     get_run_spec,
     get_ssh_fleet_configuration,
     get_volume_provisioning_data,
@@ -1040,8 +1048,17 @@ class TestJobSubmittedWorker:
         assert job.lock_token is not None
 
     async def test_assigns_job_to_instance(
-        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: JobSubmittedWorker,
+        monkeypatch: pytest.MonkeyPatch,
     ):
+        get_targeted_instance_offers_mock = AsyncMock()
+        monkeypatch.setattr(
+            "dstack._internal.server.background.pipeline_tasks.jobs_submitted.get_targeted_instance_offers",
+            get_targeted_instance_offers_mock,
+        )
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(session=session, project_id=project.id)
@@ -1073,6 +1090,580 @@ class TestJobSubmittedWorker:
         assert job.lock_expires_at is None
         assert instance.status == InstanceStatus.BUSY
         assert instance.busy_blocks == 1
+        get_targeted_instance_offers_mock.assert_not_awaited()
+
+    async def test_assigns_job_to_specific_instance(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project, name="my-fleet")
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="my-fleet-0",
+        )
+        selected = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="my-fleet-1",
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(instances=[InstanceNameSelector(name="my-fleet-1")]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == selected.id
+        assert job.fleet_id == fleet.id
+
+    async def test_assigns_job_to_specific_hostname(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project, name="my-fleet")
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            remote_connection_info=get_remote_connection_info(host="192.168.1.10"),
+        )
+        selected = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            remote_connection_info=get_remote_connection_info(host="192.168.1.11"),
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(instances=[InstanceHostnameSelector(hostname="192.168.1.11")]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == selected.id
+        assert job.fleet_id == fleet.id
+
+    async def test_assigns_service_replicas_to_specific_shared_instance_blocks(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(session=session, project=project, name="my-fleet")
+        selected = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="shared-worker",
+            total_blocks=2,
+            busy_blocks=0,
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                port=8080,
+                commands=["echo"],
+                replicas=Range[int](min=2, max=2),
+                resources=ResourcesSpec(
+                    cpu=CPUSpec.parse("1"),
+                    memory=Range[Memory](min=Memory.parse("1GB"), max=None),
+                    gpu=None,
+                ),
+            ),
+            profile=Profile(instances=[InstanceNameSelector(name="shared-worker")]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        first_job = await create_job(session=session, run=run, replica_num=0)
+        second_job = await create_job(session=session, run=run, replica_num=1)
+
+        await _process_job(session=session, worker=worker, job_model=first_job)
+        await session.refresh(selected)
+        assert selected.busy_blocks == 1
+
+        await _process_job(session=session, worker=worker, job_model=second_job)
+
+        first_job = await _get_job(session, first_job.id)
+        second_job = await _get_job(session, second_job.id)
+        await session.refresh(selected)
+        assert first_job.instance is not None and first_job.instance.id == selected.id
+        assert second_job.instance is not None and second_job.instance.id == selected.id
+        assert selected.status == InstanceStatus.BUSY
+        assert selected.busy_blocks == 2
+
+    async def test_specific_instance_assignment_stays_in_run_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run_fleet = await create_fleet(session=session, project=project, name="run-fleet")
+        other_fleet = await create_fleet(session=session, project=project, name="other-fleet")
+        selected = await create_instance(
+            session=session,
+            project=project,
+            fleet=run_fleet,
+            status=InstanceStatus.IDLE,
+            name="run-fleet-0",
+            price=10,
+        )
+        await create_instance(
+            session=session,
+            project=project,
+            fleet=other_fleet,
+            status=InstanceStatus.IDLE,
+            name="other-fleet-0",
+            price=1,
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(
+                instances=[
+                    InstanceNameSelector(name="run-fleet-0"),
+                    InstanceNameSelector(name="other-fleet-0"),
+                ]
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=run_fleet,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == selected.id
+        assert job.fleet_id == run_fleet.id
+
+    async def test_assigns_job_to_specific_instance_in_imported_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        exporter_user = await create_user(
+            session, name="exporter-user", global_role=GlobalRole.USER
+        )
+        importer_user = await create_user(
+            session, name="importer-user", global_role=GlobalRole.USER
+        )
+        exporter_project = await create_project(
+            session, name="exporter-project", owner=exporter_user
+        )
+        importer_project = await create_project(
+            session, name="importer-project", owner=importer_user
+        )
+        repo = await create_repo(session=session, project_id=importer_project.id)
+        local_fleet = await create_fleet(
+            session=session,
+            project=importer_project,
+            name="same-fleet",
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        exported_fleet = await create_fleet(
+            session=session,
+            project=exporter_project,
+            name="same-fleet",
+            spec=get_fleet_spec(get_ssh_fleet_configuration()),
+        )
+        await create_instance(
+            session=session,
+            project=importer_project,
+            fleet=local_fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=1,
+            name="local-worker",
+        )
+        selected = await create_instance(
+            session=session,
+            project=exporter_project,
+            fleet=exported_fleet,
+            status=InstanceStatus.IDLE,
+            instance_num=1,
+            name="exported-worker",
+        )
+        await create_export(
+            session=session,
+            exporter_project=exporter_project,
+            importer_projects=[importer_project],
+            exported_fleets=[exported_fleet],
+        )
+        selectors: list[InstanceSelector] = [
+            FleetInstanceSelector(
+                fleet=EntityReference.parse("exporter-project/same-fleet"),
+                instance=1,
+            )
+        ]
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(instances=selectors),
+        )
+        run = await create_run(
+            session=session,
+            project=importer_project,
+            repo=repo,
+            user=importer_user,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.SUBMITTED
+        assert job.instance_assigned
+        assert job.instance is not None and job.instance.id == selected.id
+        assert job.fleet_id == exported_fleet.id
+
+    async def test_does_not_assign_multinode_job_without_enough_specific_instances(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="shared-worker",
+            backend=BackendType.AWS,
+            total_blocks=2,
+            busy_blocks=0,
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="debian", nodes=2, commands=["echo"]),
+            profile=Profile(instances=[InstanceNameSelector(name="shared-worker")]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        master_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            waiting_master_job=False,
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            waiting_master_job=True,
+        )
+
+        await _process_job(session=session, worker=worker, job_model=master_job)
+
+        master_job = await _get_job(session, master_job.id)
+        await session.refresh(worker_job)
+        await session.refresh(instance)
+        assert master_job.status == JobStatus.TERMINATING
+        assert (
+            master_job.termination_reason
+            == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        )
+        assert not master_job.instance_assigned
+        assert worker_job.waiting_master_job
+        assert instance.status == InstanceStatus.IDLE
+        assert instance.busy_blocks == 0
+
+    async def test_assigns_multinode_jobs_to_specific_shared_ssh_instances(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet = await create_fleet(
+            session=session,
+            project=project,
+            spec=get_fleet_spec(
+                get_ssh_fleet_configuration(
+                    hosts=["10.0.0.1", "10.0.0.2"],
+                    placement=InstanceGroupPlacement.CLUSTER,
+                    blocks=2,
+                )
+            ),
+        )
+        selected_master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="worker-0",
+            backend=BackendType.REMOTE,
+            region="remote",
+            price=1,
+            total_blocks=2,
+            busy_blocks=0,
+            offer=get_instance_offer_with_availability(
+                backend=BackendType.REMOTE,
+                region="remote",
+                cpu_count=2,
+                memory_gib=4,
+                total_blocks=2,
+            ),
+            job_provisioning_data=get_job_provisioning_data(
+                backend=BackendType.REMOTE,
+                region="remote",
+                cpu_count=2,
+                memory_gib=4,
+            ),
+        )
+        selected_worker = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="worker-1",
+            backend=BackendType.REMOTE,
+            region="remote",
+            price=2,
+            instance_num=1,
+            total_blocks=2,
+            busy_blocks=0,
+            offer=get_instance_offer_with_availability(
+                backend=BackendType.REMOTE,
+                region="remote",
+                cpu_count=2,
+                memory_gib=4,
+                total_blocks=2,
+            ),
+            job_provisioning_data=get_job_provisioning_data(
+                backend=BackendType.REMOTE,
+                region="remote",
+                cpu_count=2,
+                memory_gib=4,
+            ),
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(
+                image="debian",
+                nodes=2,
+                commands=["echo"],
+                resources=ResourcesSpec(
+                    cpu=CPUSpec.parse("1.."),
+                    memory=Range[Memory](min=Memory.parse("1GB"), max=None),
+                    gpu=None,
+                ),
+            ),
+            profile=Profile(
+                instances=[
+                    InstanceNameSelector(name="worker-0"),
+                    InstanceNameSelector(name="worker-1"),
+                ]
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        master_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            waiting_master_job=False,
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            waiting_master_job=True,
+        )
+
+        await _process_job(session=session, worker=worker, job_model=master_job)
+        master_job = await _get_job(session, master_job.id)
+        assert master_job.instance is not None and master_job.instance.id == selected_master.id
+
+        await _process_job(session=session, worker=worker, job_model=master_job)
+        master_job = await _get_job(session, master_job.id)
+        await session.refresh(worker_job)
+        assert master_job.status == JobStatus.PROVISIONING
+        assert worker_job.waiting_master_job is False
+
+        await _process_job(session=session, worker=worker, job_model=worker_job)
+
+        worker_job = await _get_job(session, worker_job.id)
+        await session.refresh(selected_master)
+        await session.refresh(selected_worker)
+        assert worker_job.instance is not None and worker_job.instance.id == selected_worker.id
+        assert selected_master.busy_blocks == 2
+        assert selected_worker.busy_blocks == 2
+        master_runtime = JobRuntimeData.__response__.parse_raw(master_job.job_runtime_data)
+        worker_runtime = JobRuntimeData.__response__.parse_raw(worker_job.job_runtime_data)
+        assert master_runtime.network_mode == NetworkMode.HOST
+        assert worker_runtime.network_mode == NetworkMode.HOST
+        assert master_runtime.offer is not None and master_runtime.offer.blocks == 2
+        assert worker_runtime.offer is not None and worker_runtime.offer.blocks == 2
+
+    async def test_assigns_multinode_jobs_to_specific_instances_in_same_cluster_fleet(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        fleet_spec = get_fleet_spec()
+        fleet_spec.configuration.placement = InstanceGroupPlacement.CLUSTER
+        fleet = await create_fleet(session=session, project=project, spec=fleet_spec)
+        selected_master = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="worker-0",
+            backend=BackendType.AWS,
+            region="eu-west-1",
+            price=1,
+            job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
+        )
+        selected_worker = await create_instance(
+            session=session,
+            project=project,
+            fleet=fleet,
+            status=InstanceStatus.IDLE,
+            name="worker-1",
+            backend=BackendType.AWS,
+            region="eu-west-1",
+            price=2,
+            job_provisioning_data=get_job_provisioning_data(region="eu-west-1"),
+        )
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            configuration=TaskConfiguration(image="debian", nodes=2, commands=["echo"]),
+            profile=Profile(
+                instances=[
+                    InstanceNameSelector(name="worker-0"),
+                    InstanceNameSelector(name="worker-1"),
+                ]
+            ),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            fleet=fleet,
+            run_spec=run_spec,
+        )
+        master_job = await create_job(
+            session=session,
+            run=run,
+            job_num=0,
+            waiting_master_job=False,
+        )
+        worker_job = await create_job(
+            session=session,
+            run=run,
+            job_num=1,
+            waiting_master_job=True,
+        )
+
+        await _process_job(session=session, worker=worker, job_model=master_job)
+        master_job = await _get_job(session, master_job.id)
+        assert master_job.instance is not None and master_job.instance.id == selected_master.id
+        assert master_job.status == JobStatus.SUBMITTED
+
+        await _process_job(session=session, worker=worker, job_model=master_job)
+        master_job = await _get_job(session, master_job.id)
+        await session.refresh(worker_job)
+        assert master_job.status == JobStatus.PROVISIONING
+        assert worker_job.waiting_master_job is False
+
+        await _process_job(session=session, worker=worker, job_model=worker_job)
+
+        worker_job = await _get_job(session, worker_job.id)
+        await session.refresh(selected_master)
+        await session.refresh(selected_worker)
+        assert worker_job.status == JobStatus.SUBMITTED
+        assert worker_job.instance is not None and worker_job.instance.id == selected_worker.id
+        assert selected_master.busy_blocks == 1
+        assert selected_worker.busy_blocks == 1
+
+    async def test_does_not_create_capacity_when_specific_instance_is_missing(
+        self, test_db, session: AsyncSession, worker: JobSubmittedWorker
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        await create_fleet(session=session, project=project)
+        run_spec = get_run_spec(
+            repo_id=repo.name,
+            profile=Profile(instances=[InstanceNameSelector(name="missing-instance")]),
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_spec=run_spec,
+        )
+        job = await create_job(session=session, run=run)
+
+        await _process_job(session=session, worker=worker, job_model=job)
+
+        job = await _get_job(session, job.id)
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        res = await session.execute(select(InstanceModel))
+        assert res.scalars().all() == []
 
     async def test_assigns_job_to_imported_fleet(
         self, test_db, session: AsyncSession, worker: JobSubmittedWorker
