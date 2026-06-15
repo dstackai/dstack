@@ -357,7 +357,6 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
     ```yaml
     type: service
     name: prefill-decode
-    image: lmsysorg/sglang:v0.5.10.post1
 
     env:
       - HF_TOKEN
@@ -365,62 +364,69 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
 
     replicas:
       - count: 1
-        # For now replica group with router must have count: 1
+        python: "3.12"
         commands:
           - pip install smg
           - |
             smg launch \
+              --enable-igw \
+              --pd-disaggregation \
+              --model-path $MODEL_ID \
               --host 0.0.0.0 \
               --port 8000 \
-              --pd-disaggregation \
               --prefill-policy cache_aware
-        resources:
-          cpu: 4
         router:
           type: sglang
+        resources:
+          cpu: 4
 
-      - count: 1..4
+      - count: 1..2
         scaling:
           metric: rps
-          target: 3
+          target: 300
+        image: ghcr.io/lightseekorg/smg:1.4.1-sglang-v0.5.10
         commands:
           - |
-            python -m sglang.launch_server \
+            python3 -m sglang.launch_server \
               --model-path $MODEL_ID \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --grpc-mode \
               --disaggregation-mode prefill \
               --disaggregation-transfer-backend nixl \
-              --port 8000 \
               --disaggregation-bootstrap-port 8998
         resources:
           gpu: H200
 
-      - count: 1..8
+      - count: 1..4
         scaling:
           metric: rps
-          target: 2
+          target: 300
+        image: ghcr.io/lightseekorg/smg:1.4.1-sglang-v0.5.10
         commands:
           - |
-            python -m sglang.launch_server \
+            python3 -m sglang.launch_server \
               --model-path $MODEL_ID \
+              --host 0.0.0.0 \
+              --port 8000 \
+              --grpc-mode \
               --disaggregation-mode decode \
-              --disaggregation-transfer-backend nixl \
-              --port 8000
+              --disaggregation-transfer-backend nixl
         resources:
           gpu: H200
 
     port: 8000
-    model: zai-org/GLM-4.5-Air-FP8
-
-    # Custom probe is required for PD disaggregation.
-    probes:
-      - type: http
-        url: /health
-        interval: 15s
     ```
 
     </div>
 
-    > With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
+    > With the `smg` router, workers communicate via gRPC as well as HTTP.
+    >
+    > On the router side, `--enable-igw` and `--model-path` are required for gRPC worker registration via HTTP endpoint. This is how `dstack` registers workers with SMG router.
+    >
+    > With SGLang gRPC workers, pass `--grpc-mode` to the worker launch command.To use [Mooncake Transfer](https://github.com/kvcache-ai/Mooncake), set `--disaggregation-transfer-backend mooncake`. For PD disaggregation with SGLang HTTP workers, see [SGLang PD Disaggregation](../examples/inference/sglang.md#pd-disaggregation).
+    >
+    > The SMG router supports only gRPC communication mode with vLLM workers. For PD disaggregation with vLLM, see [here](../examples/inference/vllm.md#pd-disaggregation).
 
 === "Dynamo"
 

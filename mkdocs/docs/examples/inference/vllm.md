@@ -124,6 +124,84 @@ curl http://127.0.0.1:3000/proxy/services/main/qwen36/v1/chat/completions \
 
 > If a [gateway](../../concepts/gateways.md) is configured (e.g. to enable auto-scaling, HTTPS, rate limits, etc.), the service endpoint will be available at `https://qwen36.<gateway domain>/`.
 
+## Configuration options
+
+### PD disaggregation
+
+To run vLLM with [PD disaggregation](https://docs.vllm.ai/en/latest/serving/disagg_prefill.html), use replica groups: one for [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html), one for prefill workers (`kv_producer`), and one for decode workers (`kv_consumer`).
+
+<div editor-title="pd.dstack.yml">
+
+```yaml
+type: service
+name: prefill-decode
+
+env:
+  - HF_TOKEN
+  - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+
+replicas:
+  - count: 1
+    python: "3.12"
+    commands:
+      - pip install smg
+      - |
+        smg launch \
+          --pd-disaggregation \
+          --model-path $MODEL_ID \
+          --enable-igw \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --prefill-policy cache_aware
+    router:
+      type: sglang
+    resources:
+      cpu: 4
+
+  - count: 1..4
+    scaling:
+      metric: rps
+      target: 3
+    image: ghcr.io/lightseekorg/smg:1.4.1-vllm-v0.18.0
+    commands:
+      - |
+        python3 -m vllm.entrypoints.grpc_server \
+          --model "$MODEL_ID" \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_producer"}'
+    resources:
+      gpu: H200
+
+  - count: 1..8
+    scaling:
+      metric: rps
+      target: 2
+    image: ghcr.io/lightseekorg/smg:1.4.1-vllm-v0.18.0
+    commands:
+      - |
+        python3 -m vllm.entrypoints.grpc_server \
+          --model "$MODEL_ID" \
+          --host 0.0.0.0 \
+          --port 8000 \
+          --kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_consumer"}'
+    resources:
+      gpu: H200
+
+port: 8000
+```
+
+</div>
+
+> To use the [Mooncake Transfer](https://github.com/kvcache-ai/Mooncake) backend, set `"kv_connector": "MooncakeConnector"` in `--kv-transfer-config`.
+
+Currently, auto-scaling only supports `rps` as the metric. TTFT and ITL metrics are coming soon.
+
+!!! info "Cluster"
+    PD disaggregation requires the service to run in a fleet with `placement` set to `cluster`, because the replicas require an interconnect between instances.
+
+    While the prefill and decode replicas run on GPUs, the router replica requires a CPU instance in the same cluster.
+
 ## What's next?
 
 1. Read about [services](../../concepts/services.md) and [gateways](../../concepts/gateways.md)

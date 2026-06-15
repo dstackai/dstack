@@ -211,8 +211,6 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
 
     </div>
 
-    > With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
-
 === "AMD"
 
     The example below deploys `Qwen/Qwen2.5-72B-Instruct` on a multi-node cluster with AMD MI300X GPUs:
