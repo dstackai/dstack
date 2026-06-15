@@ -58,7 +58,7 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 CONFIGURABLE_DISK_SIZE = Range[Memory](
-    min=Memory.parse("40GB"),  # min for the ubuntu22.04-cuda12 image
+    min=Memory.parse("40GB"),  # min for the ubuntu24.04-cuda13.0 image
     max=Memory.parse("8192GB"),  # max for the NETWORK_SSD disk type
 )
 WAIT_FOR_DISK_TIMEOUT = 20
@@ -80,8 +80,10 @@ SUPPORTED_PLATFORMS = [
     "gpu-h100-sxm",
     "gpu-h200-sxm",
     "gpu-b200-sxm",
+    "gpu-b200-sxm-a",
     "gpu-l40s-a",
     "gpu-l40s-d",
+    "gpu-rtx6000",
     "cpu-d3",
     "cpu-e2",
 ]
@@ -167,15 +169,12 @@ class NebiusCompute(
             resource_tags=instance_config.tags,
         )
         labels = resources.filter_invalid_labels(labels)
-        gpus = instance_offer.instance.resources.gpus
         create_disk_op = resources.create_disk(
             sdk=self._sdk,
             name=instance_name,
             project_id=self._region_to_project_id[instance_offer.region],
             size_mib=instance_offer.instance.resources.disk.size_mib,
-            image_family="ubuntu24.04-cuda12"
-            if gpus and gpus[0].name == "B200"
-            else "ubuntu22.04-cuda12",
+            image_family="ubuntu24.04-cuda13.0",
             labels=labels,
         )
         create_instance_op = None
