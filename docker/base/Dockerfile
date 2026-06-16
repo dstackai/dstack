@@ -42,10 +42,10 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys \
     && chmod 600 ~/.ssh/authorized_keys \
     && rm /etc/ssh/ssh_host_* \
-    # User
+    # User: UID/GID 1001 because Ubuntu 24.04 ships a default 'ubuntu' user at 1000.
     && apt-get install -y sudo \
-    && groupadd -g 1000 dstack \
-    && useradd -u 1000 -g 1000 -G sudo -s /bin/bash -m dstack \
+    && groupadd -g 1001 dstack \
+    && useradd -u 1001 -g 1001 -G sudo -s /bin/bash -m dstack \
     && echo 'dstack ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/dstack \
     # Default working dir
     && mkdir -p /dstack/run \
