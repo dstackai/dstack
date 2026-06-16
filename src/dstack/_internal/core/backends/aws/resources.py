@@ -37,7 +37,9 @@ def get_image_id_and_username(
         image_owner = DLAMI_OWNER_ACCOUNT_ID
         username = "ubuntu"
     else:
-        image_name = f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+        image_name = (
+            f"{settings.DSTACK_VM_BASE_IMAGE_PREFIX}dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+        )
         image_owner = DSTACK_ACCOUNT_ID
         username = "ubuntu"
     response = ec2_client.describe_images(

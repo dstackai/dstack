@@ -28,6 +28,7 @@ DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION = os.getenv(
     "DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION", version.docker_base_image_ubuntu_version
 )
 DSTACK_VM_BASE_IMAGE_VERSION = os.getenv("DSTACK_VM_BASE_IMAGE_VERSION", version.vm_base_image)
+DSTACK_VM_BASE_IMAGE_PREFIX = os.getenv("DSTACK_VM_BASE_IMAGE_PREFIX", "")  # e.g. stgn-123-
 DSTACK_DIND_IMAGE = os.getenv("DSTACK_DIND_IMAGE", "dstackai/dind")
 
 CLI_LOG_LEVEL = os.getenv("DSTACK_CLI_LOG_LEVEL", "INFO").upper()
