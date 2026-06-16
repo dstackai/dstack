@@ -236,6 +236,10 @@ def _print_plan_header(plan: GatewayPlan):
     configuration_table.add_row(th("Region"), plan.spec.configuration.region)
     configuration_table.add_row(th("Domain"), domain)
 
+    if plan.spec.configuration.replicas is not None:
+        assert isinstance(plan.spec.configuration.replicas, int)
+        configuration_table.add_row(th("Replicas"), str(plan.spec.configuration.replicas))
+
     console.print(configuration_table)
     console.print()
 

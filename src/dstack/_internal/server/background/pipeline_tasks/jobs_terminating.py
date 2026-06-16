@@ -51,7 +51,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import events
-from dstack._internal.server.services.gateways import get_or_add_gateway_connection
+from dstack._internal.server.services.gateways import get_or_add_gateway_connections
 from dstack._internal.server.services.instances import (
     emit_instance_status_change_event,
     get_instance_ssh_private_keys,
@@ -795,25 +795,36 @@ async def _unregister_replica(
     run_model = job_model.run
     if run_model.gateway_id is not None:
         async with get_session_ctx() as session:
-            gateway, conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
-            gateway_target = events.Target.from_model(gateway)
-        try:
-            logger.debug(
-                "%s: unregistering replica from service %s", fmt(job_model), job_model.run_id.hex
+            gateway, connections = await get_or_add_gateway_connections(
+                session, run_model.gateway_id
             )
-            async with conn.client() as client:
-                await client.unregister_replica(
-                    project=run_model.project.name,
-                    run_name=run_model.run_name,
-                    job_id=job_model.id,
+            gateway_target = events.Target.from_model(gateway)
+        for conn in connections:
+            try:
+                logger.debug(
+                    "%s: unregistering replica from service %s on gateway replica %s",
+                    fmt(job_model),
+                    job_model.run_id.hex,
+                    conn.ip_address,
                 )
-        except GatewayError as e:
-            logger.warning("%s: unregistering replica from service: %s", fmt(job_model), e)
-        except (httpx.RequestError, SSHError) as e:
-            logger.debug("Gateway request failed", exc_info=True)
-            # FIXME: Unhandled exception raised.
-            # Handle and retry unregister with timeout.
-            raise GatewayError(repr(e))
+                async with conn.client() as client:
+                    await client.unregister_replica(
+                        project=run_model.project.name,
+                        run_name=run_model.run_name,
+                        job_id=job_model.id,
+                    )
+            except GatewayError as e:
+                logger.warning(
+                    "%s: unregistering replica from service on gateway replica %s: %s",
+                    fmt(job_model),
+                    conn.ip_address,
+                    e,
+                )
+            except (httpx.RequestError, SSHError) as e:
+                logger.debug("Gateway request failed", exc_info=True)
+                # FIXME: Unhandled exception raised.
+                # Handle and retry unregister with timeout.
+                raise GatewayError(repr(e))
     return gateway_target
 
 

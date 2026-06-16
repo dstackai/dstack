@@ -32,8 +32,9 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayModel, RunModel
 from dstack._internal.server.services import events
 from dstack._internal.server.services.gateways import (
+    get_gateway_compute_models,
     get_gateway_configuration,
-    get_or_add_gateway_connection,
+    get_or_add_gateway_connections,
     get_project_default_gateway_model,
     get_project_gateway_model_by_reference,
 )
@@ -100,7 +101,7 @@ async def _register_service_in_gateway(
 ) -> ServiceSpec:
     assert run_spec.configuration.type == "service"
 
-    if gateway.gateway_compute is None:
+    if not get_gateway_compute_models(gateway):
         raise ServerClientError("Gateway has no instance associated with it")
 
     if gateway.status != GatewayStatus.RUNNING:
@@ -178,50 +179,51 @@ async def _register_service_in_gateway(
     domain = service_spec.get_domain()
     assert domain is not None
 
-    _, conn = await get_or_add_gateway_connection(session, gateway.id)
-    try:
-        logger.debug("%s: registering service as %s", fmt(run_model), service_spec.url)
-        async with conn.client() as client:
-            do_register = partial(
-                client.register_service,
-                project=run_model.project.name,
-                run_name=run_model.run_name,
-                domain=domain,
-                service_https=configure_service_https,
-                gateway_https=gateway_https,
-                auth=run_spec.configuration.auth,
-                client_max_body_size=settings.DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
-                options=service_spec.options,
-                rate_limits=run_spec.configuration.rate_limits,
-                ssh_private_key=run_model.project.ssh_private_key,
-                has_router_replica=has_replica_group_router,
-                router=router,
-            )
-            try:
-                await do_register()
-            except GatewayError as e:
-                if e.msg == SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE.format(
-                    ref=f"{run_model.project.name}/{run_model.run_name}"
-                ):
-                    # Happens if there was a communication issue with the gateway when last unregistering
-                    logger.warning(
-                        "Service %s/%s is dangling on gateway %s, unregistering and re-registering",
-                        run_model.project.name,
-                        run_model.run_name,
-                        gateway.name,
-                    )
-                    await client.unregister_service(
-                        project=run_model.project.name,
-                        run_name=run_model.run_name,
-                    )
+    _, connections = await get_or_add_gateway_connections(session, gateway.id)
+    for conn in connections:
+        try:
+            logger.debug("%s: registering service as %s", fmt(run_model), service_spec.url)
+            async with conn.client() as client:
+                do_register = partial(
+                    client.register_service,
+                    project=run_model.project.name,
+                    run_name=run_model.run_name,
+                    domain=domain,
+                    service_https=configure_service_https,
+                    gateway_https=gateway_https,
+                    auth=run_spec.configuration.auth,
+                    client_max_body_size=settings.DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
+                    options=service_spec.options,
+                    rate_limits=run_spec.configuration.rate_limits,
+                    ssh_private_key=run_model.project.ssh_private_key,
+                    has_router_replica=has_replica_group_router,
+                    router=router,
+                )
+                try:
                     await do_register()
-                else:
-                    raise
-    except SSHError:
-        raise ServerClientError("Gateway tunnel is not working")
-    except httpx.RequestError as e:
-        logger.debug("Gateway request failed", exc_info=True)
-        raise GatewayError(f"Gateway is not working: {e!r}")
+                except GatewayError as e:
+                    if e.msg == SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE.format(
+                        ref=f"{run_model.project.name}/{run_model.run_name}"
+                    ):
+                        # Happens if there was a communication issue with the gateway when last (un)registering
+                        logger.warning(
+                            "Service %s/%s is dangling on gateway replica %s, unregistering and re-registering",
+                            run_model.project.name,
+                            run_model.run_name,
+                            conn.ip_address,
+                        )
+                        await client.unregister_service(
+                            project=run_model.project.name,
+                            run_name=run_model.run_name,
+                        )
+                        await do_register()
+                    else:
+                        raise
+        except SSHError:
+            raise ServerClientError("Gateway tunnel is not working")
+        except httpx.RequestError as e:
+            logger.debug("Gateway request failed", exc_info=True)
+            raise GatewayError(f"Gateway is not working: {e!r}")
 
     events.emit(
         session,

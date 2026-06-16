@@ -30,13 +30,15 @@ export const useColumnsDefinitions = ({ loading, projectName, onDeleteClick, onE
             {
                 id: 'type',
                 header: t('gateway.edit.backend'),
-                cell: (gateway: IGateway) => gateway.backend,
+                cell: (gateway: IGateway) =>
+                    gateway.replicas.length > 0 ? gateway.replicas.map((r, i) => <div key={i}>{r.backend}</div>) : null,
             },
 
             {
                 id: 'region',
                 header: t('gateway.edit.region'),
-                cell: (gateway: IGateway) => gateway.region,
+                cell: (gateway: IGateway) =>
+                    gateway.replicas.length > 0 ? gateway.replicas.map((r, i) => <div key={i}>{r.region}</div>) : null,
             },
 
             {
@@ -46,9 +48,13 @@ export const useColumnsDefinitions = ({ loading, projectName, onDeleteClick, onE
             },
 
             {
-                id: 'external_ip',
-                header: t('gateway.edit.external_ip'),
-                cell: (gateway: IGateway) => gateway.ip_address,
+                id: 'hostname',
+                header: t('gateway.edit.hostname'),
+                cell: (gateway: IGateway) => {
+                    if (gateway.hostname) return gateway.hostname;
+                    if (gateway.replicas.length > 0) return gateway.replicas.map((r, i) => <div key={i}>{r.hostname}</div>);
+                    return null;
+                },
             },
 
             {

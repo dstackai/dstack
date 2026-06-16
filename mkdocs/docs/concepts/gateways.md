@@ -182,6 +182,50 @@ domain: example.com
 
 </div>
 
+### Replicas
+
+A gateway can have multiple replicas for improved availability.
+
+<div editor-title="gateway.dstack.yml">
+
+```yaml
+type: gateway
+name: example-gateway
+
+backend: aws
+region: eu-west-1
+
+domain: example.com
+
+certificate: null
+replicas: 2
+```
+
+</div>
+
+To balance requests between gateway replicas, add DNS records for each replica or set up a load balancer outside of `dstack`. Replica hostnames are displayed in `dstack` CLI and UI.
+
+<div class="termy">
+
+```shell
+$ dstack gateway list
+ NAME             BACKEND          HOSTNAME        DOMAIN       DEFAULT  STATUS
+ example-gateway                                   example.com  ✓        running
+    replica=0     aws (eu-west-1)  34.244.128.46
+    replica=1     aws (eu-west-1)  18.201.201.174
+```
+
+</div>
+
+!!! warning "Experimental"
+    Replicated gateways are an experimental feature and currently have limitations:
+
+    - Changing the number of replicas or redeploying replicas is not supported.
+    - HTTPS is not supported. Use an external load balancer for TLS termination.
+    - An unavailable gateway replica prevents any new services or service replicas from being added.
+    - All replicas are bound to the same backend and region.
+    - At most 3 replicas are allowed per gateway.
+
 !!! info "Reference"
     For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).
 

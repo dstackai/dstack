@@ -638,7 +638,6 @@ async def create_gateway(
     name: str = "test_gateway",
     region: str = "us",
     wildcard_domain: Optional[str] = None,
-    gateway_compute_id: Optional[UUID] = None,
     status: Optional[GatewayStatus] = GatewayStatus.SUBMITTED,
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     forbid_new_services: bool = False,
@@ -649,7 +648,6 @@ async def create_gateway(
         name=name,
         region=region,
         wildcard_domain=wildcard_domain,
-        gateway_compute_id=gateway_compute_id,
         status=status,
         last_processed_at=last_processed_at,
         forbid_new_services=forbid_new_services,
@@ -661,6 +659,7 @@ async def create_gateway(
 
 async def create_gateway_compute(
     session: AsyncSession,
+    gateway_id: Optional[UUID] = None,
     backend_id: Optional[UUID] = None,
     ip_address: Optional[str] = "1.1.1.1",
     region: str = "us",
@@ -669,6 +668,7 @@ async def create_gateway_compute(
     ssh_public_key: str = "",
 ) -> GatewayComputeModel:
     gateway_compute = GatewayComputeModel(
+        gateway_id=gateway_id,
         backend_id=backend_id,
         ip_address=ip_address,
         region=region,

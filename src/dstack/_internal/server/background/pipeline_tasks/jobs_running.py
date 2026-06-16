@@ -76,7 +76,7 @@ from dstack._internal.server.services.backends.provisioning import (
     get_instance_specific_mounts,
     resolve_provisioning_image,
 )
-from dstack._internal.server.services.gateways import get_or_add_gateway_connection
+from dstack._internal.server.services.gateways import get_or_add_gateway_connections
 from dstack._internal.server.services.instances import (
     get_instance_remote_connection_info,
     get_instance_ssh_private_keys,
@@ -1185,7 +1185,7 @@ async def _register_service_replica(
         return None
 
     async with get_session_ctx() as session:
-        gateway_model, conn = await get_or_add_gateway_connection(
+        gateway_model, connections = await get_or_add_gateway_connections(
             session, context.run_model.gateway_id
         )
     gateway_target = events.Target.from_model(gateway_model)
@@ -1197,35 +1197,40 @@ async def _register_service_replica(
     # so we must update job_submission with the result value.
     job_submission = context.job_submission.copy(deep=True)
     job_submission.job_runtime_data = _get_result_job_runtime_data(context.job_model, result)
-    try:
-        logger.debug(
-            "%s: registering replica for service %s", fmt(context.job_model), context.run.id.hex
-        )
-        async with conn.client() as gateway_client:
-            await gateway_client.register_replica(
-                run=context.run,
-                job_spec=job_spec,
-                job_submission=job_submission,
-                instance_project_ssh_private_key=instance_project_ssh_private_key,
-                ssh_head_proxy=ssh_head_proxy,
-                ssh_head_proxy_private_key=ssh_head_proxy_private_key,
-            )
-    except (httpx.RequestError, SSHError) as e:
-        logger.debug("Gateway request failed", exc_info=True)
-        raise GatewayError(repr(e))
-    except GatewayError as e:
-        if "already exists in service" in e.msg:
-            logger.warning(
-                (
-                    "%s: could not register replica in gateway: %s."
-                    " NOTE: if you just updated dstack from pre-0.19.25 to 0.19.25+,"
-                    " expect to see this warning once for every running service replica"
-                ),
+    for conn in connections:
+        try:
+            logger.debug(
+                "%s: registering replica for service %s on gateway replica %s",
                 fmt(context.job_model),
-                e.msg,
+                context.run.id.hex,
+                conn.ip_address,
             )
-        else:
-            raise
+            async with conn.client() as gateway_client:
+                await gateway_client.register_replica(
+                    run=context.run,
+                    job_spec=job_spec,
+                    job_submission=job_submission,
+                    instance_project_ssh_private_key=instance_project_ssh_private_key,
+                    ssh_head_proxy=ssh_head_proxy,
+                    ssh_head_proxy_private_key=ssh_head_proxy_private_key,
+                )
+        except (httpx.RequestError, SSHError) as e:
+            logger.debug("Gateway request failed", exc_info=True)
+            raise GatewayError(repr(e))
+        except GatewayError as e:
+            if "already exists in service" in e.msg:
+                logger.warning(
+                    (
+                        "%s: could not register replica in gateway %s: %s."
+                        " NOTE: if you just updated dstack from pre-0.19.25 to 0.19.25+,"
+                        " expect to see this warning once for every running service replica"
+                    ),
+                    fmt(context.job_model),
+                    conn.ip_address,
+                    e.msg,
+                )
+            else:
+                raise
     return gateway_target
 
 

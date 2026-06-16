@@ -144,6 +144,7 @@
             "region_description": "Select a region",
             "default": "Default",
             "default_checkbox": "Turn on default",
+            "hostname": "Hostname",
             "external_ip": "External IP",
             "wildcard_domain": "Wildcard domain",
             "wildcard_domain_description": "Specify the wildcard domain mapped to the external IP.",

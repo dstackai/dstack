@@ -629,7 +629,21 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     gateway_compute_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateway_computes.id", ondelete="CASCADE")
     )
-    gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship()
+    gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship(
+        foreign_keys=[gateway_compute_id]
+    )
+    """
+    Relationship with gateway computes for pre-0.20.25 gateways.
+    Use `get_gateway_compute_models()` for version-agnostic gateway compute retrieval.
+    """
+    gateway_computes: Mapped[List["GatewayComputeModel"]] = relationship(
+        back_populates="gateway",
+        foreign_keys="GatewayComputeModel.gateway_id",
+    )
+    """
+    Relationship with gateway computes for 0.20.25+ gateways.
+    Use `get_gateway_compute_models()` for version-agnostic gateway compute retrieval.
+    """
 
     runs: Mapped[List["RunModel"]] = relationship(back_populates="gateway")
 
@@ -639,21 +653,48 @@ class GatewayModel(PipelineModelMixin, BaseModel):
 
 
 class GatewayComputeModel(BaseModel):
+    """A single gateway replica.
+    **TODO**: consider renaming to `GatewayReplicaModel`.
+    """
+
     __tablename__ = "gateway_computes"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    replica_num: Mapped[int] = mapped_column(Integer, server_default="0")
     instance_id: Mapped[str] = mapped_column(String(100))
     ip_address: Mapped[str] = mapped_column(String(100))
+    """Gateway replica IP address or domain name (e.g., k8s can use domain names).
+    **TODO**: rename.
+    """
     hostname: Mapped[Optional[str]] = mapped_column(String(100))
+    """Hostname of the gateway's load balancer.
+    **TODO**: move to `GatewayModel`.
+    """
     configuration: Mapped[Optional[str]] = mapped_column(Text)
     """`configuration` is optional for compatibility with pre-0.18.2 gateways.
     Use `get_gateway_compute_configuration` to construct `configuration` for old gateways.
     """
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[str] = mapped_column(String(100))
+
+    gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey(
+            "gateways.id",
+            ondelete="SET NULL",
+            use_alter=True,
+        )
+    )
+    gateway: Mapped[Optional["GatewayModel"]] = relationship(
+        back_populates="gateway_computes",
+        foreign_keys=[gateway_id],
+    )
+    """
+    Gateway. Can be None for pre-0.20.25 gateways, which use GatewayModel.gateway_compute_id to
+    establish the relationship.
+    """
 
     backend_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("backends.id", ondelete="CASCADE")

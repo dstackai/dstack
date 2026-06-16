@@ -95,15 +95,39 @@ def get_gateways_table(
                 # Ignore errors in case future server versions introduce more interpolation variables
                 exception_type=None,
             )
-        row = {
+
+        gateway_row = {
             "NAME": name,
-            "BACKEND": format_backend(gateway.configuration.backend, gateway.configuration.region),
-            "HOSTNAME": gateway.hostname,
             "DOMAIN": domain,
             "DEFAULT": "✓" if gateway.default else "",
             "STATUS": gateway.status,
             "CREATED": format_date(gateway.created_at),
             "ERROR": gateway.status_message,
         }
-        add_row_from_dict(table, row)
+        if gateway.hostname is not None:
+            gateway_row["HOSTNAME"] = gateway.hostname
+        if len(gateway.replicas) == 0:
+            # replicas not yet created, or it's a pre-0.20.25 server without replica support
+            gateway_row["BACKEND"] = format_backend(
+                gateway.configuration.backend, gateway.configuration.region
+            )
+            gateway_row["HOSTNAME"] = gateway_row.get("HOSTNAME", gateway.ip_address)
+        if len(gateway.replicas) == 1:
+            # compact display for single-replica gateway
+            gateway_row["BACKEND"] = format_backend(
+                gateway.replicas[0].backend, gateway.replicas[0].region
+            )
+            gateway_row["HOSTNAME"] = gateway_row.get("HOSTNAME", gateway.replicas[0].hostname)
+        add_row_from_dict(table, gateway_row)
+
+        if len(gateway.replicas) > 1:
+            for replica in gateway.replicas:
+                replica_row = {
+                    "NAME": f"   replica={replica.replica_num}",
+                    "BACKEND": format_backend(replica.backend, replica.region),
+                    "HOSTNAME": replica.hostname,
+                    "CREATED": format_date(replica.created_at),
+                }
+                add_row_from_dict(table, replica_row, style="secondary")
+
     return table

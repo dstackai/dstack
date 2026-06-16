@@ -41,5 +41,7 @@ def _get_gateway_configuration_excludes(
 
     if configuration.router is None:
         configuration_excludes["router"] = True
+    if configuration.replicas is None:
+        configuration_excludes["replicas"] = True
 
     return configuration_excludes
