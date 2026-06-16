@@ -165,6 +165,9 @@ If you're using a smaller DB instance, you may need to set lower `DSTACK_DB_POOL
        
        If you encounter errors, please [submit an issue](https://github.com/dstackai/dstack/issues/new/choose).
 
+> For a local setup running PostgreSQL and the [SSH proxy](#ssh-proxy) together, see the example
+> [`docker-compose.yml`](https://github.com/dstackai/dstack/blob/master/docker/server/docker-compose.yml).
+
 ## Logs storage
 
 By default, `dstack` stores workload logs locally in `~/.dstack/server/projects/<project_name>/logs`.
@@ -376,6 +379,9 @@ To deploy the SSH proxy, follow its [deployment guide](https://github.com/dstack
 * `DSTACK_SERVER_SSHPROXY_ADDRESS` – the address where users reach the SSH proxy, in the `HOSTNAME[:PORT]` form (`PORT` defaults to 22).
 
 <!-- TODO: once the Tenant isolation guide (#3913) is merged, document blocking host SSH access here (DSTACK_SERVER_SSHPROXY_ENFORCED) with a link to that guide. -->
+
+> For a local setup running [PostgreSQL](#postgresql) and the SSH proxy together, see the example
+> [`docker-compose.yml`](https://github.com/dstackai/dstack/blob/master/docker/server/docker-compose.yml).
 
 ## Encryption
 
