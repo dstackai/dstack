@@ -134,6 +134,10 @@ GATEWAY_CONNECT_ATTEMPTS = 30
 GATEWAY_CONNECT_DELAY = 10
 GATEWAY_CONFIGURE_ATTEMPTS = 50
 GATEWAY_CONFIGURE_DELAY = 3
+# Artificial limit to avoid doing too many per-replica operations (gateway replica provisioning,
+# service registration, etc) in a single pipeline tick. Can be lifted once the implementation is
+# more mature.
+GATEWAY_MAX_REPLICAS = 3  # documented in gateways.md, keep in sync
 
 
 async def list_project_gateways(
@@ -629,6 +633,8 @@ async def get_combined_gateway_stats(
     for conn in connections:
         stats = await conn.get_stats(project_name, run_name)
         if stats is None:  # Stats not fetched yet
+            # TODO: find a way to make service scaling decisions even if some gateway replicas are
+            # unavailable for fetching stats.
             return None
         per_replica.append(stats)
     return _merge_per_window_stats(per_replica) if per_replica else None
@@ -906,6 +912,11 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
     replicas = (
         configuration.replicas if configuration.replicas is not None else GATEWAY_REPLICAS_DEFAULT
     )
+
+    if replicas > GATEWAY_MAX_REPLICAS:
+        raise ServerClientError(
+            f"Cannot provision {replicas} gateway replicas. This server allows at most {GATEWAY_MAX_REPLICAS}"
+        )
 
     if configuration.certificate is not None:
         if configuration.certificate.type == "lets-encrypt" and not configuration.public_ip:

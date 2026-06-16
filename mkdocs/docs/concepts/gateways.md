@@ -224,6 +224,7 @@ $ dstack gateway list
     - HTTPS is not supported. Use an external load balancer for TLS termination.
     - An unavailable gateway replica prevents any new services or service replicas from being added.
     - All replicas are bound to the same backend and region.
+    - At most 3 replicas are allowed per gateway.
 
 !!! info "Reference"
     For all gateway configuration options, refer to the [reference](../reference/dstack.yml/gateway.md).

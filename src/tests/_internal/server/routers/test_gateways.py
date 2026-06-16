@@ -738,6 +738,18 @@ class TestCreateGateway:
                 "The deprecated `router` property is not supported for multi-replica gateways",
                 id="multi-replica-with-router",
             ),
+            pytest.param(
+                {
+                    "type": "gateway",
+                    "name": "test",
+                    "backend": "aws",
+                    "region": "us",
+                    "certificate": None,
+                    "replicas": 4,
+                },
+                "Cannot provision 4 gateway replicas. This server allows at most 3",
+                id="replicas-exceed-max",
+            ),
         ],
     )
     async def test_invalid_configuration_rejected(

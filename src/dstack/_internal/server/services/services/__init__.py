@@ -205,7 +205,7 @@ async def _register_service_in_gateway(
                     if e.msg == SERVICE_ALREADY_REGISTERED_ERROR_TEMPLATE.format(
                         ref=f"{run_model.project.name}/{run_model.run_name}"
                     ):
-                        # Happens if there was a communication issue with the gateway when last unregistering
+                        # Happens if there was a communication issue with the gateway when last (un)registering
                         logger.warning(
                             "Service %s/%s is dangling on gateway replica %s, unregistering and re-registering",
                             run_model.project.name,
