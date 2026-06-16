@@ -9,7 +9,6 @@ from sqlalchemy.orm import joinedload, load_only, selectinload
 
 from dstack._internal.core.backends.base.compute import ComputeWithGatewaySupport
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import GATEWAY_REPLICAS_DEFAULT, GatewayStatus
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
@@ -425,13 +424,11 @@ async def _process_provisioning_gateway(gateway_model: GatewayModel) -> _Provisi
     # Provisioning gateways must have compute.
     assert len(gateway_computes) > 0
 
-    # FIXME: problems caused by blocking on connect_to_gateway_with_retry and configure_gateway:
+    # TODO: do only one connection/configuration attempt per pipeline tick.
+    # Blocking on connect_to_gateway_with_retry and configure_gateway now has these cons:
     # - cannot delete the gateway before it is provisioned because the DB model is locked
     # - connection retry counter is reset on server restart
     # - only one server replica is processing the gateway
-    # Easy to fix by doing only one connection/configuration attempt per processing iteration. The
-    # main challenge is applying the same provisioning model to the dstack Sky gateway to avoid
-    # maintaining a different model for Sky.
 
     errors = await asyncio.gather(
         *(_connect_and_configure_gateway_replica(gateway_model, gc) for gc in gateway_computes)
@@ -580,7 +577,6 @@ class _ProcessToBeDeletedResult:
 
 
 async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _ProcessToBeDeletedResult:
-    assert gateway_model.backend.type != BackendType.DSTACK
     backend = await backends_services.get_project_backend_by_type_or_error(
         project=gateway_model.project, backend_type=gateway_model.backend.type
     )
