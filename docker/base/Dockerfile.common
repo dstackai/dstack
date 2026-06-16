@@ -34,7 +34,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && rm -f /etc/apt/sources.list.d/cuda.list \
     && sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config \
     && mkdir /run/sshd \
-    && mkdir ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys \
+    && mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys \
     && chmod 600 ~/.ssh/authorized_keys \
     && rm /etc/ssh/ssh_host_* \
     # User
