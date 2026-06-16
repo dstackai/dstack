@@ -16,7 +16,6 @@ ENV OMPI_MCA_btl_tcp_if_exclude=lo,docker0
 ENV NCCL_SOCKET_IFNAME=^docker,lo
 
 RUN export DEBIAN_FRONTEND=noninteractive \
-    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_VERSION}04/x86_64/3bf863cc.pub \
     && apt-get update --fix-missing \
     && apt-get upgrade -y \
     && ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime \
@@ -24,6 +23,12 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && dpkg-reconfigure --frontend noninteractive tzdata \
     && apt-get install -y bzip2 ca-certificates curl build-essential git libglib2.0-0 libsm6 libxext6 libxrender1 mercurial openssh-server subversion wget \
         libibverbs1 ibverbs-providers ibverbs-utils libibverbs-dev infiniband-diags \
+    # nvidia/cuda ships nvidia's apt singing key in legacy format (/etc/apt/trusted.gpg).
+    # This lead to warnings, so we install cuda-keyring.
+    && wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_VERSION}04/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb \
+    && rm cuda-keyring_1.1-1_all.deb \
+    && rm -f /etc/apt/sources.list.d/cuda.list \
     && sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config \
     && mkdir /run/sshd \
     && mkdir ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys \

@@ -11,7 +11,6 @@ ENV OPEN_MPI_PATH=/usr/lib/x86_64-linux-gnu/openmpi
 # Prerequisites
 
 RUN export DEBIAN_FRONTEND=noninteractive \
-    && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${UBUNTU_VERSION}04/x86_64/3bf863cc.pub \
     && apt-get update --fix-missing \
     && apt-get upgrade -y \
     && ln -fs /usr/share/zoneinfo/America/New_York /etc/localtime \
