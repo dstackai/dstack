@@ -297,7 +297,6 @@ async def create_gateway(
         return gateway_model_to_gateway(gateway, default_gateway_id=default_gateway.id)
 
 
-# NOTE: dstack Sky imports and uses this function
 async def connect_to_gateway_with_retry(
     gateway_compute: GatewayComputeModel,
 ) -> Optional[GatewayConnection]:
@@ -371,9 +370,6 @@ async def delete_gateways(
                 "Failed to delete gateways: gateways are being processed currently. Try again later."
             )
         for gateway_model in gateway_models:
-            if gateway_model.backend.type == BackendType.DSTACK:
-                raise ServerClientError("Cannot delete dstack Sky gateway")
-        for gateway_model in gateway_models:
             if not gateway_model.to_be_deleted:
                 gateway_model.to_be_deleted = True
                 events.emit(
@@ -397,8 +393,6 @@ async def set_gateway_wildcard_domain(
     ) as gateway:
         if gateway is None:
             raise ResourceNotExistsError()
-        if gateway.backend.type == BackendType.DSTACK:
-            raise ServerClientError("Custom domains for dstack Sky gateway are not supported")
         old_domain = gateway.wildcard_domain
         if old_domain != wildcard_domain:
             gateway.wildcard_domain = wildcard_domain
@@ -758,7 +752,6 @@ def _get_gateway_compute_router_config(
     return compute_config.router
 
 
-# NOTE: dstack Sky imports and uses this function
 async def configure_gateway(
     connection: GatewayConnection,
     attempts: int = GATEWAY_CONFIGURE_ATTEMPTS,
@@ -839,9 +832,6 @@ def gateway_model_to_gateway(
         default_gateway_id: ID of the default gateway in the project where `gateway_model` is being
             viewed. Can be different from `gateway_model.project` if the gateway is imported.
     """
-    backend_type = gateway_model.backend.type
-    if gateway_model.backend.type == BackendType.DSTACK:
-        backend_type = BackendType.AWS
     is_default = default_gateway_id == gateway_model.id
     configuration = get_gateway_configuration(gateway_model)
     configuration.default = is_default
@@ -867,7 +857,7 @@ def gateway_model_to_gateway(
         name=gateway_model.name,
         project_name=gateway_model.project.name,
         hostname=gateway_hostname,
-        backend=backend_type,
+        backend=gateway_model.backend.type,
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=is_default,

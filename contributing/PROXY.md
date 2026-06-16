@@ -127,7 +127,7 @@ There are also similar gateway-specific helper functions to obtain gateway-speci
 
 ## Gateway operations
 
-Gateway instances are managed by the `dstack` server. A gateway is associated with a project and some backend in the project. In `dstack` Sky, there is also a global gateway associated with all projects.
+Gateway instances are managed by the `dstack` server. A gateway is associated with a project and some backend in the project. Gateways can be shared between projects using Exports.
 
 ### Creation
 
