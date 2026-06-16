@@ -4,6 +4,9 @@ ARG UBUNTU_VERSION
 # Build stage
 FROM nvidia/cuda:12.8.1-base-ubuntu${UBUNTU_VERSION}.04 AS builder
 
+# ARGs before FROM must be redeclared
+ARG UBUNTU_VERSION
+
 ENV NCCL_HOME=/opt/nccl
 ENV CUDA_HOME=/usr/local/cuda
 ENV OPEN_MPI_PATH=/usr/lib/x86_64-linux-gnu/openmpi
