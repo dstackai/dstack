@@ -202,7 +202,7 @@ server = [
     "prometheus-client",
     "grpcio>=1.81.0",
     "protobuf>=6.33.5",
-    "smg-grpc-proto>=0.4.7",
+    "smg-grpc-proto==0.4.9", # Pin to avoid grpcio version mismatch when smg-grpc-proto bumps grpcio dependency https://github.com/dstackai/dstack/pull/3971
 ]
 aws = [
     "boto3>=1.38.13",
