@@ -80,9 +80,10 @@ class TestPatchGateway:
         assert gw.instance_id == ""
         assert gw.hostname == ""
 
-    def test_old_version_multi_replica_is_noop(self):
+    def test_old_version_multi_replica_concatenates_hostnames(self):
         replicas = [_make_gateway_replica("1.2.3.4"), _make_gateway_replica("5.6.7.8")]
         gw = _make_gateway(replicas=replicas)
         patch_gateway(gw, Version("0.20.24"))
-        assert gw.ip_address is None
-        assert gw.instance_id is None
+        assert gw.hostname == "1.2.3.4\n5.6.7.8"
+        assert gw.ip_address == "1.2.3.4\n5.6.7.8"
+        assert gw.instance_id == ""
