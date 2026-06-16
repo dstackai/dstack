@@ -200,7 +200,7 @@ server = [
     "asyncpg",
     "python-json-logger>=3.1.0",
     "prometheus-client",
-    "grpcio>=1.50",
+    "grpcio>=1.81.0",
     "protobuf>=6.33.5",
     "smg-grpc-proto>=0.4.7",
 ]
