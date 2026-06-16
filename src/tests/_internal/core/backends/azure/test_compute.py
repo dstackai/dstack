@@ -55,9 +55,18 @@ class TestVMImageVariant:
     @pytest.mark.parametrize(
         ["variant", "expected_name"],
         [
-            [VMImageVariant.GRID, f"dstack-grid-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"],
-            [VMImageVariant.CUDA, f"dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"],
-            [VMImageVariant.STANDARD, f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"],
+            [
+                VMImageVariant.GRID,
+                f"{settings.DSTACK_VM_BASE_IMAGE_PREFIX}dstack-grid-{settings.DSTACK_VM_BASE_IMAGE_VERSION}",
+            ],
+            [
+                VMImageVariant.CUDA,
+                f"{settings.DSTACK_VM_BASE_IMAGE_PREFIX}dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}",
+            ],
+            [
+                VMImageVariant.STANDARD,
+                f"{settings.DSTACK_VM_BASE_IMAGE_PREFIX}dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}",
+            ],
         ],
     )
     def test_get_image_name(self, variant: VMImageVariant, expected_name: str):

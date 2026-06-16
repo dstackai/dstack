@@ -442,14 +442,15 @@ class VMImageVariant(enum.Enum):
             return cls.STANDARD
 
     def get_image_name(self) -> str:
+        prefix = settings.DSTACK_VM_BASE_IMAGE_PREFIX
         if self is self.GRID:
-            return f"dstack-grid-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+            return f"{prefix}dstack-grid-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         elif self is self.CUDA:
-            return f"dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+            return f"{prefix}dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         elif self is self.CUDA_WITH_PROPRIETARY_KERNEL_MODULES:
             return f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
         elif self is self.STANDARD:
-            return f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+            return f"{prefix}dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         else:
             raise ValueError(f"Unexpected image variant {self!r}")
 
@@ -528,6 +529,13 @@ def _get_image_ref(
     location: str,
     variant: VMImageVariant,
 ) -> ImageReference:
+    if settings.DSTACK_VM_BASE_IMAGE_PREFIX:
+        # Staging images are not published to the community gallery, so reference directly.
+        image = compute_client.images.get(
+            resource_group_name="dstack-resources-westeurope",
+            image_name=variant.get_image_name(),
+        )
+        return ImageReference(id=image.id)
     image = compute_client.community_gallery_images.get(
         location=location,
         public_gallery_name="dstack-ebac134d-04b9-4c2b-8b6c-ad3e73904aa7",  # Gen2

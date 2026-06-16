@@ -1133,12 +1133,17 @@ def _get_image(instance_type_name: str, gpu_name: Optional[str]) -> GCPImage:
         )
     elif gpu_name is not None:
         if not requires_nvidia_proprietary_kernel_modules(gpu_name):
-            image_name = f"dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+            image_name = (
+                f"{settings.DSTACK_VM_BASE_IMAGE_PREFIX}"
+                f"dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+            )
         else:
             image_name = f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
         is_ufw_installed = True
     else:
-        image_name = f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+        image_name = (
+            f"{settings.DSTACK_VM_BASE_IMAGE_PREFIX}dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+        )
         is_ufw_installed = True
     image_name = image_name.replace(".", "-")
     return GCPImage(

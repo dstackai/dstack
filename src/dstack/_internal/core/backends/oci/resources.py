@@ -356,10 +356,11 @@ def terminate_instance_if_exists(client: oci.core.ComputeClient, instance_id: st
 def get_marketplace_listing_and_package(
     gpu_name: Optional[str], client: oci.marketplace.MarketplaceClient
 ) -> Tuple[oci.marketplace.models.Listing, oci.marketplace.models.ImageListingPackage]:
-    listing_name = f"dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+    prefix = settings.DSTACK_VM_BASE_IMAGE_PREFIX
+    listing_name = f"{prefix}dstack-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
     if gpu_name is not None:
         if not requires_nvidia_proprietary_kernel_modules(gpu_name):
-            listing_name = f"dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
+            listing_name = f"{prefix}dstack-cuda-{settings.DSTACK_VM_BASE_IMAGE_VERSION}"
         else:
             listing_name = f"dstack-cuda-{DSTACK_OS_IMAGE_WITH_PROPRIETARY_NVIDIA_KERNEL_MODULES}"
 
