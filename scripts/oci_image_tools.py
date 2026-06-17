@@ -121,7 +121,7 @@ class CheckCommandArgs:
         parser.set_defaults(to_struct=cls.from_namespace, run_command=check_command)
 
     @staticmethod
-    def from_namespace(args: Namespace) -> "PublishCommandArgs":
+    def from_namespace(args: Namespace) -> "CheckCommandArgs":
         return CheckCommandArgs(
             image_name=args.image_name,
             regions=args.regions or [],
