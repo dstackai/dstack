@@ -10,9 +10,9 @@ from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.background.scheduled_tasks.probes import (
     PROCESSING_OVERHEAD_TIMEOUT,
-    SSH_CONNECT_TIMEOUT,
     process_probes,
 )
+from dstack._internal.server.services.jobs.job_replica_tunnel import SSH_CONNECT_TIMEOUT
 from dstack._internal.server.testing.common import (
     create_instance,
     create_job,

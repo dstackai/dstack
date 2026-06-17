@@ -555,15 +555,7 @@ async def _get_worker(
     # Router workers list is empty and no connection_mode discovered.
     async with get_service_replica_tunnel(job_model) as uds_path:
         async with get_service_replica_http_client_over_uds(uds_path) as client:
-            try:
-                result = await _probe_http_worker(client, worker_url=http_worker_url)
-            except RemoteProtocolError as e:
-                logger.debug(
-                    "HTTP server_info probe failed for %s (trying gRPC): %r",
-                    http_worker_url,
-                    e,
-                )
-                result = {"status": "not_ready", "worker": None}
+            result = await _probe_http_worker(client, worker_url=http_worker_url)
         if result["status"] == "ready":
             return result
         async with get_service_replica_grpc_channel_over_uds(uds_path) as channel:
