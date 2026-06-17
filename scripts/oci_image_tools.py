@@ -3,8 +3,8 @@ import sys
 import time
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Dict, Iterable, List, Mapping
+from datetime import datetime, timedelta, timezone
+from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar
 
 import oci
 from oci.object_storage.models import Bucket
@@ -129,6 +129,128 @@ class CheckCommandArgs:
         )
 
 
+@dataclass
+class DeletePublicationsCommandArgs:
+    compartment_id: str
+    regions: List[str]
+    before: datetime
+    name_contains: Optional[str]
+    keep_latest: int
+    yes: bool
+
+    @classmethod
+    def setup_parser(cls, parser: ArgumentParser) -> None:
+        parser.add_argument("--compartment", dest="compartment_id", required=True)
+        parser.add_argument("--regions", metavar="REGION_NAME", nargs="*")
+        _add_cleanup_filter_arguments(parser)
+        parser.set_defaults(to_struct=cls.from_namespace, run_command=delete_publications_command)
+
+    @staticmethod
+    def from_namespace(args: Namespace) -> "DeletePublicationsCommandArgs":
+        return DeletePublicationsCommandArgs(
+            compartment_id=args.compartment_id,
+            regions=args.regions or [],
+            before=_parse_before(args.before),
+            name_contains=args.name_contains,
+            keep_latest=_validate_keep_latest(args.keep_latest),
+            yes=args.yes,
+        )
+
+
+@dataclass
+class DeleteImagesCommandArgs:
+    compartment_id: str
+    regions: List[str]
+    before: datetime
+    name_contains: Optional[str]
+    keep_latest: int
+    yes: bool
+
+    @classmethod
+    def setup_parser(cls, parser: ArgumentParser) -> None:
+        parser.add_argument("--compartment", dest="compartment_id", required=True)
+        parser.add_argument("--regions", metavar="REGION_NAME", nargs="*")
+        _add_cleanup_filter_arguments(parser)
+        parser.set_defaults(to_struct=cls.from_namespace, run_command=delete_images_command)
+
+    @staticmethod
+    def from_namespace(args: Namespace) -> "DeleteImagesCommandArgs":
+        return DeleteImagesCommandArgs(
+            compartment_id=args.compartment_id,
+            regions=args.regions or [],
+            before=_parse_before(args.before),
+            name_contains=args.name_contains,
+            keep_latest=_validate_keep_latest(args.keep_latest),
+            yes=args.yes,
+        )
+
+
+@dataclass
+class DeleteBucketsCommandArgs:
+    compartment_id: str
+    regions: List[str]
+    before: datetime
+    name_contains: Optional[str]
+    keep_latest: int
+    yes: bool
+
+    @classmethod
+    def setup_parser(cls, parser: ArgumentParser) -> None:
+        parser.add_argument("--compartment", dest="compartment_id", required=True)
+        parser.add_argument("--regions", metavar="REGION_NAME", nargs="*")
+        _add_cleanup_filter_arguments(parser)
+        parser.set_defaults(to_struct=cls.from_namespace, run_command=delete_buckets_command)
+
+    @staticmethod
+    def from_namespace(args: Namespace) -> "DeleteBucketsCommandArgs":
+        return DeleteBucketsCommandArgs(
+            compartment_id=args.compartment_id,
+            regions=args.regions or [],
+            before=_parse_before(args.before),
+            name_contains=args.name_contains,
+            keep_latest=_validate_keep_latest(args.keep_latest),
+            yes=args.yes,
+        )
+
+
+def _add_cleanup_filter_arguments(parser: ArgumentParser) -> None:
+    parser.add_argument(
+        "--before",
+        required=True,
+        metavar="YYYY-MM-DD",
+        help="Delete resources created strictly before this date (UTC)",
+    )
+    parser.add_argument(
+        "--name-contains",
+        help="Only consider resources whose name contains this substring (case-insensitive)",
+    )
+    parser.add_argument(
+        "--keep-latest",
+        type=int,
+        default=0,
+        help="Always keep this many newest matching resources per region, "
+        "regardless of --before (default: 0)",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Actually delete (default: preview only)",
+    )
+
+
+def _parse_before(value: str) -> datetime:
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise ScriptError(f"Invalid --before date {value!r}, expected YYYY-MM-DD")
+
+
+def _validate_keep_latest(value: int) -> int:
+    if value < 0:
+        raise ScriptError("--keep-latest must be >= 0")
+    return value
+
+
 def main() -> None:
     parser = ArgumentParser(description="Tools for delivering OCI images")
     subparsers = parser.add_subparsers()
@@ -161,7 +283,44 @@ def main() -> None:
     )
     CheckCommandArgs.setup_parser(check_parser)
 
+    delete_publications_parser = subparsers.add_parser(
+        name="delete-publications",
+        description=(
+            "Delete OCI Marketplace community publications (a.k.a. Community "
+            "Applications) older than a date to free up the marketplace quota. "
+            "Dry-run by default; pass --yes to actually delete. Run this before "
+            "delete-images, since an image cannot be deleted while a publication "
+            "still references it."
+        ),
+    )
+    DeletePublicationsCommandArgs.setup_parser(delete_publications_parser)
+
+    delete_images_parser = subparsers.add_parser(
+        name="delete-images",
+        description=(
+            "Delete Custom Images older than a date in the given compartment and "
+            "regions. Dry-run by default; pass --yes to actually delete."
+        ),
+    )
+    DeleteImagesCommandArgs.setup_parser(delete_images_parser)
+
+    delete_buckets_parser = subparsers.add_parser(
+        name="delete-buckets",
+        description=(
+            "Delete Object Storage buckets older than a date in the given compartment "
+            "and regions, along with their contents (objects, pre-authenticated "
+            "requests, in-progress uploads). The copy command creates a bucket named "
+            "after the image to transfer it between regions and normally deletes it; "
+            "use this to clean up buckets left over by interrupted copies. "
+            "Dry-run by default; pass --yes to actually delete."
+        ),
+    )
+    DeleteBucketsCommandArgs.setup_parser(delete_buckets_parser)
+
     args = parser.parse_args()
+    if not hasattr(args, "run_command"):
+        parser.print_help()
+        sys.exit(1)
     args.run_command(args.to_struct(args))
 
 
@@ -239,6 +398,176 @@ def check_command(args: CheckCommandArgs) -> None:
             "Check the review status by choosing the correct region and compartment here: "
             "https://cloud.oracle.com/marketplace/community-images"
         )
+
+
+def delete_publications_command(args: DeletePublicationsCommandArgs) -> None:
+    region_clients = get_region_clients(required_regions=args.regions)
+    regions_to_clean = args.regions or list(region_clients)
+    total_deleted = 0
+
+    for region in sorted(regions_to_clean):
+        client = region_clients[region].marketplace_client
+        publications = list_community_publications(args.compartment_id, client)
+        publications = _filter_by_name(publications, lambda p: p.name, args.name_contains)
+        keep, to_delete = _partition_for_deletion(
+            publications, lambda p: p.time_created, args.before, args.keep_latest
+        )
+        _report_selection(region, "publications", keep, to_delete, lambda p: (p.name, p.id))
+
+        if args.yes:
+            for publication in to_delete:
+                client.delete_publication(publication.id)
+                logging.info(
+                    "[%s] deleted publication %s (%s)", region, publication.name, publication.id
+                )
+                total_deleted += 1
+
+    _report_outcome(args.yes, "publications", total_deleted)
+
+
+def delete_images_command(args: DeleteImagesCommandArgs) -> None:
+    region_clients = get_region_clients(required_regions=args.regions)
+    regions_to_clean = args.regions or list(region_clients)
+    total_deleted = 0
+
+    for region in sorted(regions_to_clean):
+        client = region_clients[region].compute_client
+        images = list_compartment_images(args.compartment_id, client)
+        images = _filter_by_name(images, lambda i: i.display_name, args.name_contains)
+        keep, to_delete = _partition_for_deletion(
+            images, lambda i: i.time_created, args.before, args.keep_latest
+        )
+        _report_selection(region, "images", keep, to_delete, lambda i: (i.display_name, i.id))
+
+        if args.yes:
+            for image in to_delete:
+                client.delete_image(image.id)
+                logging.info("[%s] deleted image %s (%s)", region, image.display_name, image.id)
+                total_deleted += 1
+
+    _report_outcome(args.yes, "images", total_deleted)
+
+
+def delete_buckets_command(args: DeleteBucketsCommandArgs) -> None:
+    region_clients = get_region_clients(required_regions=args.regions)
+    regions_to_clean = args.regions or list(region_clients)
+    total_deleted = 0
+
+    for region in sorted(regions_to_clean):
+        client = region_clients[region].object_storage_client
+        namespace: str = client.get_namespace().data
+        buckets = list_compartment_buckets(namespace, args.compartment_id, client)
+        buckets = _filter_by_name(buckets, lambda b: b.name, args.name_contains)
+        keep, to_delete = _partition_for_deletion(
+            buckets, lambda b: b.time_created, args.before, args.keep_latest
+        )
+        _report_selection(region, "buckets", keep, to_delete, lambda b: (b.name, namespace))
+
+        if args.yes:
+            for bucket in to_delete:
+                resources.delete_bucket(namespace, bucket.name, client)
+                logging.info("[%s] deleted bucket %s", region, bucket.name)
+                total_deleted += 1
+
+    _report_outcome(args.yes, "buckets", total_deleted)
+
+
+def list_community_publications(
+    compartment_id: str, client: oci.marketplace.MarketplaceClient
+) -> List[oci.marketplace.models.PublicationSummary]:
+    """
+    List community publications (a.k.a. "Community Applications") created in
+    `compartment_id`. These are the publisher-side counterparts of marketplace
+    listings and count against the marketplace "Community Applications" quota.
+    """
+    return list(
+        resources.chain_paginated_responses(
+            client.list_publications,
+            compartment_id=compartment_id,
+            listing_type=oci.marketplace.models.PublicationSummary.LISTING_TYPE_COMMUNITY,
+        )
+    )
+
+
+def list_compartment_images(
+    compartment_id: str, client: oci.core.ComputeClient
+) -> List[oci.core.models.Image]:
+    """
+    List Custom Images owned by `compartment_id`. `list_images` also returns
+    Oracle platform images (with no compartment), which must never be deleted,
+    so they are filtered out here.
+    """
+    images = resources.chain_paginated_responses(client.list_images, compartment_id=compartment_id)
+    return [image for image in images if image.compartment_id == compartment_id]
+
+
+def list_compartment_buckets(
+    namespace: str, compartment_id: str, client: oci.object_storage.ObjectStorageClient
+) -> List[oci.object_storage.models.BucketSummary]:
+    return list(
+        resources.chain_paginated_responses(
+            client.list_buckets, namespace_name=namespace, compartment_id=compartment_id
+        )
+    )
+
+
+T = TypeVar("T")
+
+
+def _filter_by_name(
+    items: Iterable[T], get_name: Callable[[T], str], name_contains: Optional[str]
+) -> List[T]:
+    if not name_contains:
+        return list(items)
+    needle = name_contains.lower()
+    return [item for item in items if needle in get_name(item).lower()]
+
+
+def _partition_for_deletion(
+    items: Iterable[T],
+    get_time: Callable[[T], datetime],
+    before: datetime,
+    keep_latest: int,
+) -> Tuple[List[T], List[T]]:
+    # Sort newest first so --keep-latest preserves the most recent resources.
+    ordered = sorted(items, key=get_time, reverse=True)
+    keep, to_delete = [], []
+    for index, item in enumerate(ordered):
+        if index < keep_latest or get_time(item) >= before:
+            keep.append(item)
+        else:
+            to_delete.append(item)
+    return keep, to_delete
+
+
+def _report_selection(
+    region: str,
+    kind: str,
+    keep: Sequence[T],
+    to_delete: Sequence[T],
+    describe: Callable[[T], Tuple[str, str]],
+) -> None:
+    logging.info(
+        "[%s] %d matching %s: %d to delete, %d to keep",
+        region,
+        len(keep) + len(to_delete),
+        kind,
+        len(to_delete),
+        len(keep),
+    )
+    for item in keep:
+        name, ocid = describe(item)
+        logging.info("[%s]   KEEP   %s (%s)", region, name, ocid)
+    for item in to_delete:
+        name, ocid = describe(item)
+        logging.info("[%s]   DELETE %s (%s)", region, name, ocid)
+
+
+def _report_outcome(deleted_for_real: bool, kind: str, total_deleted: int) -> None:
+    if not deleted_for_real:
+        logging.info("Preview only. Re-run with --yes to delete the %s.", kind)
+    else:
+        logging.info("Deleted %d %s.", total_deleted, kind)
 
 
 def get_region_clients(
