@@ -11,7 +11,6 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal import settings
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction, EntityReference
@@ -152,7 +151,7 @@ def get_dev_env_run_plan_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = f"dstackai/base:{settings.DSTACK_DOCKER_BASE_IMAGE_VERSION}-base-ubuntu{settings.DSTACK_DOCKER_BASE_IMAGE_UBUNTU_VERSION}"
+        image_name = "dstackai/base:0.14-base-ubuntu24.04"
 
     run_spec = {
         "configuration": {
@@ -390,7 +389,7 @@ def get_dev_env_run_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.13-base-ubuntu22.04"
+        image_name = "dstackai/base:0.14-base-ubuntu24.04"
 
     return {
         "id": run_id,

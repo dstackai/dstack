@@ -124,6 +124,7 @@ class DeleteAmisCommandArgs:
     regions: List[str]
     before: datetime
     name_prefix: str
+    name_contains: Optional[str]
     keep_latest: int
     yes: bool
 
@@ -145,6 +146,11 @@ class DeleteAmisCommandArgs:
             "--name-prefix",
             default=DEFAULT_NAME_PREFIX,
             help=f"Only consider AMIs whose name starts with this (default: {DEFAULT_NAME_PREFIX!r})",
+        )
+        parser.add_argument(
+            "--name-contains",
+            help="Further restrict to AMIs whose name contains this substring "
+            "(case-insensitive), e.g. a version like 0.18",
         )
         parser.add_argument(
             "--keep-latest",
@@ -172,6 +178,7 @@ class DeleteAmisCommandArgs:
             regions=args.regions or list(PROD_REGIONS),
             before=before,
             name_prefix=args.name_prefix,
+            name_contains=args.name_contains,
             keep_latest=args.keep_latest,
             yes=args.yes,
         )
@@ -312,7 +319,7 @@ def delete_amis_command(args: DeleteAmisCommandArgs) -> None:
     total_deleted = 0
     for region in args.regions:
         ec2 = boto3.client("ec2", region_name=region)
-        images = _find_self_owned_images(ec2, args.name_prefix)
+        images = _find_self_owned_images(ec2, args.name_prefix, args.name_contains)
         # Sort newest first so --keep-latest preserves the most recent images.
         images.sort(key=lambda img: img["_created"], reverse=True)
 
@@ -359,12 +366,15 @@ def delete_amis_command(args: DeleteAmisCommandArgs) -> None:
         logger.info("Deleted %d AMIs.", total_deleted)
 
 
-def _find_self_owned_images(ec2, name_prefix: str) -> List[dict]:
+def _find_self_owned_images(ec2, name_prefix: str, name_contains: Optional[str]) -> List[dict]:
     resp = ec2.describe_images(
         Owners=["self"],
         Filters=[{"Name": "name", "Values": [f"{name_prefix}*"]}],
     )
     images = resp["Images"]
+    if name_contains:
+        needle = name_contains.lower()
+        images = [img for img in images if needle in img["Name"].lower()]
     for image in images:
         image["_created"] = datetime.strptime(
             image["CreationDate"], "%Y-%m-%dT%H:%M:%S.%fZ"
