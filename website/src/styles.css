@@ -867,35 +867,105 @@ p {
   );
 }
 
-.footer-inner {
+.footer-content {
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 24px;
-  align-items: center;
-  min-height: 88px;
+  padding-top: 48px;
   font-size: 13px;
 }
 
-.footer-left,
-.footer-inner nav {
+/* Top row: brand block (logo + social) on the left, the link group flush to the
+   right edge (justify-content on this outer row), so the columns themselves keep a
+   tight content width + fixed gap rather than being stretched apart. */
+.footer-top {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 48px;
+  padding-bottom: 32px;
 }
 
-.footer-left {
-  gap: 10px;
+.footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   min-width: 0;
 }
 
-.footer-theme-toggle svg {
-  transform: translateY(-0.5px);
+/* Link columns: each sized to its content, separated by a fixed gap. */
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px 72px;
 }
 
-.footer-inner nav {
-  justify-content: flex-end;
-  gap: 28px;
+.footer-brand__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: var(--cs-text);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none !important;
+}
+
+.footer-brand__logo img {
+  width: 28px;
+  height: 28px;
+}
+
+.footer-brand__logo span {
+  font-family: 'Geist Pixel Square', var(--font-base);
+  font-weight: 700;
+  font-size: 25px;
+}
+
+.footer-social {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.footer-social__link {
+  display: inline-flex;
+  color: var(--cs-text) !important;
+  text-decoration: none !important;
+}
+
+.footer-social__link svg {
+  display: block;
+}
+
+/* Column captions: match the top-menu link size (16px); links sit a step below. */
+.footer-col__heading {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cs-text);
+}
+
+/* Bottom bar: theme toggle + copyright, separated from the columns by a divider. */
+.footer-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 64px;
+  border-top: 1px solid var(--cs-border);
+}
+
+/* Drop the icon button's horizontal padding so the glyph sits flush-left, aligned
+   with the logo/social icons above it; nudge it up to sit on the copyright baseline. */
+.footer-theme-toggle {
+  padding-inline: 0 !important;
+}
+
+.footer-theme-toggle svg {
+  transform: translateY(-1.5px);
 }
 
 .footer-copyright {
@@ -918,20 +988,58 @@ p {
   text-decoration-thickness: 2px !important;
 }
 
-/* Footer legal links: same color as the header nav links, underline on hover only. */
-.site-footer nav a {
+/* Footer column links: full-strength text, 14px, no underline until hover. */
+.footer-links a {
   color: var(--cs-text) !important;
+  font-size: 14px;
   text-decoration-line: none !important;
 }
 
-.site-footer nav a:hover {
+.footer-links a:hover {
   text-decoration-line: underline !important;
+}
+
+/* The brand logo and social icons are <a>s inside .site-footer, so the global
+   footer-link underline rule applies to them — override it (higher specificity). */
+.site-footer .footer-brand__logo,
+.site-footer .footer-social__link {
+  text-decoration: none !important;
+}
+
+/* On home the divider would sit on the gradient band; soften it so the footer
+   keeps blending into the colored band above. */
+.site-footer--home .footer-bar {
+  border-top-color: transparent;
 }
 
 .home-stack p a,
 .docs-article p a {
   font-size: inherit !important;
   line-height: inherit !important;
+}
+
+/* Footer responsive: below the desktop width the brand stacks above the columns,
+   which stay a single row while they still fit. */
+@media (max-width: 1100px) {
+  .footer-top {
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .footer-links {
+    width: 100%;
+    gap: 28px 56px;
+  }
+}
+
+/* Phones: four columns no longer fit in one row, and three would orphan the fourth,
+   so drop to a clean two-up grid. */
+@media (max-width: 720px) {
+  .footer-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 32px;
+  }
 }
 
 @media (max-width: 1100px) {
@@ -1112,24 +1220,16 @@ p {
     width: 100%;
   }
 
-  .footer-inner {
-    gap: 16px;
-    grid-template-columns: 1fr;
-    padding: 20px 0;
+  .footer-content {
+    padding-top: 32px;
   }
 
-  .footer-copyright {
-    grid-column: auto;
-    text-align: left;
+  .footer-top {
+    padding-bottom: 24px;
   }
 
-  .footer-left,
-  .footer-inner nav {
-    justify-content: flex-start;
-  }
-
-  .footer-inner nav {
+  .footer-bar {
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 12px;
   }
 }
