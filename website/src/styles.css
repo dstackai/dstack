@@ -23,7 +23,7 @@
   --cs-link: #0972d3;
   --cs-border: #16191f;
   --cs-panel: #f4f4f7;
-  --cs-hover: rgba(22, 25, 31, 0.035); /* faint, light hover tint for cards */
+  --cs-hover: rgba(22, 25, 31, 0.05); /* shared faint hover tint: normal buttons, cards, dropdown items */
   --cs-btn-hover: #272d38; /* filled (primary) button hover fill — shared with the split-button override */
   --cs-seg-divider: rgba(255, 255, 255, 0.22); /* split-button segment divider (light line on the dark fill) */
   --cs-dark: #0f141d;
@@ -56,7 +56,7 @@
   --cs-link: #58a6ff;
   --cs-border: #f2f3f3;
   --cs-panel: #1b212d;
-  --cs-hover: rgba(242, 243, 243, 0.06);
+  --cs-hover: rgba(242, 243, 243, 0.085);
   --cs-btn-hover: #e2e5e8;
   --cs-seg-divider: rgba(0, 0, 0, 0.18); /* split-button segment divider (dark line on the light fill) */
   --hero-gradient: linear-gradient(
@@ -203,7 +203,10 @@ p {
   align-items: center;
   gap: 0.25rem;
   min-height: 42px;
-  padding: 10px 16px;
+  /* No horizontal padding: borderless text items are spaced purely by the nav's
+     SpaceBetween gap, so the whitespace to a neighboring text item matches the whitespace
+     to a bordered button (whose padding sits inside its border) — giving uniform gaps. */
+  padding: 10px 0;
   border-radius: 21px;
   color: var(--cs-text);
   font-weight: 700;
@@ -226,6 +229,31 @@ p {
 
 .site-menu-button.active {
   border: 2px solid #879596;
+}
+
+/* "Resources" top-nav dropdown (ResourcesHoverMenu): make the ButtonDropdown trigger read
+   like the plain text menu links (.site-menu-link) — no border/background, bold 16px label,
+   underline on hover — rather than the bordered "normal" button look. */
+.site-menu-dropdown-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+.site-menu-dropdown [class*='awsui_button'] {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--cs-text) !important;
+  font-size: 16px !important; /* match the .site-menu-link items (e.g. Documentation) */
+  font-weight: 700 !important;
+  padding: 10px 0 !important; /* no horizontal padding — matches the text links */
+}
+.site-menu-dropdown [class*='awsui_button']:hover {
+  background: transparent !important;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+/* The menu opens on hover, so the dropdown caret is redundant — hide it. */
+.site-menu-dropdown [class*='awsui_button'] [class*='awsui_icon'] {
+  display: none !important;
 }
 
 .home-hero {
@@ -998,10 +1026,13 @@ p {
   text-decoration-thickness: 2px !important;
 }
 
-/* Footer column links: full-strength text, 14px, no underline until hover. */
+/* Footer column links: full-strength text, same 16px as the column headings, no underline
+   until hover. */
 .footer-links a {
   color: var(--cs-text) !important;
-  font-size: 14px;
+  /* Cloudscape <Link> sets 14px via its boosted awsui_font-size-body-m class, so override
+     with !important to match the 16px column headings. */
+  font-size: 16px !important;
   text-decoration-line: none !important;
 }
 

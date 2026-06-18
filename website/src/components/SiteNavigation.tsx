@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Button from '@cloudscape-design/components/button';
 import ButtonDropdown, { ButtonDropdownProps } from '@cloudscape-design/components/button-dropdown';
@@ -11,12 +11,71 @@ import { BLOG_URL, DOCS_URL, ROUTES, docsUrl } from '../routes';
 const dstackGithubUrl = 'https://github.com/dstackai/dstack';
 const externalIconAriaLabel = 'External link icon';
 
-// Primary links in the desktop top navigation. Documentation and Blog are served by
-// MkDocs on the same origin, so they are plain links (full-page navigations).
+// Primary links in the desktop top navigation (plain same-origin MkDocs links).
 const audienceNavItems: Array<{ label: string; href: string }> = [
   { label: 'Documentation', href: DOCS_URL },
-  { label: 'Blog', href: BLOG_URL },
 ];
+
+// "Resources" top-nav dropdown: the blog landing plus its two main categories (all
+// same-origin MkDocs pages).
+const resourcesDropdownItems: ButtonDropdownProps.Items = [
+  {
+    id: 'case-studies',
+    text: 'Case studies',
+    secondaryText: 'How AI teams run training and inference with dstack.',
+    href: `${BLOG_URL}/case-studies/`,
+  },
+  {
+    id: 'benchmarks',
+    text: 'Benchmarks',
+    secondaryText: 'Comparing hardware, inference engines, and deployment setups for AI.',
+    href: `${BLOG_URL}/benchmarks/`,
+  },
+  {
+    id: 'blog',
+    text: 'Blog',
+    secondaryText: 'Major releases, industry reports, and product updates.',
+    href: BLOG_URL,
+  },
+];
+
+// "Resources" dropdown that opens on hover and stays open while the cursor is over the
+// trigger OR the popup (the popup renders inside this wrapper, so hovering it still counts as
+// hovering the wrapper). Cloudscape's ButtonDropdown is click-only, so we open/close it by
+// reading aria-expanded and synthesizing a click on the trigger — click and keyboard keep
+// working unchanged. A short close delay bridges the gap between trigger and popup so moving
+// the cursor across it doesn't dismiss the menu. Desktop top-nav only (mobile uses SideNavigation).
+function ResourcesHoverMenu() {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<number | undefined>(undefined);
+
+  const trigger = () => wrapRef.current?.querySelector('button') ?? null;
+  const isOpen = () => trigger()?.getAttribute('aria-expanded') === 'true';
+  const cancelClose = () => {
+    if (closeTimer.current !== undefined) {
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = undefined;
+    }
+  };
+  const openNow = () => {
+    cancelClose();
+    if (!isOpen()) trigger()?.click();
+  };
+  const closeSoon = () => {
+    cancelClose();
+    closeTimer.current = window.setTimeout(() => {
+      if (isOpen()) trigger()?.click();
+    }, 140);
+  };
+
+  return (
+    <div ref={wrapRef} className="site-menu-dropdown-wrap" onMouseEnter={openNow} onMouseLeave={closeSoon}>
+      <ButtonDropdown className="site-menu-dropdown" items={resourcesDropdownItems} ariaLabel="Resources menu">
+        Resources
+      </ButtonDropdown>
+    </div>
+  );
+}
 
 // "Get started" dropdown items. secondaryText is shown under each label.
 const productDropdownItems: ButtonDropdownProps.Items = [
@@ -39,7 +98,18 @@ const productDropdownItems: ButtonDropdownProps.Items = [
 // Items for the mobile slide-out navigation.
 const mobileNavigationItems: SideNavigationProps.Item[] = [
   { type: 'link', text: 'Documentation', href: DOCS_URL },
-  { type: 'link', text: 'Blog', href: BLOG_URL },
+  // The desktop "Resources" dropdown becomes an expandable section on mobile (SideNavigation
+  // has no popups), matching the "Get started" section pattern below.
+  {
+    type: 'section',
+    text: 'Resources',
+    defaultExpanded: true,
+    items: [
+      { type: 'link', text: 'Case studies', href: `${BLOG_URL}/case-studies/` },
+      { type: 'link', text: 'Benchmarks', href: `${BLOG_URL}/benchmarks/` },
+      { type: 'link', text: 'Blog', href: BLOG_URL },
+    ],
+  },
   { type: 'link', text: 'GitHub', href: dstackGithubUrl, external: true, externalIconAriaLabel },
   {
     type: 'section',
@@ -118,12 +188,15 @@ export function SiteNavigation({
           <span>dstack</span>
         </button>
         <nav className="site-menu" aria-label="Global">
-          <SpaceBetween direction="horizontal" size="s" alignItems="center">
+          <SpaceBetween direction="horizontal" size="l" alignItems="center">
             {audienceNavItems.map(item => (
               <a key={item.label} className="site-menu-link" href={item.href}>
                 {item.label}
               </a>
             ))}
+            {/* Resources dropdown (Case studies / Benchmarks / Blog), styled to read like the
+               plain text menu links above; opens on hover. */}
+            <ResourcesHoverMenu />
             <Button
               href={dstackGithubUrl}
               target="_blank"

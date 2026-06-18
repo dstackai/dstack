@@ -77,7 +77,8 @@ body {
   border-inline: 0 !important;
 }
 
-/* 5) "Get started" dropdown popup (portaled to <body>, so targeted by stable prefix).
+/* 5) Dropdown menu popups (the "Get started" and "Resources" menus). Targeted by stable
+      class prefix so the rules apply wherever the popup renders.
    a) Fixed width, flat (no drop-shadow), and a single uniform 0.5px border on all four
       sides. By default Cloudscape draws top/bottom on the wrapper (1px) and left/right on
       a ::after — so we set the wrapper border ourselves and drop the ::after layer. */
@@ -89,10 +90,11 @@ body {
 [class*='awsui_dropdown-content-wrapper']::after {
   border: 0 !important;
 }
-/* b) Group headers ("Products" / "Login"): same weight as item labels (600), but muted
-      color so the groups read as quiet labels. */
+/* b) Group headers ("Products" / "Login"): same weight (600) and size (16px) as the item
+      labels, but muted color so the groups read as quiet labels. */
 [class*='awsui_header_16mm3'] {
   font-weight: 600 !important;
+  font-size: 16px !important;
   color: var(--cs-muted) !important;
   padding-inline: 16px !important;
 }
@@ -103,15 +105,41 @@ body {
 }
 [class*='awsui_menu-item'] [class*='awsui_main-row'] {
   font-weight: 600;
+  font-size: 15px; /* (Cloudscape's default popup label is 14px) */
 }
 /* The hovered item still picked up a border in dark mode (the token override didn't hold
    there), so force it off on the highlighted item itself (the cue is the bg tint). */
 [class*='awsui_item-element'][class*='awsui_highlighted'] {
   border-color: transparent !important;
 }
-/* Keep the description muted at all times — Cloudscape brightens it on highlight. */
+/* Keep the description muted at all times — Cloudscape brightens it on highlight. A hair of
+   separation (1.5px) from the bold label above so the two lines don't read as one block. */
 [class*='awsui_secondary-text'] {
   color: var(--cs-muted) !important;
+  margin-block-start: 1.5px;
+}
+/* A little breathing room at the top and bottom of the popup (inside the border). Placed on
+   the first/last rows rather than on the list itself, so a hovered first/last item's
+   background fills that space instead of leaving a thin un-highlighted strip against the
+   border (the hover tint is painted on the item-element, which is what carries the padding). */
+[class*='awsui_options-list'] {
+  padding-block: 0 !important;
+  /* Cloudscape pulls the list 1px into the wrapper border (decrease-block-margin) to overlap
+     its default 1px divider. With our single hairline border that just lets a hovered
+     first/last item's fill paint over the border (most visible in dark mode) — so sit the
+     list flush inside the border instead. */
+  margin-block: 0 !important;
+}
+[class*='awsui_options-list'] > :first-child {
+  padding-block-start: 6px !important;
+}
+/* Last item — flat list (ButtonDropdown without groups, e.g. the Resources menu). */
+[class*='awsui_options-list'] > [class*='awsui_item-element']:last-child {
+  padding-block-end: 6px !important;
+}
+/* Last item — grouped list: the last item inside the last category (e.g. "Get started"). */
+[class*='awsui_options-list'] > [class*='awsui_category']:last-child [class*='awsui_item-element']:last-child {
+  padding-block-end: 6px !important;
 }
 /* d) Push the external-link icon to the right edge of the item. It's rendered inline at
       the end of the label, so make the label row fill the width and flex the icon out.

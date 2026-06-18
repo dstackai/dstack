@@ -11,9 +11,9 @@ import type { ButtonProps } from '@cloudscape-design/components/button';
 const TEXT = { light: '#16191f', dark: '#f2f3f3' }; // body text color
 const SURFACE = { light: '#ffffff', dark: '#0f141d' }; // page background — used as the label color on filled buttons
 // Hover states, light + theme-aware: filled (primary) buttons shift to a slightly softer
-// shade; outlined (normal) buttons get a faint tint instead of a solid fill.
+// shade; outlined (normal) buttons, cards, and dropdown items all share one faint tint
+// (--cs-hover, defined per theme in styles.css) so every interactive surface hovers alike.
 const HOVER_FILL = 'var(--cs-btn-hover)'; // filled-button hover fill (defined per theme in styles.css; shared with the split-button override)
-const HOVER_TINT = { light: 'rgba(22, 25, 31, 0.05)', dark: 'rgba(242, 243, 243, 0.085)' };
 const FONT = 'var(--font-base)'; // single source of truth: the Geist stack defined in styles.css
 
 const tokens = {
@@ -84,8 +84,8 @@ const tokens = {
   // Normal (secondary) button: outlined, transparent by default; on hover/active a faint
   // tint (not a solid fill). Border + label stay the text color.
   colorBackgroundButtonNormalDefault: 'transparent',
-  colorBackgroundButtonNormalHover: HOVER_TINT,
-  colorBackgroundButtonNormalActive: HOVER_TINT,
+  colorBackgroundButtonNormalHover: 'var(--cs-hover)',
+  colorBackgroundButtonNormalActive: 'var(--cs-hover)',
   colorBorderButtonNormalDefault: TEXT,
   colorBorderButtonNormalHover: TEXT,
   colorBorderButtonNormalActive: TEXT,
