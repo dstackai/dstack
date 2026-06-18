@@ -1,4 +1,7 @@
-name: Build & Deploy Docs
+name: Build & Deploy Site
+
+# Builds the full site (React landing + MkDocs docs + blog, see build-docs.yml) and
+# cross-repo deploys it to the GitHub Pages repo serving dstack.ai.
 
 on:
   workflow_dispatch:
