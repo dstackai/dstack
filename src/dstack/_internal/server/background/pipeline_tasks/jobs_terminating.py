@@ -530,6 +530,8 @@ async def _apply_process_result(
                 )
 
         if result.volume_update_rows:
+            # Safe to update volumes without lock as long as no other pipeline/task
+            # updates active attached volumes and/or the races are accepted.
             await session.execute(update(VolumeModel), result.volume_update_rows)
 
         if result.detached_volume_ids and instance_model is not None:
