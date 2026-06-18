@@ -55,13 +55,21 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
   },
 ];
 
-// Global top navigation.
-export function SiteNavigation() {
+// Global top navigation. On the Old page it also renders the trigger that toggles
+// that page's side navigation drawer (state owned by the App layout).
+export function SiteNavigation({
+  oldNavigationOpen,
+  onToggleOldNavigation,
+}: {
+  oldNavigationOpen: boolean;
+  onToggleOldNavigation: () => void;
+}) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
 
   const isHome = pathname === ROUTES.HOME;
+  const isOldPage = pathname === ROUTES.OLD;
 
   const go = (to: string) => {
     navigate(to);
@@ -87,6 +95,16 @@ export function SiteNavigation() {
   return (
     <header className={`site-nav ${isHome ? 'site-nav--home' : ''} ${mobileNavigationOpen ? 'site-nav--mobile-open' : ''}`}>
       <div className="site-nav__inner">
+        {isOldPage && (
+          <div className="site-desktop-trigger">
+            <Button
+              variant="icon"
+              iconName="menu"
+              ariaLabel={oldNavigationOpen ? 'Close desktop version of navigation' : 'Open desktop version of navigation'}
+              onClick={onToggleOldNavigation}
+            />
+          </div>
+        )}
         <div className="site-mobile-trigger">
           <Button
             variant="icon"

@@ -8,6 +8,10 @@ const SITE_BASE = (import.meta.env.VITE_DOCS_BASE ?? '').replace(/\/+$/, '');
 
 export const ROUTES = {
   HOME: '/',
+  // Kept as a template/reference for building future product pages. Reachable in dev
+  // (`npm run dev` at /old); not part of the integrated production deploy (where this app
+  // only owns `/` and MkDocs serves everything else).
+  OLD: '/old',
 } as const;
 
 export type Route = (typeof ROUTES)[keyof typeof ROUTES];
