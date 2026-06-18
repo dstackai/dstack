@@ -8,16 +8,46 @@
       name="description"
       content="dstack is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters."
     />
-    <!-- Favicon and social image are served by MkDocs at /assets/... on the same origin. -->
+    <link rel="canonical" href="https://dstack.ai/" />
+    <!-- Favicon is served by MkDocs at /assets/... on the same origin. -->
     <link rel="icon" href="/assets/images/dstack-fav-32.ico" />
+
+    <!-- Open Graph / Twitter. The social image is the card MkDocs' social plugin generates
+         for the home page (assets/images/social/index.png); absolute URLs are required by
+         social scrapers. -->
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://dstack.ai/" />
     <meta property="og:title" content="dstack — The orchestration stack for AI infrastructure" />
     <meta
       property="og:description"
       content="dstack is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters."
     />
-    <meta property="og:image" content="/assets/images/social/index.png" />
+    <meta property="og:image" content="https://dstack.ai/assets/images/social/index.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="dstack — The orchestration stack for AI infrastructure" />
+    <meta
+      name="twitter:description"
+      content="dstack is a unified control plane for GPU provisioning and orchestration that works with any GPU cloud, Kubernetes, or on-prem clusters."
+    />
+    <meta name="twitter:image" content="https://dstack.ai/assets/images/social/index.png" />
+
+    <!-- Google Analytics (GA4) — same property as the docs/blog (mkdocs.yml). Skipped on
+         localhost so local dev doesn't send hits to the production property. -->
+    <script>
+      if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=G-JX21114P7B';
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { dataLayer.push(arguments); };
+        gtag('js', new Date());
+        gtag('config', 'G-JX21114P7B');
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
