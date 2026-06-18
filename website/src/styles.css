@@ -1,0 +1,1135 @@
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/Geist-Variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Geist Pixel Square';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/GeistPixel-Square.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: light;
+  --cs-text: #16191f;
+  --font-base: Geist, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --cs-bg: #ffffff;
+  --cs-muted: #5f6b7a;
+  --cs-link: #0972d3;
+  --cs-border: #d5dbdb;
+  --cs-panel: #f4f4f7;
+  --cs-dark: #0f141d;
+  --nav-height: 4.875rem;
+  --frame: 80rem;
+  --page-gutter: clamp(1.5rem, 5.5vw, 5rem);
+  --section-gap: clamp(2.5rem, 4vw, 4rem);
+  --card-gap: 1.25rem;
+  --radius: 0.875rem;
+  --media-column: minmax(18rem, 40rem);
+  --doc-article-width: 49.5rem;
+  --doc-rail-width: 17.5rem;
+  --doc-right-gap: 2.5rem;
+  --doc-gap: var(--doc-right-gap);
+  --doc-main-width: calc(var(--doc-article-width) + var(--doc-right-gap) + var(--doc-rail-width));
+  --hero-gradient: linear-gradient(
+    145deg,
+    rgba(176, 65, 255, 0.38) 0%,
+    rgba(96, 106, 255, 0.33) 34%,
+    rgba(38, 59, 188, 0.06) 62%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --cs-text: #f2f3f3;
+  --cs-bg: #0f141d;
+  --cs-muted: #c6c6cd;
+  --cs-link: #58a6ff;
+  --cs-border: #414750;
+  --cs-panel: #1b212d;
+  --hero-gradient: linear-gradient(
+    145deg,
+    rgba(159, 98, 255, 0.2) 0%,
+    rgba(92, 105, 255, 0.13) 36%,
+    rgba(21, 36, 112, 0.12) 66%,
+    rgba(15, 20, 29, 0) 100%
+  );
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--cs-text);
+  background: var(--cs-bg, #ffffff);
+  font-family: var(--font-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Override Cloudscape's font-family design tokens (default Open Sans) so its components
+   render in Geist too. The monospace token is left untouched so code stays monospaced. */
+body.awsui-visual-refresh {
+  font-family: var(--font-base);
+  --font-family-base-gmnpzl: var(--font-base);
+  --font-family-display-a93nj0: var(--font-base);
+  --font-family-heading-ugphat: var(--font-base);
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+p {
+  line-height: 1.5;
+}
+
+.site-frame {
+  width: min(var(--frame), calc(100vw - (2 * var(--page-gutter))));
+  margin: 0 auto;
+}
+
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  height: var(--nav-height);
+  border-bottom: 1px solid var(--cs-border);
+  background: var(--cs-bg, #ffffff);
+}
+
+.site-nav--home {
+  border-bottom: 0;
+  background: transparent;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.site-nav::after {
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  content: '';
+  background: linear-gradient(90deg, #8f41ff 0 29%, #5668ff 29% 61%, #2d49d8 61% 78%, #102f80 78% 100%);
+}
+
+.site-nav--home::after {
+  display: none;
+}
+
+.site-nav__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 100%;
+  padding: 14px 24px;
+}
+
+.site-logo,
+.site-menu-button {
+  border: 0;
+  background: transparent;
+  color: var(--cs-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.site-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.site-logo img {
+  width: 28px;
+  height: 28px;
+}
+
+.site-logo span {
+  font-family: 'Geist Pixel Square', var(--font-base);
+  font-weight: 700;
+  font-size: 25px;
+}
+
+.site-menu {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.site-desktop-trigger {
+  flex: 0 0 auto;
+}
+
+.site-mobile-trigger,
+.site-mobile-spacer {
+  display: none;
+}
+
+.site-menu-button,
+.site-menu-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-radius: 21px;
+  color: var(--cs-text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-menu-button:hover,
+.site-menu-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* Keyboard focus only on the top-menu buttons. */
+.site-menu-button:focus-visible,
+.site-menu-link:focus-visible {
+  background: var(--color-background-button-link-hover-lhrs2u, #f0fbff);
+  color: var(--color-text-button-link-hover-kvrc36, #002b66);
+}
+
+.site-menu-button.active {
+  border: 2px solid #879596;
+}
+
+.home-hero {
+  position: relative;
+  overflow: visible;
+  background: var(--cs-bg);
+}
+
+.home-hero::before {
+  position: absolute;
+  top: calc(-1 * var(--nav-height));
+  right: 0;
+  bottom: -16rem;
+  left: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  background: var(--hero-gradient);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 46%, transparent 88%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 46%, transparent 88%);
+}
+
+.home-hero__content {
+  position: relative;
+  z-index: 1;
+  padding: 96px 0 64px;
+  color: var(--cs-text);
+}
+
+.home-hero h2 {
+  margin-top: 0;
+  max-width: 720px;
+  color: var(--cs-text);
+  font-size: 42px;
+  line-height: 1.16;
+  font-weight: 700;
+}
+
+.home-hero p {
+  margin-top: 16px;
+  max-width: 600px;
+}
+
+.home-hero__actions {
+  margin-top: 28px;
+}
+
+.home-hero__art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 1;
+}
+
+:root[data-theme='dark'] .home-hero__art {
+  opacity: 0.92;
+}
+
+/* Centered content frame for the art, so it aligns with the columns of the blocks below. */
+.home-hero__art-frame {
+  position: relative;
+  height: 100%;
+}
+
+/* Art occupies the second content column: right edge at the frame edge, width of one
+   column, so its left edge lines up with the second column of the blocks below. */
+.hero-slice {
+  position: absolute;
+  top: 68px;
+  right: 0;
+  width: calc((100% - var(--doc-gap)) / 2);
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hero-slice--dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .hero-slice--light {
+  display: none;
+}
+
+:root[data-theme='dark'] .hero-slice--dark {
+  display: block;
+}
+
+/* Lifted above the footer gradient so the content/cards stay clean while the gradient
+   shows through behind them. */
+.home-main {
+  position: relative;
+  z-index: 1;
+}
+
+.home-stack {
+  padding: 0 0 96px;
+}
+
+.home-with-rail .docs-body {
+  grid-template-columns:
+    minmax(0, calc(100% - var(--doc-right-gap) - var(--doc-rail-width)))
+    var(--doc-right-gap)
+    var(--doc-rail-width);
+}
+
+.home-with-rail .image-text-row,
+.home-with-rail .image-text-row:not(.image-first) {
+  grid-template-columns: minmax(16rem, 1fr) minmax(0, 1fr);
+  gap: var(--doc-gap);
+}
+
+.media-card h3,
+.doc-media-card h3 {
+  margin-bottom: 8px;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.image-text-row {
+  display: grid;
+  grid-template-columns: var(--media-column) minmax(0, 1fr);
+  gap: var(--section-gap);
+  align-items: center;
+  margin-top: 40px;
+}
+
+.image-text-row:not(.image-first) {
+  grid-template-columns: minmax(0, 1fr) var(--media-column);
+}
+
+.image-text-row.image-first .landing-image {
+  order: -1;
+}
+
+.docs-shell--old-page .image-text-row,
+.docs-shell--old-page .image-text-row:not(.image-first) {
+  grid-template-columns: minmax(14rem, 24rem) minmax(0, 1fr);
+  gap: var(--doc-gap);
+}
+
+.docs-shell--old-page .image-text-row:not(.image-first) {
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 24rem);
+}
+
+.landing-image {
+  width: 100%;
+  aspect-ratio: 876 / 528;
+  height: auto;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.landing-copy {
+  max-width: 604px;
+}
+
+.landing-copy h2,
+.overview-section h2,
+.start-building h2,
+.docs-section > h2 {
+  margin-bottom: 12px;
+  font-size: 28px;
+  line-height: 1.25;
+}
+
+/* "Get started" and "Trusted by" section headings: larger than the in-flow block
+   titles, closer to the hero size. */
+#resources > h2,
+#trusted-by > h2 {
+  margin-bottom: 32px;
+  font-size: 36px;
+}
+
+/* Extra breathing room before "Looking for more?" (the second block in this section). */
+#resources .doc-alternating + .doc-alternating {
+  margin-top: 105px;
+}
+
+/* Keep the lower sections flowing as one continuous sequence (no dividers between them). */
+#faq,
+#trusted-by {
+  border-bottom: 0;
+}
+
+/* FAQ question headers sized to match the testimonial names. */
+.faq-list [class*="awsui_header-text"] {
+  font-size: 18px;
+}
+
+.landing-copy p + p {
+  margin-top: 18px;
+}
+
+.overview-section {
+  margin-top: 56px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--card-gap);
+  margin-top: 20px;
+}
+
+.stat-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--card-gap);
+  align-items: center;
+  min-height: 160px;
+  padding: 24px 40px;
+  border-radius: 8px;
+  background: var(--cs-panel);
+}
+
+.stat-card span {
+  color: #3867ff;
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.stat-card p {
+  max-width: 14ch;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.core-features {
+  margin-top: 36px;
+}
+
+.core-features > h3 {
+  margin-bottom: 4px;
+  font-size: 20px;
+}
+
+.core-features > p {
+  max-width: 1230px;
+}
+
+.feature-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-top: 32px;
+}
+
+.media-card {
+  border: 1px solid var(--cs-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--cs-bg, #ffffff);
+}
+
+.media-card img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  background: #f3f5f9;
+}
+
+.media-card h3,
+.media-card p {
+  padding-inline: 20px;
+}
+
+.media-card h3 {
+  padding-top: 16px;
+}
+
+.media-card p {
+  padding-bottom: 22px;
+  font-size: 14px;
+}
+
+.start-building {
+  margin-top: 64px;
+  padding-top: 48px;
+  border-top: 1px solid var(--cs-border);
+}
+
+.start-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--card-gap);
+  margin-top: 20px;
+}
+
+.start-grid article {
+  min-height: 152px;
+  padding: 24px 20px;
+  border: 1px solid var(--cs-border);
+  border-radius: 12px;
+}
+
+.start-grid h3 {
+  margin-bottom: 18px;
+  font-size: 20px;
+}
+
+.start-grid p {
+  font-size: 14px;
+}
+
+.docs-shell {
+  min-height: calc(100vh - var(--nav-height));
+}
+
+.docs-main {
+  width: min(var(--doc-main-width), calc(100vw - (2 * var(--page-gutter))));
+  padding: 1.625rem 0 6rem;
+}
+
+.docs-shell--navigation-collapsed .docs-main {
+  width: min(var(--frame), calc(100vw - (2 * var(--page-gutter))));
+  margin-inline: auto;
+}
+
+.docs-body {
+  display: grid;
+  grid-template-columns: minmax(0, var(--doc-article-width)) var(--doc-right-gap) var(--doc-rail-width);
+  align-items: start;
+}
+
+.docs-body--no-rail {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.docs-shell--navigation-collapsed .docs-body {
+  grid-template-columns:
+    minmax(0, calc(100% - var(--doc-right-gap) - var(--doc-rail-width)))
+    var(--doc-right-gap)
+    var(--doc-rail-width);
+}
+
+.docs-shell--old-page .docs-main {
+  width: min(var(--frame), 100%);
+  margin-inline: auto;
+}
+
+.docs-shell--old-page .docs-body {
+  grid-template-columns:
+    minmax(0, calc(100% - var(--doc-right-gap) - var(--doc-rail-width)))
+    var(--doc-right-gap)
+    var(--doc-rail-width);
+}
+
+.docs-article {
+  grid-column: 1;
+}
+
+.docs-right {
+  grid-column: 3;
+  position: sticky;
+  top: calc(var(--nav-height) + 2rem);
+  margin-top: 1.5rem;
+}
+
+.docs-title {
+  margin-top: 1rem;
+  padding-bottom: 1.125rem;
+  border-bottom: 1px solid var(--cs-border);
+}
+
+.docs-title h1 {
+  font-size: 36px;
+  line-height: 1.2;
+}
+
+.docs-title p {
+  margin-top: 8px;
+  color: var(--cs-muted);
+  font-size: 18px;
+}
+
+.docs-section {
+  padding: 1.5rem 0 3rem;
+  border-bottom: 1px solid var(--cs-border);
+}
+
+.docs-section:last-child {
+  border-bottom: 0;
+}
+
+/* No divider between the explore section and Access GPU marketplace below it. */
+.docs-section.explore-section {
+  border-bottom: 0;
+}
+
+.doc-alternating {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) minmax(0, 1fr);
+  gap: var(--doc-gap);
+  align-items: center;
+  margin-top: 18px;
+}
+
+.doc-alternating + .doc-alternating {
+  margin-top: 48px;
+}
+
+.doc-alternating:not(.image-first) {
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 1fr);
+}
+
+.doc-alternating:not(.image-first) .doc-visual {
+  order: 2;
+}
+
+.doc-visual {
+  min-width: 0;
+}
+
+/* CodeView has no prop to disable its built-in fill; let the Container surface show through. */
+.code-snippet > div {
+  background-color: transparent !important;
+}
+
+/* Cap the marketplace table height so the rows scroll inside the container.
+   Tuned so the block matches the height of the tab blocks above. */
+.gpu-scroll {
+  max-height: 307px;
+  overflow-y: auto;
+}
+
+/* Cloudscape buttons render as <a> when given href; exclude them from the docs underline rule.
+   Higher specificity than `.docs-article a` so the reset wins regardless of source order. */
+.docs-article .doc-action a,
+.docs-article .figma-card a {
+  text-decoration: none !important;
+}
+
+/* No column header for the marketplace list (Table has no prop to omit it). */
+.gpu-scroll thead {
+  display: none;
+}
+
+.doc-action {
+  margin-top: 20px;
+}
+
+
+.doc-alternating img {
+  width: 100%;
+  aspect-ratio: 980 / 640;
+  height: auto;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.doc-alternating img.doc-diagram {
+  object-fit: contain;
+}
+
+.doc-diagram--dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .doc-diagram--light {
+  display: none;
+}
+
+:root[data-theme='dark'] .doc-diagram--dark {
+  display: block;
+}
+
+.doc-alternating h2 {
+  margin-bottom: 12px;
+  font-size: 28px;
+}
+
+.doc-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--card-gap);
+  margin-top: 24px;
+}
+
+.doc-media-card img {
+  height: 98px;
+}
+
+.doc-media-card h3 {
+  padding-top: 24px;
+}
+
+.doc-media-card {
+  min-height: 272px;
+}
+
+.alert-block {
+  margin-top: 1.5rem;
+}
+
+.figma-card {
+  width: min(24rem, 100%);
+  margin-top: 1.5rem;
+  border: 1px solid var(--cs-border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: var(--cs-bg, #ffffff);
+}
+
+.figma-card img {
+  width: 100%;
+  aspect-ratio: 980 / 560;
+  height: auto;
+  object-fit: cover;
+}
+
+.figma-card div {
+  padding: 24px;
+}
+
+.figma-card h3 {
+  margin-bottom: 12px;
+  font-size: 20px;
+}
+
+.figma-card p {
+  margin-bottom: 20px;
+}
+
+/* Core-concept cards: 2x2 grid inside the AlternatingDocBlock visual slot. */
+.concept-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--card-gap);
+}
+
+/* Concept titles link to the docs — smaller and link-styled (link color + underline,
+   the underline coming from the .docs-article anchor rule). */
+.concept-grid .media-card h3 {
+  font-size: 16px;
+}
+
+.concept-grid .media-card h3 a {
+  color: var(--cs-link);
+  text-decoration: none !important;
+}
+
+.concept-grid .media-card h3 a:hover {
+  text-decoration: underline !important;
+}
+
+/* Product cards reusing the figma-card style. Used inside an AlternatingDocBlock
+   visual slot, so it stays vertically centered (no top margin). */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--card-gap);
+}
+
+/* Two-up variant: dstack Sky and dstack Enterprise side by side. */
+.product-grid--pair {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Testimonial cards in the "Trusted by" section. */
+.testimonial-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--card-gap);
+  margin-top: 24px;
+}
+
+.testimonial-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.testimonial-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.product-grid .figma-card {
+  width: auto;
+  margin-top: 0;
+}
+
+.right-rail-block {
+  margin-top: 32px;
+  padding-top: 28px;
+  border-top: 1px solid var(--cs-border);
+}
+
+.docs-right > h2 {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.right-rail-block h2 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.right-rail-block p {
+  margin-bottom: 10px;
+  color: var(--cs-muted);
+}
+
+.site-footer {
+  position: relative;
+  border-top: 1px solid var(--cs-border);
+  background: var(--cs-bg, #ffffff);
+}
+
+/* On home, drop the divider line and white block so the footer blends into the
+   colored band above (mirrors the transparent, borderless home header). */
+.site-footer--home {
+  border-top: 0;
+  background: transparent;
+}
+
+/* Single colored band: rises from the bottom of the page up toward the divider (which
+   crops it visually), deepening in color toward the footer. Painted behind .home-main so
+   the content and cards stay clean on top. */
+.site-footer--home::before {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -28rem;
+  bottom: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(176, 65, 255, 0) 0%,
+    rgba(176, 65, 255, 0.1) 55%,
+    rgba(96, 106, 255, 0.22) 100%
+  );
+}
+
+.footer-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  min-height: 88px;
+  font-size: 13px;
+}
+
+.footer-left,
+.footer-inner nav {
+  display: flex;
+  align-items: center;
+}
+
+.footer-left {
+  gap: 10px;
+  min-width: 0;
+}
+
+.footer-theme-toggle svg {
+  transform: translateY(-0.5px);
+}
+
+.footer-inner nav {
+  justify-content: flex-end;
+  gap: 28px;
+}
+
+.footer-copyright {
+  text-align: left;
+}
+
+.home-stack a,
+.docs-article a,
+.right-rail-block a,
+.site-footer a {
+  text-decoration-line: underline !important;
+  text-decoration-color: currentColor !important;
+  text-underline-offset: 0.08em;
+}
+
+.home-stack a:hover,
+.docs-article a:hover,
+.right-rail-block a:hover,
+.site-footer a:hover {
+  text-decoration-thickness: 2px !important;
+}
+
+/* Footer legal links: same color as the header nav links, underline on hover only. */
+.site-footer nav a {
+  color: var(--cs-text) !important;
+  text-decoration-line: none !important;
+}
+
+.site-footer nav a:hover {
+  text-decoration-line: underline !important;
+}
+
+.home-stack p a,
+.docs-article p a {
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+@media (max-width: 1100px) {
+  .site-frame {
+    width: calc(100vw - 48px);
+  }
+
+  .home-hero__content {
+    padding: 64px 0;
+  }
+
+  .home-hero__art {
+    opacity: 0.85;
+  }
+
+  .hero-slice {
+    top: 24px;
+  }
+
+  .feature-card-grid,
+  .stats-grid,
+  .start-grid,
+  .doc-card-grid,
+  .product-grid,
+  .concept-grid,
+  .testimonial-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .image-text-row,
+  .image-text-row:not(.image-first),
+  .home-with-rail .image-text-row,
+  .home-with-rail .image-text-row:not(.image-first),
+  .docs-shell--old-page .image-text-row,
+  .docs-shell--old-page .image-text-row:not(.image-first),
+  .doc-alternating,
+  .doc-alternating:not(.image-first) {
+    grid-template-columns: 1fr;
+  }
+
+  .image-text-row.image-first .landing-image,
+  .doc-alternating:not(.image-first) .doc-visual {
+    order: initial;
+  }
+
+  /* Tighter gap between blocks once they stack into a single column. */
+  .doc-alternating + .doc-alternating {
+    margin-top: 32px;
+  }
+
+  .landing-image,
+  .doc-alternating img {
+    width: 100%;
+    height: auto;
+  }
+
+  .docs-shell {
+    display: block;
+  }
+
+  .docs-main {
+    width: calc(100vw - 48px);
+    margin: 0 auto;
+    padding-top: 24px;
+  }
+
+  .docs-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .docs-right {
+    display: block;
+    order: -1;
+    position: static;
+    width: 100%;
+    margin: 1.5rem 0 2rem;
+  }
+
+  .right-rail-block {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .site-nav {
+    height: 54px;
+  }
+
+  .site-nav__inner {
+    position: relative;
+    justify-content: space-between;
+    gap: 0;
+    width: 100%;
+    padding: 0 13px;
+  }
+
+  .site-menu {
+    display: none;
+  }
+
+  .site-mobile-trigger,
+  .site-mobile-spacer {
+    display: block;
+    flex: 0 0 28px;
+  }
+
+  .site-desktop-trigger {
+    display: none;
+  }
+
+  .site-logo {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .home-hero {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .home-hero__content {
+    order: 1;
+    padding: 64px 0 24px;
+  }
+
+  .home-hero__art {
+    position: relative;
+    order: 2;
+    inset: auto;
+    display: flex;
+    justify-content: center;
+    margin: 20px 0 8px;
+    opacity: 1;
+  }
+
+  .hero-slice {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: min(25rem, 88vw);
+    margin: 0 auto;
+  }
+
+  .site-mobile-navigation {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: -1;
+    max-height: calc(100vh - 58px);
+    overflow: auto;
+    padding: 20px;
+    border-bottom: 1px solid var(--cs-border);
+    background: var(--cs-bg, #ffffff);
+  }
+
+  .home-hero h1 {
+    font-size: 36px;
+  }
+
+  .home-hero h2 {
+    font-size: 32px;
+  }
+
+  .home-stack {
+    padding-top: 0;
+  }
+
+  .stat-card {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .figma-card,
+  .figma-card img {
+    width: 100%;
+  }
+
+  .footer-inner {
+    gap: 16px;
+    grid-template-columns: 1fr;
+    padding: 20px 0;
+  }
+
+  .footer-copyright {
+    grid-column: auto;
+    text-align: left;
+  }
+
+  .footer-left,
+  .footer-inner nav {
+    justify-content: flex-start;
+  }
+
+  .footer-inner nav {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+}

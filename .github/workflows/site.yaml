@@ -1,0 +1,72 @@
+name: Build & Deploy Site
+
+# Builds the full dstack website — the React landing (website/) overlaid onto the
+# MkDocs docs + blog build (site/) — and deploys it to GitHub Pages.
+#
+# This adapts the docs-only deploy (.github/workflows/docs.yaml + build-docs.yml): same
+# manual trigger and cross-repo push to a *.github.io repo, plus a Node build of the
+# landing and the overlay step (scripts/docs/build_site.sh).
+#
+# Defaults target the production Pages repo. The inputs let the SAME workflow deploy to a
+# staging Pages repo (e.g. peterschmidt85/peterschmidt85.github.io) without code changes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pages_repo:
+        description: Target GitHub Pages repository (owner/name)
+        default: dstackai/dstackai.github.io
+      pages_branch:
+        description: Target branch in the Pages repository
+        default: gh-pages
+      strip_cname:
+        description: Remove site/CNAME before deploy (use for staging, never for production)
+        type: boolean
+        default: false
+
+jobs:
+  build-site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - name: Install dstack
+        run: uv sync --extra server
+      - name: Install build deps for social cards
+        run: |
+          sudo apt-get update && sudo apt-get install -y libcairo2-dev libfreetype6-dev libffi-dev libjpeg-dev libpng-dev libz-dev
+      - name: Build combined site (landing + docs + blog)
+        run: ./scripts/docs/build_site.sh
+      - name: Strip CNAME (staging only)
+        if: ${{ inputs.strip_cname }}
+        run: rm -f site/CNAME
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site
+          retention-days: 1
+          include-hidden-files: true
+
+  deploy-site:
+    needs: [build-site]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4.6.4
+        with:
+          repository-name: ${{ inputs.pages_repo }}
+          branch: ${{ inputs.pages_branch }}
+          token: ${{ secrets.GH_TOKEN }}
+          folder: site

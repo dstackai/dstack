@@ -8,6 +8,7 @@
 # * runner/.justfile – Building and uploading dstack runner and shim
 # * frontend/.justfile – Building and running the frontend
 # * mkdocs/.justfile – Building and previewing the docs site
+# * website/.justfile – Building and previewing the React landing page
 
 default:
     @just --list
@@ -19,3 +20,5 @@ import "runner/.justfile"
 import "frontend/.justfile"
 
 import "mkdocs/.justfile"
+
+import "website/.justfile"
