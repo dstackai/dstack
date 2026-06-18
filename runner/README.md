@@ -94,13 +94,14 @@ These are non-exhaustive lists of external dependencies (executables, libraries)
 * `umount`
 * `mountpoint`
 * `lsblk`
+* `blkid`
 * `mkfs.ext4`
 * (NVIDIA GPU SSH fleet instances only) `nvidia-smi`
 * (AMD SSH fleet instances only) `docker` (used for `amd-smi` container)
 * (Intel Gaudi SSH fleet instances only) `hl-smi`
 * ...
 
-Debian/Ubuntu packages: `mount` (`mount`, `umount`), `util-linux` (`mountpoint`, `lsblk`), `e2fsprogs` (`mkfs.ext4`)
+Debian/Ubuntu packages: `mount` (`mount`, `umount`), `util-linux` (`mountpoint`, `lsblk`, `blkid`), `e2fsprogs` (`mkfs.ext4`)
 
 ### `dstack-runner`
 

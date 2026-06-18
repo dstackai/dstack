@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -35,7 +34,6 @@ import (
 	"github.com/dstackai/dstack/runner/internal/common/gpu"
 	"github.com/dstackai/dstack/runner/internal/common/log"
 	"github.com/dstackai/dstack/runner/internal/common/types"
-	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/dstackai/dstack/runner/internal/shim/host"
 )
 
@@ -609,169 +607,6 @@ func (d *DockerRunner) remove(ctx context.Context, task *Task) (err error) {
 		}
 	}
 	log.Debug(ctx, "removed", "task", task.ID)
-	return nil
-}
-
-func getBackend(backendType string) (backends.Backend, error) {
-	switch backendType {
-	case "aws":
-		return backends.NewAWSBackend(), nil
-	case "gcp":
-		return backends.NewGCPBackend(), nil
-	}
-	return nil, fmt.Errorf("unknown backend: %q", backendType)
-}
-
-func prepareVolumes(ctx context.Context, taskConfig TaskConfig) error {
-	for _, volume := range taskConfig.Volumes {
-		err := formatAndMountVolume(ctx, volume)
-		if err != nil {
-			return fmt.Errorf("format and mount volume: %w", err)
-		}
-	}
-	return nil
-}
-
-func unmountVolumes(ctx context.Context, taskConfig TaskConfig) error {
-	if len(taskConfig.Volumes) == 0 {
-		return nil
-	}
-	log.Debug(ctx, "Unmounting volumes...")
-	var failed []string
-	for _, volume := range taskConfig.Volumes {
-		mountPoint := getVolumeMountPoint(volume.Name)
-		cmd := exec.CommandContext(ctx, "mountpoint", mountPoint)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			log.Info(ctx, "skipping", "mountpoint", mountPoint, "output", output)
-			continue
-		}
-		cmd = exec.CommandContext(ctx, "umount", "-qf", mountPoint)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			log.Error(ctx, "failed to unmount", "mountpoint", mountPoint, "output", output)
-			failed = append(failed, mountPoint)
-		} else {
-			log.Debug(ctx, "unmounted", "mountpoint", mountPoint)
-		}
-	}
-	if len(failed) > 0 {
-		return fmt.Errorf("failed to unmount volume(s): %v", failed)
-	}
-	return nil
-}
-
-func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
-	backend, err := getBackend(volume.Backend)
-	if err != nil {
-		return fmt.Errorf("get backend: %w", err)
-	}
-	deviceName, err := backend.GetRealDeviceName(volume.VolumeId, volume.DeviceName)
-	if err != nil {
-		return fmt.Errorf("get real device name: %w", err)
-	}
-	fsCreated, err := initFileSystem(ctx, deviceName, !volume.InitFs)
-	if err != nil {
-		return fmt.Errorf("init file system: %w", err)
-	}
-	// Make FS root directory world-writable (0777) to give any job user
-	// a permission to create new files
-	// NOTE: mke2fs (that is, mkfs.ext4) supports `-E root_perms=0777` since 1.47.1:
-	// https://e2fsprogs.sourceforge.net/e2fsprogs-release.html#1.47.1
-	// but, as of 2024-12-04, this version is too new to rely on, for example,
-	// Ubuntu 24.04 LTS has only 1.47.0
-	// 0 means "do not chmod root directory"
-	var fsRootPerms os.FileMode = 0
-	// Change permissions only if the FS was created by us, don't mess with
-	// user-formatted volumes
-	if fsCreated {
-		fsRootPerms = 0o777
-	}
-	err = mountDisk(ctx, deviceName, getVolumeMountPoint(volume.Name), fsRootPerms)
-	if err != nil {
-		return fmt.Errorf("mount disk: %w", err)
-	}
-	return nil
-}
-
-func getVolumeMountPoint(volumeName string) string {
-	// Put volumes in dstack-specific dir to avoid clashes with host dirs.
-	// /mnt/disks is used since on some VM images other places may not be writable (e.g. GCP COS).
-	return fmt.Sprintf("/mnt/disks/dstack-volumes/%s", volumeName)
-}
-
-func prepareInstanceMountPoints(taskConfig TaskConfig) error {
-	// If the instance volume directory doesn't exist, create it with world-writable permissions (0777)
-	// to give any job user a permission to create new files
-	// If the directory already exists, do nothing, don't mess with already set permissions, especially
-	// on SSH fleets where permissions are managed by the host admin
-	for _, mountPoint := range taskConfig.InstanceMounts {
-		if _, err := os.Stat(mountPoint.InstancePath); errors.Is(err, os.ErrNotExist) {
-			// All missing parent dirs are created with 0755 permissions
-			if err = os.MkdirAll(mountPoint.InstancePath, 0o755); err != nil {
-				return fmt.Errorf("create instance mount directory: %w", err)
-			}
-			if err = os.Chmod(mountPoint.InstancePath, 0o777); err != nil {
-				return fmt.Errorf("chmod instance mount directory: %w", err)
-			}
-		} else if err != nil {
-			return fmt.Errorf("stat instance mount directory: %w", err)
-		}
-	}
-	return nil
-}
-
-// initFileSystem creates an ext4 file system on a disk only if the disk is not already has a file system.
-// Returns true if the file system is created.
-func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists bool) (bool, error) {
-	// Run the lsblk command to get filesystem type
-	cmd := exec.CommandContext(ctx, "lsblk", "-no", "FSTYPE", deviceName)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return false, fmt.Errorf("failed to check if disk is formatted: %w", err)
-	}
-
-	// If the output is not empty, the disk is already formatted
-	fsType := strings.TrimSpace(out.String())
-	if fsType != "" {
-		return false, nil
-	}
-
-	if errorIfNotExists {
-		return false, fmt.Errorf("disk has no file system")
-	}
-
-	log.Debug(ctx, "formatting disk with ext4 filesystem...", "device", deviceName)
-	cmd = exec.CommandContext(ctx, "mkfs.ext4", "-F", deviceName)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return false, fmt.Errorf("failed to format disk: %w, output: %s", err, string(output))
-	}
-	log.Debug(ctx, "disk formatted succesfully!", "device", deviceName)
-	return true, nil
-}
-
-func mountDisk(ctx context.Context, deviceName, mountPoint string, fsRootPerms os.FileMode) error {
-	// Create the mount point directory if it doesn't exist
-	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
-		log.Debug(ctx, "creating mount point...", "mountpoint", mountPoint)
-		if err := os.MkdirAll(mountPoint, 0o755); err != nil {
-			return fmt.Errorf("failed to create mount point: %w", err)
-		}
-	}
-
-	// Mount the disk to the mount point
-	log.Debug(ctx, "mounting disk...", "device", deviceName, "mountpoint", mountPoint)
-	cmd := exec.CommandContext(ctx, "mount", deviceName, mountPoint)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to mount disk: %w, output: %s", err, string(output))
-	}
-
-	if fsRootPerms != 0 {
-		if err := os.Chmod(mountPoint, fsRootPerms); err != nil {
-			return fmt.Errorf("failed to chmod volume root directory %s: %w", mountPoint, err)
-		}
-	}
-
-	log.Debug(ctx, "disk mounted successfully!")
 	return nil
 }
 
