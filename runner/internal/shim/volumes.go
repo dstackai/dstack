@@ -118,13 +118,13 @@ func prepareInstanceMountPoints(taskConfig TaskConfig) error {
 //
 // Safety contract: mkfs is reached ONLY after the device is confirmed to be a
 // real, ready, non-zero-sized block device AND a direct superblock probe
-// positively reports no signature.
+// repeatedly confirms no signature.
 func initFileSystem(ctx context.Context, deviceName string, errorIfNotExists bool) (bool, error) {
 	if err := waitForBlockDevice(ctx, deviceName, 10*time.Second); err != nil {
 		return false, fmt.Errorf("device %s not ready: %w", deviceName, err)
 	}
 
-	fsType, hasFS, err := probeFilesystem(ctx, deviceName)
+	fsType, hasFS, err := hasFilesystem(ctx, deviceName)
 	if err != nil {
 		return false, fmt.Errorf("failed to check if disk is formatted: %w", err)
 	}
@@ -196,6 +196,38 @@ func blockDeviceSize(deviceName string) (uint64, error) {
 		return 0, fmt.Errorf("BLKGETSIZE64 ioctl on %s: %w", deviceName, err)
 	}
 	return uint64(size), nil
+}
+
+// hasFilesystem reports whether deviceName has a filesystem, re-confirming a
+// "no filesystem" verdict before believing it.
+//
+// The check is asymmetric on purpose: it prevents a hypothetical
+// transient false "no-fs" from leading to a destructive mkfs.
+func hasFilesystem(ctx context.Context, deviceName string) (string, bool, error) {
+	const confirmAttempts = 3
+	const confirmInterval = 1 * time.Second
+
+	fsType, hasFS, err := probeFilesystem(ctx, deviceName)
+	if err != nil || hasFS {
+		return fsType, hasFS, err
+	}
+	for attempt := range confirmAttempts {
+		select {
+		case <-ctx.Done():
+			return "", false, ctx.Err()
+		case <-time.After(confirmInterval):
+		}
+		fsType, hasFS, err = probeFilesystem(ctx, deviceName)
+		if err != nil {
+			return "", false, err
+		}
+		if hasFS {
+			log.Warning(ctx, "filesystem appeared on re-probe, not formatting",
+				"fstype", fsType, "attempt", attempt)
+			return fsType, true, nil
+		}
+	}
+	return "", false, nil
 }
 
 // probeFilesystem reports the filesystem type on deviceName via a direct
