@@ -1,8 +1,12 @@
 import CodeView from '@cloudscape-design/code-view/code-view';
 import yamlHighlight from '@cloudscape-design/code-view/highlight/yaml';
+import Button from '@cloudscape-design/components/button';
 import Container from '@cloudscape-design/components/container';
+import Icon from '@cloudscape-design/components/icon';
+import SpaceBetween from '@cloudscape-design/components/space-between';
 import Table from '@cloudscape-design/components/table';
 import Tabs from '@cloudscape-design/components/tabs';
+import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { images } from '../../data/images';
 import { docsUrl } from '../../routes';
@@ -32,9 +36,6 @@ const gpuOffers = [
   { name: 'A100', memory: '80GB', price: '$1.20 - $3.40' },
   { name: 'A100', memory: '40GB', price: '$0.83 - $2.30' },
   { name: 'L40S', memory: '48GB', price: '$0.80 - $1.40' },
-  { name: 'A10', memory: '24GB', price: '$0.30 - $0.90' },
-  { name: 'L4', memory: '24GB', price: '$0.28 - $0.80' },
-  { name: 'T4', memory: '16GB', price: '$0.18 - $0.53' },
 ];
 
 // Read-only YAML snippet. Line wrapping is left off so one line maps to one row,
@@ -94,6 +95,7 @@ export function ExploreSection() {
         }
         title="Bring your own clouds"
         imageFirst
+        action={<Button href={docsUrl('concepts/backends')} style={mainButtonStyle}>Backends</Button>}
       >
         dstack natively integrates with the major GPU clouds and automates provisioning of clusters.
         <br />
@@ -115,6 +117,12 @@ export function ExploreSection() {
           />
         }
         title="Bring on-prem clusters"
+        action={
+          <SpaceBetween direction="horizontal" size="xs">
+            <Button href={docsUrl('concepts/backends/#kubernetes')} style={mainButtonStyle}>Kubernetes</Button>
+            <Button href={docsUrl('concepts/fleets/#ssh-fleets')} style={mainButtonStyle}>SSH Fleets</Button>
+          </SpaceBetween>
+        }
       >
         Have an existing Kubernetes cluster? Point dstack to the kubeconfig, and dstack
         will schedule workloads on it as it was a cloud cluster.
@@ -135,10 +143,14 @@ function KeyConceptsBlock() {
       visual={
         <div className="concept-grid">
           {keyConcepts.map(concept => (
-            <article className="media-card" key={concept.name}>
-              <h3><a href={concept.href}>{concept.name}</a></h3>
+            // Whole card is the link so it reads as clickable, with an ActionCard-style
+            // arrow. Kept as a real <a> (open-in-new-tab / SEO) rather than Cloudscape's
+            // onClick-only ActionCard component.
+            <a className="media-card concept-card" href={concept.href} key={concept.name}>
+              <span className="concept-card__arrow" aria-hidden="true"><Icon name="angle-right" /></span>
+              <h3>{concept.name}</h3>
               <p>{concept.description}</p>
-            </article>
+            </a>
           ))}
         </div>
       }
@@ -154,7 +166,12 @@ function KeyConceptsBlock() {
 
 function GpuMarketplaceBlock() {
   return (
-    <AlternatingDocBlock visual={<GpuMarketplaceTable />} title="Access marketplace GPUs" imageFirst>
+    <AlternatingDocBlock
+      visual={<GpuMarketplaceTable />}
+      title="Access marketplace GPUs"
+      imageFirst
+      action={<Button href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign up</Button>}
+    >
       Don't have your own cloud accounts or on-prem clusters? No problem. You can access compute
       through dstack Sky, our hosted GPU marketplace.
       <br />

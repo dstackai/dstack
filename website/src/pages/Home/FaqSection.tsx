@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Button from '@cloudscape-design/components/button';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
+import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 
 const faqItems = [
@@ -46,7 +47,7 @@ export function FaqSection() {
         }
         title="FAQ"
         action={
-          <Button variant="primary" href="https://discord.gg/dstack" target="_blank" iconAlign="right" iconName="external">
+          <Button variant="primary" href="https://discord.gg/dstack" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
             Discord
           </Button>
         }

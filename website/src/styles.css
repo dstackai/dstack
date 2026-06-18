@@ -21,15 +21,18 @@
   --cs-bg: #ffffff;
   --cs-muted: #5f6b7a;
   --cs-link: #0972d3;
-  --cs-border: #d5dbdb;
+  --cs-border: #16191f;
   --cs-panel: #f4f4f7;
+  --cs-hover: rgba(22, 25, 31, 0.035); /* faint, light hover tint for cards */
+  --cs-btn-hover: #272d38; /* filled (primary) button hover fill — shared with the split-button override */
+  --cs-seg-divider: rgba(255, 255, 255, 0.22); /* split-button segment divider (light line on the dark fill) */
   --cs-dark: #0f141d;
   --nav-height: 4.875rem;
   --frame: 80rem;
   --page-gutter: clamp(1.5rem, 5.5vw, 5rem);
   --section-gap: clamp(2.5rem, 4vw, 4rem);
   --card-gap: 1.25rem;
-  --radius: 0.875rem;
+  --radius: 0;
   --media-column: minmax(18rem, 40rem);
   --doc-article-width: 49.5rem;
   --doc-rail-width: 17.5rem;
@@ -51,8 +54,11 @@
   --cs-bg: #0f141d;
   --cs-muted: #c6c6cd;
   --cs-link: #58a6ff;
-  --cs-border: #414750;
+  --cs-border: #f2f3f3;
   --cs-panel: #1b212d;
+  --cs-hover: rgba(242, 243, 243, 0.06);
+  --cs-btn-hover: #e2e5e8;
+  --cs-seg-divider: rgba(0, 0, 0, 0.18); /* split-button segment divider (dark line on the light fill) */
   --hero-gradient: linear-gradient(
     145deg,
     rgba(159, 98, 255, 0.2) 0%,
@@ -80,14 +86,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Override Cloudscape's font-family design tokens (default Open Sans) so its components
-   render in Geist too. The monospace token is left untouched so code stays monospaced. */
-body.awsui-visual-refresh {
-  font-family: var(--font-base);
-  --font-family-base-gmnpzl: var(--font-base);
-  --font-family-display-a93nj0: var(--font-base);
-  --font-family-heading-ugphat: var(--font-base);
-}
+/* Cloudscape's own font family is set via the theming API (see cloudscape-theme.ts);
+   this base rule covers the non-Cloudscape markup. */
 
 img {
   display: block;
@@ -115,7 +115,7 @@ p {
   top: 0;
   z-index: 900;
   height: var(--nav-height);
-  border-bottom: 1px solid var(--cs-border);
+  border-bottom: 0.5px solid var(--cs-border);
   background: var(--cs-bg, #ffffff);
 }
 
@@ -203,7 +203,7 @@ p {
   align-items: center;
   gap: 0.25rem;
   min-height: 42px;
-  padding: 8px 12px;
+  padding: 10px 16px;
   border-radius: 21px;
   color: var(--cs-text);
   font-weight: 700;
@@ -216,11 +216,12 @@ p {
   text-underline-offset: 0.2em;
 }
 
-/* Keyboard focus only on the top-menu buttons. */
+/* Keyboard focus only on the top-menu buttons. These are our own elements (not Cloudscape
+   components), so use plain values rather than Cloudscape's internal token variables. */
 .site-menu-button:focus-visible,
 .site-menu-link:focus-visible {
-  background: var(--color-background-button-link-hover-lhrs2u, #f0fbff);
-  color: var(--color-text-button-link-hover-kvrc36, #002b66);
+  background: var(--cs-panel);
+  color: var(--cs-text);
 }
 
 .site-menu-button.active {
@@ -437,7 +438,7 @@ p {
   align-items: center;
   min-height: 160px;
   padding: 24px 40px;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--cs-panel);
 }
 
@@ -475,8 +476,8 @@ p {
 }
 
 .media-card {
-  border: 1px solid var(--cs-border);
-  border-radius: 12px;
+  border: 0.5px solid var(--cs-border);
+  border-radius: 0;
   overflow: hidden;
   background: var(--cs-bg, #ffffff);
 }
@@ -505,7 +506,7 @@ p {
 .start-building {
   margin-top: 64px;
   padding-top: 48px;
-  border-top: 1px solid var(--cs-border);
+  border-top: 0.5px solid var(--cs-border);
 }
 
 .start-grid {
@@ -518,8 +519,8 @@ p {
 .start-grid article {
   min-height: 152px;
   padding: 24px 20px;
-  border: 1px solid var(--cs-border);
-  border-radius: 12px;
+  border: 0.5px solid var(--cs-border);
+  border-radius: 0;
 }
 
 .start-grid h3 {
@@ -588,7 +589,7 @@ p {
 .docs-title {
   margin-top: 1rem;
   padding-bottom: 1.125rem;
-  border-bottom: 1px solid var(--cs-border);
+  border-bottom: 0.5px solid var(--cs-border);
 }
 
 .docs-title h1 {
@@ -604,7 +605,7 @@ p {
 
 .docs-section {
   padding: 1.5rem 0 3rem;
-  border-bottom: 1px solid var(--cs-border);
+  border-bottom: 0.5px solid var(--cs-border);
 }
 
 .docs-section:last-child {
@@ -724,8 +725,8 @@ p {
 .figma-card {
   width: min(24rem, 100%);
   margin-top: 1.5rem;
-  border: 1px solid var(--cs-border);
-  border-radius: 0.75rem;
+  border: 0.5px solid var(--cs-border);
+  border-radius: 0;
   overflow: hidden;
   background: var(--cs-bg, #ffffff);
 }
@@ -757,19 +758,32 @@ p {
   gap: var(--card-gap);
 }
 
-/* Concept titles link to the docs — smaller and link-styled (link color + underline,
-   the underline coming from the .docs-article anchor rule). */
+/* Each concept card is a whole-card link to the docs: text-colored (not link-blue),
+   no underline, with a subtle background on hover to signal it's clickable. */
+.concept-grid .media-card {
+  display: block;
+  position: relative; /* for the arrow */
+  color: var(--cs-text);
+  text-decoration: none !important;
+  transition: background 0.15s ease;
+}
+
+.concept-grid .media-card:hover {
+  background: var(--cs-hover);
+}
+
 .concept-grid .media-card h3 {
   font-size: 16px;
+  padding-right: 44px; /* clear the arrow */
 }
 
-.concept-grid .media-card h3 a {
-  color: var(--cs-link);
-  text-decoration: none !important;
-}
-
-.concept-grid .media-card h3 a:hover {
-  text-decoration: underline !important;
+/* ActionCard-style navigation arrow, top-right. */
+.concept-card__arrow {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  display: inline-flex;
+  color: var(--cs-text);
 }
 
 /* Product cards reusing the figma-card style. Used inside an AlternatingDocBlock
@@ -815,7 +829,7 @@ p {
 .right-rail-block {
   margin-top: 32px;
   padding-top: 28px;
-  border-top: 1px solid var(--cs-border);
+  border-top: 0.5px solid var(--cs-border);
 }
 
 .docs-right > h2 {
@@ -836,7 +850,7 @@ p {
 
 .site-footer {
   position: relative;
-  border-top: 1px solid var(--cs-border);
+  border-top: 0.5px solid var(--cs-border);
   background: var(--cs-bg, #ffffff);
 }
 
@@ -922,7 +936,7 @@ p {
   font-size: 25px;
 }
 
-.footer-social {
+.footer-channels {
   display: flex;
   gap: 12px;
   margin: 0;
@@ -930,13 +944,13 @@ p {
   list-style: none;
 }
 
-.footer-social__link {
+.footer-channel-link {
   display: inline-flex;
   color: var(--cs-text) !important;
   text-decoration: none !important;
 }
 
-.footer-social__link svg {
+.footer-channel-link svg {
   display: block;
 }
 
@@ -955,15 +969,11 @@ p {
   gap: 10px;
   min-width: 0;
   min-height: 64px;
-  border-top: 1px solid var(--cs-border);
+  border-top: 0.5px solid var(--cs-border);
 }
 
-/* Drop the icon button's horizontal padding so the glyph sits flush-left, aligned
-   with the logo/social icons above it; nudge it up to sit on the copyright baseline. */
-.footer-theme-toggle {
-  padding-inline: 0 !important;
-}
-
+/* The icon button's horizontal padding is removed via its `style` prop (see SiteFooter);
+   this just nudges the glyph up onto the copyright baseline. */
 .footer-theme-toggle svg {
   transform: translateY(-1.5px);
 }
@@ -1002,7 +1012,7 @@ p {
 /* The brand logo and social icons are <a>s inside .site-footer, so the global
    footer-link underline rule applies to them — override it (higher specificity). */
 .site-footer .footer-brand__logo,
-.site-footer .footer-social__link {
+.site-footer .footer-channel-link {
   text-decoration: none !important;
 }
 
@@ -1194,7 +1204,7 @@ p {
     max-height: calc(100vh - 58px);
     overflow: auto;
     padding: 20px;
-    border-bottom: 1px solid var(--cs-border);
+    border-bottom: 0.5px solid var(--cs-border);
     background: var(--cs-bg, #ffffff);
   }
 

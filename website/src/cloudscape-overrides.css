@@ -1,0 +1,147 @@
+/*
+  Cloudscape internal overrides — the deliberate, isolated exception.
+
+  Everything Cloudscape exposes as a themeable design token lives in cloudscape-theme.ts
+  (the supported `applyTheme` API). This file covers only the few visual details that
+  Cloudscape does NOT expose as tokens, so they have to be set against its generated CSS
+  variables / scoped class names directly.
+
+  MAINTENANCE
+  - The hashed suffixes below (…-uwo8my, …-gudemr, awsui_…_sne0l) are pinned to the
+    installed @cloudscape-design/components version.
+  - After upgrading Cloudscape, re-verify each name. If one drifts, the rule simply stops
+    matching and the component falls back to its Cloudscape default (graceful degradation,
+    not a breakage). Re-derive with:
+      grep -roE '\-\-border-divider-section-width-[a-z0-9]+' node_modules/@cloudscape-design/components/container
+      grep -roE '\-\-color-border-tabs-[a-z-]+-[a-z0-9]+'    node_modules/@cloudscape-design/components/tabs
+      grep -roE 'awsui_split-trigger-wrapper_[a-z0-9_]+'     node_modules/@cloudscape-design/components/button-dropdown
+*/
+
+/* NB: Cloudscape defines these tokens on `body` inside `@layer awsui-base-theme`. Our
+   redeclarations are unlayered, so they win over Cloudscape's layered ones. The COLOR
+   tokens inherit, so `body` is enough. The border-WIDTH token does NOT inherit, so it
+   has to be declared on the elements that read it — hence the universal selector. */
+
+/* 1) Hairline (0.5px) borders on Container / Tabs / Table rows (and anything else using
+      these divider widths). Border color + radius are themeable (cloudscape-theme.ts); the
+      widths are not, and they don't inherit — so set them on every element via `*`.
+      (section-width: containers/tabs; list-width: table rows + list dividers.) */
+* {
+  --border-divider-section-width-uwo8my: 0.5px;
+  --border-divider-list-width-tdfx1x: 0.5px;
+}
+
+/* 2) Tabs: the bottom divider and the active-tab underline use the text color.
+      Tabs use tab-specific border-color tokens that the theming API doesn't expose. */
+body {
+  --color-border-tabs-divider-f5t9va: var(--cs-text);
+  --color-border-tabs-underline-gudemr: var(--cs-text);
+  --color-border-dropdown-group-ylcnh8: transparent; /* no divider between dropdown groups */
+  --color-text-expandable-section-hover-ojzwhd: var(--cs-text); /* FAQ: don't turn the question blue on hover */
+}
+
+/* 3) Split ButtonDropdown ("Get started"): close the gap before the arrow (a 2px
+      margin on the main segment) and drop the main action's trailing padding so the
+      label and arrow sit flush. ButtonDropdown has no `style` prop, so this targets its
+      scoped classes by stable prefix (hash-independent). */
+/* !important is required: Cloudscape boosts its own rules' specificity with a :not(#\9)
+   trick, which an attribute selector can't otherwise outrank. */
+[class*='awsui_split-trigger-wrapper'] > [class*='awsui_trigger-item']:not(:last-child) > [class*='awsui_trigger-button'] {
+  margin-inline-end: 0 !important; /* close the 2px gap before the arrow */
+  padding-inline-end: 16px !important; /* breathing room between the label and the divider */
+}
+/* Match the other top-nav buttons' height (see menuButtonStyle, 7px block). */
+[class*='awsui_split-trigger-wrapper'] [class*='awsui_trigger-button'] {
+  padding-block: 7px !important;
+}
+/* Subtle 0.5px divider between the two segments — a hair lighter/darker than the fill
+   so the split reads, without breaking the single-button look. (Hover stays per-segment,
+   which is Cloudscape's default and the better affordance here.) */
+[class*='awsui_split-trigger-wrapper'] > [class*='awsui_trigger-item']:not(:first-child) > [class*='awsui_trigger-button'] {
+  border-inline-start: 0.5px solid var(--cs-seg-divider) !important;
+}
+
+/* 4) Content tabs.
+   a) Full-height vertical separators between tabs (default insets them 12px top/bottom). */
+[class*='awsui_tabs-tab_']:not(:last-child) > [class*='awsui_tabs-tab-header-container']::before {
+  inset-block: 0 !important;
+}
+/* b) Drop the gray border + shadow that Cloudscape shows on the scroll arrows when the
+      tab strip overflows (the box-shadow renders both; border-inline is the divider). */
+[class*='awsui_pagination-button-left-scrollable'],
+[class*='awsui_pagination-button-right-scrollable'] {
+  box-shadow: none !important;
+}
+[class*='awsui_pagination-button-left'],
+[class*='awsui_pagination-button-right'] {
+  border-inline: 0 !important;
+}
+
+/* 5) "Get started" dropdown popup (portaled to <body>, so targeted by stable prefix).
+   a) Fixed width, flat (no drop-shadow), and a single uniform 0.5px border on all four
+      sides. By default Cloudscape draws top/bottom on the wrapper (1px) and left/right on
+      a ::after — so we set the wrapper border ourselves and drop the ::after layer. */
+[class*='awsui_dropdown-content-wrapper'] {
+  inline-size: 300px !important;
+  box-shadow: none !important;
+  border: 0.5px solid var(--cs-text) !important;
+}
+[class*='awsui_dropdown-content-wrapper']::after {
+  border: 0 !important;
+}
+/* b) Group headers ("Products" / "Login"): same weight as item labels (600), but muted
+      color so the groups read as quiet labels. */
+[class*='awsui_header_16mm3'] {
+  font-weight: 600 !important;
+  color: var(--cs-muted) !important;
+  padding-inline: 16px !important;
+}
+/* c) Items: bold label (matching the group weight), tighter horizontal padding aligned
+      with the header. The description below keeps its normal/muted styling. */
+[class*='awsui_menu-item'] {
+  padding-inline: 16px !important;
+}
+[class*='awsui_menu-item'] [class*='awsui_main-row'] {
+  font-weight: 600;
+}
+/* The hovered item still picked up a border in dark mode (the token override didn't hold
+   there), so force it off on the highlighted item itself (the cue is the bg tint). */
+[class*='awsui_item-element'][class*='awsui_highlighted'] {
+  border-color: transparent !important;
+}
+/* Keep the description muted at all times — Cloudscape brightens it on highlight. */
+[class*='awsui_secondary-text'] {
+  color: var(--cs-muted) !important;
+}
+/* d) Push the external-link icon to the right edge of the item. It's rendered inline at
+      the end of the label, so make the label row fill the width and flex the icon out.
+      Scoped under `awsui_main-row` (dropdown-item only) so it doesn't affect the external
+      icons in SideNavigation, which share the `awsui_external-icon` class. */
+[class*='awsui_main-row'] > :first-child {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  align-items: center;
+}
+[class*='awsui_main-row'] [class*='awsui_external-icon'] {
+  margin-inline-start: auto !important;
+}
+
+/* 6) FAQ accordion (ExpandableSection): faint background tint on hover that covers the
+      whole block (question + answer) uniformly. Tint the section root, then neutralize
+      every inner background (header + content both carry their own white bg) so only the
+      single root tint shows — otherwise an opaque child paints over it and the question
+      ends up with an extra highlight vs the answer. FAQ items are plain text, so blanking
+      inner backgrounds is safe. */
+.faq-list [class*='awsui_root']:hover {
+  background: var(--cs-hover) !important;
+}
+.faq-list [class*='awsui_root']:hover * {
+  background: transparent !important;
+}
+
+/* 7) Testimonial quote cards: dotted, 0.25px border (overrides the global hairline for
+      these specific Containers — scoped via the fitHeight Container root in the grid). */
+.testimonial-grid [class*='awsui_fit-height'] {
+  border-style: dotted !important;
+  border-width: 0.25px !important;
+}

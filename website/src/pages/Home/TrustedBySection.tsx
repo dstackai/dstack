@@ -42,7 +42,7 @@ const testimonials = [
   */
   {
     name: 'Dmitry Melikyan',
-    title: 'Founder',
+    title: 'CEO',
     company: 'Graphsignal',
     photo: '/static/quotes/dmitry.jpg',
     quote:

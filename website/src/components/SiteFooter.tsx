@@ -95,11 +95,11 @@ export function SiteFooter({
               <img src={asset('/static/logo-notext.svg')} alt="" />
               <span>dstack</span>
             </a>
-            <ul className="footer-social" aria-label="Social media">
+            <ul className="footer-channels" aria-label="Community links">
               {socialLinks.map(social => (
                 <li key={social.label}>
                   <a
-                    className="footer-social__link"
+                    className="footer-channel-link"
                     href={social.href}
                     target="_blank"
                     rel="noreferrer"
@@ -135,6 +135,7 @@ export function SiteFooter({
             iconName="light-dark"
             ariaLabel={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
             onClick={onToggleTheme}
+            style={{ root: { paddingInline: '0px' } }}
           />
           <span className="footer-copyright">© 2026, dstack Inc. All rights reserved.</span>
         </div>

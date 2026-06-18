@@ -4,15 +4,12 @@ import Button from '@cloudscape-design/components/button';
 import ButtonDropdown, { ButtonDropdownProps } from '@cloudscape-design/components/button-dropdown';
 import SideNavigation, { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 import SpaceBetween from '@cloudscape-design/components/space-between';
+import { menuButtonStyle } from '../cloudscape-theme';
 import { asset } from '../asset';
 import { BLOG_URL, DOCS_URL, ROUTES, docsUrl } from '../routes';
 
 const dstackGithubUrl = 'https://github.com/dstackai/dstack';
 const externalIconAriaLabel = 'External link icon';
-
-const transparentButton = {
-  root: { background: { default: 'transparent', hover: 'transparent', active: 'transparent' } },
-};
 
 // Primary links in the desktop top navigation. Documentation and Blog are served by
 // MkDocs on the same origin, so they are plain links (full-page navigations).
@@ -21,19 +18,20 @@ const audienceNavItems: Array<{ label: string; href: string }> = [
   { label: 'Blog', href: BLOG_URL },
 ];
 
-// "Get started" dropdown items, grouped by hosting model. secondaryText is shown under each label.
+// "Get started" dropdown items. secondaryText is shown under each label.
 const productDropdownItems: ButtonDropdownProps.Items = [
   {
-    text: 'Self-hosted',
+    text: 'Products',
     items: [
-      { id: 'open-source', text: 'Open-source', secondaryText: 'Install the open-source version', href: docsUrl('installation'), external: true, externalIconAriaLabel },
-      { id: 'enterprise', text: 'dstack Enterprise', secondaryText: 'Talk to us', href: 'https://calendly.com/dstackai/discovery-call', external: true, externalIconAriaLabel },
+      { id: 'open-source', text: 'Open-source', secondaryText: 'Deploy it anywhere. Use with your own clouds or on-prem clusters.', href: docsUrl('installation') },
+      { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Access GPU marketplace, or bring your own clouds. Hosted by us.', href: 'https://sky.dstack.ai', external: true, externalIconAriaLabel },
+      { id: 'enterprise', text: 'dstack Enterprise', secondaryText: 'Self-hosted with SSO, air-gapped setup, dedicated support, and more.', href: 'https://calendly.com/dstackai/discovery-call', external: true, externalIconAriaLabel },
     ],
   },
   {
-    text: 'Hosted by dstack',
+    text: 'Login',
     items: [
-      { id: 'sky', text: 'dstack Sky', secondaryText: 'Sign up for dstack Sky', href: 'https://sky.dstack.ai', external: true, externalIconAriaLabel },
+      { id: 'sky-login', text: 'dstack Sky', href: 'https://sky.dstack.ai', external: true, externalIconAriaLabel },
     ],
   },
 ];
@@ -131,7 +129,7 @@ export function SiteNavigation({
               target="_blank"
               iconAlign="right"
               iconName="external"
-              style={transparentButton}
+              style={menuButtonStyle}
             >
               GitHub
             </Button>

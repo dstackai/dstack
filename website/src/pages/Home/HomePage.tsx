@@ -1,15 +1,12 @@
 import Button from '@cloudscape-design/components/button';
 import SpaceBetween from '@cloudscape-design/components/space-between';
+import { heroButtonStyle } from '../../cloudscape-theme';
 import { images, ThemedImage } from '../../data/images';
 import { DOCS_URL } from '../../routes';
 import { ExploreSection } from './ExploreSection';
 import { FaqSection } from './FaqSection';
 import { GetStartedSection } from './GetStartedSection';
 import { TrustedBySection } from './TrustedBySection';
-
-const transparentButton = {
-  root: { background: { default: 'transparent', hover: 'transparent', active: 'transparent' } },
-};
 
 // Hero artwork: both variants are rendered and CSS shows the one matching the theme.
 function ThemedHeroImage({ image }: { image: ThemedImage }) {
@@ -40,16 +37,16 @@ export function HomePage() {
             for AI infrastructure
           </h2>
           <p>
-            dstack is a unified control plane for GPU provisioning and orchestration that works with any
-            GPU cloud, Kubernetes, or on-prem clusters. It streamlines development, training, and inference,
-            and is compatible with any hardware, open-source tools, and frameworks.
+            dstack is an open-source orchestration layer that standardizes how AI workloads are defined,
+            scheduled, and run across heterogeneous compute. From GPU clouds to Kubernetes to on-prem
+            clusters, dstack makes AI infrastructure portable across NVIDIA, AMD, Tenstorrent, and Google TPU.
           </p>
           <div className="home-hero__actions">
             <SpaceBetween direction="horizontal" size="xs">
-              <Button variant="primary" onClick={scrollToResources}>
+              <Button variant="primary" onClick={scrollToResources} style={heroButtonStyle}>
                 Get started
               </Button>
-              <Button href={DOCS_URL} style={transparentButton}>
+              <Button href={DOCS_URL} style={heroButtonStyle}>
                 Documentation
               </Button>
             </SpaceBetween>

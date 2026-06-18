@@ -3,6 +3,7 @@ import shHighlight from '@cloudscape-design/code-view/highlight/sh';
 import Button from '@cloudscape-design/components/button';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import Tabs from '@cloudscape-design/components/tabs';
+import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { installMethods, maxInstallLines, padYamlToLines } from '../../data/snippets';
 import { docsUrl } from '../../routes';
@@ -40,8 +41,8 @@ export function GetStartedSection() {
         imageFirst
         action={
           <SpaceBetween direction="horizontal" size="xs">
-            <Button href={docsUrl('installation')}>Installation</Button>
-            <Button href={docsUrl('quickstart')}>Quickstart</Button>
+            <Button href={docsUrl('installation')} style={mainButtonStyle}>Installation</Button>
+            <Button href={docsUrl('quickstart')} style={mainButtonStyle}>Quickstart</Button>
           </SpaceBetween>
         }
       >
@@ -61,7 +62,7 @@ export function GetStartedSection() {
               <div>
                 <h3>dstack Sky</h3>
                 <p>Hosted by us. Bring your own clouds, or access marketplace GPUs.</p>
-                <Button href="https://sky.dstack.ai" variant="primary" target="_blank" iconName="external" iconAlign="right">
+                <Button href="https://sky.dstack.ai" variant="primary" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>
                   Sign up
                 </Button>
               </div>
@@ -70,7 +71,7 @@ export function GetStartedSection() {
               <div>
                 <h3>dstack Enterprise</h3>
                 <p>Self-hosted with SSO, air-gapped setup, dedicated support, and more.</p>
-                <Button href="https://calendly.com/dstackai/discovery-call" target="_blank" iconName="external" iconAlign="right">
+                <Button href="https://calendly.com/dstackai/discovery-call" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>
                   Talk to us
                 </Button>
               </div>
