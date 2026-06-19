@@ -207,6 +207,16 @@ p {
   display: none;
 }
 
+/* On the Old page the nav drops the brand gradient accent for a plain 1px hairline in the
+   text color, matching the Cloudscape reference header. */
+.site-nav--old {
+  border-bottom: 1px solid var(--cs-text);
+}
+
+.site-nav--old::after {
+  display: none;
+}
+
 .site-nav__inner {
   position: relative;
   z-index: 1;
@@ -681,6 +691,16 @@ p {
 .docs-shell--old-page .docs-main {
   width: min(var(--frame), 100%);
   margin-inline: auto;
+  /* The footer is the last child here; sit it flush at the bottom of the content
+     column instead of leaving the article's bottom padding below it. */
+  padding-bottom: 0;
+}
+
+/* Cloudscape gives the AppLayout content region a 40px bottom margin. With the footer living
+   inside it, that leaves a 40px strip below the footer; drop it so the footer sits flush at the
+   page bottom, matching the global site footer. */
+.docs-shell--old-page [class*='awsui_main_'] {
+  margin-bottom: 0 !important;
 }
 
 .docs-shell--old-page .docs-body {
@@ -697,8 +717,27 @@ p {
 .docs-right {
   grid-column: 3;
   position: sticky;
-  top: calc(var(--nav-height) + 2rem);
+  /* Clear the sticky header (banner + nav), matching scroll-padding-top above. */
+  top: calc(var(--nav-height) + 3.25rem);
   margin-top: 1.5rem;
+}
+
+/* The section divider in the docs side nav is inset by default (unlike the header
+   divider); pull it out to the drawer edges so it spans the full sidebar width. */
+.docs-shell [class*='awsui_divider-default'] {
+  margin-left: -28px !important;
+  margin-right: -24px !important;
+}
+
+/* Cloudscape's expandable nav group renders the caret before the label, indenting the parent
+   past its sibling links, and indents the children 40px. Pull the caret into the left gutter so
+   the parent label lines up with its siblings, and tighten the children to one indent level. */
+.docs-shell [class*='awsui_expandable-link-group'] [class*='awsui_expand-button'] {
+  margin-left: -22px !important;
+}
+
+.docs-shell [class*='awsui_list-variant-expandable-link-group'] {
+  padding-left: 20px !important;
 }
 
 .docs-title {
@@ -1251,6 +1290,23 @@ p {
   font-size: 13px;
 }
 
+/* The Old page renders the footer inside the AppLayout content column (so the side nav runs
+   full-height beside it). Fill the column instead of the centered site frame, and reserve
+   space on the right so the last link column isn't flush with the edge (matches the column gap). */
+.docs-main .footer-content {
+  width: auto;
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* Drop the divider line and the opaque block: Cloudscape paints the content area a slightly
+   different grey than --cs-bg, so an opaque footer reads as a mismatched rectangle (most
+   visible in dark mode). Going transparent + borderless lets it blend into the column. */
+.docs-main .site-footer {
+  border-top: 0;
+  background: transparent;
+}
+
 /* Top row: brand block (logo + social) on the left, the link group flush to the
    right edge (justify-content on this outer row), so the columns themselves keep a
    tight content width + fixed gap rather than being stretched apart. */
@@ -1332,7 +1388,6 @@ p {
   gap: 10px;
   min-width: 0;
   min-height: 64px;
-  border-top: 0.5px solid var(--cs-border);
 }
 
 /* The icon button's horizontal padding is removed via its `style` prop (see SiteFooter);
@@ -1359,6 +1414,12 @@ p {
 .right-rail-block a:hover,
 .site-footer a:hover {
   text-decoration-thickness: 2px !important;
+}
+
+/* The rail's "Need help?" Discord CTA is a Cloudscape Button (renders an <a>); keep the
+   link-underline rules above from underlining it, matching the landing's Discord button. */
+.right-rail-block a[class*='awsui_button'] {
+  text-decoration-line: none !important;
 }
 
 /* Footer column links: full-strength text, same 16px as the column headings, no underline

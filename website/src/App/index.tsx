@@ -4,13 +4,15 @@ import { SiteBanner } from '../components/SiteBanner';
 import { SiteFooter } from '../components/SiteFooter';
 import { SiteNavigation } from '../components/SiteNavigation';
 import { ROUTES } from '../routes';
-import { useTheme } from '../theme';
+import { useTheme, ThemeMode } from '../theme';
 
 // State shared from the layout down to routed pages via the router Outlet context.
-// Used by the Old page (its side-nav drawer) and the top-nav trigger.
+// Used by the Old page (its side-nav drawer + in-content footer) and the top-nav trigger.
 export type LayoutContext = {
   oldNavigationOpen: boolean;
   setOldNavigationOpen: (open: boolean) => void;
+  theme: ThemeMode;
+  toggleTheme: () => void;
 };
 
 export function useLayoutContext() {
@@ -23,7 +25,7 @@ export function App() {
   const { pathname } = useLocation();
   const [oldNavigationOpen, setOldNavigationOpen] = useState(true);
 
-  const layoutContext: LayoutContext = { oldNavigationOpen, setOldNavigationOpen };
+  const layoutContext: LayoutContext = { oldNavigationOpen, setOldNavigationOpen, theme, toggleTheme };
 
   return (
     <>
@@ -35,7 +37,11 @@ export function App() {
         />
       </div>
       <Outlet context={layoutContext} />
-      <SiteFooter home={pathname === ROUTES.HOME} theme={theme} onToggleTheme={toggleTheme} />
+      {/* The Old page renders its own footer inside the AppLayout content, so the side nav
+          runs full-height beside it; every other page uses the global footer here. */}
+      {pathname !== ROUTES.OLD && (
+        <SiteFooter home={pathname === ROUTES.HOME} theme={theme} onToggleTheme={toggleTheme} />
+      )}
     </>
   );
 }

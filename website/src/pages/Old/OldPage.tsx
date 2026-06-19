@@ -6,7 +6,8 @@ import BreadcrumbGroup from '@cloudscape-design/components/breadcrumb-group';
 import Button from '@cloudscape-design/components/button';
 import Link from '@cloudscape-design/components/link';
 import SideNavigation, { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
-import SpaceBetween from '@cloudscape-design/components/space-between';
+import { mainButtonStyle } from '../../cloudscape-theme';
+import { SiteFooter } from '../../components/SiteFooter';
 import { images } from '../../data/images';
 import { DOCS_URL, ROUTES } from '../../routes';
 import { useLayoutContext } from '../../App';
@@ -27,7 +28,16 @@ const docsNavigationItems: SideNavigationProps.Item[] = [
     title: 'For developers',
     items: [
       { type: 'link', text: 'Start developing', href: '#/developers/start-developing' },
-      { type: 'link', text: 'Using Cloudscape components', href: '#/developers/using-components' },
+      {
+        type: 'expandable-link-group',
+        text: 'Using Cloudscape components',
+        href: '#/developers/using-components',
+        defaultExpanded: true,
+        items: [
+          { type: 'link', text: 'Component playground', href: '#/developers/using-components/playground' },
+          { type: 'link', text: 'Sample code', href: '#/developers/using-components/sample-code' },
+        ],
+      },
       { type: 'link', text: 'Global styles', href: '#/developers/global-styles' },
       { type: 'link', text: 'Built-in internationalization', href: '#/developers/i18n' },
       { type: 'link', text: 'AI Tools Support', href: '#/developers/ai-tools' },
@@ -39,13 +49,12 @@ const docsNavigationItems: SideNavigationProps.Item[] = [
 // navigation drawer state is owned by the App layout (shared with the top nav trigger).
 export function OldPage() {
   const navigate = useNavigate();
-  const { oldNavigationOpen, setOldNavigationOpen } = useLayoutContext();
+  const { oldNavigationOpen, setOldNavigationOpen, theme, toggleTheme } = useLayoutContext();
 
   return (
     <AppLayoutToolbar
       className={`docs-shell docs-shell--old-page ${oldNavigationOpen ? 'docs-shell--navigation-open' : 'docs-shell--navigation-collapsed'}`}
-      headerSelector=".site-nav"
-      footerSelector=".site-footer"
+      headerSelector=".site-header"
       navigationOpen={oldNavigationOpen}
       onNavigationChange={event => setOldNavigationOpen(event.detail.open)}
       navigationTriggerHide
@@ -60,7 +69,7 @@ export function OldPage() {
       navigation={
         <SideNavigation
           activeHref="#/designers/start-designing"
-          header={{ text: 'Get started', href: '#/get-started' }}
+          // header={{ text: 'Get started', href: '#/get-started' }}
           items={docsNavigationItems}
           onFollow={event => {
             event.preventDefault();
@@ -99,6 +108,7 @@ export function OldPage() {
               ]}
             />
           </div>
+          <SiteFooter home={false} theme={theme} onToggleTheme={toggleTheme} />
         </div>
       }
     />
@@ -118,19 +128,18 @@ function DocsRightRail({
       <h2 id={onThisPageId}>On this page</h2>
       <AnchorNavigation ariaLabelledby={onThisPageId} scrollSpyOffset={110} anchors={anchors} />
       <div className="right-rail-block">
-        <h2>About this page</h2>
-        <p>Published: May 31, 2022</p>
-      </div>
-      <div className="right-rail-block">
-        <h2>Did this page help you?</h2>
-        <p>Your feedback helps us improve our documentation.</p>
-        <SpaceBetween size="xs">
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button iconName="thumbs-up">Yes</Button>
-            <Button iconName="thumbs-down">No</Button>
-          </SpaceBetween>
-          <Link href="#feedback">Provide additional feedback</Link>
-        </SpaceBetween>
+        <h2>Need help?</h2>
+        <p>Reach out to us on Discord</p>
+        <Button
+          variant="normal"
+          href="https://discord.gg/dstack"
+          target="_blank"
+          iconAlign="right"
+          iconName="external"
+          style={mainButtonStyle}
+        >
+          Discord
+        </Button>
       </div>
     </aside>
   );

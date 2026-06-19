@@ -161,7 +161,7 @@ export function SiteNavigation({
   };
 
   return (
-    <header className={`site-nav ${isHome ? 'site-nav--home' : ''} ${mobileNavigationOpen ? 'site-nav--mobile-open' : ''}`}>
+    <header className={`site-nav ${isHome ? 'site-nav--home' : ''} ${isOldPage ? 'site-nav--old' : ''} ${mobileNavigationOpen ? 'site-nav--mobile-open' : ''}`}>
       <div className="site-nav__inner">
         {isOldPage && (
           <div className="site-desktop-trigger">
