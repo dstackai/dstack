@@ -208,6 +208,7 @@ class BaseRunConfigurator(
             # We can attach to run multiple times if it goes from running to pending (retried).
             while True:
                 with MultiItemStatus(_get_apply_status(run), console=console) as live:
+                    ready_wait_attempt = 0
                     while not _is_ready_to_attach(run):
                         table = get_runs_table([run])
                         live.update(
@@ -215,7 +216,8 @@ class BaseRunConfigurator(
                             *_get_apply_wait_renderables(run),
                             status=_get_apply_status(run),
                         )
-                        time.sleep(5)
+                        time.sleep(_get_ready_wait_interval(ready_wait_attempt))
+                        ready_wait_attempt += 1
                         run.refresh()
 
                 console.print(
@@ -722,6 +724,12 @@ class ServiceConfigurator(RunWithCommandsConfiguratorMixin, BaseRunConfigurator)
     def apply_args(self, conf: TaskConfiguration, args: argparse.Namespace):
         super().apply_args(conf, args)
         self.apply_commands_args(conf, args)
+
+
+def _get_ready_wait_interval(attempt: int) -> float:
+    if attempt < 5:
+        return 1
+    return 5
 
 
 def _merge_ports(conf: List[PortMapping], args: List[PortMapping]) -> Dict[int, PortMapping]:
