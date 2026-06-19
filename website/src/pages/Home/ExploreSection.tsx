@@ -8,7 +8,9 @@ import Table from '@cloudscape-design/components/table';
 import Tabs from '@cloudscape-design/components/tabs';
 import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
-import { images } from '../../data/images';
+import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
+import { DashedBorder } from '../../components/DashedBorder';
+import { highlightTerms } from '../../components/highlightTerms';
 import { docsUrl } from '../../routes';
 import {
   backendConfigs,
@@ -72,7 +74,7 @@ function GpuMarketplaceTable() {
 export function ExploreSection() {
   return (
     <section className="docs-section explore-section" id="explore">
-      <AlternatingDocBlock image={images.architecture} title="Vendor-agnostic, open-source" imageFirst>
+      <AlternatingDocBlock visual={<ArchitectureDiagram />} title="Vendor-agnostic, open-source" imageFirst>
         dstack unifies fleets, dev environments, tasks, services, volumes, and gateways in one control plane for AI workloads.
         <br />
         <br />
@@ -147,9 +149,10 @@ function KeyConceptsBlock() {
             // arrow. Kept as a real <a> (open-in-new-tab / SEO) rather than Cloudscape's
             // onClick-only ActionCard component.
             <a className="media-card concept-card" href={concept.href} key={concept.name}>
+              <DashedBorder />
               <span className="concept-card__arrow" aria-hidden="true"><Icon name="angle-right" /></span>
               <h3>{concept.name}</h3>
-              <p>{concept.description}</p>
+              <p>{highlightTerms(concept.description)}</p>
             </a>
           ))}
         </div>

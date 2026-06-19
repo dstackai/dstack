@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { ThemedImage } from '../data/images';
+import { highlightTerms } from './highlightTerms';
 
 // In-content diagram: a plain string renders a single image, a themed pair swaps with the theme.
 function ThemedDocImage({ image }: { image: string | ThemedImage }) {
@@ -38,7 +39,7 @@ export function AlternatingDocBlock({
       <div className="doc-visual">{visual ?? (image && <ThemedDocImage image={image} />)}</div>
       <div>
         <h2>{title}</h2>
-        <p>{children}</p>
+        <p>{highlightTerms(children)}</p>
         {action && <div className="doc-action">{action}</div>}
       </div>
     </div>

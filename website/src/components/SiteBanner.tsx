@@ -1,4 +1,3 @@
-import Icon from '@cloudscape-design/components/icon';
 import { BLOG_URL } from '../routes';
 
 // Top announcement banner, mirroring the one on the MkDocs docs site. It sits above the top
@@ -12,9 +11,22 @@ export function SiteBanner() {
     <aside className="site-banner">
       <a className="site-banner__link" href={BANNER_HREF}>
         {BANNER_TEXT}
-        <span className="site-banner__arrow">
-          <Icon name="arrow-right" />
-        </span>
+        {/* Thin, accurate arrow (shaft + head) — lighter than Cloudscape's filled chevron. */}
+        <svg
+          className="site-banner__arrow"
+          viewBox="0 0 24 24"
+          width="17"
+          height="17"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M4 12h15" />
+          <path d="m12.5 5.5 6.5 6.5-6.5 6.5" />
+        </svg>
       </a>
     </aside>
   );

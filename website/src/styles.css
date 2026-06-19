@@ -23,6 +23,8 @@
   --cs-link: #0972d3;
   --cs-border: #16191f;
   --cs-panel: #f4f4f7;
+  --font-small: 15px; /* small body text: action-card descriptions, quotes, FAQ answers */
+  --font-card-heading: 16px; /* card titles: action cards, dstack Sky/Enterprise, quote names */
   --cs-hover: rgba(22, 25, 31, 0.03); /* shared faint hover tint: normal buttons, cards, dropdown items (softened from 0.05) */
   --cs-btn-hover: #272d38; /* filled (primary) button hover fill — shared with the split-button override */
   --cs-seg-divider: rgba(255, 255, 255, 0.22); /* split-button segment divider (light line on the dark fill) */
@@ -108,6 +110,16 @@ p {
   line-height: 1.5;
 }
 
+/* Inline highlight for key terms (e.g. "dstack"): a thin rounded outline with minor padding and
+   a transparent fill. Border takes a muted text color so it stays subtle and theme-adaptive. */
+.highlight {
+  padding: 0.06em 0.36em;
+  border: 0.25px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  white-space: nowrap;
+}
+
 .site-frame {
   width: min(var(--frame), calc(100vw - (2 * var(--page-gutter))));
   margin: 0 auto;
@@ -131,9 +143,14 @@ p {
    narrow screens (the banner grows to contain them). */
 .site-banner__link {
   color: var(--cs-bg) !important;
-  font-size: 15px;
-  font-weight: 500; /* was 300 */
+  font-size: 16.5px;
+  font-weight: 300;
   text-decoration: none !important;
+}
+
+/* On dark, the banner is light-on-dark; nudge the weight up a hair for even visual weight. */
+:root[data-theme='dark'] .site-banner__link {
+  font-weight: 350;
 }
 
 /* Icons follow the banner's (inverted) text color in both themes. */
@@ -345,6 +362,7 @@ p {
 .home-hero p {
   margin-top: 16px;
   max-width: 600px;
+  font-size: 17px;
 }
 
 /* Hero CTAs sit side by side, each sized to its own label (not forced to equal width). */
@@ -597,7 +615,7 @@ p {
 
 .media-card p {
   padding-bottom: 22px;
-  font-size: 14px;
+  font-size: var(--font-small);
 }
 
 .start-building {
@@ -796,6 +814,231 @@ p {
   font-size: 28px;
 }
 
+/* Body copy in the alternating marketing blocks (normal page text). */
+.doc-alternating p {
+  font-size: 17px;
+}
+
+/* Action-card (concept) descriptions are a step smaller than normal text. Higher specificity
+   than `.doc-alternating p` so it wins (the cards sit inside an alternating block). This is the
+   shared small-text size (--font-small), reused for quotes, FAQ answers, and popup descriptions. */
+.concept-grid .media-card p {
+  font-size: var(--font-small);
+}
+
+/* "Vendor-agnostic, open-source" architecture diagram (components/ArchitectureDiagram.tsx),
+   rebuilt from a static SVG into HTML/CSS and sized 1:1 with it. Every dimension is in cqw
+   (% of the diagram's own width, resolved against the .arch-diagram-wrap container) so the
+   whole thing scales proportionally like the original SVG. Source design width is 901.8
+   units, so 1 unit ≈ 0.111cqw. Logos are monochrome + theme-adaptive (see .arch-logo). */
+.arch-diagram-wrap {
+  container-type: inline-size;
+  width: 100%;
+}
+
+.arch-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 2.66cqw; /* 24u between the four layers */
+  width: 100%;
+  color: var(--cs-text);
+  --arch-border-width: max(1px, 0.22cqw); /* placeholder badge stroke */
+  --arch-gradient: linear-gradient(45deg, #002aff, #002aff, #e165fe);
+}
+
+/* Dotted outline: an inline <svg> with one rounded rect, stroked with the exact 2-on / 6-off
+   dash. Geometry is set in CSS (modern browsers allow x/y/width/height/rx as CSS so we can inset
+   by the half stroke with calc — no edge clipping, crisp dots) and the stroke takes the text
+   color so it matches the labels and flips with the theme. */
+.arch-dash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.arch-dash rect {
+  x: 0.75px;
+  y: 0.75px;
+  width: calc(100% - 1.5px);
+  height: calc(100% - 1.5px);
+  rx: 12px;
+  fill: none;
+  stroke: var(--arch-dash-stroke, var(--cs-text));
+  stroke-width: 1.5px;
+  stroke-dasharray: 2 6;
+  stroke-linecap: butt;
+}
+
+/* Top + bottom three-up rows share one grid so cells line up. Ratio 487.3 : 191.8 : 191.8. */
+.arch-row {
+  display: grid;
+  grid-template-columns: 2.54fr 1fr 1fr;
+  gap: 1.72cqw; /* 15.5u */
+}
+
+.arch-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.55cqw;
+  min-height: 9.83cqw; /* 88.7u */
+  padding: 0 2cqw;
+  border-radius: 12px;
+}
+
+.arch-cell--center {
+  justify-content: center;
+}
+
+/* Centered labels (e.g. "On-prem clusters") may wrap rather than overflow the narrow column. */
+.arch-cell--center .arch-cell__label {
+  white-space: normal;
+  text-align: center;
+}
+
+.arch-cell--full {
+  min-height: 9.83cqw;
+}
+
+/* "Any GPU cloud": logos left, label pushed to the right edge. */
+.arch-cell--gpu {
+  justify-content: space-between;
+}
+
+/* "Any hardware": label pinned left, logos centered across the full row. */
+.arch-cell--hw {
+  justify-content: center;
+}
+.arch-cell--hw > .arch-cell__label {
+  position: absolute;
+  left: 2cqw;
+}
+
+.arch-cell__label {
+  font-size: 2.55cqw;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Orchestration layer — gradient band. Title gets more room above the cells than below
+   (≈73 vs ≈31u); cells inset ≈5% each side. */
+.arch-orchestration {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3cqw;
+  padding: 3.2cqw 5.07cqw 3.48cqw;
+  border-radius: 1.6cqw;
+  background: var(--arch-gradient);
+  color: #fff;
+}
+
+/* Same size/weight as the cell labels (e.g. "Any framework"). */
+.arch-orchestration__title {
+  font-size: 2.55cqw;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Five primitives — NOT equal width: "Dev environments" (2nd) is wider so its label fits. */
+.arch-orchestration__cells {
+  display: grid;
+  grid-template-columns: 1fr 1.34fr 1fr 1fr 1fr;
+  gap: 1.26cqw; /* 11.4u */
+  width: 100%;
+}
+
+.arch-subcell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 5.54cqw; /* 50u */
+  padding: 0 0.8cqw;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 2.25cqw;
+  font-weight: 500;
+  line-height: 1.2;
+  --arch-dash-stroke: #fff; /* white dotted outline on the gradient */
+}
+
+.arch-logos {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.15cqw; /* ~10u between logos in the SVG */
+  flex-wrap: nowrap; /* keep each cell's logos on one line (mobile reflow re-enables wrap) */
+}
+
+/* Real logo: source SVG (or webp) used as a mask filled with the current text color, so it reads
+   monochrome and flips with the theme. The mask image URL is the only inline bit (it needs the
+   runtime base path); size + aspect live in the per-logo classes below. */
+.arch-logo {
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+/* Per-logo height (cqw, so it scales) + aspect from each source's viewBox. Wide marks (AWS,
+   Meta, NVIDIA) are set shorter so they don't dominate; tall ones (PyTorch) a touch taller. */
+.arch-logo--aws { height: 4.05cqw; aspect-ratio: 304 / 182; }
+.arch-logo--gcp { height: 4.55cqw; aspect-ratio: 256 / 206; }
+.arch-logo--lambda { height: 4.9cqw; aspect-ratio: 1; }
+.arch-logo--nebius { height: 4.6cqw; aspect-ratio: 1; }
+.arch-logo--runpod { height: 5.04cqw; aspect-ratio: 120 / 130; }
+.arch-logo--kubernetes { height: 4.98cqw; aspect-ratio: 1; }
+.arch-logo--pytorch { height: 5.2cqw; aspect-ratio: 90.3 / 109.1; }
+.arch-logo--vllm { height: 4.8cqw; aspect-ratio: 1; }
+.arch-logo--sglang { height: 4.8cqw; aspect-ratio: 596 / 683; }
+.arch-logo--meta { height: 3.7cqw; aspect-ratio: 287.56 / 191; }
+.arch-logo--huggingface { height: 5.1cqw; aspect-ratio: 1; }
+.arch-logo--nvidia { height: 3.7cqw; aspect-ratio: 271.7 / 179.7; }
+.arch-logo--amd { height: 4.6cqw; aspect-ratio: 1600 / 1408; }
+.arch-logo--tenstorrent { height: 4.8cqw; aspect-ratio: 170 / 169; }
+.arch-logo--tpu { height: 4.2cqw; aspect-ratio: 256 / 206; } /* shares the GCP mark, sized down a touch */
+
+/* Placeholder badge (fallback if a logo ever lacks a source). Overrides the mask fill. */
+.arch-logo--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  /* height + min-width set inline per logo */
+  padding: 0 0.6cqw;
+  border: var(--arch-border-width) dashed color-mix(in srgb, var(--cs-text) 42%, transparent);
+  border-radius: 0.7cqw;
+  background: none;
+  font-size: 1.5cqw;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--cs-muted);
+}
+
+/* Safety net for very narrow containers (phones): stop shrinking, stack the rows, drop the
+   primitives to two columns, and switch to fixed legible type. */
+@container (max-width: 360px) {
+  .arch-diagram { gap: 12px; }
+  .arch-row { grid-template-columns: 1fr; gap: 8px; }
+  .arch-cell { min-height: 52px; padding: 10px 14px; gap: 12px; border-width: 1px; border-radius: 8px; }
+  .arch-cell__label { font-size: 14px; white-space: normal; }
+  .arch-orchestration { gap: 12px; padding: 16px; border-radius: 12px; }
+  .arch-orchestration__title { font-size: 15px; }
+  .arch-orchestration__cells { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .arch-subcell { min-height: 44px; font-size: 13px; border-width: 1px; border-radius: 7px; }
+  .arch-logos { gap: 12px; }
+  /* !important to beat the per-logo cqw heights. */
+  .arch-logo { height: 22px !important; }
+  .arch-logo--placeholder { height: 22px !important; min-width: 22px !important; font-size: 12px; border-width: 1px; border-radius: 5px; }
+}
+
 .doc-card-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -841,11 +1084,12 @@ p {
 
 .figma-card h3 {
   margin-bottom: 12px;
-  font-size: 20px;
+  font-size: var(--font-card-heading);
 }
 
 .figma-card p {
   margin-bottom: 20px;
+  font-size: var(--font-small);
 }
 
 /* Core-concept cards: 2x2 grid inside the AlternatingDocBlock visual slot. */
@@ -859,10 +1103,11 @@ p {
    no underline, with a subtle background on hover to signal it's clickable. */
 .concept-grid .media-card {
   display: block;
-  position: relative; /* for the arrow */
+  position: relative; /* for the arrow + the dotted border overlay */
   color: var(--cs-text);
   text-decoration: none !important;
   transition: background 0.15s ease;
+  border: none; /* dotted outline is drawn by the shared <DashedBorder> (.arch-dash) instead */
 }
 
 .concept-grid .media-card:hover {
@@ -870,8 +1115,13 @@ p {
 }
 
 .concept-grid .media-card h3 {
-  font-size: 16px;
+  font-size: var(--font-card-heading);
   padding-right: 44px; /* clear the arrow */
+}
+
+/* Quote author name reuses the card-heading size. */
+.testimonial-name {
+  font-size: var(--font-card-heading) !important;
 }
 
 /* ActionCard-style navigation arrow, top-right. */
@@ -903,6 +1153,16 @@ p {
   gap: var(--card-gap);
   margin-top: 24px;
 }
+
+/* Small body text — quotes and FAQ answers — reuse the action-card description's size, line
+   height, and color so they read identically. !important to beat Cloudscape's boosted classes. */
+.testimonial-grid p,
+.faq-list [class*='awsui_content'] {
+  font-size: var(--font-small) !important;
+  line-height: 1.5 !important;
+  color: var(--cs-text) !important;
+}
+
 
 .testimonial-person {
   display: flex;

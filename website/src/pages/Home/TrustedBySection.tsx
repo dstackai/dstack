@@ -2,6 +2,7 @@ import Box from '@cloudscape-design/components/box';
 import Container from '@cloudscape-design/components/container';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import { asset } from '../../asset';
+import { highlightTerms } from '../../components/highlightTerms';
 
 const testimonials = [
   {
@@ -96,13 +97,13 @@ export function TrustedBySection() {
               <div className="testimonial-person">
                 <img className="testimonial-photo" src={asset(testimonial.photo)} alt="" />
                 <SpaceBetween size="xxxs">
-                  <Box variant="h3" padding="n">{testimonial.name}</Box>
+                  <Box variant="h3" padding="n" className="testimonial-name">{testimonial.name}</Box>
                   <Box variant="small" color="text-body-secondary">
                     {testimonial.title} at {testimonial.company}
                   </Box>
                 </SpaceBetween>
               </div>
-              <Box variant="p">{testimonial.quote}</Box>
+              <Box variant="p">{highlightTerms(testimonial.quote)}</Box>
             </SpaceBetween>
           </Container>
         ))}

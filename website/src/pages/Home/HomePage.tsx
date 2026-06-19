@@ -1,5 +1,6 @@
 import Button from '@cloudscape-design/components/button';
 import { heroButtonStyle } from '../../cloudscape-theme';
+import { highlightTerms } from '../../components/highlightTerms';
 import { images, ThemedImage } from '../../data/images';
 import { DOCS_URL } from '../../routes';
 import { ExploreSection } from './ExploreSection';
@@ -36,9 +37,10 @@ export function HomePage() {
             for AI infrastructure
           </h2>
           <p>
-            dstack is an open-source orchestration layer that standardizes how AI workloads are defined,
-            scheduled, and run across heterogeneous compute. From GPU clouds to Kubernetes to on-prem
-            clusters, dstack makes AI infrastructure portable across NVIDIA, AMD, Tenstorrent, and Google TPU.
+            {highlightTerms(
+              'dstack is an open-source orchestration layer that standardizes how AI workloads run across heterogeneous compute. From GPU clouds to Kubernetes to on-prem ' +
+                'clusters, dstack makes AI infrastructure portable across NVIDIA, AMD, Tenstorrent, and TPU.',
+            )}
           </p>
           <div className="home-hero__actions">
             <Button variant="primary" onClick={scrollToResources} style={heroButtonStyle}>

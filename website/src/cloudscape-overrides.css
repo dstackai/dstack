@@ -117,11 +117,13 @@ body {
 [class*='awsui_item-element'][class*='awsui_highlighted'] {
   border-color: transparent !important;
 }
-/* Keep the description muted at all times — Cloudscape brightens it on highlight. A hair of
-   separation (1.5px) from the bold label above so the two lines don't read as one block. */
+/* Popup item descriptions: normal text color (not muted), 13px / weight 300. A hair of
+   separation (1.5px) from the label above so the two lines don't read as one block. */
 [class*='awsui_secondary-text'] {
-  color: var(--cs-muted) !important;
+  color: var(--cs-text) !important;
   margin-block-start: 1.5px;
+  font-size: 13px !important;
+  font-weight: 300 !important;
 }
 /* A little breathing room at the top and bottom of the popup (inside the border). Placed on
    the first/last rows rather than on the list itself, so a hovered first/last item's

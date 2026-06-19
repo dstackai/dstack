@@ -51,7 +51,7 @@ export function GetStartedSection() {
         <br />
         <br />
 
-        Once it's running, manage your workloads from the CLI — or let agents do it for you.
+        Once it's running, manage your workloads from the CLI, or let agents do it for you.
       </AlternatingDocBlock>
 
       <AlternatingDocBlock

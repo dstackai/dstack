@@ -11,11 +11,8 @@ export const images = {
     light: asset('/static/dstack-gpu-artwork.svg'),
     dark: asset('/static/dstack-gpu-artwork-dark.svg'),
   },
-  // Architecture diagram for the "Vendor-agnostic, open-source" block.
-  architecture: {
-    light: 'https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11.svg',
-    dark: 'https://dstack.ai/static-assets/static-assets/images/dstack-architecture-diagram-v11-dark.svg',
-  },
+  // (The "Vendor-agnostic, open-source" architecture diagram is now an HTML/CSS component —
+  //  see components/ArchitectureDiagram.tsx — not an image.)
   // Old page imagery (kept for comparison / as a template for future product pages).
   meet: img('/__images/yvlrib0vb3vb/3RkANdWu0IRLpTcBJYSPg5/2397551327a83cfbddd1fe4db9f58188/homepage--meet-cloudscape--os-light.png'),
   familiar: img('/__images/yvlrib0vb3vb/3CJGtMGSx07lhdtgwL8Ncb/0e33dc1bac3936239e2bc856ee268e80/homepage--get-familiar-with-system--os-light.png'),
