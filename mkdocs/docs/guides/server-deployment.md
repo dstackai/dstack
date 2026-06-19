@@ -5,7 +5,10 @@ description: Deploying the dstack server
 
 The `dstack` server can run on your laptop or any environment with access to the cloud and on-prem clusters you plan to use.
 
-The minimum hardware requirements for running the server are 1 CPU and 1GB of RAM.
+??? info "Hardware requirements"
+    The minimum hardware requirements for running the server are 1 CPU and 1GB of RAM. The recommended RAM is
+    "8MB × number of active instances". For example, a server with 1000 active instances should have 8GB of RAM.
+    You can set the `DSTACK_SERVER_SSH_POOL_DISABLED` env var to minimize RAM usage at the expense of slower processing.
 
 === "pip"
     > The server can be set up via `pip` on Linux, macOS, and Windows (via WSL 2). It requires Git and OpenSSH.
@@ -43,7 +46,7 @@ The minimum hardware requirements for running the server are 1 CPU and 1GB of RA
     </div>
 
 === "Docker"
-     > To deploy the server most reliably, it's recommended to use `dstackai/dstack` Docker image.
+     > For production deployments, it's recommended to use `dstackai/dstack` Docker image.
 
     <div class="termy">
     
