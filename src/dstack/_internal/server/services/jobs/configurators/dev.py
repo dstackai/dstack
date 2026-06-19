@@ -8,8 +8,9 @@ from dstack._internal.server.services.ides import get_ide
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 
 INSTALL_IPYKERNEL = (
+    "(echo 'uv pip install ipykernel...' && uv pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
     "(echo 'pip install ipykernel...' && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
-    "echo 'no pip, ipykernel was not installed'"
+    "echo 'no uv or pip found, ipykernel was not installed'"
 )
 
 
