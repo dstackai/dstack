@@ -23,7 +23,7 @@
   --cs-link: #0972d3;
   --cs-border: #16191f;
   --cs-panel: #f4f4f7;
-  --cs-hover: rgba(22, 25, 31, 0.05); /* shared faint hover tint: normal buttons, cards, dropdown items */
+  --cs-hover: rgba(22, 25, 31, 0.03); /* shared faint hover tint: normal buttons, cards, dropdown items (softened from 0.05) */
   --cs-btn-hover: #272d38; /* filled (primary) button hover fill — shared with the split-button override */
   --cs-seg-divider: rgba(255, 255, 255, 0.22); /* split-button segment divider (light line on the dark fill) */
   --cs-dark: #0f141d;
@@ -56,7 +56,7 @@
   --cs-link: #58a6ff;
   --cs-border: #f2f3f3;
   --cs-panel: #1b212d;
-  --cs-hover: rgba(242, 243, 243, 0.085);
+  --cs-hover: rgba(242, 243, 243, 0.05); /* softened from 0.085 */
   --cs-btn-hover: #e2e5e8;
   --cs-seg-divider: rgba(0, 0, 0, 0.18); /* split-button segment divider (dark line on the light fill) */
   --hero-gradient: linear-gradient(
@@ -74,6 +74,9 @@
 
 html {
   scroll-behavior: smooth;
+  /* Offset anchor / scrollIntoView landings by the sticky header (banner + nav) so a targeted
+     section isn't hidden behind it — e.g. "Get started" scrolling to #resources. */
+  scroll-padding-top: calc(var(--nav-height) + 3.25rem);
 }
 
 body {
@@ -118,7 +121,7 @@ p {
   align-items: center;
   justify-content: center;
   min-height: 38px;
-  padding: 9px 16px;
+  padding: 9px 16px 7.5px;
   background: var(--cs-text);
   color: var(--cs-bg);
   text-align: center;
@@ -129,7 +132,7 @@ p {
 .site-banner__link {
   color: var(--cs-bg) !important;
   font-size: 15px;
-  font-weight: 300;
+  font-weight: 500; /* was 300 */
   text-decoration: none !important;
 }
 
@@ -344,21 +347,12 @@ p {
   max-width: 600px;
 }
 
-/* Hero CTAs sized to equal width: an inline grid of equal (1fr) columns shrinks to the
-   wider button, and each button fills its column. */
+/* Hero CTAs sit side by side, each sized to its own label (not forced to equal width). */
 .home-hero__actions {
   margin-top: 28px;
-  display: inline-grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  display: inline-flex;
+  flex-wrap: wrap;
   gap: 8px;
-}
-
-.home-hero__actions [class*='awsui_button'] {
-  width: 100%;
-  /* Center the label now that the button is wider than its content. !important: Cloudscape
-     sets text-align:start on the button via a specificity-boosted rule. */
-  text-align: center !important;
 }
 
 .home-hero__art {
@@ -505,6 +499,15 @@ p {
   border-bottom: 0;
 }
 
+/* 1px outer frame on the FAQ block with rounded (12px) corners. ExpandableSection
+   has no radius token, so we border + clip the wrapper; overflow:hidden trims the items' square
+   corners to the radius. Internal dividers between questions stay 0.5px (see cloudscape-overrides). */
+.faq-list {
+  border: 1px solid var(--cs-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
 /* FAQ question headers. */
 .faq-list [class*="awsui_header-text"] {
   font-size: 16px;
@@ -570,8 +573,8 @@ p {
 }
 
 .media-card {
-  border: 0.5px solid var(--cs-border);
-  border-radius: 0;
+  border: 1px solid var(--cs-border); /* 1px / 12px */
+  border-radius: 12px;
   overflow: hidden;
   background: var(--cs-bg, #ffffff);
 }
@@ -819,8 +822,8 @@ p {
 .figma-card {
   width: min(24rem, 100%);
   margin-top: 1.5rem;
-  border: 0.5px solid var(--cs-border);
-  border-radius: 0;
+  border: 1px solid var(--cs-border); /* 1px / 12px */
+  border-radius: 12px;
   overflow: hidden;
   background: var(--cs-bg, #ffffff);
 }
@@ -1309,9 +1312,12 @@ p {
     grid-template-columns: 1fr 1fr;
     width: 100%;
   }
-  /* Trim the desktop 34px side padding so both labels fit the halved columns. */
+  /* Each button fills its half-column; center the label and trim the desktop 34px side
+     padding so both fit. !important: Cloudscape sets text-align:start via a boosted rule. */
   .home-hero__actions [class*='awsui_button'] {
+    width: 100%;
     padding-inline: 16px !important;
+    text-align: center !important;
   }
 
   .site-mobile-navigation {

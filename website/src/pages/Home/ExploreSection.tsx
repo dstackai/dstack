@@ -170,7 +170,7 @@ function GpuMarketplaceBlock() {
       visual={<GpuMarketplaceTable />}
       title="Access marketplace GPUs"
       imageFirst
-      action={<Button href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign up</Button>}
+      action={<Button href="https://sky.dstack.ai" variant="primary" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign up</Button>}
     >
       Don't have your own cloud accounts or on-prem clusters? No problem. You can access compute
       through dstack Sky, our hosted GPU marketplace.

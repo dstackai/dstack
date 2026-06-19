@@ -23,9 +23,9 @@ const tokens = {
   fontFamilyHeading: FONT,
   fontFamilyDisplay: FONT,
 
-  // Square corners everywhere, including buttons. (Focus-ring radii are left untouched.)
-  borderRadiusButton: '0px',
-  borderRadiusContainer: '0px',
+  // rounded corners on buttons + containers (tabs/tables/quotes). 12px.
+  borderRadiusButton: '12px',
+  borderRadiusContainer: '12px',
   borderRadiusInput: '0px',
   borderRadiusDropdown: '0px',
   borderRadiusItem: '0px',
@@ -33,10 +33,10 @@ const tokens = {
   borderRadiusAlert: '0px',
   borderRadiusPopover: '0px',
   borderRadiusTiles: '0px',
-  borderRadiusCardDefault: '0px',
-  borderRadiusCardEmbedded: '0px',
-  borderRadiusActionCardDefault: '0px',
-  borderRadiusActionCardEmbedded: '0px',
+  borderRadiusCardDefault: '12px',
+  borderRadiusCardEmbedded: '12px',
+  borderRadiusActionCardDefault: '12px',
+  borderRadiusActionCardEmbedded: '12px',
   borderRadiusFlashbar: '0px',
   borderRadiusDropzone: '0px',
   borderRadiusTutorialPanelItem: '0px',
@@ -45,11 +45,11 @@ const tokens = {
 
   // Hairline borders on structural controls. Icon stroke widths (borderWidthIcon*) are
   // intentionally left alone — those drive icon rendering, not container borders.
-  borderWidthButton: '0.5px',
+  borderWidthButton: '1px', /* 1px borders */
   borderWidthField: '0.5px',
   borderWidthDropdown: '0.5px',
   borderWidthPopover: '0.5px',
-  borderWidthCard: '0.5px',
+  borderWidthCard: '1px', /* 1px borders */
 
   // Neutral borders/dividers take the text color instead of gray. Semantic borders
   // (status, badges, selected/focused) keep their defaults so they still read as such.
@@ -103,7 +103,7 @@ applyTheme({ theme: { tokens } });
 // proportionally: hero buttons are the most generous, main-area buttons a step below.
 // (Transparent backgrounds for normal buttons are handled globally by the tokens above.)
 export const heroButtonStyle: ButtonProps.Style = {
-  root: { paddingBlock: '12px', paddingInline: '34px' },
+  root: { paddingBlock: '10px', paddingInline: '30px' }, // trimmed a touch from 12/34
 };
 export const mainButtonStyle: ButtonProps.Style = {
   root: { paddingBlock: '8px', paddingInline: '26px' },
