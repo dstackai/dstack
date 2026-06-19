@@ -1026,9 +1026,15 @@ p {
    primitives to two columns, and switch to fixed legible type. */
 @container (max-width: 360px) {
   .arch-diagram { gap: 12px; }
-  .arch-row { grid-template-columns: 1fr; gap: 8px; }
+  /* Two columns: the wide first cell ("Any framework" / "Any cloud") spans the full width on its
+     own row, and the two narrower cells pair up on the row below. */
+  .arch-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .arch-row > :first-child { grid-column: 1 / -1; }
   .arch-cell { min-height: 52px; padding: 10px 14px; gap: 12px; border-width: 1px; border-radius: 8px; }
   .arch-cell__label { font-size: 14px; white-space: normal; }
+  /* "Any hardware": label left, logos pushed to the right (the desktop layout centers them). */
+  .arch-cell--hw { justify-content: space-between; }
+  .arch-cell--hw > .arch-cell__label { position: static; }
   .arch-orchestration { gap: 12px; padding: 16px; border-radius: 12px; }
   .arch-orchestration__title { font-size: 15px; }
   .arch-orchestration__cells { grid-template-columns: repeat(2, 1fr); gap: 8px; }
