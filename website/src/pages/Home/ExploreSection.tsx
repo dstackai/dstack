@@ -120,7 +120,7 @@ export function ExploreSection() {
         action={
           <SpaceBetween direction="horizontal" size="xs">
             <Button href={docsUrl('concepts/backends/#kubernetes')} style={mainButtonStyle}>Kubernetes</Button>
-            <Button href={docsUrl('concepts/fleets/#ssh-fleets')} style={mainButtonStyle}>SSH Fleets</Button>
+            <Button href={docsUrl('concepts/fleets/#ssh-fleets')} style={mainButtonStyle}>SSH fleets</Button>
           </SpaceBetween>
         }
       >

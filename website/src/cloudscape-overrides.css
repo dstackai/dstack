@@ -173,3 +173,12 @@ body {
   border-style: dotted !important;
   border-width: 0.25px !important;
 }
+
+/* 8) Mobile slide-out navigation (SideNavigation): render the expandable section headers
+      ("Resources" / "Get started") in the same weight and size as their sub-links, instead
+      of bold, for a flatter menu. Scoped to the mobile drawer; `awsui_header-text` is a
+      stable, hash-independent prefix. */
+.site-mobile-navigation [class*='awsui_header-text'] {
+  font-weight: 400 !important;
+  font-size: 14px !important;
+}

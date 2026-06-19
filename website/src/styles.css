@@ -110,9 +110,56 @@ p {
   margin: 0 auto;
 }
 
-.site-nav {
+/* Top announcement banner. Filled with the text color and an inverted label — the same
+   treatment as the primary buttons — so it reads as a deliberate strip in either theme. It
+   sticks to the top together with the nav (see .site-header). */
+.site-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 9px 16px;
+  background: var(--cs-text);
+  color: var(--cs-bg);
+  text-align: center;
+}
+
+/* Plain inline link so the label and arrow wrap together as one centered paragraph on
+   narrow screens (the banner grows to contain them). */
+.site-banner__link {
+  color: var(--cs-bg) !important;
+  font-size: 16px;
+  font-weight: 300;
+  text-decoration: none !important;
+}
+
+/* Icons follow the banner's (inverted) text color in both themes. */
+.site-banner [class*='awsui_icon'] {
+  color: var(--cs-bg) !important;
+}
+
+.site-banner__arrow {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-inline-start: 6px;
+  transition: transform 0.2s ease;
+}
+
+.site-banner__link:hover .site-banner__arrow {
+  transform: translateX(3px);
+}
+
+/* Banner + nav stick to the top together. Sticking the wrapper (rather than each child)
+   handles the banner's variable height when its text wraps on narrow screens, and keeps it
+   above the hero gradient (which can extend up into this area). */
+.site-header {
   position: sticky;
   top: 0;
+  z-index: 901;
+}
+
+.site-nav {
+  position: relative;
   z-index: 900;
   height: var(--nav-height);
   border-bottom: 0.5px solid var(--cs-border);
@@ -297,8 +344,21 @@ p {
   max-width: 600px;
 }
 
+/* Hero CTAs sized to equal width: an inline grid of equal (1fr) columns shrinks to the
+   wider button, and each button fills its column. */
 .home-hero__actions {
   margin-top: 28px;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px;
+}
+
+.home-hero__actions [class*='awsui_button'] {
+  width: 100%;
+  /* Center the label now that the button is wider than its content. !important: Cloudscape
+     sets text-align:start on the button via a specificity-boosted rule. */
+  text-align: center !important;
 }
 
 .home-hero__art {
@@ -340,6 +400,12 @@ p {
 
 :root[data-theme='dark'] .hero-slice--dark {
   display: block;
+}
+
+/* Phone-only copy of the hero artwork, placed just above the footer (see HomePage). The
+   light/dark swap is handled by the shared .hero-slice--light/--dark rules above. */
+.home-hero-mobile-art {
+  display: none;
 }
 
 /* Lifted above the footer gradient so the content/cards stay clean while the gradient
@@ -439,9 +505,9 @@ p {
   border-bottom: 0;
 }
 
-/* FAQ question headers sized to match the testimonial names. */
+/* FAQ question headers. */
 .faq-list [class*="awsui_header-text"] {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .landing-copy p + p {
@@ -1059,12 +1125,17 @@ p {
   line-height: inherit !important;
 }
 
-/* Footer responsive: below the desktop width the brand stacks above the columns,
-   which stay a single row while they still fit. */
+/* Footer responsive: below the desktop width the columns stack on top, with the brand
+   (logo + social) below them — the links are the primary footer nav, so they lead. */
 @media (max-width: 1100px) {
   .footer-top {
     flex-direction: column;
     gap: 32px;
+  }
+
+  /* Links first, brand (logo + social icons) second. */
+  .footer-brand {
+    order: 2;
   }
 
   .footer-links {
@@ -1121,9 +1192,14 @@ p {
     grid-template-columns: 1fr;
   }
 
-  .image-text-row.image-first .landing-image,
-  .doc-alternating:not(.image-first) .doc-visual {
+  .image-text-row.image-first .landing-image {
     order: initial;
+  }
+
+  /* Stacked on mobile, always lead with the text block; the visual follows below
+     (regardless of the desktop image-first / image-last alternation). */
+  .doc-alternating .doc-visual {
+    order: 2;
   }
 
   /* Tighter gap between blocks once they stack into a single column. */
@@ -1208,22 +1284,34 @@ p {
     padding: 64px 0 24px;
   }
 
+  /* On phones the hero artwork moves out of the hero and down above the footer: hide the
+     top instance and show the relocated copy (centered, in normal flow). */
   .home-hero__art {
-    position: relative;
-    order: 2;
-    inset: auto;
-    display: flex;
-    justify-content: center;
-    margin: 20px 0 8px;
-    opacity: 1;
+    display: none;
   }
 
-  .hero-slice {
+  .home-hero-mobile-art {
+    display: block;
+    margin: 20px 0 4px;
+  }
+
+  .home-hero-mobile-art .hero-slice {
     position: relative;
     top: auto;
     right: auto;
     width: min(25rem, 88vw);
     margin: 0 auto;
+  }
+
+  /* Hero CTAs share one full-width row on phones — two equal columns spanning the width. */
+  .home-hero__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  /* Trim the desktop 34px side padding so both labels fit the halved columns. */
+  .home-hero__actions [class*='awsui_button'] {
+    padding-inline: 16px !important;
   }
 
   .site-mobile-navigation {

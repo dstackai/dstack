@@ -41,7 +41,6 @@ export function GetStartedSection() {
         imageFirst
         action={
           <SpaceBetween direction="horizontal" size="xs">
-            <Button href={docsUrl('installation')} style={mainButtonStyle}>Installation</Button>
             <Button href={docsUrl('quickstart')} style={mainButtonStyle}>Quickstart</Button>
           </SpaceBetween>
         }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Outlet, useLocation, useOutletContext } from 'react-router-dom';
+import { SiteBanner } from '../components/SiteBanner';
 import { SiteFooter } from '../components/SiteFooter';
 import { SiteNavigation } from '../components/SiteNavigation';
 import { ROUTES } from '../routes';
@@ -26,10 +27,13 @@ export function App() {
 
   return (
     <>
-      <SiteNavigation
-        oldNavigationOpen={oldNavigationOpen}
-        onToggleOldNavigation={() => setOldNavigationOpen(open => !open)}
-      />
+      <div className="site-header">
+        <SiteBanner />
+        <SiteNavigation
+          oldNavigationOpen={oldNavigationOpen}
+          onToggleOldNavigation={() => setOldNavigationOpen(open => !open)}
+        />
+      </div>
       <Outlet context={layoutContext} />
       <SiteFooter home={pathname === ROUTES.HOME} theme={theme} onToggleTheme={toggleTheme} />
     </>

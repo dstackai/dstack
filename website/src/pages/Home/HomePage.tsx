@@ -1,5 +1,4 @@
 import Button from '@cloudscape-design/components/button';
-import SpaceBetween from '@cloudscape-design/components/space-between';
 import { heroButtonStyle } from '../../cloudscape-theme';
 import { images, ThemedImage } from '../../data/images';
 import { DOCS_URL } from '../../routes';
@@ -42,14 +41,12 @@ export function HomePage() {
             clusters, dstack makes AI infrastructure portable across NVIDIA, AMD, Tenstorrent, and Google TPU.
           </p>
           <div className="home-hero__actions">
-            <SpaceBetween direction="horizontal" size="xs">
-              <Button variant="primary" onClick={scrollToResources} style={heroButtonStyle}>
-                Get started
-              </Button>
-              <Button href={DOCS_URL} style={heroButtonStyle}>
-                Documentation
-              </Button>
-            </SpaceBetween>
+            <Button variant="primary" onClick={scrollToResources} style={heroButtonStyle}>
+              Get started
+            </Button>
+            <Button href={DOCS_URL} style={heroButtonStyle}>
+              Documentation
+            </Button>
           </div>
         </div>
       </section>
@@ -63,6 +60,12 @@ export function HomePage() {
             <GetStartedSection />
           </article>
         </div>
+      </div>
+
+      {/* On phones the hero artwork is relocated down here, just above the footer
+          (the top instance is hidden at the same breakpoint). */}
+      <div className="site-frame home-hero-mobile-art" aria-hidden="true">
+        <ThemedHeroImage image={images.hero} />
       </div>
     </main>
   );
