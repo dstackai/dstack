@@ -171,6 +171,8 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     if settings.SERVER_SSH_POOL_ENABLED:
         await run_async(instance_connection_pool.startup_cleanup)
+    else:
+        logger.info("Server SSH pool is disabled")
     scheduler = None
     pipeline_manager = None
     if settings.SERVER_BACKGROUND_PROCESSING_ENABLED:

@@ -146,6 +146,8 @@ For more details on the options below, refer to the [server deployment](../guide
 - `DSTACK_SERVER_SSHPROXY_ENFORCED`{ #DSTACK_SERVER_SSHPROXY_ENFORCED } – When set to any value, restricts all SSH connections to go through the SSH proxy.
 - `DSTACK_SERVER_JOB_NETWORK_MODE`{ #DSTACK_SERVER_JOB_NETWORK_MODE } – Controls the network mode assigned to jobs. Accepts an integer value: `1` forces bridge networking for single-node jobs while distributed tasks still use host networking; `2` uses host networking whenever the job occupies a full instance (default); `3` forces bridge networking for all jobs including distributed tasks.
 - `DSTACK_SERVER_SSH_CONNECT_TIMEOUT`{ #DSTACK_SERVER_SSH_CONNECT_TIMEOUT } – The SSH `ConnectTimeout` for server-instance connections, in seconds. Defaults to `3`. Increase if there are high-latency links between the server and instances.
+- `DSTACK_SERVER_SSH_POOL_DISABLED`{ #DSTACK_SERVER_SSH_POOL_DISABLED } – Disables the reuse of server SSH connections to instances. If set, significantly decreases server RAM usage, but
+slows down processing and may cause CPU spikes due to frequent SSH-connection establishment.
 
 ??? info "Internal environment variables"
      The following environment variables are intended for development purposes:
