@@ -37,7 +37,7 @@ export function GetStartedSection() {
             }))}
           />
         }
-        title="Open-source"
+        title="dstack"
         imageFirst
         action={
           <SpaceBetween direction="horizontal" size="xs">
@@ -45,13 +45,13 @@ export function GetStartedSection() {
           </SpaceBetween>
         }
       >
-        Install dstack on your laptop with uv, or deploy it anywhere using the dstackai/dstack Docker image.
+        dstack is fully open-source. Install it on your laptop with uv, or deploy it anywhere using
+        the dstackai/dstack Docker image.
 
         <br />
         <br />
 
-        It takes under a minute to get started and have your first workload running whether you're
-        using dstack via CLI, or let agents do it for you.
+        Once it's running, manage your workloads from the CLI — or let agents do it for you.
       </AlternatingDocBlock>
 
       <AlternatingDocBlock

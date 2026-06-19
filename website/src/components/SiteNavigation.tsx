@@ -82,7 +82,7 @@ const productDropdownItems: ButtonDropdownProps.Items = [
   {
     text: 'Products',
     items: [
-      { id: 'open-source', text: 'Open-source', secondaryText: 'Deploy it anywhere. Use with your own clouds or on-prem clusters.', href: docsUrl('installation') },
+      { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane that works across clouds, Kubernetes, and on-prem.', href: docsUrl('installation') },
       { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Access GPU marketplace, or bring your own clouds. Hosted by us.', href: 'https://sky.dstack.ai', external: true, externalIconAriaLabel },
       { id: 'enterprise', text: 'dstack Enterprise', secondaryText: 'Self-hosted with SSO, air-gapped setup, dedicated support, and more.', href: 'https://calendly.com/dstackai/discovery-call', external: true, externalIconAriaLabel },
     ],
@@ -116,7 +116,7 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
     text: 'Get started',
     defaultExpanded: true,
     items: [
-      { type: 'link', text: 'Open-source', href: docsUrl('installation'), external: true, externalIconAriaLabel },
+      { type: 'link', text: 'dstack', href: docsUrl('installation'), external: true, externalIconAriaLabel },
       { type: 'link', text: 'dstack Sky', href: 'https://sky.dstack.ai', external: true, externalIconAriaLabel },
       { type: 'link', text: 'dstack Enterprise', href: 'https://calendly.com/dstackai/discovery-call', external: true, externalIconAriaLabel },
     ],
