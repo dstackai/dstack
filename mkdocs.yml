@@ -32,21 +32,23 @@ theme:
   font:
     text: Source Sans Pro
     code: IBM Plex Mono
+  # Light (default) + dark (slate) schemes WITH toggles — Material needs the toggle radios so its
+  # palette JS honors the stored __palette and applies it during parse (flash-free). We HIDE the
+  # toggle buttons via CSS (cloudscape-docs.css) and drive the choice from the shared `dstack-theme`
+  # localStorage key (website/src/theme.ts), translated into __palette in main.html's extrahead.
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
+    - scheme: default
       primary: white
       accent: lilac
-  #        toggle:
-  #          icon: material/weather-night
-  #          name: Switch to dark mode
-  #      - media: "(prefers-color-scheme: dark)"
-  #        scheme: slate
-  #        primary: black
-  #        accent: light blue
-  #        toggle:
-  #          icon: material/weather-sunny
-  #          name: Switch to light mode
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: white
+      accent: lilac
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
   features:
     - content.tooltips
     - navigation.path

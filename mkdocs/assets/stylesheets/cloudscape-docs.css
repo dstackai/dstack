@@ -54,6 +54,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
+/* Light-on-dark text looks thinner than dark-on-light at the same weight; use a heavier weight in
+   dark mode so the banner reads with the same emphasis as in light (matches the landing). */
+[data-md-color-scheme="slate"] .md-typeset.md-banner__inner,
+[data-md-color-scheme="slate"] .md-typeset.md-banner__inner a {
+    font-weight: 500;
+}
 /* The → arrow: replicate /old's .site-banner__arrow exactly — inline-flex (so it doesn't stretch
    the line box past the text), vertical-align middle, and a 6px gap before it (was 0). */
 .md-banner__inner .icon {
@@ -97,11 +103,16 @@
     /* /old keeps the logo alone on the left and clusters the whole nav on the right.
        Push the tab group (and the search + buttons that follow it in the DOM) to the
        right edge, leaving an empty middle. */
-    /* Search is now FIRST in the right cluster (it ships before the tabs in the template), so it
+    /* Search is FIRST in the right cluster (it ships before the tabs in the template), so it
        carries the auto-margin that pushes search → tabs → buttons to the right edge as one group.
        The tabs then sit a fixed gap to the search's right, just left of "Docs". */
     .md-header .md-search {
         margin-left: auto;
+    }
+    /* The theme toggle is the first item in the buttons block (before GitHub); 15px sits it a touch
+       tighter than the 20px GitHub→Get-started gap. */
+    .cs-theme-toggle--header {
+        margin-right: 15px;
     }
     .md-tabs {
         display: block;       /* was display:none until JS added .ready — tabs now ship in the header */
@@ -388,12 +399,84 @@
     margin-left: 23px;
 }
 
+/* Header chrome (burger + search icons, the "dstack" wordmark, page title) → theme-aware so it
+   stays visible on the dark header in dark mode (it was hardcoded black). var(--cs-text) is the
+   existing dark color in light mode, so this is a no-op there. The colorful .md-logo IMG is a
+   multi-color SVG and isn't affected by color/fill. */
+.md-header__title,
+.md-header__topic,
+.md-header__ellipsis,
+.md-header__button.md-icon {
+    color: var(--cs-text) !important;
+}
+.md-header__button.md-icon svg {
+    fill: currentColor !important;
+}
+.md-header .md-search__icon,
+.md-header .md-search__icon svg {
+    color: var(--cs-muted) !important;
+    fill: currentColor !important;
+}
+
+/* Hide Material's header palette toggle — the theme switcher lives in the FOOTER (.cs-theme-toggle).
+   display:none keeps the radio inputs in the DOM so Material's palette JS still honors __palette
+   (which we set from the shared dstack-theme key) and applies the scheme flash-free on load. */
+.md-header__option,
+[data-md-component="palette"] {
+    display: none !important;
+}
+
 @media screen and (min-width: 76.1875em) {
     .cs-nav-toggle { display: inline-flex; }
 }
 
 @media screen and (max-width: 76.1875em) {
     .cs-nav-toggle { display: none; }
+
+    /* Tighten the header on mobile so the cluster fits: drop the icon buttons' (burger/search)
+       margins and shrink the gaps (search→GitHub and GitHub→Get started) to 5px. */
+    .md-header__button.md-icon {
+        margin: 0 !important;
+    }
+    .md-header__inner .md-header__buttons {
+        margin-left: 5px;
+    }
+    .md-header__buttons .md-button.github {
+        margin-right: 5px;
+    }
+
+    /* The theme-aware nav colors below are scoped to the desktop media query, so the MOBILE drawer
+       fell back to extra.css's black text — invisible on the dark drawer. Apply them here too. */
+    .md-sidebar--primary .md-nav__title,
+    .md-sidebar--primary .md-nav__item--section > .md-nav__link,
+    .md-sidebar--primary .md-nav__item--section > .md-nav__link[for] {
+        color: var(--cs-nav-heading) !important;
+    }
+    .md-sidebar--primary .md-nav__link,
+    .md-sidebar--primary .md-nav__link .md-typeset {
+        color: var(--cs-nav-link) !important;
+    }
+    .md-sidebar--primary .md-nav__link--active,
+    .md-sidebar--primary .md-nav__link--active .md-typeset {
+        color: var(--cs-nav-active) !important;
+    }
+    /* Material gives the drawer's section titles a light (#f6f9fc) background that stayed light in
+       dark mode (the light text then sat on a near-white bar). Make it transparent so the titles
+       read on the dark drawer. */
+    .md-sidebar--primary .md-nav__title {
+        background-color: transparent !important;
+    }
+    /* The repo "source" facts (dstackai/dstack · stars · forks) + its icon at the bottom of the
+       drawer were black (rgba(0,0,0,.87)) → invisible on the dark drawer. Make them theme-aware. */
+    .md-sidebar--primary .md-nav__source,
+    .md-sidebar--primary .md-source__repository,
+    .md-sidebar--primary .md-source__facts,
+    .md-sidebar--primary .md-source__fact,
+    .md-sidebar--primary .md-source__icon,
+    .md-sidebar--primary .md-source__icon svg {
+        color: var(--cs-nav-link) !important;
+        fill: currentColor !important;
+    }
 }
 
 /* Search box → 36px tall, 12px radius, 1px border (consistent with the sidebar + components).
@@ -1157,25 +1240,71 @@
     font-size: 13px;
     color: var(--cs-text);
 }
-/* Theme toggle (half-circle) at x=304 (aligned with the logo); copyright follows at 332. */
+/* Theme toggle: a pill switch + crescent moon, matching the dstack control-plane app's toggle
+   (frontend AppLayout). Light scheme = switch OFF (grey track, white thumb left); the slate scheme
+   = switch ON (the app's dark-mode "checked" blue track, dark thumb slid right). Colors are the
+   Cloudscape control tokens: track #424650, checked #42b4ff, thumb #fff (light) / #0f141a (dark). */
 .cs-theme-toggle {
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
+    gap: 6px;
     padding: 0;
-    margin-right: 12px;
     border: 0;
     background: transparent;
-    color: var(--cs-text);
+    color: var(--cs-text);          /* the moon inherits this */
     cursor: pointer;
 }
-.cs-theme-toggle svg {
+.cs-theme-toggle__track {
+    position: relative;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 16px;
+    border-radius: 8px;
+    background: #424650;
+    transition: background-color 0.2s ease;
+}
+.cs-theme-toggle__thumb {
+    position: absolute;
+    top: 2px;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    transform: translateX(2px);
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+.cs-theme-toggle__moon {
+    flex: 0 0 auto;
     width: 16px;
     height: 16px;
     display: block;
+}
+[data-md-color-scheme="slate"] .cs-theme-toggle__track {
+    background: #42b4ff;
+}
+[data-md-color-scheme="slate"] .cs-theme-toggle__thumb {
+    background: #0f141a;
+    transform: translateX(10px);
+}
+/* The header toggle (before GitHub in the buttons block) shows only on the desktop header
+   (≥76.1875em); the footer toggle takes over below that, on tablet + mobile, where the header
+   collapses toward the burger menu. */
+.cs-theme-toggle--header {
+    display: none;
+    transform: translateY(0.5px); /* the header baseline sits a hair high; nudge it down to match */
+}
+.cs-theme-toggle--footer {
+    margin-left: 12px;          /* sits after the copyright */
+}
+@media screen and (min-width: 76.1875em) {
+    .cs-theme-toggle--header {
+        display: inline-flex;
+    }
+    .cs-theme-toggle--footer {
+        display: none;
+    }
 }
 .tx-footer__bar .md-copyright,
 .tx-footer__bar .md-copyright__highlight {
@@ -1279,6 +1408,15 @@
         padding-left: 20px !important;
     }
 
+    /* When many tab labels don't fit, scroll them horizontally instead of overflowing/clipping
+       (the parent .tabbed-set is overflow-x:clip). Descendant selector so it matches regardless
+       of nesting (extra.css's `.tabbed-set > .tabbed-labels` direct-child rule wasn't applying). */
+    .md-typeset .tabbed-set .tabbed-labels {
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        max-width: 100% !important;
+    }
+
     /* 2) Restore the desktop 12px radius (extra.css/Material zero it on small screens). */
     .md-content__inner > pre > code,
     .md-content__inner > .highlight > pre > code,
@@ -1323,6 +1461,22 @@
     font-size: 15.5px;    /* inline code reads larger than code blocks (14px) to sit in 16px body text */
 }
 
+/* Reference parameter values/types/links use the same inline-code style as the rest of the docs.
+   extra.css renders them as a smaller, bold, blue, purple-tinted chip with no border — drop that so
+   they read as ordinary inline code (the bordered, text-colored hairline chip above). */
+.md-typeset .reference-item code,
+.md-typeset .reference-item a code {
+    background-color: transparent;
+    border: 0.25px solid currentColor;
+    border-radius: 6px;
+    padding: 1px 6px;
+    height: auto;
+    margin: 0 2px;
+    color: inherit;
+    font-weight: 400;
+    font-size: 15.5px;
+}
+
 /* Body text: 14px / 400 / 1.5, heading-dark color (matches /old's Cloudscape body).
    Match /old's content font-smoothing (auto/subpixel, not antialiased) and weight (400, not the
    theme's 300) — those were making the docs text look lighter/thinner than /old. */
@@ -1361,6 +1515,13 @@
     font-size: 20px;
     font-weight: 700;
     letter-spacing: normal;
+    color: var(--cs-nav-heading);
+}
+/* h4–h6 aren't re-colored above, so they'd fall back to extra.css's hardcoded black (invisible in
+   dark). Pin them to the theme-aware heading color too. */
+.md-typeset h4,
+.md-typeset h5,
+.md-typeset h6 {
     color: var(--cs-nav-heading);
 }
 
@@ -1499,6 +1660,21 @@
 .md-typeset :is(.highlight.dstack-scrollable-code, .dstack-editable-code),
 .md-typeset [data-termynal] {
     padding: 16px 20px !important;
+}
+/* Editors show a centered filename caption (.editor-title) absolutely at top:10px, which overlapped
+   the first code line — give the editor's code extra top padding so the code clears the caption. */
+.md-typeset div[editor-title] pre > code {
+    padding-top: 32px !important;
+}
+
+/* Termy copy button: it's position:absolute inside [data-termynal], which is itself the horizontal
+   scroll container — so it scrolled away with the content. Re-anchor it to the non-scrolling .termy
+   wrapper (make that the positioning context and drop [data-termynal]'s) so it stays pinned. */
+.md-typeset .termy {
+    position: relative;
+}
+.md-typeset .termy > [data-termynal].dstack-termy-has-copy {
+    position: static;
 }
 
 /* Remove the red/yellow/green window dots (the macOS-window imitation). */
@@ -1716,8 +1892,10 @@
     .md-main__inner:has(.md-content--blog) .md-sidebar--secondary {
         margin-right: 0;
     }
-    /* No left sidebar → drop the full-height vertical divider drawn at left:280px. */
-    body:has(.md-content--blog)::before {
+    /* No left sidebar → drop the full-height vertical divider drawn at left:280px. Applies to blog
+       posts and to any page that hides the nav (e.g. /terms, /privacy → .md-sidebar--primary[hidden]). */
+    body:has(.md-content--blog)::before,
+    body:has(.md-sidebar--primary[hidden])::before {
         display: none;
     }
 }
@@ -1927,7 +2105,9 @@
 .arch-logo--amd { height: 4.6cqw; aspect-ratio: 1600 / 1408; -webkit-mask-image: url(../images/arch-logos/amd.webp); mask-image: url(../images/arch-logos/amd.webp); }
 .arch-logo--tenstorrent { height: 4.8cqw; aspect-ratio: 170 / 169; -webkit-mask-image: url(../images/arch-logos/tenstorrent.svg); mask-image: url(../images/arch-logos/tenstorrent.svg); }
 .arch-logo--tpu { height: 4.2cqw; aspect-ratio: 256 / 206; -webkit-mask-image: url(../images/arch-logos/gcp.svg); mask-image: url(../images/arch-logos/gcp.svg); }
-@container (max-width: 360px) {
+/* Reflow to 2-up below ~480px (was 360px): the cell labels are a fixed 16px, so on a narrow
+   phone the 3-up grid can't shrink them and they overflow — switch to 2-up sooner. */
+@container (max-width: 480px) {
     .arch-diagram { gap: 12px; }
     .arch-row { grid-template-columns: 1fr 1fr; gap: 8px; }
     .arch-row > :first-child { grid-column: 1 / -1; }

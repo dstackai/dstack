@@ -376,14 +376,28 @@ function decodeHashId(hashId) {
     }
 }
 
-// Footer theme toggle (half-circle, like /old). Flips Material's color scheme; the dark
-// styling pass is still pending, so dark may look unfinished — that's expected for now.
+// Wires up the footer's half-circle light-dark toggle (.cs-theme-toggle). This is the docs' only
+// theme switcher — Material's own header palette toggle is hidden via CSS. Persists the choice to
+// the shared `dstack-theme` localStorage key (also read/written by the React site, website/src/
+// theme.ts) AND mirrors it into Material's __palette/radio so the scheme survives reloads (the
+// <head> script in main.html reads dstack-theme on load and applies it flash-free).
 function setupThemeToggle() {
     var KEY = "data-md-color-scheme";
+    function apply(dark) {
+        try {
+            localStorage.setItem("dstack-theme", dark ? "dark" : "light");
+        } catch (e) {}
+        // __dstackApplyTheme (defined inline in main.html's extrahead) owns the dark→palette mapping
+        // and flips the <body> scheme. Fall back to the bare scheme flip if it somehow isn't loaded.
+        if (typeof window.__dstackApplyTheme === "function") {
+            window.__dstackApplyTheme(dark, true);
+        } else {
+            document.body.setAttribute(KEY, dark ? "slate" : "default");
+        }
+    }
     document.querySelectorAll("[data-cs-theme-toggle]").forEach(function (btn) {
         btn.addEventListener("click", function () {
-            var cur = document.body.getAttribute(KEY);
-            document.body.setAttribute(KEY, cur === "slate" ? "default" : "slate");
+            apply(document.body.getAttribute(KEY) !== "slate");
         });
     });
 }

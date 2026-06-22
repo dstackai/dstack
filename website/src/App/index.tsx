@@ -34,6 +34,8 @@ export function App() {
         <SiteNavigation
           oldNavigationOpen={oldNavigationOpen}
           onToggleOldNavigation={() => setOldNavigationOpen(open => !open)}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
       </div>
       <Outlet context={layoutContext} />

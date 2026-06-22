@@ -1,6 +1,6 @@
-import Button from '@cloudscape-design/components/button';
 import Link from '@cloudscape-design/components/link';
 import SpaceBetween from '@cloudscape-design/components/space-between';
+import { ThemeToggle } from './ThemeToggle';
 import { asset } from '../asset';
 import { BLOG_URL, docsUrl, PRIVACY_URL, TERMS_URL } from '../routes';
 import { ThemeMode } from '../theme';
@@ -129,15 +129,10 @@ export function SiteFooter({
           </nav>
         </div>
         <div className="footer-bar">
-          <Button
-            className="footer-theme-toggle"
-            variant="icon"
-            iconName="light-dark"
-            ariaLabel={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            onClick={onToggleTheme}
-            style={{ root: { paddingInline: '0px' } }}
-          />
           <span className="footer-copyright">© 2026, dstack Inc. All rights reserved.</span>
+          {/* After the copyright; shown only on tablet/mobile (on large screens the toggle lives in
+              the header nav). */}
+          <ThemeToggle theme={theme} onToggle={onToggleTheme} className="theme-toggle--footer" />
         </div>
       </div>
     </footer>

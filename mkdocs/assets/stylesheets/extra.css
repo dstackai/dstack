@@ -77,7 +77,7 @@ html {
 
 @media screen and (max-width: 76.1875em) {
     .md-header {
-        background-color: rgb(255, 255, 255);
+        background-color: var(--cs-bg);   /* theme-aware (was hardcoded white → white header in dark) */
     }
 }
 
@@ -1900,8 +1900,11 @@ a.md-go-to-action.secondary {
     background: white;
 }
 
+/* Blog post-title links are styled as headings, not links: inherit the heading's color so they
+   track the theme (Material's default link color, and the old hardcoded black here, are both
+   invisible on the dark scheme). */
 .md-post__content :is(h2, h3, h4, h5, h6) a {
-    color: rgba(0,0,0,0.87);
+    color: inherit;
 }
 
 div[editor-title] code .editor-title {

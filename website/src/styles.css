@@ -139,18 +139,19 @@ p {
   text-align: center;
 }
 
-/* Plain inline link so the label and arrow wrap together as one centered paragraph on
-   narrow screens (the banner grows to contain them). */
+/* Keep the whole banner (label + arrow) on a single line — never wrap. */
 .site-banner__link {
   color: var(--cs-bg) !important;
   font-size: 16.5px;
   font-weight: 300;
   text-decoration: none !important;
+  white-space: nowrap;
 }
 
-/* On dark, the banner is light-on-dark; nudge the weight up a hair for even visual weight. */
+/* Light-on-dark text looks thinner than dark-on-light at the same weight; use a heavier weight in
+   dark mode so the banner reads with the same emphasis as in light. */
 :root[data-theme='dark'] .site-banner__link {
-  font-weight: 350;
+  font-weight: 500;
 }
 
 /* Icons follow the banner's (inverted) text color in both themes. */
@@ -1390,10 +1391,70 @@ p {
   min-height: 64px;
 }
 
-/* The icon button's horizontal padding is removed via its `style` prop (see SiteFooter);
-   this just nudges the glyph up onto the copyright baseline. */
-.footer-theme-toggle svg {
-  transform: translateY(-1.5px);
+/* Theme toggle: a pill switch + crescent moon, matching the dstack control-plane app's toggle
+   (frontend AppLayout). Light = switch OFF (grey track, white thumb left); [data-theme="dark"]
+   = switch ON (the app's dark-mode "checked" blue track, dark thumb slid right). Colors are the
+   Cloudscape control tokens: track #424650, checked #42b4ff, thumb #fff (light) / #0f141a (dark).
+   The same component renders in the header (large screens) and footer (tablet/mobile); the
+   --header / --footer variants below toggle which one is visible at the 1024px breakpoint. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;           /* the moon inherits the surrounding text color */
+  cursor: pointer;
+}
+.theme-toggle__track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 16px;
+  border-radius: 8px;
+  background: #424650;
+  transition: background-color 0.2s ease;
+}
+.theme-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  transform: translateX(2px);
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+.theme-toggle__moon {
+  flex: 0 0 auto;
+  display: block;
+}
+[data-theme='dark'] .theme-toggle__track {
+  background: #42b4ff;
+}
+[data-theme='dark'] .theme-toggle__thumb {
+  background: #0f141a;
+  transform: translateX(10px);
+}
+
+/* The header toggle shows only on large screens; the footer one takes over at ≤1024px (tablet +
+   mobile), where the header nav collapses into the burger menu. */
+.theme-toggle--footer {
+  display: none;
+}
+.theme-toggle--header {
+  transform: translateY(3px); /* the nav row centers it a hair high; nudge it down to match */
+  margin-right: -5px;           /* trim the SpaceBetween gap to GitHub by 5px */
+}
+@media (max-width: 1024px) {
+  .theme-toggle--header {
+    display: none;
+  }
+  .theme-toggle--footer {
+    display: inline-flex;
+  }
 }
 
 .footer-copyright {
@@ -1571,7 +1632,12 @@ p {
   }
 }
 
-@media (max-width: 640px) {
+/* Switch to the burger nav at ≤1024px: the full menu (Documentation + the three blog links +
+   theme toggle + GitHub + Get started) is too wide for tablet widths. This matches the theme
+   toggle's 1024px boundary (header → footer above), so the footer toggle takes over exactly when
+   the burger appears — no width band is left without a toggle. The hero/content phone layout
+   stays at ≤640px (below). */
+@media (max-width: 1024px) {
   .site-nav {
     height: 54px;
   }
@@ -1604,6 +1670,21 @@ p {
     transform: translateX(-50%);
   }
 
+  .site-mobile-navigation {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: -1;
+    max-height: calc(100vh - 58px);
+    overflow: auto;
+    padding: 20px;
+    border-bottom: 0.5px solid var(--cs-border);
+    background: var(--cs-bg, #ffffff);
+  }
+}
+
+@media (max-width: 640px) {
   .home-hero {
     display: flex;
     flex-direction: column;
@@ -1614,23 +1695,14 @@ p {
     padding: 64px 0 24px;
   }
 
-  /* On phones the hero artwork moves out of the hero and down above the footer: hide the
-     top instance and show the relocated copy (centered, in normal flow). */
+  /* On phones the hero artwork is dropped entirely (not worth the vertical space): hide both the
+     top instance and the relocated bottom copy. */
   .home-hero__art {
     display: none;
   }
 
   .home-hero-mobile-art {
-    display: block;
-    margin: 20px 0 4px;
-  }
-
-  .home-hero-mobile-art .hero-slice {
-    position: relative;
-    top: auto;
-    right: auto;
-    width: min(25rem, 88vw);
-    margin: 0 auto;
+    display: none;
   }
 
   /* Hero CTAs share one full-width row on phones — two equal columns spanning the width. */
@@ -1645,19 +1717,6 @@ p {
     width: 100%;
     padding-inline: 16px !important;
     text-align: center !important;
-  }
-
-  .site-mobile-navigation {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    z-index: -1;
-    max-height: calc(100vh - 58px);
-    overflow: auto;
-    padding: 20px;
-    border-bottom: 0.5px solid var(--cs-border);
-    background: var(--cs-bg, #ffffff);
   }
 
   .home-hero h1 {

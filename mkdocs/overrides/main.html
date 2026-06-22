@@ -1,6 +1,29 @@
 {% extends "base.html" %}
 
 {% block extrahead %}
+{#- The single mapping from the shared dark/light choice (localStorage['dstack-theme'], shared with
+    website/src/theme.ts) onto Material's native palette. Defined as a global here — in the first
+    inline script, during parse — so every other theme touchpoint (the header radio sync, the footer
+    toggle in extra.js, the cross-tab storage listener below) reuses ONE definition instead of
+    re-spelling the {index, color} object and the dark=slate=index-1 mapping. Uses Material's
+    __md_set (defined just above in partials/javascripts/base.html) so the key gets Material's scope
+    prefix (e.g. /.__palette) — a plain localStorage key is ignored by Material. -#}
+<script>
+  // dark → slate (palette index 1); light → default (index 0). setScheme also flips the live
+  // <body> attribute (for runtime toggles); omit it at first paint (Material's inline palette
+  // script applies the scheme from __palette during parse — flash-free).
+  window.__dstackApplyTheme = function (dark, setScheme) {
+    try {
+      if (typeof __md_set === 'function') {
+        __md_set('__palette', { index: dark ? 1 : 0, color: { media: '', scheme: dark ? 'slate' : 'default', primary: 'white', accent: 'lilac' } });
+      }
+      var radio = document.getElementById('__palette_' + (dark ? 1 : 0));
+      if (radio) radio.checked = true;
+      if (setScheme) document.body.setAttribute('data-md-color-scheme', dark ? 'slate' : 'default');
+    } catch (e) {}
+  };
+  try { window.__dstackApplyTheme(localStorage.getItem('dstack-theme') === 'dark', false); } catch (e) {}
+</script>
 <link rel="preload" href="{{ 'assets/fonts/Geist-Variable.woff2' | url }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{{ 'assets/fonts/GeistMono-Variable.woff2' | url }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{{ 'assets/fonts/GeistPixel-Square.woff2' | url }}" as="font" type="font/woff2" crossorigin>
@@ -154,6 +177,15 @@
 <script src="/assets/javascripts/termynal.js"></script>
 <script async src="https://tally.so/widgets/embed.js"></script>
 {{ super() }}
+{#- Live cross-tab/cross-app sync: when the shared dstack-theme changes elsewhere (e.g. the React
+    landing's footer toggle in another tab), apply it here without a reload. The docs' own footer
+    toggle writes dstack-theme directly (assets/javascripts/extra.js). First paint is flash-free via
+    extrahead → __palette → Material's inline palette script. -#}
+<script>
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'dstack-theme') window.__dstackApplyTheme(e.newValue === 'dark', true);
+  });
+</script>
 <script src="https://widget.kapa.ai/kapa-widget.bundle.js"
         data-website-id="1c028b8e-609e-40e3-b792-f3939a461850"
         data-project-name="dstack"

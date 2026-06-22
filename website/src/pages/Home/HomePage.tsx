@@ -34,7 +34,7 @@ export function HomePage() {
           <h2>
             The orchestration stack
             <br />
-            for AI infrastructure
+            for heterogeneous AI compute
           </h2>
           <p>
             {highlightTerms(
@@ -48,7 +48,7 @@ export function HomePage() {
               Get started
             </Button>
             <Button href={DOCS_URL} style={heroButtonStyle}>
-              Documentation
+              View docs
             </Button>
           </div>
         </div>

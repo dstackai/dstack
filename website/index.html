@@ -12,6 +12,16 @@
     <!-- Favicon is served by MkDocs at /assets/... on the same origin. -->
     <link rel="icon" href="/assets/images/dstack-fav-32.ico" />
 
+    <!-- Apply the saved light/dark choice before first paint, so theme-aware UI (e.g. the header
+         theme toggle) renders in its final state instead of animating from the default once
+         theme.ts's effect runs. Mirrors the dstack-theme key written by theme.ts. -->
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem('dstack-theme') === 'dark' ? 'dark' : 'light';
+      } catch (e) {}
+    </script>
+
     <!-- Open Graph / Twitter. The social image is the card MkDocs' social plugin generates
          for the home page (assets/images/social/index.png); absolute URLs are required by
          social scrapers. -->
