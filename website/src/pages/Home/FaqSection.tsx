@@ -48,7 +48,7 @@ export function FaqSection() {
         }
         title="FAQ"
         action={
-          <Button variant="primary" href="https://discord.gg/dstack" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
+          <Button variant="primary" href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
             Discord
           </Button>
         }

@@ -187,7 +187,21 @@ body {
       stable, hash-independent prefix. */
 .site-mobile-navigation [class*='awsui_header-text'] {
   font-weight: 400 !important;
-  font-size: 14px !important;
+  font-size: 16px !important;
+}
+
+/* All text buttons → 16px label (header GitHub/Get started, hero CTAs, and the buttons further
+   down the landing), matching the menu links + docs. Icon buttons keep their own glyph sizing. */
+[class*='awsui_button']:not([class*='awsui_variant-icon']),
+[class*='awsui_trigger-button'] {
+  font-size: 16px !important;
+}
+
+/* Primary (filled) buttons use 500 weight per design — outline/normal buttons keep their weight.
+   Applies app-wide (new landing + /old). */
+[class*='awsui_variant-primary'],
+.site-get-started [class*='awsui_trigger-button'] {
+  font-weight: 500 !important;
 }
 
 /* 9) Content tabs: highlight the selected (and hovered) tab with a background

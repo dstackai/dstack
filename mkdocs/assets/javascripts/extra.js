@@ -31,12 +31,23 @@ function setupTermynal(root = document) {
                 const singleInput = getTermynalOption(node, termynalRoot, "termynalSingleInput") === "true";
                 const copyEnabled = getTermynalOption(node, termynalRoot, "termynalCopy") === "true";
                 const instant = getTermynalOption(node, termynalRoot, "termynalInstant") === "true";
+                const maxHeight = getTermynalOption(node, termynalRoot, "termynalMaxHeight");
+                const lines = text.split(/(?<!\\)\n/)
+                // The copy button copies ONLY the input ($ commands), raw — not the rendered output.
+                const inputText = singleInput
+                    ? (text.startsWith(promptLiteralStart) ? text.slice(promptLiteralStart.length).trimEnd() : text.trimEnd())
+                    : lines.map(line => {
+                        if (line.startsWith(promptLiteralStart)) return line.slice(promptLiteralStart.length).trimEnd();
+                        if (line.startsWith(customPromptLiteralStart)) {
+                            const p = line.indexOf(promptLiteralStart);
+                            if (p !== -1) return line.slice(p + promptLiteralStart.length).trimEnd();
+                        }
+                        return null;
+                    }).filter(l => l !== null).join("\n");
                 const copyText = node.dstackTermynalCopyText ||
                     termynalRoot?.dstackTermynalCopyText ||
                     getTermynalOption(node, termynalRoot, "termynalCopyText") ||
-                    text.trimEnd();
-                const maxHeight = getTermynalOption(node, termynalRoot, "termynalMaxHeight");
-                const lines = text.split(/(?<!\\)\n/)
+                    inputText;
                 const useLines = singleInput
                     ? [{
                         type: "input",
@@ -117,7 +128,7 @@ function setupTermynal(root = document) {
                     div.classList.add("dstack-termy-scrollable");
                     div.style.setProperty("--dstack-termy-max-height", maxHeight);
                 }
-                if (copyEnabled) {
+                if (copyText) {
                     div.classList.add("dstack-termy-has-copy");
                 }
                 node.replaceWith(div);
@@ -128,7 +139,7 @@ function setupTermynal(root = document) {
                     lineDelay: instant ? 0 : 500,
                     typeDelay: instant ? 0 : 20
                 });
-                if (copyEnabled) {
+                if (copyText) {
                     setupTermynalCopyButton(termynal, copyText);
                 }
                 termynals.push(termynal);
@@ -365,15 +376,73 @@ function decodeHashId(hashId) {
     }
 }
 
+// Footer theme toggle (half-circle, like /old). Flips Material's color scheme; the dark
+// styling pass is still pending, so dark may look unfinished — that's expected for now.
+function setupThemeToggle() {
+    var KEY = "data-md-color-scheme";
+    document.querySelectorAll("[data-cs-theme-toggle]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            var cur = document.body.getAttribute(KEY);
+            document.body.setAttribute(KEY, cur === "slate" ? "default" : "slate");
+        });
+    });
+}
+
+// Clicking a heading's ¶ permalink copies its full URL to the clipboard instead of
+// scrolling/jumping (which landed under the sticky header). Delegated, so it survives
+// instant navigation and re-rendered content.
+function setupHeaderlinkCopy() {
+    document.addEventListener("click", function (event) {
+        var link = event.target.closest && event.target.closest("a.headerlink");
+        if (!link) return;
+        event.preventDefault();
+        event.stopPropagation();
+        var url = location.origin + location.pathname + link.getAttribute("href");
+        copyTextToClipboard(url);
+        flashCopied(event);
+    }, true);
+}
+
+function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(function () { legacyCopyText(text); });
+    } else {
+        legacyCopyText(text);
+    }
+}
+
+function legacyCopyText(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
+}
+
+// Small "Copied!" toast at the click point — fixed-positioned so it shows even after the
+// ¶ (which is opacity:0 until hover) is no longer hovered.
+function flashCopied(event) {
+    var tip = document.createElement("span");
+    tip.className = "cs-copied-tip";
+    tip.textContent = "Copied!";
+    tip.style.left = event.clientX + "px";
+    tip.style.top = event.clientY + "px";
+    document.body.appendChild(tip);
+    setTimeout(function () { tip.remove(); }, 1200);
+}
+
 window.addEventListener("DOMContentLoaded", function() {
-    let tabs = document.querySelector(".md-tabs")
-    let header = document.querySelector(".md-header")
-    let search = document.querySelector(".md-search")
-    search.parentNode.insertBefore(tabs, search)
-    header.classList.add("ready")
+    // Tabs are now rendered directly inside the header (see header-2.html) instead of being
+    // relocated here from below the header — that move caused a visible flash on load.
     setupTermynal()
     setupCustomCodeTitles()
     setupSensitiveTocActiveState()
+    setupThemeToggle()
+    setupHeaderlinkCopy()
 });
 
 (function () {

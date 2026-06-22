@@ -654,7 +654,7 @@ p {
 }
 
 .start-grid p {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .docs-shell {
@@ -1070,7 +1070,7 @@ p {
   .arch-row { grid-template-columns: 1fr 1fr; gap: 8px; }
   .arch-row > :first-child { grid-column: 1 / -1; }
   .arch-cell { min-height: 52px; padding: 10px 14px; gap: 12px; border-width: 1px; border-radius: 8px; }
-  .arch-cell__label { font-size: 14px; white-space: normal; }
+  .arch-cell__label { font-size: 16px; white-space: normal; }
   /* "Any hardware": label left, logos pushed to the right (the desktop layout centers them). */
   .arch-cell--hw { justify-content: space-between; }
   .arch-cell--hw > .arch-cell__label { position: static; }

@@ -138,12 +138,17 @@
         {% endif %}
     {% endblock %}
   </article>
+  {% include "partials/tx-footer.html" %}
 </div>
 {% endblock %}
 
 {% block header %}
     {% include "header-2.html" %}
 {% endblock %}
+
+{# Tabs are rendered inside the header (header-2.html); suppress base.html's below-header
+   tabs so they aren't duplicated. #}
+{% block tabs %}{% endblock %}
 
 {% block scripts %}
 <script src="/assets/javascripts/termynal.js"></script>
@@ -191,63 +196,13 @@
 {% endblock %}
 
 {% block announce %}
-<a href="/blog/agentic-orchestration/" target="_blank">Infrastructure orchestration is an agent skill <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span></a>
+<a href="/blog/agentic-orchestration/" target="_blank">Infrastructure orchestration is an agent skill<span class="icon"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15"/><path d="m12.5 5.5 6.5 6.5-6.5 6.5"/></svg></span></a>
 {% endblock %}
 
-{% block footer %}
-    <footer class="tx-footer">
-        <div class="md-main__inner md-grid">
-            <div class="tx-footer__left-side">
-                <div class="tx-footer__copyright">
-                    {% include "partials/copyright.html" %}
-                    {% if config.extra.social %}
-                        {% include "partials/social.html" %}
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="tx-footer__right-side">
-              <!--<div class="tx-footer__section">
-                  <div class="tx-footer__section-title">Contact</div>
-                  <a href="mailto:hello@dstack.ai" class="tx-footer__section-link">hello@dstack.ai</a>
-                  &lt;!&ndash;<a class="tx-footer__section-link" href="javascript:void(0)" onclick="$crisp.push(['do', 'chat:show'])">Open chat</a>&ndash;&gt;
-              </div>-->
-            
-              <div class="tx-footer__section">
-                <div class="tx-footer__section-title">Documentation</div>
-                <a href="/docs/installation" class="tx-footer__section-link">Getting started</a>
-                <a href="/docs/concepts/backends/" class="tx-footer__section-link">Concepts</a>
-                <a href="/docs/guides/protips/" class="tx-footer__section-link">Guides</a>
-                <a href="/docs/reference/dstack.yml/dev-environment/" class="tx-footer__section-link">Reference</a>
-              </div>
-              
-              <div class="tx-footer__section">
-                <div class="tx-footer__section-title">Examples</div>
-                <a href="/docs/examples/training/trl/" class="tx-footer__section-link">Training</a>
-                <a href="/docs/examples/clusters/aws/" class="tx-footer__section-link">Clusters</a>
-                <a href="/docs/examples/inference/sglang/" class="tx-footer__section-link">Inference</a>
-                <a href="/docs/examples/models/deepseek-v4/" class="tx-footer__section-link">Models</a>
-                <a href="/docs/examples/accelerators/amd/" class="tx-footer__section-link">Accelerators</a>
-              </div>
-              
-              <div class="tx-footer__section">
-                <div class="tx-footer__section-title">Community</div>
-                <a href="https://discord.gg/u8SmfwPpMd" target="_blank" class="tx-footer__section-link external">Join Discord</a>
-                <a href="https://github.com/dstackai/dstack" target="_blank" class="tx-footer__section-link external">GitHub</a>
-              </div>
-              
-              <div class="tx-footer__section">
-                <div class="tx-footer__section-title">Company</div>
-                <a href="https://calendly.com/dstackai/discovery-call" target="_blank" class="tx-footer__section-link external">Talk to us</a>
-                <!-- <a href="/partners" class="tx-footer__section-link">Partners</a> -->
-                <a href="/terms" class="tx-footer__section-link">Terms</a>
-                <a href="/privacy" class="tx-footer__section-link">Privacy</a>
-                <a href="/blog" class="tx-footer__section-link">Blog</a>
-                <!--<a href="https://dstackai.notion.site/Jobs-at-dstack-ff01a450c3174904b70c36124f2d8f4b" target="_blank" class="tx-footer__section-link external">Careers</a>-->
-              </div>
-        </div>
-    </footer>
-{% endblock %}
+{# Footer is rendered INSIDE .md-content (above, after the article) — NOT as a full-width sibling —
+   so it starts to the RIGHT of the left sidebar (left sidebar stays a full-height column on its
+   left) and keeps .md-main__inner tall enough that the sticky left sidebar never eases away. #}
+{% block footer %}{% endblock %}
 
 {% block site_nav %}
     {% if nav %}
@@ -257,6 +212,10 @@
       <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" {{ hidden }}>
         <div class="md-sidebar__scrollwrap">
           <div class="md-sidebar__inner">
+            {# Inside the scroll content so it scrolls out with the nav, like /old (not pinned). #}
+            <button type="button" class="cs-nav-collapse" data-cs-nav-toggle aria-label="Collapse navigation">
+              <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M11 2 5 8l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
             {% include "partials/nav.html" %}
           </div>
         </div>

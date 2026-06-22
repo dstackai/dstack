@@ -1,0 +1,58 @@
+<footer class="tx-footer">
+  <div class="tx-footer__inner">
+    <div class="tx-footer__top">
+      <div class="tx-footer__brand">
+        <a class="tx-footer__logo" href="{{ '/' }}" aria-label="dstack home">
+          <img src="{{ 'assets/images/dstack-logo-notext.svg' | url }}" alt="">
+          <span>dstack</span>
+        </a>
+        {% if config.extra.social %}
+          {% include "partials/social.html" %}
+        {% endif %}
+      </div>
+
+      <div class="tx-footer__right-side">
+        <div class="tx-footer__section">
+          <div class="tx-footer__section-title">Documentation</div>
+          <a href="/docs/installation" class="tx-footer__section-link">Getting started</a>
+          <a href="/docs/concepts/backends/" class="tx-footer__section-link">Concepts</a>
+          <a href="/docs/guides/protips/" class="tx-footer__section-link">Guides</a>
+          <a href="/docs/reference/dstack.yml/dev-environment/" class="tx-footer__section-link">Reference</a>
+        </div>
+
+        <div class="tx-footer__section">
+          <div class="tx-footer__section-title">Examples</div>
+          <a href="/docs/examples/training/trl/" class="tx-footer__section-link">Training</a>
+          <a href="/docs/examples/clusters/aws/" class="tx-footer__section-link">Clusters</a>
+          <a href="/docs/examples/inference/sglang/" class="tx-footer__section-link">Inference</a>
+          <a href="/docs/examples/models/deepseek-v4/" class="tx-footer__section-link">Models</a>
+          <a href="/docs/examples/accelerators/amd/" class="tx-footer__section-link">Accelerators</a>
+        </div>
+
+        <div class="tx-footer__section">
+          <div class="tx-footer__section-title">Community</div>
+          <a href="https://github.com/dstackai/dstack" target="_blank" class="tx-footer__section-link external">GitHub</a>
+          <a href="https://discord.gg/u8SmfwPpMd" target="_blank" class="tx-footer__section-link external">Discord</a>
+        </div>
+
+        <div class="tx-footer__section">
+          <div class="tx-footer__section-title">Company</div>
+          <a href="/blog" class="tx-footer__section-link">Blog</a>
+          <a href="https://calendly.com/dstackai/discovery-call" target="_blank" class="tx-footer__section-link external">Talk to us</a>
+          <a href="/terms" class="tx-footer__section-link">Terms of service</a>
+          <a href="/privacy" class="tx-footer__section-link">Privacy policy</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="tx-footer__bar">
+      <button type="button" class="cs-theme-toggle" data-cs-theme-toggle aria-label="Toggle light/dark theme">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+          <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 1.5 A6.5 6.5 0 0 0 8 14.5 Z" fill="currentColor"/>
+        </svg>
+      </button>
+      {% include "partials/copyright.html" %}
+    </div>
+  </div>
+</footer>

@@ -20,6 +20,12 @@ const audienceNavItems: Array<{ label: string; href: string }> = [
 // same-origin MkDocs pages).
 const resourcesDropdownItems: ButtonDropdownProps.Items = [
   {
+    id: 'blog',
+    text: 'Blog',
+    secondaryText: 'Major releases, industry reports, and product updates.',
+    href: BLOG_URL,
+  },
+  {
     id: 'case-studies',
     text: 'Case studies',
     secondaryText: 'How AI teams run training and inference with dstack.',
@@ -30,12 +36,6 @@ const resourcesDropdownItems: ButtonDropdownProps.Items = [
     text: 'Benchmarks',
     secondaryText: 'Comparing hardware, inference engines, and deployment setups for AI.',
     href: `${BLOG_URL}/benchmarks/`,
-  },
-  {
-    id: 'blog',
-    text: 'Blog',
-    secondaryText: 'Major releases, industry reports, and product updates.',
-    href: BLOG_URL,
   },
 ];
 

@@ -9,6 +9,12 @@
 {% endif %}
 <header class="{{ class }}" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="{{ lang.t('header') }}">
+    {# Blog posts have no left nav, so suppress the burger (page.config.date = blog post). #}
+    {% if not (page.config and page.config.date) %}
+      <button type="button" class="md-header__button cs-nav-toggle" aria-label="Toggle navigation" data-cs-nav-toggle>
+        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M15 3H1M15 8H1M15 13H1" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      </button>
+    {% endif %}
     <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" title="{{ config.site_name | e }}" class="md-header__button md-logo" aria-label="{{ config.site_name }}" data-md-component="logo">
       {% include "partials/logo.html" %}
     </a>
@@ -46,12 +52,19 @@
       {% include "partials/alternate.html" %}
     {% endif %}
 
+    {# Search sits BEFORE the tabs (left of "Docs"), like the user asked. #}
     {% if "material/search" in config.plugins %}
       <label class="md-header__button md-icon" for="__search">
         {% set icon = config.theme.icon.search or "material/magnify" %}
         {% include ".icons/" ~ icon ~ ".svg" %}
       </label>
       {% include "partials/search.html" %}
+    {% endif %}
+
+    {# Tabs rendered directly in the header (not relocated via JS) to avoid a load flash.
+       base.html's below-header tabs block is suppressed in main.html. #}
+    {% if "navigation.tabs" in features %}
+      {% include "partials/tabs.html" %}
     {% endif %}
 
     <!--{% if config.repo_url %}
@@ -61,20 +74,57 @@
     {% endif %}-->
 
     <div class="md-header__buttons">
-      <a id="gh-star-link" href="https://github.com/dstackai/dstack" target="_blank" class="md-button md-button--primary github external-skip">GitHub</a>
-      <script>
-        fetch("https://api.github.com/repos/dstackai/dstack")
-          .then(r => r.json())
-          .then(data => {
-            if (data.stargazers_count) {
-              document.getElementById("gh-star-link").textContent =
-                data.stargazers_count.toLocaleString("en-US");
-            }
-          })
-          .catch(() => {});
-      </script>
-      <a href="https://sky.dstack.ai" target="_blank" class="md-button md-button--primary sky external-skip">dstack Sky</a>
+      <a href="https://github.com/dstackai/dstack" target="_blank" class="md-button md-button--primary github external-skip">GitHub</a>
+      <div class="cs-get-started">
+        <button type="button" class="md-button md-button--primary cs-get-started__main" aria-haspopup="true" aria-expanded="false">Get started</button>
+        <button type="button" class="md-button md-button--primary cs-get-started__toggle" aria-label="Get started options" aria-expanded="false" aria-haspopup="true">
+          {% include ".icons/material/menu-down.svg" %}
+        </button>
+        <div class="cs-get-started__menu" hidden>
+          <span class="cs-get-started__group">Products</span>
+          <a href="{{ 'docs/installation/' | url }}">
+            <span class="cs-get-started__item-title">dstack</span>
+            <span class="cs-get-started__item-desc">The open-source control plane that works across clouds, Kubernetes, and on-prem.</span>
+          </a>
+          <a href="https://sky.dstack.ai" target="_blank">
+            <span class="cs-get-started__item-title">dstack Sky</span>
+            <span class="cs-get-started__item-desc">Access GPU marketplace, or bring your own clouds. Hosted by us.</span>
+          </a>
+          <a href="https://calendly.com/dstackai/discovery-call" target="_blank">
+            <span class="cs-get-started__item-title">dstack Enterprise</span>
+            <span class="cs-get-started__item-desc">Self-hosted with SSO, air-gapped setup, dedicated support, and more.</span>
+          </a>
+          <span class="cs-get-started__group">Login</span>
+          <a href="https://sky.dstack.ai" target="_blank">
+            <span class="cs-get-started__item-title">dstack Sky</span>
+          </a>
+        </div>
+      </div>
     </div>
+    <script>
+      (function () {
+        document.addEventListener('click', function (e) {
+          if (e.target.closest('[data-cs-nav-toggle]')) {
+            document.body.classList.toggle('cs-nav-collapsed');
+            // The content column reflows (792↔960), so re-align the right rail's TOC offset.
+            window.dispatchEvent(new Event('resize'));
+            return;
+          }
+          var menu = document.querySelector('.cs-get-started__menu');
+          if (!menu) return;
+          var triggers = document.querySelectorAll('.cs-get-started__main, .cs-get-started__toggle');
+          // Both segments open the popup (no default navigation).
+          if (e.target.closest('.cs-get-started__main, .cs-get-started__toggle')) {
+            var hidden = menu.hasAttribute('hidden');
+            menu.toggleAttribute('hidden', !hidden);
+            triggers.forEach(function (t) { t.setAttribute('aria-expanded', String(hidden)); });
+          } else if (!e.target.closest('.cs-get-started__menu')) {
+            menu.setAttribute('hidden', '');
+            triggers.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+          }
+        });
+      })();
+    </script>
   </nav>
   {% if "navigation.tabs.sticky" in features %}
     {% if "navigation.tabs" in features %}

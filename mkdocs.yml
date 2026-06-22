@@ -11,7 +11,7 @@ repo_name: dstackai/dstack
 edit_uri: edit/master/mkdocs/
 
 #Copyright
-copyright: © 2026 dstack Inc.
+copyright: © 2026, dstack Inc. All rights reserved.
 
 # Source directory for site content
 docs_dir: mkdocs
@@ -60,7 +60,7 @@ theme:
     - navigation.sections
     #    - navigation.expand
     - navigation.top
-    - announce.dismiss
+    # announce.dismiss removed — /old's banner has no dismiss (×) button
     - navigation.tracking
     - navigation.footer
 
@@ -252,6 +252,7 @@ extra_css:
   - assets/stylesheets/termynal.css
   - assets/stylesheets/landing.css
   - assets/stylesheets/pricing.css
+  - assets/stylesheets/cloudscape-docs.css
 extra_javascript:
   - https://unpkg.com/swagger-ui-dist@5.32.0/swagger-ui-bundle.js
   - assets/javascripts/swagger.js

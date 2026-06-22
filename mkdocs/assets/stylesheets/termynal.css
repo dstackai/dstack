@@ -31,7 +31,7 @@
     background: var(--color-bg);
     color: var(--color-text);
     /* font-size: 18px; */
-    font-size: 14px;
+    font-size: var(--dstack-code-font-size);   /* 15px, consistent with code/editor blocks */
     line-height: var(--dstack-code-line-height);
     /* font-family: 'Fira Mono', Consolas, Menlo, Monaco, 'Courier New', Courier, monospace; */
     font-family: var(--md-code-font-family) !important;
@@ -112,14 +112,14 @@
             appearance: none;
     background: transparent;
     border: 0;
-    color: var(--color-text-subtle);
+    color: var(--cs-muted);   /* match the code/editor copy button */
     cursor: pointer;
-    height: 24px;
+    height: 18px;
     padding: 0;
     position: absolute;
-    right: 15px;
-    top: 9px;
-    width: 24px;
+    right: 20px;              /* glyph flush at the content padding (16/20), like the code copy */
+    top: 16px;
+    width: 18px;
     z-index: 2;
 }
 
@@ -150,8 +150,8 @@
     background-color: currentColor;
     content: '';
     display: block;
-    height: 16px;
-    margin: 4px;
+    height: 18px;
+    margin: 0;
     mask-image: var(--md-code-copy-icon, var(--md-clipboard-icon));
     mask-position: center;
     mask-repeat: no-repeat;
@@ -160,12 +160,12 @@
     -webkit-mask-position: center;
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-size: contain;
-    width: 16px;
+    width: 18px;
 }
 
 [data-termynal] > .dstack-termy-copy:hover,
 [data-termynal] > .dstack-termy-copy:focus-visible {
-    color: var(--color-text);
+    color: var(--cs-text);   /* match the code/editor copy hover */
     outline: none;
 }
 

@@ -132,7 +132,7 @@ function DocsRightRail({
         <p>Reach out to us on Discord</p>
         <Button
           variant="normal"
-          href="https://discord.gg/dstack"
+          href="https://discord.gg/u8SmfwPpMd"
           target="_blank"
           iconAlign="right"
           iconName="external"
