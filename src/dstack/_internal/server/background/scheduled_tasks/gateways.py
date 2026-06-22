@@ -33,7 +33,7 @@ async def _remove_inactive_connections():
         res = await session.execute(
             select(GatewayComputeModel.ip_address).where(GatewayComputeModel.active == True)
         )
-    active_connection_ips = set(res.scalars().all())
+    active_connection_ips = {ip for ip in res.scalars().all() if ip is not None}
     for conn in await gateway_connections_pool.all():
         if conn.ip_address not in active_connection_ips:
             await gateway_connections_pool.remove(conn.ip_address)

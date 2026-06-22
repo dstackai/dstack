@@ -3,6 +3,9 @@ import asyncio
 from dstack._internal.server.background.pipeline_tasks.base import Pipeline
 from dstack._internal.server.background.pipeline_tasks.compute_groups import ComputeGroupPipeline
 from dstack._internal.server.background.pipeline_tasks.fleets import FleetPipeline
+from dstack._internal.server.background.pipeline_tasks.gateway_replicas import (
+    GatewayReplicaPipeline,
+)
 from dstack._internal.server.background.pipeline_tasks.gateways import GatewayPipeline
 from dstack._internal.server.background.pipeline_tasks.instances import InstancePipeline
 from dstack._internal.server.background.pipeline_tasks.jobs_running import JobRunningPipeline
@@ -33,6 +36,7 @@ class PipelineManager:
             ComputeGroupPipeline(pipeline_hinter=self._hinter),
             FleetPipeline(pipeline_hinter=self._hinter),
             GatewayPipeline(pipeline_hinter=self._hinter),
+            GatewayReplicaPipeline(pipeline_hinter=self._hinter),
             JobSubmittedPipeline(pipeline_hinter=self._hinter),
             JobRunningPipeline(pipeline_hinter=self._hinter),
             JobTerminatingPipeline(pipeline_hinter=self._hinter),

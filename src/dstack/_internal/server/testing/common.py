@@ -44,7 +44,11 @@ from dstack._internal.core.models.fleets import (
     SSHHostParams,
     SSHParams,
 )
-from dstack._internal.core.models.gateways import GatewayComputeConfiguration, GatewayStatus
+from dstack._internal.core.models.gateways import (
+    GatewayComputeConfiguration,
+    GatewayReplicaStatus,
+    GatewayStatus,
+)
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Disk,
@@ -662,10 +666,15 @@ async def create_gateway_compute(
     gateway_id: Optional[UUID] = None,
     backend_id: Optional[UUID] = None,
     ip_address: Optional[str] = "1.1.1.1",
-    region: str = "us",
+    region: Optional[str] = "us",
     instance_id: Optional[str] = "i-1234567890",
     ssh_private_key: str = "",
     ssh_public_key: str = "",
+    status: GatewayReplicaStatus = GatewayReplicaStatus.RUNNING,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    replica_num: int = 0,
+    active: bool = True,
+    configuration: Optional[str] = None,
 ) -> GatewayComputeModel:
     gateway_compute = GatewayComputeModel(
         gateway_id=gateway_id,
@@ -675,6 +684,11 @@ async def create_gateway_compute(
         instance_id=instance_id,
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
+        status=status,
+        last_processed_at=last_processed_at,
+        replica_num=replica_num,
+        active=active,
+        configuration=configuration,
     )
     session.add(gateway_compute)
     await session.commit()

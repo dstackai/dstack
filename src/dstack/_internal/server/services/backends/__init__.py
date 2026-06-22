@@ -451,6 +451,27 @@ async def get_project_backend_model_by_type_or_error(
     return backend_model
 
 
+async def get_project_backend_with_model_by_id(
+    project: ProjectModel, backend_id: UUID
+) -> Optional[BackendTuple]:
+    backends_with_models = await get_project_backends_with_models(project=project)
+    for backend_model, backend in backends_with_models:
+        if backend_model.id == backend_id:
+            return backend_model, backend
+    return None
+
+
+async def get_project_backend_with_model_by_id_or_error(
+    project: ProjectModel, backend_id: UUID
+) -> BackendTuple:
+    backend_with_model = await get_project_backend_with_model_by_id(
+        project=project, backend_id=backend_id
+    )
+    if backend_with_model is None:
+        raise BackendNotAvailable()
+    return backend_with_model
+
+
 async def get_backend_offers(
     backends: List[Backend],
     requirements: Requirements,

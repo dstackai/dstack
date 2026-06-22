@@ -1,18 +1,18 @@
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.errors import BackendNotAvailable
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
     GatewayConfiguration,
-    GatewayProvisioningData,
+    GatewayReplicaStatus,
     GatewayStatus,
 )
 from dstack._internal.server.background.pipeline_tasks.gateways import (
@@ -23,8 +23,6 @@ from dstack._internal.server.background.pipeline_tasks.gateways import (
 )
 from dstack._internal.server.models import GatewayModel
 from dstack._internal.server.testing.common import (
-    AsyncContextManager,
-    ComputeMockSpec,
     create_backend,
     create_gateway,
     create_gateway_compute,
@@ -239,83 +237,6 @@ class TestGatewayWorkerSubmitted:
             backend_id=backend.id,
             status=GatewayStatus.SUBMITTED,
         )
-        gateway.lock_token = uuid.uuid4()
-        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
-        await session.commit()
-
-        with patch(
-            "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
-        ) as m:
-            aws = Mock()
-            m.return_value = (backend, aws)
-            aws.compute.return_value = Mock(spec=ComputeMockSpec)
-            aws.compute.return_value.create_gateway.return_value = GatewayProvisioningData(
-                instance_id="i-1234567890",
-                ip_address="2.2.2.2",
-                region="us",
-            )
-            await worker.process(_gateway_to_pipeline_item(gateway))
-            m.assert_called_once()
-            aws.compute.return_value.create_gateway.assert_called_once()
-
-        await session.refresh(gateway)
-        res = await session.execute(
-            select(GatewayModel)
-            .where(GatewayModel.id == gateway.id)
-            .options(selectinload(GatewayModel.gateway_computes))
-        )
-        gateway = res.unique().scalar_one()
-        assert gateway.status == GatewayStatus.PROVISIONING
-        assert len(gateway.gateway_computes) > 0
-        assert gateway.gateway_computes[0].ip_address == "2.2.2.2"
-        events = await list_events(session)
-        assert len(events) == 1
-        assert events[0].message == "Gateway status changed SUBMITTED -> PROVISIONING"
-
-    async def test_marks_gateway_as_failed_if_gateway_creation_errors(
-        self, test_db, session: AsyncSession, worker: GatewayWorker
-    ):
-        project = await create_project(session=session)
-        backend = await create_backend(session=session, project_id=project.id)
-        gateway = await create_gateway(
-            session=session,
-            project_id=project.id,
-            backend_id=backend.id,
-            status=GatewayStatus.SUBMITTED,
-        )
-        gateway.lock_token = uuid.uuid4()
-        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
-        await session.commit()
-
-        with patch(
-            "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
-        ) as m:
-            aws = Mock()
-            m.return_value = (backend, aws)
-            aws.compute.return_value = Mock(spec=ComputeMockSpec)
-            aws.compute.return_value.create_gateway.side_effect = BackendError("Some error")
-            await worker.process(_gateway_to_pipeline_item(gateway))
-            m.assert_called_once()
-            aws.compute.return_value.create_gateway.assert_called_once()
-
-        await session.refresh(gateway)
-        assert gateway.status == GatewayStatus.FAILED
-        assert gateway.status_message == "Some error"
-        events = await list_events(session)
-        assert len(events) == 1
-        assert events[0].message == "Gateway status changed SUBMITTED -> FAILED (Some error)"
-
-    async def test_submitted_creates_multiple_computes_for_multi_replica(
-        self, test_db, session: AsyncSession, worker: GatewayWorker
-    ):
-        project = await create_project(session=session)
-        backend = await create_backend(session=session, project_id=project.id)
-        gateway = await create_gateway(
-            session=session,
-            project_id=project.id,
-            backend_id=backend.id,
-            status=GatewayStatus.SUBMITTED,
-        )
         config = GatewayConfiguration(
             name=gateway.name,
             backend=BackendType.AWS,
@@ -330,15 +251,8 @@ class TestGatewayWorkerSubmitted:
         with patch(
             "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
         ) as m:
-            aws = Mock()
-            m.return_value = (backend, aws)
-            aws.compute.return_value = Mock(spec=ComputeMockSpec)
-            aws.compute.return_value.create_gateway.side_effect = [
-                GatewayProvisioningData(instance_id="i-aaa", ip_address="2.2.2.2", region="us"),
-                GatewayProvisioningData(instance_id="i-bbb", ip_address="3.3.3.3", region="us"),
-            ]
+            m.return_value = (backend, Mock())
             await worker.process(_gateway_to_pipeline_item(gateway))
-            assert aws.compute.return_value.create_gateway.call_count == 2
 
         await session.refresh(gateway)
         res = await session.execute(
@@ -350,12 +264,13 @@ class TestGatewayWorkerSubmitted:
         assert gateway.status == GatewayStatus.PROVISIONING
         computes = sorted(gateway.gateway_computes, key=lambda c: c.replica_num)
         assert len(computes) == 2
-        assert computes[0].ip_address == "2.2.2.2"
+        assert computes[0].status == GatewayReplicaStatus.SUBMITTED
         assert computes[0].replica_num == 0
-        assert computes[1].ip_address == "3.3.3.3"
+        assert computes[1].status == GatewayReplicaStatus.SUBMITTED
         assert computes[1].replica_num == 1
+        assert all(c.ip_address is None for c in computes)
 
-    async def test_marks_gateway_as_failed_if_second_replica_creation_errors(
+    async def test_marks_gateway_as_failed_if_backend_not_available(
         self, test_db, session: AsyncSession, worker: GatewayWorker
     ):
         project = await create_project(session=session)
@@ -366,13 +281,6 @@ class TestGatewayWorkerSubmitted:
             backend_id=backend.id,
             status=GatewayStatus.SUBMITTED,
         )
-        config = GatewayConfiguration(
-            name=gateway.name,
-            backend=BackendType.AWS,
-            region=gateway.region,
-            replicas=2,
-        )
-        gateway.configuration = config.json()
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
@@ -380,32 +288,18 @@ class TestGatewayWorkerSubmitted:
         with patch(
             "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
         ) as m:
-            aws = Mock()
-            m.return_value = (backend, aws)
-            aws.compute.return_value = Mock(spec=ComputeMockSpec)
-            aws.compute.return_value.create_gateway.side_effect = [
-                GatewayProvisioningData(instance_id="i-aaa", ip_address="2.2.2.2", region="us"),
-                BackendError("Some error"),
-            ]
+            m.side_effect = BackendNotAvailable()
             await worker.process(_gateway_to_pipeline_item(gateway))
-            assert aws.compute.return_value.create_gateway.call_count == 2
 
         await session.refresh(gateway)
-        res = await session.execute(
-            select(GatewayModel)
-            .where(GatewayModel.id == gateway.id)
-            .options(selectinload(GatewayModel.gateway_computes))
-        )
-        gateway = res.unique().scalar_one()
         assert gateway.status == GatewayStatus.FAILED
-        assert gateway.status_message == "Some error"
-        # The first replica's compute is saved even though the second failed
-        assert len(gateway.gateway_computes) == 1
-        assert gateway.gateway_computes[0].ip_address == "2.2.2.2"
-        assert gateway.gateway_computes[0].replica_num == 0
+        assert gateway.status_message == "Backend not available"
         events = await list_events(session)
         assert len(events) == 1
-        assert events[0].message == "Gateway status changed SUBMITTED -> FAILED (Some error)"
+        assert (
+            events[0].message
+            == "Gateway status changed SUBMITTED -> FAILED (Backend not available)"
+        )
 
 
 @pytest.mark.asyncio
@@ -424,21 +318,23 @@ class TestGatewayWorkerProvisioning:
             status=GatewayStatus.PROVISIONING,
         )
         if legacy_compute:
-            gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
-            gateway.gateway_compute_id = gateway_compute.id  # pre-0.20.25 relationship style
+            gateway_compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                status=GatewayReplicaStatus.RUNNING,
+            )
+            gateway.gateway_compute_id = gateway_compute.id
         else:
-            await create_gateway_compute(session, gateway_id=gateway.id)
+            await create_gateway_compute(
+                session,
+                gateway_id=gateway.id,
+                status=GatewayReplicaStatus.RUNNING,
+            )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
 
-        with patch(
-            "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
-        ) as pool_add:
-            pool_add.return_value = MagicMock()
-            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
-            await worker.process(_gateway_to_pipeline_item(gateway))
-            pool_add.assert_called_once()
+        await worker.process(_gateway_to_pipeline_item(gateway))
 
         await session.refresh(gateway)
         assert gateway.status == GatewayStatus.RUNNING
@@ -457,22 +353,25 @@ class TestGatewayWorkerProvisioning:
             backend_id=backend.id,
             status=GatewayStatus.PROVISIONING,
         )
-        await create_gateway_compute(session, gateway_id=gateway.id, ip_address="1.1.1.1")
-        compute1 = await create_gateway_compute(
-            session, gateway_id=gateway.id, ip_address="2.2.2.2"
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address="1.1.1.1",
+            status=GatewayReplicaStatus.RUNNING,
+            replica_num=0,
         )
-        compute1.replica_num = 1
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address="2.2.2.2",
+            status=GatewayReplicaStatus.RUNNING,
+            replica_num=1,
+        )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
 
-        with patch(
-            "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
-        ) as pool_add:
-            pool_add.return_value = MagicMock()
-            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
-            await worker.process(_gateway_to_pipeline_item(gateway))
-            assert pool_add.call_count == 2
+        await worker.process(_gateway_to_pipeline_item(gateway))
 
         await session.refresh(gateway)
         assert gateway.status == GatewayStatus.RUNNING
@@ -480,47 +379,7 @@ class TestGatewayWorkerProvisioning:
         assert len(events) == 1
         assert events[0].message == "Gateway status changed PROVISIONING -> RUNNING"
 
-    @pytest.mark.parametrize("legacy_compute", [False, True])
-    async def test_marks_gateway_as_failed_if_fails_to_connect(
-        self, test_db, session: AsyncSession, worker: GatewayWorker, legacy_compute: bool
-    ):
-        project = await create_project(session=session)
-        backend = await create_backend(session=session, project_id=project.id)
-        gateway = await create_gateway(
-            session=session,
-            project_id=project.id,
-            backend_id=backend.id,
-            status=GatewayStatus.PROVISIONING,
-        )
-        if legacy_compute:
-            gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
-            gateway.gateway_compute_id = gateway_compute.id  # pre-0.20.25 relationship style
-        else:
-            gateway_compute = await create_gateway_compute(session, gateway_id=gateway.id)
-        gateway.lock_token = uuid.uuid4()
-        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
-        await session.commit()
-
-        with patch(
-            "dstack._internal.server.services.gateways.connect_to_gateway_with_retry"
-        ) as connect_to_gateway_with_retry_mock:
-            connect_to_gateway_with_retry_mock.return_value = None
-            await worker.process(_gateway_to_pipeline_item(gateway))
-            connect_to_gateway_with_retry_mock.assert_called_once()
-
-        await session.refresh(gateway)
-        await session.refresh(gateway_compute)
-        assert gateway.status == GatewayStatus.FAILED
-        assert gateway.status_message == "Failed to connect to gateway"
-        assert gateway_compute.active is False
-        events = await list_events(session)
-        assert len(events) == 1
-        assert (
-            events[0].message
-            == "Gateway status changed PROVISIONING -> FAILED (Failed to connect to gateway)"
-        )
-
-    async def test_marks_gateway_as_failed_if_any_replica_fails_to_connect(
+    async def test_still_provisioning_if_not_all_replicas_running(
         self, test_db, session: AsyncSession, worker: GatewayWorker
     ):
         project = await create_project(session=session)
@@ -531,46 +390,146 @@ class TestGatewayWorkerProvisioning:
             backend_id=backend.id,
             status=GatewayStatus.PROVISIONING,
         )
-        compute0 = await create_gateway_compute(
-            session, gateway_id=gateway.id, ip_address="1.1.1.1"
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address="1.1.1.1",
+            status=GatewayReplicaStatus.RUNNING,
+            replica_num=0,
         )
-        compute1 = await create_gateway_compute(
-            session, gateway_id=gateway.id, ip_address="2.2.2.2"
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address="2.2.2.2",
+            status=GatewayReplicaStatus.PROVISIONING,
+            replica_num=1,
         )
-        compute1.replica_num = 1
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        original_last_processed_at = gateway.last_processed_at
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.PROVISIONING
+        assert gateway.last_processed_at > original_last_processed_at
+        events = await list_events(session)
+        assert len(events) == 0
+
+    @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize(
+        "replica_status", [GatewayReplicaStatus.TERMINATING, GatewayReplicaStatus.TERMINATED]
+    )
+    async def test_marks_gateway_as_failed_if_replica_failed(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayWorker,
+        legacy_compute: bool,
+        replica_status: GatewayReplicaStatus,
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+        )
+        if legacy_compute:
+            gateway_compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                status=replica_status,
+                active=False,
+            )
+            gateway.gateway_compute_id = gateway_compute.id
+        else:
+            await create_gateway_compute(
+                session,
+                gateway_id=gateway.id,
+                status=replica_status,
+                active=False,
+            )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
 
-        with patch(
-            "dstack._internal.server.services.gateways.connect_to_gateway_with_retry"
-        ) as connect_mock:
-            connect_mock.return_value = None
-            await worker.process(_gateway_to_pipeline_item(gateway))
-            assert connect_mock.call_count == 2
+        await worker.process(_gateway_to_pipeline_item(gateway))
 
         await session.refresh(gateway)
         assert gateway.status == GatewayStatus.FAILED
-        assert gateway.status_message == "Failed to connect to gateway"
-
-        await session.refresh(compute0)
-        await session.refresh(compute1)
-        assert compute0.active is False
-        assert compute1.active is False
-
+        assert gateway.status_message == "Failed to provision gateway replica"
         events = await list_events(session)
         assert len(events) == 1
         assert (
             events[0].message
-            == "Gateway status changed PROVISIONING -> FAILED (Failed to connect to gateway)"
+            == "Gateway status changed PROVISIONING -> FAILED (Failed to provision gateway replica)"
         )
+
+    async def test_still_provisioning_with_submitted_replica(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+        )
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address=None,
+            instance_id=None,
+            region=None,
+            status=GatewayReplicaStatus.SUBMITTED,
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        original_last_processed_at = gateway.last_processed_at
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.PROVISIONING
+        assert gateway.last_processed_at > original_last_processed_at
+        events = await list_events(session)
+        assert len(events) == 0
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestGatewayWorkerDeleted:
+    async def test_deletes_gateway_with_no_computes(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        gateway.to_be_deleted = True
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        res = await session.execute(select(GatewayModel.id).where(GatewayModel.id == gateway.id))
+        assert res.scalar_one_or_none() is None
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway deleted"
+
     @pytest.mark.parametrize("legacy_compute", [False, True])
-    async def test_deletes_gateway_and_marks_compute_deleted(
+    async def test_deletes_gateway_when_all_replicas_terminated(
         self, test_db, session: AsyncSession, worker: GatewayWorker, legacy_compute: bool
     ):
         project = await create_project(session=session)
@@ -582,47 +541,49 @@ class TestGatewayWorkerDeleted:
             status=GatewayStatus.RUNNING,
         )
         if legacy_compute:
-            gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
-            gateway.gateway_compute_id = gateway_compute.id  # pre-0.20.25 relationship style
-        else:
             gateway_compute = await create_gateway_compute(
-                session=session, backend_id=backend.id, gateway_id=gateway.id
+                session=session,
+                backend_id=backend.id,
+                status=GatewayReplicaStatus.TERMINATED,
+                active=False,
+            )
+            gateway.gateway_compute_id = gateway_compute.id
+        else:
+            await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                gateway_id=gateway.id,
+                status=GatewayReplicaStatus.TERMINATED,
+                active=False,
             )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         gateway.to_be_deleted = True
         await session.commit()
 
-        with (
-            patch(
-                "dstack._internal.server.services.backends.get_project_backend_by_type_or_error"
-            ) as get_backend_mock,
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.gateways.gateway_connections_pool.remove"
-            ) as remove_connection_mock,
-        ):
-            backend_mock = Mock()
-            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backend_mock.return_value = backend_mock
+        await worker.process(_gateway_to_pipeline_item(gateway))
 
-            await worker.process(_gateway_to_pipeline_item(gateway))
-
-            get_backend_mock.assert_called_once()
-            backend_mock.compute.return_value.terminate_gateway.assert_called_once()
-            remove_connection_mock.assert_called_once_with(gateway_compute.ip_address)
-
-        await session.refresh(gateway_compute)
         res = await session.execute(select(GatewayModel.id).where(GatewayModel.id == gateway.id))
         assert res.scalar_one_or_none() is None
-        assert gateway_compute.active is False
-        assert gateway_compute.deleted is True
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Gateway deleted"
 
-    @pytest.mark.parametrize("legacy_compute", [False, True])
-    async def test_keeps_gateway_if_terminate_fails(
-        self, test_db, session: AsyncSession, worker: GatewayWorker, legacy_compute: bool
+    @pytest.mark.parametrize(
+        "replica_status",
+        [
+            GatewayReplicaStatus.SUBMITTED,
+            GatewayReplicaStatus.PROVISIONING,
+            GatewayReplicaStatus.RUNNING,
+            GatewayReplicaStatus.TERMINATING,
+        ],
+    )
+    async def test_waits_when_replicas_not_yet_terminated(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayWorker,
+        replica_status: GatewayReplicaStatus,
     ):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -632,13 +593,13 @@ class TestGatewayWorkerDeleted:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        if legacy_compute:
-            gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
-            gateway.gateway_compute_id = gateway_compute.id  # pre-0.20.25 relationship style
-        else:
-            gateway_compute = await create_gateway_compute(
-                session=session, backend_id=backend.id, gateway_id=gateway.id
-            )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            status=replica_status,
+            active=False,
+        )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         gateway.lock_owner = "GatewayPipeline"
@@ -646,40 +607,20 @@ class TestGatewayWorkerDeleted:
         original_last_processed_at = gateway.last_processed_at
         await session.commit()
 
-        with (
-            patch(
-                "dstack._internal.server.services.backends.get_project_backend_by_type_or_error"
-            ) as get_backend_mock,
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.gateways.gateway_connections_pool.remove"
-            ) as remove_connection_mock,
-        ):
-            backend_mock = Mock()
-            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            backend_mock.compute.return_value.terminate_gateway.side_effect = BackendError(
-                "Terminate failed"
-            )
-            get_backend_mock.return_value = backend_mock
+        await worker.process(_gateway_to_pipeline_item(gateway))
 
-            await worker.process(_gateway_to_pipeline_item(gateway))
-
-            get_backend_mock.assert_called_once()
-            backend_mock.compute.return_value.terminate_gateway.assert_called_once()
-            remove_connection_mock.assert_not_called()
-
+        res = await session.execute(select(GatewayModel.id).where(GatewayModel.id == gateway.id))
+        assert res.scalar_one_or_none() is not None
         await session.refresh(gateway)
-        await session.refresh(gateway_compute)
         assert gateway.to_be_deleted is True
         assert gateway.last_processed_at > original_last_processed_at
         assert gateway.lock_token is None
         assert gateway.lock_expires_at is None
         assert gateway.lock_owner is None
-        assert gateway_compute.active is True
-        assert gateway_compute.deleted is False
         events = await list_events(session)
         assert len(events) == 0
 
-    async def test_deletes_gateway_with_multiple_replicas(
+    async def test_deletes_gateway_with_multiple_replicas_all_terminated(
         self, test_db, session: AsyncSession, worker: GatewayWorker
     ):
         project = await create_project(session=session)
@@ -690,100 +631,33 @@ class TestGatewayWorkerDeleted:
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
         )
-        compute0 = await create_gateway_compute(
-            session=session, backend_id=backend.id, gateway_id=gateway.id, ip_address="1.1.1.1"
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            ip_address="1.1.1.1",
+            status=GatewayReplicaStatus.TERMINATED,
+            active=False,
+            replica_num=0,
         )
-        compute1 = await create_gateway_compute(
-            session=session, backend_id=backend.id, gateway_id=gateway.id, ip_address="2.2.2.2"
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            ip_address="2.2.2.2",
+            status=GatewayReplicaStatus.TERMINATED,
+            active=False,
+            replica_num=1,
         )
-        compute1.replica_num = 1
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         gateway.to_be_deleted = True
         await session.commit()
 
-        with (
-            patch(
-                "dstack._internal.server.services.backends.get_project_backend_by_type_or_error"
-            ) as get_backend_mock,
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.gateways.gateway_connections_pool.remove"
-            ) as remove_connection_mock,
-        ):
-            backend_mock = Mock()
-            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            get_backend_mock.return_value = backend_mock
+        await worker.process(_gateway_to_pipeline_item(gateway))
 
-            await worker.process(_gateway_to_pipeline_item(gateway))
-
-            assert backend_mock.compute.return_value.terminate_gateway.call_count == 2
-            assert remove_connection_mock.call_count == 2
-
-        await session.refresh(compute0)
-        await session.refresh(compute1)
         res = await session.execute(select(GatewayModel.id).where(GatewayModel.id == gateway.id))
         assert res.scalar_one_or_none() is None
-        assert compute0.active is False
-        assert compute0.deleted is True
-        assert compute1.active is False
-        assert compute1.deleted is True
         events = await list_events(session)
         assert len(events) == 1
         assert events[0].message == "Gateway deleted"
-
-    async def test_keeps_gateway_if_second_replica_terminate_fails(
-        self, test_db, session: AsyncSession, worker: GatewayWorker
-    ):
-        project = await create_project(session=session)
-        backend = await create_backend(session=session, project_id=project.id)
-        gateway = await create_gateway(
-            session=session,
-            project_id=project.id,
-            backend_id=backend.id,
-            status=GatewayStatus.RUNNING,
-        )
-        compute0 = await create_gateway_compute(
-            session=session, backend_id=backend.id, gateway_id=gateway.id, ip_address="1.1.1.1"
-        )
-        compute1 = await create_gateway_compute(
-            session=session, backend_id=backend.id, gateway_id=gateway.id, ip_address="2.2.2.2"
-        )
-        compute1.replica_num = 1
-        gateway.lock_token = uuid.uuid4()
-        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
-        gateway.lock_owner = "GatewayPipeline"
-        gateway.to_be_deleted = True
-        original_last_processed_at = gateway.last_processed_at
-        await session.commit()
-
-        with (
-            patch(
-                "dstack._internal.server.services.backends.get_project_backend_by_type_or_error"
-            ) as get_backend_mock,
-            patch(
-                "dstack._internal.server.background.pipeline_tasks.gateways.gateway_connections_pool.remove"
-            ) as remove_connection_mock,
-        ):
-            backend_mock = Mock()
-            backend_mock.compute.return_value = Mock(spec=ComputeMockSpec)
-            backend_mock.compute.return_value.terminate_gateway.side_effect = [
-                None,
-                BackendError("Terminate failed"),
-            ]
-            get_backend_mock.return_value = backend_mock
-
-            await worker.process(_gateway_to_pipeline_item(gateway))
-
-            assert backend_mock.compute.return_value.terminate_gateway.call_count == 2
-            remove_connection_mock.assert_called_once_with(compute0.ip_address)
-
-        await session.refresh(gateway)
-        await session.refresh(compute0)
-        await session.refresh(compute1)
-        assert gateway.to_be_deleted is True
-        assert gateway.last_processed_at > original_last_processed_at
-        assert gateway.lock_token is None
-        assert gateway.lock_expires_at is None
-        assert gateway.lock_owner is None
-        assert compute0.deleted is False
-        assert compute1.deleted is False

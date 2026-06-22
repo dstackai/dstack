@@ -74,6 +74,8 @@ class TestListAndGetGateways:
                         "backend": backend.type.value,
                         "region": "us",
                         "created_at": response.json()[0]["replicas"][0]["created_at"],
+                        "status": "running",
+                        "status_message": None,
                     }
                 ],
                 "instance_id": None,
@@ -145,6 +147,8 @@ class TestListAndGetGateways:
                     "backend": backend.type.value,
                     "region": "us",
                     "created_at": response.json()["replicas"][0]["created_at"],
+                    "status": "running",
+                    "status_message": None,
                 }
             ],
             "instance_id": None,
@@ -843,6 +847,8 @@ class TestDefaultGateway:
                     "backend": backend.type.value,
                     "region": "us",
                     "created_at": response.json()["replicas"][0]["created_at"],
+                    "status": "running",
+                    "status_message": None,
                 }
             ],
             "instance_id": None,
@@ -1222,6 +1228,8 @@ class TestUpdateGateway:
                     "backend": backend.type.value,
                     "region": "us",
                     "created_at": response.json()["replicas"][0]["created_at"],
+                    "status": "running",
+                    "status_message": None,
                 }
             ],
             "instance_id": None,
