@@ -14,12 +14,12 @@ const dstackGithubUrl = 'https://github.com/dstackai/dstack';
 const externalIconAriaLabel = 'External link icon';
 
 // Primary links in the desktop top navigation (plain same-origin MkDocs links). The blog
-// categories are listed individually (Case studies / Benchmarks / Blog) to mirror the docs
+// categories are listed individually (Case studies / Reports / Blog) to mirror the docs
 // header tabs — no "Resources" dropdown.
 const audienceNavItems: Array<{ label: string; href: string }> = [
   { label: 'Docs', href: DOCS_URL },
   { label: 'Case studies', href: `${BLOG_URL}/case-studies/` },
-  { label: 'Benchmarks', href: `${BLOG_URL}/benchmarks/` },
+  { label: 'Reports', href: `${BLOG_URL}/reports/` },
   { label: 'Blog', href: BLOG_URL },
 ];
 
@@ -46,7 +46,7 @@ const productDropdownItems: ButtonDropdownProps.Items = [
 const mobileNavigationItems: SideNavigationProps.Item[] = [
   { type: 'link', text: 'Docs', href: DOCS_URL },
   { type: 'link', text: 'Case studies', href: `${BLOG_URL}/case-studies/` },
-  { type: 'link', text: 'Benchmarks', href: `${BLOG_URL}/benchmarks/` },
+  { type: 'link', text: 'Reports', href: `${BLOG_URL}/reports/` },
   { type: 'link', text: 'Blog', href: BLOG_URL },
   { type: 'link', text: 'GitHub', href: dstackGithubUrl, external: true, externalIconAriaLabel },
   {

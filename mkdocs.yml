@@ -75,7 +75,7 @@ plugins:
       categories_url_format: "{slug}"
       archive: false
       categories_name: Blog
-      categories_sort_reverse: true
+      # categories_sort_reverse: true
   - social:
       cards_layout_options:
         background_color: "black"

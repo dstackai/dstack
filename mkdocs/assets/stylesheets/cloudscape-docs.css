@@ -1861,6 +1861,7 @@
 }
 .md-typeset :is(h1, h2, h3, h4, h5, h6) a:hover {
     text-decoration: underline;
+    color: inherit;   /* keep the heading color — don't pick up Material's accent (lilac) on hover */
 }
 
 /* Blog excerpt header (author avatars + date · category · read time) removed entirely on the
@@ -1875,31 +1876,13 @@
 }
 
 /* ===== Blog post (article) layout ========================================== */
-/* Blog posts render NO left sidebar (overrides/blog-post.html) — only the article + right rail.
-   The content div carries .md-content--blog (NOT Material's .md-content--post, which is a
-   column-reverse flex meant to pair the post sidebar with the article). It's a CSS hook to widen
-   the article to the same "collapsed left menu" layout as a docs page with the nav hidden: a
-   1280px region (960 body + 40 gap + 280 rail) centered in the viewport. :has() reaches ancestors. */
+/* Blog posts use the same desktop layout as the blog index/category pages: left nav sidebar +
+   article + right rail (On this page, then the relocated post metadata). The content div carries
+   .md-content--blog purely as a hook for that metadata relocation (see .cs-post-meta); layout-wise
+   it now matches a normal page, so no width/sidebar overrides are needed here. */
 @media screen and (min-width: 76.1875em) {
-    .md-main__inner.md-grid:has(.md-content--blog) {
-        max-width: 1280px;
-        margin-left: auto;
-        margin-right: auto;
-    }
-    .md-main__inner:has(.md-content--blog) .md-content {
-        margin-left: 0;
-    }
-    .md-main__inner:has(.md-content--blog) .md-sidebar--secondary {
-        margin-right: 0;
-    }
-    /* Blog posts render the primary nav only so the mobile drawer (burger) has it; on desktop the
-       article spans the full width, so hide the left sidebar here. */
-    .md-main__inner:has(.md-content--blog) .md-sidebar--primary {
-        display: none;
-    }
-    /* No left sidebar → drop the full-height vertical divider drawn at left:280px. Applies to blog
-       posts and to any page that hides the nav (e.g. /terms, /privacy → .md-sidebar--primary[hidden]). */
-    body:has(.md-content--blog)::before,
+    /* Pages that hide the nav entirely (/terms, /privacy → .md-sidebar--primary[hidden]) have no
+       left sidebar, so drop the full-height vertical divider drawn at left:280px. */
     body:has(.md-sidebar--primary[hidden])::before {
         display: none;
     }

@@ -4,13 +4,15 @@ date: 2026-06-23
 description: "How supply, software readiness, orchestration, and networking shape accelerator choices across NVIDIA, AMD, TPUs, Trainium, and specialized inference systems."
 slug: state-of-heterogeneous-compute-2026
 image: https://dstack.ai/static-assets/static-assets/images/state-of-heterogeneous-compute-2026.png
-# categories:
-#   - Benchmarks
+categories:
+  - Reports
 ---
 
 # The state of heterogeneous AI compute in 2026
 
 Heterogeneous AI compute is becoming harder to ignore. The reason is practical: supply pressure, pricing, and stack readiness are making more than one accelerator path worth evaluating.
+
+<img src="https://dstack.ai/static-assets/static-assets/images/state-of-heterogeneous-compute-2026.png" width="750"/>
 
 This report focuses on accelerator choices behind training and inference workloads: the main patterns, the evidence behind them, how readiness differs across NVIDIA, AMD, TPUs, Trainium, and specialized inference systems, and why orchestration and networking determine whether capacity can be used in practice.
 
@@ -160,7 +162,7 @@ The open question is portability. Ethernet has momentum through [Spectrum-X](htt
 - **Software.** An accelerator path matters only if the model, framework, runtime, kernels, distributed training path, serving stack, containers, and debugging tools are ready enough for the workload.
 - **Orchestration.** Kubernetes and Slurm remain important, but heterogeneous compute needs a higher-level way to provision, place, and operate workloads across fragmented clouds, clusters, datacenters, and accelerator stacks without leaving platform teams to stitch every path together themselves.
 
-## Outside of the scope
+## Out of scope
 
 - Custom silicon controlled by individual hyperscalers or frontier labs. It matters as a supply signal because large buyers can reserve or build capacity outside the public accelerator market, but it is not a generally adoptable path for most teams.
 - Chinese accelerators, including Huawei Ascend and Cambricon. These may be important, especially in China, but comparable public data is limited and hard to verify from outside the region.
