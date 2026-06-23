@@ -1,0 +1,2129 @@
+/* ============================================================================
+   Cloudscape docs theme
+   Overrides that make the MkDocs chrome match the /old page (the React/Cloudscape
+   reference in website/src/styles.css) pixel-to-pixel, in light and dark.
+
+   Loaded LAST (after extra.css, landing.css, pricing.css) so these win on source
+   order — avoids per-property specificity fights with the existing theme CSS.
+   Design tokens (--cs-*) are defined in extra.css. Built up component by component.
+   ============================================================================ */
+
+/* ===== Dark-mode foundation ================================================
+   Material's slate scheme paints the page a lighter blue-gray (#1e2129); /old's dark page is
+   near-black (#0f141d = --cs-bg). Repoint Material's default bg token so the body and every
+   surface that inherits it match /old. Code blocks and admonitions keep their own tokens. */
+[data-md-color-scheme="slate"] {
+    --md-default-bg-color: var(--cs-bg);
+}
+
+/* ===== Announce banner ===================================================== */
+/* /old's banner INVERTS with the theme: dark bar + white text in light, light bar + dark text in
+   dark. Driving bg from --cs-text and text from --cs-bg reproduces that for free (light: #16191f /
+   #fff; dark: #f2f3f3 / #0f141d) — and keeps light mode pixel-identical to before. */
+.md-banner {
+    background-color: var(--cs-text);
+    color: var(--cs-bg);
+    /* Match /old's .site-banner EXACTLY (website/src/styles.css): flex-centered, min-height 38px,
+       padding 9px 16px 7.5px — not the old padding:3px 0 + 26px line-height (which only happened
+       to be ~38px tall but positioned the text differently). */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 9px 16px 7.5px;
+    margin-bottom: 0;   /* a base 1px bottom margin left a gap below the banner, pushing the whole
+                           header (and logo/burger) 1px lower than /old, where banner+header touch */
+}
+
+.md-typeset.md-banner__inner {
+    font-size: 16.5px;
+    font-weight: 300;   /* /old measures 16.5px / weight 300 (lighter); earlier pass wrongly used 16/400 */
+    line-height: 1.15;  /* /old's .site-banner__link line-height (18.975px) — was inheriting 26px */
+    margin: 0;          /* drop .md-grid's auto margins; the flex parent centers it */
+    color: var(--cs-bg);  /* inverts with the banner bg; in slate a stray rule otherwise made it #1e2129 (invisible on the light bar) */
+    /* .md-typeset sets font-smoothing:auto (subpixel → heavier); override here (0,2,0 beats
+       .md-typeset's 0,1,0) so the banner renders antialiased like /old + the landing. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+/* extra.css forces the link to 0.75rem (15px); restore /old's size/weight (the visible text is the link). */
+.md-typeset.md-banner__inner a {
+    font-size: 16.5px;
+    font-weight: 300;
+    color: var(--cs-bg) !important;   /* the visible banner text is this link; invert it with the bar (beats the slate link color) */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+/* Light-on-dark text looks thinner than dark-on-light at the same weight; use a heavier weight in
+   dark mode so the banner reads with the same emphasis as in light (matches the landing). */
+[data-md-color-scheme="slate"] .md-typeset.md-banner__inner,
+[data-md-color-scheme="slate"] .md-typeset.md-banner__inner a {
+    font-weight: 500;
+}
+/* The → arrow: replicate /old's .site-banner__arrow exactly — inline-flex (so it doesn't stretch
+   the line box past the text), vertical-align middle, and a 6px gap before it (was 0). */
+.md-banner__inner .icon {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    margin-inline-start: 6px;
+    width: 17px !important;   /* match /old's 17×17 arrow box so the 17px svg sits centered, not overflowing a 12.5px box */
+    height: 17px !important;
+}
+/* Banner arrow is now /old's exact 24×24 stroked → (swapped in main.html); size it 17×17 like /old.
+   max-width:none lifts mkdocs's `.md-typeset svg{max-width:100%}`, which was capping it to ~12.5px. */
+.md-banner__inner .icon svg {
+    width: 17px !important;
+    height: 17px !important;
+    max-width: none !important;
+}
+
+/* ===== Header ============================================================== */
+@media screen and (min-width: 76.1875em) {
+    /* White (dark in slate) bar with a 1px solid hairline, like /old .site-nav. */
+    .md-header {
+        background-color: var(--cs-bg);
+        backdrop-filter: none;
+        border-bottom: 1px solid var(--cs-border);
+        padding-bottom: 0;
+    }
+
+    /* Full-width nav, 78px tall, 24px gutters (vs the centered md-grid). */
+    .md-header__inner.md-grid {
+        height: var(--cs-nav-height);
+        min-height: var(--cs-nav-height);
+        max-width: none;
+        margin: 0;
+        padding-left: 24px;
+        padding-right: 24px;
+        align-items: center;
+    }
+
+    /* /old keeps the logo alone on the left and clusters the whole nav on the right.
+       Push the tab group (and the search + buttons that follow it in the DOM) to the
+       right edge, leaving an empty middle. */
+    /* Search is FIRST in the right cluster (it ships before the tabs in the template), so it
+       carries the auto-margin that pushes search → tabs → buttons to the right edge as one group.
+       The tabs then sit a fixed gap to the search's right, just left of "Docs". */
+    .md-header .md-search {
+        margin-left: auto;
+    }
+    /* The theme toggle is the first item in the buttons block (before GitHub); 15px sits it a touch
+       tighter than the 20px GitHub→Get-started gap. */
+    .cs-theme-toggle--header {
+        margin-right: 15px;
+    }
+    .md-tabs {
+        display: block;       /* was display:none until JS added .ready — tabs now ship in the header */
+        flex-grow: 0;
+        margin-left: 10px;    /* makes the search→Docs gap (~22px) match the inter-menu gaps */
+        padding-left: 0;
+    }
+
+    /* The buttons block also has margin-left:auto by default, which would split the free
+       space into two gaps. Zero it so the single auto-margin on .md-tabs pushes the whole
+       cluster (tabs → search → buttons) to the right as one group. */
+    .md-header__inner .md-header__buttons {
+        margin-left: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    /* No Discord icon in the header. */
+    .md-tabs__item:nth-child(6) {
+        display: none;
+    }
+}
+
+/* Below desktop the header's right cluster (search → GitHub → Get started) loses the desktop flex
+   layout: the buttons fall back to display:block (inline), so search abuts GitHub (0 gap), the
+   GitHub↔Get-started gap is just github's margin (unequal), and the pills sit a px or two off.
+   Restore a flex cluster with equal 16px gaps, vertically centered. */
+@media screen and (max-width: 76.1875em) {
+    .md-header__inner .md-header__buttons {
+        display: flex;
+        align-items: center;
+        /* search↔GitHub gap = the GitHub↔Get-started gap (github's existing margin-right: 20px),
+           so all three sit at an equal 20px. No flex `gap` — that would double with the margin. */
+        margin-left: 20px;
+    }
+}
+/* Below 60em the search box collapses to a 40px icon button (already padded). The 20px button
+   margin then reads as too much space before GitHub — trim it so the glyph→GitHub gap matches. */
+@media screen and (max-width: 59.9375em) {
+    .md-header__inner .md-header__buttons {
+        margin-left: 4px;
+    }
+}
+
+/* Keep every header pill vertically centered and free of stray vertical margins so GitHub
+   and the Get started split button line up exactly. */
+.md-header__buttons .md-button {
+    margin-top: 0;
+    margin-bottom: 0;
+    vertical-align: middle;
+}
+
+/* Nav links (Docs / Case studies / …) → 16px / 700 / cs-text. Active stays cs-text
+   (the gradient underline indicator is kept). */
+[data-md-color-primary=white] .md-tabs__link,
+[data-md-color-primary=white] .md-tabs__link.md-tabs__link--active,
+[data-md-color-primary=white] .md-tabs__item--active .md-tabs__link {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--cs-text);
+}
+
+[data-md-color-primary=white] .md-tabs__link:hover {
+    color: var(--cs-text);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;   /* matches /old's .site-menu-link:hover distance */
+}
+
+/* No current-page indicator on the top nav — /old's top nav has none. Removes the
+   purple gradient bar from extra.css. */
+.md-tabs__item--active .md-tabs__link::after {
+    display: none !important;
+}
+
+/* Header action buttons → /old pills. Prefixed with the primary color attr to
+   out-specify landing.css's button rules. */
+[data-md-color-primary=white] .md-header__buttons .md-button--primary,
+[data-md-color-primary=white] .md-header__buttons .md-button--primary:hover {
+    box-sizing: border-box;
+    height: 36px;             /* /old buttons are all 36px tall */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700 !important; /* beats `.md-button { font-weight: 500 !important }` in extra.css */
+    line-height: 1;
+    padding: 0 18px;
+    white-space: nowrap;
+}
+
+/* GitHub → outlined "GitHub" with a trailing external-link glyph (no star count). */
+[data-md-color-primary=white] .md-header__buttons .md-button--primary.github,
+[data-md-color-primary=white] .md-header__buttons .md-button--primary.github:hover {
+    background: transparent;
+    color: var(--cs-text);
+    border: 1px solid var(--cs-border);
+}
+
+/* Gap between GitHub and Get started → 20px to match /old (was 5px). */
+.md-header__buttons .md-button.github {
+    margin-right: 20px;
+}
+
+/* landing.css adds a GitHub octocat ::before; /old's button is just "GitHub ↗", so drop it. */
+.md-header__buttons .md-button--primary.github::before {
+    content: none !important;
+    display: none !important;
+}
+
+.md-header__buttons .md-button.github::after {
+    content: "";
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-left: 6px;
+    flex: 0 0 auto;
+    background-color: currentColor;
+    -webkit-mask: var(--cs-ext-icon) center / contain no-repeat;
+    mask: var(--cs-ext-icon) center / contain no-repeat;
+}
+
+/* Get started → /old's split button (dark primary main + caret) with a dropdown menu. */
+.md-header__buttons .cs-get-started {
+    position: relative;
+    display: inline-flex;
+    align-items: stretch;
+    margin-right: 5px;
+}
+
+[data-md-color-primary=white] .md-header__buttons .cs-get-started .md-button--primary,
+[data-md-color-primary=white] .md-header__buttons .cs-get-started .md-button--primary:hover {
+    background: var(--cs-text);
+    color: var(--cs-bg);
+    border: 1px solid var(--cs-text);
+    margin: 0;
+    /* Primary (filled) button uses 500 weight per design — the GitHub outline button stays 700. */
+    font-weight: 500 !important;
+}
+
+/* Hover states (Cloudscape): the outlined GitHub button fills subtly (NOT black — landing.css
+   forces `background:black !important` on primary hover, so these need !important too); the dark
+   Get-started button lightens to the button-hover token. */
+[data-md-color-primary=white] .md-header__buttons .md-button--primary.github:hover {
+    background: var(--cs-hover) !important;
+    border-color: var(--cs-border) !important;
+    color: var(--cs-text) !important;
+}
+/* Hovering EITHER segment lights up BOTH (the whole pill reads as one button that opens the menu). */
+[data-md-color-primary=white] .md-header__buttons .cs-get-started:hover .md-button--primary {
+    background: var(--cs-btn-hover) !important;
+    border-color: var(--cs-btn-hover) !important;
+    color: var(--cs-bg) !important;
+}
+
+.md-header__buttons .cs-get-started__main {
+    border-radius: 12px 0 0 12px !important;
+    border-right: 0 !important;
+    cursor: pointer;
+    /* No separator now, so pull the caret in close to the label (was 18px + the toggle's 6px). */
+    padding-right: 6px !important;
+}
+
+/* No segment separator — the caret reads as part of the same button. */
+.md-header__buttons .cs-get-started__toggle {
+    border-radius: 0 12px 12px 0 !important;
+    padding: 0 6px !important;
+    border-left: 0 !important;
+    cursor: pointer;
+}
+
+.md-header__buttons .cs-get-started__toggle svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* Matches the new landing / old Get-started popup (cloudscape-overrides.css): fixed 300px, flat
+   (no shadow), a single 0.5px cs-text border, 12px radius clipped to rounded corners. */
+.md-header__buttons .cs-get-started__menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 300px;
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--cs-bg);
+    border: 0.5px solid var(--cs-text);
+    border-radius: 12px;
+    box-shadow: none;
+    overflow: hidden;
+    z-index: 1000;
+    /* Match the landing dropdown's subpixel smoothing (Material defaults to antialiased = thinner). */
+    -webkit-font-smoothing: auto;
+    -moz-osx-font-smoothing: auto;
+}
+
+.md-header__buttons .cs-get-started__menu[hidden] {
+    display: none;
+}
+
+/* Group headers ("Products" / "Login") → 15px / 300, ~5.5px vertical padding, like the landing. */
+.md-header__buttons .cs-get-started__group {
+    padding: 5.5px 16px;
+    font-size: 15px;
+    font-weight: 300;
+    color: var(--cs-text);
+}
+
+/* Items → 4px/16px padding; a 15/600 heading-color title with an optional description below. */
+.md-header__buttons .cs-get-started__menu a {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 16px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--cs-text);
+    text-decoration: none;
+}
+.md-header__buttons .cs-get-started__item-title {
+    color: var(--cs-nav-heading);
+}
+/* The generic external-link "↗" is an a::after rendered as a block, so the column flex dropped it
+   onto its own line below the description. Suppress it and put the icon inline after the TITLE
+   text instead (external items only), like the landing. */
+.md-header__buttons .cs-get-started__menu a::after {
+    content: none !important;
+    display: none !important;
+}
+.md-header__buttons .cs-get-started__menu a[target="_blank"] .cs-get-started__item-title::after {
+    content: "";
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    margin-left: 5px;
+    vertical-align: middle;
+    background-color: currentColor;
+    -webkit-mask: var(--cs-ext-icon) center / contain no-repeat;
+    mask: var(--cs-ext-icon) center / contain no-repeat;
+}
+/* Description: 13px / 300 / full text color (light weight reads muted) / 16px line-height, like
+   the landing's secondary text. */
+.md-header__buttons .cs-get-started__item-desc {
+    margin-top: 1.5px;
+    font-size: 13px;
+    font-weight: 300;
+    line-height: 16px;
+    color: var(--cs-text);
+    white-space: normal;
+}
+
+.md-header__buttons .cs-get-started__menu a:hover {
+    background: var(--cs-hover);
+}
+
+/* Burger (desktop sidebar toggle) — far left, like /old. */
+.cs-nav-toggle {
+    order: -1;
+    margin-left: 5px;    /* /old centers its 16px icon in a 26px button at the 24px gutter → icon at
+                            x=29; ours had it at x=28. 5px from the gutter matches /old exactly. */
+    margin-right: 8px;
+    padding: 0;
+    color: var(--cs-nav-link);   /* /old's burger is #424650 (muted gray), not the near-black text color */
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+}
+
+.cs-nav-toggle svg {
+    width: 16px;        /* match /old's 16px stroked hamburger */
+    height: 16px;
+    fill: none;
+    display: block;     /* inline svg sat in a 19px line-box (3px descender below), so the icon's
+                           center landed 1.5px above the button center; block removes the line-box
+                           so the icon centers in the header like /old (shared cy with the logo) */
+}
+
+/* Logo: a bit more gap from the burger so the icon sits at /old's x=76 (not ~63). 23px (not 24)
+   compensates for the burger's +1px left margin above, keeping the logo icon at exactly 76. */
+.md-header .md-logo {
+    margin-left: 23px;
+}
+
+/* Header chrome (burger + search icons, the "dstack" wordmark, page title) → theme-aware so it
+   stays visible on the dark header in dark mode (it was hardcoded black). var(--cs-text) is the
+   existing dark color in light mode, so this is a no-op there. The colorful .md-logo IMG is a
+   multi-color SVG and isn't affected by color/fill. */
+.md-header__title,
+.md-header__topic,
+.md-header__ellipsis,
+.md-header__button.md-icon {
+    color: var(--cs-text) !important;
+}
+.md-header__button.md-icon svg {
+    fill: currentColor !important;
+}
+.md-header .md-search__icon,
+.md-header .md-search__icon svg {
+    color: var(--cs-muted) !important;
+    fill: currentColor !important;
+}
+
+/* Hide Material's header palette toggle — the theme switcher lives in the FOOTER (.cs-theme-toggle).
+   display:none keeps the radio inputs in the DOM so Material's palette JS still honors __palette
+   (which we set from the shared dstack-theme key) and applies the scheme flash-free on load. */
+.md-header__option,
+[data-md-component="palette"] {
+    display: none !important;
+}
+
+@media screen and (min-width: 76.1875em) {
+    .cs-nav-toggle { display: inline-flex; }
+}
+
+@media screen and (max-width: 76.1875em) {
+    .cs-nav-toggle { display: none; }
+
+    /* Tighten the header on mobile so the cluster fits: drop the icon buttons' (burger/search)
+       margins and shrink the gaps (search→GitHub and GitHub→Get started) to 5px. */
+    .md-header__button.md-icon {
+        margin: 0 !important;
+    }
+    .md-header__inner .md-header__buttons {
+        margin-left: 5px;
+    }
+    .md-header__buttons .md-button.github {
+        margin-right: 5px;
+    }
+
+    /* The theme-aware nav colors below are scoped to the desktop media query, so the MOBILE drawer
+       fell back to extra.css's black text — invisible on the dark drawer. Apply them here too. */
+    .md-sidebar--primary .md-nav__title,
+    .md-sidebar--primary .md-nav__item--section > .md-nav__link,
+    .md-sidebar--primary .md-nav__item--section > .md-nav__link[for] {
+        color: var(--cs-nav-heading) !important;
+    }
+    .md-sidebar--primary .md-nav__link,
+    .md-sidebar--primary .md-nav__link .md-typeset {
+        color: var(--cs-nav-link) !important;
+    }
+    .md-sidebar--primary .md-nav__link--active,
+    .md-sidebar--primary .md-nav__link--active .md-typeset {
+        color: var(--cs-nav-active) !important;
+    }
+    /* Material gives the drawer's section titles a light (#f6f9fc) background that stayed light in
+       dark mode (the light text then sat on a near-white bar). Make it transparent so the titles
+       read on the dark drawer. */
+    .md-sidebar--primary .md-nav__title {
+        background-color: transparent !important;
+    }
+    /* The repo "source" facts (dstackai/dstack · stars · forks) + its icon at the bottom of the
+       drawer were black (rgba(0,0,0,.87)) → invisible on the dark drawer. Make them theme-aware. */
+    .md-sidebar--primary .md-nav__source,
+    .md-sidebar--primary .md-source__repository,
+    .md-sidebar--primary .md-source__facts,
+    .md-sidebar--primary .md-source__fact,
+    .md-sidebar--primary .md-source__icon,
+    .md-sidebar--primary .md-source__icon svg {
+        color: var(--cs-nav-link) !important;
+        fill: currentColor !important;
+    }
+}
+
+/* Search box → 36px tall, 12px radius, 1px border (consistent with the sidebar + components).
+   color-primary prefix beats extra.css's rules. */
+[data-md-color-primary=white] .md-search__form,
+[data-md-color-primary=white] .md-search__form:hover {
+    border-radius: 12px;
+    height: 36px;
+    border: 1px solid var(--cs-border);   /* stays 1px on hover (extra.css thinned it to 0.5px) */
+}
+
+.md-search__input {
+    border-radius: 12px;
+    color: var(--cs-text);   /* theme-aware so the typed text is visible in dark mode */
+}
+/* Placeholder was `color: inherit` (extra.css) → invisible on the dark search surface. Use a
+   theme-aware muted token so it shows in both light and dark. */
+.md-search__input::placeholder {
+    color: var(--cs-muted) !important;
+    opacity: 1;
+}
+
+/* Magnifying-glass icon → 18px and vertically centered (was 24px, top-aligned). */
+.md-search__form .md-search__icon {
+    width: 18px;
+    height: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.md-search__form .md-search__icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ===== Left sidebar (Cloudscape SideNavigation) ============================
+   Spec measured from /old: 28px left / 24px right gutter, section titles 18/700,
+   links 14/400 with a 12px gap (margin, not padding), full-bleed section dividers,
+   a 1px right border, no chevron icons. */
+@media screen and (min-width: 76.1875em) {
+    .md-sidebar--primary {
+        width: 280px;
+        /* mkdocs default padding-top is 26px; /old's first section sits ~20px below the header
+           (6px here + the inner's 14px). Kill the default 1.2rem bottom padding too. */
+        padding-top: 6px;
+        padding-bottom: 0;
+        /* Sticky viewport-height rail (Material default position:sticky, top:79). Sticky — not fixed —
+           so it tracks the header as the (non-sticky) banner scrolls away: it sits below the header
+           at the top, stays pinned for the whole article, and only eases away as the footer scrolls
+           in. The 280px column stays in the flex row (it's still in flow). */
+        height: calc(100vh - 79px);
+        overflow: hidden;
+    }
+
+    /* The visible section groups (Getting started, Concepts, …) live inside the active tab
+       item's (Docs) nested nav. Zero the wrapper padding so the gutter lives on each section
+       item — that makes the item box full-bleed, so its divider border runs edge-to-edge
+       while the content stays inset 28/24. */
+    .md-sidebar--primary .md-nav--primary > .md-nav__list,
+    .md-sidebar--primary .md-nav--primary > .md-nav__list > .md-nav__item,
+    .md-sidebar--primary .md-nav__item--section > .md-nav {
+        padding: 0;
+        margin: 0;
+    }
+    /* /old aligns a section's direct items (leaf links AND expandable labels) flush with their
+       header at the gutter — NO indent. Only items nested under an expandable get indented (handled
+       below). So the section's child list stays at padding 0. */
+    .md-sidebar--primary .md-nav__item--section > .md-nav > .md-nav__list {
+        padding: 0;
+        margin: 0;
+    }
+    .md-sidebar--primary .md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item--section {
+        padding-left: 24px;
+        padding-right: 24px;
+        margin: 0;
+    }
+    /* Section lists carry mkdocs' overflow:hidden (collapse animation) and clip two things that must
+       hang in the gutter: the full-bleed section separators (::before, left:-4 → 280) and the
+       expandable carets (left:-18). Sections never collapse (navigation.sections), so overflow is
+       safe to release. Must be ALL sections, not just the active one — else carets only show under
+       the currently-active section. Neutralize the nested-nav slide-surface bg that visible exposes. */
+    .md-sidebar--primary .md-nav__item--section > .md-nav > .md-nav__list {
+        overflow: visible !important;
+    }
+    .md-sidebar--primary .md-nav__item--section > .md-nav {
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    /* Top spacing: override extra.css's -25px scrollwrap pull so content clears the header.
+       Also span the full 0→280 width (margin 0) with a 4px left padding to preserve the gutter —
+       otherwise the scrollwrap's box is 4→276 and its overflow-x (forced to auto by overflow-y:
+       hidden) CLIPS the full-bleed section separators, leaving a gap at both edges. */
+    .md-sidebar--primary .md-sidebar__scrollwrap {
+        margin-top: 0;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 4px;
+        /* Internal scroll (nav stays sticky; the page scroll doesn't move it). Drop extra.css's fade. */
+        height: 100% !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        /* Don't let the scrollbar gutter reserve space (which would clip the full-bleed separators
+           on the right); thin/overlay scrollbar instead. */
+        scrollbar-width: thin;
+        -webkit-mask-image: none !important;
+        mask-image: none !important;
+    }
+    .md-sidebar--primary .md-sidebar__inner {
+        padding-top: 14px;
+        /* Containing block for the collapse "<" button, which now lives inside this (scrolling)
+           element so it scrolls out with the nav. */
+        position: relative;
+    }
+    /* Nav scrollbar → neutral gray like /old (mkdocs colours it with the lilac accent by default). */
+    .md-sidebar--primary .md-sidebar__scrollwrap {
+        scrollbar-color: rgba(0, 0, 0, 0.28) transparent;
+    }
+    .md-sidebar--primary .md-sidebar__scrollwrap::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.28) !important;
+        border-radius: 4px;
+    }
+
+    /* Remove the lifted-nav negative margin (was pulling the gutter left to ~20px). */
+    .md-sidebar--primary .md-nav__item--section > .md-nav {
+        margin-left: 0 !important;
+    }
+
+    /* Align links with their section title (kill the per-item 10px left margin). */
+    .md-sidebar--primary .md-nav__item {
+        margin-left: 0 !important;
+    }
+
+    /* Divider + 24px gap between section groups. The section item is inset (4px left from the
+       scrollwrap margin, ~19px right), so a border-top leaves a gap before the 280px vertical
+       divider. Draw the separator as a full-bleed line (0→280, like /old) via a pseudo-element
+       anchored to the sidebar edges (left:-4 cancels the scrollwrap margin; width 280 reaches the
+       divider). */
+    .md-sidebar--primary .md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item--section + .md-nav__item--section {
+        position: relative;
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 0;
+    }
+    .md-sidebar--primary .md-nav__item--section > .md-nav > .md-nav__list > .md-nav__item--section + .md-nav__item--section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -4px;
+        width: 280px;
+        height: 1px;
+        background: var(--cs-border);
+        pointer-events: none;
+    }
+
+    /* Remove mkdocs' per-item left guide border (the stray vertical line on nested items). */
+    .md-sidebar--primary .md-nav__item,
+    .md-sidebar--primary .md-nav__item--nested {
+        border-left: 0 !important;
+    }
+
+    /* Zero every nested indent so a section's links align with its title at the gutter. */
+    .md-sidebar--primary .md-nav__item--section .md-nav__list {
+        padding-left: 0;
+        margin-left: 0;
+    }
+    .md-sidebar--primary .md-nav__item--section .md-nav__item {
+        margin-left: 0;
+    }
+
+    /* Section title → 18/700 heading at the gutter, with a gap before its links. */
+    .md-sidebar--primary .md-nav__item--section > .md-nav__link,
+    .md-sidebar--primary .md-nav__item--section > .md-nav__link[for] {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--cs-nav-heading);
+        left: 0;
+        padding: 0;
+        margin: 0 0 12px 0;
+    }
+
+    /* Links → 14/400 muted, compact, 12px apart via margin (no padding box). */
+    .md-sidebar--primary .md-nav__link {
+        font-size: 16px;
+        font-weight: 400;
+        color: var(--cs-nav-link);
+        line-height: 20px;
+        padding: 0;
+        margin: 0 0 10px 0;
+    }
+    /* The blog left-nav items wrap their text in an inner `.md-typeset` span which extra.css sizes to
+       0.75rem (15px), overriding the link's 14px (docs items have no such span → 14px). Force the
+       span to 14px so blog items match docs. The "Blog" section title has no .md-typeset, so its
+       18px rule is unaffected. Also zero the 0.75rem leak on the <li>. */
+    .md-sidebar--primary .md-nav__item {
+        font-size: 16px;
+    }
+    .md-sidebar--primary .md-nav__link .md-typeset {
+        font-size: 16px;
+    }
+    /* !important to beat landing.css's generic link:hover (which turned nav links black). */
+    .md-sidebar--primary .md-nav__item .md-nav__link:hover {
+        color: var(--cs-nav-active) !important;
+    }
+
+    /* Active link → blue + bold, no accent bar. */
+    .md-sidebar--primary .md-nav__item--section.md-nav__item .md-nav__link--active {
+        border: 0;
+        border-image: none;
+        margin: 0 0 10px 0;
+        padding: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--cs-nav-active);
+    }
+
+    /* No chevron / expand icons (/old's nav doesn't show them). */
+    .md-sidebar--primary .md-nav__icon {
+        display: none;
+    }
+
+    /* Burger collapses the sidebar (JS toggles body.cs-nav-collapsed in header-2.html). */
+    body.cs-nav-collapsed .md-sidebar--primary {
+        display: none;
+    }
+}
+
+/* ===== Layout: full-width main area (matches /old) ========================= */
+@media screen and (min-width: 76.1875em) {
+    /* No centered max-width grid — span the full viewport like /old's AppLayout, so the
+       sidebar sits flush at the left edge and the rail flush at the right. */
+    .md-main__inner.md-grid {
+        max-width: none;
+        margin: 0;
+        position: relative;
+    }
+
+    /* Make the content grid at least a viewport tall so the sticky, viewport-tall sidebar always
+       fits INSIDE it and clamps to its bottom — the footer is pushed below it instead of the
+       sidebar spilling into the footer (the footer's own inner grid is excluded). This is the
+       structural fix for "footer overlaps the sidebar"; no JS / opaque-footer band-aid needed. */
+    .md-main > .md-main__inner.md-grid {
+        min-height: calc(100vh - 79px);
+    }
+
+    /* Full-height sidebar divider: a 1px line from below the header to the page bottom, spanning
+       the content AND the footer, so the left panel reads as full-height like /old. Drawn on
+       body (the footer is a sibling of the main content); the header/banner cover its top. */
+    body {
+        position: relative;
+    }
+    body::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 280px;
+        width: 1px;
+        background: var(--cs-border);
+        pointer-events: none;
+    }
+    body.cs-nav-collapsed::before {
+        display: none;
+    }
+
+    /* Columns: sidebar 280 (flush-left), article ~792 (24px gap to sidebar, 40px to rail),
+       rail 280 with a 24px right gutter. */
+    .md-sidebar--primary {
+        margin-left: 0;
+    }
+    /* Content region (body + 40px gap + 280px rail) is capped at 1280px and CENTERED in the
+       space after the sidebar, with a 24px minimum side margin — Cloudscape's maxContentWidth
+       behavior. Below ~1608px viewport the cap isn't reached, so margins stay 24 (matches /old
+       at 1440); above it they grow symmetrically (e.g. 84px at 1728). 1560 = 280 sidebar + 1280
+       region. (100% = the full-width inner, so it excludes any scrollbar — no overflow.) */
+    .md-content {
+        margin-left: max(24px, calc((100% - 1560px) / 2));
+        margin-right: 40px;
+        max-width: 960px;
+    }
+    .md-sidebar--secondary {
+        width: 280px;
+        margin-left: 0;
+        margin-right: max(24px, calc((100% - 1560px) / 2));
+    }
+
+    /* Collapsed (sidebar hidden): /old centers the content region with 80px gutters and a 1280px
+       max width — body 960, 40px gap, rail 280 (1080→1360). */
+    body.cs-nav-collapsed .md-main__inner.md-grid {
+        max-width: 1280px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    body.cs-nav-collapsed .md-content {
+        margin-left: 0;
+    }
+    body.cs-nav-collapsed .md-sidebar--secondary {
+        margin-right: 0;
+    }
+}
+
+/* ===== Sidebar collapse button + nested elements ========================== */
+@media screen and (min-width: 76.1875em) {
+    /* The "<" collapse toggle at the sidebar's top-right (like /old's AppLayout trigger).
+       Reuses the same body.cs-nav-collapsed toggle as the header burger. */
+    .cs-nav-collapse {
+        position: absolute;
+        top: 17px;              /* center on the first section title; now anchored to the scrolling
+                                   inner (it lives inside .md-sidebar__inner) so it scrolls out
+                                   with the nav, like /old — not pinned. */
+        right: 22px;
+        z-index: 3;
+        display: inline-flex;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--cs-nav-link);
+        cursor: pointer;
+    }
+    .cs-nav-collapse:hover {
+        color: var(--cs-nav-active);
+    }
+    .cs-nav-collapse svg {
+        width: 16px;            /* match /old's 16px stroked collapse chevron */
+        height: 16px;
+        fill: none;
+    }
+    body.cs-nav-collapsed .cs-nav-collapse {
+        display: none;
+    }
+
+    /* Nested (collapsible, non-section) groups — e.g. "More", "Training": show the expand
+       caret on the LEFT and indent the children, like /old's expandable-link-group. */
+    .md-sidebar--primary .md-nav__item--nested:not(.md-nav__item--section) > .md-nav > .md-nav__list {
+        padding-left: 20px;
+    }
+    /* Expandable label aligns with sibling leaf links; the caret hangs in the gutter to its LEFT,
+       like /old's "▾ Using Cloudscape components" (absolutely positioned, so it doesn't push the
+       text in). */
+    .md-sidebar--primary .md-nav__item--nested:not(.md-nav__item--section) > .md-nav__link {
+        position: relative;
+    }
+    /* mkdocs' chevron SVG renders empty in our nav, so paint /old's EXACT triangle as a background
+       image: ▶ (right) when collapsed, ▼ (down) when the group is expanded (toggle checked). Using a
+       background (not a border-triangle ::after) because material's global box-sizing:border-box
+       reset squashes a width:0/height:0 border-triangle down to ~0px. Colour #424650 matches /old. */
+    .md-sidebar--primary .md-nav__item--nested:not(.md-nav__item--section) > .md-nav__link .md-nav__icon {
+        display: block;
+        position: absolute;
+        left: -18px;
+        top: 50%;
+        margin-top: -8px;
+        width: 16px;
+        height: 16px;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 16px 16px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23424650'%3E%3Cpath d='M11 8 5 12V4Z'/%3E%3C/svg%3E");
+        /* material rotates the icon on expand — we drive orientation via the background-image swap
+           below instead, so kill its transform (else our ▼ background would be spun). */
+        transform: none !important;
+    }
+    .md-sidebar--primary .md-nav__toggle:checked ~ .md-nav__link .md-nav__icon {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23424650'%3E%3Cpath d='M8 11 12 5H4Z'/%3E%3C/svg%3E");
+    }
+    /* Suppress material's own masked-chevron ::after on the icon — it was rendering a SECOND caret
+       next to our /old-style triangle background. */
+    .md-sidebar--primary .md-nav__item--nested:not(.md-nav__item--section) > .md-nav__link .md-nav__icon::after {
+        display: none;
+    }
+}
+
+@media screen and (max-width: 76.1875em) {
+    .cs-nav-collapse {
+        display: none;
+    }
+}
+
+/* ===== Right rail: "On this page" TOC + Need help block ==================== */
+/* /old renders the left nav, TOC, breadcrumb, content and footer with subpixel smoothing
+   (auto = thicker); only the top header stays antialiased. Material defaults everything to
+   antialiased, which made the left nav + breadcrumb read noticeably thinner than /old. */
+.md-sidebar--primary,
+.md-sidebar--secondary,
+.md-path {
+    -webkit-font-smoothing: auto;
+    -moz-osx-font-smoothing: auto;
+}
+/* Applies at ALL widths (was `min-width: 76.1875em`): that em-based query drops out at browser zoom
+   levels where extra.css's unconditional `.md-nav__link { color:black }` + inherited `.md-nav__item
+   { 0.75rem }` then win — which is the 16.5px/black bug. The TOC only renders at desktop anyway
+   (mkdocs hides the secondary sidebar below its own breakpoint), so unconditional is safe. */
+@media screen {
+    /* Heading → 18/700 heading color, at the rail edge (matches the "Need help?" / "Metadata"
+       headings in the same rail). */
+    .md-sidebar--secondary .md-nav__title {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--cs-nav-heading);
+        padding-left: 0;
+        margin-left: 0;
+        margin-bottom: 8px;
+    }
+    /* Continuous black vertical line down the whole TOC (like /old's anchor-nav rail); the active
+       anchor paints a blue segment over it (below). Items are indented off the line via link padding. */
+    .md-sidebar--secondary .md-nav__list {
+        padding-left: 0 !important;
+        margin-left: 0 !important;
+        padding-bottom: 0 !important;   /* was 8px → part of the line's tail past the last anchor */
+        border-left: 2px solid var(--cs-border);
+        position: relative;   /* positioning context for the sliding blue indicator */
+    }
+    /* Rail ends at the bottom-most anchor (no tail) — but NEVER by zeroing a PARENT's own margin
+       (that collides it with its first child, e.g. Fleets' "Manage fleets" → "List fleets"). The
+       bottom-most anchor is either the last top-level LEAF, or the last child of a parent that is
+       itself the last top-level item. */
+    .md-sidebar--secondary .md-nav--secondary > .md-nav__list > .md-nav__item:last-of-type:not(:has(> .md-nav)) > .md-nav__link,
+    .md-sidebar--secondary .md-nav--secondary > .md-nav__list > .md-nav__item:last-of-type > .md-nav > .md-nav__list > .md-nav__item:last-of-type > .md-nav__link {
+        margin-bottom: 0 !important;
+    }
+    /* If that last top-level item is itself a nested block, also drop its after-block tail. */
+    .md-sidebar--secondary .md-nav--secondary > .md-nav__list > .md-nav__item:last-of-type > .md-nav {
+        margin-bottom: 0 !important;
+    }
+    /* extra.css's `.md-nav--secondary > .md-nav__list > .md-nav__item { font-size: 16.5px }` leaks
+       onto the items; force 14px so nothing reads 16.5px (even though the link already wins). */
+    .md-sidebar--secondary .md-nav__list .md-nav__item {
+        font-size: 16px !important;
+    }
+    .md-sidebar--secondary .md-nav__item {
+        margin-left: 0 !important;
+        /* mkdocs puts the active-indicator track (border-left + padding) on the ITEM — /old has
+           no track, so zero it; the nested indent is re-added on the nested link's padding. */
+        padding-left: 0 !important;
+        border-left: 0 !important;
+    }
+
+    /* Rail content flush to the rail's left edge like /old (mkdocs insets it ~12px via the
+       scrollwrap margin + inner padding). */
+    .md-sidebar--secondary .md-sidebar__scrollwrap {
+        margin-left: 0;
+        margin-right: 0;
+    }
+    .md-sidebar--secondary .md-sidebar__inner {
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    /* Anchor links → 14/400 muted, compact (h~20, 4px gap), text indented 16px off the line. */
+    .md-sidebar--secondary .md-nav__list .md-nav__link {
+        font-size: 16px !important;     /* beats extra.css's `.md-nav__item { font-size: 0.75rem }` */
+        font-weight: 400 !important;
+        color: var(--cs-nav-link) !important;
+        line-height: 20px;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        padding-left: 16px !important;
+        margin: 0 0 8px -2px !important;   /* 8px between TOC items (was 4px) */
+        border-left: 2px solid transparent !important;   /* sits on the black line; fades to blue when active */
+        border-image: none !important;
+        /* Copied from /old: animate ALL properties (not a narrow list) over /old's "slow" 180ms.
+           The blue segment is this <a>'s border-color, so `all` fades it in too. */
+        transition-property: all !important;
+        transition-duration: var(--motion-duration-slow-zji5vl, 180ms) !important;
+    }
+    /* Nested (h3) anchors indent one level deeper than their h2 parent: text 16px → 28px.
+       The active blue segment still sits on the shared rail (the anchor's border stays at x=0;
+       only its text padding grows), so nesting reads as hierarchy without a second line. */
+    .md-sidebar--secondary .md-nav__list .md-nav__list .md-nav__link {
+        padding-left: 28px !important;
+    }
+    /* ONE continuous rail: the top list already draws the black line down the whole TOC (nested
+       lists live inside it), so nested lists must NOT draw their own — that was the doubled line. */
+    .md-sidebar--secondary .md-nav__list .md-nav__list {
+        border-left: 0 !important;
+    }
+    /* mkdocs gives the nested <nav> a margin-bottom of -8px (its built-in tightening), so the last
+       nested item collided with the next h2 (net gap was -4px). Make it positive for a bit of
+       breathing room after a nested block ends, before the next top-level item. */
+    .md-sidebar--secondary .md-nav__item > .md-nav {
+        margin-bottom: 8px !important;   /* collapses with the last nested item's 4px → ~8px gap */
+    }
+    /* Active anchor → bold blue text + a 2px blue segment over the black line. Pure CSS: a left
+       border pulled -2px so it sits on (covers) the 2px line; the -2px margin is offset by the 2px
+       border so the text stays aligned with the inactive rows. Jumps between anchors on scroll (no JS). */
+    /* Active = the same 2px border (from the rule above) turned blue — only the COLOR changes, so the
+       border-color transition fades it in over the black line (no width jump). */
+    .md-sidebar--secondary .md-nav__list .md-nav__link.md-nav__link--active {
+        border-left-color: var(--cs-nav-active) !important;
+        /* Color the link itself too — on the blog index TOC the text is in a bare .md-ellipsis (no
+           inner .md-typeset like docs), so it inherits this; on docs the .md-typeset rule below wins. */
+        color: var(--cs-nav-active) !important;
+        font-weight: 700 !important;
+    }
+    /* The link TEXT lives in an inner <span class="md-typeset"> (a.md-nav__link > .md-ellipsis >
+       span.md-typeset). That span carries its OWN color (.md-typeset{color}) + size
+       (.md-nav__link .md-typeset{0.75rem}), which override what it inherits from the <a> — so the
+       text rendered black/16.5px even though the <a> computed to blue/14px. Style the span itself. */
+    .md-sidebar--secondary .md-nav__list .md-nav__link .md-typeset {
+        color: var(--cs-nav-link) !important;
+        font-size: 16px !important;
+        font-weight: 400 !important;
+        /* Copied from /old VERBATIM. /old animates `all` properties over the "slow" 180ms duration,
+           not just `color`. A color-only transition animated only `color` and missed whatever
+           actually carries the change here, so no fade ever showed — `all` is the fix. */
+        transition-property: all !important;
+        transition-duration: var(--motion-duration-slow-zji5vl, 180ms) !important;
+    }
+    .md-sidebar--secondary .md-nav__list .md-nav__link--active .md-typeset {
+        color: var(--cs-nav-active) !important;
+        font-weight: 700 !important;
+    }
+    /* Kill material's full-width transparent ::before on the active anchor (it boxed the indicator). */
+    .md-sidebar--secondary .md-nav__list .md-nav__link--active::before {
+        display: none !important;
+    }
+}
+
+/* "On this page" aligns with the H1 on every page. The rail and the content share the same top
+   edge; the article's 20px padding-top pushes the H1 down, so the rail gets a matching offset
+   (20px minus the rail title's ~13px internal top) to line the two up. */
+@media screen and (min-width: 76.1875em) {
+    .md-sidebar--secondary {
+        margin-top: 7px;
+    }
+}
+
+/* Need help? block under the TOC. Matches /old's .right-rail-block exactly (32px / 28px). */
+.cs-need-help {
+    margin-top: 32px;
+    padding-top: 28px;
+    border-top: 0.5px solid var(--cs-border);
+}
+.cs-need-help h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--cs-nav-heading);
+    margin: 0 0 8px;
+}
+.cs-need-help p {
+    font-size: 16px;
+    color: var(--cs-nav-link);
+    margin: 0 0 16px;
+}
+.cs-need-help .cs-discord {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--cs-border);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--cs-text);
+    font-size: 16px;
+    font-weight: 700 !important; /* beats extra.css's `.md-button { font-weight: 500 !important }` */
+    line-height: 1;
+    padding: 9px 18px;
+}
+.cs-need-help .cs-discord::after {
+    content: "";
+    width: 16px;
+    height: 16px;
+    margin-left: 6px;
+    background-color: currentColor;
+    -webkit-mask: var(--cs-ext-icon) center / contain no-repeat;
+    mask: var(--cs-ext-icon) center / contain no-repeat;
+}
+/* /old's Discord is a Cloudscape "normal" button: subtle bg fill on hover. Match the GitHub
+   outline button's hover (var(--cs-hover)); !important to beat landing.css's generic button hover. */
+.cs-need-help .cs-discord:hover {
+    background: var(--cs-hover) !important;
+    border-color: var(--cs-border);
+    color: var(--cs-text);
+}
+
+/* "Copied!" toast shown when a heading's ¶ permalink is clicked (handled in extra.js).
+   Fixed at the click point so it shows even after the ¶ stops being hovered. */
+.cs-copied-tip {
+    position: fixed;
+    transform: translate(-50%, -160%);
+    padding: 3px 9px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: #fff;
+    background: var(--cs-text, #16191f);
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1000;
+    animation: cs-copied-fade 1.2s ease forwards;
+}
+@keyframes cs-copied-fade {
+    0%, 65% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Footer external links → /old's external icon (override landing.css's icon). */
+.tx-footer__section-link.external::after {
+    content: "" !important;
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-left: 5px;
+    vertical-align: -3px;
+    background-color: currentColor;
+    -webkit-mask: var(--cs-ext-icon) center / contain no-repeat;
+    mask: var(--cs-ext-icon) center / contain no-repeat;
+}
+
+/* ===== Footer (tx-footer → /old footer) =================================== */
+/* STRUCTURAL: the footer is rendered INSIDE .md-content (the content area, right of the left
+   sidebar), so the left sidebar stays a full-height column on its LEFT and the footer never spans
+   under it. It widens past the body column to also cover the rail column (calc(100% + 320px) = 792
+   body + 40 gap + 280 rail), following .md-content's responsive position for free: 304→1416 open,
+   364→1644 at 1728, 80→1360 collapsed. Keeping it inside .md-content also keeps .md-main__inner tall
+   enough that the sticky left sidebar never eases away (it's persistent), no JS. */
+.tx-footer {
+    /* Opaque + stacked above the sticky right rail: the wide footer (calc(100%+320)) overlaps the
+       rail column, and the rail is sticky (so it can't ease away while the footer is inside its
+       containing block — that's what keeps the LEFT sidebar persistent). Painting the footer over
+       the rail cleanly hides that overlap, pure CSS, no JS. The bg matches the page so it's invisible
+       except where it covers the rail. */
+    background: var(--cs-bg);
+    position: relative;
+    z-index: 1;
+    border-top: 0;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    /* /old footer text is subpixel (auto), not antialiased — matches the thicker look. */
+    -webkit-font-smoothing: auto;
+    -moz-osx-font-smoothing: auto;
+}
+.tx-footer__inner {
+    display: block;
+}
+@media screen and (min-width: 76.1875em) {
+    /* The rail's TOC sits at the top, so the rail column is free at the footer's row — widen the
+       footer to cover the body column + gap + rail. */
+    .tx-footer {
+        width: calc(100% + 320px);
+    }
+}
+/* Below desktop the footer (a child of .md-content, NOT .md-content__inner) had no side inset and
+   its row of columns overflowed the screen. Pad it to the article's side margin (.8rem = 16px) and
+   stack like the new landing: link columns first, brand (logo + social) below. */
+@media screen and (max-width: 76.1875em) {
+    /* `.tx-footer` qualifier bumps specificity over the base `.tx-footer__top { padding: 48px 0 32px }`
+       (which would otherwise reset the side padding to 0). */
+    .tx-footer .tx-footer__top,
+    .tx-footer .tx-footer__bar {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+    .tx-footer .tx-footer__top {
+        flex-direction: column;
+        gap: 32px;
+    }
+    .tx-footer__brand {
+        order: 2;
+    }
+    .tx-footer .tx-footer__right-side {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 28px 56px !important;
+    }
+}
+/* Phones: four columns no longer fit in one row, so drop to a clean two-up grid (like the landing). */
+@media screen and (max-width: 44.984375em) {
+    .tx-footer .tx-footer__right-side {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 28px 32px !important;
+    }
+}
+
+/* Top row: brand (logo + social) left, the 4 link columns right. */
+.tx-footer__top {
+    display: flex;
+    justify-content: space-between;
+    gap: 48px;
+    padding: 48px 0 32px;
+}
+.tx-footer__brand {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.tx-footer__logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--cs-text);
+    text-decoration: none;
+}
+.tx-footer__logo img {
+    width: 28px;
+    height: 28px;
+}
+.tx-footer__logo span {
+    font-family: "Geist Pixel Square", var(--md-text-font-family);
+    font-size: 25px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Social icons (20px, 12px gap, text color). */
+.tx-footer .md-social {
+    display: flex;
+    gap: 12px;
+    padding: 0;
+    margin: 0;
+}
+.tx-footer .md-social__link {
+    width: 20px;
+    height: 20px;
+    color: var(--cs-text);
+}
+.tx-footer .md-social__link svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+/* Link columns: 72px between columns, 8px between items (matches /old). */
+.tx-footer__right-side {
+    display: flex;
+    gap: 72px !important;
+}
+.tx-footer__section {
+    margin: 0 !important;
+    /* landing.css makes the section a flex column with a 10px row-gap; that stacks on top of the
+       link/title margins (→ 18px item gap, 24px heading gap). Kill it; margins do the spacing. */
+    gap: 0 !important;
+}
+.tx-footer__section-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--cs-text);
+    margin-bottom: 13px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.tx-footer__section-link {
+    display: block;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--cs-text) !important;
+    margin: 0 0 8px 0 !important;
+    padding: 0 !important;
+    text-decoration: none;
+    line-height: 1.5;
+}
+.tx-footer__section-link:hover {
+    text-decoration: underline;
+}
+
+/* Bottom bar: copyright (theme toggle to come with dark mode). */
+.tx-footer__bar {
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    color: var(--cs-text);
+}
+/* Theme toggle: a pill switch + crescent moon, matching the dstack control-plane app's toggle
+   (frontend AppLayout). Light scheme = switch OFF (grey track, white thumb left); the slate scheme
+   = switch ON (the app's dark-mode "checked" blue track, dark thumb slid right). Colors are the
+   Cloudscape control tokens: track #424650, checked #42b4ff, thumb #fff (light) / #0f141a (dark). */
+.cs-theme-toggle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--cs-text);          /* the moon inherits this */
+    cursor: pointer;
+}
+.cs-theme-toggle__track {
+    position: relative;
+    flex: 0 0 auto;
+    width: 24px;
+    height: 16px;
+    border-radius: 8px;
+    background: #424650;
+    transition: background-color 0.2s ease;
+}
+.cs-theme-toggle__thumb {
+    position: absolute;
+    top: 2px;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    transform: translateX(2px);
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+.cs-theme-toggle__moon {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+[data-md-color-scheme="slate"] .cs-theme-toggle__track {
+    background: #42b4ff;
+}
+[data-md-color-scheme="slate"] .cs-theme-toggle__thumb {
+    background: #0f141a;
+    transform: translateX(10px);
+}
+/* The header toggle (before GitHub in the buttons block) shows only on the desktop header
+   (≥76.1875em); the footer toggle takes over below that, on tablet + mobile, where the header
+   collapses toward the burger menu. */
+.cs-theme-toggle--header {
+    display: none;
+    transform: translateY(0.5px); /* the header baseline sits a hair high; nudge it down to match */
+}
+.cs-theme-toggle--footer {
+    margin-left: 12px;          /* sits after the copyright */
+}
+@media screen and (min-width: 76.1875em) {
+    .cs-theme-toggle--header {
+        display: inline-flex;
+    }
+    .cs-theme-toggle--footer {
+        display: none;
+    }
+}
+.tx-footer__bar .md-copyright,
+.tx-footer__bar .md-copyright__highlight {
+    font-size: 13px;
+    line-height: 20px;          /* 20px box → centered in 64px bar = 22px above/below (matches /old) */
+    margin: 0;
+    padding: 0;                 /* base mkdocs adds 8px top/bottom → box grows to 28px; remove it */
+    color: var(--cs-text);
+}
+
+/* ===== Main content typography (→ /old) =================================== */
+/* Remove the "edit this page" pencil (per request; /old has no such control). */
+.md-content__button.md-icon {
+    display: none;
+}
+/* Breadcrumb: 14px text + 16px gray separator (matches /old; mkdocs default is 15.4px / a larger
+   blue-gray chevron). */
+.md-path {
+    font-size: 16px;
+}
+.md-path__item:not(:first-child)::before {
+    width: 16px;
+    height: 16px;
+    background-color: #8c8c94;
+}
+/* Announce banner link: no underline (matches /old; the × dismiss is removed via mkdocs.yml).
+   Beats the `.md-typeset a` underline since the banner inner also carries `md-typeset`. */
+.md-banner a,
+.md-banner.md-typeset a {
+    text-decoration: none !important;
+}
+/* Fill the 792px content column (base mkdocs adds 24px side margins → text squeezed to 744). */
+.md-content__inner {
+    max-width: none;
+    /* Consistent top gap before the H1 on every page (docs + blog) — replaces the removed
+       breadcrumb's spacing. The right rail's offset (below) matches this so "On this page"
+       lines up with the H1. */
+    padding-top: 20px;
+}
+/* Only fill the column edge-to-edge on DESKTOP. Below desktop we KEEP mkdocs's default side margin
+   (.8rem) so content + bordered/rounded components aren't flush to the screen edge — consistent
+   with the desktop look. (See the mobile de-bleed block below.) */
+@media screen and (min-width: 76.1875em) {
+    .md-content__inner {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}
+
+/* Breadcrumbs hidden site-wide (docs + blog), at ALL breakpoints (was desktop-only — the
+   breadcrumb was reappearing on tablet/mobile). The H1 top gap comes from the padding-top above. */
+.md-content > .md-path {
+    display: none !important;
+}
+
+/* ===== Mobile / tablet consistency ========================================= */
+/* The cs-nav-toggle (desktop sidebar-collapse "≡") must never show below desktop — there the
+   Material drawer (the other menu icon) handles nav, so it was a duplicate hamburger. */
+@media screen and (max-width: 76.1875em) {
+    .md-header .cs-nav-toggle {
+        display: none !important;
+    }
+}
+
+/* Below ~720px Material AND extra.css's "old design" mobile block full-bleed code/editors/termy/
+   blockquotes/tabs/admonitions to the screen edge (negative .8rem margins, div[editor-title] even
+   blows out to 100vw) and strip their radius + borders. We keep the SAME card look as desktop —
+   1px border, 12px radius, inset by the content's side margin. Selectors mirror extra.css's
+   `[dir=ltr] .md-typeset :is(...)` specificity so these (loaded last) win. */
+@media screen and (max-width: 44.984375em) {
+    /* 1) Kill every negative side margin (and div[editor-title]'s 100vw blow-out). */
+    [dir=ltr] .md-typeset .admonition,
+    [dir=ltr] .md-typeset details,
+    .md-typeset blockquote,
+    .md-typeset .termy,
+    .md-typeset .tabbed-set,
+    .md-typeset div.arithmatex,
+    .md-content__inner > pre,
+    .md-content__inner > .highlight,
+    .md-content__inner > .highlight + .result,
+    .md-content__inner > .tabbed-set .tabbed-labels {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    [dir=ltr] .md-typeset div[editor-title] {
+        width: auto !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    /* Components nested INSIDE a <details> card were also blown out (width:100%+1.6rem, -0.8rem). */
+    [dir=ltr] .md-typeset details :is(.md-typeset__scrollwrap, .highlight, .termy, div[editor-title], .tabbed-set, .md-typeset__table) {
+        width: auto !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    /* extra.css zeros the details content's left padding on mobile, so the text sat flush at the
+       card edge (20px left of the summary text). Keep the 20px so content aligns under the summary. */
+    [dir=ltr] .md-typeset details > :is(.md-typeset__scrollwrap, p, h4, h3, .tabbed-set, ul, ol):not(.admonition-title, summary) {
+        padding-left: 20px !important;
+    }
+
+    /* When many tab labels don't fit, scroll them horizontally instead of overflowing/clipping
+       (the parent .tabbed-set is overflow-x:clip). Descendant selector so it matches regardless
+       of nesting (extra.css's `.tabbed-set > .tabbed-labels` direct-child rule wasn't applying). */
+    .md-typeset .tabbed-set .tabbed-labels {
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        max-width: 100% !important;
+    }
+
+    /* 2) Restore the desktop 12px radius (extra.css/Material zero it on small screens). */
+    .md-content__inner > pre > code,
+    .md-content__inner > .highlight > pre > code,
+    .md-content__inner > .highlight > .filename,
+    .md-content__inner > .highlight + .result,
+    .md-typeset .tabbed-set pre > code,
+    .md-typeset [data-termynal],
+    .md-typeset blockquote,
+    [dir=ltr] .md-typeset div[editor-title] code,
+    [dir=ltr] .md-typeset :is(.admonition, details) {
+        border-radius: 12px !important;
+    }
+
+    /* 3) Restore borders (extra.css drops pre>code, editor code, and admonition/details borders). */
+    .md-typeset pre > code,
+    [dir=ltr] .md-typeset div[editor-title] code {
+        border: 1px solid var(--cs-border) !important;
+    }
+    .md-content__inner > .highlight + .result {
+        border-left-width: 1px !important;
+        border-right-width: 1px !important;
+    }
+    /* Admonitions AND details: solid 1px card on the normal surface (undo extra.css's mobile
+       gradient fill + 0 border). The :is() matches extra.css's selector specificity so this wins. */
+    [dir=ltr] .md-typeset :is(.admonition, details) {
+        border: 1px solid var(--cs-border) !important;
+        background: var(--cs-bg) !important;
+    }
+}
+
+/* Inline code → the landing's keyword-highlight chip (how it highlights `dstack`, `Kubernetes`,
+   etc.): transparent fill, 1px #16191f border, 6px radius. Keeps the mono font + blue accent;
+   replaces extra.css's purple-tinted pill. */
+.md-typeset :not(pre, h1, h2, h3, h4, h5, h6) > code {
+    background-color: transparent;
+    border: 0.25px solid currentColor;   /* exactly like the landing keyword chip (hairline, text-colored) */
+    border-radius: 6px;
+    padding: 1px 6px;
+    height: auto;
+    color: inherit;       /* normal text color, like the landing keyword (was blue) */
+    font-weight: 400;     /* not bold (was 600) */
+    font-size: 15.5px;    /* inline code reads larger than code blocks (14px) to sit in 16px body text */
+}
+
+/* Reference parameter values/types/links use the same inline-code style as the rest of the docs.
+   extra.css renders them as a smaller, bold, blue, purple-tinted chip with no border — drop that so
+   they read as ordinary inline code (the bordered, text-colored hairline chip above). */
+.md-typeset .reference-item code,
+.md-typeset .reference-item a code {
+    background-color: transparent;
+    border: 0.25px solid currentColor;
+    border-radius: 6px;
+    padding: 1px 6px;
+    height: auto;
+    margin: 0 2px;
+    color: inherit;
+    font-weight: 400;
+    font-size: 15.5px;
+}
+
+/* Body text: 14px / 400 / 1.5, heading-dark color (matches /old's Cloudscape body).
+   Match /old's content font-smoothing (auto/subpixel, not antialiased) and weight (400, not the
+   theme's 300) — those were making the docs text look lighter/thinner than /old. */
+.md-typeset {
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--cs-nav-heading);
+    -webkit-font-smoothing: auto;
+    -moz-osx-font-smoothing: auto;
+}
+.md-typeset p,
+.md-typeset li {
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--cs-nav-heading);
+}
+
+/* Headings: 700 weight, heading-dark color, no negative letter-spacing. */
+.md-typeset h1 {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: normal;
+    color: var(--cs-nav-heading);
+    margin-bottom: 0.5em;   /* was extra.css's 0.75em — a touch tighter under the title */
+}
+.md-typeset h2 {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: normal;
+    color: var(--cs-nav-heading);
+    margin-bottom: 12px;
+}
+.md-typeset h3 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: normal;
+    color: var(--cs-nav-heading);
+}
+/* h4–h6 aren't re-colored above, so they'd fall back to extra.css's hardcoded black (invisible in
+   dark). Pin them to the theme-aware heading color too. */
+.md-typeset h4,
+.md-typeset h5,
+.md-typeset h6 {
+    color: var(--cs-nav-heading);
+}
+
+/* Content links: Cloudscape blue + underline (was purple, no underline). */
+.md-typeset a {
+    color: var(--cs-nav-active);
+    text-decoration: underline;
+}
+
+/* ===== Content tabs (pymdownx.tabbed) → landing/Cloudscape style ============
+   Restyle ONLY the label strip — the content inside each tab is left untouched and gets no border.
+   Like the landing's Cloudscape Tabs: a row of tabs sitting next to each other, no background, 1px
+   borders between/around them; the selected (and hovered) tab gets a slight gray fill (--cs-hover);
+   labels stay in the body text color (no blue, no underline, no sliding underline indicator). */
+@media screen {
+    /* Strip: drop extra.css's blue-gradient bg + 0.5px box; a plain transparent row of tabs. */
+    .md-typeset .tabbed-labels,
+    .md-typeset .tabbed-labels--linked {
+        background: none !important;
+        box-shadow: none !important;
+        border: 0 !important;
+        display: inline-flex !important;
+        width: auto !important;
+        max-width: 100%;
+        margin-bottom: 0 !important;
+        overflow: visible !important;
+    }
+    /* Kill the JS blue-gradient sliding active-indicator overlay. */
+    .js .md-typeset .tabbed-labels::before {
+        display: none !important;
+        background: none !important;
+    }
+    /* Each tab → a bordered cell, transparent at rest, body text. Negative left margin collapses the
+       shared vertical border with the previous tab so separators read as a single 1px line.
+       Font + padding measured from the landing's Cloudscape tab: 16px/700 Geist, 20px line-height,
+       13px horizontal padding (cell = text + 26px), 17px vertical (cell ≈ 54px tall). */
+    .md-typeset .tabbed-labels > label {
+        background: none !important;
+        border: 1px solid var(--cs-border) !important;
+        margin: 0 0 0 -1px !important;
+        padding: 12px 13px !important;   /* 12+12 + 20 line-height + 2px borders = 46px, matching the landing */
+        font-size: 16px !important;      /* tab labels 16px; height stays 46px (line-height-driven) */
+        font-weight: 700 !important;
+        line-height: 20px !important;
+        color: var(--cs-text) !important;
+        border-radius: 0 !important;   /* square inner corners; outer corners rounded below */
+        /* Equal-width tabs: every tab is ≥108px and its label is centered (wider labels still grow). */
+        box-sizing: border-box !important;
+        min-width: 108px !important;
+        text-align: center !important;
+        z-index: auto !important;
+    }
+    /* Round the strip's outer corners (12px) on all four sides — first tab's left corners, last
+       tab's right corners (top and bottom). Inner corners stay square. */
+    .md-typeset .tabbed-labels > label:first-of-type {
+        margin-left: 0 !important;
+        border-top-left-radius: 12px !important;
+        border-bottom-left-radius: 12px !important;
+    }
+    .md-typeset .tabbed-labels > label:last-of-type {
+        margin-right: 0 !important;
+        border-top-right-radius: 12px !important;
+        border-bottom-right-radius: 12px !important;
+    }
+    /* Drop extra.css's :after vertical separator — the real borders above replace it. */
+    .md-typeset .tabbed-labels > label::after {
+        display: none !important;
+    }
+    /* Linked labels wrap their text in an <a>; strip the content-link blue + underline. Drop
+       extra.css's min-width:80px so each tab is content-width + 13px padding, like the landing. */
+    .md-typeset .tabbed-labels--linked > label > a {
+        color: var(--cs-text) !important;
+        text-decoration: none !important;
+        font-weight: 700 !important;
+        font-size: 16px !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+    }
+    /* Hover → slight gray fill. */
+    .md-typeset .tabbed-labels > label:hover {
+        background: var(--cs-hover) !important;
+    }
+    /* Selected tab → slight gray fill (Material marks it via the checked input + nth-child label). */
+    .md-typeset .tabbed-set > input:first-child:checked ~ .tabbed-labels > :first-child,
+    .md-typeset .tabbed-set > input:nth-child(2):checked ~ .tabbed-labels > :nth-child(2),
+    .md-typeset .tabbed-set > input:nth-child(3):checked ~ .tabbed-labels > :nth-child(3),
+    .md-typeset .tabbed-set > input:nth-child(4):checked ~ .tabbed-labels > :nth-child(4),
+    .md-typeset .tabbed-set > input:nth-child(5):checked ~ .tabbed-labels > :nth-child(5),
+    .md-typeset .tabbed-set > input:nth-child(6):checked ~ .tabbed-labels > :nth-child(6),
+    .md-typeset .tabbed-set > input:nth-child(7):checked ~ .tabbed-labels > :nth-child(7),
+    .md-typeset .tabbed-set > input:nth-child(8):checked ~ .tabbed-labels > :nth-child(8),
+    .md-typeset .tabbed-set > input:nth-child(9):checked ~ .tabbed-labels > :nth-child(9),
+    .md-typeset .tabbed-set > input:nth-child(10):checked ~ .tabbed-labels > :nth-child(10) {
+        background: var(--cs-hover) !important;
+    }
+}
+
+/* ===== Code / editor components → Cloudscape white code component ===========
+   White surface, 1px solid border, 12px radius, NO terminal traffic-light dots. Syntax colors
+   matched to the landing's Cloudscape CodeView (light theme). Theme-aware via --cs tokens, so in
+   slate the surface goes dark and the existing light-on-dark syntax palette (extra.css) takes over. */
+
+/* Light syntax colors — measured from the landing CodeView. On <body data-md-color-scheme=default>,
+   same specificity as extra.css's `[data-md-color-primary=white]` dark palette but later in source
+   order, so these win in light mode. In slate the attribute changes, so the dark palette resumes. */
+[data-md-color-scheme="default"] {
+    --md-code-fg-color: #0f141a;
+    --md-code-hl-keyword-color: #0e45b4;
+    --md-code-hl-function-color: #0e45b4;
+    --md-code-hl-name-color: #0f141a;
+    --md-code-hl-string-color: #207a7f;
+    --md-code-hl-comment-color: #697077;
+    --md-code-hl-number-color: #a16101;
+    --md-code-hl-constant-color: #a16101;
+    --md-code-hl-operator-color: #9749d1;
+    --md-code-hl-punctuation-color: #9749d1;
+    --md-code-hl-variable-color: #0f141a;
+}
+
+/* The code surface: cs-bg (white in light), dark text, 1px cs-border, 12px radius. Covers the
+   highlighted blocks, dstack scrollable/editable code, and termynal terminals. NOT div[editor-title]
+   — that's just a zero-padding wrapper around a pre>code (its title is a span inside the code), so
+   bordering both gave a DOUBLE border; the inner pre>code is the single box. */
+.md-typeset pre > code,
+.md-typeset :is(.highlight.dstack-scrollable-code, .dstack-editable-code),
+.md-typeset [data-termynal] {
+    background-color: var(--cs-bg) !important;
+    color: var(--cs-text) !important;
+    border: 1px solid var(--cs-border) !important;   /* 1px solid, consistent with admonitions/details */
+    border-radius: 12px !important;
+    /* landing.css has a global `[data-termynal] { font-size: 14px }`; beat it (this is more specific). */
+    font-size: var(--dstack-code-font-size) !important;
+}
+/* Drop the 55–60px top padding that reserved room for the (now removed) window dots. */
+.md-typeset pre > code,
+.md-typeset :is(.highlight.dstack-scrollable-code, .dstack-editable-code),
+.md-typeset [data-termynal] {
+    padding: 16px 20px !important;
+}
+/* Editors show a centered filename caption (.editor-title) absolutely at top:10px, which overlapped
+   the first code line — give the editor's code extra top padding so the code clears the caption. */
+.md-typeset div[editor-title] pre > code {
+    padding-top: 32px !important;
+}
+
+/* Termy copy button: it's position:absolute inside [data-termynal], which is itself the horizontal
+   scroll container — so it scrolled away with the content. Re-anchor it to the non-scrolling .termy
+   wrapper (make that the positioning context and drop [data-termynal]'s) so it stays pinned. */
+.md-typeset .termy {
+    position: relative;
+}
+.md-typeset .termy > [data-termynal].dstack-termy-has-copy {
+    position: static;
+}
+
+/* Remove the red/yellow/green window dots (the macOS-window imitation). */
+.md-typeset .highlight pre > code::before,
+.md-typeset div[editor-title] pre > code::before,
+.md-typeset :is(.highlight.dstack-scrollable-code, .dstack-editable-code)::before,
+.md-typeset [data-termynal]::before {
+    display: none !important;
+    content: none !important;
+}
+
+/* Copy / code-nav buttons: keep them legible on the white surface (was #eee on hover → invisible). */
+.md-code__nav .md-code__button,
+.md-code__nav:hover .md-code__button,
+.md-typeset .highlight.dstack-scrollable-code:hover > .md-code__nav .md-code__button {
+    color: var(--cs-muted) !important;
+}
+.md-code__nav .md-code__button:hover {
+    color: var(--cs-text) !important;
+}
+/* Copy button: the 18px glyph itself flush at the content padding (16/20). The nav had 4px padding
+   and the button was 24px with an 18px centered glyph (3px margin) → ~7px extra inset; zero both so
+   the glyph box sits exactly at the content edge. Termy copy below matches. */
+.md-typeset .md-code__nav {
+    top: 16px !important;
+    right: 20px !important;
+    padding: 0 !important;
+}
+.md-typeset .md-code__nav .md-code__button {
+    width: 18px !important;
+    height: 18px !important;
+}
+.md-typeset .md-code__button::after {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+/* Code caption ("fleet.dstack.yml") → normal text color, not the muted #a2a2a2. */
+.md-typeset .editor-title {
+    color: var(--cs-text) !important;
+}
+
+/* ===== details/summary (collapsible admonitions) → code-like card ==========
+   Match the code component: 12px radius, 1px border, white surface; 16px caption with no
+   admonition type-icon (the expand chevron stays). The card has NO padding — the summary and the
+   content pad themselves — so the summary's hover highlight spans the full header width like the
+   content tabs (overflow:hidden clips it to the rounded corners). */
+.md-typeset details {
+    border: 1px solid var(--cs-border) !important;
+    border-radius: 12px !important;
+    background-color: var(--cs-bg) !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+/* [dir=ltr] .md-typeset details[class] (0,3,2) out-specifies extra.css's
+   `[dir=ltr] .md-typeset :is(.admonition-title,summary)` (18px, 0,3,0) and the `.info>summary`
+   1.1em rule, so the 16px caption actually wins. The summary pads itself (16/20) and spans the full
+   card width; margin 0 removes extra.css's -12px side margins. */
+[dir=ltr] .md-typeset details[class] > summary {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    line-height: 1.5 !important;
+    padding: 16px 20px !important;
+    margin: 0 !important;
+}
+/* Gray hover highlight over the WHOLE card (header + content), not just the summary, when the
+   header is hovered — like the content tabs. :has() ties it to the clickable summary. */
+.md-typeset details:has(> summary:hover) {
+    background: var(--cs-hover) !important;
+}
+/* Hide the admonition type-icon (::before); keep the expand/collapse chevron (::after), vertically
+   centered (margin, not transform, so the open-state rotation isn't clobbered) and 20px from the
+   right edge — symmetric with the caption's 20px left inset. */
+.md-typeset details > summary::before {
+    display: none !important;
+}
+.md-typeset details > summary::after {
+    right: 20px !important;
+    top: 50% !important;
+    margin-top: -10px !important;
+}
+/* Content pads itself: left/right aligns with the caption; the last child clears the bottom border;
+   the first content element's gap comes from the summary's padding-bottom. */
+.md-typeset details > :not(summary) {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+}
+.md-typeset details > summary + * {
+    margin-top: 0 !important;
+}
+.md-typeset details > :last-child {
+    padding-bottom: 16px !important;
+    margin-bottom: 0 !important;
+}
+/* A nested admonition/details keeps its OWN padding (which beats the parent's per-child padding),
+   so its border sat flush to the outer card on all sides. Inset it with margins so it reads as a
+   card within the card — left/right align with the text content, plus a bottom gap. */
+[dir=ltr] .md-typeset details > :is(.admonition, details) {
+    margin-left: 20px !important;
+    margin-right: 20px !important;
+    margin-bottom: 16px !important;
+}
+
+/* ===== Admonitions (non-collapsible) → card style ==========================
+   Plain 1px solid border, 12px radius, 16px caption, no type-icon (consistent with the
+   code/editor + collapsible <details> cards). */
+.md-typeset .admonition {
+    border: 1px solid var(--cs-border) !important;
+    border-radius: 12px !important;
+    background-color: var(--cs-bg) !important;
+    box-shadow: none !important;
+    padding: 16px 20px !important;
+}
+[dir=ltr] .md-typeset .admonition > .admonition-title {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    line-height: 1.5 !important;
+    margin: 0 0 8px 0 !important;   /* remove extra.css's -12px side / negative bottom margins */
+    padding: 0 !important;
+}
+/* Hide the admonition type-icon. */
+.md-typeset .admonition > .admonition-title::before {
+    display: none !important;
+}
+/* Content aligns with the caption (was indented ~32px for the icon gutter). */
+.md-typeset .admonition > :not(.admonition-title) {
+    padding-left: 0 !important;
+}
+/* extra.css still indents code/blockquote/editors/termy inside admonitions/details by 32px (the
+   old icon-gutter offset). With the icon gone, align them with the text content instead. */
+[dir=ltr] .md-typeset :is(.admonition, details) > :is(pre, blockquote, .highlight, .termy, div[editor-title]) {
+    margin-left: 0 !important;
+}
+/* The padding-left:0 above also stripped a blockquote's own left padding, leaving its text flush
+   against the fill — restore it so blockquotes inside admonitions read normally. ([dir=ltr] prefix
+   out-specifies the `:not(.admonition-title)` rule above, which also carries !important.) */
+[dir=ltr] .md-typeset .admonition > blockquote {
+    padding-left: 25px !important;
+}
+
+/* ===== Misc rounded corners + termy ======================================== */
+/* Blockquotes → 12px round corners (consistent with the cards/code). */
+.md-typeset blockquote {
+    border-radius: 12px !important;
+}
+/* Footer prev/next links → 12px round corners; theme-aware border + text (was 5px / black). */
+.md-typeset a.md-footer__link {
+    border-radius: 12px !important;
+    border-color: var(--cs-border) !important;
+    color: var(--cs-text) !important;
+}
+/* Termynal: hide the "restart ↻" control. */
+[data-terminal-control] {
+    display: none !important;
+}
+
+/* (Termynal copy button is styled in termynal.css — `[data-termynal] > .dstack-termy-copy` — to
+   match the code/editor copy button: 18px glyph at the content padding 16/20, cs-muted → cs-text.) */
+
+/* ===== Header logo wordmark clickability ===================================
+   Material drops the site-name topic to z-index:-1 when the header title is "active" (which it is on
+   blog index pages), so the visible "dstack" wordmark sits behind the empty page-title topic and
+   isn't clickable. Force it on top so the wordmark link (→ home) always works; the page-title topic
+   is just text, so let clicks pass through it to the link below. */
+.md-header__title .md-header__topic:first-child {
+    z-index: 1 !important;
+}
+.md-header__title .md-header__topic[data-md-component="header-topic"] {
+    pointer-events: none !important;
+}
+
+/* ===== Blog ================================================================ */
+/* The blog index's "On this page" lists the article titles (blog_toc). Material keeps the secondary
+   sidebar visibility:hidden when it finds no in-page anchors (the blog TOC links to other posts),
+   so force it visible — we want the article-title TOC to show. */
+.md-sidebar--secondary {
+    visibility: visible !important;
+}
+
+/* Blog article titles (h2 > a.toclink on the index) and any heading links shouldn't carry the
+   content-link underline — only underline on hover, like a title link. */
+.md-typeset :is(h1, h2, h3, h4, h5, h6) a {
+    text-decoration: none;
+}
+.md-typeset :is(h1, h2, h3, h4, h5, h6) a:hover {
+    text-decoration: underline;
+}
+
+/* Blog excerpt header (author avatars + date · category · read time) removed entirely on the
+   list/index/category pages — that data lives in the article's right rail instead (.cs-post-meta).
+   Hiding the whole header (not just .md-post__meta) reclaims its fixed height. */
+.md-post--excerpt .md-post__header {
+    display: none;
+}
+/* Material's 3.2rem gap between excerpts was too much; 40px is enough separation between cards. */
+.md-post--excerpt {
+    margin-bottom: 40px;
+}
+
+/* ===== Blog post (article) layout ========================================== */
+/* Blog posts render NO left sidebar (overrides/blog-post.html) — only the article + right rail.
+   The content div carries .md-content--blog (NOT Material's .md-content--post, which is a
+   column-reverse flex meant to pair the post sidebar with the article). It's a CSS hook to widen
+   the article to the same "collapsed left menu" layout as a docs page with the nav hidden: a
+   1280px region (960 body + 40 gap + 280 rail) centered in the viewport. :has() reaches ancestors. */
+@media screen and (min-width: 76.1875em) {
+    .md-main__inner.md-grid:has(.md-content--blog) {
+        max-width: 1280px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .md-main__inner:has(.md-content--blog) .md-content {
+        margin-left: 0;
+    }
+    .md-main__inner:has(.md-content--blog) .md-sidebar--secondary {
+        margin-right: 0;
+    }
+    /* Blog posts render the primary nav only so the mobile drawer (burger) has it; on desktop the
+       article spans the full width, so hide the left sidebar here. */
+    .md-main__inner:has(.md-content--blog) .md-sidebar--primary {
+        display: none;
+    }
+    /* No left sidebar → drop the full-height vertical divider drawn at left:280px. Applies to blog
+       posts and to any page that hides the nav (e.g. /terms, /privacy → .md-sidebar--primary[hidden]). */
+    body:has(.md-content--blog)::before,
+    body:has(.md-sidebar--primary[hidden])::before {
+        display: none;
+    }
+}
+
+/* Relocated post metadata in the right rail (after "On this page"). A "Metadata" heading mirrors
+   the "Need help?" block; items use the TOC anchor font (14/400 muted) with slightly smaller icons. */
+.cs-post-meta {
+    margin-top: 32px;
+}
+/* Separator above the metadata only when "On this page" precedes it (toc has items). */
+.cs-post-meta--sep {
+    padding-top: 28px;
+    border-top: 0.5px solid var(--cs-border);
+}
+.cs-post-meta__title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--cs-nav-heading);
+    margin: 0 0 8px;
+}
+.cs-post-meta__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.cs-post-meta__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    line-height: 20px;
+    color: var(--cs-nav-link);
+    margin-bottom: 8px;
+}
+.cs-post-meta__item:last-child {
+    margin-bottom: 0;
+}
+.cs-post-meta__item svg {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+    fill: currentColor;
+    color: var(--cs-muted);
+}
+.cs-post-meta__item a {
+    color: var(--cs-nav-link);
+    text-decoration: none;
+}
+.cs-post-meta__item a:hover {
+    text-decoration: underline;
+}
+
+/* Blog excerpt "Continue reading →": one cohesive inline-flex link so the arrow sits ON the text
+   line (it was floating ~4px above the baseline) and is sized to the 14px text, like the external
+   icon. The arrow lives inside the <a>, so it's part of the clickable link. */
+.md-typeset .md-post__action a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.md-typeset .md-post__action .icon {
+    width: 14px;
+    height: auto;
+    margin-left: 0;          /* the flex gap handles spacing now */
+}
+.md-typeset .md-post__action .icon svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* ===== Architecture diagram (docs index) =====================================
+   Ported 1:1 from the new landing's <ArchitectureDiagram> (website/src/components/
+   ArchitectureDiagram.tsx + .arch-* in website/src/styles.css). Keep the two in sync — if the
+   landing diagram changes, update this block AND the HTML in mkdocs/docs/index.md.
+   Everything is in cqw (resolved against .arch-diagram-wrap) so it scales like the old SVG.
+   Logos are source SVG/webp used as a currentColor mask → monochrome + theme-adaptive. */
+.arch-diagram-wrap {
+    container-type: inline-size;
+    width: 100%;
+    max-width: 700px;
+    margin: 1em 0;
+}
+/* The cells' dotted outline is an <svg>; Material's `.md-typeset svg { height:auto; max-width:100% }`
+   would collapse it, so force it to fill the cell (it's position:absolute inset:0). */
+.md-typeset .arch-dash {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+}
+.arch-diagram {
+    display: flex;
+    flex-direction: column;
+    gap: 2.66cqw;
+    width: 100%;
+    color: var(--cs-text);
+    --arch-border-width: max(1px, 0.22cqw);
+    --arch-gradient: linear-gradient(45deg, #002aff, #002aff, #e165fe);
+}
+.arch-dash {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+}
+.arch-dash rect {
+    x: 0.75px;
+    y: 0.75px;
+    width: calc(100% - 1.5px);
+    height: calc(100% - 1.5px);
+    rx: 12px;
+    fill: none;
+    stroke: var(--arch-dash-stroke, var(--cs-text));
+    stroke-width: 1.5px;
+    stroke-dasharray: 2 6;
+    stroke-linecap: butt;
+}
+.arch-row {
+    display: grid;
+    grid-template-columns: 2.54fr 1fr 1fr;
+    gap: 1.72cqw;
+}
+.arch-cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1.55cqw;
+    min-height: 9.83cqw;
+    padding: 0 2cqw;
+    border-radius: 12px;
+}
+.arch-cell--center { justify-content: center; }
+.arch-cell--center .arch-cell__label { white-space: normal; text-align: center; }
+.arch-cell--full { min-height: 9.83cqw; }
+.arch-cell--gpu { justify-content: space-between; }
+.arch-cell--hw { justify-content: center; }
+.arch-cell--hw > .arch-cell__label { position: absolute; left: 2cqw; }
+.arch-cell__label {
+    font-size: 16px;   /* fixed (not cqw-scaled) to match the body text */
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.arch-orchestration {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3cqw;
+    padding: 3.2cqw 5.07cqw 3.48cqw;
+    border-radius: 1.6cqw;
+    background: var(--arch-gradient);
+    color: #fff;
+}
+.arch-orchestration__title { font-size: 16px; font-weight: 500; text-align: center; }
+.arch-orchestration__cells {
+    display: grid;
+    grid-template-columns: 1fr 1.34fr 1fr 1fr 1fr;
+    gap: 1.26cqw;
+    width: 100%;
+}
+.arch-subcell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 5.54cqw;
+    padding: 0 0.8cqw;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 2.25cqw;
+    font-weight: 500;
+    line-height: 1.2;
+    --arch-dash-stroke: #fff;
+}
+.arch-logos {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.15cqw;
+    flex-wrap: nowrap;
+}
+.arch-logo {
+    display: inline-block;
+    background-color: currentColor;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+}
+/* Per-logo height + aspect (from each source's viewBox) + the mask image (relative to this
+   stylesheet → /assets/images/arch-logos/). */
+.arch-logo--aws { height: 4.05cqw; aspect-ratio: 304 / 182; -webkit-mask-image: url(../images/arch-logos/aws.svg); mask-image: url(../images/arch-logos/aws.svg); }
+.arch-logo--gcp { height: 4.55cqw; aspect-ratio: 256 / 206; -webkit-mask-image: url(../images/arch-logos/gcp.svg); mask-image: url(../images/arch-logos/gcp.svg); }
+.arch-logo--lambda { height: 4.9cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/lambda.svg); mask-image: url(../images/arch-logos/lambda.svg); }
+.arch-logo--nebius { height: 4.6cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/nebius.svg); mask-image: url(../images/arch-logos/nebius.svg); }
+.arch-logo--runpod { height: 5.04cqw; aspect-ratio: 120 / 130; -webkit-mask-image: url(../images/arch-logos/runpod.svg); mask-image: url(../images/arch-logos/runpod.svg); }
+.arch-logo--kubernetes { height: 4.98cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/kubernetes.svg); mask-image: url(../images/arch-logos/kubernetes.svg); }
+.arch-logo--pytorch { height: 5.2cqw; aspect-ratio: 90.3 / 109.1; -webkit-mask-image: url(../images/arch-logos/pytorch.svg); mask-image: url(../images/arch-logos/pytorch.svg); }
+.arch-logo--vllm { height: 4.8cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/vllm.svg); mask-image: url(../images/arch-logos/vllm.svg); }
+.arch-logo--sglang { height: 4.8cqw; aspect-ratio: 596 / 683; -webkit-mask-image: url(../images/arch-logos/sglang.svg); mask-image: url(../images/arch-logos/sglang.svg); }
+.arch-logo--meta { height: 3.7cqw; aspect-ratio: 287.56 / 191; -webkit-mask-image: url(../images/arch-logos/meta.svg); mask-image: url(../images/arch-logos/meta.svg); }
+.arch-logo--huggingface { height: 5.1cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/huggingface.svg); mask-image: url(../images/arch-logos/huggingface.svg); }
+.arch-logo--nvidia { height: 3.7cqw; aspect-ratio: 271.7 / 179.7; -webkit-mask-image: url(../images/arch-logos/nvidia.svg); mask-image: url(../images/arch-logos/nvidia.svg); }
+.arch-logo--amd { height: 4.6cqw; aspect-ratio: 1600 / 1408; -webkit-mask-image: url(../images/arch-logos/amd.webp); mask-image: url(../images/arch-logos/amd.webp); }
+.arch-logo--tenstorrent { height: 4.8cqw; aspect-ratio: 170 / 169; -webkit-mask-image: url(../images/arch-logos/tenstorrent.svg); mask-image: url(../images/arch-logos/tenstorrent.svg); }
+.arch-logo--tpu { height: 4.2cqw; aspect-ratio: 256 / 206; -webkit-mask-image: url(../images/arch-logos/gcp.svg); mask-image: url(../images/arch-logos/gcp.svg); }
+/* Reflow to 2-up below ~480px (was 360px): the cell labels are a fixed 16px, so on a narrow
+   phone the 3-up grid can't shrink them and they overflow — switch to 2-up sooner. */
+@container (max-width: 480px) {
+    .arch-diagram { gap: 12px; }
+    .arch-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .arch-row > :first-child { grid-column: 1 / -1; }
+    .arch-cell { min-height: 52px; padding: 10px 14px; gap: 12px; border-radius: 8px; }
+    .arch-cell__label { font-size: 16px; white-space: normal; }
+    .arch-cell--hw { justify-content: space-between; }
+    .arch-cell--hw > .arch-cell__label { position: static; }
+    .arch-orchestration { gap: 12px; padding: 16px; border-radius: 12px; }
+    .arch-orchestration__title { font-size: 15px; }
+    .arch-orchestration__cells { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .arch-subcell { min-height: 44px; font-size: 13px; border-radius: 7px; }
+    .arch-logos { gap: 12px; }
+    .arch-logo { height: 22px !important; }
+}

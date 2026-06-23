@@ -1,5 +1,11 @@
 # Documentation setup
 
+> **The dstack.ai site has three parts on one origin:** the **landing** page (`/`) is a React
+> app in [`website/`](../website); the **docs** (`/docs`) and **blog** (`/blog`) are built with
+> MkDocs from `mkdocs/`. This guide covers the **docs and blog** (MkDocs). For the landing and
+> for building everything together, see [The landing page](#the-landing-page-website) and
+> [Building the whole site](#building-the-whole-site) below.
+
 ## 1. Clone the repo:
 
 ```shell
@@ -36,7 +42,7 @@ uv run pre-commit install
 
 ## 5. Preview documentation
 
-To preview the documentation, run the follow command:
+To preview the **docs and blog** (MkDocs), run the follow command:
 
 ```shell
 uv run mkdocs serve --livereload -s
@@ -44,11 +50,43 @@ uv run mkdocs serve --livereload -s
 
 The `--livereload` flag is required to work around live-reload bugs in recent `mkdocs` versions.
 
+This serves the docs and blog only. The landing page (`/`) is a separate React app — when you
+run `mkdocs serve` on its own, `/` simply redirects to `/docs/`. To work on the landing, see
+[The landing page](#the-landing-page-website) below.
+
 If you want to build static files, you can use the following command:
 
 ```shell
 uv run mkdocs build -s
 ```
+
+## The landing page (website/)
+
+The landing page at `/` is a React (Vite) app in [`website/`](../website), not MkDocs. It has
+its own `package.json`/`node_modules`. Preview it on its own (requires Node 20+):
+
+```shell
+just website-dev            # Vite dev server on http://127.0.0.1:5173
+```
+
+Docs/blog links on the landing resolve same-origin (`/docs`, `/blog`), which 404 in standalone
+dev. Point them at a live site while iterating: `just website-dev https://dstack.ai`.
+
+The `/old` route is kept as a template for building future product pages (reachable in dev; not
+part of the production deploy). Google Analytics and the social/OG image reuse the same property
+and MkDocs-generated card as the rest of the site.
+
+## Building the whole site
+
+CI builds the landing and the MkDocs docs/blog and overlays them into a single `site/`:
+
+```shell
+just site-build             # website/dist + `mkdocs build` -> ./site (scripts/docs/build_site.sh)
+just site-serve             # preview the combined site on http://127.0.0.1:8001
+```
+
+In the combined build the React `index.html` owns `/`, while MkDocs serves `/docs`, `/blog`, and
+the shared `/assets`. This is what the `Build & Deploy Site` workflow deploys.
 
 ## Documentation build system
 
@@ -141,7 +179,7 @@ we should not reintroduce per-tag OpenAPI files unless there is a concrete reaso
 
 ```
 mkdocs/                         # docs_dir for the mkdocs site
-├── index.md                    # Homepage
+├── index.md                    # Redirects to /docs/ (the landing "/" is the React app in website/)
 ├── docs/                       # /docs/ URL section
 │   ├── index.md                # Getting started
 │   ├── installation.md
@@ -157,7 +195,13 @@ mkdocs/                         # docs_dir for the mkdocs site
 ├── layouts/                    # Social card layouts
 └── assets/                     # Stylesheets, images, fonts
 
+website/                        # React (Vite) landing page — served at "/"
+├── index.html                  # Entry; title, OG/meta, Google Analytics
+├── src/                        # App, pages (Home, Old), components, routes
+└── public/static/              # Landing assets (namespaced to avoid clashing with /assets)
+
 scripts/docs/
+├── build_site.sh               # Build landing + docs/blog and overlay into ./site
 ├── hooks.py                    # MkDocs build hooks
 ├── gen_llms_files.py           # llms.txt generation
 ├── gen_schema_reference.py     # Schema expansion

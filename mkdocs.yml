@@ -11,7 +11,7 @@ repo_name: dstackai/dstack
 edit_uri: edit/master/mkdocs/
 
 #Copyright
-copyright: © 2026 dstack Inc.
+copyright: © 2026, dstack Inc. All rights reserved.
 
 # Source directory for site content
 docs_dir: mkdocs
@@ -32,21 +32,23 @@ theme:
   font:
     text: Source Sans Pro
     code: IBM Plex Mono
+  # Light (default) + dark (slate) schemes WITH toggles — Material needs the toggle radios so its
+  # palette JS honors the stored __palette and applies it during parse (flash-free). We HIDE the
+  # toggle buttons via CSS (cloudscape-docs.css) and drive the choice from the shared `dstack-theme`
+  # localStorage key (website/src/theme.ts), translated into __palette in main.html's extrahead.
   palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
+    - scheme: default
       primary: white
       accent: lilac
-  #        toggle:
-  #          icon: material/weather-night
-  #          name: Switch to dark mode
-  #      - media: "(prefers-color-scheme: dark)"
-  #        scheme: slate
-  #        primary: black
-  #        accent: light blue
-  #        toggle:
-  #          icon: material/weather-sunny
-  #          name: Switch to light mode
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: white
+      accent: lilac
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
   features:
     - content.tooltips
     - navigation.path
@@ -60,7 +62,7 @@ theme:
     - navigation.sections
     #    - navigation.expand
     - navigation.top
-    - announce.dismiss
+    # announce.dismiss removed — /old's banner has no dismiss (×) button
     - navigation.tracking
     - navigation.footer
 
@@ -252,6 +254,7 @@ extra_css:
   - assets/stylesheets/termynal.css
   - assets/stylesheets/landing.css
   - assets/stylesheets/pricing.css
+  - assets/stylesheets/cloudscape-docs.css
 extra_javascript:
   - https://unpkg.com/swagger-ui-dist@5.32.0/swagger-ui-bundle.js
   - assets/javascripts/swagger.js

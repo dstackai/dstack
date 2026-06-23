@@ -1,10 +1,7 @@
 {#-
   This file was automatically generated - do not edit
 -#}
-{% set title = lang.t("toc") %}
-{% if config.mdx_configs.toc and config.mdx_configs.toc.title %}
-  {% set title = config.mdx_configs.toc.title %}
-{% endif %}
+{% set title = "On this page" %}
 <nav class="md-nav md-nav--secondary" aria-label="{{ title }}">
   {% set toc = page.toc %}
   {% set first = toc | first %}
@@ -23,3 +20,48 @@
     </ul>
   {% endif %}
 </nav>
+
+{#- Blog posts: relocate the post metadata (date / category / read time) into the right
+    rail, right after "On this page". page.config.date is set only on blog post pages. -#}
+{% if page.config and page.config.date %}
+  {#- Separator above the metadata only when there's an "On this page" list above it. -#}
+  <div class="cs-post-meta{% if toc %} cs-post-meta--sep{% endif %}">
+    <h2 class="cs-post-meta__title">Metadata</h2>
+    <ul class="cs-post-meta__list">
+      <li class="cs-post-meta__item">
+        {% include ".icons/material/calendar.svg" %}
+        <time datetime="{{ page.config.date.created }}">{{- page.config.date.created | date -}}</time>
+      </li>
+      {% if page.config.date.updated %}
+        <li class="cs-post-meta__item">
+          {% include ".icons/material/calendar-clock.svg" %}
+          <time datetime="{{ page.config.date.updated }}">{{- page.config.date.updated | date -}}</time>
+        </li>
+      {% endif %}
+      {% if page.categories %}
+        <li class="cs-post-meta__item">
+          {% include ".icons/material/bookshelf.svg" %}
+          <span>
+            {{ lang.t("blog.categories.in") }}
+            {% for category in page.categories %}<a href="{{ category.url | url }}">{{- category.title -}}</a>{%- if loop.revindex > 1 %}, {% endif -%}{% endfor %}
+          </span>
+        </li>
+      {% endif %}
+      {% if page.config.readtime %}
+        {% set time = page.config.readtime %}
+        <li class="cs-post-meta__item">
+          {% include ".icons/material/clock-outline.svg" %}
+          <span>
+            {% if time == 1 %}{{ lang.t("readtime.one") }}{% else %}{{ lang.t("readtime.other") | replace("#", time) }}{% endif %}
+          </span>
+        </li>
+      {% endif %}
+    </ul>
+  </div>
+{% endif %}
+
+<div class="cs-need-help">
+  <h2>Need help?</h2>
+  <p>Reach out to us on Discord</p>
+  <a href="https://discord.gg/u8SmfwPpMd" target="_blank" class="md-button cs-discord">Discord</a>
+</div>

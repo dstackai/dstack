@@ -1,0 +1,45 @@
+{#-
+  Blog post (article) layout — dstack override.
+  Unlike Material's default blog-post.html we DON'T render the left ".md-sidebar--post"
+  panel (Back to index + Metadata) and we DON'T render the left primary nav. The article
+  spans the wider "collapsed left menu" layout (see .md-content--post rules in
+  cloudscape-docs.css) and the post metadata is relocated into the right rail, after the
+  "On this page" TOC (rendered by toc.html when page.config.date is set).
+-#}
+{% extends "main.html" %}
+
+{% block container %}
+  <div class="md-content md-content--blog" data-md-component="content">
+    <article class="md-content__inner md-typeset">
+      {% block content %}
+        {% include "partials/content.html" %}
+      {% endblock %}
+    </article>
+    {% include "partials/tx-footer.html" %}
+  </div>
+{% endblock %}
+
+{# Blog posts show the right rail (toc + relocated metadata). The left primary nav is also rendered
+   so the MOBILE drawer (burger) has the site nav to open — but it's hidden on desktop (see
+   `body:has(.md-content--blog) .md-sidebar--primary` in cloudscape-docs.css), so the article keeps
+   its full-width, sidebar-less reading layout there. #}
+{% block site_nav %}
+  {% if nav %}
+    <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+      <div class="md-sidebar__scrollwrap">
+        <div class="md-sidebar__inner">
+          {% include "partials/nav.html" %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+  {% if "toc.integrate" not in features %}
+    <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+      <div class="md-sidebar__scrollwrap">
+        <div class="md-sidebar__inner">
+          {% include "toc.html" %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
