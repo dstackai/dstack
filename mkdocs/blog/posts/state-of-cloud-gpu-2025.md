@@ -4,8 +4,8 @@ date: 2025-09-10
 description: "TBA"
 slug: state-of-cloud-gpu-2025
 image: https://dstack.ai/static-assets/static-assets/images/cloud-gpu-providers.png
-categories:
-  - Reports
+# categories:
+#   - Benchmarks
 ---
 
 # The state of cloud GPUs in 2025: costs, performance, playbooks

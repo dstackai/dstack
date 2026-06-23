@@ -1,6 +1,6 @@
 ---
 title: "The state of heterogeneous AI compute in 2026"
-date: 2026-06-05
+date: 2026-06-23
 description: "How supply, software readiness, orchestration, and networking shape accelerator choices across NVIDIA, AMD, TPUs, Trainium, and specialized inference systems."
 slug: state-of-heterogeneous-compute-2026
 image: https://dstack.ai/static-assets/static-assets/images/state-of-heterogeneous-compute-2026.png
