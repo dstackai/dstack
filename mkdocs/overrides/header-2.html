@@ -9,9 +9,17 @@
 {% endif %}
 <header class="{{ class }}" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="{{ lang.t('header') }}">
-    {# No left nav → no burger. True for blog posts (page.config.date) and for pages that hide the
-       navigation (e.g. /terms, /privacy via `hide: [navigation]`). #}
-    {% if not (page.config and page.config.date) and not (page.meta and page.meta.hide and "navigation" in page.meta.hide) %}
+    {# Two distinct nav controls (note: blog posts carry `hide: navigation` in their meta, but
+       blog-post.html still renders the site nav for the MOBILE drawer — so they're treated separately
+       from genuinely nav-less pages like /terms, /privacy):
+       - cs-nav-toggle: the DESKTOP collapse button. Only useful when there's a left sidebar column,
+         so hide it on blog posts (the article spans the full width) and on hide:navigation pages.
+       - label[for="__drawer"]: the MOBILE drawer hamburger. Keep it on blog posts (their drawer has
+         the site nav) and normal pages; drop it only on hide:navigation pages that DON'T render a
+         drawer (/terms, /privacy), so it never opens an empty dimming overlay. #}
+    {% set is_blog_post = page.config and page.config.date %}
+    {% set hides_nav = page.meta and page.meta.hide and "navigation" in page.meta.hide %}
+    {% if not is_blog_post and not hides_nav %}
       <button type="button" class="md-header__button cs-nav-toggle" aria-label="Toggle navigation" data-cs-nav-toggle>
         <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M15 3H1M15 8H1M15 13H1" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
       </button>
@@ -19,10 +27,12 @@
     <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" title="{{ config.site_name | e }}" class="md-header__button md-logo" aria-label="{{ config.site_name }}" data-md-component="logo">
       {% include "partials/logo.html" %}
     </a>
-    <label class="md-header__button md-icon" for="__drawer">
-      {% set icon = config.theme.icon.menu or "material/menu" %}
-      {% include ".icons/" ~ icon ~ ".svg" %}
-    </label>
+    {% if is_blog_post or not hides_nav %}
+      <label class="md-header__button md-icon" for="__drawer">
+        {% set icon = config.theme.icon.menu or "material/menu" %}
+        {% include ".icons/" ~ icon ~ ".svg" %}
+      </label>
+    {% endif %}
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
         <div class="md-header__topic">

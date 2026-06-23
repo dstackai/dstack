@@ -1892,6 +1892,11 @@
     .md-main__inner:has(.md-content--blog) .md-sidebar--secondary {
         margin-right: 0;
     }
+    /* Blog posts render the primary nav only so the mobile drawer (burger) has it; on desktop the
+       article spans the full width, so hide the left sidebar here. */
+    .md-main__inner:has(.md-content--blog) .md-sidebar--primary {
+        display: none;
+    }
     /* No left sidebar → drop the full-height vertical divider drawn at left:280px. Applies to blog
        posts and to any page that hides the nav (e.g. /terms, /privacy → .md-sidebar--primary[hidden]). */
     body:has(.md-content--blog)::before,
