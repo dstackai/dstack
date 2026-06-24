@@ -309,29 +309,67 @@ p {
   border: 2px solid #879596;
 }
 
-/* "Resources" top-nav dropdown (ResourcesHoverMenu): make the ButtonDropdown trigger read
-   like the plain text menu links (.site-menu-link) — no border/background, bold 16px label,
-   underline on hover — rather than the bordered "normal" button look. */
-.site-menu-dropdown-wrap {
+/* "Products" top-nav hover menu. The trigger (.site-hover-menu__trigger) inherits the plain
+   text-link look from .site-menu-button; the popup opens on hover and is anchored to the
+   trigger. Continuity across the trigger→popup gap is handled by a close delay in JS
+   (hover-intent), so no visual bridge is needed here. */
+.site-hover-menu {
+  position: relative;
   display: inline-flex;
   align-items: center;
 }
-.site-menu-dropdown [class*='awsui_button'] {
-  border-color: transparent !important;
-  background: transparent !important;
-  color: var(--cs-text) !important;
-  font-size: 16px !important; /* match the .site-menu-link items (e.g. Documentation) */
-  font-weight: 700 !important;
-  padding: 10px 0 !important; /* no horizontal padding — matches the text links */
+
+/* Popup geometry matches the old Cloudscape "Get started" menu (cloudscape-overrides.css):
+   300px wide, flat (no shadow), a single 0.5px cs-text border, 12px radius. Vertical breathing
+   sits on the popup (6px) and the items carry the 16px horizontal padding so hover fills edge
+   to edge. */
+.site-hover-menu__popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  width: 300px;
+  padding: 0;
+  background: var(--cs-bg);
+  border: 0.5px solid var(--cs-text);
+  border-radius: 12px;
+  overflow: hidden;
 }
-.site-menu-dropdown [class*='awsui_button']:hover {
-  background: transparent !important;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
+
+.site-hover-menu__item {
+  display: block;
+  padding: 4px 16px;
+  color: var(--cs-text);
+  text-decoration: none;
 }
-/* The menu opens on hover, so the dropdown caret is redundant — hide it. */
-.site-menu-dropdown [class*='awsui_button'] [class*='awsui_icon'] {
-  display: none !important;
+
+/* Top/bottom breathing room lives on the first/last items (not the popup) so a hovered
+   first/last item's background fills it instead of leaving an un-highlighted strip at the edge. */
+.site-hover-menu__item:first-child {
+  padding-top: 10px;
+}
+.site-hover-menu__item:last-child {
+  padding-bottom: 10px;
+}
+
+.site-hover-menu__item:hover {
+  background: var(--cs-hover);
+}
+
+.site-hover-menu__item-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.site-hover-menu__item-desc {
+  margin-top: 1.5px;
+  color: var(--cs-text);
+  font-weight: 300;
+  font-size: 13px;
+  line-height: 16px;
 }
 
 .home-hero {
@@ -859,11 +897,14 @@ p {
   font-size: 17px;
 }
 
-/* Action-card (concept) descriptions are a step smaller than normal text. Higher specificity
-   than `.doc-alternating p` so it wins (the cards sit inside an alternating block). This is the
-   shared small-text size (--font-small), reused for quotes, FAQ answers, and popup descriptions. */
+/* Concept-card descriptions: muted, 14px (a step down from the standard small text) since they
+   sit in a dense card grid. Higher specificity than `.doc-alternating p` so it wins (the cards
+   sit inside an alternating block). */
 .concept-grid .media-card p {
-  font-size: var(--font-small);
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--cs-muted);
 }
 
 /* "Vendor-agnostic, open-source" architecture diagram (components/ArchitectureDiagram.tsx),
@@ -1145,24 +1186,63 @@ p {
   gap: var(--card-gap);
 }
 
-/* Each concept card is a whole-card link to the docs: text-colored (not link-blue),
-   no underline, with a subtle background on hover to signal it's clickable. */
+/* Each concept card is a whole-card link to the docs: an uppercase label (with a small gradient
+   dot), a tight title, and muted copy inside the landing's dotted outline — the shared
+   <DashedBorder> / .arch-dash, matching the architecture-diagram pills above. Faint fill on
+   hover, and the arrow slides. */
 .concept-grid .media-card {
   display: block;
-  position: relative; /* for the arrow + the dotted border overlay */
+  position: relative; /* for the arrow, label dot, and dotted overlay */
   color: var(--cs-text);
   text-decoration: none !important;
-  transition: background 0.15s ease;
-  border: none; /* dotted outline is drawn by the shared <DashedBorder> (.arch-dash) instead */
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  padding: 16px 18px 18px;
+  transition: background-color 0.15s ease;
 }
 
 .concept-grid .media-card:hover {
-  background: var(--cs-hover);
+  background-color: var(--cs-hover);
+}
+
+/* Uppercase category label above the title, led by a small blue→magenta dot. Black and light
+   weight, paired with a thin dotted stroke below for a delicate look. */
+.concept-card__label {
+  display: block;
+  position: relative;
+  margin-bottom: 11px;
+  padding-left: 15px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--cs-text);
+}
+
+/* Thinner dotted stroke on the cards than the diagram pills (which stay 1.5px). */
+.concept-card .arch-dash rect {
+  stroke-width: 1px;
+}
+
+.concept-card__label::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #002aff, #e165fe);
 }
 
 .concept-grid .media-card h3 {
-  font-size: var(--font-card-heading);
-  padding-right: 44px; /* clear the arrow */
+  margin: 0 0 6px;
+  padding: 0 28px 0 0; /* clear the arrow */
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 /* Quote author name reuses the card-heading size. */
@@ -1173,10 +1253,15 @@ p {
 /* ActionCard-style navigation arrow, top-right. */
 .concept-card__arrow {
   position: absolute;
-  top: 16px;
-  right: 18px;
+  top: 15px;
+  right: 15px;
   display: inline-flex;
   color: var(--cs-text);
+  transition: transform 0.2s ease;
+}
+
+.concept-grid .media-card:hover .concept-card__arrow {
+  transform: translateX(4px);
 }
 
 /* Product cards reusing the figma-card style. Used inside an AlternatingDocBlock

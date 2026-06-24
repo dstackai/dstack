@@ -3,7 +3,6 @@ import yamlHighlight from '@cloudscape-design/code-view/highlight/yaml';
 import Button from '@cloudscape-design/components/button';
 import Container from '@cloudscape-design/components/container';
 import Icon from '@cloudscape-design/components/icon';
-import SpaceBetween from '@cloudscape-design/components/space-between';
 import Table from '@cloudscape-design/components/table';
 import Tabs from '@cloudscape-design/components/tabs';
 import { mainButtonStyle } from '../../cloudscape-theme';
@@ -22,10 +21,10 @@ import {
 
 // Core orchestration primitives shown in the "AI-native orchestration" block.
 const keyConcepts = [
-  { name: 'Fleets', href: docsUrl('concepts/fleets'), description: 'Provision and manage clusters across clouds, Kubernetes, and on-prem.' },
-  { name: 'Dev environments', href: docsUrl('concepts/dev-environments'), description: 'Launch dev environments to be accessed by agents or from your IDE.' },
-  { name: 'Tasks', href: docsUrl('concepts/tasks'), description: 'Run training and batch jobs across a single node or clusters.' },
-  { name: 'Services', href: docsUrl('concepts/services'), description: 'Deploy model inference as secure and scalable endpoints.' },
+  { name: 'Fleets', label: 'Cloud & on-prem', href: docsUrl('concepts/fleets'), description: 'Provision and manage clusters across clouds, Kubernetes, and on-prem.' },
+  { name: 'Dev environments', label: 'Development', href: docsUrl('concepts/dev-environments'), description: 'Launch dev environments to be accessed by agents or from your IDE.' },
+  { name: 'Tasks', label: 'Training and batch', href: docsUrl('concepts/tasks'), description: 'Run training and batch jobs across a single node or clusters.' },
+  { name: 'Services', label: 'Model inference', href: docsUrl('concepts/services'), description: 'Deploy model inference as secure and scalable endpoints.' },
 ];
 
 // Rough per-GPU/hour ranges across backends, in the spirit of `dstack offer --group-by gpu`.
@@ -97,7 +96,6 @@ export function ExploreSection() {
         }
         title="Bring your own clouds"
         imageFirst
-        action={<Button href={docsUrl('concepts/backends')} style={mainButtonStyle}>Backends</Button>}
       >
         dstack natively integrates with the major GPU clouds and automates provisioning of clusters.
         <br />
@@ -119,12 +117,6 @@ export function ExploreSection() {
           />
         }
         title="Bring on-prem clusters"
-        action={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button href={docsUrl('concepts/backends/#kubernetes')} style={mainButtonStyle}>Kubernetes</Button>
-            <Button href={docsUrl('concepts/fleets/#ssh-fleets')} style={mainButtonStyle}>SSH fleets</Button>
-          </SpaceBetween>
-        }
       >
         Have an existing Kubernetes cluster? Point dstack to the kubeconfig, and dstack
         will schedule workloads on it as it was a cloud cluster.
@@ -151,6 +143,7 @@ function KeyConceptsBlock() {
             <a className="media-card concept-card" href={concept.href} key={concept.name}>
               <DashedBorder />
               <span className="concept-card__arrow" aria-hidden="true"><Icon name="angle-right" /></span>
+              <span className="concept-card__label">{concept.label}</span>
               <h3>{concept.name}</h3>
               <p>{highlightTerms(concept.description)}</p>
             </a>
@@ -173,7 +166,7 @@ function GpuMarketplaceBlock() {
       visual={<GpuMarketplaceTable />}
       title="Access marketplace GPUs"
       imageFirst
-      action={<Button href="https://sky.dstack.ai" variant="primary" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign up</Button>}
+      action={<Button href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Try dstack Sky</Button>}
     >
       Don't have your own cloud accounts or on-prem clusters? No problem. You can access compute
       through dstack Sky, our hosted GPU marketplace.

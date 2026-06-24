@@ -2,7 +2,7 @@ import Button from '@cloudscape-design/components/button';
 import { heroButtonStyle } from '../../cloudscape-theme';
 import { highlightTerms } from '../../components/highlightTerms';
 import { images, ThemedImage } from '../../data/images';
-import { DOCS_URL } from '../../routes';
+import { docsUrl } from '../../routes';
 import { ExploreSection } from './ExploreSection';
 import { FaqSection } from './FaqSection';
 import { GetStartedSection } from './GetStartedSection';
@@ -19,9 +19,6 @@ function ThemedHeroImage({ image }: { image: ThemedImage }) {
 }
 
 export function HomePage() {
-  const scrollToResources = () =>
-    document.getElementById('resources')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
   return (
     <main className="home-main">
       <section className="home-hero">
@@ -44,11 +41,11 @@ export function HomePage() {
             )}
           </p>
           <div className="home-hero__actions">
-            <Button variant="primary" onClick={scrollToResources} style={heroButtonStyle}>
-              Get started
+            <Button href={docsUrl('installation')} style={heroButtonStyle}>
+              Install open-source
             </Button>
-            <Button href={DOCS_URL} style={heroButtonStyle}>
-              View docs
+            <Button variant="primary" href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={heroButtonStyle}>
+              Try dstack Sky
             </Button>
           </div>
         </div>

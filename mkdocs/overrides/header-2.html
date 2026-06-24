@@ -101,31 +101,7 @@
         </svg>
       </button>
       <a href="https://github.com/dstackai/dstack" target="_blank" class="md-button md-button--primary github external-skip">GitHub</a>
-      <div class="cs-get-started">
-        <button type="button" class="md-button md-button--primary cs-get-started__main" aria-haspopup="true" aria-expanded="false">Get started</button>
-        <button type="button" class="md-button md-button--primary cs-get-started__toggle" aria-label="Get started options" aria-expanded="false" aria-haspopup="true">
-          {% include ".icons/material/menu-down.svg" %}
-        </button>
-        <div class="cs-get-started__menu" hidden>
-          <span class="cs-get-started__group">Products</span>
-          <a href="{{ 'docs/installation/' | url }}">
-            <span class="cs-get-started__item-title">dstack</span>
-            <span class="cs-get-started__item-desc">The open-source control plane that works across clouds, Kubernetes, and on-prem.</span>
-          </a>
-          <a href="https://sky.dstack.ai" target="_blank">
-            <span class="cs-get-started__item-title">dstack Sky</span>
-            <span class="cs-get-started__item-desc">Access GPU marketplace, or bring your own clouds. Hosted by us.</span>
-          </a>
-          <a href="https://calendly.com/dstackai/discovery-call" target="_blank">
-            <span class="cs-get-started__item-title">dstack Enterprise</span>
-            <span class="cs-get-started__item-desc">Self-hosted with SSO, air-gapped setup, dedicated support, and more.</span>
-          </a>
-          <span class="cs-get-started__group">Login</span>
-          <a href="https://sky.dstack.ai" target="_blank">
-            <span class="cs-get-started__item-title">dstack Sky</span>
-          </a>
-        </div>
-      </div>
+      <a href="https://sky.dstack.ai" target="_blank" class="md-button md-button--primary cs-try-sky external-skip">dstack Sky</a>
     </div>
     <script>
       (function () {
@@ -134,19 +110,6 @@
             document.body.classList.toggle('cs-nav-collapsed');
             // The content column reflows (792↔960), so re-align the right rail's TOC offset.
             window.dispatchEvent(new Event('resize'));
-            return;
-          }
-          var menu = document.querySelector('.cs-get-started__menu');
-          if (!menu) return;
-          var triggers = document.querySelectorAll('.cs-get-started__main, .cs-get-started__toggle');
-          // Both segments open the popup (no default navigation).
-          if (e.target.closest('.cs-get-started__main, .cs-get-started__toggle')) {
-            var hidden = menu.hasAttribute('hidden');
-            menu.toggleAttribute('hidden', !hidden);
-            triggers.forEach(function (t) { t.setAttribute('aria-expanded', String(hidden)); });
-          } else if (!e.target.closest('.cs-get-started__menu')) {
-            menu.setAttribute('hidden', '');
-            triggers.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
           }
         });
       })();
