@@ -903,6 +903,7 @@ class TestListRuns:
         job2 = await create_job(
             session=session,
             run=run,
+            submission_num=1,
             submitted_at=run_submitted_at,
             last_processed_at=run_submitted_at,
         )
@@ -930,7 +931,7 @@ class TestListRuns:
                         "job_submissions": [
                             {
                                 "id": str(job2.id),
-                                "submission_num": 0,
+                                "submission_num": 1,
                                 "deployment_num": 0,
                                 "submitted_at": run_submitted_at.isoformat(),
                                 "last_processed_at": run_submitted_at.isoformat(),
@@ -953,7 +954,7 @@ class TestListRuns:
                 ],
                 "latest_job_submission": {
                     "id": str(job2.id),
-                    "submission_num": 0,
+                    "submission_num": 1,
                     "deployment_num": 0,
                     "submitted_at": run_submitted_at.isoformat(),
                     "last_processed_at": run_submitted_at.isoformat(),

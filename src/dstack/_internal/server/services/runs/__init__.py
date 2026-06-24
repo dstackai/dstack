@@ -1,6 +1,7 @@
 import itertools
 import math
 import uuid
+from collections import defaultdict
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -9,7 +10,8 @@ import pydantic
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import aliased, joinedload, noload, selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import (
@@ -37,11 +39,13 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
     ServiceSpec,
 )
+from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services.diff import format_diff_fields_for_event
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
     JobModel,
+    MemberModel,
     ProbeModel,
     ProjectModel,
     RepoModel,
@@ -63,7 +67,6 @@ from dstack._internal.server.services.locking import get_locker, string_to_lock_
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.probes import is_probe_ready
-from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.resources import (
     set_gpu_vendor_default,
     set_resources_defaults,
@@ -168,32 +171,33 @@ async def list_user_runs(
 ) -> List[Run]:
     if project_name is None and repo_id is not None:
         return []
-    projects = await list_user_project_models(
-        session=session,
-        user=user,
-        only_names=True,
-    )
     runs_user = None
     if username is not None:
         runs_user = await get_user_model_by_name(session=session, username=username)
         if runs_user is None:
             raise ResourceNotExistsError("User not found")
     repo = None
+    project = None
     if project_name is not None:
-        projects = [p for p in projects if p.name == project_name]
-        if len(projects) == 0:
+        project = await _get_project_model_for_runs_list(
+            session=session,
+            user=user,
+            project_name=project_name,
+        )
+        if project is None:
             return []
         if repo_id is not None:
             repo = await repos_services.get_repo_model(
                 session=session,
-                project=projects[0],
+                project=project,
                 repo_id=repo_id,
             )
             if repo is None:
                 raise RepoDoesNotExistError.with_id(repo_id)
     run_models = await list_projects_run_models(
         session=session,
-        projects=projects,
+        user=user,
+        project=project,
         repo=repo,
         runs_user=runs_user,
         only_active=only_active,
@@ -201,6 +205,13 @@ async def list_user_runs(
         prev_run_id=prev_run_id,
         limit=limit,
         ascending=ascending,
+    )
+    await _load_run_jobs_for_list(
+        session=session,
+        run_models=run_models,
+        include_jobs=include_jobs,
+        job_submissions_limit=job_submissions_limit,
+        return_in_api=True,
     )
     runs = []
     for r in run_models:
@@ -220,9 +231,30 @@ async def list_user_runs(
     return runs
 
 
+async def _get_project_model_for_runs_list(
+    session: AsyncSession,
+    user: UserModel,
+    project_name: str,
+) -> Optional[ProjectModel]:
+    filters = [
+        ProjectModel.name == project_name,
+        ProjectModel.deleted == False,
+    ]
+    if user.global_role != GlobalRole.ADMIN:
+        filters.extend(
+            [
+                MemberModel.project_id == ProjectModel.id,
+                MemberModel.user_id == user.id,
+            ]
+        )
+    res = await session.execute(select(ProjectModel).where(*filters))
+    return res.scalar()
+
+
 async def list_projects_run_models(
     session: AsyncSession,
-    projects: List[ProjectModel],
+    user: UserModel,
+    project: Optional[ProjectModel],
     repo: Optional[RepoModel],
     runs_user: Optional[UserModel],
     only_active: bool,
@@ -232,7 +264,24 @@ async def list_projects_run_models(
     ascending: bool,
 ) -> List[RunModel]:
     filters = []
-    filters.append(RunModel.project_id.in_(p.id for p in projects))
+    if project is not None:
+        filters.append(RunModel.project_id == project.id)
+    elif user.global_role == GlobalRole.ADMIN:
+        filters.append(
+            RunModel.project_id.in_(select(ProjectModel.id).where(ProjectModel.deleted == False))
+        )
+    else:
+        filters.append(
+            RunModel.project_id.in_(
+                select(MemberModel.project_id)
+                .where(MemberModel.user_id == user.id)
+                .where(
+                    MemberModel.project_id.in_(
+                        select(ProjectModel.id).where(ProjectModel.deleted == False)
+                    )
+                )
+            )
+        )
     if repo is not None:
         filters.append(RunModel.repo_id == repo.id)
     if runs_user is not None:
@@ -271,14 +320,158 @@ async def list_projects_run_models(
     res = await session.execute(
         select(RunModel)
         .where(*filters)
+        .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
         .options(joinedload(RunModel.user).load_only(UserModel.name))
         .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
-        .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
+        .options(noload(RunModel.jobs))
         .order_by(*order_by)
         .limit(limit)
     )
     run_models = list(res.scalars().all())
     return run_models
+
+
+async def _load_run_jobs_for_list(
+    session: AsyncSession,
+    run_models: List[RunModel],
+    include_jobs: bool,
+    job_submissions_limit: Optional[int],
+    return_in_api: bool,
+) -> None:
+    if len(run_models) == 0:
+        return
+
+    effective_job_submissions_limit = job_submissions_limit if include_jobs else 0
+    jobs = await _list_jobs_for_runs_list(
+        session=session,
+        run_ids=[r.id for r in run_models],
+        job_submissions_limit=effective_job_submissions_limit,
+        include_probes=include_jobs and return_in_api,
+    )
+    jobs_by_run = defaultdict(list)
+    for job in jobs:
+        jobs_by_run[job.run_id].append(job)
+    for run_model in run_models:
+        set_committed_value(run_model, "jobs", jobs_by_run.get(run_model.id, []))
+
+
+async def _list_jobs_for_runs_list(
+    session: AsyncSession,
+    run_ids: List[uuid.UUID],
+    job_submissions_limit: Optional[int],
+    include_probes: bool,
+) -> List[JobModel]:
+    options = []
+    if include_probes:
+        options.append(joinedload(JobModel.probes))
+    if job_submissions_limit is None:
+        res = await session.execute(
+            select(JobModel)
+            .where(JobModel.run_id.in_(run_ids))
+            .options(*options)
+            .order_by(
+                JobModel.run_id,
+                JobModel.replica_num,
+                JobModel.job_num,
+                JobModel.submission_num,
+            )
+        )
+        return list(res.unique().scalars().all())
+
+    jobs = await _list_latest_jobs_for_runs_list(
+        session=session,
+        run_ids=run_ids,
+        job_submissions_limit=max(job_submissions_limit, 1),
+        include_probes=include_probes,
+    )
+    latest_termination_jobs = await _list_latest_termination_jobs_for_runs_list(
+        session=session,
+        run_ids=run_ids,
+    )
+    jobs_by_id = {job.id: job for job in jobs}
+    for job in latest_termination_jobs:
+        jobs_by_id.setdefault(job.id, job)
+    return sorted(
+        jobs_by_id.values(),
+        key=lambda j: (j.run_id, j.replica_num, j.job_num, j.submission_num),
+    )
+
+
+async def _list_latest_jobs_for_runs_list(
+    session: AsyncSession,
+    run_ids: List[uuid.UUID],
+    job_submissions_limit: int,
+    include_probes: bool,
+) -> List[JobModel]:
+    row_number = (
+        func.row_number()
+        .over(
+            partition_by=(JobModel.run_id, JobModel.replica_num, JobModel.job_num),
+            order_by=JobModel.submission_num.desc(),
+        )
+        .label("row_number")
+    )
+    jobs_sq = (
+        select(
+            JobModel,
+            row_number,
+        )
+        .where(JobModel.run_id.in_(run_ids))
+        .subquery()
+    )
+    job_alias = aliased(JobModel, jobs_sq)
+    options = []
+    if include_probes:
+        options.append(joinedload(job_alias.probes))
+    res = await session.execute(
+        select(job_alias)
+        .where(jobs_sq.c.row_number <= job_submissions_limit)
+        .options(*options)
+        .order_by(
+            job_alias.run_id,
+            job_alias.replica_num,
+            job_alias.job_num,
+            job_alias.submission_num,
+        )
+    )
+    return list(res.unique().scalars().all())
+
+
+async def _list_latest_termination_jobs_for_runs_list(
+    session: AsyncSession,
+    run_ids: List[uuid.UUID],
+) -> List[JobModel]:
+    row_number = (
+        func.row_number()
+        .over(
+            partition_by=(JobModel.run_id, JobModel.replica_num, JobModel.job_num),
+            order_by=JobModel.submission_num.desc(),
+        )
+        .label("row_number")
+    )
+    jobs_sq = (
+        select(
+            JobModel,
+            row_number,
+        )
+        .where(
+            JobModel.run_id.in_(run_ids),
+            JobModel.termination_reason.isnot(None),
+        )
+        .subquery()
+    )
+    job_alias = aliased(JobModel, jobs_sq)
+    res = await session.execute(
+        select(job_alias)
+        .where(jobs_sq.c.row_number == 1)
+        .order_by(
+            job_alias.run_id,
+            job_alias.replica_num,
+            job_alias.job_num,
+            job_alias.submission_num,
+        )
+    )
+    return list(res.scalars().all())
 
 
 async def get_run(
