@@ -203,6 +203,10 @@ class BaseRunConfigurator(
             console.print(detach_message)
             return
 
+        pre_attach_hook = getattr(command_args, "pre_attach_hook", None)
+        if pre_attach_hook is not None:
+            pre_attach_hook(run.name)
+
         abort_at_exit = False
         try:
             # We can attach to run multiple times if it goes from running to pending (retried).

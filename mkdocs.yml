@@ -305,6 +305,7 @@ nav:
             - Exports: docs/concepts/exports.md
       - Guides:
           - CLI & API: docs/guides/cli-api.md
+          - Endpoint harness: docs/guides/endpoint-harness.md
           - Server deployment: docs/guides/server-deployment.md
           - Troubleshooting: docs/guides/troubleshooting.md
           - More:

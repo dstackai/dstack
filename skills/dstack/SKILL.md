@@ -237,9 +237,16 @@ port: 8000
 model: meta-llama/Meta-Llama-3.1-8B-Instruct
 
 resources:
-  gpu: 80GB
+  gpu: 24GB
   disk: 200GB
 ```
+
+**GPU sizing rule**
+
+If `--gpu` is not provided:
+- 7B/8B models -> `gpu: 24GB`
+- 13B/14B models -> `gpu: 40GB` or `48GB`
+- 30B+ models -> `gpu: 80GB`
 
 **Service endpoints:**
 - Without gateway: `<server URL>/proxy/services/<project name>/<run name>/`
