@@ -152,6 +152,7 @@ def create_instances_struct(
     max_efa_interfaces: int = 0,
     reservation_id: Optional[str] = None,
     is_capacity_block: bool = False,
+    tenancy: Optional[str] = None,
 ) -> Dict[str, Any]:
     struct: Dict[str, Any] = dict(
         BlockDeviceMappings=[
@@ -212,6 +213,12 @@ def create_instances_struct(
         struct["CapacityReservationSpecification"] = {
             "CapacityReservationTarget": {"CapacityReservationId": reservation_id}
         }
+
+    # A Capacity Reservation created with non-default tenancy (e.g. `dedicated`) only
+    # accepts instances launched with a matching `Placement.Tenancy`. Apply it
+    # automatically so users don't have to configure tenancy explicitly.
+    if tenancy is not None and tenancy != "default":
+        struct.setdefault("Placement", {})["Tenancy"] = tenancy
 
     return struct
 
