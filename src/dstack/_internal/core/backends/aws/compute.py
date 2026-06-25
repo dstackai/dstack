@@ -277,6 +277,7 @@ class AWSCompute(
         )
         enable_efa = max_efa_interfaces > 0
         is_capacity_block = False
+        reservation_tenancy = None
         try:
             vpc_id, subnets_ids = self._get_vpc_id_subnets_ids_or_error(
                 ec2_client=ec2_client,
@@ -297,6 +298,7 @@ class AWSCompute(
                     instance_count=1,
                 )
                 if reservation is not None:
+                    reservation_tenancy = reservation.get("Tenancy")
                     # Filter out az different from capacity reservation
                     subnet_id_to_az_map = {
                         k: v
@@ -355,6 +357,7 @@ class AWSCompute(
                         max_efa_interfaces=max_efa_interfaces,
                         reservation_id=instance_config.reservation,
                         is_capacity_block=is_capacity_block,
+                        tenancy=reservation_tenancy,
                     )
                 )
             except botocore.exceptions.ClientError as e:
