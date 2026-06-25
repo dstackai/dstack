@@ -19,12 +19,6 @@ You describe what to deploy (model, GPU, backends, and other profile options). T
 The harness does **not** pick cloud offers or provision instances. dstack's scheduler
 does that after submission, the same way it does for a hand-written service config.
 
-??? info "Prerequisites"
-    - [dstack server and CLI](../installation.md) configured for your project
-    - At least one [fleet](../concepts/fleets.md)
-    - `DSTACK_HARNESS_API_KEY` set (see [LLM configuration](#llm-configuration))
-    - [`skills/dstack/SKILL.md`](https://github.com/dstackai/dstack/blob/master/skills/dstack/SKILL.md)
-      in the project, or pass `--skill-path`
 
 ## Quick start
 
