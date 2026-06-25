@@ -7,7 +7,7 @@ import SpaceBetween from '@cloudscape-design/components/space-between';
 import { menuButtonStyle } from '../cloudscape-theme';
 import { ThemeToggle } from './ThemeToggle';
 import { asset } from '../asset';
-import { BLOG_URL, DOCS_URL, ROUTES, docsUrl } from '../routes';
+import { BLOG_URL, DOCS_URL, ROUTES } from '../routes';
 import { ThemeMode } from '../theme';
 
 const dstackGithubUrl = 'https://github.com/dstackai/dstack';
@@ -27,15 +27,21 @@ const GithubGlyph = () => (
     <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
   </svg>
 );
-const CloudGlyph = () => (
-  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" aria-hidden="true">
-    <path d="M6.2 15h8a3.1 3.1 0 0 0 .4-6.16A4.3 4.3 0 0 0 6.6 7.2 3.5 3.5 0 0 0 6.2 15z" />
+const CloudUploadGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 14.899A6 6 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 .5 8.973" />
+    <path d="M12 12v8" />
+    <path d="m8 16 4-4 4 4" />
   </svg>
 );
-const ShieldGlyph = () => (
-  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" aria-hidden="true">
-    <path d="M10 2.6 4.6 4.8v4.5c0 3.4 2.3 5.9 5.4 7 3.1-1.1 5.4-3.6 5.4-7V4.8z" />
-    <path d="m7.7 9.8 1.7 1.7 3-3.2" strokeLinecap="round" />
+const FingerprintGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 10a2 2 0 0 0-2 2c0 1.5.4 3 1 4.3" />
+    <path d="M12 6.5A5.5 5.5 0 0 0 6.5 12c0 2 .4 3.5 1.1 5" />
+    <path d="M12 14v3.5" />
+    <path d="M15.6 8.4A5.5 5.5 0 0 1 17.5 12c0 2.2-.5 4.3-1.3 6" />
+    <path d="M12 3a9 9 0 0 0-9 9" />
+    <path d="M21 12a9 9 0 0 0-3-6.7" />
   </svg>
 );
 
@@ -61,9 +67,9 @@ type ProductLink = {
 // follow as rows. Reused by the standalone top-nav hover menu and the mobile nav's "Products"
 // section.
 const products: ProductLink[] = [
-  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane that works across clouds, Kubernetes, and on-prem.', href: docsUrl('installation'), icon: <GithubGlyph /> },
-  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Access GPU marketplace, or bring your own clouds. Hosted and managed by us.', href: 'https://sky.dstack.ai', external: true, icon: <CloudGlyph /> },
-  { id: 'enterprise', text: 'Enterprise', secondaryText: 'Self-hosted with SSO, air-gapped setup, dedicated support, and more.', href: 'https://calendly.com/dstackai/discovery-call', external: true, icon: <ShieldGlyph /> },
+  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane that works across clouds, Kubernetes, and on-prem.', href: DOCS_URL, icon: <GithubGlyph /> },
+  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Access GPU marketplace, or bring your own clouds. Hosted and managed by us.', href: 'https://sky.dstack.ai', external: true, icon: <CloudUploadGlyph /> },
+  { id: 'enterprise', text: 'Enterprise', secondaryText: 'Self-hosted with SSO, air-gapped setup, dedicated support, and more.', href: 'https://calendly.com/dstackai/discovery-call', external: true, icon: <FingerprintGlyph /> },
 ];
 
 // Items for the mobile slide-out navigation. The blog categories are top-level links (mirroring
@@ -151,7 +157,7 @@ function ProductsHoverMenu() {
             )}
             <span className="site-products-menu__feat-name">{products[0].text}</span>
             <span className="site-products-menu__feat-desc">{products[0].secondaryText}</span>
-            <span className="site-products-menu__feat-cta">Install open-source</span>
+            <span className="site-products-menu__feat-cta">Documentation</span>
           </a>
           <div className="site-products-menu__list">
             {products.slice(1).map(product => (

@@ -345,7 +345,7 @@ p {
   border-radius: 12px;
 }
 
-/* Featured open-source panel — brand gradient; the whole panel links to the install docs. */
+/* Featured open-source panel — brand gradient; the whole panel links to the docs. */
 .site-products-menu__feat {
   position: relative;
   display: block;
@@ -368,6 +368,8 @@ p {
   font-size: 13px;
   line-height: 1.5;
 }
+/* The "Documentation" button. Hovering anywhere on the featured panel changes the button's
+   background (only the button reacts, not the whole section). */
 .site-products-menu__feat-cta {
   display: inline-flex;
   align-items: center;
@@ -378,6 +380,10 @@ p {
   color: #16191f;
   font-size: 12.5px;
   font-weight: 600;
+  transition: background-color 0.15s ease;
+}
+.site-products-menu__feat:hover .site-products-menu__feat-cta {
+  background: #e9ebef;
 }
 
 /* Live GitHub star count, top-right of the featured panel (only shown once the API responds). */
@@ -428,8 +434,8 @@ p {
   color: var(--cs-text);
 }
 .site-products-menu__ic svg {
-  width: 19px;
-  height: 19px;
+  width: 20px;
+  height: 20px;
 }
 .site-products-menu__rbody {
   flex: 1 1 auto;
