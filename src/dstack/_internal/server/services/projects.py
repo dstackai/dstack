@@ -469,19 +469,24 @@ async def list_user_project_models(
     user: UserModel,
     only_names: bool = False,
     include_members: bool = False,
+    project_names: Optional[List[str]] = None,
 ) -> List[ProjectModel]:
     load_only_attrs = []
     if only_names:
         load_only_attrs += [ProjectModel.id, ProjectModel.name]
     if user.global_role == GlobalRole.ADMIN:
         return await list_project_models(
-            session=session, load_only_attrs=load_only_attrs, include_members=include_members
+            session=session,
+            load_only_attrs=load_only_attrs,
+            include_members=include_members,
+            project_names=project_names,
         )
     return await list_member_project_models(
         session=session,
         user=user,
         load_only_attrs=load_only_attrs,
         include_members=include_members,
+        project_names=project_names,
     )
 
 
@@ -490,6 +495,7 @@ async def list_member_project_models(
     user: UserModel,
     include_members: bool = False,
     load_only_attrs: Optional[List[QueryableAttribute]] = None,
+    project_names: Optional[List[str]] = None,
 ) -> List[ProjectModel]:
     """
     List project models for a user where they are a member.
@@ -499,15 +505,14 @@ async def list_member_project_models(
         options.append(joinedload(ProjectModel.members))
     if load_only_attrs:
         options.append(load_only(*load_only_attrs))
-    res = await session.execute(
-        select(ProjectModel)
-        .where(
-            MemberModel.project_id == ProjectModel.id,
-            MemberModel.user_id == user.id,
-            ProjectModel.deleted == False,
-        )
-        .options(*options)
-    )
+    filters = [
+        MemberModel.project_id == ProjectModel.id,
+        MemberModel.user_id == user.id,
+        ProjectModel.deleted == False,
+    ]
+    if project_names is not None:
+        filters.append(ProjectModel.name.in_(project_names))
+    res = await session.execute(select(ProjectModel).where(*filters).options(*options))
     return list(res.scalars().unique().all())
 
 
@@ -547,15 +552,17 @@ async def list_project_models(
     session: AsyncSession,
     load_only_attrs: Optional[List[QueryableAttribute]] = None,
     include_members: bool = False,
+    project_names: Optional[List[str]] = None,
 ) -> List[ProjectModel]:
     options = []
     if include_members:
         options.append(joinedload(ProjectModel.members))
     if load_only_attrs:
         options.append(load_only(*load_only_attrs))
-    res = await session.execute(
-        select(ProjectModel).where(ProjectModel.deleted == False).options(*options)
-    )
+    filters = [ProjectModel.deleted == False]
+    if project_names is not None:
+        filters.append(ProjectModel.name.in_(project_names))
+    res = await session.execute(select(ProjectModel).where(*filters).options(*options))
     return list(res.scalars().unique().all())
 
 

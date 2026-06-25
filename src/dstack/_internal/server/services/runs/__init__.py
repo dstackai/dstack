@@ -52,6 +52,7 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import events, services
+from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
@@ -178,11 +179,13 @@ async def list_user_runs(
     repo = None
     project = None
     if project_name is not None:
-        project = await _get_project_model(
+        projects = await projects_services.list_user_project_models(
             session=session,
             user=user,
-            project_name=project_name,
+            only_names=True,
+            project_names=[project_name],
         )
+        project = next(iter(projects), None)
         if project is None:
             return []
         if repo_id is not None:
@@ -229,31 +232,6 @@ async def list_user_runs(
     if len(run_models) > len(runs):
         logger.debug("Can't load %s runs", len(run_models) - len(runs))
     return runs
-
-
-async def _get_project_model(
-    session: AsyncSession,
-    user: UserModel,
-    project_name: str,
-) -> Optional[ProjectModel]:
-    """
-    Resolve project_name and check user access for the runs list.
-
-    This avoids loading project relations that are not used by runs list responses.
-    """
-    filters = [
-        ProjectModel.name == project_name,
-        ProjectModel.deleted == False,
-    ]
-    if user.global_role != GlobalRole.ADMIN:
-        filters.extend(
-            [
-                MemberModel.project_id == ProjectModel.id,
-                MemberModel.user_id == user.id,
-            ]
-        )
-    res = await session.execute(select(ProjectModel).where(*filters))
-    return res.scalar()
 
 
 async def list_projects_run_models(
@@ -399,16 +377,19 @@ async def _list_job_models(
         )
         return list(res.unique().scalars().all())
 
-    requested_jobs = await _list_requested_job_submissions(
+    requested_jobs = await _list_latest_job_models_per_job(
         session=session,
         run_ids=run_ids,
-        job_submissions_limit=max(job_submissions_limit, 1),
+        limit_per_job=max(job_submissions_limit, 1),
         include_probes=include_probes,
     )
-    # Extra rows used only to preserve run.status_message, e.g. `retrying`.
-    status_message_jobs = await _list_status_message_jobs(
+    # Also load rows needed to preserve run.status_message, e.g. `retrying`.
+    status_message_jobs = await _list_latest_job_models_per_job(
         session=session,
         run_ids=run_ids,
+        limit_per_job=1,
+        include_probes=False,
+        only_with_termination_reason=True,
     )
 
     # Merge the two job lists by ID because the same row may appear in both.
@@ -418,35 +399,6 @@ async def _list_job_models(
     return sorted(
         jobs_by_id.values(),
         key=lambda j: (j.run_id, j.replica_num, j.job_num, j.submission_num),
-    )
-
-
-async def _list_requested_job_submissions(
-    session: AsyncSession,
-    run_ids: List[uuid.UUID],
-    job_submissions_limit: int,
-    include_probes: bool,
-) -> List[JobModel]:
-    """List submissions requested by job_submissions_limit."""
-    return await _list_latest_job_models_per_job(
-        session=session,
-        run_ids=run_ids,
-        limit_per_job=job_submissions_limit,
-        include_probes=include_probes,
-    )
-
-
-async def _list_status_message_jobs(
-    session: AsyncSession,
-    run_ids: List[uuid.UUID],
-) -> List[JobModel]:
-    """List jobs with termination reasons used to compute run.status_message."""
-    return await _list_latest_job_models_per_job(
-        session=session,
-        run_ids=run_ids,
-        limit_per_job=1,
-        include_probes=False,
-        only_with_termination_reason=True,
     )
 
 
