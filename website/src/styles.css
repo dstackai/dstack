@@ -319,57 +319,136 @@ p {
   align-items: center;
 }
 
-/* Popup geometry matches the old Cloudscape "Get started" menu (cloudscape-overrides.css):
-   300px wide, flat (no shadow), a single 0.5px cs-text border, 12px radius. Vertical breathing
-   sits on the popup (6px) and the items carry the 16px horizontal padding so hover fills edge
-   to edge. */
-.site-hover-menu__popup {
+/* Dropdown caret on the Products trigger — rotates 180° while the menu is open. */
+.site-hover-menu__caret {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+  transition: transform 0.15s ease;
+}
+.site-hover-menu__trigger[aria-expanded='true'] .site-hover-menu__caret {
+  transform: rotate(180deg);
+}
+
+/* "Products" popup: the open-source product featured on the brand gradient (with its live
+   GitHub star count), then dstack Sky & Enterprise as rows. Anchored to the trigger; flat with a
+   single 0.5px cs-text border and 12px radius, matching the landing's popup geometry. */
+.site-products-menu {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
   z-index: 1000;
-  width: 300px;
-  padding: 0;
+  width: 360px;
+  padding: 6px;
   background: var(--cs-bg);
   border: 0.5px solid var(--cs-text);
   border-radius: 12px;
-  overflow: hidden;
 }
 
-.site-hover-menu__item {
+/* Featured open-source panel — brand gradient; the whole panel links to the install docs. */
+.site-products-menu__feat {
+  position: relative;
   display: block;
-  padding: 4px 16px;
+  padding: 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1e40ff, #8b2fd0);
+  color: #fff;
+  text-decoration: none;
+}
+.site-products-menu__feat-name {
+  display: block;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.site-products-menu__feat-desc {
+  display: block;
+  margin: 8px 0 13px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.site-products-menu__feat-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: #fff;
+  color: #16191f;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Live GitHub star count, top-right of the featured panel (only shown once the API responds). */
+.site-products-menu__gh {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.site-products-menu__gh svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* dstack Sky & Enterprise rows. */
+.site-products-menu__list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+.site-products-menu__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 10px;
+  border-radius: 9px;
   color: var(--cs-text);
   text-decoration: none;
 }
-
-/* Top/bottom breathing room lives on the first/last items (not the popup) so a hovered
-   first/last item's background fills it instead of leaving an un-highlighted strip at the edge. */
-.site-hover-menu__item:first-child {
-  padding-top: 10px;
-}
-.site-hover-menu__item:last-child {
-  padding-bottom: 10px;
-}
-
-.site-hover-menu__item:hover {
+.site-products-menu__row:hover {
   background: var(--cs-hover);
 }
-
-.site-hover-menu__item-title {
-  display: flex;
+.site-products-menu__ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 0.5px solid var(--cs-text);
+  color: var(--cs-text);
+}
+.site-products-menu__ic svg {
+  width: 19px;
+  height: 19px;
+}
+.site-products-menu__rbody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.site-products-menu__name {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.site-hover-menu__item-desc {
-  margin-top: 1.5px;
   color: var(--cs-text);
-  font-weight: 300;
+  font-size: 15px;
+  font-weight: 600;
+}
+.site-products-menu__desc {
+  display: block;
+  margin-top: 3px;
+  color: color-mix(in srgb, var(--cs-text) 68%, var(--cs-muted));
   font-size: 13px;
-  line-height: 16px;
+  line-height: 1.5;
 }
 
 .home-hero {
@@ -1184,6 +1263,9 @@ p {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--card-gap);
+  padding: 8px;
+  border: 1px solid var(--cs-border);
+  border-radius: 12px;
 }
 
 /* Each concept card is a whole-card link to the docs: an uppercase label (with a small gradient
@@ -1202,17 +1284,25 @@ p {
   transition: background-color 0.15s ease;
 }
 
-.concept-grid .media-card:hover {
-  background-color: var(--cs-hover);
+/* ActionCard-style navigation arrow on the title row (aligned with Fleets / Dev environments /
+   …) — hidden until hover, then fades in and slides right. No background change on hover; the
+   arrow alone signals interactivity. */
+.concept-card__arrow {
+  margin-left: auto;
+  display: inline-flex;
+  color: var(--cs-text);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.concept-grid .media-card:hover .concept-card__arrow {
+  opacity: 1;
+  transform: translateX(4px);
 }
 
-/* Uppercase category label above the title, led by a small blue→magenta dot. Black and light
-   weight, paired with a thin dotted stroke below for a delicate look. */
+/* Uppercase category label above the title — black and light weight for a delicate look. */
 .concept-card__label {
   display: block;
-  position: relative;
   margin-bottom: 11px;
-  padding-left: 15px;
   font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.09em;
@@ -1220,24 +1310,9 @@ p {
   color: var(--cs-text);
 }
 
-/* Thinner dotted stroke on the cards than the diagram pills (which stay 1.5px). */
-.concept-card .arch-dash rect {
-  stroke-width: 1px;
-}
-
-.concept-card__label::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #002aff, #e165fe);
-}
-
 .concept-grid .media-card h3 {
+  display: flex;
+  align-items: center;
   margin: 0 0 6px;
   padding: 0;
   font-size: 17px;
@@ -1258,7 +1333,7 @@ p {
   gap: var(--card-gap);
 }
 
-/* Two-up variant: dstack Sky and dstack Enterprise side by side. */
+/* Two-up variant: dstack Sky and Enterprise side by side. */
 .product-grid--pair {
   grid-template-columns: repeat(2, 1fr);
 }

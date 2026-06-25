@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Button from '@cloudscape-design/components/button';
 import Icon from '@cloudscape-design/components/icon';
@@ -11,7 +11,33 @@ import { BLOG_URL, DOCS_URL, ROUTES, docsUrl } from '../routes';
 import { ThemeMode } from '../theme';
 
 const dstackGithubUrl = 'https://github.com/dstackai/dstack';
+const dstackGithubApiUrl = 'https://api.github.com/repos/dstackai/dstack';
 const externalIconAriaLabel = 'External link icon';
+
+// Compact star count: 1340 → "1.3k", 12000 → "12k", 980 → "980".
+function formatStars(count: number): string {
+  if (count < 1000) return String(count);
+  const thousands = count / 1000;
+  return `${thousands >= 10 ? Math.round(thousands) : Number(thousands.toFixed(1))}k`;
+}
+
+// Monochrome product glyphs for the "Products" menu (GitHub mark also doubles as the star badge).
+const GithubGlyph = () => (
+  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+  </svg>
+);
+const CloudGlyph = () => (
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" aria-hidden="true">
+    <path d="M6.2 15h8a3.1 3.1 0 0 0 .4-6.16A4.3 4.3 0 0 0 6.6 7.2 3.5 3.5 0 0 0 6.2 15z" />
+  </svg>
+);
+const ShieldGlyph = () => (
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" aria-hidden="true">
+    <path d="M10 2.6 4.6 4.8v4.5c0 3.4 2.3 5.9 5.4 7 3.1-1.1 5.4-3.6 5.4-7V4.8z" />
+    <path d="m7.7 9.8 1.7 1.7 3-3.2" strokeLinecap="round" />
+  </svg>
+);
 
 // Primary links in the desktop top navigation (plain same-origin MkDocs links). The blog
 // categories are listed individually (Case studies / Blog) to mirror the docs
@@ -22,14 +48,22 @@ const audienceNavItems: Array<{ label: string; href: string }> = [
   { label: 'Blog', href: BLOG_URL },
 ];
 
-type ProductLink = { id: string; text: string; secondaryText: string; href: string; external?: boolean };
+type ProductLink = {
+  id: string;
+  text: string;
+  secondaryText: string;
+  href: string;
+  external?: boolean;
+  icon: ReactNode;
+};
 
-// The three products. Reused by the standalone "Products" top-nav hover menu and the mobile
-// nav's "Products" section.
+// The products. products[0] (open-source) is featured at the top of the "Products" menu; the rest
+// follow as rows. Reused by the standalone top-nav hover menu and the mobile nav's "Products"
+// section.
 const products: ProductLink[] = [
-  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane that works across clouds, Kubernetes, and on-prem.', href: docsUrl('installation') },
-  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Access GPU marketplace, or bring your own clouds. Hosted by us.', href: 'https://sky.dstack.ai', external: true },
-  { id: 'enterprise', text: 'dstack Enterprise', secondaryText: 'Self-hosted with SSO, air-gapped setup, dedicated support, and more.', href: 'https://calendly.com/dstackai/discovery-call', external: true },
+  { id: 'open-source', text: 'dstack', secondaryText: 'The open-source control plane that works across clouds, Kubernetes, and on-prem.', href: docsUrl('installation'), icon: <GithubGlyph /> },
+  { id: 'sky-product', text: 'dstack Sky', secondaryText: 'Access GPU marketplace, or bring your own clouds. Hosted and managed by us.', href: 'https://sky.dstack.ai', external: true, icon: <CloudGlyph /> },
+  { id: 'enterprise', text: 'Enterprise', secondaryText: 'Self-hosted with SSO, air-gapped setup, dedicated support, and more.', href: 'https://calendly.com/dstackai/discovery-call', external: true, icon: <ShieldGlyph /> },
 ];
 
 // Items for the mobile slide-out navigation. The blog categories are top-level links (mirroring
@@ -72,6 +106,21 @@ function ProductsHoverMenu() {
     closeTimer.current = window.setTimeout(() => setOpen(false), 150);
   };
 
+  // GitHub star count for the open-source repo, fetched once the menu first opens. Best-effort:
+  // if the API is rate-limited or errors, the badge simply doesn't render.
+  const [stars, setStars] = useState<number | null>(null);
+  const starsFetched = useRef(false);
+  useEffect(() => {
+    if (!open || starsFetched.current) return;
+    starsFetched.current = true;
+    fetch(dstackGithubApiUrl)
+      .then(response => (response.ok ? response.json() : null))
+      .then(data => {
+        if (data && typeof data.stargazers_count === 'number') setStars(data.stargazers_count);
+      })
+      .catch(() => {});
+  }, [open]);
+
   return (
     <div
       className="site-hover-menu"
@@ -86,24 +135,44 @@ function ProductsHoverMenu() {
     >
       <button type="button" className="site-menu-button site-hover-menu__trigger" aria-haspopup="true" aria-expanded={open}>
         Products
+        <svg className="site-hover-menu__caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 6.5 8 10.5 12 6.5" />
+        </svg>
       </button>
       {open && (
-        <div className="site-hover-menu__popup" role="menu">
-          {products.map(product => (
-            <a
-              key={product.id}
-              role="menuitem"
-              className="site-hover-menu__item"
-              href={product.href}
-              {...(product.external ? { target: '_blank', rel: 'noreferrer' } : {})}
-            >
-              <span className="site-hover-menu__item-title">
-                {product.text}
-                {product.external && <Icon name="external" />}
+        <div className="site-products-menu" role="menu">
+          {/* Open-source featured on the brand gradient; the whole panel links to install. */}
+          <a className="site-products-menu__feat" role="menuitem" href={products[0].href}>
+            {stars !== null && (
+              <span className="site-products-menu__gh" aria-label={`${stars} GitHub stars`}>
+                <GithubGlyph />
+                {formatStars(stars)}
               </span>
-              <span className="site-hover-menu__item-desc">{product.secondaryText}</span>
-            </a>
-          ))}
+            )}
+            <span className="site-products-menu__feat-name">{products[0].text}</span>
+            <span className="site-products-menu__feat-desc">{products[0].secondaryText}</span>
+            <span className="site-products-menu__feat-cta">Install open-source</span>
+          </a>
+          <div className="site-products-menu__list">
+            {products.slice(1).map(product => (
+              <a
+                key={product.id}
+                role="menuitem"
+                className="site-products-menu__row"
+                href={product.href}
+                {...(product.external ? { target: '_blank', rel: 'noreferrer' } : {})}
+              >
+                <span className="site-products-menu__ic">{product.icon}</span>
+                <div className="site-products-menu__rbody">
+                  <span className="site-products-menu__name">
+                    {product.text}
+                    {product.external && <Icon name="external" />}
+                  </span>
+                  <span className="site-products-menu__desc">{product.secondaryText}</span>
+                </div>
+              </a>
+            ))}
+          </div>
         </div>
       )}
     </div>

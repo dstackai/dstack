@@ -69,10 +69,10 @@ export function GetStartedSection() {
             </article>
             <article className="figma-card">
               <div>
-                <h3>dstack Enterprise</h3>
+                <h3>Enterprise</h3>
                 <p>Self-hosted with SSO, air-gapped setup, dedicated support, and more.</p>
                 <Button href="https://calendly.com/dstackai/discovery-call" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>
-                  Talk to us
+                  Get a demo
                 </Button>
               </div>
             </article>

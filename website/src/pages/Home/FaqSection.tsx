@@ -51,7 +51,7 @@ export function FaqSection() {
         action={
           <SpaceBetween direction="horizontal" size="xs">
             <Button variant="primary" href="https://calendly.com/dstackai/discovery-call" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
-              Talk to us
+              Get a demo
             </Button>
             <Button href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
               Discord

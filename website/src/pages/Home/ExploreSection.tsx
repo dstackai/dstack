@@ -2,12 +2,12 @@ import CodeView from '@cloudscape-design/code-view/code-view';
 import yamlHighlight from '@cloudscape-design/code-view/highlight/yaml';
 import Button from '@cloudscape-design/components/button';
 import Container from '@cloudscape-design/components/container';
+import Icon from '@cloudscape-design/components/icon';
 import Table from '@cloudscape-design/components/table';
 import Tabs from '@cloudscape-design/components/tabs';
 import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
-import { DashedBorder } from '../../components/DashedBorder';
 import { highlightTerms } from '../../components/highlightTerms';
 import { docsUrl } from '../../routes';
 import {
@@ -140,9 +140,11 @@ function KeyConceptsBlock() {
             // arrow. Kept as a real <a> (open-in-new-tab / SEO) rather than Cloudscape's
             // onClick-only ActionCard component.
             <a className="media-card concept-card" href={concept.href} key={concept.name}>
-              <DashedBorder />
               <span className="concept-card__label">{concept.label}</span>
-              <h3>{concept.name}</h3>
+              <h3>
+                {concept.name}
+                <span className="concept-card__arrow" aria-hidden="true"><Icon name="angle-right" /></span>
+              </h3>
               <p>{highlightTerms(concept.description)}</p>
             </a>
           ))}

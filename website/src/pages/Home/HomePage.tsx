@@ -41,10 +41,10 @@ export function HomePage() {
             )}
           </p>
           <div className="home-hero__actions">
-            <Button href={docsUrl('installation')} style={heroButtonStyle}>
+            <Button variant="primary" href={docsUrl('installation')} style={heroButtonStyle}>
               Install open-source
             </Button>
-            <Button variant="primary" href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={heroButtonStyle}>
+            <Button href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={heroButtonStyle}>
               Try dstack Sky
             </Button>
           </div>
