@@ -2,7 +2,6 @@ import CodeView from '@cloudscape-design/code-view/code-view';
 import yamlHighlight from '@cloudscape-design/code-view/highlight/yaml';
 import Button from '@cloudscape-design/components/button';
 import Container from '@cloudscape-design/components/container';
-import Icon from '@cloudscape-design/components/icon';
 import Table from '@cloudscape-design/components/table';
 import Tabs from '@cloudscape-design/components/tabs';
 import { mainButtonStyle } from '../../cloudscape-theme';
@@ -142,7 +141,6 @@ function KeyConceptsBlock() {
             // onClick-only ActionCard component.
             <a className="media-card concept-card" href={concept.href} key={concept.name}>
               <DashedBorder />
-              <span className="concept-card__arrow" aria-hidden="true"><Icon name="angle-right" /></span>
               <span className="concept-card__label">{concept.label}</span>
               <h3>{concept.name}</h3>
               <p>{highlightTerms(concept.description)}</p>

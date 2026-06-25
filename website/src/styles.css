@@ -1239,7 +1239,7 @@ p {
 
 .concept-grid .media-card h3 {
   margin: 0 0 6px;
-  padding: 0 28px 0 0; /* clear the arrow */
+  padding: 0;
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -1248,20 +1248,6 @@ p {
 /* Quote author name reuses the card-heading size. */
 .testimonial-name {
   font-size: var(--font-card-heading) !important;
-}
-
-/* ActionCard-style navigation arrow, top-right. */
-.concept-card__arrow {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  display: inline-flex;
-  color: var(--cs-text);
-  transition: transform 0.2s ease;
-}
-
-.concept-grid .media-card:hover .concept-card__arrow {
-  transform: translateX(4px);
 }
 
 /* Product cards reusing the figma-card style. Used inside an AlternatingDocBlock
