@@ -77,14 +77,14 @@ class TestListUserRuns:
         ).scalar_one()
         loaded_job_submission_nums = []
         unbounded_job_selects = []
-        original_list_jobs = runs_services._list_jobs_for_runs_list
+        original_list_jobs = runs_services._list_job_models
 
         async def list_jobs_wrapper(*args, **kwargs):
             jobs = await original_list_jobs(*args, **kwargs)
             loaded_job_submission_nums.append(sorted(job.submission_num for job in jobs))
             return jobs
 
-        monkeypatch.setattr(runs_services, "_list_jobs_for_runs_list", list_jobs_wrapper)
+        monkeypatch.setattr(runs_services, "_list_job_models", list_jobs_wrapper)
 
         @event.listens_for(test_db.engine.sync_engine, "before_cursor_execute")
         def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):

@@ -650,6 +650,7 @@ class RunCollection:
                 project_name=self._project,
                 repo_id=None,
                 limit=1,
+                job_submissions_limit=1,
             )
         return [self._model_to_run(run) for run in runs]
 
