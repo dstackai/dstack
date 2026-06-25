@@ -28,11 +28,14 @@ from dstack._internal.core.models.runs import JobStatus, RunSpec, get_service_po
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.jobs import get_job_provisioning_data, get_job_spec
 from dstack._internal.server.services.jobs.job_replica_grpc_client import (
+    get_service_replica_grpc_channel_over_uds,
     get_service_replica_grpc_client,
 )
 from dstack._internal.server.services.jobs.job_replica_http_client import (
     get_service_replica_client,
+    get_service_replica_http_client_over_uds,
 )
+from dstack._internal.server.services.jobs.job_replica_tunnel import get_service_replica_tunnel
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.utils.logging import get_logger
 
@@ -366,50 +369,49 @@ def _is_expected_grpc_discovery_error(error: Exception) -> bool:
     return False
 
 
-async def _get_http_worker(job_model: JobModel, *, worker_url: str) -> _WorkerPayloadResult:
+async def _probe_http_worker(client: AsyncClient, *, worker_url: str) -> _WorkerPayloadResult:
     try:
-        async with get_service_replica_client(job_model) as client:
-            data = await _request_json_limited(
-                client,
-                "GET",
-                f"{_ROUTER_HTTP}/server_info",
-                max_response_bytes=_MAX_SERVER_INFO_RESPONSE_BYTES,
-                ok_statuses={200},
-            )
-            if isinstance(data, dict):
-                if data.get("status") != "ready":
-                    return {"status": "not_ready", "worker": None}
-                mode = data.get("disaggregation_mode", "")
-                if mode == "prefill":
-                    bootstrap_port = data.get("disaggregation_bootstrap_port")
-                    worker: _TargetWorker = {
-                        "url": worker_url,
-                        "worker_type": "prefill",
-                        "connection_mode": "http",
-                        "runtime_type": "sglang",
-                    }
-                    if bootstrap_port is not None:
-                        worker["bootstrap_port"] = bootstrap_port
-                    return {"status": "ready", "worker": worker}
-                if mode == "decode":
-                    return {
-                        "status": "ready",
-                        "worker": {
-                            "url": worker_url,
-                            "worker_type": "decode",
-                            "connection_mode": "http",
-                            "runtime_type": "sglang",
-                        },
-                    }
+        data = await _request_json_limited(
+            client,
+            "GET",
+            f"{_ROUTER_HTTP}/server_info",
+            max_response_bytes=_MAX_SERVER_INFO_RESPONSE_BYTES,
+            ok_statuses={200},
+        )
+        if isinstance(data, dict):
+            if data.get("status") != "ready":
+                return {"status": "not_ready", "worker": None}
+            mode = data.get("disaggregation_mode", "")
+            if mode == "prefill":
+                bootstrap_port = data.get("disaggregation_bootstrap_port")
+                worker: _TargetWorker = {
+                    "url": worker_url,
+                    "worker_type": "prefill",
+                    "connection_mode": "http",
+                    "runtime_type": "sglang",
+                }
+                if bootstrap_port is not None:
+                    worker["bootstrap_port"] = bootstrap_port
+                return {"status": "ready", "worker": worker}
+            if mode == "decode":
                 return {
                     "status": "ready",
                     "worker": {
                         "url": worker_url,
-                        "worker_type": "regular",
+                        "worker_type": "decode",
                         "connection_mode": "http",
                         "runtime_type": "sglang",
                     },
                 }
+            return {
+                "status": "ready",
+                "worker": {
+                    "url": worker_url,
+                    "worker_type": "regular",
+                    "connection_mode": "http",
+                    "runtime_type": "sglang",
+                },
+            }
     except _ResponseTooLargeError:
         logger.warning("server_info response too large for worker %s", worker_url)
     except RemoteProtocolError as e:
@@ -417,6 +419,11 @@ async def _get_http_worker(job_model: JobModel, *, worker_url: str) -> _WorkerPa
     except Exception as e:
         logger.exception("Could not fetch server_info for worker %s: %r", worker_url, e)
     return {"status": "not_ready", "worker": None}
+
+
+async def _get_http_worker(job_model: JobModel, *, worker_url: str) -> _WorkerPayloadResult:
+    async with get_service_replica_client(job_model) as client:
+        return await _probe_http_worker(client, worker_url=worker_url)
 
 
 async def _get_grpc_server_info(
@@ -487,6 +494,30 @@ def _grpc_server_info_to_worker(
     return worker
 
 
+async def _probe_grpc_worker(
+    channel: grpc.aio.Channel,
+    *,
+    worker_url: str,
+    runtime_type: Optional[_RuntimeType] = None,
+) -> _WorkerPayloadResult:
+    if runtime_type is not None:
+        try:
+            response = await _get_grpc_server_info(channel, runtime_type)
+        except Exception as e:
+            if _is_expected_grpc_discovery_error(e):
+                logger.debug("gRPC worker %s not ready (GetServerInfo)", worker_url)
+                return {"status": "not_ready", "worker": None}
+            raise
+    else:
+        runtime_type, response = await _discover_grpc_server_info(channel)
+        if runtime_type is None or response is None:
+            logger.debug("gRPC worker %s not ready (GetServerInfo)", worker_url)
+            return {"status": "not_ready", "worker": None}
+
+    worker = _grpc_server_info_to_worker(worker_url, runtime_type, response)
+    return {"status": "ready", "worker": worker}
+
+
 async def _get_grpc_worker(
     job_model: JobModel,
     *,
@@ -495,19 +526,9 @@ async def _get_grpc_worker(
 ) -> _WorkerPayloadResult:
     try:
         async with get_service_replica_grpc_client(job_model) as channel:
-            if runtime_type is not None:
-                try:
-                    response = await _get_grpc_server_info(channel, runtime_type)
-                except Exception as e:
-                    if _is_expected_grpc_discovery_error(e):
-                        logger.debug("gRPC worker %s not ready (GetServerInfo)", worker_url)
-                        return {"status": "not_ready", "worker": None}
-                    raise
-            else:
-                runtime_type, response = await _discover_grpc_server_info(channel)
-                if runtime_type is None or response is None:
-                    logger.debug("gRPC worker %s not ready (GetServerInfo)", worker_url)
-                    return {"status": "not_ready", "worker": None}
+            return await _probe_grpc_worker(
+                channel, worker_url=worker_url, runtime_type=runtime_type
+            )
     except Exception as e:
         logger.exception(
             "Could not fetch gRPC GetServerInfo for worker %s: %r",
@@ -515,9 +536,6 @@ async def _get_grpc_worker(
             e,
         )
         return {"status": "not_ready", "worker": None}
-
-    worker = _grpc_server_info_to_worker(worker_url, runtime_type, response)
-    return {"status": "ready", "worker": worker}
 
 
 async def _get_worker(
@@ -535,18 +553,25 @@ async def _get_worker(
     if connection_mode == "http":
         return await _get_http_worker(job_model, worker_url=http_worker_url)
     # Router workers list is empty and no connection_mode discovered.
-    try:
-        result = await _get_http_worker(job_model, worker_url=http_worker_url)
-    except RemoteProtocolError as e:
-        logger.debug(
-            "HTTP server_info probe failed for %s (trying gRPC): %r",
-            http_worker_url,
-            e,
-        )
-        result: _WorkerPayloadResult = {"status": "not_ready", "worker": None}
-    if result["status"] == "ready":
-        return result
-    return await _get_grpc_worker(job_model, worker_url=grpc_worker_url, runtime_type=runtime_type)
+    async with get_service_replica_tunnel(job_model) as uds_path:
+        async with get_service_replica_http_client_over_uds(uds_path) as client:
+            result = await _probe_http_worker(client, worker_url=http_worker_url)
+        if result["status"] == "ready":
+            return result
+        async with get_service_replica_grpc_channel_over_uds(uds_path) as channel:
+            try:
+                return await _probe_grpc_worker(
+                    channel,
+                    worker_url=grpc_worker_url,
+                    runtime_type=runtime_type,
+                )
+            except Exception as e:
+                logger.exception(
+                    "Could not fetch gRPC GetServerInfo for worker %s: %r",
+                    grpc_worker_url,
+                    e,
+                )
+                return {"status": "not_ready", "worker": None}
 
 
 async def _build_target_workers(

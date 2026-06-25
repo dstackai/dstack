@@ -1,14 +1,60 @@
 html {
-    --dstack-code-font-size: 14px;
+    --dstack-code-font-size: 15px;
     --dstack-code-line-height: 1.075rem;
+}
+
+/* ── Cloudscape design tokens ──────────────────────────────────────────────
+   Mirrors website/src/styles.css (the /old page) so the docs chrome can match
+   it pixel-to-pixel in both light and dark. Dark maps onto Material's `slate`
+   color scheme. Geometry: nav is 4.875rem (78px), content frame 80rem. */
+:root {
+    --cs-text: #16191f;
+    --cs-bg: #ffffff;
+    --cs-muted: #5f6b7a;
+    --cs-link: #0972d3;
+    --cs-border: #16191f;
+    --cs-panel: #f4f4f7;
+    --cs-hover: rgba(22, 25, 31, 0.05);   /* ~#f3f3f4 on white — visible like /old's button hover (3% was too faint) */
+    --cs-btn-hover: #272d38;
+    /* Absolute px: Material's rem is 20px (125% base) vs /old's 16px, so /old rems
+       don't translate. 78px = /old's 4.875rem nav; 1280px = its 80rem frame. */
+    --cs-nav-height: 78px;
+    --cs-frame: 1280px;
+    /* Cloudscape SideNavigation palette (measured from /old's left nav). */
+    --cs-nav-heading: #0f141a;
+    --cs-nav-link: #424650;
+    --cs-nav-active: #006ce0;
+    /* Cloudscape external-link icon (stroked box-arrow), as a mask — matches /old exactly. */
+    --cs-ext-icon: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="none" stroke="black" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" d="M13 9.012v-6H7M13.02 3 7 9.01M3 5.012v8h8.01"/></svg>');
+}
+
+[data-md-color-scheme="slate"] {
+    --cs-text: #f2f3f3;
+    --cs-bg: #0f141d;
+    --cs-muted: #c6c6cd;
+    --cs-link: #58a6ff;
+    --cs-border: #f2f3f3;
+    --cs-panel: #1b212d;
+    --cs-hover: rgba(242, 243, 243, 0.05);
+    --cs-btn-hover: #e2e5e8;
+    --cs-nav-heading: #ebebf0;
+    --cs-nav-link: #c6c6cd;
+    --cs-nav-active: #42b4ff;
 }
 
 @media screen and (min-width: 76.1875em) {
     .md-header {
-        backdrop-filter: blur(5px);
-        background-color: rgba(255, 255, 255, 0);
-        border-bottom: 0.5px dotted rgba(0, 0, 0, 1);
-        padding-bottom: 2px;
+        background-color: var(--cs-bg);
+        border-bottom: 1px solid var(--cs-border);
+        padding-bottom: 0;
+    }
+
+    /* Match the /old nav: 78px tall, full-width with 24px gutters (not the centered grid). */
+    .md-header__inner {
+        height: var(--cs-nav-height);
+        max-width: none;
+        padding-left: 24px;
+        padding-right: 24px;
     }
 
     [dir=ltr] .md-header__source {
@@ -31,7 +77,7 @@ html {
 
 @media screen and (max-width: 76.1875em) {
     .md-header {
-        background-color: rgb(255, 255, 255);
+        background-color: var(--cs-bg);   /* theme-aware (was hardcoded white → white header in dark) */
     }
 }
 
@@ -134,8 +180,6 @@ html {
 
     -webkit-mask-image: linear-gradient(rgba(0,0,0,1) 85%, rgba(0,0,0,0));
     mask-image: linear-gradient(rgba(0,0,0,1) 85%, rgba(0,0,0,0));
-
-    padding-bottom: 40px;
 }
 
 .md-sidebar__scrollwrap:hover {
@@ -261,9 +305,10 @@ html {
 
 @media screen and (min-width: 76.1875em) {
     .md-header__topic:first-child {
-        font-size: 24px;
-        top: 2px;
-        left: 1px;
+        font-size: 25px;   /* /old's logo text is 25px (was 24px) */
+        top: 0;            /* was 2px — that pushed the wordmark 2px below its own icon; /old aligns
+                              the "dstack" text centered with the logo glyph (shared cy) */
+        left: 1px;         /* keeps the icon→text gap at /old's 8px (base sits 1px tighter) */
         /*font-family: Poppins, metro-web, Metro, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;*/
         /*font-weight: 500;*/
     }
@@ -336,7 +381,11 @@ html {
   font-family: 'Geist';
   font-style: normal;
   font-weight: 100 900;
-  font-display: swap;
+  /* `optional`, not `swap`: the font is preloaded (see main.html), so it's ready and used with
+     no swap; if it's ever not ready in time, the page stays on the fallback for that load rather
+     than swapping mid-render. Either way there's no late reflow — which otherwise shifted the
+     right-anchored header nav cluster ~10px (visible as movement around the search box). */
+  font-display: optional;
   src: url(../fonts/Geist-Variable.woff2) format('woff2');
 }
 
@@ -729,13 +778,14 @@ code .md-code__nav:hover .md-code__button {
 }
 
 .md-typeset h2 {
-    margin: 1.4em 0 0.64em;
-    padding-top: 0.2em;
+    margin: 0 0 0.64em;   /* /old's h2 has no top margin — spacing comes from the preceding element (was 1.4em + 0.2em padding ≈ 45px) */
     font-size: 25px;
 }
 
-.md-typeset :is(h2, h3, h4, h5, h6)[id] {
-    scroll-margin-top: 3rem;
+.md-typeset :is(h1, h2, h3, h4, h5, h6)[id] {
+    /* Sticky header is 79px; clear it + ~16px gap so a clicked TOC anchor lands BELOW the header
+       (was 3rem/60px, which left the heading hidden under the header). */
+    scroll-margin-top: 96px;
 }
 
 .md-typeset h1, .md-typeset h2 {
@@ -764,9 +814,8 @@ code .md-code__nav:hover .md-code__button {
 
 .md-typeset h3 {
     font-size: 21.5px;
+    margin-block-start: 0;   /* /old's h3 has no top margin (was ~32px) */
     margin-block-end: 0;
-    padding-bottom: 0.7em;
-    border-bottom: 1px solid rgba(243, 244, 246, 1);
 }
 
 [data-md-color-scheme=slate][data-md-color-primary=black], [data-md-color-primary=white] {
@@ -832,11 +881,14 @@ body {
 }
 
 .md-header__button.md-logo :where(img,svg) {
-    height: 1.25rem !important;
+    /* Pin to explicit px (not 1.4rem): /old's logo is exactly 28×28. 1.4rem only equals 28 when the
+       rem base is 20px — if the base drifts (e.g. 22px) the logo balloons to 30.8. Lock both axes. */
+    width: 28px !important;
+    height: 28px !important;
 }
 
 .md-header__button.md-logo {
-    margin: 0 0 0 0.5rem;
+    margin: 0 0.3rem 0 0.5rem;   /* 0.3rem right → icon↔text gap 8px like /old (was 2px) */
     padding: 0;
 }
 
@@ -954,9 +1006,9 @@ body {
 }
 
 .md-nav.md-nav--secondary > .md-nav__list > .md-nav__item {
-    margin-left: 16px;
-    border-left: 0.5px dotted rgba(0, 0, 0, 0.4);
-    font-size: 16.5px;
+    /* Old TOC item style REMOVED (it conflicted with the new "On this page" TOC in
+       cloudscape-docs.css — this set font-size:16.5px + a dotted border that won at zoom levels
+       where the new rules' media query dropped out). New TOC: 14px, solid 2px line, sliding indicator. */
 }
 
 .md-sidebar--secondary .md-nav__link {
@@ -1360,7 +1412,7 @@ height: auto;
     }
 
     .md-tabs__item--active .md-tabs__link {
-        font-weight: 600;
+        font-weight: 700;
     }
 
     .md-tabs__item--active .md-tabs__link:after {
@@ -1463,20 +1515,20 @@ height: auto;
     }
 
     .md-tabs__link {
-        font-size: 0.88rem;
-        font-weight: 500;
-        color: rgba(0,0,0,0.87);
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--cs-text);
         /*letter-spacing: -0.5px;*/
         margin-top: 1px;
         line-height: 24px;
     }
 
     .md-tabs__link:hover {
-        color: black;
+        color: var(--cs-text);
     }
 
     .md-tabs__link.md-tabs__link--active {
-        color: var(--md-accent-fg-color);
+        color: var(--cs-text);
     }
 
     .md-nav[aria-label="Community"] .md-nav__item:nth-child(1) {
@@ -1848,8 +1900,11 @@ a.md-go-to-action.secondary {
     background: white;
 }
 
+/* Blog post-title links are styled as headings, not links: inherit the heading's color so they
+   track the theme (Material's default link color, and the old hardcoded black here, are both
+   invisible on the dark scheme). */
 .md-post__content :is(h2, h3, h4, h5, h6) a {
-    color: rgba(0,0,0,0.87);
+    color: inherit;
 }
 
 div[editor-title] code .editor-title {
@@ -1934,19 +1989,15 @@ a[href^="http"]:not(:where(
 )):after {
   content: '';
   display: inline-block;
-  width: 18.5px;
-  height: 18.5px;
-  margin-left: 0.15em;
-  vertical-align: -0.2em;
+  /* Shared Cloudscape external-link icon (same as landing / old / footer), sized to the font
+     (em-based) instead of a fixed 18.5px so it reads as part of the text. */
+  width: 0.9em;
+  height: 0.9em;
+  margin-left: 0.2em;
+  vertical-align: -0.12em;
   background-color: currentColor;
-  mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="m11.93 5 2.83 2.83L5 17.59 6.42 19l9.76-9.75L19 12.07V5z"></path></svg>');
-  mask-size: 100%;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="m11.93 5 2.83 2.83L5 17.59 6.42 19l9.76-9.75L19 12.07V5z"></path></svg>');
-  -webkit-mask-size: 100%;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
+  -webkit-mask: var(--cs-ext-icon) center / contain no-repeat;
+  mask: var(--cs-ext-icon) center / contain no-repeat;
   text-decoration: none;
 }
 

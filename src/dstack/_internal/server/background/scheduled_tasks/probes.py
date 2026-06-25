@@ -12,9 +12,9 @@ from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProbeModel
 from dstack._internal.server.services.jobs import get_job_spec
 from dstack._internal.server.services.jobs.job_replica_http_client import (
-    SSH_CONNECT_TIMEOUT,
     get_service_replica_client,
 )
+from dstack._internal.server.services.jobs.job_replica_tunnel import SSH_CONNECT_TIMEOUT
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.utils.common import get_current_datetime

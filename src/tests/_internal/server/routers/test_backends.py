@@ -492,9 +492,15 @@ class TestCreateBackend:
         }
         with (
             patch("dstack._internal.core.backends.azure.auth.authenticate") as authenticate_mock,
-            patch("azure.mgmt.subscription.SubscriptionClient") as SubscriptionClientMock,
-            patch("azure.mgmt.resource.ResourceManagementClient") as ResourceManagementClientMock,
-            patch("azure.mgmt.network.NetworkManagementClient") as NetworkManagementClientMock,
+            patch(
+                "dstack._internal.core.backends.azure.configurator.subscription_mgmt.SubscriptionClient"
+            ) as SubscriptionClientMock,
+            patch(
+                "dstack._internal.core.backends.azure.configurator.resource_mgmt.ResourceManagementClient"
+            ) as ResourceManagementClientMock,
+            patch(
+                "dstack._internal.core.backends.azure.configurator.network_mgmt.NetworkManagementClient"
+            ) as NetworkManagementClientMock,
         ):
             authenticate_mock.return_value = None, "test_tenant"
             subscription_client_mock = SubscriptionClientMock.return_value

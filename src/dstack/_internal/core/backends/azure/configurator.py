@@ -6,7 +6,6 @@ import azure.core.exceptions
 from azure.core.credentials import TokenCredential
 from azure.mgmt import msi as msi_mgmt
 from azure.mgmt import network as network_mgmt
-from azure.mgmt import resource as resource_mgmt
 from azure.mgmt import subscription as subscription_mgmt
 from azure.mgmt.network.models import (
     AddressSpace,
@@ -18,6 +17,7 @@ from azure.mgmt.network.models import (
     Subnet,
     VirtualNetwork,
 )
+from azure.mgmt.resource import resources as resource_mgmt
 from azure.mgmt.resource.resources.models import ResourceGroup
 
 from dstack._internal.core.backends.azure import auth, compute, resources

@@ -9,13 +9,30 @@
 {% endif %}
 <header class="{{ class }}" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="{{ lang.t('header') }}">
+    {# Two distinct nav controls (note: blog posts carry `hide: navigation` in their meta, but
+       blog-post.html still renders the site nav for the MOBILE drawer — so they're treated separately
+       from genuinely nav-less pages like /terms, /privacy):
+       - cs-nav-toggle: the DESKTOP collapse button. Only useful when there's a left sidebar column,
+         so hide it on blog posts (the article spans the full width) and on hide:navigation pages.
+       - label[for="__drawer"]: the MOBILE drawer hamburger. Keep it on blog posts (their drawer has
+         the site nav) and normal pages; drop it only on hide:navigation pages that DON'T render a
+         drawer (/terms, /privacy), so it never opens an empty dimming overlay. #}
+    {% set is_blog_post = page.config and page.config.date %}
+    {% set hides_nav = page.meta and page.meta.hide and "navigation" in page.meta.hide %}
+    {% if not is_blog_post and not hides_nav %}
+      <button type="button" class="md-header__button cs-nav-toggle" aria-label="Toggle navigation" data-cs-nav-toggle>
+        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M15 3H1M15 8H1M15 13H1" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      </button>
+    {% endif %}
     <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" title="{{ config.site_name | e }}" class="md-header__button md-logo" aria-label="{{ config.site_name }}" data-md-component="logo">
       {% include "partials/logo.html" %}
     </a>
-    <label class="md-header__button md-icon" for="__drawer">
-      {% set icon = config.theme.icon.menu or "material/menu" %}
-      {% include ".icons/" ~ icon ~ ".svg" %}
-    </label>
+    {% if is_blog_post or not hides_nav %}
+      <label class="md-header__button md-icon" for="__drawer">
+        {% set icon = config.theme.icon.menu or "material/menu" %}
+        {% include ".icons/" ~ icon ~ ".svg" %}
+      </label>
+    {% endif %}
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
@@ -42,16 +59,29 @@
     {% if not config.theme.palette is mapping %}
       {% include "partials/javascripts/palette.html" %}
     {% endif %}
+    {#- The palette radios now exist; check the one matching the shared dstack-theme so Material's
+        bundle (which reads the checked radio on load) keeps the right scheme — flash-free. The
+        extrahead already set __palette, so the inline palette JS applied the scheme during parse. -#}
+    <script>
+      try { window.__dstackApplyTheme(localStorage.getItem('dstack-theme') === 'dark', false); } catch (e) {}
+    </script>
     {% if config.extra.alternate %}
       {% include "partials/alternate.html" %}
     {% endif %}
 
+    {# Search sits BEFORE the tabs (left of "Docs"), like the user asked. #}
     {% if "material/search" in config.plugins %}
       <label class="md-header__button md-icon" for="__search">
         {% set icon = config.theme.icon.search or "material/magnify" %}
         {% include ".icons/" ~ icon ~ ".svg" %}
       </label>
       {% include "partials/search.html" %}
+    {% endif %}
+
+    {# Tabs rendered directly in the header (not relocated via JS) to avoid a load flash.
+       base.html's below-header tabs block is suppressed in main.html. #}
+    {% if "navigation.tabs" in features %}
+      {% include "partials/tabs.html" %}
     {% endif %}
 
     <!--{% if config.repo_url %}
@@ -61,20 +91,66 @@
     {% endif %}-->
 
     <div class="md-header__buttons">
-      <a id="gh-star-link" href="https://github.com/dstackai/dstack" target="_blank" class="md-button md-button--primary github external-skip">GitHub</a>
-      <script>
-        fetch("https://api.github.com/repos/dstackai/dstack")
-          .then(r => r.json())
-          .then(data => {
-            if (data.stargazers_count) {
-              document.getElementById("gh-star-link").textContent =
-                data.stargazers_count.toLocaleString("en-US");
-            }
-          })
-          .catch(() => {});
-      </script>
-      <a href="https://sky.dstack.ai" target="_blank" class="md-button md-button--primary sky external-skip">dstack Sky</a>
+      {# Theme toggle, before GitHub — shown only on large screens (on tablet/mobile it lives in the
+         footer, see partials/tx-footer.html). Same .cs-theme-toggle markup + the extra.js click
+         handler, which binds every [data-cs-theme-toggle]. #}
+      <button type="button" class="cs-theme-toggle cs-theme-toggle--header" data-cs-theme-toggle aria-label="Toggle light/dark theme">
+        <span class="cs-theme-toggle__track" aria-hidden="true"><span class="cs-theme-toggle__thumb"></span></span>
+        <svg class="cs-theme-toggle__moon" viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true" focusable="false">
+          <path d="M12.8166 9.79921C12.8417 9.75608 12.7942 9.70771 12.7497 9.73041C11.9008 10.164 10.9392 10.4085 9.92054 10.4085C6.48046 10.4085 3.69172 7.61979 3.69172 4.17971C3.69172 3.16099 3.93628 2.19938 4.36989 1.3504C4.39259 1.30596 4.34423 1.25842 4.3011 1.28351C2.44675 2.36242 1.2002 4.37123 1.2002 6.67119C1.2002 10.1113 3.98893 12.9 7.42901 12.9C9.72893 12.9 11.7377 11.6535 12.8166 9.79921Z" fill="currentColor" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+      <a href="https://github.com/dstackai/dstack" target="_blank" class="md-button md-button--primary github external-skip">GitHub</a>
+      <div class="cs-get-started">
+        <button type="button" class="md-button md-button--primary cs-get-started__main" aria-haspopup="true" aria-expanded="false">Get started</button>
+        <button type="button" class="md-button md-button--primary cs-get-started__toggle" aria-label="Get started options" aria-expanded="false" aria-haspopup="true">
+          {% include ".icons/material/menu-down.svg" %}
+        </button>
+        <div class="cs-get-started__menu" hidden>
+          <span class="cs-get-started__group">Products</span>
+          <a href="{{ 'docs/installation/' | url }}">
+            <span class="cs-get-started__item-title">dstack</span>
+            <span class="cs-get-started__item-desc">The open-source control plane that works across clouds, Kubernetes, and on-prem.</span>
+          </a>
+          <a href="https://sky.dstack.ai" target="_blank">
+            <span class="cs-get-started__item-title">dstack Sky</span>
+            <span class="cs-get-started__item-desc">Access GPU marketplace, or bring your own clouds. Hosted by us.</span>
+          </a>
+          <a href="https://calendly.com/dstackai/discovery-call" target="_blank">
+            <span class="cs-get-started__item-title">dstack Enterprise</span>
+            <span class="cs-get-started__item-desc">Self-hosted with SSO, air-gapped setup, dedicated support, and more.</span>
+          </a>
+          <span class="cs-get-started__group">Login</span>
+          <a href="https://sky.dstack.ai" target="_blank">
+            <span class="cs-get-started__item-title">dstack Sky</span>
+          </a>
+        </div>
+      </div>
     </div>
+    <script>
+      (function () {
+        document.addEventListener('click', function (e) {
+          if (e.target.closest('[data-cs-nav-toggle]')) {
+            document.body.classList.toggle('cs-nav-collapsed');
+            // The content column reflows (792↔960), so re-align the right rail's TOC offset.
+            window.dispatchEvent(new Event('resize'));
+            return;
+          }
+          var menu = document.querySelector('.cs-get-started__menu');
+          if (!menu) return;
+          var triggers = document.querySelectorAll('.cs-get-started__main, .cs-get-started__toggle');
+          // Both segments open the popup (no default navigation).
+          if (e.target.closest('.cs-get-started__main, .cs-get-started__toggle')) {
+            var hidden = menu.hasAttribute('hidden');
+            menu.toggleAttribute('hidden', !hidden);
+            triggers.forEach(function (t) { t.setAttribute('aria-expanded', String(hidden)); });
+          } else if (!e.target.closest('.cs-get-started__menu')) {
+            menu.setAttribute('hidden', '');
+            triggers.forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+          }
+        });
+      })();
+    </script>
   </nav>
   {% if "navigation.tabs.sticky" in features %}
     {% if "navigation.tabs" in features %}

@@ -1,0 +1,1756 @@
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/Geist-Variable.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Geist Pixel Square';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/GeistPixel-Square.woff2') format('woff2');
+}
+
+:root {
+  color-scheme: light;
+  --cs-text: #16191f;
+  --font-base: Geist, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  --cs-bg: #ffffff;
+  --cs-muted: #5f6b7a;
+  --cs-link: #0972d3;
+  --cs-border: #16191f;
+  --cs-panel: #f4f4f7;
+  --font-small: 15px; /* small body text: action-card descriptions, quotes, FAQ answers */
+  --font-card-heading: 16px; /* card titles: action cards, dstack Sky/Enterprise, quote names */
+  --cs-hover: rgba(22, 25, 31, 0.03); /* shared faint hover tint: normal buttons, cards, dropdown items (softened from 0.05) */
+  --cs-btn-hover: #272d38; /* filled (primary) button hover fill — shared with the split-button override */
+  --cs-seg-divider: rgba(255, 255, 255, 0.22); /* split-button segment divider (light line on the dark fill) */
+  --cs-dark: #0f141d;
+  --nav-height: 4.875rem;
+  --frame: 80rem;
+  --page-gutter: clamp(1.5rem, 5.5vw, 5rem);
+  --section-gap: clamp(2.5rem, 4vw, 4rem);
+  --card-gap: 1.25rem;
+  --radius: 0;
+  --media-column: minmax(18rem, 40rem);
+  --doc-article-width: 49.5rem;
+  --doc-rail-width: 17.5rem;
+  --doc-right-gap: 2.5rem;
+  --doc-gap: var(--doc-right-gap);
+  --doc-main-width: calc(var(--doc-article-width) + var(--doc-right-gap) + var(--doc-rail-width));
+  --hero-gradient: linear-gradient(
+    145deg,
+    rgba(176, 65, 255, 0.38) 0%,
+    rgba(96, 106, 255, 0.33) 34%,
+    rgba(38, 59, 188, 0.06) 62%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --cs-text: #f2f3f3;
+  --cs-bg: #0f141d;
+  --cs-muted: #c6c6cd;
+  --cs-link: #58a6ff;
+  --cs-border: #f2f3f3;
+  --cs-panel: #1b212d;
+  --cs-hover: rgba(242, 243, 243, 0.05); /* softened from 0.085 */
+  --cs-btn-hover: #e2e5e8;
+  --cs-seg-divider: rgba(0, 0, 0, 0.18); /* split-button segment divider (dark line on the light fill) */
+  --hero-gradient: linear-gradient(
+    145deg,
+    rgba(159, 98, 255, 0.2) 0%,
+    rgba(92, 105, 255, 0.13) 36%,
+    rgba(21, 36, 112, 0.12) 66%,
+    rgba(15, 20, 29, 0) 100%
+  );
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Offset anchor / scrollIntoView landings by the sticky header (banner + nav) so a targeted
+     section isn't hidden behind it — e.g. "Get started" scrolling to #resources. */
+  scroll-padding-top: calc(var(--nav-height) + 3.25rem);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  color: var(--cs-text);
+  background: var(--cs-bg, #ffffff);
+  font-family: var(--font-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Cloudscape's own font family is set via the theming API (see cloudscape-theme.ts);
+   this base rule covers the non-Cloudscape markup. */
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+p {
+  line-height: 1.5;
+}
+
+/* Inline highlight for key terms (e.g. "dstack"): a thin rounded outline with minor padding and
+   a transparent fill. Border takes a muted text color so it stays subtle and theme-adaptive. */
+.highlight {
+  padding: 0.06em 0.36em;
+  border: 0.25px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.site-frame {
+  width: min(var(--frame), calc(100vw - (2 * var(--page-gutter))));
+  margin: 0 auto;
+}
+
+/* Top announcement banner. Filled with the text color and an inverted label — the same
+   treatment as the primary buttons — so it reads as a deliberate strip in either theme. It
+   sticks to the top together with the nav (see .site-header). */
+.site-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 9px 16px 7.5px;
+  background: var(--cs-text);
+  color: var(--cs-bg);
+  text-align: center;
+}
+
+/* Keep the whole banner (label + arrow) on a single line — never wrap. */
+.site-banner__link {
+  color: var(--cs-bg) !important;
+  font-size: 16.5px;
+  font-weight: 300;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+/* Light-on-dark text looks thinner than dark-on-light at the same weight; use a heavier weight in
+   dark mode so the banner reads with the same emphasis as in light. */
+:root[data-theme='dark'] .site-banner__link {
+  font-weight: 500;
+}
+
+/* Icons follow the banner's (inverted) text color in both themes. */
+.site-banner [class*='awsui_icon'] {
+  color: var(--cs-bg) !important;
+}
+
+.site-banner__arrow {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-inline-start: 6px;
+  transition: transform 0.2s ease;
+}
+
+.site-banner__link:hover .site-banner__arrow {
+  transform: translateX(3px);
+}
+
+/* Banner + nav stick to the top together. Sticking the wrapper (rather than each child)
+   handles the banner's variable height when its text wraps on narrow screens, and keeps it
+   above the hero gradient (which can extend up into this area). */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 901;
+}
+
+.site-nav {
+  position: relative;
+  z-index: 900;
+  height: var(--nav-height);
+  border-bottom: 0.5px solid var(--cs-border);
+  background: var(--cs-bg, #ffffff);
+}
+
+.site-nav--home {
+  border-bottom: 0;
+  background: transparent;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.site-nav::after {
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  content: '';
+  background: linear-gradient(90deg, #8f41ff 0 29%, #5668ff 29% 61%, #2d49d8 61% 78%, #102f80 78% 100%);
+}
+
+.site-nav--home::after {
+  display: none;
+}
+
+/* On the Old page the nav drops the brand gradient accent for a plain 1px hairline in the
+   text color, matching the Cloudscape reference header. */
+.site-nav--old {
+  border-bottom: 1px solid var(--cs-text);
+}
+
+.site-nav--old::after {
+  display: none;
+}
+
+.site-nav__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 100%;
+  padding: 14px 24px;
+}
+
+.site-logo,
+.site-menu-button {
+  border: 0;
+  background: transparent;
+  color: var(--cs-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.site-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.site-logo img {
+  width: 28px;
+  height: 28px;
+}
+
+.site-logo span {
+  font-family: 'Geist Pixel Square', var(--font-base);
+  font-weight: 700;
+  font-size: 25px;
+}
+
+.site-menu {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.site-desktop-trigger {
+  flex: 0 0 auto;
+}
+
+.site-mobile-trigger,
+.site-mobile-spacer {
+  display: none;
+}
+
+.site-menu-button,
+.site-menu-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 42px;
+  /* No horizontal padding: borderless text items are spaced purely by the nav's
+     SpaceBetween gap, so the whitespace to a neighboring text item matches the whitespace
+     to a bordered button (whose padding sits inside its border) — giving uniform gaps. */
+  padding: 10px 0;
+  border-radius: 21px;
+  color: var(--cs-text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-menu-button:hover,
+.site-menu-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* Keyboard focus only on the top-menu buttons. These are our own elements (not Cloudscape
+   components), so use plain values rather than Cloudscape's internal token variables. */
+.site-menu-button:focus-visible,
+.site-menu-link:focus-visible {
+  background: var(--cs-panel);
+  color: var(--cs-text);
+}
+
+.site-menu-button.active {
+  border: 2px solid #879596;
+}
+
+/* "Resources" top-nav dropdown (ResourcesHoverMenu): make the ButtonDropdown trigger read
+   like the plain text menu links (.site-menu-link) — no border/background, bold 16px label,
+   underline on hover — rather than the bordered "normal" button look. */
+.site-menu-dropdown-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+.site-menu-dropdown [class*='awsui_button'] {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--cs-text) !important;
+  font-size: 16px !important; /* match the .site-menu-link items (e.g. Documentation) */
+  font-weight: 700 !important;
+  padding: 10px 0 !important; /* no horizontal padding — matches the text links */
+}
+.site-menu-dropdown [class*='awsui_button']:hover {
+  background: transparent !important;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+/* The menu opens on hover, so the dropdown caret is redundant — hide it. */
+.site-menu-dropdown [class*='awsui_button'] [class*='awsui_icon'] {
+  display: none !important;
+}
+
+.home-hero {
+  position: relative;
+  overflow: visible;
+  background: var(--cs-bg);
+}
+
+.home-hero::before {
+  position: absolute;
+  top: calc(-1 * var(--nav-height));
+  right: 0;
+  bottom: -16rem;
+  left: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  background: var(--hero-gradient);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 46%, transparent 88%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 46%, transparent 88%);
+}
+
+.home-hero__content {
+  position: relative;
+  z-index: 1;
+  padding: 96px 0 64px;
+  color: var(--cs-text);
+}
+
+.home-hero h2 {
+  margin-top: 0;
+  max-width: 720px;
+  color: var(--cs-text);
+  font-size: 42px;
+  line-height: 1.16;
+  font-weight: 700;
+}
+
+.home-hero p {
+  margin-top: 16px;
+  max-width: 600px;
+  font-size: 17px;
+}
+
+/* Hero CTAs sit side by side, each sized to its own label (not forced to equal width). */
+.home-hero__actions {
+  margin-top: 28px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-hero__art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 1;
+}
+
+:root[data-theme='dark'] .home-hero__art {
+  opacity: 0.92;
+}
+
+/* Centered content frame for the art, so it aligns with the columns of the blocks below. */
+.home-hero__art-frame {
+  position: relative;
+  height: 100%;
+}
+
+/* Art occupies the second content column: right edge at the frame edge, width of one
+   column, so its left edge lines up with the second column of the blocks below. */
+.hero-slice {
+  position: absolute;
+  top: 68px;
+  right: 0;
+  width: calc((100% - var(--doc-gap)) / 2);
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hero-slice--dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .hero-slice--light {
+  display: none;
+}
+
+:root[data-theme='dark'] .hero-slice--dark {
+  display: block;
+}
+
+/* Phone-only copy of the hero artwork, placed just above the footer (see HomePage). The
+   light/dark swap is handled by the shared .hero-slice--light/--dark rules above. */
+.home-hero-mobile-art {
+  display: none;
+}
+
+/* Lifted above the footer gradient so the content/cards stay clean while the gradient
+   shows through behind them. */
+.home-main {
+  position: relative;
+  z-index: 1;
+}
+
+.home-stack {
+  padding: 0 0 96px;
+}
+
+.home-with-rail .docs-body {
+  grid-template-columns:
+    minmax(0, calc(100% - var(--doc-right-gap) - var(--doc-rail-width)))
+    var(--doc-right-gap)
+    var(--doc-rail-width);
+}
+
+.home-with-rail .image-text-row,
+.home-with-rail .image-text-row:not(.image-first) {
+  grid-template-columns: minmax(16rem, 1fr) minmax(0, 1fr);
+  gap: var(--doc-gap);
+}
+
+.media-card h3,
+.doc-media-card h3 {
+  margin-bottom: 8px;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.image-text-row {
+  display: grid;
+  grid-template-columns: var(--media-column) minmax(0, 1fr);
+  gap: var(--section-gap);
+  align-items: center;
+  margin-top: 40px;
+}
+
+.image-text-row:not(.image-first) {
+  grid-template-columns: minmax(0, 1fr) var(--media-column);
+}
+
+.image-text-row.image-first .landing-image {
+  order: -1;
+}
+
+.docs-shell--old-page .image-text-row,
+.docs-shell--old-page .image-text-row:not(.image-first) {
+  grid-template-columns: minmax(14rem, 24rem) minmax(0, 1fr);
+  gap: var(--doc-gap);
+}
+
+.docs-shell--old-page .image-text-row:not(.image-first) {
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 24rem);
+}
+
+.landing-image {
+  width: 100%;
+  aspect-ratio: 876 / 528;
+  height: auto;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.landing-copy {
+  max-width: 604px;
+}
+
+.landing-copy h2,
+.overview-section h2,
+.start-building h2,
+.docs-section > h2 {
+  margin-bottom: 12px;
+  font-size: 28px;
+  line-height: 1.25;
+}
+
+/* "Get started" and "Trusted by" section headings: larger than the in-flow block
+   titles, closer to the hero size. */
+#resources > h2,
+#trusted-by > h2 {
+  margin-bottom: 32px;
+  font-size: 36px;
+}
+
+/* Extra breathing room before "Looking for more?" (the second block in this section). */
+#resources .doc-alternating + .doc-alternating {
+  margin-top: 105px;
+}
+
+/* Keep the lower sections flowing as one continuous sequence (no dividers between them). */
+#faq,
+#trusted-by {
+  border-bottom: 0;
+}
+
+/* 1px outer frame on the FAQ block with rounded (12px) corners. ExpandableSection
+   has no radius token, so we border + clip the wrapper; overflow:hidden trims the items' square
+   corners to the radius. Internal dividers between questions stay 0.5px (see cloudscape-overrides). */
+.faq-list {
+  border: 1px solid var(--cs-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* FAQ question headers. */
+.faq-list [class*="awsui_header-text"] {
+  font-size: 16px;
+}
+
+.landing-copy p + p {
+  margin-top: 18px;
+}
+
+.overview-section {
+  margin-top: 56px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--card-gap);
+  margin-top: 20px;
+}
+
+.stat-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--card-gap);
+  align-items: center;
+  min-height: 160px;
+  padding: 24px 40px;
+  border-radius: 0;
+  background: var(--cs-panel);
+}
+
+.stat-card span {
+  color: #3867ff;
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.stat-card p {
+  max-width: 14ch;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.core-features {
+  margin-top: 36px;
+}
+
+.core-features > h3 {
+  margin-bottom: 4px;
+  font-size: 20px;
+}
+
+.core-features > p {
+  max-width: 1230px;
+}
+
+.feature-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-top: 32px;
+}
+
+.media-card {
+  border: 1px solid var(--cs-border); /* 1px / 12px */
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--cs-bg, #ffffff);
+}
+
+.media-card img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  background: #f3f5f9;
+}
+
+.media-card h3,
+.media-card p {
+  padding-inline: 20px;
+}
+
+.media-card h3 {
+  padding-top: 16px;
+}
+
+.media-card p {
+  padding-bottom: 22px;
+  font-size: var(--font-small);
+}
+
+.start-building {
+  margin-top: 64px;
+  padding-top: 48px;
+  border-top: 0.5px solid var(--cs-border);
+}
+
+.start-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--card-gap);
+  margin-top: 20px;
+}
+
+.start-grid article {
+  min-height: 152px;
+  padding: 24px 20px;
+  border: 0.5px solid var(--cs-border);
+  border-radius: 0;
+}
+
+.start-grid h3 {
+  margin-bottom: 18px;
+  font-size: 20px;
+}
+
+.start-grid p {
+  font-size: 16px;
+}
+
+.docs-shell {
+  min-height: calc(100vh - var(--nav-height));
+}
+
+.docs-main {
+  width: min(var(--doc-main-width), calc(100vw - (2 * var(--page-gutter))));
+  padding: 1.625rem 0 6rem;
+}
+
+.docs-shell--navigation-collapsed .docs-main {
+  width: min(var(--frame), calc(100vw - (2 * var(--page-gutter))));
+  margin-inline: auto;
+}
+
+.docs-body {
+  display: grid;
+  grid-template-columns: minmax(0, var(--doc-article-width)) var(--doc-right-gap) var(--doc-rail-width);
+  align-items: start;
+}
+
+.docs-body--no-rail {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.docs-shell--navigation-collapsed .docs-body {
+  grid-template-columns:
+    minmax(0, calc(100% - var(--doc-right-gap) - var(--doc-rail-width)))
+    var(--doc-right-gap)
+    var(--doc-rail-width);
+}
+
+.docs-shell--old-page .docs-main {
+  width: min(var(--frame), 100%);
+  margin-inline: auto;
+  /* The footer is the last child here; sit it flush at the bottom of the content
+     column instead of leaving the article's bottom padding below it. */
+  padding-bottom: 0;
+}
+
+/* Cloudscape gives the AppLayout content region a 40px bottom margin. With the footer living
+   inside it, that leaves a 40px strip below the footer; drop it so the footer sits flush at the
+   page bottom, matching the global site footer. */
+.docs-shell--old-page [class*='awsui_main_'] {
+  margin-bottom: 0 !important;
+}
+
+.docs-shell--old-page .docs-body {
+  grid-template-columns:
+    minmax(0, calc(100% - var(--doc-right-gap) - var(--doc-rail-width)))
+    var(--doc-right-gap)
+    var(--doc-rail-width);
+}
+
+.docs-article {
+  grid-column: 1;
+}
+
+.docs-right {
+  grid-column: 3;
+  position: sticky;
+  /* Clear the sticky header (banner + nav), matching scroll-padding-top above. */
+  top: calc(var(--nav-height) + 3.25rem);
+  margin-top: 1.5rem;
+}
+
+/* The section divider in the docs side nav is inset by default (unlike the header
+   divider); pull it out to the drawer edges so it spans the full sidebar width. */
+.docs-shell [class*='awsui_divider-default'] {
+  margin-left: -28px !important;
+  margin-right: -24px !important;
+}
+
+/* Cloudscape's expandable nav group renders the caret before the label, indenting the parent
+   past its sibling links, and indents the children 40px. Pull the caret into the left gutter so
+   the parent label lines up with its siblings, and tighten the children to one indent level. */
+.docs-shell [class*='awsui_expandable-link-group'] [class*='awsui_expand-button'] {
+  margin-left: -22px !important;
+}
+
+.docs-shell [class*='awsui_list-variant-expandable-link-group'] {
+  padding-left: 20px !important;
+}
+
+.docs-title {
+  margin-top: 1rem;
+  padding-bottom: 1.125rem;
+  border-bottom: 0.5px solid var(--cs-border);
+}
+
+.docs-title h1 {
+  font-size: 36px;
+  line-height: 1.2;
+}
+
+.docs-title p {
+  margin-top: 8px;
+  color: var(--cs-muted);
+  font-size: 18px;
+}
+
+.docs-section {
+  padding: 1.5rem 0 3rem;
+  border-bottom: 0.5px solid var(--cs-border);
+}
+
+.docs-section:last-child {
+  border-bottom: 0;
+}
+
+/* No divider between the explore section and Access GPU marketplace below it. */
+.docs-section.explore-section {
+  border-bottom: 0;
+}
+
+.doc-alternating {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) minmax(0, 1fr);
+  gap: var(--doc-gap);
+  align-items: center;
+  margin-top: 18px;
+}
+
+.doc-alternating + .doc-alternating {
+  margin-top: 48px;
+}
+
+.doc-alternating:not(.image-first) {
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 1fr);
+}
+
+.doc-alternating:not(.image-first) .doc-visual {
+  order: 2;
+}
+
+.doc-visual {
+  min-width: 0;
+}
+
+/* CodeView has no prop to disable its built-in fill; let the Container surface show through. */
+.code-snippet > div {
+  background-color: transparent !important;
+}
+
+/* Cap the marketplace table height so the rows scroll inside the container.
+   Tuned so the block matches the height of the tab blocks above. */
+.gpu-scroll {
+  max-height: 307px;
+  overflow-y: auto;
+}
+
+/* Cloudscape buttons render as <a> when given href; exclude them from the docs underline rule.
+   Higher specificity than `.docs-article a` so the reset wins regardless of source order. */
+.docs-article .doc-action a,
+.docs-article .figma-card a {
+  text-decoration: none !important;
+}
+
+/* No column header for the marketplace list (Table has no prop to omit it). */
+.gpu-scroll thead {
+  display: none;
+}
+
+.doc-action {
+  margin-top: 20px;
+}
+
+
+.doc-alternating img {
+  width: 100%;
+  aspect-ratio: 980 / 640;
+  height: auto;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.doc-alternating img.doc-diagram {
+  object-fit: contain;
+}
+
+.doc-diagram--dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .doc-diagram--light {
+  display: none;
+}
+
+:root[data-theme='dark'] .doc-diagram--dark {
+  display: block;
+}
+
+.doc-alternating h2 {
+  margin-bottom: 12px;
+  font-size: 28px;
+}
+
+/* Body copy in the alternating marketing blocks (normal page text). */
+.doc-alternating p {
+  font-size: 17px;
+}
+
+/* Action-card (concept) descriptions are a step smaller than normal text. Higher specificity
+   than `.doc-alternating p` so it wins (the cards sit inside an alternating block). This is the
+   shared small-text size (--font-small), reused for quotes, FAQ answers, and popup descriptions. */
+.concept-grid .media-card p {
+  font-size: var(--font-small);
+}
+
+/* "Vendor-agnostic, open-source" architecture diagram (components/ArchitectureDiagram.tsx),
+   rebuilt from a static SVG into HTML/CSS and sized 1:1 with it. Every dimension is in cqw
+   (% of the diagram's own width, resolved against the .arch-diagram-wrap container) so the
+   whole thing scales proportionally like the original SVG. Source design width is 901.8
+   units, so 1 unit ≈ 0.111cqw. Logos are monochrome + theme-adaptive (see .arch-logo). */
+.arch-diagram-wrap {
+  container-type: inline-size;
+  width: 100%;
+}
+
+.arch-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 2.66cqw; /* 24u between the four layers */
+  width: 100%;
+  color: var(--cs-text);
+  --arch-border-width: max(1px, 0.22cqw); /* placeholder badge stroke */
+  --arch-gradient: linear-gradient(45deg, #002aff, #002aff, #e165fe);
+}
+
+/* Dotted outline: an inline <svg> with one rounded rect, stroked with the exact 2-on / 6-off
+   dash. Geometry is set in CSS (modern browsers allow x/y/width/height/rx as CSS so we can inset
+   by the half stroke with calc — no edge clipping, crisp dots) and the stroke takes the text
+   color so it matches the labels and flips with the theme. */
+.arch-dash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.arch-dash rect {
+  x: 0.75px;
+  y: 0.75px;
+  width: calc(100% - 1.5px);
+  height: calc(100% - 1.5px);
+  rx: 12px;
+  fill: none;
+  stroke: var(--arch-dash-stroke, var(--cs-text));
+  stroke-width: 1.5px;
+  stroke-dasharray: 2 6;
+  stroke-linecap: butt;
+}
+
+/* Top + bottom three-up rows share one grid so cells line up. Ratio 487.3 : 191.8 : 191.8. */
+.arch-row {
+  display: grid;
+  grid-template-columns: 2.54fr 1fr 1fr;
+  gap: 1.72cqw; /* 15.5u */
+}
+
+.arch-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.55cqw;
+  min-height: 9.83cqw; /* 88.7u */
+  padding: 0 2cqw;
+  border-radius: 12px;
+}
+
+.arch-cell--center {
+  justify-content: center;
+}
+
+/* Centered labels (e.g. "On-prem clusters") may wrap rather than overflow the narrow column. */
+.arch-cell--center .arch-cell__label {
+  white-space: normal;
+  text-align: center;
+}
+
+.arch-cell--full {
+  min-height: 9.83cqw;
+}
+
+/* "Any GPU cloud": logos left, label pushed to the right edge. */
+.arch-cell--gpu {
+  justify-content: space-between;
+}
+
+/* "Any hardware": label pinned left, logos centered across the full row. */
+.arch-cell--hw {
+  justify-content: center;
+}
+.arch-cell--hw > .arch-cell__label {
+  position: absolute;
+  left: 2cqw;
+}
+
+.arch-cell__label {
+  font-size: 2.55cqw;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Orchestration layer — gradient band. Title gets more room above the cells than below
+   (≈73 vs ≈31u); cells inset ≈5% each side. */
+.arch-orchestration {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3cqw;
+  padding: 3.2cqw 5.07cqw 3.48cqw;
+  border-radius: 1.6cqw;
+  background: var(--arch-gradient);
+  color: #fff;
+}
+
+/* Same size/weight as the cell labels (e.g. "Any framework"). */
+.arch-orchestration__title {
+  font-size: 2.55cqw;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Five primitives — NOT equal width: "Dev environments" (2nd) is wider so its label fits. */
+.arch-orchestration__cells {
+  display: grid;
+  grid-template-columns: 1fr 1.34fr 1fr 1fr 1fr;
+  gap: 1.26cqw; /* 11.4u */
+  width: 100%;
+}
+
+.arch-subcell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 5.54cqw; /* 50u */
+  padding: 0 0.8cqw;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 2.25cqw;
+  font-weight: 500;
+  line-height: 1.2;
+  --arch-dash-stroke: #fff; /* white dotted outline on the gradient */
+}
+
+.arch-logos {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.15cqw; /* ~10u between logos in the SVG */
+  flex-wrap: nowrap; /* keep each cell's logos on one line (mobile reflow re-enables wrap) */
+}
+
+/* Real logo: source SVG (or webp) used as a mask filled with the current text color, so it reads
+   monochrome and flips with the theme. The mask image URL is the only inline bit (it needs the
+   runtime base path); size + aspect live in the per-logo classes below. */
+.arch-logo {
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+/* Per-logo height (cqw, so it scales) + aspect from each source's viewBox. Wide marks (AWS,
+   Meta, NVIDIA) are set shorter so they don't dominate; tall ones (PyTorch) a touch taller. */
+.arch-logo--aws { height: 4.05cqw; aspect-ratio: 304 / 182; }
+.arch-logo--gcp { height: 4.55cqw; aspect-ratio: 256 / 206; }
+.arch-logo--lambda { height: 4.9cqw; aspect-ratio: 1; }
+.arch-logo--nebius { height: 4.6cqw; aspect-ratio: 1; }
+.arch-logo--runpod { height: 5.04cqw; aspect-ratio: 120 / 130; }
+.arch-logo--kubernetes { height: 4.98cqw; aspect-ratio: 1; }
+.arch-logo--pytorch { height: 5.2cqw; aspect-ratio: 90.3 / 109.1; }
+.arch-logo--vllm { height: 4.8cqw; aspect-ratio: 1; }
+.arch-logo--sglang { height: 4.8cqw; aspect-ratio: 596 / 683; }
+.arch-logo--meta { height: 3.7cqw; aspect-ratio: 287.56 / 191; }
+.arch-logo--huggingface { height: 5.1cqw; aspect-ratio: 1; }
+.arch-logo--nvidia { height: 3.7cqw; aspect-ratio: 271.7 / 179.7; }
+.arch-logo--amd { height: 4.6cqw; aspect-ratio: 1600 / 1408; }
+.arch-logo--tenstorrent { height: 4.8cqw; aspect-ratio: 170 / 169; }
+.arch-logo--tpu { height: 4.2cqw; aspect-ratio: 256 / 206; } /* shares the GCP mark, sized down a touch */
+
+/* Placeholder badge (fallback if a logo ever lacks a source). Overrides the mask fill. */
+.arch-logo--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  /* height + min-width set inline per logo */
+  padding: 0 0.6cqw;
+  border: var(--arch-border-width) dashed color-mix(in srgb, var(--cs-text) 42%, transparent);
+  border-radius: 0.7cqw;
+  background: none;
+  font-size: 1.5cqw;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--cs-muted);
+}
+
+/* Safety net for very narrow containers (phones): stop shrinking, stack the rows, drop the
+   primitives to two columns, and switch to fixed legible type. */
+@container (max-width: 360px) {
+  .arch-diagram { gap: 12px; }
+  /* Two columns: the wide first cell ("Any framework" / "Any cloud") spans the full width on its
+     own row, and the two narrower cells pair up on the row below. */
+  .arch-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .arch-row > :first-child { grid-column: 1 / -1; }
+  .arch-cell { min-height: 52px; padding: 10px 14px; gap: 12px; border-width: 1px; border-radius: 8px; }
+  .arch-cell__label { font-size: 16px; white-space: normal; }
+  /* "Any hardware": label left, logos pushed to the right (the desktop layout centers them). */
+  .arch-cell--hw { justify-content: space-between; }
+  .arch-cell--hw > .arch-cell__label { position: static; }
+  .arch-orchestration { gap: 12px; padding: 16px; border-radius: 12px; }
+  .arch-orchestration__title { font-size: 15px; }
+  .arch-orchestration__cells { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .arch-subcell { min-height: 44px; font-size: 13px; border-width: 1px; border-radius: 7px; }
+  .arch-logos { gap: 12px; }
+  /* !important to beat the per-logo cqw heights. */
+  .arch-logo { height: 22px !important; }
+  .arch-logo--placeholder { height: 22px !important; min-width: 22px !important; font-size: 12px; border-width: 1px; border-radius: 5px; }
+}
+
+.doc-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--card-gap);
+  margin-top: 24px;
+}
+
+.doc-media-card img {
+  height: 98px;
+}
+
+.doc-media-card h3 {
+  padding-top: 24px;
+}
+
+.doc-media-card {
+  min-height: 272px;
+}
+
+.alert-block {
+  margin-top: 1.5rem;
+}
+
+.figma-card {
+  width: min(24rem, 100%);
+  margin-top: 1.5rem;
+  border: 1px solid var(--cs-border); /* 1px / 12px */
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--cs-bg, #ffffff);
+}
+
+.figma-card img {
+  width: 100%;
+  aspect-ratio: 980 / 560;
+  height: auto;
+  object-fit: cover;
+}
+
+.figma-card div {
+  padding: 24px;
+}
+
+.figma-card h3 {
+  margin-bottom: 12px;
+  font-size: var(--font-card-heading);
+}
+
+.figma-card p {
+  margin-bottom: 20px;
+  font-size: var(--font-small);
+}
+
+/* Core-concept cards: 2x2 grid inside the AlternatingDocBlock visual slot. */
+.concept-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--card-gap);
+}
+
+/* Each concept card is a whole-card link to the docs: text-colored (not link-blue),
+   no underline, with a subtle background on hover to signal it's clickable. */
+.concept-grid .media-card {
+  display: block;
+  position: relative; /* for the arrow + the dotted border overlay */
+  color: var(--cs-text);
+  text-decoration: none !important;
+  transition: background 0.15s ease;
+  border: none; /* dotted outline is drawn by the shared <DashedBorder> (.arch-dash) instead */
+}
+
+.concept-grid .media-card:hover {
+  background: var(--cs-hover);
+}
+
+.concept-grid .media-card h3 {
+  font-size: var(--font-card-heading);
+  padding-right: 44px; /* clear the arrow */
+}
+
+/* Quote author name reuses the card-heading size. */
+.testimonial-name {
+  font-size: var(--font-card-heading) !important;
+}
+
+/* ActionCard-style navigation arrow, top-right. */
+.concept-card__arrow {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  display: inline-flex;
+  color: var(--cs-text);
+}
+
+/* Product cards reusing the figma-card style. Used inside an AlternatingDocBlock
+   visual slot, so it stays vertically centered (no top margin). */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--card-gap);
+}
+
+/* Two-up variant: dstack Sky and dstack Enterprise side by side. */
+.product-grid--pair {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Testimonial cards in the "Trusted by" section. */
+.testimonial-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--card-gap);
+  margin-top: 24px;
+}
+
+/* Small body text — quotes and FAQ answers — reuse the action-card description's size, line
+   height, and color so they read identically. !important to beat Cloudscape's boosted classes. */
+.testimonial-grid p,
+.faq-list [class*='awsui_content'] {
+  font-size: var(--font-small) !important;
+  line-height: 1.5 !important;
+  color: var(--cs-text) !important;
+}
+
+
+.testimonial-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.testimonial-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.product-grid .figma-card {
+  width: auto;
+  margin-top: 0;
+}
+
+.right-rail-block {
+  margin-top: 32px;
+  padding-top: 28px;
+  border-top: 0.5px solid var(--cs-border);
+}
+
+.docs-right > h2 {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.right-rail-block h2 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.right-rail-block p {
+  margin-bottom: 10px;
+  color: var(--cs-muted);
+}
+
+.site-footer {
+  position: relative;
+  border-top: 0.5px solid var(--cs-border);
+  background: var(--cs-bg, #ffffff);
+}
+
+/* On home, drop the divider line and white block so the footer blends into the
+   colored band above (mirrors the transparent, borderless home header). */
+.site-footer--home {
+  border-top: 0;
+  background: transparent;
+}
+
+/* Single colored band: rises from the bottom of the page up toward the divider (which
+   crops it visually), deepening in color toward the footer. Painted behind .home-main so
+   the content and cards stay clean on top. */
+.site-footer--home::before {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -28rem;
+  bottom: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(176, 65, 255, 0) 0%,
+    rgba(176, 65, 255, 0.1) 55%,
+    rgba(96, 106, 255, 0.22) 100%
+  );
+}
+
+.footer-content {
+  position: relative;
+  z-index: 1;
+  padding-top: 48px;
+  font-size: 13px;
+}
+
+/* The Old page renders the footer inside the AppLayout content column (so the side nav runs
+   full-height beside it). Fill the column instead of the centered site frame, and reserve
+   space on the right so the last link column isn't flush with the edge (matches the column gap). */
+.docs-main .footer-content {
+  width: auto;
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* Drop the divider line and the opaque block: Cloudscape paints the content area a slightly
+   different grey than --cs-bg, so an opaque footer reads as a mismatched rectangle (most
+   visible in dark mode). Going transparent + borderless lets it blend into the column. */
+.docs-main .site-footer {
+  border-top: 0;
+  background: transparent;
+}
+
+/* Top row: brand block (logo + social) on the left, the link group flush to the
+   right edge (justify-content on this outer row), so the columns themselves keep a
+   tight content width + fixed gap rather than being stretched apart. */
+.footer-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 48px;
+  padding-bottom: 32px;
+}
+
+.footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* Link columns: each sized to its content, separated by a fixed gap. */
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px 72px;
+}
+
+.footer-brand__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: var(--cs-text);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none !important;
+}
+
+.footer-brand__logo img {
+  width: 28px;
+  height: 28px;
+}
+
+.footer-brand__logo span {
+  font-family: 'Geist Pixel Square', var(--font-base);
+  font-weight: 700;
+  font-size: 25px;
+}
+
+.footer-channels {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.footer-channel-link {
+  display: inline-flex;
+  color: var(--cs-text) !important;
+  text-decoration: none !important;
+}
+
+.footer-channel-link svg {
+  display: block;
+}
+
+/* Column captions: match the top-menu link size (16px); links sit a step below. */
+.footer-col__heading {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cs-text);
+}
+
+/* Bottom bar: theme toggle + copyright, separated from the columns by a divider. */
+.footer-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 64px;
+}
+
+/* Theme toggle: a pill switch + crescent moon, matching the dstack control-plane app's toggle
+   (frontend AppLayout). Light = switch OFF (grey track, white thumb left); [data-theme="dark"]
+   = switch ON (the app's dark-mode "checked" blue track, dark thumb slid right). Colors are the
+   Cloudscape control tokens: track #424650, checked #42b4ff, thumb #fff (light) / #0f141a (dark).
+   The same component renders in the header (large screens) and footer (tablet/mobile); the
+   --header / --footer variants below toggle which one is visible at the 1024px breakpoint. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;           /* the moon inherits the surrounding text color */
+  cursor: pointer;
+}
+.theme-toggle__track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 16px;
+  border-radius: 8px;
+  background: #424650;
+  transition: background-color 0.2s ease;
+}
+.theme-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  transform: translateX(2px);
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+.theme-toggle__moon {
+  flex: 0 0 auto;
+  display: block;
+}
+[data-theme='dark'] .theme-toggle__track {
+  background: #42b4ff;
+}
+[data-theme='dark'] .theme-toggle__thumb {
+  background: #0f141a;
+  transform: translateX(10px);
+}
+
+/* The header toggle shows only on large screens; the footer one takes over at ≤1024px (tablet +
+   mobile), where the header nav collapses into the burger menu. */
+.theme-toggle--footer {
+  display: none;
+}
+.theme-toggle--header {
+  transform: translateY(3px); /* the nav row centers it a hair high; nudge it down to match */
+  margin-right: -5px;           /* trim the SpaceBetween gap to GitHub by 5px */
+}
+@media (max-width: 1024px) {
+  .theme-toggle--header {
+    display: none;
+  }
+  .theme-toggle--footer {
+    display: inline-flex;
+  }
+}
+
+.footer-copyright {
+  text-align: left;
+}
+
+.home-stack a,
+.docs-article a,
+.right-rail-block a,
+.site-footer a {
+  text-decoration-line: underline !important;
+  text-decoration-color: currentColor !important;
+  text-underline-offset: 0.08em;
+}
+
+.home-stack a:hover,
+.docs-article a:hover,
+.right-rail-block a:hover,
+.site-footer a:hover {
+  text-decoration-thickness: 2px !important;
+}
+
+/* The rail's "Need help?" Discord CTA is a Cloudscape Button (renders an <a>); keep the
+   link-underline rules above from underlining it, matching the landing's Discord button. */
+.right-rail-block a[class*='awsui_button'] {
+  text-decoration-line: none !important;
+}
+
+/* Footer column links: full-strength text, same 16px as the column headings, no underline
+   until hover. */
+.footer-links a {
+  color: var(--cs-text) !important;
+  /* Cloudscape <Link> sets 14px via its boosted awsui_font-size-body-m class, so override
+     with !important to match the 16px column headings. */
+  font-size: 16px !important;
+  text-decoration-line: none !important;
+}
+
+.footer-links a:hover {
+  text-decoration-line: underline !important;
+}
+
+/* The brand logo and social icons are <a>s inside .site-footer, so the global
+   footer-link underline rule applies to them — override it (higher specificity). */
+.site-footer .footer-brand__logo,
+.site-footer .footer-channel-link {
+  text-decoration: none !important;
+}
+
+/* On home the divider would sit on the gradient band; soften it so the footer
+   keeps blending into the colored band above. */
+.site-footer--home .footer-bar {
+  border-top-color: transparent;
+}
+
+.home-stack p a,
+.docs-article p a {
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+/* Footer responsive: below the desktop width the columns stack on top, with the brand
+   (logo + social) below them — the links are the primary footer nav, so they lead. */
+@media (max-width: 1100px) {
+  .footer-top {
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  /* Links first, brand (logo + social icons) second. */
+  .footer-brand {
+    order: 2;
+  }
+
+  .footer-links {
+    width: 100%;
+    gap: 28px 56px;
+  }
+}
+
+/* Phones: four columns no longer fit in one row, and three would orphan the fourth,
+   so drop to a clean two-up grid. */
+@media (max-width: 720px) {
+  .footer-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 32px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .site-frame {
+    width: calc(100vw - 48px);
+  }
+
+  .home-hero__content {
+    padding: 64px 0;
+  }
+
+  .home-hero__art {
+    opacity: 0.85;
+  }
+
+  .hero-slice {
+    top: 24px;
+  }
+
+  .feature-card-grid,
+  .stats-grid,
+  .start-grid,
+  .doc-card-grid,
+  .product-grid,
+  .concept-grid,
+  .testimonial-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .image-text-row,
+  .image-text-row:not(.image-first),
+  .home-with-rail .image-text-row,
+  .home-with-rail .image-text-row:not(.image-first),
+  .docs-shell--old-page .image-text-row,
+  .docs-shell--old-page .image-text-row:not(.image-first),
+  .doc-alternating,
+  .doc-alternating:not(.image-first) {
+    grid-template-columns: 1fr;
+  }
+
+  .image-text-row.image-first .landing-image {
+    order: initial;
+  }
+
+  /* Stacked on mobile, always lead with the text block; the visual follows below
+     (regardless of the desktop image-first / image-last alternation). */
+  .doc-alternating .doc-visual {
+    order: 2;
+  }
+
+  /* Tighter gap between blocks once they stack into a single column. */
+  .doc-alternating + .doc-alternating {
+    margin-top: 32px;
+  }
+
+  .landing-image,
+  .doc-alternating img {
+    width: 100%;
+    height: auto;
+  }
+
+  .docs-shell {
+    display: block;
+  }
+
+  .docs-main {
+    width: calc(100vw - 48px);
+    margin: 0 auto;
+    padding-top: 24px;
+  }
+
+  .docs-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .docs-right {
+    display: block;
+    order: -1;
+    position: static;
+    width: 100%;
+    margin: 1.5rem 0 2rem;
+  }
+
+  .right-rail-block {
+    display: none;
+  }
+}
+
+/* Switch to the burger nav at ≤1024px: the full menu (Documentation + the three blog links +
+   theme toggle + GitHub + Get started) is too wide for tablet widths. This matches the theme
+   toggle's 1024px boundary (header → footer above), so the footer toggle takes over exactly when
+   the burger appears — no width band is left without a toggle. The hero/content phone layout
+   stays at ≤640px (below). */
+@media (max-width: 1024px) {
+  .site-nav {
+    height: 54px;
+  }
+
+  .site-nav__inner {
+    position: relative;
+    justify-content: space-between;
+    gap: 0;
+    width: 100%;
+    padding: 0 13px;
+  }
+
+  .site-menu {
+    display: none;
+  }
+
+  .site-mobile-trigger,
+  .site-mobile-spacer {
+    display: block;
+    flex: 0 0 28px;
+  }
+
+  .site-desktop-trigger {
+    display: none;
+  }
+
+  .site-logo {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .site-mobile-navigation {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: -1;
+    max-height: calc(100vh - 58px);
+    overflow: auto;
+    padding: 20px;
+    border-bottom: 0.5px solid var(--cs-border);
+    background: var(--cs-bg, #ffffff);
+  }
+}
+
+@media (max-width: 640px) {
+  .home-hero {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .home-hero__content {
+    order: 1;
+    padding: 64px 0 24px;
+  }
+
+  /* On phones the hero artwork is dropped entirely (not worth the vertical space): hide both the
+     top instance and the relocated bottom copy. */
+  .home-hero__art {
+    display: none;
+  }
+
+  .home-hero-mobile-art {
+    display: none;
+  }
+
+  /* Hero CTAs share one full-width row on phones — two equal columns spanning the width. */
+  .home-hero__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  /* Each button fills its half-column; center the label and trim the desktop 34px side
+     padding so both fit. !important: Cloudscape sets text-align:start via a boosted rule. */
+  .home-hero__actions [class*='awsui_button'] {
+    width: 100%;
+    padding-inline: 16px !important;
+    text-align: center !important;
+  }
+
+  .home-hero h1 {
+    font-size: 36px;
+  }
+
+  .home-hero h2 {
+    font-size: 32px;
+  }
+
+  .home-stack {
+    padding-top: 0;
+  }
+
+  .stat-card {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .figma-card,
+  .figma-card img {
+    width: 100%;
+  }
+
+  .footer-content {
+    padding-top: 32px;
+  }
+
+  .footer-top {
+    padding-bottom: 24px;
+  }
+
+  .footer-bar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

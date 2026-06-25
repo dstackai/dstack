@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager, contextmanager
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -229,3 +230,79 @@ async def test_get_worker_grpc_preference_skips_http():
     assert result == grpc_not_ready
     grpc_mock.assert_awaited_once()
     http_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_worker_bootstrap_uses_single_tunnel():
+    job = MagicMock()
+    uds_path = Path("/tmp/replica.sock")
+    grpc_ready: dict = {
+        "status": "ready",
+        "worker": {
+            "url": "grpc://10.0.0.1:8000",
+            "worker_type": "prefill",
+            "connection_mode": "grpc",
+            "runtime_type": "vllm",
+        },
+    }
+
+    tunnel_cm = AsyncMock()
+    tunnel_cm.__aenter__.return_value = uds_path
+    tunnel_cm.__aexit__.return_value = None
+
+    http_cm = AsyncMock()
+    http_cm.__aenter__.return_value = MagicMock()
+    http_cm.__aexit__.return_value = None
+
+    grpc_cm = AsyncMock()
+    grpc_cm.__aenter__.return_value = MagicMock()
+    grpc_cm.__aexit__.return_value = None
+
+    with (
+        patch(
+            "dstack._internal.server.services.runs.router_worker_sync.get_service_replica_tunnel",
+            return_value=tunnel_cm,
+        ) as tunnel_mock,
+        patch(
+            "dstack._internal.server.services.runs.router_worker_sync"
+            ".get_service_replica_http_client_over_uds",
+            return_value=http_cm,
+        ) as http_over_uds_mock,
+        patch(
+            "dstack._internal.server.services.runs.router_worker_sync"
+            ".get_service_replica_grpc_channel_over_uds",
+            return_value=grpc_cm,
+        ) as grpc_over_uds_mock,
+        patch(
+            "dstack._internal.server.services.runs.router_worker_sync._probe_http_worker",
+            new_callable=AsyncMock,
+            return_value={"status": "not_ready", "worker": None},
+        ) as http_probe_mock,
+        patch(
+            "dstack._internal.server.services.runs.router_worker_sync._probe_grpc_worker",
+            new_callable=AsyncMock,
+            return_value=grpc_ready,
+        ) as grpc_probe_mock,
+        patch(
+            "dstack._internal.server.services.runs.router_worker_sync._get_http_worker",
+            new_callable=AsyncMock,
+        ) as get_http_mock,
+        patch(
+            "dstack._internal.server.services.runs.router_worker_sync._get_grpc_worker",
+            new_callable=AsyncMock,
+        ) as get_grpc_mock,
+    ):
+        result = await _get_worker(
+            job,
+            http_worker_url="http://10.0.0.1:8000",
+            grpc_worker_url="grpc://10.0.0.1:8000",
+        )
+
+    assert result == grpc_ready
+    tunnel_mock.assert_called_once_with(job)
+    http_over_uds_mock.assert_called_once_with(uds_path)
+    grpc_over_uds_mock.assert_called_once_with(uds_path)
+    http_probe_mock.assert_awaited_once()
+    grpc_probe_mock.assert_awaited_once()
+    get_http_mock.assert_not_awaited()
+    get_grpc_mock.assert_not_awaited()
