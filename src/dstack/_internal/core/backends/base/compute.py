@@ -926,8 +926,11 @@ def get_shim_pre_start_commands(
     return [
         f"dlpath=$(sudo mktemp -t {DSTACK_SHIM_BINARY_NAME}.XXXXXXXXXX)",
         # -sS -- disable progress meter and warnings, but still show errors (unlike bare -s)
-        f'sudo curl -sS --compressed --connect-timeout 60 --max-time 240 --retry 1 --output "$dlpath" "{url}"',
-        f'sudo mv "$dlpath" {dstack_shim_binary_path}',
+        # -f  -- fail (non-zero exit, no error body written) on HTTP errors, so a transient
+        #        403/5xx is never saved as the shim binary; chain `mv` so a failed download
+        #        is never installed (otherwise it would run as a script -> "Syntax error").
+        f'sudo curl -fsS --compressed --connect-timeout 60 --max-time 240 --retry 1 --output "$dlpath" "{url}"'
+        f' && sudo mv "$dlpath" {dstack_shim_binary_path}',
         f"sudo chmod +x {dstack_shim_binary_path}",
         f"{{ sudo chcon system_u:object_r:bin_t:s0 {dstack_shim_binary_path} 2>/dev/null || true; }}",
         f"sudo mkdir {dstack_working_dir} -p",
