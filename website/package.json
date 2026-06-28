@@ -12,6 +12,7 @@
     "@cloudscape-design/code-view": "^3.0.142",
     "@cloudscape-design/components": "^3.0.0",
     "@cloudscape-design/global-styles": "^1.0.0",
+    "@dstackai/sqircle": "^0.1.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.30.4"

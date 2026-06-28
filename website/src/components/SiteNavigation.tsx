@@ -4,7 +4,7 @@ import Button from '@cloudscape-design/components/button';
 import Icon from '@cloudscape-design/components/icon';
 import SideNavigation, { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 import SpaceBetween from '@cloudscape-design/components/space-between';
-import { menuButtonStyle } from '../cloudscape-theme';
+import { getStartedButtonStyle, menuButtonStyle } from '../cloudscape-theme';
 import { ThemeToggle } from './ThemeToggle';
 import { asset } from '../asset';
 import { BLOG_URL, DOCS_URL, ROUTES } from '../routes';
@@ -90,7 +90,6 @@ const mobileNavigationItems: SideNavigationProps.Item[] = [
   { type: 'link', text: 'Case studies', href: `${BLOG_URL}/case-studies/` },
   { type: 'link', text: 'Blog', href: BLOG_URL },
   { type: 'link', text: 'GitHub', href: dstackGithubUrl, external: true, externalIconAriaLabel },
-  { type: 'link', text: 'dstack Sky', href: 'https://sky.dstack.ai', external: true, externalIconAriaLabel },
 ];
 
 // Standalone "Products" top-nav menu. The popup opens on hover (and on keyboard focus) and
@@ -149,15 +148,16 @@ function ProductsHoverMenu() {
         <div className="site-products-menu" role="menu">
           {/* Open-source featured on the brand gradient; the whole panel links to install. */}
           <a className="site-products-menu__feat" role="menuitem" href={products[0].href}>
-            {stars !== null && (
-              <span className="site-products-menu__gh" aria-label={`${stars} GitHub stars`}>
-                <GithubGlyph />
-                {formatStars(stars)}
-              </span>
-            )}
-            <span className="site-products-menu__feat-name">{products[0].text}</span>
-            <span className="site-products-menu__feat-desc">{products[0].secondaryText}</span>
-            <span className="site-products-menu__feat-cta">Documentation</span>
+            <span className="site-products-menu__feat-iccol">
+              <span className="site-products-menu__feat-ic"><GithubGlyph /></span>
+              {stars !== null && (
+                <span className="site-products-menu__gh" aria-label={`${stars} GitHub stars`}>{formatStars(stars)}</span>
+              )}
+            </span>
+            <span className="site-products-menu__feat-body">
+              <span className="site-products-menu__feat-name">{products[0].text}</span>
+              <span className="site-products-menu__feat-desc">{products[0].secondaryText}</span>
+            </span>
           </a>
           <div className="site-products-menu__list">
             {products.slice(1).map(product => (
@@ -210,6 +210,19 @@ export function SiteNavigation({
     setMobileNavigationOpen(false);
   };
 
+  // "Get started" scrolls to the Get-started section on the home page (id="resources"). From any
+  // other route, go home first, then scroll once it has rendered.
+  const goToGetStarted = (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+    setMobileNavigationOpen(false);
+    if (pathname === ROUTES.HOME) {
+      document.getElementById('resources')?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      navigate(ROUTES.HOME);
+      window.setTimeout(() => document.getElementById('resources')?.scrollIntoView({ behavior: 'smooth' }), 120);
+    }
+  };
+
   return (
     <header className={`site-nav ${isHome ? 'site-nav--home' : ''} ${isOldPage ? 'site-nav--old' : ''} ${mobileNavigationOpen ? 'site-nav--mobile-open' : ''}`}>
       <div className="site-nav__inner">
@@ -250,7 +263,6 @@ export function SiteNavigation({
                tablet/mobile it moves to the footer (the whole nav collapses into the burger menu). */}
             <ThemeToggle theme={theme} onToggle={onToggleTheme} className="theme-toggle--header" />
             <Button
-              variant="primary"
               href={dstackGithubUrl}
               target="_blank"
               iconAlign="right"
@@ -260,13 +272,12 @@ export function SiteNavigation({
               GitHub
             </Button>
             <Button
-              href="https://sky.dstack.ai"
-              target="_blank"
-              iconAlign="right"
-              iconName="external"
-              style={menuButtonStyle}
+              variant="primary"
+              href="#resources"
+              onClick={goToGetStarted}
+              style={getStartedButtonStyle}
             >
-              dstack Sky
+              Get started
             </Button>
           </SpaceBetween>
         </nav>

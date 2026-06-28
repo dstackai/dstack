@@ -204,12 +204,13 @@
     white-space: nowrap;
 }
 
-/* GitHub → filled (primary) "GitHub" with a trailing external-link glyph (no star count). */
+/* GitHub → outlined (normal) "GitHub" with a trailing external-link glyph. Weight 700 so it matches
+   the filled "Get started" trigger beside it (the two now read as one type, different fills). */
 [data-md-color-primary=white] .md-header__buttons .md-button--primary.github {
-    background: var(--cs-text);
-    color: var(--cs-bg);
-    border: 1px solid var(--cs-text);
-    font-weight: 500 !important; /* filled primary uses 500; the outlined Try-Sky button stays 700 */
+    background: transparent;
+    color: var(--cs-text);
+    border: 1px solid var(--cs-border);
+    font-weight: 700 !important;
 }
 
 /* Gap between GitHub and dstack Sky → 20px to match /old (was 5px). */
@@ -259,12 +260,182 @@
     mask: var(--cs-ext-icon) center / contain no-repeat;
 }
 
-/* GitHub hover: the filled GitHub button lightens to the button-hover token. landing.css forces
-   `background:black !important` on primary hover, so these need !important to win. */
+/* "Get started" header dropdown — mirrors the landing's Products popup (featured open-source +
+   dstack Sky + Enterprise). Pure-CSS hover/focus-within (the docs are static); right-aligned so the
+   panel never overflows the header's right edge. Reuses the --cs-* tokens (defined in extra.css). */
+.cs-gs-menu {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.cs-gs-menu__trigger {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 5px;
+    /* the caret is lighter than a full glyph, so trim the trailing padding (was 18px). */
+    padding-right: 12px !important;
+}
+.cs-gs-menu__caret {
+    transition: transform 0.15s ease;
+}
+.cs-gs-menu:hover .cs-gs-menu__caret,
+.cs-gs-menu:focus-within .cs-gs-menu__caret {
+    transform: rotate(180deg);
+}
+.cs-gs-menu__popup {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 1000;
+    width: 360px;
+    padding: 6px;
+    background: var(--cs-bg);
+    border: 0.5px solid var(--cs-text);
+    border-radius: 12px;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+/* Invisible bridge over the 8px gap so the pointer can travel from trigger to popup. */
+.cs-gs-menu__popup::before {
+    content: "";
+    position: absolute;
+    inset: -8px 0 auto 0;
+    height: 8px;
+}
+.cs-gs-menu:hover .cs-gs-menu__popup,
+.cs-gs-menu:focus-within .cs-gs-menu__popup {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+/* Text inside the popup must wrap — Material forces white-space:nowrap on header links/buttons. */
+.cs-gs-menu__popup,
+.cs-gs-menu__feat,
+.cs-gs-menu__row,
+.cs-gs-menu__feat *,
+.cs-gs-menu__row * {
+    white-space: normal !important;
+}
+.cs-gs-menu__feat {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #002aff, #002aff, #e165fe);
+    color: #fff;
+    text-decoration: none;
+}
+.cs-gs-menu__feat-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+/* Left column: icon tile with the live star count centered beneath it (mirrors the landing). */
+.cs-gs-menu__feat-iccol {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+.cs-gs-menu__gh {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.cs-gs-menu__feat-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 0.5px solid rgba(255, 255, 255, 0.5);
+    color: #fff;
+}
+.cs-gs-menu__feat-ic svg {
+    width: 18px;
+    height: 18px;
+}
+.cs-gs-menu__feat-name {
+    display: block;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+}
+.cs-gs-menu__feat-desc {
+    display: block;
+    margin-top: 8px;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.cs-gs-menu__list {
+    display: flex;
+    flex-direction: column;
+    margin-top: 6px;
+}
+.cs-gs-menu__row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 10px;
+    border-radius: 9px;
+    color: var(--cs-text);
+    text-decoration: none;
+}
+.cs-gs-menu__row:hover {
+    background: var(--cs-hover);
+}
+.cs-gs-menu__ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 0.5px solid var(--cs-text);
+    color: var(--cs-text);
+}
+.cs-gs-menu__ic svg {
+    width: 20px;
+    height: 20px;
+}
+.cs-gs-menu__rbody {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.cs-gs-menu__name {
+    display: block;
+    color: var(--cs-text);
+    font-size: 15px;
+    font-weight: 600;
+}
+.cs-gs-menu__desc {
+    display: block;
+    margin-top: 3px;
+    color: var(--cs-muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+/* On tablet/mobile the header buttons collapse; keep the dropdown from overflowing tiny screens. */
+@media (max-width: 76.1875em) {
+    .cs-gs-menu__popup { width: min(360px, calc(100vw - 32px)); }
+}
+
+/* GitHub hover: outlined button gets a faint tint (landing.css forces black !important on primary
+   hover, so these need !important to win). */
 [data-md-color-primary=white] .md-header__buttons .md-button--primary.github:hover {
-    background: var(--cs-btn-hover) !important;
-    border-color: var(--cs-btn-hover) !important;
-    color: var(--cs-bg) !important;
+    background: var(--cs-hover) !important;
+    border-color: var(--cs-border) !important;
+    color: var(--cs-text) !important;
 }
 
 /* Burger (desktop sidebar toggle) — far left, like /old. */

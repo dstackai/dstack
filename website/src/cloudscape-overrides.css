@@ -33,19 +33,18 @@
 /* 2) Tabs: the bottom divider and the active-tab underline use the text color.
       Tabs use tab-specific border-color tokens that the theming API doesn't expose. */
 body {
-  --color-border-tabs-divider-f5t9va: var(--cs-text);
+  --color-border-tabs-divider-f5t9va: color-mix(in srgb, var(--cs-text) 14%, transparent);
   --color-border-tabs-underline-gudemr: var(--cs-text);
   --color-border-dropdown-group-ylcnh8: transparent; /* no divider between dropdown groups */
   --color-text-expandable-section-hover-ojzwhd: var(--cs-text); /* FAQ: don't turn the question blue on hover */
 }
 
 /* 4) Content tabs.
-   a) Full-height vertical separators between tabs (default insets them 12px top/bottom).
-      `inset-block: 0` spans only the container's padding box, leaving a 1px gap at top/bottom
-      against the 1px transparent border; the negative inset extends them over that border so
-      they match the height of the edge separators (real borders on the border box). */
-[class*='awsui_tabs-tab_']:not(:last-child) > [class*='awsui_tabs-tab-header-container']::before {
-  inset-block: calc(-1 * var(--border-divider-section-width-uwo8my, 1px)) !important;
+   a) Drop the vertical separators Cloudscape draws between tabs. Selection is shown by the
+      active tab's pill background (section 9), so the dividers just add noise — the tabs read
+      as a row of pills separated by the cells' own padding (matching the landing's tab design). */
+[class*='awsui_tabs-tab_'] > [class*='awsui_tabs-tab-header-container']::before {
+  display: none !important;
 }
 /* b) Drop the gray border + shadow that Cloudscape shows on the scroll arrows when the
       tab strip overflows (the box-shadow renders both; border-inline is the divider). */
@@ -56,6 +55,12 @@ body {
 [class*='awsui_pagination-button-left'],
 [class*='awsui_pagination-button-right'] {
   border-inline: 0 !important;
+}
+/* c) The scroll-arrow buttons carry 12px block margins, so they are taller than the tab row and
+      stretch the whole strip (and its tabs) ~10px taller than a chevron-free strip. Zero the block
+      margin so the arrows no longer inflate the tab height — the strip matches the others. */
+[class*='awsui_pagination-button'] {
+  margin-block: 0 !important;
 }
 
 /* 6) FAQ accordion (ExpandableSection): faint background tint on hover that covers the
@@ -100,57 +105,45 @@ body {
   font-weight: 500 !important;
 }
 
-/* 9) Content tabs: highlight the selected (and hovered) tab with a background
-      tint instead of blue text + an underline indicator. The background uses the same tint as
-      the dropdown popup items (--cs-hover), so every hover surface matches. */
-/* a) The under-tab horizontal divider and the vertical tab separators keep the 1px outer
-      border width (they inherit --border-divider-section-width, no override needed here). */
-/* b) Drop the per-tab active underline indicator — selection is now shown by the background
-      (this also removes that indicator's rounded ends). */
+/* 9) Content tabs — "pill" selection, matching the landing's own tab design: the active tab is a
+      panel-grey rounded-top pill (a hovered tab gets the faint --cs-hover tint), inactive labels
+      are muted, and there are no separators (section 4a). The pill is painted on the inner link
+      so each cell's inline padding becomes the gap between pills; a little top padding on the
+      strip lets the pills float above the softened (section 2) under-tab divider. */
+/* a) Drop the per-tab active underline indicator — selection is shown by the pill background. */
 [class*='awsui_tabs-tab-header-container']::after {
   display: none !important;
 }
-/* c) Keep tab labels in the body color at rest, on hover, and when selected (no blue accent). */
-[class*='awsui_tabs-tab-link'] {
-  color: var(--cs-text) !important;
+/* b) Float the pills: top padding above the strip, and tighter cell padding so neighbouring
+      pills sit close (the cell's inline padding is the inter-pill gap). */
+[class*='awsui_tabs-header-list'] {
+  padding: 6px 4px 0 !important;
 }
-/* d) Background highlight for the hovered and selected tab — painted on the whole tab cell
-      (the header container fills edge to edge; the inner link has padding-inline:0, so painting
-      the link alone leaves gaps). aria-selected lives on the inner link, hence :has(). */
-[class*='awsui_tabs-tab-header-container']:hover,
-[class*='awsui_tabs-tab-header-container']:has([aria-selected='true']) {
+[class*='awsui_tabs-tab-header-container'] {
+  padding-inline: 3px !important;
+}
+/* c) The pill: muted label at rest, body color + faint tint on hover, panel-grey when selected.
+      Rounded top only — the flat bottom sits on the under-tab divider. aria-selected lives on
+      the inner link. */
+[class*='awsui_tabs-tab-link'] {
+  color: var(--cs-muted) !important;
+  padding-block: 13px !important; /* with the label padding zeroed (d), this matches .gs-tab's 15px/14px content-tab height */
+  padding-inline: 14px !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+[class*='awsui_tabs-tab-link']:hover {
+  color: var(--cs-text) !important;
   background: var(--cs-hover) !important;
 }
-/* e) 1px vertical separators bounding the strip (Cloudscape only draws them between tabs).
-      After the last tab: always. Before the first tab: ONLY when the strip overflows (a
-      scroll arrow is present). With no scrolling the first tab sits against the container's
-      left border, so a leading separator just reads as a doubled line — so we omit it. */
-[class*='awsui_tabs-tab_']:last-child > [class*='awsui_tabs-tab-header-container'] {
-  border-inline-end: 1px solid var(--color-border-tabs-divider-f5t9va) !important;
+[class*='awsui_tabs-tab-link'][aria-selected='true'] {
+  color: var(--cs-text) !important;
+  background: var(--cs-panel) !important;
 }
-[class*='awsui_tab-header-scroll-container']:has([class*='pagination-button-left-scrollable'], [class*='pagination-button-right-scrollable'])
-  [class*='awsui_tabs-tab_']:first-child
-  > [class*='awsui_tabs-tab-header-container'] {
-  border-inline-start: 1px solid var(--color-border-tabs-divider-f5t9va) !important;
-}
-
-/* 10) GPU table: 0.5px row separators that run edge to edge, while keeping the
-       container's breathing room. The Container padding lives on `content-inner` (the
-       `with-paddings` element). We drop only its INLINE padding so the table — and therefore
-       the row separators — spans the full width; the top/bottom padding is kept. A 20px inset
-       is then restored on just the outer cells so the text isn't flush against the border. */
-.gpu-scroll * {
-  --border-divider-list-width-tdfx1x: 0.5px;
-}
-[class*='awsui_content-inner']:has(.gpu-scroll) {
-  padding-inline: 0 !important;
-  padding-block: 8px !important; /* a little top/bottom breathing room, trimmed from the default */
-}
-.gpu-scroll tr > :first-child {
-  padding-inline-start: 20px !important;
-}
-.gpu-scroll tr > :last-child {
-  padding-inline-end: 20px !important;
+/* d) The label span carries its own inner padding (4px 8px) on top of the link's padding, which
+      makes the Cloudscape pill ~12px taller than the landing's own tabs. Zero it so the pill height
+      is just link-padding + text — matching .gs-tab / .gs-skytab exactly. */
+[class*='awsui_tabs-tab-label'] {
+  padding: 0 !important;
 }
 
 /* 11) Thin (0.5px) dividers between stacked FAQ items. The block's outer corners

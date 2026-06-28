@@ -112,3 +112,8 @@ export const mainButtonStyle: ButtonProps.Style = {
 export const menuButtonStyle: ButtonProps.Style = {
   root: { paddingBlock: '7px', paddingInline: '18px' },
 };
+// Header "Get started" — same as menuButtonStyle but with 1px extra on the right so the label
+// doesn't sit a hair close to the edge (inline-end 19px vs inline-start 18px).
+export const getStartedButtonStyle: ButtonProps.Style = {
+  root: { paddingBlock: '7px', paddingInline: '18px 19px' },
+};

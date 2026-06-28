@@ -50,11 +50,11 @@ export function FaqSection() {
         title="FAQ"
         action={
           <SpaceBetween direction="horizontal" size="xs">
-            <Button variant="primary" href="https://calendly.com/dstackai/discovery-call" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
-              Get a demo
-            </Button>
-            <Button href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
+            <Button variant="primary" href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
               Discord
+            </Button>
+            <Button href="https://calendly.com/dstackai/discovery-call" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
+              Contact us
             </Button>
           </SpaceBetween>
         }

@@ -1,18 +1,10 @@
-// Image assets used across the site. Local SVGs live in /public/static; the architecture
-// diagram is served from the dstack static-assets host; the Old-page placeholders are
+// Image assets used across the site. The home hero is now a live <SquircleScene> component and
+// the "Vendor-agnostic, open-source" architecture diagram is an HTML/CSS component (see
+// components/ArchitectureDiagram.tsx) — neither is an image. The Old-page placeholders below are
 // pulled from the Cloudscape foundation image set.
-import { asset } from '../asset';
-
 const img = (path: string) => `https://cloudscape.design${path}`;
 
 export const images = {
-  // Home hero artwork (light/dark variants).
-  hero: {
-    light: asset('/static/dstack-gpu-artwork.svg'),
-    dark: asset('/static/dstack-gpu-artwork-dark.svg'),
-  },
-  // (The "Vendor-agnostic, open-source" architecture diagram is now an HTML/CSS component —
-  //  see components/ArchitectureDiagram.tsx — not an image.)
   // Old page imagery (kept for comparison / as a template for future product pages).
   meet: img('/__images/yvlrib0vb3vb/3RkANdWu0IRLpTcBJYSPg5/2397551327a83cfbddd1fe4db9f58188/homepage--meet-cloudscape--os-light.png'),
   familiar: img('/__images/yvlrib0vb3vb/3CJGtMGSx07lhdtgwL8Ncb/0e33dc1bac3936239e2bc856ee268e80/homepage--get-familiar-with-system--os-light.png'),
