@@ -20,7 +20,6 @@ const HERO_LAYERS: SquircleLayerConfig[] = [
     id: 'layer-1',
     visible: true,
     offset: { x: 0, y: 176 },
-    geometry: { exponent: 24 },
     base: {
       material: 'wireframe',
       paletteId: '15',
@@ -40,7 +39,6 @@ const HERO_LAYERS: SquircleLayerConfig[] = [
     id: 'layer-2',
     visible: true,
     offset: { x: 0, y: 88 },
-    geometry: { exponent: 24 },
     base: {
       material: 'transparent',
       paletteId: '20',
@@ -60,7 +58,6 @@ const HERO_LAYERS: SquircleLayerConfig[] = [
     id: 'layer-3',
     visible: true,
     offset: { x: 0, y: 0 },
-    geometry: { exponent: 24 },
     base: {
       material: 'solid',
       paletteId: '20',
