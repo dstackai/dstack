@@ -30,19 +30,26 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import EntityReference
+from dstack._internal.core.models.common import ApplyAction, EntityReference
 from dstack._internal.core.models.gateways import (
     GATEWAY_REPLICAS_DEFAULT,
     AnyGatewayRouterConfig,
+    ApplyGatewayPlanInput,
     Gateway,
     GatewayComputeConfiguration,
     GatewayConfiguration,
+    GatewayPlan,
     GatewayReplica,
     GatewaySpec,
     GatewayStatus,
     LetsEncryptGatewayCertificate,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.core.services.diff import (
+    ModelDiff,
+    diff_models,
+    format_diff_fields_for_event,
+)
 from dstack._internal.proxy.gateway.const import SERVICE_SCALING_WINDOWS
 from dstack._internal.proxy.gateway.schemas.stats import PerWindowStats, Stat
 from dstack._internal.server import settings
@@ -80,6 +87,7 @@ from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+_CONF_UPDATABLE_FIELDS = frozenset({"domain"})
 
 
 def switch_gateway_status(
@@ -227,15 +235,18 @@ async def create_gateway(
     project: ProjectModel,
     configuration: GatewayConfiguration,
     pipeline_hinter: PipelineHinterProtocol,
+    *,
+    effective_configuration: Optional[GatewayConfiguration] = None,
 ) -> Gateway:
-    spec = await apply_plugin_policies(
-        user=user.name,
-        project=project.name,
-        # Create pseudo spec until the gateway API is updated to accept spec
-        spec=GatewaySpec(configuration=configuration),
-    )
-    configuration = spec.configuration
-    _validate_gateway_configuration(configuration)
+    if effective_configuration is None:
+        spec = await apply_plugin_policies(
+            user=user.name,
+            project=project.name,
+            spec=GatewaySpec(configuration=configuration),
+        )
+        effective_configuration = spec.configuration
+        _validate_gateway_configuration(effective_configuration)
+    configuration = effective_configuration
 
     backend_model, _ = await get_project_backend_with_model_by_type_or_error(
         project=project, backend_type=configuration.backend
@@ -871,6 +882,134 @@ def gateway_model_to_gateway(
         configuration=configuration,
         replicas=replicas,
     )
+
+
+async def get_plan(
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    spec: GatewaySpec,
+) -> GatewayPlan:
+    effective_spec = await apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        spec=spec,
+    )
+    _validate_gateway_configuration(effective_spec.configuration)
+
+    action = ApplyAction.CREATE
+    current_gateway: Optional[Gateway] = None
+
+    if effective_spec.configuration.name is not None:
+        current_gateway_model = await get_project_gateway_model_by_reference(
+            session=session,
+            project=project,
+            ref=EntityReference(name=effective_spec.configuration.name, project=None),
+            load_gateway_compute=True,
+            load_backend_type=True,
+        )
+        if current_gateway_model is not None:
+            if current_gateway_model.to_be_deleted:
+                raise ServerClientError(
+                    f"Gateway {effective_spec.configuration.name!r} is being deleted. Try again later."
+                )
+            current_gateway = gateway_model_to_gateway(
+                current_gateway_model, default_gateway_id=project.default_gateway_id
+            )
+            if _can_update_gateway_in_place(
+                diff_models(current_gateway.configuration, effective_spec.configuration)
+            ):
+                action = ApplyAction.UPDATE
+
+    return GatewayPlan(
+        project_name=project.name,
+        user=user.name,
+        spec=spec,
+        effective_spec=effective_spec,
+        current_resource=current_gateway,
+        action=action,
+    )
+
+
+async def apply_plan(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    plan: ApplyGatewayPlanInput,
+    force: bool,
+    pipeline_hinter: PipelineHinterProtocol,
+) -> Gateway:
+    spec = await apply_plugin_policies(
+        user=user.name,
+        project=project.name,
+        spec=plan.spec,
+    )
+    new_configuration = spec.configuration
+    _validate_gateway_configuration(new_configuration)
+
+    if new_configuration.name is None:
+        return await create_gateway(
+            session=session,
+            user=user,
+            project=project,
+            configuration=plan.spec.configuration,
+            pipeline_hinter=pipeline_hinter,
+            effective_configuration=new_configuration,
+        )
+
+    async with get_project_gateway_model_by_name_for_update(
+        session, project, new_configuration.name
+    ) as gateway_model:
+        if gateway_model is None:
+            return await create_gateway(
+                session=session,
+                user=user,
+                project=project,
+                configuration=plan.spec.configuration,
+                pipeline_hinter=pipeline_hinter,
+                effective_configuration=new_configuration,
+            )
+        if gateway_model.to_be_deleted:
+            raise ServerClientError(
+                f"Gateway {new_configuration.name!r} is being deleted. Try again later."
+            )
+        current_configuration = gateway_model_to_gateway(
+            gateway_model,
+            default_gateway_id=project.default_gateway_id,
+        ).configuration
+
+        if not force:
+            if (
+                plan.current_resource is None
+                or plan.current_resource.id != gateway_model.id
+                or plan.current_resource.configuration != current_configuration
+            ):
+                raise ServerClientError(
+                    "Failed to apply plan. Resource has been changed. Try again or use force apply."
+                )
+
+        diff = diff_models(current_configuration, new_configuration)
+        if not _can_update_gateway_in_place(diff):
+            raise ServerClientError(
+                f"Gateway {new_configuration.name!r} cannot be updated in-place."
+                " Delete it and re-apply."
+            )
+
+        gateway_model.wildcard_domain = new_configuration.domain
+        gateway_model.configuration = new_configuration.json()
+        events.emit(
+            session,
+            f"Gateway updated. Changed fields: {format_diff_fields_for_event(diff)}",
+            actor=events.UserActor.from_user(user),
+            targets=[events.Target.from_model(gateway_model)],
+        )
+        await session.commit()
+
+    return gateway_model_to_gateway(gateway_model, default_gateway_id=project.default_gateway_id)
+
+
+def _can_update_gateway_in_place(conf_diff: ModelDiff) -> bool:
+    return all(field in _CONF_UPDATABLE_FIELDS for field in conf_diff)
 
 
 def _validate_gateway_configuration(configuration: GatewayConfiguration):

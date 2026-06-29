@@ -7,7 +7,7 @@ from pydantic import Field, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import ApplyAction, CoreModel
 from dstack._internal.core.models.routers import AnyGatewayRouterConfig
 from dstack._internal.utils.tags import tags_validator
 
@@ -80,7 +80,8 @@ class GatewayConfiguration(CoreModel):
                 "The gateway wildcard domain name, e.g. `example.com`."
                 " Service domain names are constructed as `<run name>.<gateway domain`."
                 " The domain name can use the `${{ run.project_name }}` variable"
-                " to include the service’s project name"
+                " to include the service’s project name."
+                " Can be updated in-place. Updates do not affect existing services"
             )
         ),
     ] = None
@@ -165,7 +166,22 @@ class GatewayPlan(CoreModel):
     project_name: str
     user: str
     spec: GatewaySpec
+    effective_spec: GatewaySpec
     current_resource: Optional[Gateway] = None
+    action: ApplyAction
+
+
+class ApplyGatewayPlanInput(CoreModel):
+    spec: GatewaySpec
+    current_resource: Annotated[
+        Optional[Gateway],
+        Field(
+            description=(
+                "The expected current resource."
+                " If the resource has changed, the apply fails unless `force: true`."
+            )
+        ),
+    ] = None
 
 
 class GatewayComputeConfiguration(CoreModel):
