@@ -31,8 +31,14 @@ class TestListAndGetGateways:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_list(
-        self, test_db, session: AsyncSession, client: AsyncClient, legacy_compute: bool
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        legacy_compute: bool,
+        populate_configuration: bool,
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -44,13 +50,21 @@ class TestListAndGetGateways:
             session=session,
             project_id=project.id,
             backend_id=backend.id,
+            populate_configuration=populate_configuration,
         )
         if legacy_compute:
-            gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+            gateway_compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                populate_configuration=populate_configuration,
+            )
             gateway.gateway_compute_id = gateway_compute.id  # pre-0.20.25 relationship style
         else:
             gateway_compute = await create_gateway_compute(
-                session=session, backend_id=backend.id, gateway_id=gateway.id
+                session=session,
+                backend_id=backend.id,
+                gateway_id=gateway.id,
+                populate_configuration=populate_configuration,
             )
         await session.commit()
         response = await client.post(
@@ -102,8 +116,14 @@ class TestListAndGetGateways:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_get(
-        self, test_db, session: AsyncSession, client: AsyncClient, legacy_compute: bool
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        legacy_compute: bool,
+        populate_configuration: bool,
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -115,13 +135,21 @@ class TestListAndGetGateways:
             session=session,
             project_id=project.id,
             backend_id=backend.id,
+            populate_configuration=populate_configuration,
         )
         if legacy_compute:
-            gateway_compute = await create_gateway_compute(session=session, backend_id=backend.id)
+            gateway_compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                populate_configuration=populate_configuration,
+            )
             gateway.gateway_compute_id = gateway_compute.id  # pre-0.20.25 relationship style
         else:
             gateway_compute = await create_gateway_compute(
-                session=session, backend_id=backend.id, gateway_id=gateway.id
+                session=session,
+                backend_id=backend.id,
+                gateway_id=gateway.id,
+                populate_configuration=populate_configuration,
             )
         await session.commit()
         response = await client.post(
@@ -797,7 +825,10 @@ class TestDefaultGateway:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_set_default_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_set_default_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient, populate_configuration: bool
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -809,11 +840,13 @@ class TestDefaultGateway:
             project_id=project.id,
             backend_id=backend.id,
             name="first_gateway",
+            populate_configuration=populate_configuration,
         )
         gateway_compute = await create_gateway_compute(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
+            populate_configuration=populate_configuration,
         )
         response = await client.post(
             f"/api/project/{project.name}/gateways/set_default",
@@ -875,11 +908,13 @@ class TestDefaultGateway:
             project_id=project.id,
             backend_id=backend.id,
             name="second_gateway",
+            populate_configuration=populate_configuration,
         )
         await create_gateway_compute(
             session=session,
             backend_id=backend.id,
             gateway_id=second_gateway.id,
+            populate_configuration=populate_configuration,
         )
         await clear_events(session)
         response = await client.post(
@@ -1061,8 +1096,13 @@ class TestDeleteGateway:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_marks_gateways_to_be_deleted(
-        self, test_db, session: AsyncSession, client: AsyncClient
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        populate_configuration: bool,
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -1076,22 +1116,26 @@ class TestDeleteGateway:
             project_id=project.id,
             backend_id=backend_aws.id,
             name="gateway-aws",
+            populate_configuration=populate_configuration,
         )
         gateway_compute_aws = await create_gateway_compute(
             session=session,
             backend_id=backend_aws.id,
             gateway_id=gateway_aws.id,
+            populate_configuration=populate_configuration,
         )
         gateway_gcp = await create_gateway(
             session=session,
             project_id=project.id,
             backend_id=backend_gcp.id,
             name="gateway-gcp",
+            populate_configuration=populate_configuration,
         )
         gateway_compute_gcp = await create_gateway_compute(
             session=session,
             backend_id=backend_gcp.id,
             gateway_id=gateway_gcp.id,
+            populate_configuration=populate_configuration,
         )
         response = await client.post(
             f"/api/project/{project.name}/gateways/delete",
@@ -1183,7 +1227,10 @@ class TestUpdateGateway:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_set_wildcard_domain(self, test_db, session: AsyncSession, client: AsyncClient):
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_set_wildcard_domain(
+        self, test_db, session: AsyncSession, client: AsyncClient, populate_configuration: bool
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -1195,11 +1242,13 @@ class TestUpdateGateway:
             project_id=project.id,
             backend_id=backend.id,
             wildcard_domain="old.example",
+            populate_configuration=populate_configuration,
         )
         gateway_compute = await create_gateway_compute(
             session=session,
             backend_id=backend.id,
             gateway_id=gateway.id,
+            populate_configuration=populate_configuration,
         )
         response = await client.post(
             f"/api/project/{project.name}/gateways/set_wildcard_domain",

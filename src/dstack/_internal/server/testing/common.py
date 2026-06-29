@@ -44,7 +44,11 @@ from dstack._internal.core.models.fleets import (
     SSHHostParams,
     SSHParams,
 )
-from dstack._internal.core.models.gateways import GatewayComputeConfiguration, GatewayStatus
+from dstack._internal.core.models.gateways import (
+    GatewayComputeConfiguration,
+    GatewayConfiguration,
+    GatewayStatus,
+)
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import (
     Disk,
@@ -641,13 +645,31 @@ async def create_gateway(
     status: Optional[GatewayStatus] = GatewayStatus.SUBMITTED,
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     forbid_new_services: bool = False,
+    populate_configuration: bool = True,
 ) -> GatewayModel:
+    """
+    Args:
+        populate_configuration: whether to populate GatewayModel.configuration.
+            True - 0.18.2+ gateways, False - legacy pre-0.18.2 gateways. Prefer
+            testing against both in major test cases.
+    """
+    configuration = None
+    if populate_configuration:
+        backend = await session.get(BackendModel, backend_id)
+        assert backend is not None
+        configuration = GatewayConfiguration(
+            name=name,
+            backend=backend.type,
+            region=region,
+            domain=wildcard_domain,
+        ).json()
     gateway = GatewayModel(
         project_id=project_id,
         backend_id=backend_id,
         name=name,
         region=region,
         wildcard_domain=wildcard_domain,
+        configuration=configuration,
         status=status,
         last_processed_at=last_processed_at,
         forbid_new_services=forbid_new_services,
@@ -666,7 +688,30 @@ async def create_gateway_compute(
     instance_id: Optional[str] = "i-1234567890",
     ssh_private_key: str = "",
     ssh_public_key: str = "",
+    populate_configuration: bool = True,
 ) -> GatewayComputeModel:
+    """
+    Args:
+        populate_configuration: whether to populate GatewayComputeModel.configuration.
+            True - 0.18.2+ gateways, False - legacy pre-0.18.2 gateways. Prefer
+            testing against both in major test cases.
+    """
+    configuration = None
+    if populate_configuration:
+        backend_type = BackendType.AWS
+        if backend_id is not None:
+            backend = await session.get(BackendModel, backend_id)
+            assert backend is not None
+            backend_type = backend.type
+        configuration = GatewayComputeConfiguration(
+            project_name="test-project",
+            instance_name=instance_id or "test-instance",
+            backend=backend_type,
+            region=region,
+            public_ip=True,
+            ssh_key_pub=ssh_public_key,
+            certificate=None,
+        ).json()
     gateway_compute = GatewayComputeModel(
         gateway_id=gateway_id,
         backend_id=backend_id,
@@ -675,6 +720,7 @@ async def create_gateway_compute(
         instance_id=instance_id,
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
+        configuration=configuration,
     )
     session.add(gateway_compute)
     await session.commit()
