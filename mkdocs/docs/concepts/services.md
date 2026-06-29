@@ -423,7 +423,7 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
     > SMG workers connect to the router over HTTP or gRPC. The example above uses HTTP. SGLang workers support both modes; vLLM workers support gRPC only.
 
     ??? info "gRPC mode"
-        Over gRPC, workers run from an SMG worker image, and `smg launch` needs `--enable-igw` and `--model-path` so the router can register the workers. See the full configurations in [SGLang PD disaggregation](../examples/inference/sglang.md#pd-disaggregation) and [vLLM PD disaggregation](../examples/inference/vllm.md#pd-disaggregation).
+        Over gRPC, workers run from SMG images that bundle a specific backend version (SGLang or vLLM), and `smg launch` needs `--enable-igw` and `--model-path` so the router can register the workers. See the full configurations in [SGLang PD disaggregation](../examples/inference/sglang.md#pd-disaggregation) and [vLLM PD disaggregation](../examples/inference/vllm.md#pd-disaggregation).
 
 === "Dynamo"
 

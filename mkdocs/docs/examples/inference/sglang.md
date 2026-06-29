@@ -213,7 +213,7 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
 
     ??? info "gRPC mode"
 
-        SGLang workers can also connect to the SMG router over gRPC. Use an SMG worker image, pass `--grpc-mode` to the worker, and add `--enable-igw` and `--model-path` to `smg launch` so the router can register the workers.
+        SGLang workers can also connect to the SMG router over gRPC. Run the workers from an SMG image that bundles the SGLang version, pass `--grpc-mode`, and add `--enable-igw` and `--model-path` to `smg launch` so the router can register them.
 
         <div editor-title="pd-grpc.dstack.yml">
 
