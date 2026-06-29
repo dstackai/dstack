@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Button from '@cloudscape-design/components/button';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
+import SpaceBetween from '@cloudscape-design/components/space-between';
 import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { highlightTerms } from '../../components/highlightTerms';
@@ -48,9 +49,14 @@ export function FaqSection() {
         }
         title="FAQ"
         action={
-          <Button variant="primary" href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
-            Discord
-          </Button>
+          <SpaceBetween direction="horizontal" size="xs">
+            <Button variant="primary" href="https://discord.gg/u8SmfwPpMd" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
+              Discord
+            </Button>
+            <Button href="https://calendly.com/dstackai/discovery-call" target="_blank" iconAlign="right" iconName="external" style={mainButtonStyle}>
+              Contact us
+            </Button>
+          </SpaceBetween>
         }
       >
         Have questions, or need help? Reach out to us on Discord or directly.

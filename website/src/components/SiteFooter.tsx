@@ -66,7 +66,7 @@ const footerColumns: FooterColumn[] = [
     heading: 'Company',
     links: [
       { label: 'Blog', href: BLOG_URL },
-      { label: 'Talk to us', href: 'https://calendly.com/dstackai/discovery-call', external: true },
+      { label: 'Get a demo', href: 'https://calendly.com/dstackai/discovery-call', external: true },
       { label: 'Terms of service', href: TERMS_URL },
       { label: 'Privacy policy', href: PRIVACY_URL },
     ],
