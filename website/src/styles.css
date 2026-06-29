@@ -1514,11 +1514,6 @@ p {
 .gs-boxfoot > [class*='awsui_button'] {
   flex: 0 0 auto;
 }
-.gs-foot__cta {
-  display: flex;
-  gap: 8px;
-  flex: 0 0 auto;
-}
 
 /* Tab strip — shared by the open-source code box (uv / pip / Docker) and dstack Sky (GPU
    marketplace / bring your own clouds), so both boxes read the same: tabs on top, content, footer. */
@@ -1717,8 +1712,6 @@ p {
      uses its shorter wording and the CTAs use tighter padding so the note keeps room beside them. */
   .gs-boxfoot { align-items: center; gap: 10px; }
   .gs-boxfoot [class*='awsui_button'] { padding-inline: 14px !important; }
-  /* Sky has two CTAs; on a phone keep only the primary ("Sign up") so the note fits beside it. */
-  .gs-foot__cta > [class*='awsui_button']:first-child { display: none !important; }
   .gs-foot__full { display: none; }
   .gs-foot__short { display: inline; }
 }

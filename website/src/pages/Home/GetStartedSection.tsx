@@ -241,10 +241,7 @@ export function GetStartedSection() {
                   <span className="gs-foot__full">Sign up to get $5 credit for on-demand and spot instances</span>
                   <span className="gs-foot__short">Sign up to get $5 in credits</span>
                 </span>
-                <div className="gs-foot__cta">
-                  <Button href="https://sky.dstack.ai" target="_blank" style={mainButtonStyle}>Reserve a cluster</Button>
-                  <Button variant="primary" href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign up</Button>
-                </div>
+                <Button variant="primary" href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign up</Button>
               </div>
             </div>
           </div>
