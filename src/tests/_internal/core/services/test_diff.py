@@ -78,7 +78,7 @@ class TestDiffModels:
             ),
             pytest.param(
                 _CoreModelA(a=1, b="x"),
-                _CoreModelA.__response__(a=1, b="y"),
+                _CoreModelA.__request__(a=1, b="y"),
                 {"b": ModelFieldDiff(old="x", new="y")},
                 id="core-model-base-request",
             ),
