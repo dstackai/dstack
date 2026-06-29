@@ -128,7 +128,7 @@ curl http://127.0.0.1:3000/proxy/services/main/qwen36/v1/chat/completions \
 
 ### PD disaggregation
 
-To run vLLM with [PD disaggregation](https://docs.vllm.ai/en/latest/serving/disagg_prefill.html), use replica groups: one for [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html), one for prefill workers (`kv_producer`), and one for decode workers (`kv_consumer`).
+To run vLLM with [PD disaggregation](https://docs.vllm.ai/en/latest/serving/disagg_prefill.html), use replica groups: one for [Shepherd Model Gateway (SMG)](https://docs.sglang.io/advanced_features/sgl_model_gateway.html), one for prefill workers, and one for decode workers.
 
 <div editor-title="pd.dstack.yml">
 
