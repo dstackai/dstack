@@ -396,6 +396,10 @@ async def set_gateway_wildcard_domain(
         old_domain = gateway.wildcard_domain
         if old_domain != wildcard_domain:
             gateway.wildcard_domain = wildcard_domain
+            if gateway.configuration is not None:
+                conf = get_gateway_configuration(gateway)
+                conf.domain = wildcard_domain
+                gateway.configuration = conf.json()
             events.emit(
                 session,
                 f"Gateway wildcard domain changed {old_domain!r} -> {gateway.wildcard_domain!r}",

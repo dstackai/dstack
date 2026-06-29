@@ -3832,6 +3832,52 @@ class TestSubmitService:
         assert ("Service registered in gateway" in {e.message for e in events}) == is_gateway
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_submit_to_gateway_by_name(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        populate_configuration: bool,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user, name="test-project")
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="my-gateway",
+            wildcard_domain="my-gateway.example",
+            populate_configuration=populate_configuration,
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            populate_configuration=populate_configuration,
+        )
+        run_spec = get_service_run_spec(
+            repo_id=repo.name,
+            run_name="test-service",
+            gateway="my-gateway",
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/submit",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec},
+        )
+        assert response.status_code == 200
+        assert response.json()["service"]["url"] == "https://test-service.my-gateway.example"
+        events = await list_events(session)
+        assert "Service registered in gateway" in {e.message for e in events}
+
+    @pytest.mark.asyncio
     async def test_return_error_if_specified_gateway_not_exists(
         self, test_db, session: AsyncSession, client: AsyncClient
     ) -> None:
