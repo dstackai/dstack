@@ -13,7 +13,7 @@ def patch_gateway(gateway: Gateway, client_version: Optional[Version]) -> None:
         gateway.ip_address = "\n".join(r.hostname for r in gateway.replicas if r.hostname)
         if gateway.hostname is None:
             gateway.hostname = gateway.ip_address
-    if client_version == Version("0.20.25"):
+    if client_version in (Version("0.20.25"), Version("0.20.26")):
         for replica in gateway.replicas:
             if replica.hostname is None:
                 replica.hostname = ""

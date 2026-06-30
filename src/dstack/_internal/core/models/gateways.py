@@ -133,7 +133,7 @@ class GatewayReplica(CoreModel):
     region: Optional[str] = None
     created_at: datetime.datetime
     status: Optional[GatewayReplicaStatus] = None
-    """`status` is only optional on the client side for compatibility with 0.20.25 servers"""
+    """`status` is only optional on the client side for compatibility with 0.20.25 and 0.20.26 servers"""
     status_message: Optional[str] = None
 
 
