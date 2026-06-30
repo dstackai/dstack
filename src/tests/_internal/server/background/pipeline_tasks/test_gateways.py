@@ -27,6 +27,7 @@ from dstack._internal.server.testing.common import (
     create_gateway,
     create_gateway_compute,
     create_project,
+    get_gateway_compute_configuration,
     list_events,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -486,6 +487,7 @@ class TestGatewayWorkerProvisioning:
             instance_id=None,
             region=None,
             status=GatewayReplicaStatus.SUBMITTED,
+            configuration=get_gateway_compute_configuration().json(),
         )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)

@@ -92,6 +92,7 @@ class TestGatewayReplicaFetcher:
             region=None,
             status=GatewayReplicaStatus.SUBMITTED,
             last_processed_at=stale - timedelta(seconds=3),
+            configuration=get_gateway_compute_configuration().json(),
         )
         provisioning = await create_gateway_compute(
             session=session,
@@ -127,6 +128,7 @@ class TestGatewayReplicaFetcher:
             instance_id=None,
             region=None,
             last_processed_at=now,
+            configuration=get_gateway_compute_configuration().json(),
         )
         recent.created_at = now - timedelta(minutes=2)
         recent.last_processed_at = now
@@ -138,6 +140,7 @@ class TestGatewayReplicaFetcher:
             instance_id=None,
             region=None,
             last_processed_at=stale + timedelta(seconds=1),
+            configuration=get_gateway_compute_configuration().json(),
         )
         locked.lock_expires_at = now + timedelta(minutes=1)
         locked.lock_token = uuid.uuid4()
@@ -381,6 +384,7 @@ class TestGatewayReplicaWorkerSubmitted:
             instance_id=None,
             region=None,
             status=GatewayReplicaStatus.SUBMITTED,
+            configuration=get_gateway_compute_configuration().json(),
         )
         _lock_compute(compute)
         await session.commit()
@@ -416,6 +420,7 @@ class TestGatewayReplicaWorkerSubmitted:
             instance_id=None,
             region=None,
             status=GatewayReplicaStatus.SUBMITTED,
+            configuration=get_gateway_compute_configuration().json(),
         )
         _lock_compute(compute)
         await session.commit()
@@ -450,6 +455,7 @@ class TestGatewayReplicaWorkerSubmitted:
             instance_id=None,
             region=None,
             status=GatewayReplicaStatus.SUBMITTED,
+            configuration=get_gateway_compute_configuration().json(),
         )
         _lock_compute(compute)
         await session.commit()
