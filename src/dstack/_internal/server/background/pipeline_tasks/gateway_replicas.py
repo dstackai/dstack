@@ -145,6 +145,7 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
                         ),
                     )
                     .where(
+                        GatewayComputeModel.deleted == False,
                         or_(
                             GatewayComputeModel.status.in_(
                                 [
