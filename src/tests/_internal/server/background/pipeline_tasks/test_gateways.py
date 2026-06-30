@@ -307,8 +307,14 @@ class TestGatewayWorkerSubmitted:
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestGatewayWorkerProvisioning:
     @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_provisioning_to_running(
-        self, test_db, session: AsyncSession, worker: GatewayWorker, legacy_compute: bool
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayWorker,
+        legacy_compute: bool,
+        populate_configuration: bool,
     ):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -317,12 +323,14 @@ class TestGatewayWorkerProvisioning:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.PROVISIONING,
+            populate_configuration=populate_configuration,
         )
         if legacy_compute:
             gateway_compute = await create_gateway_compute(
                 session=session,
                 backend_id=backend.id,
                 status=GatewayReplicaStatus.RUNNING,
+                populate_configuration=populate_configuration,
             )
             gateway.gateway_compute_id = gateway_compute.id
         else:
@@ -330,6 +338,7 @@ class TestGatewayWorkerProvisioning:
                 session,
                 gateway_id=gateway.id,
                 status=GatewayReplicaStatus.RUNNING,
+                populate_configuration=populate_configuration,
             )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
@@ -531,8 +540,14 @@ class TestGatewayWorkerDeleted:
         assert events[0].message == "Gateway deleted"
 
     @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_deletes_gateway_when_all_replicas_terminated(
-        self, test_db, session: AsyncSession, worker: GatewayWorker, legacy_compute: bool
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayWorker,
+        legacy_compute: bool,
+        populate_configuration: bool,
     ):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -541,6 +556,7 @@ class TestGatewayWorkerDeleted:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
+            populate_configuration=populate_configuration,
         )
         if legacy_compute:
             gateway_compute = await create_gateway_compute(
@@ -548,6 +564,7 @@ class TestGatewayWorkerDeleted:
                 backend_id=backend.id,
                 status=GatewayReplicaStatus.TERMINATED,
                 active=False,
+                populate_configuration=populate_configuration,
             )
             gateway.gateway_compute_id = gateway_compute.id
         else:
@@ -557,6 +574,7 @@ class TestGatewayWorkerDeleted:
                 gateway_id=gateway.id,
                 status=GatewayReplicaStatus.TERMINATED,
                 active=False,
+                populate_configuration=populate_configuration,
             )
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)

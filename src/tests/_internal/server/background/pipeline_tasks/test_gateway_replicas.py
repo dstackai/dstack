@@ -522,6 +522,7 @@ class TestGatewayReplicaWorkerRunning:
         ],
     )
     @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_running_to_terminating(
         self,
         test_db,
@@ -530,6 +531,7 @@ class TestGatewayReplicaWorkerRunning:
         gateway_status: GatewayStatus,
         to_be_deleted: bool,
         legacy_compute: bool,
+        populate_configuration: bool,
     ):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -538,6 +540,7 @@ class TestGatewayReplicaWorkerRunning:
             project_id=project.id,
             backend_id=backend.id,
             status=gateway_status,
+            populate_configuration=populate_configuration,
         )
         gateway.to_be_deleted = to_be_deleted
         if legacy_compute:
@@ -545,6 +548,7 @@ class TestGatewayReplicaWorkerRunning:
                 session=session,
                 status=GatewayReplicaStatus.RUNNING,
                 active=True,
+                populate_configuration=populate_configuration,
             )
             gateway.gateway_compute_id = compute.id
         else:
@@ -553,6 +557,7 @@ class TestGatewayReplicaWorkerRunning:
                 gateway_id=gateway.id,
                 status=GatewayReplicaStatus.RUNNING,
                 active=True,
+                populate_configuration=populate_configuration,
             )
         _lock_compute(compute)
         await session.commit()
@@ -568,8 +573,14 @@ class TestGatewayReplicaWorkerRunning:
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestGatewayReplicaWorkerProvisioning:
     @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_provisioning_to_running(
-        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker, legacy_compute: bool
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        legacy_compute: bool,
+        populate_configuration: bool,
     ):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -578,11 +589,13 @@ class TestGatewayReplicaWorkerProvisioning:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.PROVISIONING,
+            populate_configuration=populate_configuration,
         )
         if legacy_compute:
             compute = await create_gateway_compute(
                 session=session,
                 status=GatewayReplicaStatus.PROVISIONING,
+                populate_configuration=populate_configuration,
             )
             gateway.gateway_compute_id = compute.id
         else:
@@ -590,6 +603,7 @@ class TestGatewayReplicaWorkerProvisioning:
                 session=session,
                 gateway_id=gateway.id,
                 status=GatewayReplicaStatus.PROVISIONING,
+                populate_configuration=populate_configuration,
             )
         _lock_compute(compute)
         await session.commit()
@@ -745,8 +759,14 @@ class TestGatewayReplicaWorkerProvisioning:
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestGatewayReplicaWorkerTerminating:
     @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_terminating_to_terminated(
-        self, test_db, session: AsyncSession, worker: GatewayReplicaWorker, legacy_compute: bool
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayReplicaWorker,
+        legacy_compute: bool,
+        populate_configuration: bool,
     ):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -755,6 +775,7 @@ class TestGatewayReplicaWorkerTerminating:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.FAILED,
+            populate_configuration=populate_configuration,
         )
         if legacy_compute:
             compute = await create_gateway_compute(
@@ -762,6 +783,7 @@ class TestGatewayReplicaWorkerTerminating:
                 backend_id=backend.id,
                 status=GatewayReplicaStatus.TERMINATING,
                 active=False,
+                populate_configuration=populate_configuration,
             )
             gateway.gateway_compute_id = compute.id
         else:
@@ -771,6 +793,7 @@ class TestGatewayReplicaWorkerTerminating:
                 backend_id=backend.id,
                 status=GatewayReplicaStatus.TERMINATING,
                 active=False,
+                populate_configuration=populate_configuration,
             )
         _lock_compute(compute)
         await session.commit()
