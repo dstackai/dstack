@@ -33,7 +33,14 @@ def diff_models(
         A dict of changed fields in the form of
         `{<field_name>: {"old": old_value, "new": new_value}}`
     """
-    if type(old) is not type(new):
+    if not (
+        type(old) is type(new)
+        or (
+            isinstance(old, CoreModel)
+            and isinstance(new, CoreModel)
+            and type(old).__response__ is type(new).__response__
+        )
+    ):
         raise TypeError("Both instances must be of the same Pydantic model class.")
 
     if reset is not None:

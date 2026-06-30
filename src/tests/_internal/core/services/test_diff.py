@@ -1,6 +1,128 @@
 import pytest
+from pydantic import BaseModel
 
-from dstack._internal.core.services.diff import ModelDiff, ModelFieldDiff, flatten_diff_fields
+from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.services.diff import (
+    ModelDiff,
+    ModelFieldDiff,
+    diff_models,
+    flatten_diff_fields,
+)
+
+
+class TestDiffModels:
+    class _BaseModelA(BaseModel):
+        a: int
+        b: str
+
+    class _BaseModelB(BaseModel):
+        c: int
+
+    class _BaseModelAB(_BaseModelA, _BaseModelB):
+        pass
+
+    class _CoreModelA(CoreModel):
+        a: int
+        b: str
+
+    class _CoreModelB(CoreModel):
+        c: int
+
+    class _CoreModelAB(_CoreModelA, _CoreModelB):
+        pass
+
+    @pytest.mark.parametrize(
+        ("old", "new", "expected"),
+        [
+            pytest.param(
+                _BaseModelA(a=1, b="x"),
+                _BaseModelA(a=1, b="y"),
+                {"b": ModelFieldDiff(old="x", new="y")},
+                id="base-model",
+            ),
+            pytest.param(
+                _CoreModelA(a=1, b="x"),
+                _CoreModelA(a=1, b="y"),
+                {"b": ModelFieldDiff(old="x", new="y")},
+                id="core-model",
+            ),
+            pytest.param(
+                _BaseModelA(a=1, b="x"),
+                _BaseModelA(a=1, b="x"),
+                {},
+                id="base-model-no-diff",
+            ),
+            pytest.param(
+                _CoreModelA(a=1, b="x"),
+                _CoreModelA(a=1, b="x"),
+                {},
+                id="core-model-no-diff",
+            ),
+            pytest.param(
+                _CoreModelA.__request__(a=1, b="x"),
+                _CoreModelA.__request__(a=1, b="y"),
+                {"b": ModelFieldDiff(old="x", new="y")},
+                id="core-model-request",
+            ),
+            pytest.param(
+                _CoreModelA.__response__(a=1, b="x"),
+                _CoreModelA.__response__(a=1, b="y"),
+                {"b": ModelFieldDiff(old="x", new="y")},
+                id="core-model-response",
+            ),
+            pytest.param(
+                _CoreModelA.__request__(a=1, b="x"),
+                _CoreModelA.__response__(a=1, b="y"),
+                {"b": ModelFieldDiff(old="x", new="y")},
+                id="core-model-request-response",
+            ),
+            pytest.param(
+                _CoreModelA(a=1, b="x"),
+                _CoreModelA.__request__(a=1, b="y"),
+                {"b": ModelFieldDiff(old="x", new="y")},
+                id="core-model-base-request",
+            ),
+            pytest.param(
+                _CoreModelA(a=1, b="x"),
+                _CoreModelA.__response__(a=1, b="y"),
+                {"b": ModelFieldDiff(old="x", new="y")},
+                id="core-model-base-response",
+            ),
+        ],
+    )
+    def test_diff_models(self, old: BaseModel, new: BaseModel, expected: ModelDiff) -> None:
+        assert diff_models(old, new) == expected
+
+    @pytest.mark.parametrize(
+        ("old", "new"),
+        [
+            pytest.param(
+                _BaseModelA(a=1, b="x"),
+                _BaseModelB(c=2),
+                id="different-base-models",
+            ),
+            pytest.param(
+                _BaseModelA(a=1, b="x"),
+                _BaseModelAB(a=1, b="x", c=2),
+                id="base-model-and-subclass",
+            ),
+            pytest.param(
+                _CoreModelA(a=1, b="x"),
+                _CoreModelB(c=2),
+                id="different-core-models",
+            ),
+            pytest.param(
+                _CoreModelA(a=1, b="x"),
+                _CoreModelAB(a=1, b="x", c=2),
+                id="core-model-and-subclass",
+            ),
+        ],
+    )
+    def test_type_mismatch(self, old: BaseModel, new: BaseModel) -> None:
+        with pytest.raises(
+            TypeError, match="Both instances must be of the same Pydantic model class."
+        ):
+            diff_models(old, new)
 
 
 @pytest.mark.parametrize(

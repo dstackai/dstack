@@ -8,6 +8,7 @@ from dstack._internal.core.backends.aws.resources import (
     _create_network_interfaces_struct,
     _is_valid_tag_key,
     _is_valid_tag_value,
+    create_instances_struct,
     get_image_id_and_username,
     validate_tags,
 )
@@ -236,6 +237,43 @@ class TestGetImageIdAndUsername:
                 image_config=image_config,
             )
         assert "cpu image not configured" in caplog.text
+
+
+class TestCreateInstancesStruct:
+    def _struct(self, **kwargs):
+        return create_instances_struct(
+            disk_size=100,
+            image_id="ami-1",
+            instance_type="m5.large",
+            iam_instance_profile=None,
+            user_data="",
+            tags=[],
+            security_group_id="sg-1",
+            spot=False,
+            **kwargs,
+        )
+
+    def test_no_tenancy_by_default(self):
+        struct = self._struct(reservation_id="cr-1")
+        assert "Placement" not in struct
+
+    def test_default_tenancy_not_set(self):
+        # `default` is the implicit AWS behavior, so it should not be sent explicitly
+        struct = self._struct(reservation_id="cr-1", tenancy="default")
+        assert "Placement" not in struct
+
+    def test_dedicated_tenancy_applied(self):
+        struct = self._struct(reservation_id="cr-1", tenancy="dedicated")
+        assert struct["Placement"]["Tenancy"] == "dedicated"
+
+    def test_tenancy_merged_with_placement_group(self):
+        struct = self._struct(
+            reservation_id="cr-1",
+            tenancy="dedicated",
+            placement_group_name="pg-1",
+        )
+        assert struct["Placement"]["GroupName"] == "pg-1"
+        assert struct["Placement"]["Tenancy"] == "dedicated"
 
 
 class TestCreateNetworkInterfacesStruct:

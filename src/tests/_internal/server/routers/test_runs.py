@@ -903,6 +903,7 @@ class TestListRuns:
         job2 = await create_job(
             session=session,
             run=run,
+            submission_num=1,
             submitted_at=run_submitted_at,
             last_processed_at=run_submitted_at,
         )
@@ -930,7 +931,7 @@ class TestListRuns:
                         "job_submissions": [
                             {
                                 "id": str(job2.id),
-                                "submission_num": 0,
+                                "submission_num": 1,
                                 "deployment_num": 0,
                                 "submitted_at": run_submitted_at.isoformat(),
                                 "last_processed_at": run_submitted_at.isoformat(),
@@ -953,7 +954,7 @@ class TestListRuns:
                 ],
                 "latest_job_submission": {
                     "id": str(job2.id),
-                    "submission_num": 0,
+                    "submission_num": 1,
                     "deployment_num": 0,
                     "submitted_at": run_submitted_at.isoformat(),
                     "last_processed_at": run_submitted_at.isoformat(),
@@ -3829,6 +3830,52 @@ class TestSubmitService:
         assert response.json()["service"]["model"]["base_url"] == expected_model_url
         events = await list_events(session)
         assert ("Service registered in gateway" in {e.message for e in events}) == is_gateway
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_submit_to_gateway_by_name(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        populate_configuration: bool,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user, name="test-project")
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            name="my-gateway",
+            wildcard_domain="my-gateway.example",
+            populate_configuration=populate_configuration,
+        )
+        await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+            gateway_id=gateway.id,
+            populate_configuration=populate_configuration,
+        )
+        run_spec = get_service_run_spec(
+            repo_id=repo.name,
+            run_name="test-service",
+            gateway="my-gateway",
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/submit",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec},
+        )
+        assert response.status_code == 200
+        assert response.json()["service"]["url"] == "https://test-service.my-gateway.example"
+        events = await list_events(session)
+        assert "Service registered in gateway" in {e.message for e in events}
 
     @pytest.mark.asyncio
     async def test_return_error_if_specified_gateway_not_exists(

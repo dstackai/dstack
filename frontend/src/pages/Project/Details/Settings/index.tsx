@@ -86,6 +86,7 @@ export const ProjectSettings: React.FC = () => {
     const { data: runsData } = useGetRunsQuery({
         project_name: paramProjectName,
         limit: 1,
+        job_submissions_limit: 1,
     });
 
     useEffect(() => {

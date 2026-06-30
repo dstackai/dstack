@@ -1,33 +1,22 @@
 import Button from '@cloudscape-design/components/button';
+import { useLayoutContext } from '../../App';
 import { heroButtonStyle } from '../../cloudscape-theme';
+import { HeroSquircle } from '../../components/HeroSquircle';
 import { highlightTerms } from '../../components/highlightTerms';
-import { images, ThemedImage } from '../../data/images';
 import { DOCS_URL } from '../../routes';
 import { ExploreSection } from './ExploreSection';
 import { FaqSection } from './FaqSection';
 import { GetStartedSection } from './GetStartedSection';
 import { TrustedBySection } from './TrustedBySection';
 
-// Hero artwork: both variants are rendered and CSS shows the one matching the theme.
-function ThemedHeroImage({ image }: { image: ThemedImage }) {
-  return (
-    <>
-      <img src={image.light} alt="" className="hero-slice hero-slice--light" />
-      <img src={image.dark} alt="" className="hero-slice hero-slice--dark" />
-    </>
-  );
-}
-
 export function HomePage() {
-  const scrollToResources = () =>
-    document.getElementById('resources')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
+  const { theme } = useLayoutContext();
   return (
     <main className="home-main">
       <section className="home-hero">
         <div className="home-hero__art" aria-hidden="true">
           <div className="site-frame home-hero__art-frame">
-            <ThemedHeroImage image={images.hero} />
+            <HeroSquircle theme={theme} />
           </div>
         </div>
         <div className="site-frame home-hero__content">
@@ -44,7 +33,15 @@ export function HomePage() {
             )}
           </p>
           <div className="home-hero__actions">
-            <Button variant="primary" onClick={scrollToResources} style={heroButtonStyle}>
+            <Button
+              variant="primary"
+              href="#resources"
+              onClick={event => {
+                event.preventDefault();
+                document.getElementById('resources')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              style={heroButtonStyle}
+            >
               Get started
             </Button>
             <Button href={DOCS_URL} style={heroButtonStyle}>
@@ -63,12 +60,6 @@ export function HomePage() {
             <GetStartedSection />
           </article>
         </div>
-      </div>
-
-      {/* On phones the hero artwork is relocated down here, just above the footer
-          (the top instance is hidden at the same breakpoint). */}
-      <div className="site-frame home-hero-mobile-art" aria-hidden="true">
-        <ThemedHeroImage image={images.hero} />
       </div>
     </main>
   );

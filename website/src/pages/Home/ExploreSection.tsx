@@ -1,16 +1,14 @@
 import CodeView from '@cloudscape-design/code-view/code-view';
 import yamlHighlight from '@cloudscape-design/code-view/highlight/yaml';
 import Button from '@cloudscape-design/components/button';
-import Container from '@cloudscape-design/components/container';
 import Icon from '@cloudscape-design/components/icon';
-import SpaceBetween from '@cloudscape-design/components/space-between';
-import Table from '@cloudscape-design/components/table';
 import Tabs from '@cloudscape-design/components/tabs';
 import { mainButtonStyle } from '../../cloudscape-theme';
 import { AlternatingDocBlock } from '../../components/AlternatingDocBlock';
 import { ArchitectureDiagram } from '../../components/ArchitectureDiagram';
 import { DashedBorder } from '../../components/DashedBorder';
 import { highlightTerms } from '../../components/highlightTerms';
+import { gpuOffers } from '../../data/gpus';
 import { docsUrl } from '../../routes';
 import {
   backendConfigs,
@@ -22,22 +20,10 @@ import {
 
 // Core orchestration primitives shown in the "AI-native orchestration" block.
 const keyConcepts = [
-  { name: 'Fleets', href: docsUrl('concepts/fleets'), description: 'Provision and manage clusters across clouds, Kubernetes, and on-prem.' },
-  { name: 'Dev environments', href: docsUrl('concepts/dev-environments'), description: 'Launch dev environments to be accessed by agents or from your IDE.' },
-  { name: 'Tasks', href: docsUrl('concepts/tasks'), description: 'Run training and batch jobs across a single node or clusters.' },
-  { name: 'Services', href: docsUrl('concepts/services'), description: 'Deploy model inference as secure and scalable endpoints.' },
-];
-
-// Rough per-GPU/hour ranges across backends, in the spirit of `dstack offer --group-by gpu`.
-const gpuOffers = [
-  { name: 'B300', memory: '288GB', price: '$6.00 - $12.00' },
-  { name: 'B200', memory: '192GB', price: '$4.00 - $9.00' },
-  { name: 'H200', memory: '141GB', price: '$3.10 - $7.49' },
-  { name: 'H100', memory: '80GB', price: '$1.90 - $5.99' },
-  { name: 'RTX PRO 6000', memory: '96GB', price: '$1.79 - $3.50' },
-  { name: 'A100', memory: '80GB', price: '$1.20 - $3.40' },
-  { name: 'A100', memory: '40GB', price: '$0.83 - $2.30' },
-  { name: 'L40S', memory: '48GB', price: '$0.80 - $1.40' },
+  { name: 'Fleets', label: 'Cloud & on-prem', href: docsUrl('concepts/fleets'), description: 'Provision and manage clusters across clouds, Kubernetes, and on-prem.' },
+  { name: 'Dev environments', label: 'Development', href: docsUrl('concepts/dev-environments'), description: 'Launch dev environments to be accessed by agents or from your IDE.' },
+  { name: 'Tasks', label: 'Training and batch', href: docsUrl('concepts/tasks'), description: 'Run training and batch jobs across a single node or clusters.' },
+  { name: 'Services', label: 'Model inference', href: docsUrl('concepts/services'), description: 'Deploy model inference as secure and scalable endpoints.' },
 ];
 
 // Read-only YAML snippet. Line wrapping is left off so one line maps to one row,
@@ -50,23 +36,20 @@ function YamlCode({ content }: { content: string }) {
   );
 }
 
-// Scrollable GPU price list. The column header is hidden via CSS (.gpu-scroll thead)
-// and the table uses the embedded variant so it sits flush inside the container.
+// GPU price list — a plain monospace name/price list in a bordered card, matching the dstack Sky
+// "GPU marketplace" pane in the Get started section (same .gs-mkt__row treatment, single source).
 function GpuMarketplaceTable() {
   return (
-    <Container>
-      <div className="gpu-scroll">
-        <Table
-          variant="embedded"
-          ariaLabels={{ tableLabel: 'GPU marketplace offers' }}
-          columnDefinitions={[
-            { id: 'gpu', header: 'GPU', cell: offer => <><strong>{offer.name}</strong> ({offer.memory})</>, isRowHeader: true },
-            { id: 'price', header: '$/hour', cell: offer => offer.price },
-          ]}
-          items={gpuOffers}
-        />
-      </div>
-    </Container>
+    <div className="gpu-mkt">
+      <ul className="gpu-mkt__list">
+        {gpuOffers.map(offer => (
+          <li className="gs-mkt__row" key={`${offer.name} ${offer.memory}`}>
+            <span className="gs-mkt__g"><span className="gs-mkt__name">{offer.name}</span>{' '}{offer.memory}</span>
+            <span className="gs-mkt__p">{offer.price}/hr</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -97,7 +80,6 @@ export function ExploreSection() {
         }
         title="Bring your own clouds"
         imageFirst
-        action={<Button href={docsUrl('concepts/backends')} style={mainButtonStyle}>Backends</Button>}
       >
         dstack natively integrates with the major GPU clouds and automates provisioning of clusters.
         <br />
@@ -119,12 +101,6 @@ export function ExploreSection() {
           />
         }
         title="Bring on-prem clusters"
-        action={
-          <SpaceBetween direction="horizontal" size="xs">
-            <Button href={docsUrl('concepts/backends/#kubernetes')} style={mainButtonStyle}>Kubernetes</Button>
-            <Button href={docsUrl('concepts/fleets/#ssh-fleets')} style={mainButtonStyle}>SSH fleets</Button>
-          </SpaceBetween>
-        }
       >
         Have an existing Kubernetes cluster? Point dstack to the kubeconfig, and dstack
         will schedule workloads on it as it was a cloud cluster.
@@ -150,8 +126,11 @@ function KeyConceptsBlock() {
             // onClick-only ActionCard component.
             <a className="media-card concept-card" href={concept.href} key={concept.name}>
               <DashedBorder />
-              <span className="concept-card__arrow" aria-hidden="true"><Icon name="angle-right" /></span>
-              <h3>{concept.name}</h3>
+              <span className="concept-card__label">{concept.label}</span>
+              <h3>
+                {concept.name}
+                <span className="concept-card__arrow" aria-hidden="true"><Icon name="angle-right" /></span>
+              </h3>
               <p>{highlightTerms(concept.description)}</p>
             </a>
           ))}
@@ -173,7 +152,7 @@ function GpuMarketplaceBlock() {
       visual={<GpuMarketplaceTable />}
       title="Access marketplace GPUs"
       imageFirst
-      action={<Button href="https://sky.dstack.ai" variant="primary" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Sign up</Button>}
+      action={<Button href="https://sky.dstack.ai" target="_blank" iconName="external" iconAlign="right" style={mainButtonStyle}>Try dstack Sky</Button>}
     >
       Don't have your own cloud accounts or on-prem clusters? No problem. You can access compute
       through dstack Sky, our hosted GPU marketplace.

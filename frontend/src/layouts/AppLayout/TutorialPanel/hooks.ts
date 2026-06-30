@@ -47,6 +47,7 @@ export const useTutorials = () => {
     const { data: projectData } = useGetProjectsQuery({});
     const { data: runsData } = useGetRunsQuery({
         limit: 1,
+        job_submissions_limit: 1,
     });
 
     const completeIsChecked = useRef<boolean>(false);

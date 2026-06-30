@@ -211,7 +211,80 @@ To run SGLang with [PD disaggregation](https://docs.sglang.io/advanced_features/
 
     </div>
 
-    > With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
+    ??? info "gRPC mode"
+
+        SGLang workers can also connect to the SMG router over gRPC. Run the workers from an SMG image that bundles the SGLang version, pass `--grpc-mode`, and add `--enable-igw` and `--model-path` to `smg launch` so the router can register them.
+
+        <div editor-title="pd-grpc.dstack.yml">
+
+        ```yaml
+        type: service
+        name: prefill-decode
+
+        env:
+          - HF_TOKEN
+          - MODEL_ID=zai-org/GLM-4.5-Air-FP8
+
+        replicas:
+          - count: 1
+            # For now replica group with router must have count: 1
+            python: "3.12"
+            commands:
+              - pip install smg
+              - |
+                smg launch \
+                  --enable-igw \
+                  --pd-disaggregation \
+                  --model-path $MODEL_ID \
+                  --host 0.0.0.0 \
+                  --port 8000 \
+                  --prefill-policy cache_aware
+            router:
+              type: sglang
+            resources:
+              cpu: 4
+
+          - count: 1..4
+            scaling:
+              metric: rps
+              target: 3
+            image: ghcr.io/lightseekorg/smg:1.4.1-sglang-v0.5.10
+            commands:
+              - |
+                python3 -m sglang.launch_server \
+                  --model-path $MODEL_ID \
+                  --host 0.0.0.0 \
+                  --port 8000 \
+                  --grpc-mode \
+                  --disaggregation-mode prefill \
+                  --disaggregation-transfer-backend nixl \
+                  --disaggregation-bootstrap-port 8998
+            resources:
+              gpu: H200
+
+          - count: 1..8
+            scaling:
+              metric: rps
+              target: 2
+            image: ghcr.io/lightseekorg/smg:1.4.1-sglang-v0.5.10
+            commands:
+              - |
+                python3 -m sglang.launch_server \
+                  --model-path $MODEL_ID \
+                  --host 0.0.0.0 \
+                  --port 8000 \
+                  --grpc-mode \
+                  --disaggregation-mode decode \
+                  --disaggregation-transfer-backend nixl
+            resources:
+              gpu: H200
+
+        port: 8000
+        ```
+
+        </div>
+
+        To use the [Mooncake](https://github.com/kvcache-ai/Mooncake) transfer backend, set `--disaggregation-transfer-backend mooncake`.
 
 === "AMD"
 

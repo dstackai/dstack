@@ -420,7 +420,10 @@ Below is an example for running `zai-org/GLM-4.5-Air-FP8` on `H200`:
 
     </div>
 
-    > With the `sglang` router, you can use SGLang prefill and decode workers. Support for vLLM and TensorRT-LLM workers is coming soon.
+    > SMG workers connect to the router over HTTP or gRPC. The example above uses HTTP. SGLang workers support both modes; vLLM workers support gRPC only.
+
+    ??? info "gRPC mode"
+        Over gRPC, workers run from SMG images that bundle a specific backend version (SGLang or vLLM), and `smg launch` needs `--enable-igw` and `--model-path` so the router can register the workers. See the full configurations in [SGLang PD disaggregation](../examples/inference/sglang.md#pd-disaggregation) and [vLLM PD disaggregation](../examples/inference/vllm.md#pd-disaggregation).
 
 === "Dynamo"
 

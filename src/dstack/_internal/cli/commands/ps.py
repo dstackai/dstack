@@ -67,6 +67,7 @@ class PsCommand(APIBaseCommand):
         if args.watch and args.format == "json":
             raise CLIError("JSON output is not supported together with --watch")
 
+        # TODO: Add a `ps --json` option to control how many job submissions are returned.
         runs = self.api.runs.list(all=args.all, limit=args.last)
         deprecated_router_runs = [
             run._run.run_spec.run_name

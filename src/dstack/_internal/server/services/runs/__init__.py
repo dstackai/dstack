@@ -1,6 +1,7 @@
 import itertools
 import math
 import uuid
+from collections import defaultdict
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -9,7 +10,7 @@ import pydantic
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import aliased, joinedload, noload, selectinload
 
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import (
@@ -37,11 +38,13 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
     ServiceSpec,
 )
+from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services.diff import format_diff_fields_for_event
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
     FleetModel,
     JobModel,
+    MemberModel,
     ProbeModel,
     ProjectModel,
     RepoModel,
@@ -49,6 +52,7 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import events, services
+from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.jobs import (
     check_can_attach_job_volumes,
@@ -63,7 +67,6 @@ from dstack._internal.server.services.locking import get_locker, string_to_lock_
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.services.probes import is_probe_ready
-from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.server.services.resources import (
     set_gpu_vendor_default,
     set_resources_defaults,
@@ -168,32 +171,35 @@ async def list_user_runs(
 ) -> List[Run]:
     if project_name is None and repo_id is not None:
         return []
-    projects = await list_user_project_models(
-        session=session,
-        user=user,
-        only_names=True,
-    )
     runs_user = None
     if username is not None:
         runs_user = await get_user_model_by_name(session=session, username=username)
         if runs_user is None:
             raise ResourceNotExistsError("User not found")
     repo = None
+    project = None
     if project_name is not None:
-        projects = [p for p in projects if p.name == project_name]
-        if len(projects) == 0:
+        projects = await projects_services.list_user_project_models(
+            session=session,
+            user=user,
+            only_names=True,
+            project_names=[project_name],
+        )
+        project = next(iter(projects), None)
+        if project is None:
             return []
         if repo_id is not None:
             repo = await repos_services.get_repo_model(
                 session=session,
-                project=projects[0],
+                project=project,
                 repo_id=repo_id,
             )
             if repo is None:
                 raise RepoDoesNotExistError.with_id(repo_id)
     run_models = await list_projects_run_models(
         session=session,
-        projects=projects,
+        user=user,
+        project=project,
         repo=repo,
         runs_user=runs_user,
         only_active=only_active,
@@ -201,6 +207,13 @@ async def list_user_runs(
         prev_run_id=prev_run_id,
         limit=limit,
         ascending=ascending,
+    )
+    jobs_by_run = await _list_job_models_by_run_id(
+        session=session,
+        run_models=run_models,
+        include_jobs=include_jobs,
+        job_submissions_limit=job_submissions_limit,
+        return_in_api=True,
     )
     runs = []
     for r in run_models:
@@ -211,6 +224,7 @@ async def list_user_runs(
                     return_in_api=True,
                     include_jobs=include_jobs,
                     job_submissions_limit=job_submissions_limit,
+                    loaded_jobs=jobs_by_run.get(r.id, []),
                 )
             )
         except pydantic.ValidationError:
@@ -222,7 +236,8 @@ async def list_user_runs(
 
 async def list_projects_run_models(
     session: AsyncSession,
-    projects: List[ProjectModel],
+    user: UserModel,
+    project: Optional[ProjectModel],
     repo: Optional[RepoModel],
     runs_user: Optional[UserModel],
     only_active: bool,
@@ -232,7 +247,27 @@ async def list_projects_run_models(
     ascending: bool,
 ) -> List[RunModel]:
     filters = []
-    filters.append(RunModel.project_id.in_(p.id for p in projects))
+    if project is not None:
+        # Project-scoped list.
+        filters.append(RunModel.project_id == project.id)
+    elif user.global_role == GlobalRole.ADMIN:
+        # Global admins can list runs from all non-deleted projects.
+        filters.append(
+            RunModel.project_id.in_(select(ProjectModel.id).where(ProjectModel.deleted == False))
+        )
+    else:
+        # Regular users can list runs only from projects they belong to.
+        filters.append(
+            RunModel.project_id.in_(
+                select(MemberModel.project_id)
+                .where(MemberModel.user_id == user.id)
+                .where(
+                    MemberModel.project_id.in_(
+                        select(ProjectModel.id).where(ProjectModel.deleted == False)
+                    )
+                )
+            )
+        )
     if repo is not None:
         filters.append(RunModel.repo_id == repo.id)
     if runs_user is not None:
@@ -271,14 +306,151 @@ async def list_projects_run_models(
     res = await session.execute(
         select(RunModel)
         .where(*filters)
+        .options(joinedload(RunModel.project).load_only(ProjectModel.id, ProjectModel.name))
         .options(joinedload(RunModel.user).load_only(UserModel.name))
         .options(joinedload(RunModel.fleet).load_only(FleetModel.id, FleetModel.name))
-        .options(selectinload(RunModel.jobs).joinedload(JobModel.probes))
+        .options(noload(RunModel.jobs))
         .order_by(*order_by)
         .limit(limit)
     )
     run_models = list(res.scalars().all())
     return run_models
+
+
+async def _list_job_models_by_run_id(
+    session: AsyncSession,
+    run_models: List[RunModel],
+    include_jobs: bool,
+    job_submissions_limit: Optional[int],
+    return_in_api: bool,
+) -> dict[uuid.UUID, List[JobModel]]:
+    """
+    List only the job rows needed for runs list responses, grouped by run ID.
+
+    This avoids loading every historical submission through RunModel.jobs.
+    """
+    if len(run_models) == 0:
+        return {}
+
+    effective_job_submissions_limit = job_submissions_limit if include_jobs else 0
+    jobs = await _list_job_models(
+        session=session,
+        run_ids=[r.id for r in run_models],
+        job_submissions_limit=effective_job_submissions_limit,
+        include_probes=include_jobs and return_in_api,
+    )
+    jobs_by_run: defaultdict[uuid.UUID, List[JobModel]] = defaultdict(list)
+    for job in jobs:
+        jobs_by_run[job.run_id].append(job)
+    return dict(jobs_by_run)
+
+
+async def _list_job_models(
+    session: AsyncSession,
+    run_ids: List[uuid.UUID],
+    job_submissions_limit: Optional[int],
+    include_probes: bool,
+) -> List[JobModel]:
+    """
+    List job models for runs list responses.
+
+    When job_submissions_limit is set, include up to job_submissions_limit latest
+    submissions per job plus the latest terminated submission per job. This gives
+    run_model_to_run enough data without loading every historical submission.
+    """
+    options = []
+    if include_probes:
+        options.append(joinedload(JobModel.probes))
+    if job_submissions_limit is None:
+        # With no job_submissions_limit, return full submission history. This
+        # can be slow. UI/CLI list views pass a limit, but API callers may omit it.
+        res = await session.execute(
+            select(JobModel)
+            .where(JobModel.run_id.in_(run_ids))
+            .options(*options)
+            .order_by(
+                JobModel.run_id,
+                JobModel.replica_num,
+                JobModel.job_num,
+                JobModel.submission_num,
+            )
+        )
+        return list(res.unique().scalars().all())
+
+    requested_jobs = await _list_latest_job_models_per_job(
+        session=session,
+        run_ids=run_ids,
+        limit_per_job=max(job_submissions_limit, 1),
+        include_probes=include_probes,
+    )
+    # Also load rows needed to preserve run.status_message, e.g. `retrying`.
+    status_message_jobs = await _list_latest_job_models_per_job(
+        session=session,
+        run_ids=run_ids,
+        limit_per_job=1,
+        include_probes=False,
+        only_with_termination_reason=True,
+    )
+
+    # Merge the two job lists by ID because the same row may appear in both.
+    jobs_by_id = {job.id: job for job in requested_jobs}
+    for job in status_message_jobs:
+        jobs_by_id.setdefault(job.id, job)
+    return sorted(
+        jobs_by_id.values(),
+        key=lambda j: (j.run_id, j.replica_num, j.job_num, j.submission_num),
+    )
+
+
+async def _list_latest_job_models_per_job(
+    session: AsyncSession,
+    run_ids: List[uuid.UUID],
+    limit_per_job: int,
+    include_probes: bool,
+    only_with_termination_reason: bool = False,
+) -> List[JobModel]:
+    """
+    List up to N newest submissions for each job.
+
+    A newer submission has a higher submission_num. The SQL window applies the
+    per-job limit in the database instead of loading all retries and slicing them
+    in Python.
+    """
+    row_number = (
+        func.row_number()
+        .over(
+            partition_by=(JobModel.run_id, JobModel.replica_num, JobModel.job_num),
+            order_by=JobModel.submission_num.desc(),
+        )
+        .label("row_number")
+    )
+    filters = [JobModel.run_id.in_(run_ids)]
+    if only_with_termination_reason:
+        filters.append(JobModel.termination_reason.isnot(None))
+    jobs_sq = (
+        select(
+            JobModel,
+            row_number,
+        )
+        .where(*filters)
+        .subquery()
+    )
+    job_alias = aliased(JobModel, jobs_sq)
+    options = []
+    if include_probes:
+        options.append(joinedload(job_alias.probes))
+    res = await session.execute(
+        select(job_alias)
+        .where(jobs_sq.c.row_number <= limit_per_job)
+        .options(*options)
+        .order_by(
+            job_alias.run_id,
+            job_alias.replica_num,
+            job_alias.job_num,
+            job_alias.submission_num,
+        )
+    )
+    return list(res.unique().scalars().all())
 
 
 async def get_run(
@@ -781,14 +953,18 @@ def run_model_to_run(
     return_in_api: bool = False,
     include_sensitive: bool = False,
     include_job_connection_info: bool = False,
+    loaded_jobs: Optional[List[JobModel]] = None,
 ) -> Run:
     run_spec = get_run_spec(run_model)
+    # Runs-list passes an explicitly bounded job set. Detail/update paths use
+    # the ORM relationship loaded by their queries.
+    job_models = loaded_jobs if loaded_jobs is not None else run_model.jobs
 
     jobs: List[Job] = []
     if include_jobs:
         jobs = _get_run_jobs_with_submissions(
-            run_model=run_model,
             run_spec=run_spec,
+            job_models=job_models,
             job_submissions_limit=job_submissions_limit,
             return_in_api=return_in_api,
             include_sensitive=include_sensitive,
@@ -804,7 +980,7 @@ def run_model_to_run(
     if run_model.service_spec is not None:
         service_spec = ServiceSpec.__response__.parse_raw(run_model.service_spec)
 
-    status_message = _get_run_status_message(run_model)
+    status_message = _get_run_status_message(run_model, job_models=job_models)
     error = _get_run_error(run_model)
     fleet = _get_run_fleet(run_model)
     next_triggered_at = None
@@ -846,28 +1022,29 @@ def _set_run_resources_defaults(run_spec: RunSpec) -> None:
 
 
 def _get_run_jobs_with_submissions(
-    run_model: RunModel,
     run_spec: RunSpec,
+    job_models: List[JobModel],
     job_submissions_limit: Optional[int],
     return_in_api: bool = False,
     include_sensitive: bool = False,
     include_job_connection_info: bool = False,
 ) -> List[Job]:
     jobs: List[Job] = []
-    run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
+    run_jobs = sorted(job_models, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
     for replica_num, replica_submissions in itertools.groupby(
         run_jobs, key=lambda j: j.replica_num
     ):
-        for job_num, job_models in itertools.groupby(replica_submissions, key=lambda j: j.job_num):
+        for job_num, job_group in itertools.groupby(replica_submissions, key=lambda j: j.job_num):
+            job_submissions = list(job_group)
             submissions = []
             job_model = None
             if job_submissions_limit is not None:
                 if job_submissions_limit == 0:
                     # Take latest job submission to return its job_spec
-                    job_models = list(job_models)[-1:]
+                    job_submissions = job_submissions[-1:]
                 else:
-                    job_models = list(job_models)[-job_submissions_limit:]
-            for job_model in job_models:
+                    job_submissions = job_submissions[-job_submissions_limit:]
+            for job_model in job_submissions:
                 if job_submissions_limit != 0:
                     job_submission = job_model_to_job_submission(
                         job_model, include_probes=return_in_api
@@ -899,12 +1076,12 @@ def _get_run_jobs_with_submissions(
     return jobs
 
 
-def _get_run_status_message(run_model: RunModel) -> str:
-    if len(run_model.jobs) == 0:
+def _get_run_status_message(run_model: RunModel, job_models: List[JobModel]) -> str:
+    if len(job_models) == 0:
         return run_model.status.value
 
     sorted_job_models = sorted(
-        run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num)
+        job_models, key=lambda j: (j.replica_num, j.job_num, j.submission_num)
     )
     job_models_grouped_by_job = list(
         list(jm)
