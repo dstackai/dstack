@@ -176,8 +176,8 @@ def create_gateway_compute_model(
     project_name: str,
     configuration: GatewayConfiguration,
     replica_num: int,
-    gateway_id: Optional[uuid.UUID] = None,
-    backend_id: Optional[uuid.UUID] = None,
+    gateway_id: uuid.UUID,
+    backend_id: uuid.UUID,
 ) -> GatewayComputeModel:
     assert configuration.name is not None
 
