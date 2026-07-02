@@ -21,6 +21,14 @@ class GatewayStatus(str, Enum):
     FAILED = "failed"
 
 
+class GatewayReplicaStatus(str, Enum):
+    SUBMITTED = "submitted"
+    PROVISIONING = "provisioning"
+    RUNNING = "running"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
+
+
 class LetsEncryptGatewayCertificate(CoreModel):
     type: Annotated[
         Literal["lets-encrypt"], Field(description="Automatic certificates by Let's Encrypt")
@@ -120,11 +128,14 @@ class GatewaySpec(CoreModel):
 
 
 class GatewayReplica(CoreModel):
-    hostname: str
+    hostname: Optional[str] = None
     replica_num: int
-    backend: BackendType
-    region: str
+    backend: Optional[BackendType] = None
+    region: Optional[str] = None
     created_at: datetime.datetime
+    status: Optional[GatewayReplicaStatus] = None
+    """`status` is only optional on the client side for compatibility with 0.20.25 and 0.20.26 servers"""
+    status_message: Optional[str] = None
 
 
 class Gateway(CoreModel):

@@ -47,6 +47,7 @@ from dstack._internal.core.models.fleets import (
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayConfiguration,
+    GatewayReplicaStatus,
     GatewayStatus,
 )
 from dstack._internal.core.models.health import HealthStatus
@@ -684,10 +685,15 @@ async def create_gateway_compute(
     gateway_id: Optional[UUID] = None,
     backend_id: Optional[UUID] = None,
     ip_address: Optional[str] = "1.1.1.1",
-    region: str = "us",
+    region: Optional[str] = "us",
     instance_id: Optional[str] = "i-1234567890",
     ssh_private_key: str = "",
     ssh_public_key: str = "",
+    status: GatewayReplicaStatus = GatewayReplicaStatus.RUNNING,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    replica_num: int = 0,
+    active: bool = True,
+    configuration: Optional[str] = None,
     populate_configuration: bool = True,
 ) -> GatewayComputeModel:
     """
@@ -696,13 +702,13 @@ async def create_gateway_compute(
             True - 0.18.2+ gateways, False - legacy pre-0.18.2 gateways. Prefer
             testing against both in major test cases.
     """
-    configuration = None
-    if populate_configuration:
+    if configuration is None and populate_configuration:
         backend_type = BackendType.AWS
         if backend_id is not None:
             backend = await session.get(BackendModel, backend_id)
             assert backend is not None
             backend_type = backend.type
+        assert region is not None
         configuration = GatewayComputeConfiguration(
             project_name="test-project",
             instance_name=instance_id or "test-instance",
@@ -720,6 +726,10 @@ async def create_gateway_compute(
         instance_id=instance_id,
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
+        status=status,
+        last_processed_at=last_processed_at,
+        replica_num=replica_num,
+        active=active,
         configuration=configuration,
     )
     session.add(gateway_compute)

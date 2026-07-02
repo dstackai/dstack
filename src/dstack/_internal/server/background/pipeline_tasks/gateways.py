@@ -2,14 +2,17 @@ import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Optional, Sequence, TypedDict
+from typing import Sequence
 
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
-from dstack._internal.core.backends.base.compute import ComputeWithGatewaySupport
-from dstack._internal.core.errors import BackendError, BackendNotAvailable
-from dstack._internal.core.models.gateways import GATEWAY_REPLICAS_DEFAULT, GatewayStatus
+from dstack._internal.core.errors import BackendNotAvailable
+from dstack._internal.core.models.gateways import (
+    GATEWAY_REPLICAS_DEFAULT,
+    GatewayReplicaStatus,
+    GatewayStatus,
+)
 from dstack._internal.server.background.pipeline_tasks.base import (
     Fetcher,
     Heartbeater,
@@ -37,12 +40,11 @@ from dstack._internal.server.services.gateways import (
     emit_gateway_status_change_event,
     get_gateway_compute_models,
 )
-from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
 from dstack._internal.server.utils import sentry_utils
-from dstack._internal.utils.common import get_current_datetime, run_async
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -257,7 +259,6 @@ async def _process_submitted_item(item: GatewayPipelineItem):
         updated_ids = list(res.scalars().all())
         if len(updated_ids) == 0:
             log_lock_token_changed_after_processing(logger, item)
-            # TODO: Clean up gateway_compute_models.
             return
         emit_gateway_status_change_event(
             session=session,
@@ -273,11 +274,6 @@ class _GatewayUpdateMap(ItemUpdateMap, total=False):
     status_message: str
 
 
-class _GatewayComputeUpdateMap(TypedDict, total=False):
-    active: bool
-    deleted: bool
-
-
 @dataclass
 class _SubmittedResult:
     update_map: _GatewayUpdateMap = field(default_factory=_GatewayUpdateMap)
@@ -285,12 +281,11 @@ class _SubmittedResult:
 
 
 async def _process_submitted_gateway(gateway_model: GatewayModel) -> _SubmittedResult:
-    logger.info("%s: started gateway provisioning", fmt(gateway_model))
     configuration = gateways_services.get_gateway_configuration(gateway_model)
     try:
         (
             backend_model,
-            backend,
+            _,
         ) = await backends_services.get_project_backend_with_model_by_type_or_error(
             project=gateway_model.project, backend_type=configuration.backend
         )
@@ -301,49 +296,30 @@ async def _process_submitted_gateway(gateway_model: GatewayModel) -> _SubmittedR
                 "status_message": "Backend not available",
             }
         )
+    # NOTE: On a later stage of #3959, the SUBMITTED status may also be responsible for
+    # setting up the load balancer (e.g., AWS ALB) before replicas are created.
     replicas = (
         configuration.replicas if configuration.replicas is not None else GATEWAY_REPLICAS_DEFAULT
     )
     gateway_compute_models = []
-    try:
-        for replica_num in range(replicas):
-            logger.debug(
-                "%s replica %d: creating gateway compute", fmt(gateway_model), replica_num
-            )
-            gateway_compute_model = await gateways_services.create_gateway_compute(
-                backend_compute=backend.compute(),
-                project_name=gateway_model.project.name,
-                configuration=configuration,
-                replica_num=replica_num,
-                gateway_id=gateway_model.id,
-                backend_id=backend_model.id,
-            )
-            logger.info("%s replica %d: gateway compute created", fmt(gateway_model), replica_num)
-            gateway_compute_models.append(gateway_compute_model)
-        return _SubmittedResult(
-            update_map={"status": GatewayStatus.PROVISIONING},
-            gateway_compute_models=gateway_compute_models,
+    for replica_num in range(replicas):
+        gateway_compute_model = gateways_services.create_gateway_compute_model(
+            project_name=gateway_model.project.name,
+            configuration=configuration,
+            replica_num=replica_num,
+            gateway_id=gateway_model.id,
+            backend_id=backend_model.id,
         )
-    except BackendError as e:
-        status_message = f"Backend error: {repr(e)}"
-        if len(e.args) > 0:
-            status_message = str(e.args[0])
-        return _SubmittedResult(
-            update_map={
-                "status": GatewayStatus.FAILED,
-                "status_message": status_message,
-            },
-            gateway_compute_models=gateway_compute_models,
-        )
-    except Exception as e:
-        logger.exception("%s: got exception when creating gateway compute", fmt(gateway_model))
-        return _SubmittedResult(
-            update_map={
-                "status": GatewayStatus.FAILED,
-                "status_message": f"Unexpected error: {repr(e)}",
-            },
-            gateway_compute_models=gateway_compute_models,
-        )
+        gateway_compute_models.append(gateway_compute_model)
+    logger.info(
+        "%s: created %d replica record(s) in submitted state",
+        fmt(gateway_model),
+        len(gateway_compute_models),
+    )
+    return _SubmittedResult(
+        update_map={"status": GatewayStatus.PROVISIONING},
+        gateway_compute_models=gateway_compute_models,
+    )
 
 
 async def _process_provisioning_item(item: GatewayPipelineItem):
@@ -355,14 +331,18 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
                 GatewayModel.lock_token == item.lock_token,
             )
             .options(joinedload(GatewayModel.gateway_compute))
-            .options(selectinload(GatewayModel.gateway_computes))
+            .options(
+                selectinload(GatewayModel.gateway_computes).load_only(
+                    GatewayComputeModel.id, GatewayComputeModel.status
+                )
+            )
         )
         gateway_model = res.unique().scalar_one_or_none()
         if gateway_model is None:
             log_lock_token_mismatch(logger, item)
             return
 
-    result = await _process_provisioning_gateway(gateway_model)
+    result = _process_provisioning_gateway(gateway_model)
     gateway_update_map = result.gateway_update_map
     set_processed_update_map_fields(gateway_update_map)
     set_unlock_update_map_fields(gateway_update_map)
@@ -390,97 +370,35 @@ async def _process_provisioning_item(item: GatewayPipelineItem):
             new_status=gateway_update_map.get("status", gateway_model.status),
             status_message=gateway_update_map.get("status_message", gateway_model.status_message),
         )
-        if result.all_computes_update_map:
-            res = await session.execute(
-                update(GatewayComputeModel)
-                .where(
-                    or_(
-                        GatewayComputeModel.gateway_id == gateway_model.id,
-                        GatewayComputeModel.id == gateway_model.gateway_compute_id,
-                    )
-                )
-                .values(**result.all_computes_update_map)
-                .returning(GatewayComputeModel.id)
-            )
-            updated_ids = list(res.scalars().all())
-            if len(updated_ids) < len(get_gateway_compute_models(gateway_model)):
-                logger.error(
-                    "Failed to update compute models for gateway %s."
-                    " This is unexpected and may happen only if the compute model was manually deleted.",
-                    gateway_model.id,
-                )
 
 
 @dataclass
 class _ProvisioningResult:
     gateway_update_map: _GatewayUpdateMap = field(default_factory=_GatewayUpdateMap)
-    all_computes_update_map: _GatewayComputeUpdateMap = field(
-        default_factory=_GatewayComputeUpdateMap
-    )
 
 
-async def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningResult:
+def _process_provisioning_gateway(gateway_model: GatewayModel) -> _ProvisioningResult:
     gateway_computes = get_gateway_compute_models(gateway_model)
     # Provisioning gateways must have compute.
     assert len(gateway_computes) > 0
 
-    # TODO: do only one connection/configuration attempt per pipeline tick.
-    # Blocking on connect_to_gateway_with_retry and configure_gateway now has these cons:
-    # - cannot delete the gateway before it is provisioned because the DB model is locked
-    # - connection retry counter is reset on server restart
-    # - only one server replica is processing the gateway
+    statuses = {gc.status for gc in gateway_computes}
 
-    errors = await asyncio.gather(
-        *(_connect_and_configure_gateway_replica(gateway_model, gc) for gc in gateway_computes)
-    )
-    if any(errors):
+    if statuses & {GatewayReplicaStatus.TERMINATING, GatewayReplicaStatus.TERMINATED}:
         return _ProvisioningResult(
             gateway_update_map={
                 "status": GatewayStatus.FAILED,
-                "status_message": next(e for e in errors if e),
+                "status_message": "Failed to provision gateway replica",
             },
-            all_computes_update_map={"active": False},
         )
 
-    return _ProvisioningResult(
-        gateway_update_map={"status": GatewayStatus.RUNNING},
-    )
-
-
-async def _connect_and_configure_gateway_replica(
-    gateway_model: GatewayModel,
-    gateway_compute: GatewayComputeModel,
-) -> Optional[str]:
-    """Returns an error message on failure, None on success."""
-    logger.debug(
-        "%s replica %d: connecting to gateway compute",
-        fmt(gateway_model),
-        gateway_compute.replica_num,
-    )
-    connection = await gateways_services.connect_to_gateway_with_retry(gateway_compute)
-    if connection is None:
-        logger.warning(
-            "%s replica %d: failed to connect to gateway compute",
-            fmt(gateway_model),
-            gateway_compute.replica_num,
+    if statuses == {GatewayReplicaStatus.RUNNING}:
+        return _ProvisioningResult(
+            gateway_update_map={"status": GatewayStatus.RUNNING},
         )
-        return "Failed to connect to gateway"
-    try:
-        await gateways_services.configure_gateway(connection)
-    except Exception:
-        logger.exception(
-            "%s replica %d: failed to configure gateway",
-            fmt(gateway_model),
-            gateway_compute.replica_num,
-        )
-        await gateway_connections_pool.remove(gateway_compute.ip_address)
-        return "Failed to configure gateway"
-    logger.info(
-        "%s replica %d: gateway compute connected and configured",
-        fmt(gateway_model),
-        gateway_compute.replica_num,
-    )
-    return None
+
+    # Replicas are still being provisioned
+    return _ProvisioningResult()
 
 
 async def _process_to_be_deleted_item(item: GatewayPipelineItem):
@@ -491,39 +409,20 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
                 GatewayModel.id == item.id,
                 GatewayModel.lock_token == item.lock_token,
             )
-            .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
             .options(joinedload(GatewayModel.gateway_compute))
-            .options(selectinload(GatewayModel.gateway_computes))
-            .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
+            .options(
+                selectinload(GatewayModel.gateway_computes).load_only(
+                    GatewayComputeModel.id, GatewayComputeModel.status
+                )
+            )
         )
         gateway_model = res.unique().scalar_one_or_none()
         if gateway_model is None:
             log_lock_token_mismatch(logger, item)
             return
 
-    result = await _process_to_be_deleted_gateway(gateway_model)
+    result = _process_to_be_deleted_gateway(gateway_model)
     async with get_session_ctx() as session:
-        if result.all_computes_update_map:
-            res = await session.execute(
-                update(GatewayComputeModel)
-                .where(
-                    or_(
-                        GatewayComputeModel.gateway_id == gateway_model.id,
-                        GatewayComputeModel.id == gateway_model.gateway_compute_id,
-                    )
-                )
-                .values(**result.all_computes_update_map)
-                .returning(GatewayComputeModel.id)
-            )
-            updated_ids = list(res.scalars().all())
-            if len(updated_ids) < len(get_gateway_compute_models(gateway_model)):
-                logger.error(
-                    "Failed to update compute models for gateway %s."
-                    " This is unexpected and may happen only if the compute model was manually deleted.",
-                    gateway_model.id,
-                )
-                return
-
         if result.delete_gateway:
             res = await session.execute(
                 delete(GatewayModel)
@@ -571,50 +470,9 @@ async def _process_to_be_deleted_item(item: GatewayPipelineItem):
 @dataclass
 class _ProcessToBeDeletedResult:
     delete_gateway: bool
-    all_computes_update_map: _GatewayComputeUpdateMap = field(
-        default_factory=_GatewayComputeUpdateMap
-    )
 
 
-async def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _ProcessToBeDeletedResult:
-    backend = await backends_services.get_project_backend_by_type_or_error(
-        project=gateway_model.project, backend_type=gateway_model.backend.type
-    )
-    compute = backend.compute()
-    assert isinstance(compute, ComputeWithGatewaySupport)
-
-    for gateway_compute in get_gateway_compute_models(gateway_model):
-        gateway_compute_configuration = gateways_services.get_gateway_compute_configuration(
-            gateway_compute=gateway_compute,
-            gateway_model=gateway_model,
-        )
-        logger.debug(
-            "%s replica %d: terminating gateway compute",
-            fmt(gateway_model),
-            gateway_compute.replica_num,
-        )
-        try:
-            await run_async(
-                compute.terminate_gateway,
-                gateway_compute.instance_id,
-                gateway_compute_configuration,
-                gateway_compute.backend_data,
-            )
-        except Exception:
-            logger.exception(
-                "%s replica %d: error when terminating gateway compute",
-                fmt(gateway_model),
-                gateway_compute.replica_num,
-            )
-            return _ProcessToBeDeletedResult(delete_gateway=False)
-        logger.info(
-            "%s replica %d: gateway compute terminated",
-            fmt(gateway_model),
-            gateway_compute.replica_num,
-        )
-        await gateway_connections_pool.remove(gateway_compute.ip_address)
-
-    return _ProcessToBeDeletedResult(
-        delete_gateway=True,
-        all_computes_update_map={"active": False, "deleted": True},
-    )
+def _process_to_be_deleted_gateway(gateway_model: GatewayModel) -> _ProcessToBeDeletedResult:
+    gateway_computes = get_gateway_compute_models(gateway_model)
+    all_terminated = all(gc.status == GatewayReplicaStatus.TERMINATED for gc in gateway_computes)
+    return _ProcessToBeDeletedResult(delete_gateway=all_terminated)

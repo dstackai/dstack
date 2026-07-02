@@ -28,7 +28,7 @@ from dstack._internal.core.models.common import CoreConfig, generate_dual_core_m
 from dstack._internal.core.models.compute_groups import ComputeGroupStatus
 from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.core.models.fleets import FleetStatus
-from dstack._internal.core.models.gateways import GatewayStatus
+from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
 from dstack._internal.core.models.health import HealthStatus
 from dstack._internal.core.models.instances import InstanceStatus, InstanceTerminationReason
 from dstack._internal.core.models.profiles import (
@@ -630,7 +630,8 @@ class GatewayModel(PipelineModelMixin, BaseModel):
         ForeignKey("gateway_computes.id", ondelete="CASCADE")
     )
     gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship(
-        foreign_keys=[gateway_compute_id]
+        foreign_keys=[gateway_compute_id],
+        back_populates="legacy_gateway",
     )
     """
     Relationship with gateway computes for pre-0.20.25 gateways.
@@ -652,7 +653,7 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     # TODO: Add pipeline index ("ix_gateways_pipeline_fetch_q") if gateways become soft-deleted.
 
 
-class GatewayComputeModel(BaseModel):
+class GatewayComputeModel(PipelineModelMixin, BaseModel):
     """A single gateway replica.
     **TODO**: consider renaming to `GatewayReplicaModel`.
     """
@@ -663,9 +664,12 @@ class GatewayComputeModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    status: Mapped[GatewayReplicaStatus] = mapped_column(EnumAsString(GatewayReplicaStatus, 100))
+    status_message: Mapped[Optional[str]] = mapped_column(Text)
     replica_num: Mapped[int] = mapped_column(Integer, server_default="0")
-    instance_id: Mapped[str] = mapped_column(String(100))
-    ip_address: Mapped[str] = mapped_column(String(100))
+    instance_id: Mapped[Optional[str]] = mapped_column(String(100))
+    ip_address: Mapped[Optional[str]] = mapped_column(String(100))
     """Gateway replica IP address or domain name (e.g., k8s can use domain names).
     **TODO**: rename.
     """
@@ -678,7 +682,7 @@ class GatewayComputeModel(BaseModel):
     Use `get_gateway_compute_configuration` to construct `configuration` for old gateways.
     """
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
-    region: Mapped[str] = mapped_column(String(100))
+    region: Mapped[Optional[str]] = mapped_column(String(100))
 
     gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey(
@@ -695,6 +699,15 @@ class GatewayComputeModel(BaseModel):
     Gateway. Can be None for pre-0.20.25 gateways, which use GatewayModel.gateway_compute_id to
     establish the relationship.
     """
+    legacy_gateway: Mapped[Optional["GatewayModel"]] = relationship(
+        back_populates="gateway_compute",
+        foreign_keys="GatewayModel.gateway_compute_id",
+        viewonly=True,
+    )
+    """
+    Gateway for pre-0.20.25 gateways, where GatewayModel.gateway_compute_id points to this replica.
+    Use `gateway or legacy_gateway` to get the gateway regardless of version.
+    """
 
     backend_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("backends.id", ondelete="CASCADE")
@@ -709,6 +722,15 @@ class GatewayComputeModel(BaseModel):
     """`active` means the server should maintain a connection to the gateway."""
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     app_updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+
+    __table_args__ = (
+        Index(
+            "ix_gateway_computes_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=deleted == false(),
+            sqlite_where=deleted == false(),
+        ),
+    )
 
 
 # TODO: Drop after the release without pools

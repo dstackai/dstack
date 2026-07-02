@@ -43,8 +43,8 @@ The example-gateway doesn't exist. Create it? [y/n]: y
 Provisioning...
 ---> 100%
 
- BACKEND  REGION     NAME             HOSTNAME  DOMAIN       DEFAULT  STATUS
- aws      eu-west-1  example-gateway            example.com  ✓        submitted
+ NAME             BACKEND          HOSTNAME       DOMAIN       DEFAULT  STATUS
+ example-gateway  aws (eu-west-1)  34.244.128.46  example.com  ✓        running
 ```
 
 </div>
@@ -211,8 +211,8 @@ To balance requests between gateway replicas, add DNS records for each replica o
 $ dstack gateway list
  NAME             BACKEND          HOSTNAME        DOMAIN       DEFAULT  STATUS
  example-gateway                                   example.com  ✓        running
-    replica=0     aws (eu-west-1)  34.244.128.46
-    replica=1     aws (eu-west-1)  18.201.201.174
+    replica=0     aws (eu-west-1)  34.244.128.46                         running
+    replica=1     aws (eu-west-1)  18.201.201.174                        running
 ```
 
 </div>

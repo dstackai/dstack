@@ -8,6 +8,7 @@ from dstack._internal.core.models.gateways import (
     Gateway,
     GatewayConfiguration,
     GatewayReplica,
+    GatewayReplicaStatus,
     GatewayStatus,
 )
 from dstack._internal.server.compatibility.gateways import patch_gateway
@@ -24,6 +25,7 @@ def _make_gateway_replica(hostname: str = "1.2.3.4") -> GatewayReplica:
         backend=BackendType.AWS,
         region="us",
         created_at=get_current_datetime(),
+        status=GatewayReplicaStatus.RUNNING,
     )
 
 
