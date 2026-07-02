@@ -14,8 +14,6 @@ from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
-    Compute,
-    ComputeWithGatewaySupport,
     get_dstack_gateway_wheel,
     get_dstack_runner_version,
 )
@@ -38,6 +36,7 @@ from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayConfiguration,
     GatewayReplica,
+    GatewayReplicaStatus,
     GatewaySpec,
     GatewayStatus,
     LetsEncryptGatewayCertificate,
@@ -73,8 +72,8 @@ from dstack._internal.server.services.plugins import apply_plugin_policies
 from dstack._internal.server.utils.common import gather_map_async
 from dstack._internal.utils.common import (
     get_current_datetime,
+    get_or_error,
     interpolate_gateway_domain,
-    run_async,
 )
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
@@ -173,15 +172,13 @@ async def get_gateway_by_name(
     return gateway_model_to_gateway(gateway, default_gateway_id=project.default_gateway_id)
 
 
-async def create_gateway_compute(
+def create_gateway_compute_model(
     project_name: str,
-    backend_compute: Compute,
     configuration: GatewayConfiguration,
     replica_num: int,
-    gateway_id: Optional[uuid.UUID] = None,
-    backend_id: Optional[uuid.UUID] = None,
+    gateway_id: uuid.UUID,
+    backend_id: uuid.UUID,
 ) -> GatewayComputeModel:
-    assert isinstance(backend_compute, ComputeWithGatewaySupport)
     assert configuration.name is not None
 
     private_bytes, public_bytes = generate_rsa_key_pair_bytes()
@@ -201,23 +198,18 @@ async def create_gateway_compute(
         router=configuration.router,
     )
 
-    gpd = await run_async(
-        backend_compute.create_gateway,
-        compute_configuration,
-    )
-
+    now = get_current_datetime()
     return GatewayComputeModel(
         gateway_id=gateway_id,
         backend_id=backend_id,
         replica_num=replica_num,
-        region=gpd.region,
-        ip_address=gpd.ip_address,
-        instance_id=gpd.instance_id,
-        hostname=gpd.hostname,
         configuration=compute_configuration.json(),
-        backend_data=gpd.backend_data,
         ssh_private_key=gateway_ssh_private_key,
         ssh_public_key=gateway_ssh_public_key,
+        status=GatewayReplicaStatus.SUBMITTED,
+        active=False,
+        created_at=now,
+        last_processed_at=now,
     )
 
 
@@ -306,6 +298,10 @@ async def connect_to_gateway_with_retry(
     being accessed via domain (e.g. Kubernetes LB), it may take some time before
     the domain can be resolved.
     """
+
+    if gateway_compute.ip_address is None:
+        logger.warning("Gateway replica %s has no ip_address, cannot connect", gateway_compute.id)
+        return None
 
     connection = None
 
@@ -476,8 +472,16 @@ async def list_project_gateway_models(
     else:
         stmt = stmt.where(GatewayModel.project_id == project.id)
     if load_gateway_compute:
-        stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
-        stmt = stmt.options(selectinload(GatewayModel.gateway_computes))
+        stmt = stmt.options(
+            joinedload(GatewayModel.gateway_compute)
+            .joinedload(GatewayComputeModel.backend)
+            .load_only(BackendModel.type)
+        )
+        stmt = stmt.options(
+            selectinload(GatewayModel.gateway_computes)
+            .joinedload(GatewayComputeModel.backend)
+            .load_only(BackendModel.type)
+        )
     if load_backend_type:
         stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
@@ -505,8 +509,16 @@ async def get_project_gateway_model_by_reference(
             )
         )
     if load_gateway_compute:
-        stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
-        stmt = stmt.options(selectinload(GatewayModel.gateway_computes))
+        stmt = stmt.options(
+            joinedload(GatewayModel.gateway_compute)
+            .joinedload(GatewayComputeModel.backend)
+            .load_only(BackendModel.type)
+        )
+        stmt = stmt.options(
+            selectinload(GatewayModel.gateway_computes)
+            .joinedload(GatewayComputeModel.backend)
+            .load_only(BackendModel.type)
+        )
     if load_backend_type:
         stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
@@ -540,8 +552,16 @@ async def get_project_gateway_model_by_name_for_update(
             res = await session.execute(
                 select(GatewayModel)
                 .where(GatewayModel.id.in_([gateway_id]), *filters)
-                .options(joinedload(GatewayModel.gateway_compute))
-                .options(selectinload(GatewayModel.gateway_computes))
+                .options(
+                    joinedload(GatewayModel.gateway_compute)
+                    .joinedload(GatewayComputeModel.backend)
+                    .load_only(BackendModel.type)
+                )
+                .options(
+                    selectinload(GatewayModel.gateway_computes)
+                    .joinedload(GatewayComputeModel.backend)
+                    .load_only(BackendModel.type)
+                )
                 .options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
                 .with_for_update(key_share=True, of=GatewayModel)
             )
@@ -567,8 +587,16 @@ async def get_project_default_gateway_model(
         ),
     )
     if load_gateway_compute:
-        stmt = stmt.options(joinedload(GatewayModel.gateway_compute))
-        stmt = stmt.options(selectinload(GatewayModel.gateway_computes))
+        stmt = stmt.options(
+            joinedload(GatewayModel.gateway_compute)
+            .joinedload(GatewayComputeModel.backend)
+            .load_only(BackendModel.type)
+        )
+        stmt = stmt.options(
+            selectinload(GatewayModel.gateway_computes)
+            .joinedload(GatewayComputeModel.backend)
+            .load_only(BackendModel.type)
+        )
     if load_backend_type:
         stmt = stmt.options(joinedload(GatewayModel.backend).load_only(BackendModel.type))
     res = await session.execute(stmt)
@@ -602,6 +630,9 @@ async def get_or_add_gateway_connections(
         raise GatewayError("Gateway compute not found")
     connections: List[GatewayConnection] = []
     for compute in computes:
+        if compute.ip_address is None:
+            logger.warning("Gateway replica %s has no ip_address", compute.id)
+            raise GatewayError("Failed to connect to gateway")
         try:
             conn = await gateway_connections_pool.get_or_add(
                 hostname=compute.ip_address,
@@ -657,8 +688,7 @@ def _merge_per_window_stats(stats_per_gateway_replica: list[PerWindowStats]) -> 
 async def init_gateways(session: AsyncSession):
     res = await session.execute(
         select(GatewayComputeModel).where(
-            # FIXME: should not include computes related to gateways in the `provisioning` status.
-            # Causes warnings and delays when restarting the server during gateway provisioning.
+            GatewayComputeModel.status == GatewayReplicaStatus.RUNNING,
             GatewayComputeModel.active == True,
             GatewayComputeModel.deleted == False,
         )
@@ -674,8 +704,10 @@ async def init_gateways(session: AsyncSession):
         resource="gateway_tunnels",
     ):
         for gateway, error in await gather_map_async(
-            gateway_computes,
-            lambda g: gateway_connections_pool.get_or_add(g.ip_address, g.ssh_private_key, True),
+            [g for g in gateway_computes if g.ip_address],
+            lambda g: gateway_connections_pool.get_or_add(
+                get_or_error(g.ip_address), g.ssh_private_key, True
+            ),
             return_exceptions=True,
         ):
             if isinstance(error, Exception):
@@ -711,6 +743,11 @@ async def init_gateways(session: AsyncSession):
 
 
 async def _update_gateway(gateway_compute_model: GatewayComputeModel, build: str) -> bool:
+    if gateway_compute_model.ip_address is None:
+        logger.warning(
+            "Gateway replica %s has no ip_address, cannot update", gateway_compute_model.id
+        )
+        return False
     if _recently_updated(gateway_compute_model):
         logger.debug(
             "Skipping gateway %s update. Gateway was recently updated.",
@@ -816,11 +853,12 @@ def get_gateway_compute_configuration(
     if gateway_compute.configuration is not None:
         return GatewayComputeConfiguration.__response__.parse_raw(gateway_compute.configuration)
     # Handle gateways created before GatewayComputeConfiguration was introduced
+    gateway_configuration = get_gateway_configuration(gateway_model)
     return GatewayComputeConfiguration(
         project_name=gateway_model.project.name,
-        instance_name=gateway_compute.instance_id,
-        backend=gateway_model.backend.type,
-        region=gateway_compute.region,
+        instance_name=f"{gateway_model.name}-{gateway_compute.replica_num}",
+        backend=gateway_configuration.backend,
+        region=gateway_configuration.region,
         public_ip=True,
         ssh_key_pub=gateway_compute.ssh_public_key,
         certificate=LetsEncryptGatewayCertificate(),
@@ -844,14 +882,15 @@ def gateway_model_to_gateway(
     gateway_hostname = None
     replicas = []
     for compute in compute_models:
-        compute_configuration = get_gateway_compute_configuration(compute, gateway_model)
         replicas.append(
             GatewayReplica(
                 hostname=compute.ip_address,
                 replica_num=compute.replica_num,
-                backend=compute_configuration.backend,
-                region=compute_configuration.region,
+                backend=compute.backend.type if compute.backend else None,
+                region=compute.region,
                 created_at=compute.created_at,
+                status=compute.status,
+                status_message=compute.status_message,
             )
         )
         gateway_hostname = compute.hostname

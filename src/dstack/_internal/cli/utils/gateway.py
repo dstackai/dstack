@@ -118,6 +118,10 @@ def get_gateways_table(
                 gateway.replicas[0].backend, gateway.replicas[0].region
             )
             gateway_row["HOSTNAME"] = gateway_row.get("HOSTNAME", gateway.replicas[0].hostname)
+            gateway_row["STATUS"] = gateway.replicas[0].status or gateway.status
+            gateway_row["ERROR"] = ". ".join(
+                m for m in [gateway.status_message, gateway.replicas[0].status_message] if m
+            )
         add_row_from_dict(table, gateway_row)
 
         if len(gateway.replicas) > 1:
@@ -126,7 +130,9 @@ def get_gateways_table(
                     "NAME": f"   replica={replica.replica_num}",
                     "BACKEND": format_backend(replica.backend, replica.region),
                     "HOSTNAME": replica.hostname,
+                    "STATUS": replica.status,
                     "CREATED": format_date(replica.created_at),
+                    "ERROR": replica.status_message,
                 }
                 add_row_from_dict(table, replica_row, style="secondary")
 
