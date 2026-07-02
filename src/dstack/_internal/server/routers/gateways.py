@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import Annotated, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends
 from packaging.version import Version
@@ -9,7 +9,7 @@ import dstack._internal.server.schemas.gateways as schemas
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.common import EntityReference
-from dstack._internal.server.compatibility.gateways import patch_gateway
+from dstack._internal.server.compatibility.gateways import patch_gateway, patch_gateway_plan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.deps import Project
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -71,7 +71,53 @@ async def get_gateway(
     return CustomORJSONResponse(gateway)
 
 
-@router.post("/create", summary="Create gateway", response_model=models.Gateway)
+@router.post("/get_plan", summary="Get gateway plan", response_model=models.GatewayPlan)
+async def get_plan(
+    body: schemas.GetGatewayPlanRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectAdmin())],
+    client_version: Annotated[Optional[Version], Depends(get_client_version)],
+):
+    """
+    Returns a gateway plan for the given gateway spec.
+    This is an optional step before calling `/apply`.
+    """
+    user, project = user_project
+    plan = await gateways.get_plan(
+        session=session,
+        project=project,
+        user=user,
+        spec=body.spec,
+    )
+    patch_gateway_plan(plan, client_version)
+    return CustomORJSONResponse(plan)
+
+
+@router.post("/apply", summary="Apply gateway plan", response_model=models.Gateway)
+async def apply_plan(
+    body: schemas.ApplyGatewayPlanRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    user_project: Annotated[tuple[UserModel, ProjectModel], Depends(ProjectAdmin())],
+    pipeline_hinter: Annotated[PipelineHinterProtocol, Depends(get_pipeline_hinter)],
+    client_version: Annotated[Optional[Version], Depends(get_client_version)],
+):
+    """
+    Creates a new gateway or updates an existing gateway in-place.
+    """
+    user, project = user_project
+    gateway = await gateways.apply_plan(
+        session=session,
+        user=user,
+        project=project,
+        plan=body.plan,
+        force=body.force,
+        pipeline_hinter=pipeline_hinter,
+    )
+    patch_gateway(gateway, client_version)
+    return CustomORJSONResponse(gateway)
+
+
+@router.post("/create", summary="Create gateway", response_model=models.Gateway, deprecated=True)
 async def create_gateway(
     body: schemas.CreateGatewayRequest,
     session: AsyncSession = Depends(get_session),
@@ -79,6 +125,9 @@ async def create_gateway(
     pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
     client_version: Optional[Version] = Depends(get_client_version),
 ):
+    """
+    Deprecated in favor of `/apply`.
+    """
     user, project = user_project
     gateway = await gateways.create_gateway(
         session=session,
@@ -121,13 +170,21 @@ async def set_default_gateway(
     )
 
 
-@router.post("/set_wildcard_domain", summary="Set wildcard domain", response_model=models.Gateway)
+@router.post(
+    "/set_wildcard_domain",
+    summary="Set wildcard domain",
+    response_model=models.Gateway,
+    deprecated=True,
+)
 async def set_gateway_wildcard_domain(
     body: schemas.SetWildcardDomainRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
     client_version: Optional[Version] = Depends(get_client_version),
 ):
+    """
+    Deprecated in favor of `/apply` (in-place update).
+    """
     user, project = user_project
     gateway = await gateways.set_gateway_wildcard_domain(
         session=session,
