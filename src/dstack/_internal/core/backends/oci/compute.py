@@ -43,8 +43,6 @@ SUPPORTED_SHAPE_FAMILIES = [
     "BM.Standard.E4.",
     "BM.Standard.E5.",
     "BM.Optimized3.",
-    "VM.GPU2.",
-    "BM.GPU2.",
     "VM.GPU3.",
     "BM.GPU3.",
     "BM.GPU4.",

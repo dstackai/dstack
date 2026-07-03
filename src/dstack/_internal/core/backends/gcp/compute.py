@@ -1014,7 +1014,7 @@ def _is_supported_gcp_instance(instance_name: str, gpu_name: Optional[str]) -> b
     ]:
         if instance_name.startswith(family):
             return True
-    if gpu_name is not None and gpu_name not in {"K80", "P4"}:
+    if gpu_name is not None and gpu_name not in {"K80", "P4", "P100"}:
         return True
     return False
 
