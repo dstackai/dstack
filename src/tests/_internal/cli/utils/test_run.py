@@ -4,6 +4,7 @@ from typing import Optional
 from unittest.mock import Mock
 
 import pytest
+from freezegun import freeze_time
 from rich.table import Table
 from rich.text import Text
 from sqlalchemy import select
@@ -205,8 +206,11 @@ async def create_run_with_job(
 @pytest.mark.usefixtures("test_db", "image_config_mock")
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestGetRunsTable:
+    @freeze_time(datetime(2026, 1, 1))
     async def test_simple_run(self, session: AsyncSession):
-        api_run = await create_run_with_job(session=session)
+        api_run = await create_run_with_job(
+            session=session, submitted_at=datetime(2023, 1, 1, tzinfo=timezone.utc)
+        )
         table = get_runs_table([api_run], verbose=False)
 
         cells = get_table_cells(table)
