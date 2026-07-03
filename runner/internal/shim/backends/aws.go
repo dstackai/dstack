@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/dstackai/dstack/runner/internal/common/log"
 )
 
 const (
@@ -35,7 +37,7 @@ func NewAWSBackend() *AWSBackend {
 // * Red Hat and CentOS: may increment trailing letters in some versions – not supported.
 // * Other legacy systems: /dev/sda => /dev/sda.
 // More: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
-func (e *AWSBackend) GetRealDeviceName(volumeID, deviceName string) (string, error) {
+func (e *AWSBackend) GetRealDeviceName(ctx context.Context, volumeID, deviceName string) (string, error) {
 	// Resolve the base device, polling until it is enumerated by the guest
 	// kernel or the timeout elapses. This tolerates the delay between AWS
 	// reporting the volume as attached and the NVMe device becoming visible.
@@ -43,7 +45,7 @@ func (e *AWSBackend) GetRealDeviceName(volumeID, deviceName string) (string, err
 	var baseDevice string
 	for {
 		var err error
-		baseDevice, err = e.resolveBaseDevice(volumeID, deviceName)
+		baseDevice, err = e.resolveBaseDevice(ctx, volumeID, deviceName)
 		if err != nil {
 			return "", err
 		}
@@ -53,11 +55,12 @@ func (e *AWSBackend) GetRealDeviceName(volumeID, deviceName string) (string, err
 		if time.Now().After(deadline) {
 			return "", fmt.Errorf("volume %s not found among block devices after %s", volumeID, deviceResolveTimeout)
 		}
+		log.Debug(ctx, "volume not yet visible among block devices, retrying", "volume", volumeID)
 		time.Sleep(deviceResolveInterval)
 	}
 
 	// Run lsblk again to check for partitions on the base device
-	cmd := exec.CommandContext(context.TODO(), "lsblk", "-ln", "-o", "NAME", baseDevice)
+	cmd := exec.CommandContext(ctx, "lsblk", "-ln", "-o", "NAME", baseDevice)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -75,10 +78,10 @@ func (e *AWSBackend) GetRealDeviceName(volumeID, deviceName string) (string, err
 // NVMe serial reported by lsblk), falling back to mapping the AWS deviceName.
 // An empty string with a nil error means the device is not present yet and the
 // caller may retry.
-func (e *AWSBackend) resolveBaseDevice(volumeID, deviceName string) (string, error) {
+func (e *AWSBackend) resolveBaseDevice(ctx context.Context, volumeID, deviceName string) (string, error) {
 	// Run the lsblk command to get block device information
 	// On AWS, SERIAL contains volume id.
-	cmd := exec.CommandContext(context.TODO(), "lsblk", "-o", "NAME,SERIAL")
+	cmd := exec.CommandContext(ctx, "lsblk", "-o", "NAME,SERIAL")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
