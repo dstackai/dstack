@@ -1,7 +1,13 @@
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
+
+from pydantic import Field
 
 from dstack._internal.core.models.common import CoreConfig, CoreModel, generate_dual_core_model
-from dstack._internal.core.models.gateways import GatewayConfiguration
+from dstack._internal.core.models.gateways import (
+    ApplyGatewayPlanInput,
+    GatewayConfiguration,
+    GatewaySpec,
+)
 
 
 class CreateGatewayRequestConfig(CoreConfig):
@@ -20,6 +26,20 @@ class ListGatewaysRequest(CoreModel):
 
 class GetGatewayRequest(CoreModel):
     name: str
+
+
+class GetGatewayPlanRequest(CoreModel):
+    spec: GatewaySpec
+
+
+class ApplyGatewayPlanRequest(CoreModel):
+    plan: ApplyGatewayPlanInput
+    force: Annotated[
+        bool,
+        Field(
+            description="Use `force: true` to apply even if the expected resource does not match."
+        ),
+    ]
 
 
 class DeleteGatewaysRequest(CoreModel):

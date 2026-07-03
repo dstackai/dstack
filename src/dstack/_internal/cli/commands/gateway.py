@@ -85,7 +85,7 @@ class GatewayCommand(APIBaseCommand):
         update_parser.add_argument(
             "--set-default", action="store_true", help="Set it the default gateway for the project"
         )
-        update_parser.add_argument("--domain", help="Set the domain for the gateway")
+        update_parser.add_argument("--domain", help="(deprecated) Set the domain for the gateway")
 
         get_parser = subparsers.add_parser(
             "get", help="Get a gateway", formatter_class=self._parser.formatter_class
@@ -170,6 +170,10 @@ class GatewayCommand(APIBaseCommand):
     def _update(self, args: argparse.Namespace):
         with console.status("Updating gateway..."):
             if args.domain:
+                logger.warning(
+                    "`dstack gateway update --domain` is deprecated and may be disallowed in the future."
+                    " Use `dstack apply` to update domains or other gateway configuration properties"
+                )
                 if args.name.project is not None:
                     console.print(
                         "The [code]<project>/<gateway>[/] format is not supported for gateway names"

@@ -6,10 +6,18 @@ from dstack._internal.core.compatibility.gateways import (
     get_create_gateway_excludes,
     get_set_default_gateway_excludes,
 )
-from dstack._internal.core.models.gateways import Gateway, GatewayConfiguration
+from dstack._internal.core.models.gateways import (
+    ApplyGatewayPlanInput,
+    Gateway,
+    GatewayConfiguration,
+    GatewayPlan,
+    GatewaySpec,
+)
 from dstack._internal.server.schemas.gateways import (
+    ApplyGatewayPlanRequest,
     CreateGatewayRequest,
     DeleteGatewaysRequest,
+    GetGatewayPlanRequest,
     GetGatewayRequest,
     ListGatewaysRequest,
     SetDefaultGatewayRequest,
@@ -29,6 +37,18 @@ class GatewaysAPIClient(APIClientGroup):
     def get(self, project_name: str, gateway_name: str) -> Gateway:
         body = GetGatewayRequest(name=gateway_name)
         resp = self._request(f"/api/project/{project_name}/gateways/get", body=body.json())
+        return parse_obj_as(Gateway.__response__, resp.json())
+
+    def get_plan(self, project_name: str, spec: GatewaySpec) -> GatewayPlan:
+        body = GetGatewayPlanRequest(spec=spec)
+        resp = self._request(f"/api/project/{project_name}/gateways/get_plan", body=body.json())
+        return parse_obj_as(GatewayPlan.__response__, resp.json())
+
+    def apply_plan(
+        self, project_name: str, plan: ApplyGatewayPlanInput, *, force: bool = False
+    ) -> Gateway:
+        body = ApplyGatewayPlanRequest(plan=plan, force=force)
+        resp = self._request(f"/api/project/{project_name}/gateways/apply", body=body.json())
         return parse_obj_as(Gateway.__response__, resp.json())
 
     def create(
