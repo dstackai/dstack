@@ -24,6 +24,15 @@ const FRAMEWORKS: Logo[] = [
   { key: 'huggingface', label: 'Hugging Face', src: logoSrc('huggingface.svg') },
 ];
 
+const MODELS: Logo[] = [
+  { key: 'glm', label: 'GLM', src: logoSrc('glm.svg') },
+  { key: 'deepseek', label: 'DeepSeek', src: logoSrc('deepseek.svg') },
+  { key: 'qwen', label: 'Qwen', src: logoSrc('qwen.svg') },
+  { key: 'kimi', label: 'Kimi', src: logoSrc('kimi.svg') },
+];
+
+const DOCKER: Logo = { key: 'docker', label: 'Docker', src: logoSrc('docker.svg') };
+
 const GPU_CLOUDS: Logo[] = [
   { key: 'aws', label: 'AWS', src: logoSrc('aws.svg') },
   { key: 'gcp', label: 'Google Cloud', src: logoSrc('gcp.svg') },
@@ -72,27 +81,28 @@ function LogoRow({ logos }: { logos: Logo[] }) {
 export function ArchitectureDiagram() {
   return (
     <div className="arch-diagram-wrap">
-      <div className="arch-diagram" role="img" aria-label="dstack architecture: an orchestration layer between AI frameworks, data, and models on top, and GPU clouds, Kubernetes, on-prem clusters, and hardware below.">
-        {/* Top: what plugs in on top of the orchestration layer */}
+      <div className="arch-diagram" role="img" aria-label="dstack architecture: an orchestration layer between AI frameworks and models on top, and GPU clouds, Kubernetes, on-prem clusters, and hardware below.">
+        {/* Top: what plugs in on top of the orchestration layer. "Any model" spans the last two
+            columns so it lines up with Kubernetes + on-prem below. */}
         <div className="arch-row">
           <div className="arch-cell">
             <DashedBorder />
             <span className="arch-cell__label">Any framework</span>
             <LogoRow logos={FRAMEWORKS} />
           </div>
-          <div className="arch-cell arch-cell--center">
+          <div className="arch-cell arch-cell--model">
             <DashedBorder />
-            <span className="arch-cell__label">Your data</span>
-          </div>
-          <div className="arch-cell arch-cell--center">
-            <DashedBorder />
-            <span className="arch-cell__label">Any models</span>
+            <span className="arch-cell__label">Any model</span>
+            <LogoRow logos={MODELS} />
           </div>
         </div>
 
         {/* Middle: the orchestration layer itself */}
         <div className="arch-orchestration">
-          <div className="arch-orchestration__title">The AI-native orchestration stack</div>
+          <div className="arch-orchestration__title">
+            <span>dstack orchestration</span>
+            <LogoMark logo={DOCKER} />
+          </div>
           <div className="arch-orchestration__cells">
             {['Fleets', 'Dev environments', 'Tasks', 'Services', 'Volumes'].map(name => (
               <div className="arch-subcell" key={name}>

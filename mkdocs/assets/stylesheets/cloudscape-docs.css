@@ -204,8 +204,14 @@
     white-space: nowrap;
 }
 
-/* GitHub → outlined (normal) "GitHub" with a trailing external-link glyph. Weight 700 so it matches
-   the filled "Get started" trigger beside it (the two now read as one type, different fills). */
+/* "Get started" trigger uses the landing's primary-button weight (500) — lighter than the GitHub
+   pill (700), mirroring the landing where the primary and normal button variants differ in weight. */
+[data-md-color-primary=white] .md-header__buttons .md-button--primary.cs-gs-menu__trigger {
+    font-weight: 500 !important;
+}
+
+/* GitHub → outlined (normal) "GitHub" with a trailing external-link glyph, mirroring the landing's
+   normal-variant GitHub button (weight 700). */
 [data-md-color-primary=white] .md-header__buttons .md-button--primary.github {
     background: transparent;
     color: var(--cs-text);
@@ -272,14 +278,14 @@
     display: inline-flex !important;
     align-items: center;
     gap: 5px;
+    cursor: pointer;
     /* the caret is lighter than a full glyph, so trim the trailing padding (was 18px). */
     padding-right: 12px !important;
 }
 .cs-gs-menu__caret {
     transition: transform 0.15s ease;
 }
-.cs-gs-menu:hover .cs-gs-menu__caret,
-.cs-gs-menu:focus-within .cs-gs-menu__caret {
+.cs-gs-menu--open .cs-gs-menu__caret {
     transform: rotate(180deg);
 }
 .cs-gs-menu__popup {
@@ -288,9 +294,9 @@
     right: 0;
     z-index: 1000;
     width: 360px;
-    padding: 6px;
+    padding: 0;
     background: var(--cs-bg);
-    border: 0.5px solid var(--cs-text);
+    border: 1px solid var(--cs-text);
     border-radius: 12px;
     box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
     opacity: 0;
@@ -298,15 +304,7 @@
     transform: translateY(-4px);
     transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
 }
-/* Invisible bridge over the 8px gap so the pointer can travel from trigger to popup. */
-.cs-gs-menu__popup::before {
-    content: "";
-    position: absolute;
-    inset: -8px 0 auto 0;
-    height: 8px;
-}
-.cs-gs-menu:hover .cs-gs-menu__popup,
-.cs-gs-menu:focus-within .cs-gs-menu__popup {
+.cs-gs-menu--open .cs-gs-menu__popup {
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
@@ -324,10 +322,10 @@
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding: 14px;
+    padding: 11px 10px;
     border-radius: 10px;
-    background: linear-gradient(135deg, #002aff, #002aff, #e165fe);
-    color: #fff;
+    background: var(--cs-text);
+    color: var(--cs-bg);
     text-decoration: none;
 }
 .cs-gs-menu__feat-body {
@@ -343,9 +341,9 @@
     flex: 0 0 auto;
 }
 .cs-gs-menu__gh {
-    color: rgba(255, 255, 255, 0.88);
+    color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 300;
     font-variant-numeric: tabular-nums;
 }
 .cs-gs-menu__feat-ic {
@@ -356,8 +354,8 @@
     width: 34px;
     height: 34px;
     border-radius: 9px;
-    border: 0.5px solid rgba(255, 255, 255, 0.5);
-    color: #fff;
+    border: 0.5px solid color-mix(in srgb, var(--cs-bg) 50%, transparent);
+    color: var(--cs-bg);
 }
 .cs-gs-menu__feat-ic svg {
     width: 18px;
@@ -365,21 +363,20 @@
 }
 .cs-gs-menu__feat-name {
     display: block;
-    color: #fff;
+    color: var(--cs-bg);
     font-size: 16px;
     font-weight: 600;
 }
 .cs-gs-menu__feat-desc {
     display: block;
     margin-top: 8px;
-    color: rgba(255, 255, 255, 0.88);
+    color: color-mix(in srgb, var(--cs-bg) 88%, transparent);
     font-size: 13px;
     line-height: 1.5;
 }
 .cs-gs-menu__list {
     display: flex;
     flex-direction: column;
-    margin-top: 6px;
 }
 .cs-gs-menu__row {
     display: flex;
@@ -413,10 +410,21 @@
     min-width: 0;
 }
 .cs-gs-menu__name {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     color: var(--cs-text);
     font-size: 15px;
     font-weight: 600;
+}
+.cs-gs-menu__ext {
+    flex: 0 0 auto;
+    /* Shared Cloudscape external-link icon (same as footer / GitHub / dstack Sky buttons). */
+    width: 0.9em;
+    height: 0.9em;
+    background-color: currentColor;
+    -webkit-mask: var(--cs-ext-icon) center / contain no-repeat;
+    mask: var(--cs-ext-icon) center / contain no-repeat;
 }
 .cs-gs-menu__desc {
     display: block;
@@ -2067,7 +2075,7 @@
     width: 100%;
     color: var(--cs-text);
     --arch-border-width: max(1px, 0.22cqw);
-    --arch-gradient: linear-gradient(45deg, #002aff, #002aff, #e165fe);
+    --arch-gradient: var(--cs-text);
 }
 .arch-dash {
     position: absolute;
@@ -2078,15 +2086,15 @@
     pointer-events: none;
 }
 .arch-dash rect {
-    x: 0.75px;
-    y: 0.75px;
-    width: calc(100% - 1.5px);
-    height: calc(100% - 1.5px);
+    x: 0.25px;
+    y: 0.25px;
+    width: calc(100% - 0.5px);
+    height: calc(100% - 0.5px);
     rx: 12px;
     fill: none;
     stroke: var(--arch-dash-stroke, var(--cs-text));
-    stroke-width: 1.5px;
-    stroke-dasharray: 2 6;
+    stroke-width: 0.5px;
+    stroke-dasharray: 1 0;
     stroke-linecap: butt;
 }
 .arch-row {
@@ -2107,6 +2115,7 @@
 .arch-cell--center .arch-cell__label { white-space: normal; text-align: center; }
 .arch-cell--full { min-height: 9.83cqw; }
 .arch-cell--gpu { justify-content: space-between; }
+.arch-cell--model { grid-column: span 2; justify-content: space-between; }
 .arch-cell--hw { justify-content: center; }
 .arch-cell--hw > .arch-cell__label { position: absolute; left: 2cqw; }
 .arch-cell__label {
@@ -2120,12 +2129,12 @@
     flex-direction: column;
     align-items: center;
     gap: 3cqw;
-    padding: 3.2cqw 5.07cqw 3.48cqw;
+    padding: 3.2cqw 3.2cqw 3.48cqw;
     border-radius: 1.6cqw;
     background: var(--arch-gradient);
-    color: #fff;
+    color: var(--cs-bg);
 }
-.arch-orchestration__title { font-size: 16px; font-weight: 500; text-align: center; }
+.arch-orchestration__title { display: flex; align-items: center; justify-content: space-between; gap: 2cqw; width: 100%; font-size: 16px; font-weight: 500; }
 .arch-orchestration__cells {
     display: grid;
     grid-template-columns: 1fr 1.34fr 1fr 1fr 1fr;
@@ -2144,7 +2153,7 @@
     font-size: 2.25cqw;
     font-weight: 500;
     line-height: 1.2;
-    --arch-dash-stroke: #fff;
+    --arch-dash-stroke: var(--cs-bg);
 }
 .arch-logos {
     display: inline-flex;
@@ -2179,6 +2188,11 @@
 .arch-logo--amd { height: 4.6cqw; aspect-ratio: 1600 / 1408; -webkit-mask-image: url(../images/arch-logos/amd.webp); mask-image: url(../images/arch-logos/amd.webp); }
 .arch-logo--tenstorrent { height: 4.8cqw; aspect-ratio: 170 / 169; -webkit-mask-image: url(../images/arch-logos/tenstorrent.svg); mask-image: url(../images/arch-logos/tenstorrent.svg); }
 .arch-logo--tpu { height: 4.2cqw; aspect-ratio: 256 / 206; -webkit-mask-image: url(../images/arch-logos/gcp.svg); mask-image: url(../images/arch-logos/gcp.svg); }
+.arch-logo--glm { height: 3.4cqw; aspect-ratio: 19 / 16; -webkit-mask-image: url(../images/arch-logos/glm.svg); mask-image: url(../images/arch-logos/glm.svg); }
+.arch-logo--deepseek { height: 4.8cqw; aspect-ratio: 1; transform: translateY(-1px); -webkit-mask-image: url(../images/arch-logos/deepseek.svg); mask-image: url(../images/arch-logos/deepseek.svg); }
+.arch-logo--qwen { height: 4.9cqw; aspect-ratio: 1; transform: translateY(1px); -webkit-mask-image: url(../images/arch-logos/qwen.svg); mask-image: url(../images/arch-logos/qwen.svg); }
+.arch-logo--kimi { height: 4.3cqw; aspect-ratio: 1; -webkit-mask-image: url(../images/arch-logos/kimi.svg); mask-image: url(../images/arch-logos/kimi.svg); }
+.arch-logo--docker { height: 2.8cqw; aspect-ratio: 122.88 / 88.17; -webkit-mask-image: url(../images/arch-logos/docker.svg); mask-image: url(../images/arch-logos/docker.svg); }
 /* Reflow to 2-up below ~480px (was 360px): the cell labels are a fixed 16px, so on a narrow
    phone the 3-up grid can't shrink them and they overflow — switch to 2-up sooner. */
 @container (max-width: 480px) {
