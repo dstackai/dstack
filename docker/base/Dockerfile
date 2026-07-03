@@ -5,7 +5,7 @@ ARG UBUNTU_VERSION
 # (base / devel / devel-efa).
 # ============================================================================
 
-FROM nvidia/cuda:12.8.2-base-ubuntu${UBUNTU_VERSION}.04 AS common
+FROM nvidia/cuda:13.0.3-base-ubuntu${UBUNTU_VERSION}.04 AS common
 
 # ARGs before FROM must be redeclared to be used after FROM
 ARG UBUNTU_VERSION
@@ -60,7 +60,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | INSTALLER_NO_MODIFY_PATH=1 sh \
 # builder: builds NCCL and nccl-tests from source for the base/devel flavors.
 # ============================================================================
 
-FROM nvidia/cuda:12.8.2-base-ubuntu${UBUNTU_VERSION}.04 AS builder
+FROM nvidia/cuda:13.0.3-base-ubuntu${UBUNTU_VERSION}.04 AS builder
 
 ENV NCCL_HOME=/opt/nccl
 ENV CUDA_HOME=/usr/local/cuda
@@ -86,7 +86,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         python3 \
         build-essential
 
-ARG NCCL_VERSION=2.26.2-1
+ARG NCCL_VERSION=2.30.7-1
 
 RUN cd /tmp \
     && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION} \
@@ -167,7 +167,7 @@ RUN cd /tmp \
     && ./efa_installer.sh -y --skip-kmod -g \
     && rm -rf /tmp/aws-efa-installer /var/lib/apt/lists/*
 
-ARG NCCL_VERSION=2.27.7-1
+ARG NCCL_VERSION=2.30.7-1
 
 RUN cd /tmp \
     && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION} \
