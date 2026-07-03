@@ -487,9 +487,18 @@ class BaseRunConfiguration(CoreModel):
         Optional[str],
         Field(description="The run name. If not specified, a random name is generated"),
     ] = None
-    image: Annotated[Optional[str], Field(description="The name of the Docker image to run")] = (
-        None
-    )
+    image: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The name of the Docker image to run."
+                " If no `image` is specified, `dstack` uses an Ubuntu 24.04-based Docker image that comes pre-configured"
+                " with `uv`, `python`, `pip`, the CUDA 13.0 runtime, InfiniBand, NCCL, and NCCL tests."
+                " It may also include provider-specific components such as EFA support on AWS."
+                " For non-Nvidia accelerators or NVidia GPUs unsupported by CUDA 13.0 (e.g. V100, P100), specify a custom Docker image."
+            )
+        ),
+    ] = None
     user: Annotated[
         Optional[str],
         Field(
