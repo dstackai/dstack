@@ -194,3 +194,31 @@ Observed result:
 - endpoint utility pytest: `14 passed`
 - broader endpoint pytest: `116 passed, 44 skipped`
 - ruff: `All checks passed!`
+
+### Endpoint Get UX
+
+`dstack endpoint get NAME` now prints a human-readable endpoint detail table by
+default. `--json` remains available for scripts and exact API inspection.
+
+This makes failed endpoints easier to inspect without requiring verbose list output
+or JSON parsing. List/watch output stays compact and continues to show short failure
+reasons in `STATUS`.
+
+Verification on 2026-07-04:
+
+```bash
+uv run pytest src/tests/_internal/cli/utils/test_endpoint.py
+uv run pytest src/tests/_internal/cli/commands/test_logs.py src/tests/_internal/cli/services/configurators/test_endpoint.py src/tests/_internal/cli/utils/test_endpoint.py src/tests/_internal/core/models/test_endpoints.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/server/services/endpoints src/tests/_internal/server/services/test_endpoint_presets.py
+uv run ruff check src/dstack/_internal/cli/commands/endpoint.py src/dstack/_internal/cli/utils/endpoint.py src/tests/_internal/cli/utils/test_endpoint.py
+uv run dstack endpoint get qwen-endpoint-no-offers-schema
+uv run dstack endpoint get qwen-endpoint-no-offers-schema --json
+uv run dstack endpoint get --help
+```
+
+Observed result:
+
+- endpoint utility pytest: `15 passed`
+- broader endpoint pytest: `117 passed, 44 skipped`
+- ruff: `All checks passed!`
+- plain `endpoint get` shows Project/User/Endpoint/Model/Status/Run/URL/Created/Error
+- JSON output and help output still work

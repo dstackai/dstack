@@ -1,7 +1,11 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from dstack._internal.cli.utils.endpoint import filter_endpoints_for_listing, get_endpoints_table
+from dstack._internal.cli.utils.endpoint import (
+    filter_endpoints_for_listing,
+    get_endpoint_table,
+    get_endpoints_table,
+)
 from dstack._internal.core.models.endpoints import (
     Endpoint,
     EndpointConfiguration,
@@ -107,6 +111,38 @@ class TestGetEndpointsTable:
 
         status_column = next(column for column in table.columns if column.header == "STATUS")
         assert status_column._cells == ["[bold medium_purple1]agenting[/]"]
+
+
+class TestGetEndpointTable:
+    def test_shows_endpoint_details(self):
+        endpoint = _get_endpoint(
+            status_message="No matching endpoint presets found.",
+        )
+
+        table = get_endpoint_table(endpoint, format_date=lambda _: "now")
+
+        assert table.columns[0]._cells == [
+            "[bold]Project[/bold]",
+            "[bold]User[/bold]",
+            "[bold]Endpoint[/bold]",
+            "[bold]Model[/bold]",
+            "[bold]Status[/bold]",
+            "[bold]Run[/bold]",
+            "[bold]URL[/bold]",
+            "[bold]Created[/bold]",
+            "[bold]Error[/bold]",
+        ]
+        assert table.columns[1]._cells == [
+            "main",
+            "test-user",
+            "qwen-endpoint",
+            "Qwen/Qwen3-0.6B",
+            "[indian_red1]no preset[/]",
+            "-",
+            "-",
+            "now",
+            "No matching endpoint presets found.",
+        ]
 
 
 class TestFilterEndpointsForListing:

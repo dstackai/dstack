@@ -14,6 +14,7 @@ from dstack._internal.cli.utils.common import (
 from dstack._internal.cli.utils.endpoint import (
     filter_endpoints_for_listing,
     get_endpoints_table,
+    print_endpoint,
     print_endpoints_table,
 )
 from dstack._internal.core.errors import ResourceNotExistsError
@@ -86,7 +87,6 @@ class EndpointCommand(APIBaseCommand):
         get_parser.add_argument(
             "--json",
             action="store_true",
-            required=True,
             help="Output in JSON format",
         )
         get_parser.set_defaults(subfunc=self._get)
@@ -144,4 +144,7 @@ class EndpointCommand(APIBaseCommand):
             console.print("Endpoint not found")
             exit(1)
 
-        print(pydantic_orjson_dumps_with_indent(endpoint.dict(), default=None))
+        if args.json:
+            print(pydantic_orjson_dumps_with_indent(endpoint.dict(), default=None))
+            return
+        print_endpoint(endpoint)

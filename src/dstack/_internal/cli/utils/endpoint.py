@@ -43,6 +43,35 @@ def print_endpoints_table(endpoints: List[Endpoint], verbose: bool = False):
     console.print()
 
 
+def print_endpoint(endpoint: Endpoint):
+    console.print(get_endpoint_table(endpoint))
+    console.print()
+
+
+def get_endpoint_table(
+    endpoint: Endpoint,
+    format_date: DateFormatter = pretty_date,
+) -> Table:
+    table = Table(box=None, show_header=False)
+    table.add_column(no_wrap=True)
+    table.add_column()
+
+    def th(value: str) -> str:
+        return f"[bold]{value}[/bold]"
+
+    table.add_row(th("Project"), endpoint.project_name)
+    table.add_row(th("User"), endpoint.user)
+    table.add_row(th("Endpoint"), endpoint.name)
+    table.add_row(th("Model"), endpoint.configuration.model)
+    table.add_row(th("Status"), _format_endpoint_status(endpoint.status, endpoint.status_message))
+    table.add_row(th("Run"), endpoint.run_name or "-")
+    table.add_row(th("URL"), endpoint.url or "-")
+    table.add_row(th("Created"), format_date(endpoint.created_at))
+    if endpoint.status_message:
+        table.add_row(th("Error"), endpoint.status_message)
+    return table
+
+
 def get_endpoints_table(
     endpoints: List[Endpoint],
     verbose: bool = False,
