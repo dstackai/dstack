@@ -97,7 +97,6 @@ These are outside the repo and are not part of the commit:
 
 ### Known Issues / Next Hardening
 
-- The endpoint service `qwen-happy-v2` may still be running and spending `$0.44/hr`.
 - Server logs can still become noisy when agent output contains large YAML/CLI output.
 - Endpoint logs now resolve to the backing service, but debug trace storage and readable
   endpoint-agent logs need more real-run pressure.
@@ -113,3 +112,21 @@ These are outside the repo and are not part of the commit:
 This checkpoint should save the code version and the first working evidence. It should
 not be treated as v1 quality. The point is to keep a recoverable version while the real
 agent loop evolves through repeated tests.
+
+### Post-Checkpoint Cleanup
+
+After the checkpoint commit and tag were created, the live endpoint was deleted to stop
+GPU spend:
+
+```bash
+uv run dstack endpoint delete qwen-endpoint-happy -y
+uv run dstack run get qwen-happy-v2 --json
+uv run dstack endpoint get qwen-endpoint-happy --json
+```
+
+Observed result on 2026-07-04:
+
+- `dstack endpoint delete qwen-endpoint-happy -y` returned `Endpoint qwen-endpoint-happy deleted`.
+- The backing service moved to `terminating`, then `dstack run get qwen-happy-v2 --json`
+  returned `Run qwen-happy-v2 not found`.
+- `dstack endpoint get qwen-endpoint-happy --json` returned `Endpoint not found`.
