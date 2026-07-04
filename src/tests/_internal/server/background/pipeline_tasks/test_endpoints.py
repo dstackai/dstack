@@ -771,17 +771,26 @@ class TestEndpointWorkerProvisioning:
             run_name=_get_agent_run_name(),
         )
         agent_service = _FakeAgentService(result=_get_verified_agent_result(agent_run))
+        preset_service = Mock()
+        preset_service.save_preset = AsyncMock(side_effect=lambda preset, comments: preset)
 
-        with patch(
-            "dstack._internal.server.background.pipeline_tasks.endpoints.get_agent_service",
-            return_value=agent_service,
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.endpoints.get_agent_service",
+                return_value=agent_service,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.endpoints."
+                "get_endpoint_preset_service",
+                return_value=preset_service,
+            ),
         ):
             await worker.process(_endpoint_to_pipeline_item(endpoint_model))
 
         await session.refresh(endpoint_model)
         await session.refresh(legacy_run)
         await session.refresh(agent_run)
-        assert endpoint_model.status == EndpointStatus.PROVISIONING
+        assert endpoint_model.status == EndpointStatus.RUNNING
         assert endpoint_model.status_message is None
         assert endpoint_model.service_run_id == agent_run.id
         assert legacy_run.status == RunStatus.PROVISIONING
@@ -789,7 +798,7 @@ class TestEndpointWorkerProvisioning:
         assert agent_run.deleted is False
         events = await list_events(session)
         assert len(events) == 1
-        assert events[0].message == "Endpoint status changed AGENTING -> PROVISIONING"
+        assert events[0].message == "Endpoint status changed AGENTING -> RUNNING"
 
     async def test_fails_when_agent_reports_foreign_run(
         self, test_db, session: AsyncSession, worker: EndpointWorker
@@ -866,16 +875,11 @@ class TestEndpointWorkerProvisioning:
             await _lock_endpoint_model(session=session, endpoint_model=endpoint_model)
 
             await worker.process(_endpoint_to_pipeline_item(endpoint_model))
-            await session.refresh(endpoint_model)
-            assert endpoint_model.status == EndpointStatus.PROVISIONING
-            assert endpoint_model.service_run_id is not None
-            await _lock_endpoint_model(session=session, endpoint_model=endpoint_model)
-
-            await worker.process(_endpoint_to_pipeline_item(endpoint_model))
 
         await session.refresh(endpoint_model)
         assert endpoint_model.status == EndpointStatus.RUNNING
         assert endpoint_model.status_message is None
+        assert endpoint_model.service_run_id is not None
         submissions = await _get_endpoint_run_submissions(
             session=session,
             endpoint_model=endpoint_model,
@@ -923,15 +927,24 @@ class TestEndpointWorkerProvisioning:
                 )
 
         agent_service = _FakeAgentService(side_effect=provision_endpoint)
+        preset_service = Mock()
+        preset_service.save_preset = AsyncMock(side_effect=lambda preset, comments: preset)
 
-        with patch(
-            "dstack._internal.server.background.pipeline_tasks.endpoints.get_agent_service",
-            return_value=agent_service,
+        with (
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.endpoints.get_agent_service",
+                return_value=agent_service,
+            ),
+            patch(
+                "dstack._internal.server.background.pipeline_tasks.endpoints."
+                "get_endpoint_preset_service",
+                return_value=preset_service,
+            ),
         ):
             await worker.process(_endpoint_to_pipeline_item(endpoint_model))
 
         await session.refresh(endpoint_model)
-        assert endpoint_model.status == EndpointStatus.PROVISIONING
+        assert endpoint_model.status == EndpointStatus.RUNNING
         assert endpoint_model.service_run_id is not None
         submissions = await _get_endpoint_run_submissions(
             session=session,
@@ -939,6 +952,29 @@ class TestEndpointWorkerProvisioning:
         )
         assert len(submissions) == 1
         assert submissions[0].run_id == endpoint_model.service_run_id
+        preset_service.save_preset.assert_awaited_once()
+
+    async def test_agenting_linked_run_waits_without_showing_provisioning(
+        self, test_db, session: AsyncSession, worker: EndpointWorker
+    ):
+        endpoint_model = await _create_endpoint_model(
+            session=session,
+            status=EndpointStatus.AGENTING,
+        )
+        endpoint_model.provisioning_method = "agent"
+        await _create_backing_service_run(
+            session=session,
+            endpoint_model=endpoint_model,
+            status=RunStatus.PROVISIONING,
+        )
+
+        await worker.process(_endpoint_to_pipeline_item(endpoint_model))
+
+        await session.refresh(endpoint_model)
+        assert endpoint_model.status == EndpointStatus.AGENTING
+        assert endpoint_model.status_message is None
+        events = await list_events(session)
+        assert events == []
 
     async def test_agent_reported_run_without_verification_report_fails_endpoint(
         self, test_db, session: AsyncSession, worker: EndpointWorker

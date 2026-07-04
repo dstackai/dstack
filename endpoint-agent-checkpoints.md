@@ -405,3 +405,47 @@ These are outside the repo and are not part of the checkpoint commit:
   `dstack logs ENDPOINT`. Endpoint logs should contain major realtime events only:
   research/plan summary, candidate submitted, provisioning state, service startup,
   verification success/failure, preset save, and cleanup.
+
+### Post-Checkpoint Patch: Agent Status And Logs
+
+Implemented immediately after tag `endpoint-agent/qwen-runpod-v1-endpoint-dev-running`.
+The tag remains the recovery point for the known-good live RunPod smoke; these edits
+are the next local branch commit.
+
+Status behavior:
+
+- Agent-created endpoints no longer expose an intermediate `provisioning` state after
+  the agent returns a verified service run.
+- If the reported service is not yet fully visible as a ready dstack service, the
+  endpoint stays `agenting` with `service_run_id` linked.
+- Once the linked service is ready, the worker saves the learned preset and moves the
+  endpoint directly from `agenting` to `running`.
+- Preset-based endpoint creation still uses `provisioning`.
+
+Endpoint log behavior:
+
+- Claude stream/tool output is no longer copied to endpoint logs.
+- Full agent trace and command output remain in workspace artifacts:
+  `trace.jsonl` when debug is enabled, plus `commands.jsonl` and `command-output/`.
+- The agent now has a user-facing progress protocol: append concise JSON objects to
+  `progress.jsonl`, for example
+  `{"phase":"submit","message":"Submitted service candidate"}`.
+- The server tails `progress.jsonl` and writes only those major events to the configured
+  log service for `dstack logs ENDPOINT`.
+- Endpoint logs still include concise start/finish markers for the provisioning agent.
+
+Verification on 2026-07-04:
+
+```bash
+uv run pytest src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/services/endpoints/test_claude_agent.py
+uv run pytest src/tests/_internal/cli/commands/test_logs.py src/tests/_internal/cli/services/configurators/test_endpoint.py src/tests/_internal/cli/utils/test_endpoint.py src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/core/models/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/server/services/endpoints src/tests/_internal/server/services/test_endpoint_presets.py
+uv run ruff check src/dstack/_internal/server/background/pipeline_tasks/endpoints.py src/dstack/_internal/server/services/endpoints/agent/claude.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/services/endpoints/test_claude_agent.py
+uv run ruff format --check src/dstack/_internal/server/background/pipeline_tasks/endpoints.py src/dstack/_internal/server/services/endpoints/agent/claude.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/services/endpoints/test_claude_agent.py
+```
+
+Observed result:
+
+- focused endpoint/agent pytest: `51 passed, 36 skipped`
+- broader endpoint/log pytest: `104 passed, 11 skipped`
+- ruff: `All checks passed!`
+- format check: `4 files already formatted`

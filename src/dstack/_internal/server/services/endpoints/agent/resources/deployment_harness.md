@@ -18,6 +18,7 @@ Workspace artifact contract:
 
 - On startup or resume, inspect `agent_state.json`, `candidates.jsonl`, `verification.json`, and `final_report.json` before submitting anything new. If a previous candidate is already running and verifiable, reuse it instead of creating a duplicate run.
 - Keep `agent_state.json` current enough to show the phase.
+- Append user-facing major progress events to `progress.jsonl` in real time. Each line must be a small JSON object such as `{"phase":"research","message":"Checking Qwen serving recipes and model requirements"}`. Use this only for milestones: research direction, chosen experiment path, candidate submitted, provisioning observation, verification result, cleanup, or terminal failure. Do not write command output, YAML, secrets, long tables, or raw traces here.
 - Add source evidence to `sources.jsonl`.
 - Keep `hardware_reasoning.md` reviewable before any paid run.
 - Record every spend-capable service, task, or dev-environment candidate in `candidates.jsonl`.

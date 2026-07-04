@@ -155,6 +155,7 @@ class TestClaudeAgentService:
         assert (work_dir / "sources.jsonl").exists()
         assert (work_dir / "candidates.jsonl").exists()
         assert (work_dir / "commands.jsonl").exists()
+        assert (work_dir / "progress.jsonl").exists()
         assert (work_dir / "hardware_reasoning.md").exists()
         final_report = json.loads((work_dir / "final_report.json").read_text())
         assert final_report["success"] is True
@@ -245,6 +246,10 @@ class TestClaudeAgentService:
         assert "Prototypes may be dstack services, tasks, or dev environments" in prompt
         assert "final verified run reported to the server must be a dstack service" in prompt
         assert "do not attempt P/D disaggregation" in prompt
+        assert "progress.jsonl" in prompt
+        assert (
+            "Do not write command output, YAML, secrets, long tables, or raw traces here" in prompt
+        )
 
     @pytest.mark.asyncio
     async def test_uses_server_default_agent_budget_when_endpoint_does_not_set_one(
@@ -435,7 +440,7 @@ class TestClaudeAgentService:
         assert "[redacted]" in trace
 
     @pytest.mark.asyncio
-    async def test_writes_compact_agent_logs_from_claude_stream(self, tmp_path):
+    async def test_records_commands_without_copying_claude_stream_to_endpoint_logs(self, tmp_path):
         class FakeLogWriter:
             def __init__(self):
                 self.messages = []
@@ -503,10 +508,7 @@ class TestClaudeAgentService:
 
         await _read_agent_stdout(reader, workspace)
 
-        assert log_writer.messages == [
-            "Agent tool: Bash (List offers)\n$ dstack offer --gpu 1 --max-price 0.3",
-            "Tool output:\nNo offers [redacted]",
-        ]
+        assert log_writer.messages == []
         command_records = [
             json.loads(line)
             for line in (tmp_path / "work" / "commands.jsonl").read_text().splitlines()
@@ -519,7 +521,7 @@ class TestClaudeAgentService:
         assert output == "No offers [redacted]"
 
     @pytest.mark.asyncio
-    async def test_truncates_large_tool_outputs_in_endpoint_logs(self, tmp_path):
+    async def test_stores_large_tool_outputs_without_endpoint_log_preview(self, tmp_path):
         class FakeLogWriter:
             def __init__(self):
                 self.messages = []
@@ -567,15 +569,88 @@ class TestClaudeAgentService:
 
         await _read_agent_stdout(reader, workspace)
 
-        assert len(log_writer.messages) == 1
-        assert "Full output is stored in the endpoint agent workspace" in log_writer.messages[0]
-        assert "offer 0199" not in log_writer.messages[0]
+        assert log_writer.messages == []
         command_records = [
             json.loads(line)
             for line in (tmp_path / "work" / "commands.jsonl").read_text().splitlines()
         ]
         output = (tmp_path / "work" / command_records[0]["output_path"]).read_text()
         assert output == long_output
+
+    @pytest.mark.asyncio
+    async def test_subprocess_streams_agent_progress_jsonl_to_endpoint_logs(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        class FakeLogWriter:
+            def __init__(self):
+                self.messages = []
+
+            async def write(self, message):
+                self.messages.append(message)
+
+            async def flush(self):
+                pass
+
+        claude_path = tmp_path / "claude"
+        claude_path.write_text(
+            """#!/bin/sh
+printf '%s\\n' '{"phase":"research","message":"Checking recipes with secret"}' >> progress.jsonl
+printf '%s\\n' '{"phase":"submit","message":"Submitted service candidate"}' >> progress.jsonl
+cat > final_report.json <<'JSON'
+{
+  "success": true,
+  "run_id": "6e578748-d597-4fde-a3a4-203587cad5a2",
+  "run_name": "qwen-agent-candidate",
+  "service_yaml": "type: service\\nname: qwen-agent-candidate\\n",
+  "verification_summary": "Verified chat completions."
+}
+JSON
+printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
+""",
+            encoding="utf-8",
+        )
+        claude_path.chmod(0o755)
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_PATH", str(claude_path))
+        work_dir = tmp_path / "work"
+        work_dir.mkdir()
+        log_writer = FakeLogWriter()
+        workspace = _AgentWorkspace(
+            root_dir=tmp_path,
+            home_dir=tmp_path / "home",
+            work_dir=work_dir,
+            trace_path=None,
+            env={},
+            redacted_values=["secret"],
+            endpoint_name="qwen-endpoint",
+            model="Qwen/Qwen3-0.6B",
+            max_agent_budget=None,
+            log_writer=log_writer,
+        )
+        request = {
+            "prompt": "prompt",
+            "env": {},
+            "cwd": str(work_dir),
+            "options": {
+                "allowed_tools": "Bash",
+                "disallowed_tools": "",
+                "model": "test-model",
+                "max_turns": 1,
+                "max_budget": None,
+                "json_schema": {},
+            },
+        }
+
+        result = await _run_agent_in_subprocess(workspace, request)
+
+        assert result.error is None
+        assert log_writer.messages == [
+            "Starting endpoint provisioning agent (test-model)",
+            "research: Checking recipes with [redacted]",
+            "submit: Submitted service candidate",
+            "Endpoint provisioning agent finished",
+        ]
 
     @pytest.mark.asyncio
     async def test_subprocess_uses_final_report_artifact_when_stream_result_is_missing(

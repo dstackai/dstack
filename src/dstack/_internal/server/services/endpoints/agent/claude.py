@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import shutil
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,9 +55,9 @@ _INHERITED_ENV_NAMES = [
 _REDACTION = "[redacted]"
 _MAX_CAPTURED_OUTPUT_CHARS = 20_000
 _MAX_AGENT_LOG_MESSAGE_CHARS = 4_000
-_MAX_TOOL_RESULT_LOG_PREVIEW_CHARS = 1_200
-_MAX_TOOL_RESULT_LOG_PREVIEW_LINES = 30
 _AGENT_LOG_BATCH_SIZE = 1
+_AGENT_PROGRESS_LOG_NAME = "progress.jsonl"
+_AGENT_PROGRESS_POLL_SECONDS = 1.0
 _CLAUDE_AGENT_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
 
 
@@ -185,6 +186,10 @@ class _AgentWorkspace:
         self.log_writer = log_writer
         self.artifacts = _AgentArtifactRecorder(self)
 
+    @property
+    def progress_path(self) -> Path:
+        return self.work_dir / _AGENT_PROGRESS_LOG_NAME
+
 
 class _AgentLogWriter:
     def __init__(
@@ -301,7 +306,12 @@ class _AgentArtifactRecorder:
     def initialize(self) -> None:
         self._workspace.work_dir.mkdir(parents=True, exist_ok=True)
         self._update_agent_state(phase="starting")
-        for filename in ["sources.jsonl", "candidates.jsonl", "commands.jsonl"]:
+        for filename in [
+            "sources.jsonl",
+            "candidates.jsonl",
+            "commands.jsonl",
+            _AGENT_PROGRESS_LOG_NAME,
+        ]:
             (self._workspace.work_dir / filename).touch(exist_ok=True)
         hardware_reasoning_path = self._workspace.work_dir / "hardware_reasoning.md"
         if not hardware_reasoning_path.exists():
@@ -610,22 +620,30 @@ async def _run_agent_in_subprocess(
         _format_agent_start_log(request),
     )
     workspace.artifacts.mark_running()
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        cwd=workspace.work_dir,
-        env=request["env"],
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    assert proc.stdout is not None
-    assert proc.stderr is not None
-    stdout_task = asyncio.create_task(_read_agent_stdout(proc.stdout, workspace))
-    stderr_task = asyncio.create_task(_read_agent_stderr(proc.stderr, workspace))
-    stdout_output, stderr_output, returncode = await asyncio.gather(
-        stdout_task,
-        stderr_task,
-        proc.wait(),
-    )
+    progress_tailer = _AgentProgressLogTailer(workspace)
+    progress_task = asyncio.create_task(progress_tailer.run())
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=workspace.work_dir,
+            env=request["env"],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        assert proc.stdout is not None
+        assert proc.stderr is not None
+        stdout_task = asyncio.create_task(_read_agent_stdout(proc.stdout, workspace))
+        stderr_task = asyncio.create_task(_read_agent_stderr(proc.stderr, workspace))
+        stdout_output, stderr_output, returncode = await asyncio.gather(
+            stdout_task,
+            stderr_task,
+            proc.wait(),
+        )
+    finally:
+        progress_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await progress_task
+        await progress_tailer.flush(include_partial=True)
     process_output = _merge_process_outputs(stdout_output, stderr_output)
     _write_trace_record(
         workspace,
@@ -634,7 +652,7 @@ async def _run_agent_in_subprocess(
             "returncode": returncode,
         },
     )
-    await _write_agent_log(workspace, f"Server agent process exited with code {returncode}")
+    await _write_agent_log(workspace, _format_agent_exit_log(returncode))
     await _flush_agent_logs(workspace)
     if process_output.report_data is None:
         process_output.report_data = _load_final_report_artifact(workspace)
@@ -730,14 +748,78 @@ async def _read_agent_stream(
         except json.JSONDecodeError:
             message = {"type": "raw-output", "stream": stream_name, "line": line.rstrip("\r\n")}
             _write_trace_record(workspace, message)
-            await _write_agent_log_if_present(workspace, message)
             continue
         if stream_name != "stdout":
             message.setdefault("stream", stream_name)
         _write_trace_record(workspace, message)
         workspace.artifacts.record_stream_message(message)
         _update_agent_process_output(output, message)
-        await _write_agent_log_if_present(workspace, message)
+
+
+class _AgentProgressLogTailer:
+    def __init__(self, workspace: _AgentWorkspace) -> None:
+        self._workspace = workspace
+        self._offset = 0
+        self._partial = ""
+
+    async def run(self) -> None:
+        while True:
+            await self.flush()
+            await asyncio.sleep(_AGENT_PROGRESS_POLL_SECONDS)
+
+    async def flush(self, *, include_partial: bool = False) -> None:
+        path = self._workspace.progress_path
+        if not path.exists():
+            return
+        if path.stat().st_size < self._offset:
+            self._offset = 0
+            self._partial = ""
+        with path.open("r", encoding="utf-8", errors="replace") as f:
+            f.seek(self._offset)
+            text = f.read()
+            self._offset = f.tell()
+        if not text and not (include_partial and self._partial):
+            return
+        self._partial += text
+        lines = self._partial.splitlines(keepends=True)
+        self._partial = ""
+        for line in lines:
+            if not include_partial and not line.endswith(("\n", "\r")):
+                self._partial = line
+                continue
+            await self._write_progress_line(line.rstrip("\r\n"))
+
+    async def _write_progress_line(self, line: str) -> None:
+        if not line.strip():
+            return
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            _write_trace_record(
+                self._workspace,
+                {"type": "agent-progress-invalid", "line": line},
+            )
+            return
+        message = _format_agent_progress_log_message(parsed)
+        if message is None:
+            _write_trace_record(
+                self._workspace,
+                {"type": "agent-progress-ignored", "record": parsed},
+            )
+            return
+        await _write_agent_log(self._workspace, message)
+
+
+def _format_agent_progress_log_message(record: Any) -> Optional[str]:
+    if not isinstance(record, dict):
+        return None
+    message = record.get("message")
+    if not isinstance(message, str) or not message.strip():
+        return None
+    phase = record.get("phase")
+    if isinstance(phase, str) and phase.strip():
+        return f"{phase.strip()}: {message.strip()}"
+    return message.strip()
 
 
 def _update_agent_process_output(
@@ -775,15 +857,6 @@ def _merge_process_outputs(*outputs: _AgentProcessOutput) -> _AgentProcessOutput
     return merged
 
 
-async def _write_agent_log_if_present(
-    workspace: _AgentWorkspace,
-    message: dict[str, Any],
-) -> None:
-    log_message = _format_agent_log_message(message)
-    if log_message is not None:
-        await _write_agent_log(workspace, log_message)
-
-
 async def _write_agent_log(workspace: _AgentWorkspace, message: str) -> None:
     if workspace.log_writer is None:
         return
@@ -799,112 +872,16 @@ async def _flush_agent_logs(workspace: _AgentWorkspace) -> None:
 
 def _format_agent_start_log(request: dict[str, Any]) -> str:
     options = request["options"]
-    parts = [f"Starting server agent ({options['model']})"]
+    parts = [f"Starting endpoint provisioning agent ({options['model']})"]
     if options["max_budget"] is not None:
         parts.append(f"max budget ${options['max_budget']}")
-    cwd = request.get("cwd")
-    if cwd:
-        parts.append(f"workspace {cwd}")
     return ", ".join(parts)
 
 
-def _format_agent_log_message(message: dict[str, Any]) -> Optional[str]:
-    message_type = message.get("type")
-    if message_type == "system" and message.get("subtype") == "init":
-        model = message.get("model")
-        version = message.get("claude_code_version")
-        details = ", ".join(
-            str(v) for v in [model, f"Claude Code {version}" if version else None] if v
-        )
-        return f"Server agent initialized ({details})" if details else "Server agent initialized"
-    if message_type == "assistant":
-        return _format_assistant_message_log(message.get("message"))
-    if message_type == "user":
-        return _format_user_message_log(message.get("message"))
-    if message_type == "result":
-        if message.get("is_error"):
-            result = message.get("result")
-            if isinstance(result, str) and result.strip():
-                return f"Server agent failed: {_truncate_log_message(result.strip())}"
-            return "Server agent failed"
-        return "Server agent finished"
-    if message_type == "raw-output":
-        line = message.get("line")
-        if isinstance(line, str) and line.strip():
-            prefix = "Agent stderr" if message.get("stream") == "stderr" else "Agent output"
-            return f"{prefix}: {line.strip()}"
-    return None
-
-
-def _format_assistant_message_log(message: Any) -> Optional[str]:
-    if not isinstance(message, dict):
-        return None
-    lines = []
-    for item in message.get("content", []):
-        if not isinstance(item, dict):
-            continue
-        if item.get("type") == "tool_use":
-            name = item.get("name") or "tool"
-            tool_input = item.get("input")
-            description = None
-            command = None
-            if isinstance(tool_input, dict):
-                description = tool_input.get("description")
-                command = tool_input.get("command")
-            if isinstance(description, str) and description.strip():
-                lines.append(f"Agent tool: {name} ({description.strip()})")
-            else:
-                lines.append(f"Agent tool: {name}")
-            if isinstance(command, str) and command.strip():
-                lines.append(f"$ {command.strip()}")
-        elif item.get("type") == "text" and isinstance(item.get("text"), str):
-            text = item["text"].strip()
-            if text:
-                lines.append(text)
-    if not lines:
-        return None
-    return "\n".join(lines)
-
-
-def _format_user_message_log(message: Any) -> Optional[str]:
-    if not isinstance(message, dict):
-        return None
-    lines = []
-    for item in message.get("content", []):
-        if not isinstance(item, dict) or item.get("type") != "tool_result":
-            continue
-        content = item.get("content")
-        if not isinstance(content, str) or not content.strip():
-            continue
-        prefix = "Tool error" if item.get("is_error") else "Tool output"
-        lines.append(_format_tool_result_log(prefix, content))
-    if not lines:
-        return None
-    return "\n\n".join(lines)
-
-
-def _format_tool_result_log(prefix: str, content: str) -> str:
-    stripped = content.strip()
-    result_lines = stripped.splitlines()
-    if (
-        len(stripped) <= _MAX_TOOL_RESULT_LOG_PREVIEW_CHARS
-        and len(result_lines) <= _MAX_TOOL_RESULT_LOG_PREVIEW_LINES
-    ):
-        return f"{prefix}:\n{stripped}"
-
-    preview_lines = result_lines[:_MAX_TOOL_RESULT_LOG_PREVIEW_LINES]
-    preview = "\n".join(preview_lines)
-    if len(preview) > _MAX_TOOL_RESULT_LOG_PREVIEW_CHARS:
-        preview = preview[: _MAX_TOOL_RESULT_LOG_PREVIEW_CHARS - 15].rstrip()
-    if preview:
-        preview += "\n... truncated"
-    else:
-        preview = "... truncated"
-    return (
-        f"{prefix} captured ({len(stripped)} chars, {len(result_lines)} lines). "
-        "Full output is stored in the endpoint agent workspace.\n"
-        f"{preview}"
-    )
+def _format_agent_exit_log(returncode: Optional[int]) -> str:
+    if returncode == 0:
+        return "Endpoint provisioning agent finished"
+    return f"Endpoint provisioning agent exited with code {returncode}"
 
 
 def _truncate_log_message(message: str) -> str:

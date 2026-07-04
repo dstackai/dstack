@@ -511,10 +511,37 @@ async def _process_agenting_endpoint(
     pipeline_hinter: PipelineHinterProtocol,
 ) -> _ProcessResult:
     if endpoint_model.service_run is not None:
-        return _ProcessResult(update_map={"status": EndpointStatus.PROVISIONING})
+        return await _process_agent_verified_endpoint(endpoint_model)
     return await _provision_endpoint_with_agent(
         endpoint_model=endpoint_model,
         pipeline_hinter=pipeline_hinter,
+    )
+
+
+async def _process_agent_verified_endpoint(endpoint_model: EndpointModel) -> _ProcessResult:
+    run_model = endpoint_model.service_run
+    if run_model is None:
+        return _ProcessResult()
+    readiness = _get_service_run_readiness(run_model, endpoint_name=endpoint_model.name)
+    if readiness.failed_message is not None:
+        return _ProcessResult(
+            update_map={
+                "status": EndpointStatus.FAILED,
+                "status_message": readiness.failed_message,
+            }
+        )
+    if readiness.model_base_url is None or readiness.model_name is None:
+        return _ProcessResult(update_map={"status": EndpointStatus.AGENTING})
+    await _save_agent_endpoint_preset(
+        endpoint_model=endpoint_model,
+        run_model=run_model,
+        model_name=readiness.model_name,
+    )
+    return _ProcessResult(
+        update_map={
+            "status": EndpointStatus.RUNNING,
+            "status_message": None,
+        }
     )
 
 
@@ -643,9 +670,30 @@ async def _provision_endpoint_with_agent(
                 "status_message": e.msg,
             }
         )
+    readiness = _get_service_run_readiness(run_model, endpoint_name=endpoint_model.name)
+    if readiness.failed_message is not None:
+        return _ProcessResult(
+            update_map={
+                "status": EndpointStatus.FAILED,
+                "status_message": readiness.failed_message,
+            }
+        )
+    if readiness.model_base_url is None or readiness.model_name is None:
+        return _ProcessResult(
+            update_map={
+                "status": EndpointStatus.AGENTING,
+                "status_message": None,
+                "service_run_id": run_model.id,
+            }
+        )
+    await _save_agent_endpoint_preset(
+        endpoint_model=endpoint_model,
+        run_model=run_model,
+        model_name=readiness.model_name,
+    )
     return _ProcessResult(
         update_map={
-            "status": EndpointStatus.PROVISIONING,
+            "status": EndpointStatus.RUNNING,
             "status_message": None,
             "service_run_id": run_model.id,
         }
@@ -695,6 +743,18 @@ async def _try_save_agent_endpoint_preset(
     run_model = endpoint_model.service_run
     if run_model is None:
         return
+    await _save_agent_endpoint_preset(
+        endpoint_model=endpoint_model,
+        run_model=run_model,
+        model_name=model_name,
+    )
+
+
+async def _save_agent_endpoint_preset(
+    endpoint_model: EndpointModel,
+    run_model: RunModel,
+    model_name: str,
+) -> None:
     preset_name = f"{model_name}-{str(run_model.id)[:8]}"
     try:
         preset = build_endpoint_preset_from_run(name=preset_name, run_model=run_model)
@@ -729,6 +789,14 @@ def _get_backing_service_readiness(endpoint_model: EndpointModel) -> _BackingSer
     run_model = endpoint_model.service_run
     if run_model is None:
         return _BackingServiceReadiness(failed_message="Backing service run is missing")
+    return _get_service_run_readiness(run_model, endpoint_name=endpoint_model.name)
+
+
+def _get_service_run_readiness(
+    run_model: RunModel,
+    *,
+    endpoint_name: str,
+) -> _BackingServiceReadiness:
     if run_model.deleted:
         return _BackingServiceReadiness(failed_message="Backing service run was deleted")
     if run_model.status.is_finished():
@@ -744,7 +812,7 @@ def _get_backing_service_readiness(endpoint_model: EndpointModel) -> _BackingSer
     try:
         service_spec = ServiceSpec.__response__.parse_raw(run_model.service_spec)
     except ValidationError:
-        logger.warning("Endpoint %s backing service spec is invalid", endpoint_model.name)
+        logger.warning("Endpoint %s backing service spec is invalid", endpoint_name)
         return _BackingServiceReadiness(failed_message="Backing service spec is invalid")
     if service_spec.model is None:
         return _BackingServiceReadiness()
