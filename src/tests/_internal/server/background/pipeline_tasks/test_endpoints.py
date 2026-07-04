@@ -971,6 +971,69 @@ class TestEndpointWorkerProvisioning:
         assert endpoint_model.status_message == "agent could not find a deployable recipe"
         agent_service.provision_endpoint.assert_awaited_once()
 
+    async def test_agent_error_status_message_is_compact(
+        self, test_db, session: AsyncSession, worker: EndpointWorker
+    ):
+        endpoint_model = await _create_endpoint_model(
+            session=session,
+            status=EndpointStatus.AGENTING,
+        )
+        endpoint_model.provisioning_method = "agent"
+        await session.commit()
+        long_error = "agent failed before report\n" + "\n".join(
+            f"offer {i:04d} gpu=A5000 price=0.27" for i in range(200)
+        )
+        agent_service = _FakeAgentService(result=AgentProvisioningResult(error=long_error))
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.endpoints.get_agent_service",
+            return_value=agent_service,
+        ):
+            await worker.process(_endpoint_to_pipeline_item(endpoint_model))
+
+        await session.refresh(endpoint_model)
+        assert endpoint_model.status == EndpointStatus.FAILED
+        assert endpoint_model.status_message is not None
+        assert len(endpoint_model.status_message) <= 500
+        assert "\n" not in endpoint_model.status_message
+        assert endpoint_model.status_message.startswith("agent failed before report offer 0000")
+        assert "offer 0199" not in endpoint_model.status_message
+
+    async def test_agent_failure_report_status_message_is_compact(
+        self, test_db, session: AsyncSession, worker: EndpointWorker
+    ):
+        endpoint_model = await _create_endpoint_model(
+            session=session,
+            status=EndpointStatus.AGENTING,
+        )
+        endpoint_model.provisioning_method = "agent"
+        await session.commit()
+        long_failure_summary = "agent could not verify service\n" + "\n".join(
+            f"line {i:04d} with detailed output" for i in range(200)
+        )
+        agent_service = _FakeAgentService(
+            result=AgentProvisioningResult(
+                final_report=AgentFinalReport(
+                    success=False,
+                    failure_summary=long_failure_summary,
+                )
+            )
+        )
+
+        with patch(
+            "dstack._internal.server.background.pipeline_tasks.endpoints.get_agent_service",
+            return_value=agent_service,
+        ):
+            await worker.process(_endpoint_to_pipeline_item(endpoint_model))
+
+        await session.refresh(endpoint_model)
+        assert endpoint_model.status == EndpointStatus.FAILED
+        assert endpoint_model.status_message is not None
+        assert len(endpoint_model.status_message) <= 500
+        assert "\n" not in endpoint_model.status_message
+        assert endpoint_model.status_message.startswith("agent could not verify service line 0000")
+        assert "line 0199" not in endpoint_model.status_message
+
     async def test_agent_failure_does_not_stop_unlinked_same_name_run(
         self, test_db, session: AsyncSession, worker: EndpointWorker
     ):

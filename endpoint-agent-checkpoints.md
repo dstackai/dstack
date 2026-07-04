@@ -148,3 +148,21 @@ Observed result on 2026-07-04:
 - Planned resources: `cpu=9 mem=50GB disk=60GB gpu=A40:48GB:1`.
 - Planned offer: RunPod `CA-MTL-1`, NVIDIA A40, `$0.44/hr`.
 - The command exited at the confirmation prompt; no endpoint or GPU run was created.
+
+### Agent Status Message Boundary
+
+Endpoint agent failures now keep endpoint `status_message` compact: agent-originated
+errors and failure summaries are collapsed to one line and capped at 500 characters.
+Full details remain in the endpoint agent workspace artifacts and endpoint logs.
+
+Verification on 2026-07-04:
+
+```bash
+uv run pytest src/tests/_internal/cli/commands/test_logs.py src/tests/_internal/cli/services/configurators/test_endpoint.py src/tests/_internal/cli/utils/test_endpoint.py src/tests/_internal/core/models/test_endpoints.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/server/services/endpoints src/tests/_internal/server/services/test_endpoint_presets.py
+uv run ruff check src/dstack/_internal/server/background/pipeline_tasks/endpoints.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py
+```
+
+Observed result:
+
+- endpoint pytest slice: `112 passed, 44 skipped`
+- ruff: `All checks passed!`

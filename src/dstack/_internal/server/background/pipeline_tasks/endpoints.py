@@ -61,6 +61,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 _NO_MATCHING_PRESET_MESSAGE = "No matching endpoint presets found."
+_MAX_AGENT_STATUS_MESSAGE_CHARS = 500
 
 
 @dataclass
@@ -538,7 +539,7 @@ async def _provision_endpoint_with_agent(
         return _ProcessResult(
             update_map={
                 "status": EndpointStatus.FAILED,
-                "status_message": result.error,
+                "status_message": _format_agent_status_message(result.error),
             }
         )
     report = result.final_report
@@ -553,8 +554,9 @@ async def _provision_endpoint_with_agent(
         return _ProcessResult(
             update_map={
                 "status": EndpointStatus.FAILED,
-                "status_message": (
-                    report.failure_summary or "Server agent did not verify the endpoint"
+                "status_message": _format_agent_status_message(
+                    report.failure_summary,
+                    default="Server agent did not verify the endpoint",
                 ),
             }
         )
@@ -648,6 +650,18 @@ async def _provision_endpoint_with_agent(
             "service_run_id": run_model.id,
         }
     )
+
+
+def _format_agent_status_message(
+    message: Optional[str],
+    default: str = "Server agent failed",
+) -> str:
+    if message is None or not message.strip():
+        return default
+    one_line_message = " ".join(message.split())
+    if len(one_line_message) <= _MAX_AGENT_STATUS_MESSAGE_CHARS:
+        return one_line_message
+    return one_line_message[: _MAX_AGENT_STATUS_MESSAGE_CHARS - 3].rstrip() + "..."
 
 
 async def _record_endpoint_run_submission(endpoint_id: uuid.UUID, run_id: uuid.UUID) -> None:
