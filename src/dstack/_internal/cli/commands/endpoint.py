@@ -40,8 +40,7 @@ class EndpointCommand(APIBaseCommand):
                 "--all",
                 help=(
                     "Show all endpoints. By default, it only shows unfinished endpoints "
-                    "and the last finished endpoint. In watch mode, it only shows "
-                    "unfinished endpoints."
+                    "and the last finished endpoint."
                 ),
                 action="store_true",
             )
@@ -117,7 +116,6 @@ class EndpointCommand(APIBaseCommand):
             endpoints,
             show_all=args.all,
             limit=args.last,
-            include_latest_finished=not args.watch,
         )
 
     def _delete(self, args: argparse.Namespace):

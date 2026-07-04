@@ -111,7 +111,7 @@ class TestFilterEndpointsForListing:
 
         assert [endpoint.name for endpoint in filtered] == ["failed-new"]
 
-    def test_watch_default_shows_only_unfinished(self):
+    def test_default_shows_latest_finished_and_unfinished_in_watch(self):
         endpoints = [
             _get_endpoint(
                 name="failed-new",
@@ -125,9 +125,9 @@ class TestFilterEndpointsForListing:
             ),
         ]
 
-        filtered = filter_endpoints_for_listing(endpoints, include_latest_finished=False)
+        filtered = filter_endpoints_for_listing(endpoints)
 
-        assert [endpoint.name for endpoint in filtered] == ["agenting"]
+        assert [endpoint.name for endpoint in filtered] == ["agenting", "failed-new"]
 
     def test_all_shows_all_sorted_newest_first(self):
         endpoints = [
