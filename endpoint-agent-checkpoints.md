@@ -133,13 +133,14 @@ Observed result on 2026-07-04:
 
 ### Preset Reuse Preview
 
-After cleanup, `qwen-endpoint-happy.dstack.yml` was changed from `preset_policy: create`
-to `preset_policy: reuse-or-create` so rerunning the smoke uses the saved preset first.
+After cleanup, `.test-configs/endpoint-agent/qwen-endpoint-happy.dstack.yml` was changed
+from `preset_policy: create` to `preset_policy: reuse-or-create` so rerunning the smoke
+uses the saved preset first.
 
 Preview command:
 
 ```bash
-echo n | uv run dstack apply -f qwen-endpoint-happy.dstack.yml
+echo n | uv run dstack apply -f .test-configs/endpoint-agent/qwen-endpoint-happy.dstack.yml
 ```
 
 Observed result on 2026-07-04:

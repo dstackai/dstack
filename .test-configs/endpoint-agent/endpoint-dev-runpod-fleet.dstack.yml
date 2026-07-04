@@ -1,0 +1,11 @@
+type: fleet
+name: endpoint-dev-runpod
+
+nodes: 0..1
+backends: [runpod]
+spot_policy: on-demand
+max_price: 0.5
+idle_duration: 5m
+
+resources:
+  gpu: 1

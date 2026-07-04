@@ -1,0 +1,9 @@
+type: endpoint
+name: qwen-endpoint-log-smoke
+
+model: Qwen/Qwen3-0.6B
+preset_policy: create
+
+backends: [runpod]
+spot_policy: on-demand
+max_price: 0.5
