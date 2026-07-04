@@ -18,6 +18,7 @@ from dstack._internal.core.models.common import (
     RegistryAuth,
     generate_dual_core_model,
 )
+from dstack._internal.core.models.endpoints import EndpointConfiguration
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.files import FilePathMapping
 from dstack._internal.core.models.fleets import FleetConfiguration
@@ -1385,6 +1386,7 @@ class ApplyConfigurationType(str, Enum):
     DEV_ENVIRONMENT = "dev-environment"
     TASK = "task"
     SERVICE = "service"
+    ENDPOINT = "endpoint"
     FLEET = "fleet"
     GATEWAY = "gateway"
     VOLUME = "volume"
@@ -1392,6 +1394,7 @@ class ApplyConfigurationType(str, Enum):
 
 AnyApplyConfiguration = Union[
     AnyRunConfiguration,
+    EndpointConfiguration,
     FleetConfiguration,
     GatewayConfiguration,
     AnyVolumeConfiguration,
@@ -1412,6 +1415,7 @@ class BaseApplyConfiguration(CoreModel):
         Union[
             # Final configurations
             AnyRunConfiguration,
+            EndpointConfiguration,
             FleetConfiguration,
             GatewayConfiguration,
             # Base configurations (further parsing required to get a concrete AnyApplyConfiguration)
@@ -1439,6 +1443,7 @@ def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
 
 AnyDstackConfiguration = Union[
     AnyRunConfiguration,
+    EndpointConfiguration,
     FleetConfiguration,
     GatewayConfiguration,
     VolumeConfiguration,

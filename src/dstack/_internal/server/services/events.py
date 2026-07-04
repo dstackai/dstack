@@ -11,6 +11,7 @@ from dstack._internal.core.models.events import Event, EventTarget, EventTargetT
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server import settings
 from dstack._internal.server.models import (
+    EndpointModel,
     EventModel,
     EventTargetModel,
     FleetModel,
@@ -97,6 +98,7 @@ class Target:
             SecretModel,
             UserModel,
             VolumeModel,
+            EndpointModel,
         ],
     ) -> "Target":
         if isinstance(model, FleetModel):
@@ -158,6 +160,13 @@ class Target:
         if isinstance(model, VolumeModel):
             return Target(
                 type=EventTargetType.VOLUME,
+                project_id=model.project_id or model.project.id,
+                id=model.id,
+                name=model.name,
+            )
+        if isinstance(model, EndpointModel):
+            return Target(
+                type=EventTargetType.ENDPOINT,
                 project_id=model.project_id or model.project.id,
                 id=model.id,
                 name=model.name,

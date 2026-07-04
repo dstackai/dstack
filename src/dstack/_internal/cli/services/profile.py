@@ -6,6 +6,7 @@ from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
+    ProfileParams,
     ProfileRetry,
     SpotPolicy,
     parse_duration,
@@ -135,7 +136,7 @@ def register_profile_args(parser: argparse.ArgumentParser):
 
 def apply_profile_args(
     args: argparse.Namespace,
-    profile_settings: Union[Profile, AnyRunConfiguration],
+    profile_settings: Union[Profile, ProfileParams, AnyRunConfiguration],
 ):
     """
     Overrides `profile_settings` settings with arguments registered by `register_profile_args()`.

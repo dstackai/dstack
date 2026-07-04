@@ -29,6 +29,7 @@ from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
     auth,
     backends,
+    endpoints,
     events,
     exports,
     files,
@@ -255,6 +256,8 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(logs.router)
     app.include_router(secrets.router)
     app.include_router(gateways.router)
+    app.include_router(endpoints.root_router)
+    app.include_router(endpoints.project_router)
     app.include_router(volumes.root_router)
     app.include_router(volumes.project_router)
     app.include_router(service_proxy.router, prefix="/proxy/services", tags=["proxy"])

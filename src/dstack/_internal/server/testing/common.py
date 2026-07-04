@@ -438,12 +438,18 @@ async def create_job(
     disconnected_at: Optional[datetime] = None,
     registered: bool = False,
     waiting_master_job: Optional[bool] = None,
+    replica_group_name: Optional[str] = None,
 ) -> JobModel:
     if deployment_num is None:
         deployment_num = run.deployment_num
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = (
-        await get_job_specs_from_run_spec(run_spec=run_spec, secrets={}, replica_num=replica_num)
+        await get_job_specs_from_run_spec(
+            run_spec=run_spec,
+            secrets={},
+            replica_num=replica_num,
+            replica_group_name=replica_group_name,
+        )
     )[0]
     job_spec.job_num = job_num
     job = JobModel(

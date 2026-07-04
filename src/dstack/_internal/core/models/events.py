@@ -16,6 +16,7 @@ class EventTargetType(str, Enum):
     INSTANCE = "instance"
     RUN = "run"
     JOB = "job"
+    ENDPOINT = "endpoint"
     VOLUME = "volume"
     GATEWAY = "gateway"
     SECRET = "secret"

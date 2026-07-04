@@ -16,6 +16,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.utils.logging import get_logger
 from dstack.api.server._auth import AuthAPIClient
 from dstack.api.server._backends import BackendsAPIClient
+from dstack.api.server._endpoints import EndpointsAPIClient
 from dstack.api.server._events import EventsAPIClient
 from dstack.api.server._exports import ExportsAPIClient
 from dstack.api.server._files import FilesAPIClient
@@ -52,6 +53,7 @@ class APIClient:
         logs: operations with logs
         gateways: operations with gateways
         volumes: operations with volumes
+        endpoints: operations with endpoints
         exports: operations with exports
         files: operations with files
     """
@@ -128,6 +130,10 @@ class APIClient:
     @property
     def volumes(self) -> VolumesAPIClient:
         return VolumesAPIClient(self._request, self._logger)
+
+    @property
+    def endpoints(self) -> EndpointsAPIClient:
+        return EndpointsAPIClient(self._request, self._logger)
 
     @property
     def exports(self) -> ExportsAPIClient:

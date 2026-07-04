@@ -5,6 +5,7 @@ from typing import Dict, Optional, Tuple, Type
 import yaml
 
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
+from dstack._internal.cli.services.configurators.endpoint import EndpointConfigurator
 from dstack._internal.cli.services.configurators.fleet import FleetConfigurator
 from dstack._internal.cli.services.configurators.gateway import GatewayConfigurator
 from dstack._internal.cli.services.configurators.run import (
@@ -32,6 +33,7 @@ apply_configurators_mapping: Dict[
         DevEnvironmentConfigurator,
         TaskConfigurator,
         ServiceConfigurator,
+        EndpointConfigurator,
         FleetConfigurator,
         GatewayConfigurator,
         VolumeConfigurator,

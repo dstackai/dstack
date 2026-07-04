@@ -22,6 +22,8 @@ ADD https://astral.sh/uv/install.sh /uv-installer.sh
 RUN sh /uv-installer.sh && rm /uv-installer.sh
 ENV PATH="/root/.local/bin/:$PATH"
 
+RUN uv run --no-project --with claude-agent-sdk==0.2.110 python -c "from pathlib import Path; import claude_agent_sdk, shutil; shutil.copy2(Path(claude_agent_sdk.__file__).parent / '_bundled' / 'claude', '/usr/local/bin/claude')" && \
+    chmod 755 /usr/local/bin/claude
 RUN uv tool install "dstack[all]==$VERSION"
 
 COPY entrypoint.sh entrypoint.sh

@@ -26,6 +26,7 @@ from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreConfig, generate_dual_core_model
 from dstack._internal.core.models.compute_groups import ComputeGroupStatus
+from dstack._internal.core.models.endpoints import EndpointStatus
 from dstack._internal.core.models.events import EventTargetType
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayReplicaStatus, GatewayStatus
@@ -995,6 +996,73 @@ class VolumeModel(PipelineModelMixin, BaseModel):
             postgresql_where=deleted == false(),
             sqlite_where=deleted == false(),
         ),
+    )
+
+
+class EndpointModel(PipelineModelMixin, BaseModel):
+    __tablename__ = "endpoints"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100))
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user: Mapped["UserModel"] = relationship()
+
+    service_run_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("runs.id"))
+    service_run: Mapped[Optional["RunModel"]] = relationship()
+    """The service run currently backing this endpoint.
+
+    This is the current/latest run. Historical endpoint-submitted runs are
+    recorded in EndpointRunSubmissionModel.
+    """
+
+    configuration: Mapped[str] = mapped_column(Text)
+    status: Mapped[EndpointStatus] = mapped_column(EnumAsString(EndpointStatus, 100), index=True)
+    """`status` must be changed only via `switch_endpoint_status()`."""
+    status_message: Mapped[Optional[str]] = mapped_column(Text)
+    provisioning_method: Mapped[Optional[str]] = mapped_column(String(100))
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
+    to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    deletion_requested_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
+    __table_args__ = (
+        Index(
+            "ix_endpoints_pipeline_fetch_q",
+            last_processed_at.asc(),
+            postgresql_where=deleted == false(),
+            sqlite_where=deleted == false(),
+        ),
+    )
+
+
+class EndpointRunSubmissionModel(BaseModel):
+    __tablename__ = "endpoint_run_submissions"
+
+    endpoint_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("endpoints.id", ondelete="CASCADE"), primary_key=True
+    )
+    endpoint: Mapped["EndpointModel"] = relationship()
+
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
+    run: Mapped["RunModel"] = relationship()
+
+    submission_num: Mapped[int] = mapped_column(Integer, primary_key=True)
+    submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+
+    __table_args__ = (
+        UniqueConstraint("run_id", name="uq_endpoint_run_submissions_run_id"),
+        Index("ix_endpoint_run_submissions_endpoint_id", endpoint_id),
     )
 
 
