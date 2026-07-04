@@ -130,3 +130,21 @@ Observed result on 2026-07-04:
 - The backing service moved to `terminating`, then `dstack run get qwen-happy-v2 --json`
   returned `Run qwen-happy-v2 not found`.
 - `dstack endpoint get qwen-endpoint-happy --json` returned `Endpoint not found`.
+
+### Preset Reuse Preview
+
+After cleanup, `qwen-endpoint-happy.dstack.yml` was changed from `preset_policy: create`
+to `preset_policy: reuse-or-create` so rerunning the smoke uses the saved preset first.
+
+Preview command:
+
+```bash
+echo n | uv run dstack apply -f qwen-endpoint-happy.dstack.yml
+```
+
+Observed result on 2026-07-04:
+
+- Matched preset: `qwen-qwen3-0-6b-b0831bdc`.
+- Planned resources: `cpu=9 mem=50GB disk=60GB gpu=A40:48GB:1`.
+- Planned offer: RunPod `CA-MTL-1`, NVIDIA A40, `$0.44/hr`.
+- The command exited at the confirmation prompt; no endpoint or GPU run was created.

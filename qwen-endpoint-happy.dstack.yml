@@ -2,7 +2,7 @@ type: endpoint
 name: qwen-endpoint-happy
 
 model: Qwen/Qwen3-0.6B
-preset_policy: create
+preset_policy: reuse-or-create
 max_agent_budget: 2
 
 spot_policy: on-demand
