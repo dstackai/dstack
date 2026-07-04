@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from rich.table import Table
 
@@ -51,7 +51,7 @@ def get_endpoints_table(
     table = Table(box=None)
     table.add_column("NAME", no_wrap=True)
     table.add_column("MODEL")
-    table.add_column("STATUS")
+    table.add_column("STATUS", no_wrap=True)
     table.add_column("RUN")
     if verbose:
         table.add_column("URL")
@@ -63,7 +63,7 @@ def get_endpoints_table(
         row = {
             "NAME": endpoint.name,
             "MODEL": endpoint.configuration.model,
-            "STATUS": _format_endpoint_status(endpoint.status),
+            "STATUS": _format_endpoint_status(endpoint.status, endpoint.status_message),
             "RUN": endpoint.run_name or "-",
             "URL": endpoint.url or "-",
             "CREATED": format_date(endpoint.created_at),
@@ -73,7 +73,11 @@ def get_endpoints_table(
     return table
 
 
-def _format_endpoint_status(status: EndpointStatus) -> str:
+def _format_endpoint_status(
+    status: EndpointStatus,
+    status_message: Optional[str] = None,
+) -> str:
+    status_value = _get_endpoint_status_value(status, status_message)
     color_map = {
         EndpointStatus.SUBMITTED: "grey",
         EndpointStatus.PROVISIONING: "deep_sky_blue1",
@@ -82,10 +86,61 @@ def _format_endpoint_status(status: EndpointStatus) -> str:
         EndpointStatus.ACTIVE: "sea_green3",
         EndpointStatus.FAILED: "indian_red1",
     }
-    style = color_map.get(status, "white")
+    if status_value == "no offers":
+        style = "gold1"
+    else:
+        style = color_map.get(status, "white")
     if not status.is_finished():
         style = f"bold {style}"
-    status_value = (
-        EndpointStatus.RUNNING.value if status == EndpointStatus.ACTIVE else status.value
-    )
     return f"[{style}]{status_value}[/]"
+
+
+def _get_endpoint_status_value(
+    status: EndpointStatus,
+    status_message: Optional[str],
+) -> str:
+    if status == EndpointStatus.ACTIVE:
+        return EndpointStatus.RUNNING.value
+    if status == EndpointStatus.FAILED:
+        failure_reason = _get_endpoint_failure_reason(status_message)
+        if failure_reason is not None:
+            return failure_reason
+    return status.value
+
+
+def _get_endpoint_failure_reason(status_message: Optional[str]) -> Optional[str]:
+    if status_message is None:
+        return None
+    normalized = " ".join(status_message.lower().split())
+    if not normalized:
+        return None
+    if any(
+        phrase in normalized
+        for phrase in [
+            "no matching instance offers",
+            "no matching offers",
+            "no offers",
+            "no-offer",
+            "zero offers",
+            "total_offers: 0",
+        ]
+    ):
+        return "no offers"
+    if "no fleets" in normalized:
+        return "no fleets"
+    if (
+        "requires the server agent" in normalized
+        or "server agent runtime" in normalized
+        or "dstack_agent_" in normalized
+        or "claude executable" in normalized
+    ):
+        return "no agent"
+    if "no matching endpoint presets" in normalized:
+        return "no preset"
+    if "server agent" in normalized or "agent" in normalized:
+        return "agent failed"
+    if "run name" in normalized and "taken" in normalized:
+        return "conflict"
+    if "backing service run" in normalized:
+        return "run failed"
+    return None

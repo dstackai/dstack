@@ -12,6 +12,7 @@ from dstack._internal.core.models.endpoints import (
 def _get_endpoint(
     name: str = "qwen-endpoint",
     status: EndpointStatus = EndpointStatus.FAILED,
+    status_message: str | None = "No matching endpoint presets found.",
     created_at: datetime | None = None,
 ) -> Endpoint:
     if created_at is None:
@@ -25,7 +26,7 @@ def _get_endpoint(
         created_at=created_at,
         last_processed_at=created_at,
         status=status,
-        status_message="No matching endpoint presets found.",
+        status_message=status_message,
         deleted=False,
     )
 
@@ -41,11 +42,59 @@ class TestGetEndpointsTable:
 
         assert "ERROR" in [column.header for column in table.columns]
 
-    def test_status_is_colored(self):
-        table = get_endpoints_table([_get_endpoint()])
+    def test_failed_status_without_reason_is_colored(self):
+        table = get_endpoints_table([_get_endpoint(status_message=None)])
 
         status_column = next(column for column in table.columns if column.header == "STATUS")
         assert status_column._cells == ["[indian_red1]failed[/]"]
+
+    def test_no_preset_status_is_colored(self):
+        table = get_endpoints_table([_get_endpoint()])
+
+        status_column = next(column for column in table.columns if column.header == "STATUS")
+        assert status_column._cells == ["[indian_red1]no preset[/]"]
+
+    def test_no_agent_status_is_colored(self):
+        table = get_endpoints_table(
+            [
+                _get_endpoint(
+                    status_message=(
+                        "No matching endpoint presets found. Creating a preset requires "
+                        "the server agent, but DSTACK_AGENT_ANTHROPIC_API_KEY is not set."
+                    )
+                )
+            ]
+        )
+
+        status_column = next(column for column in table.columns if column.header == "STATUS")
+        assert status_column._cells == ["[indian_red1]no agent[/]"]
+
+    def test_no_offers_status_is_colored(self):
+        table = get_endpoints_table(
+            [
+                _get_endpoint(
+                    status_message=(
+                        "No dstack service could be deployed because max_price matches "
+                        "ZERO offers."
+                    )
+                )
+            ]
+        )
+
+        status_column = next(column for column in table.columns if column.header == "STATUS")
+        assert status_column._cells == ["[gold1]no offers[/]"]
+
+    def test_agent_failed_status_is_colored(self):
+        table = get_endpoints_table(
+            [
+                _get_endpoint(
+                    status_message="Server agent process exited without a verification report"
+                )
+            ]
+        )
+
+        status_column = next(column for column in table.columns if column.header == "STATUS")
+        assert status_column._cells == ["[indian_red1]agent failed[/]"]
 
     def test_running_status_is_colored(self):
         table = get_endpoints_table([_get_endpoint(status=EndpointStatus.RUNNING)])

@@ -166,3 +166,31 @@ Observed result:
 
 - endpoint pytest slice: `112 passed, 44 skipped`
 - ruff: `All checks passed!`
+
+### Endpoint Failure Status UX
+
+Endpoint tables now show short failure reasons in the `STATUS` column, similar to
+`dstack ps`, instead of always showing only `failed`.
+
+Examples observed locally:
+
+- `no offers` for an agent-confirmed no-offers/no-capacity endpoint
+- `agent failed` for failed agent runs without a verified report
+- `no agent` when preset creation requires the server agent but the runtime/key is missing
+
+The verbose `ERROR` column still contains the endpoint status message.
+
+Verification on 2026-07-04:
+
+```bash
+uv run pytest src/tests/_internal/cli/utils/test_endpoint.py
+uv run pytest src/tests/_internal/cli/commands/test_logs.py src/tests/_internal/cli/services/configurators/test_endpoint.py src/tests/_internal/cli/utils/test_endpoint.py src/tests/_internal/core/models/test_endpoints.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/server/services/endpoints src/tests/_internal/server/services/test_endpoint_presets.py
+uv run ruff check src/dstack/_internal/cli/utils/endpoint.py src/tests/_internal/cli/utils/test_endpoint.py
+uv run dstack endpoint -a
+```
+
+Observed result:
+
+- endpoint utility pytest: `14 passed`
+- broader endpoint pytest: `116 passed, 44 skipped`
+- ruff: `All checks passed!`
