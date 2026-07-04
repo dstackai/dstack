@@ -439,6 +439,94 @@ class TestDeleteEndpoint:
         ]
 
 
+class TestEndpointPresets:
+    @pytest.mark.asyncio
+    async def test_list_returns_40x_if_not_authenticated(self, client: AsyncClient):
+        response = await client.post("/api/project/main/endpoints/presets/list")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    async def test_delete_returns_40x_if_not_authenticated(self, client: AsyncClient):
+        response = await client.post("/api/project/main/endpoints/presets/delete")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_lists_endpoint_presets(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        preset_service = _FakeEndpointPresetService([_endpoint_preset_plan().preset])
+        monkeypatch.setattr(
+            "dstack._internal.server.routers.endpoints.get_endpoint_preset_service",
+            lambda: preset_service,
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/endpoints/presets/list",
+            headers=get_auth_headers(user.token),
+        )
+
+        assert response.status_code == 200, response.json()
+        body = response.json()
+        assert len(body) == 1
+        assert body[0]["name"] == "qwen"
+        assert body[0]["model"] == "Qwen/Qwen3-0.6B"
+        assert body[0]["replica_spec_groups"][0]["name"] == "0"
+        assert body[0]["replica_spec_groups"][0]["replica_specs"][0]["gpu"] is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_deletes_endpoint_preset(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        preset_service = _FakeEndpointPresetService([_endpoint_preset_plan().preset])
+        monkeypatch.setattr(
+            "dstack._internal.server.routers.endpoints.get_endpoint_preset_service",
+            lambda: preset_service,
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/endpoints/presets/delete",
+            headers=get_auth_headers(user.token),
+            json={"names": ["qwen"]},
+        )
+
+        assert response.status_code == 200, response.json()
+        assert preset_service.deleted_names == ["qwen"]
+
+
+class _FakeEndpointPresetService:
+    def __init__(self, presets):
+        self._presets = presets
+        self.deleted_names = []
+
+    async def list_presets(self):
+        return self._presets
+
+    async def delete_preset(self, name):
+        if name not in {preset.name for preset in self._presets}:
+            raise FileNotFoundError(name)
+        self.deleted_names.append(name)
+
+
 async def _create_endpoint_model(
     session: AsyncSession,
     project,

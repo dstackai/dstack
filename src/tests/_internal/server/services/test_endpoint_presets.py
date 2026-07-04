@@ -159,6 +159,23 @@ replica_spec_groups:
         assert presets[0].configuration.resources.gpu is not None
 
     @pytest.mark.asyncio
+    async def test_deletes_preset_by_name(self, tmp_path):
+        service = LocalDirEndpointPresetService(tmp_path)
+        saved = await service.save_preset(_qwen_preset(name="qwen"))
+
+        await service.delete_preset(saved.name)
+
+        assert await service.list_presets() == []
+        assert not (tmp_path / "qwen.dstack.yml").exists()
+
+    @pytest.mark.asyncio
+    async def test_delete_missing_preset_raises(self, tmp_path):
+        service = LocalDirEndpointPresetService(tmp_path)
+
+        with pytest.raises(FileNotFoundError):
+            await service.delete_preset("missing")
+
+    @pytest.mark.asyncio
     async def test_skips_invalid_presets(self, tmp_path):
         (tmp_path / "task.yml").write_text("type: task\ncommands:\n  - echo nope\n")
         (tmp_path / "missing-model.yml").write_text(

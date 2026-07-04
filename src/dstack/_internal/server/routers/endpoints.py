@@ -5,9 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.endpoints as endpoints_services
 from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.models.endpoint_presets import EndpointPreset
 from dstack._internal.core.models.endpoints import Endpoint, EndpointPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.server.schemas.endpoint_presets import DeleteEndpointPresetsRequest
 from dstack._internal.server.schemas.endpoints import (
     CreateEndpointRequest,
     DeleteEndpointsRequest,
@@ -16,6 +18,10 @@ from dstack._internal.server.schemas.endpoints import (
     ListEndpointsRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
+from dstack._internal.server.services.endpoints.presets import (
+    endpoint_preset_to_api_model,
+    get_endpoint_preset_service,
+)
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol, get_pipeline_hinter
 from dstack._internal.server.utils.routers import (
     CustomORJSONResponse,
@@ -130,3 +136,28 @@ async def delete_endpoints(
         user=user,
         pipeline_hinter=pipeline_hinter,
     )
+
+
+@project_router.post(
+    "/presets/list", summary="List endpoint presets", response_model=List[EndpointPreset]
+)
+async def list_endpoint_presets(
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+):
+    _, _ = user_project
+    presets = await get_endpoint_preset_service().list_presets()
+    return CustomORJSONResponse([endpoint_preset_to_api_model(preset) for preset in presets])
+
+
+@project_router.post("/presets/delete", summary="Delete endpoint presets")
+async def delete_endpoint_presets(
+    body: DeleteEndpointPresetsRequest,
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+):
+    _, _ = user_project
+    preset_service = get_endpoint_preset_service()
+    try:
+        for name in body.names:
+            await preset_service.delete_preset(name)
+    except FileNotFoundError:
+        raise ResourceNotExistsError()

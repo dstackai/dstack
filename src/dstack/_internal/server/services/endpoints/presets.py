@@ -15,6 +15,9 @@ from dstack._internal.core.models.configurations import (
     DEFAULT_REPLICA_GROUP_NAME,
     ServiceConfiguration,
 )
+from dstack._internal.core.models.endpoint_presets import (
+    EndpointPreset as EndpointPresetSummary,
+)
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -48,6 +51,10 @@ class EndpointPresetService(ABC):
         pass
 
     @abstractmethod
+    async def delete_preset(self, name: str) -> None:
+        pass
+
+    @abstractmethod
     async def save_preset(
         self,
         preset: EndpointPreset,
@@ -63,6 +70,9 @@ class LocalDirEndpointPresetService(EndpointPresetService):
 
     async def list_presets(self) -> list[EndpointPreset]:
         return await run_async(self._list_presets)
+
+    async def delete_preset(self, name: str) -> None:
+        return await run_async(self._delete_preset, name)
 
     async def save_preset(
         self,
@@ -82,6 +92,17 @@ class LocalDirEndpointPresetService(EndpointPresetService):
             if preset is not None:
                 presets.append(preset)
         return presets
+
+    def _delete_preset(self, name: str) -> None:
+        if not self._presets_dir.exists():
+            raise FileNotFoundError(name)
+        for path in self._presets_dir.iterdir():
+            if path.suffix not in [".yml", ".yaml"]:
+                continue
+            if _get_preset_name_from_path(path) == name:
+                path.unlink()
+                return
+        raise FileNotFoundError(name)
 
     def _load_preset(self, path: Path) -> Optional[EndpointPreset]:
         try:
@@ -146,6 +167,14 @@ _endpoint_preset_service: EndpointPresetService = LocalDirEndpointPresetService(
 
 def get_endpoint_preset_service() -> EndpointPresetService:
     return _endpoint_preset_service
+
+
+def endpoint_preset_to_api_model(preset: EndpointPreset) -> EndpointPresetSummary:
+    return EndpointPresetSummary(
+        name=preset.name,
+        model=preset.model,
+        replica_spec_groups=preset.replica_spec_groups,
+    )
 
 
 def _get_preset_name_from_path(path: Path) -> str:

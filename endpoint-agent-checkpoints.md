@@ -222,3 +222,32 @@ Observed result:
 - ruff: `All checks passed!`
 - plain `endpoint get` shows Project/User/Endpoint/Model/Status/Run/URL/Created/Error
 - JSON output and help output still work
+
+### Endpoint Preset CLI
+
+`dstack preset` now lists endpoint presets saved on the server. `dstack preset list`
+is equivalent, and `dstack preset delete NAME` removes a saved endpoint preset after
+confirmation.
+
+This is intentionally limited to list/delete. Creating or updating presets remains part
+of the endpoint agent flow, where the agent saves a preset only after verifying the final
+service.
+
+Verification on 2026-07-04:
+
+```bash
+uv run pytest src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/routers/test_endpoints.py
+uv run pytest src/tests/_internal/cli/commands/test_logs.py src/tests/_internal/cli/services/configurators/test_endpoint.py src/tests/_internal/cli/utils/test_endpoint.py src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/core/models/test_endpoints.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/server/services/endpoints src/tests/_internal/server/services/test_endpoint_presets.py
+uv run ruff check src/dstack/_internal/core/models/endpoint_presets.py src/dstack/_internal/server/services/endpoints/presets.py src/dstack/_internal/server/schemas/endpoint_presets.py src/dstack/api/server/_endpoint_presets.py src/dstack/api/server/__init__.py src/dstack/_internal/server/routers/endpoints.py src/dstack/_internal/cli/utils/preset.py src/dstack/_internal/cli/commands/preset.py src/dstack/_internal/cli/services/completion.py src/dstack/_internal/cli/main.py src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/routers/test_endpoints.py
+uv run dstack preset --help
+uv run dstack preset
+uv run dstack --help
+```
+
+Observed result:
+
+- focused preset/router pytest: `38 passed, 11 skipped`
+- broader endpoint/preset pytest: `125 passed, 46 skipped`
+- ruff: `All checks passed!`
+- `dstack preset` lists the saved Qwen endpoint presets
+- top-level help now includes `preset            Manage endpoint presets`

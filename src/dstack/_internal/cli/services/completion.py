@@ -82,6 +82,11 @@ class EndpointNameCompleter(BaseAPINameCompleter):
         return [r.name for r in api.client.endpoints.list(api.project)]
 
 
+class EndpointPresetNameCompleter(BaseAPINameCompleter):
+    def fetch_resource_names(self, api: Client) -> Iterable[str]:
+        return [r.name for r in api.client.endpoint_presets.list(api.project)]
+
+
 class GatewayNameCompleter(BaseAPINameCompleter):
     def fetch_resource_names(self, api: Client) -> Iterable[str]:
         return [r.name for r in api.client.gateways.list(api.project)]

@@ -16,6 +16,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.utils.logging import get_logger
 from dstack.api.server._auth import AuthAPIClient
 from dstack.api.server._backends import BackendsAPIClient
+from dstack.api.server._endpoint_presets import EndpointPresetsAPIClient
 from dstack.api.server._endpoints import EndpointsAPIClient
 from dstack.api.server._events import EventsAPIClient
 from dstack.api.server._exports import ExportsAPIClient
@@ -134,6 +135,10 @@ class APIClient:
     @property
     def endpoints(self) -> EndpointsAPIClient:
         return EndpointsAPIClient(self._request, self._logger)
+
+    @property
+    def endpoint_presets(self) -> EndpointPresetsAPIClient:
+        return EndpointPresetsAPIClient(self._request, self._logger)
 
     @property
     def exports(self) -> ExportsAPIClient:
