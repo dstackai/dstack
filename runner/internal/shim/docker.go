@@ -46,7 +46,13 @@ const (
 	LabelKeyIsTask = LabelKeyPrefix + "is-task"
 	LabelKeyTaskID = LabelKeyPrefix + "task-id"
 	LabelValueTrue = "true"
+
+	nvidiaModesetDevicePath = "/dev/nvidia-modeset"
 )
+
+type createContainerOptions struct {
+	disableNvidiaDisplayCapability bool
+}
 
 // dockerd reports pulling progress as a stream of JSON Lines. The format of records is not documented in the API documentation,
 // although it's occasionally mentioned, e.g., https://docs.docker.com/reference/api/engine/version-history/#v148-api-changes
@@ -465,7 +471,7 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 	if err := d.tasks.Update(task); err != nil {
 		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
-	if err := d.createContainer(ctx, &task); err != nil {
+	if err := d.createContainer(ctx, &task, createContainerOptions{}); err != nil {
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
 		log.Error(ctx, errMessage)
 		task.SetStatusTerminated(string(types.TerminationReasonCreatingContainerError), errMessage)
@@ -478,6 +484,21 @@ func (d *DockerRunner) Run(ctx context.Context, taskID string) error {
 		return fmt.Errorf("%w: failed to update task %s: %w", ErrInternal, task.ID, err)
 	}
 	err = d.startContainer(ctx, &task)
+	if len(task.config.GPUDevices) == 0 &&
+		shouldRetryWithoutNvidiaDisplayCapability(d.gpuVendor, err) {
+		log.Warning(ctx, "retrying container without NVIDIA display capability", "task", task.ID, "err", err)
+		if removeErr := d.removeContainer(ctx, &task); removeErr != nil {
+			err = fmt.Errorf("remove container before retry: %w", removeErr)
+		} else if createErr := d.createContainer(
+			ctx,
+			&task,
+			createContainerOptions{disableNvidiaDisplayCapability: true},
+		); createErr != nil {
+			err = fmt.Errorf("create container without NVIDIA display capability: %w", createErr)
+		} else {
+			err = d.startContainer(ctx, &task)
+		}
+	}
 	if err == nil {
 		// startContainer sets `ports` field, committing update
 		if err := d.tasks.Update(task); err != nil {
@@ -583,17 +604,9 @@ func (d *DockerRunner) remove(ctx context.Context, task *Task) (err error) {
 	if task.Status != TaskStatusTerminated {
 		return fmt.Errorf("%w: cannot remove task %s with %s status", ErrRequest, task.ID, task.Status)
 	}
-	removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
 	// Normally, it should not be empty
-	if task.containerID != "" {
-		err := d.client.ContainerRemove(ctx, task.containerID, removeOptions)
-		if err != nil {
-			if errdefs.IsNotFound(err) {
-				log.Error(ctx, "cannot remove container: not found", "task", task.ID)
-			} else {
-				return fmt.Errorf("%w: failed to remove container task=%s: %w", ErrInternal, task.ID, err)
-			}
-		}
+	if err := d.removeContainer(ctx, task); err != nil {
+		return err
 	}
 	// Normally, it should not be empty
 	if task.runnerDir != "" {
@@ -607,6 +620,24 @@ func (d *DockerRunner) remove(ctx context.Context, task *Task) (err error) {
 		}
 	}
 	log.Debug(ctx, "removed", "task", task.ID)
+	return nil
+}
+
+func (d *DockerRunner) removeContainer(ctx context.Context, task *Task) error {
+	if task.containerID == "" {
+		return nil
+	}
+	removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
+	err := d.client.ContainerRemove(ctx, task.containerID, removeOptions)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			log.Error(ctx, "cannot remove container: not found", "task", task.ID)
+			task.containerID = ""
+			return nil
+		}
+		return fmt.Errorf("%w: failed to remove container task=%s: %w", ErrInternal, task.ID, err)
+	}
+	task.containerID = ""
 	return nil
 }
 
@@ -701,7 +732,11 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 	return nil
 }
 
-func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
+func (d *DockerRunner) createContainer(
+	ctx context.Context,
+	task *Task,
+	options createContainerOptions,
+) error {
 	mounts, err := d.dockerParams.DockerMounts(task.runnerDir)
 	if err != nil {
 		return fmt.Errorf("get docker mounts: %w", err)
@@ -775,7 +810,7 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 		if len(task.config.GPUDevices) > 0 {
 			configureGpuDevices(hostConfig, task.config.GPUDevices)
 		} else {
-			configureGpus(containerConfig, hostConfig, d.gpuVendor, task.gpuIDs)
+			configureGpus(containerConfig, hostConfig, d.gpuVendor, task.gpuIDs, options)
 		}
 	}
 	configureHpcNetworkingIfAvailable(hostConfig)
@@ -786,6 +821,12 @@ func (d *DockerRunner) createContainer(ctx context.Context, task *Task) error {
 	}
 	task.containerID = resp.ID
 	return nil
+}
+
+func shouldRetryWithoutNvidiaDisplayCapability(vendor gpu.GpuVendor, err error) bool {
+	return vendor == gpu.GpuVendorNvidia &&
+		err != nil &&
+		strings.Contains(err.Error(), nvidiaModesetDevicePath)
 }
 
 func (d *DockerRunner) startContainer(ctx context.Context, task *Task) error {
@@ -930,7 +971,13 @@ func configureGpuDevices(hostConfig *container.HostConfig, gpuDevices []GPUDevic
 	}
 }
 
-func configureGpus(config *container.Config, hostConfig *container.HostConfig, vendor gpu.GpuVendor, ids []string) {
+func configureGpus(
+	config *container.Config,
+	hostConfig *container.HostConfig,
+	vendor gpu.GpuVendor,
+	ids []string,
+	options createContainerOptions,
+) {
 	// NVIDIA: ids are identifiers reported by nvidia-smi, GPU-<UUID> strings
 	// AMD: ids are DRI render node paths, e.g., /dev/dri/renderD128
 	// Tenstorrent: ids are device indices to be used with /dev/tenstorrent/<id>
@@ -939,10 +986,11 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 		hostConfig.DeviceRequests = append(
 			hostConfig.DeviceRequests,
 			container.DeviceRequest{
-				// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
-				// Default capabilities: utility, compute.
-				// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
-				Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
+				// Request the existing broad capability set by default. If the host fails due to
+				// a missing modeset device, retry without the X11 display capability.
+				// Docker's default capabilities: utility, compute.
+				// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html
+				Capabilities: [][]string{nvidiaDeviceRequestCapabilities(options)},
 				DeviceIDs:    ids,
 			},
 		)
@@ -1011,6 +1059,15 @@ func configureGpus(config *container.Config, hostConfig *container.HostConfig, v
 	case gpu.GpuVendorNone:
 		// nothing to do
 	}
+}
+
+func nvidiaDeviceRequestCapabilities(options createContainerOptions) []string {
+	capabilities := []string{"gpu", "utility", "compute", "graphics", "video"}
+	if !options.disableNvidiaDisplayCapability {
+		capabilities = append(capabilities, "display")
+	}
+	capabilities = append(capabilities, "compat32")
+	return capabilities
 }
 
 func configureHpcNetworkingIfAvailable(hostConfig *container.HostConfig) {

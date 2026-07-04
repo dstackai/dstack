@@ -3,12 +3,15 @@ package shim
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/dstackai/dstack/runner/internal/common/gpu"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,6 +93,46 @@ func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
 
 	assert.NoError(t, dockerRunner.Submit(ctx, taskConfig))
 	assert.NoError(t, dockerRunner.Run(ctx, taskConfig.ID))
+}
+
+func TestConfigureGpus_Nvidia(t *testing.T) {
+	containerConfig := &container.Config{}
+	hostConfig := &container.HostConfig{}
+	gpuIDs := []string{"GPU-beef", "GPU-cafe"}
+
+	configureGpus(containerConfig, hostConfig, gpu.GpuVendorNvidia, gpuIDs, createContainerOptions{})
+
+	require.Len(t, hostConfig.DeviceRequests, 1)
+	assert.Equal(t, gpuIDs, hostConfig.DeviceRequests[0].DeviceIDs)
+	assert.Equal(
+		t,
+		[][]string{nvidiaDeviceRequestCapabilities(createContainerOptions{})},
+		hostConfig.DeviceRequests[0].Capabilities,
+	)
+	assert.Empty(t, containerConfig.Env)
+}
+
+func TestNvidiaDeviceRequestCapabilities(t *testing.T) {
+	assert.Equal(
+		t,
+		[]string{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"},
+		nvidiaDeviceRequestCapabilities(createContainerOptions{}),
+	)
+	assert.Equal(
+		t,
+		[]string{"gpu", "utility", "compute", "graphics", "video", "compat32"},
+		nvidiaDeviceRequestCapabilities(createContainerOptions{disableNvidiaDisplayCapability: true}),
+	)
+}
+
+func TestShouldRetryWithoutNvidiaDisplayCapability(t *testing.T) {
+	err := assert.AnError
+	assert.False(t, shouldRetryWithoutNvidiaDisplayCapability(gpu.GpuVendorNvidia, err))
+
+	err = errors.New("nvidia-container-cli: mount error: stat failed: /dev/nvidia-modeset")
+	assert.True(t, shouldRetryWithoutNvidiaDisplayCapability(gpu.GpuVendorNvidia, err))
+	assert.False(t, shouldRetryWithoutNvidiaDisplayCapability(gpu.GpuVendorAmd, err))
+	assert.False(t, shouldRetryWithoutNvidiaDisplayCapability(gpu.GpuVendorNvidia, nil))
 }
 
 /* Mocks */
