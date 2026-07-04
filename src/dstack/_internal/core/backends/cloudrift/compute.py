@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from dstack._internal.core.backends.base.compute import (
     Compute,
@@ -24,6 +24,8 @@ from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+CLOUDRIFT_VM_SSH_PORT = 22
 
 
 class CloudRiftCompute(
@@ -114,7 +116,7 @@ class CloudRiftCompute(
             region=instance_offer.region,
             price=instance_offer.price,
             username="riftuser",
-            ssh_port=22,
+            ssh_port=None,
             dockerized=True,
             ssh_proxy=None,
             backend_data=None,
@@ -142,7 +144,12 @@ class CloudRiftCompute(
 
         vm_ready = vms[0].get("ready", False)
         if vm_ready:
-            provisioning_data.hostname = instance_info.get("host_address", None)
+            hostname = instance_info.get("host_address", None)
+            ssh_port = _get_vm_ssh_port(instance_info)
+            if hostname is None or ssh_port is None:
+                return
+            provisioning_data.hostname = hostname
+            provisioning_data.ssh_port = ssh_port
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
@@ -150,3 +157,102 @@ class CloudRiftCompute(
         terminated = self.client.terminate_instance(instance_id=instance_id)
         if not terminated:
             raise ComputeError(f"Failed to terminate instance {instance_id} in region {region}.")
+
+
+def _get_vm_ssh_port(instance_info: Dict) -> Optional[int]:
+    if ssh_port := _get_vm_ssh_port_from_port_mappings(instance_info):
+        return ssh_port
+    if ssh_port := _get_vm_ssh_port_from_instructions(instance_info):
+        return ssh_port
+    if _has_unusable_vm_ssh_port_data(instance_info):
+        return None
+    return CLOUDRIFT_VM_SSH_PORT
+
+
+def _get_vm_ssh_port_from_port_mappings(instance_info: Dict) -> Optional[int]:
+    port_mappings = instance_info.get("port_mappings")
+    if not isinstance(port_mappings, list):
+        return None
+    for port_mapping in port_mappings:
+        parsed_mapping = _parse_port_mapping(port_mapping)
+        if parsed_mapping is None:
+            continue
+        vm_port, host_port = parsed_mapping
+        if vm_port == CLOUDRIFT_VM_SSH_PORT:
+            return host_port
+    return None
+
+
+def _get_vm_ssh_port_from_instructions(instance_info: Dict) -> Optional[int]:
+    instructions = instance_info.get("instructions")
+    if not isinstance(instructions, dict):
+        return None
+    placeholder_values = instructions.get("placeholder_values")
+    if not isinstance(placeholder_values, list):
+        return None
+    for placeholder_value in placeholder_values:
+        ssh_port = _parse_ssh_port_placeholder_value(placeholder_value)
+        if ssh_port is not None:
+            return ssh_port
+    return None
+
+
+def _has_unusable_vm_ssh_port_data(instance_info: Dict) -> bool:
+    return isinstance(instance_info.get("port_mappings"), list) or _has_ssh_port_placeholder(
+        instance_info
+    )
+
+
+def _has_ssh_port_placeholder(instance_info: Dict) -> bool:
+    instructions = instance_info.get("instructions")
+    if not isinstance(instructions, dict):
+        return False
+    placeholder_values = instructions.get("placeholder_values")
+    if not isinstance(placeholder_values, list):
+        return False
+    return any(_is_ssh_port_placeholder_value(value) for value in placeholder_values)
+
+
+def _parse_ssh_port_placeholder_value(placeholder_value: Any) -> Optional[int]:
+    if not _is_ssh_port_placeholder_value(placeholder_value):
+        return None
+    return _parse_ssh_port_option(placeholder_value[1])
+
+
+def _is_ssh_port_placeholder_value(placeholder_value: Any) -> bool:
+    return (
+        isinstance(placeholder_value, (list, tuple))
+        and len(placeholder_value) >= 2
+        and placeholder_value[0] == "SSH_PORT"
+    )
+
+
+def _parse_ssh_port_option(ssh_port_option: Any) -> Optional[int]:
+    if not isinstance(ssh_port_option, str):
+        return None
+    if ssh_port_option.strip() == "":
+        return CLOUDRIFT_VM_SSH_PORT
+    parts = ssh_port_option.split()
+    if len(parts) != 2 or parts[0] != "-p":
+        return None
+    return _parse_port(parts[1])
+
+
+def _parse_port_mapping(port_mapping: Any) -> Optional[tuple[int, int]]:
+    if not isinstance(port_mapping, (list, tuple)) or len(port_mapping) < 2:
+        return None
+    vm_port = _parse_port(port_mapping[0])
+    host_port = _parse_port(port_mapping[1])
+    if vm_port is None or host_port is None:
+        return None
+    return vm_port, host_port
+
+
+def _parse_port(port: Any) -> Optional[int]:
+    try:
+        parsed_port = int(port)
+    except (TypeError, ValueError):
+        return None
+    if parsed_port <= 0 or parsed_port > 65535:
+        return None
+    return parsed_port
