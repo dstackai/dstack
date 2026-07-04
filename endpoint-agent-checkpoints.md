@@ -145,8 +145,9 @@ echo n | uv run dstack apply -f qwen-endpoint-happy.dstack.yml
 Observed result on 2026-07-04:
 
 - Matched preset: `qwen-qwen3-0-6b-b0831bdc`.
-- Planned resources: `cpu=9 mem=50GB disk=60GB gpu=A40:48GB:1`.
-- Planned offer: RunPod `CA-MTL-1`, NVIDIA A40, `$0.44/hr`.
+- Matched preset evidence: one verified RunPod A40 replica.
+- Planned resources now come from the preset scheduling requirements, not the exact
+  verified instance resources.
 - The command exited at the confirmation prompt; no endpoint or GPU run was created.
 
 ### Agent Status Message Boundary
@@ -251,3 +252,156 @@ Observed result:
 - ruff: `All checks passed!`
 - `dstack preset` lists the saved Qwen endpoint presets
 - top-level help now includes `preset            Manage endpoint presets`
+
+### Endpoint Preset Resource Contract
+
+Endpoint presets now separate scheduling requirements from verified runtime evidence:
+`replica_spec_groups[*].resources` is used for service planning and offer matching,
+while `replica_spec_groups[*].tested_resources` stores exact resources captured from
+actual registered service replicas.
+
+`dstack preset` now displays every actual replica when a preset has multiple replicas, using child rows such as `replica=0` or `group=worker replica=1`, matching the hierarchy used by `dstack ps`. It does not summarize replicas as counts.
+
+Invalid local preset files are skipped for user-facing preset listing and logged server-side with
+the preset path and parse/validation error.
+
+Verification on 2026-07-04:
+
+```bash
+uv run pytest src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/cli/utils/test_preset.py
+uv run pytest src/tests/_internal/cli/commands/test_logs.py src/tests/_internal/cli/services/configurators/test_endpoint.py src/tests/_internal/cli/utils/test_endpoint.py src/tests/_internal/cli/utils/test_preset.py src/tests/_internal/core/models/test_endpoints.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/server/services/endpoints src/tests/_internal/server/services/test_endpoint_presets.py
+uv run ruff check src/dstack/_internal/server/services/endpoints/presets.py src/dstack/_internal/server/services/endpoints/preset_building.py src/dstack/_internal/cli/utils/preset.py src/tests/_internal/server/services/test_endpoint_presets.py src/tests/_internal/server/background/pipeline_tasks/test_endpoints.py src/tests/_internal/server/routers/test_endpoints.py src/tests/_internal/cli/utils/test_preset.py
+uv run dstack preset
+```
+
+Observed result:
+
+- focused preset/endpoint-worker pytest: `69 passed, 35 skipped`
+- broader endpoint pytest: `138 passed, 46 skipped`
+- ruff: `All checks passed!`
+- `dstack preset` skips the old loose smoke preset and lists the valid learned preset; the server logs the skipped preset path and validation error
+
+### Endpoint Agent Retest After Deleting Preset
+
+Retest used the current checkout server on `127.0.0.1:3000` with a temporary CLI
+home at `/tmp/dstack-endpoint-test-home`; the normal/default CLI config was restored
+to `main -> 127.0.0.1:3002`.
+
+Flow observed on 2026-07-04:
+
+- Deleted the existing learned Qwen preset.
+- Submitted `qwen-endpoint-smoke` with `backend=runpod`, `spot_policy=on-demand`,
+  `max_price=0.5`.
+- Agent created real service candidates and handled real RunPod capacity failures:
+  `qwen3-06b-smoke` failed on A5000 no-capacity, `qwen3-06b-smoke2` initially retried
+  the same no-capacity path, then the agent stopped it and tried `qwen3-06b-l4`.
+- `qwen3-06b-l4` first tried L4 and then dstack provisioned A40 in CA-MTL-1 at
+  `$0.44/hr`; vLLM served `Qwen/Qwen3-0.6B` and real `/v1/chat/completions`
+  requests returned HTTP 200.
+- Endpoint reached `running`; learned preset saved as `qwen-qwen3-0-6b-94071a4a`.
+- Cleanup completed: endpoint deleted, `qwen3-06b-l4` stopped.
+
+Important harness findings:
+
+- Good: real agent loop works end-to-end through deployment, verification, endpoint
+  running state, and preset save.
+- Bad: the agent copied offer/workaround hardware into final service scheduling
+  requirements (`gpu.name: [L4, A40, RTX3090]`) instead of preserving the broadest
+  correct model-derived requirement.
+- Bad: the agent's verification/final report said L4, but the actual provisioned
+  hardware and saved `tested_resources` were A40. The server-side preset builder used
+  actual run state correctly; the agent report was stale/inferred.
+
+Patch made after this run:
+
+- Prompt resources now say to derive scheduling requirements from the model/serving
+  method, treat preview offers as availability evidence rather than target hardware,
+  avoid pinning concrete GPU/region/instance unless required or explicitly justified,
+  and re-read `dstack run get --json` after verification to report actual provisioned
+  hardware.
+
+## Checkpoint: qwen-runpod-v1-endpoint-dev-running
+
+Status: known-good endpoint-agent smoke with separate local project and corrected
+preset resource contract.
+
+Expected local tag after commit:
+
+```bash
+endpoint-agent/qwen-runpod-v1-endpoint-dev-running
+```
+
+Date: 2026-07-04
+Server: current checkout on `127.0.0.1:3000`
+CLI project: `endpoint-dev -> http://127.0.0.1:3000`
+Default CLI project preserved: `main -> http://127.0.0.1:3002`
+
+### What Worked
+
+- Endpoint `qwen-endpoint-smoke` reached `running`.
+- Model: `Qwen/Qwen3-0.6B`.
+- Agent submitted and verified service run `qwen-smoke`.
+- Final run ID: `cfef76ab-9ec7-4c41-913b-e9595e2979cd`.
+- Endpoint URL: `/proxy/services/endpoint-dev/qwen-smoke/v1`.
+- Backend/hardware: RunPod `EU-RO-1`, NVIDIA RTX 2000 Ada Generation
+  (`RTX2000Ada:16GB:1`), 6 CPU, 31GB RAM, 100GB disk.
+- Hourly price: `$0.24/hr`.
+- Agent service YAML used model-derived scheduling requirements:
+  `resources.gpu: 16GB..`, not a pinned GPU name, region, or instance type.
+- Agent used `vllm serve Qwen/Qwen3-0.6B --port 8000 --max-model-len 8192`.
+- dstack service probe reached `success_streak: 4`.
+- Agent verified both `/v1/models` and `/v1/chat/completions` through the
+  dstack service proxy with HTTP 200.
+- Endpoint preset was saved as `qwen-qwen3-0-6b-cfef76ab`.
+- Saved preset uses broad scheduling requirements and exact tested resources:
+  - scheduling: `cpu=2.. mem=8GB.. disk=100GB.. gpu=16GB..:1..`
+  - tested: `cpu=6 mem=31GB disk=100GB gpu=RTX2000Ada:16GB:1`
+
+### Verification Commands
+
+```bash
+uv run dstack endpoint --project endpoint-dev get qwen-endpoint-smoke --json
+uv run dstack run --project endpoint-dev get qwen-smoke --json
+uv run dstack preset --project endpoint-dev
+uv run dstack logs --project endpoint-dev qwen-smoke --since 3m
+```
+
+Observed result on 2026-07-04:
+
+- endpoint status: `running`
+- backing service status: `running`
+- preset listed by `dstack preset --project endpoint-dev`
+- `verification.json` recorded HTTP 200 for `/v1/models` and
+  `/v1/chat/completions`
+- `final_report.json` recorded actual provisioned hardware from run JSON
+
+### Useful Runtime Artifacts
+
+These are outside the repo and are not part of the checkpoint commit:
+
+- Final report:
+  `/Users/dstack/.dstack/server/data/endpoint_agent_runs/bb5846b3-4de1-45fb-896f-eaef5ebd73cf/workspace/final_report.json`
+- Verification:
+  `/Users/dstack/.dstack/server/data/endpoint_agent_runs/bb5846b3-4de1-45fb-896f-eaef5ebd73cf/workspace/verification.json`
+- Saved preset:
+  `/Users/dstack/.dstack/server/data/endpoint_presets/qwen-qwen3-0-6b-cfef76ab.dstack.yml`
+
+### Known Issues / Next Hardening
+
+- After agent verification, the endpoint briefly transitions from `agenting` to
+  `provisioning` before `running`. This is confusing; the next patch should avoid
+  exposing that intermediate status for agent-verified endpoints.
+- The agent still sometimes uses invalid CLI forms first, such as `dstack run list`
+  or uppercase backend names. The harness prompt should make the supported command
+  surface stricter.
+- The agent used a generic run name (`qwen-smoke`). Future prompt/harness rules
+  should require useful unique names for candidate runs.
+- The agent used shell polling loops without explicit timeouts. Future rules should
+  require bounded polling and clear progress notes.
+- `dstack logs -d` can expose very verbose shim environment output. Normal endpoint
+  logs should become a concise major-event stream written by the agent, while full
+  trace/debug artifacts stay in the workspace.
+- The endpoint agent trace is useful for debugging, but it is too detailed for normal
+  `dstack logs ENDPOINT`. Endpoint logs should contain major realtime events only:
+  research/plan summary, candidate submitted, provisioning state, service startup,
+  verification success/failure, preset save, and cleanup.

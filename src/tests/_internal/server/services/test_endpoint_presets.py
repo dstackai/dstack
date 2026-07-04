@@ -57,8 +57,16 @@ service:
     - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
   port: 8000
 replica_spec_groups:
-  - replica_specs:
-      - gpu: 16GB
+  - resources:
+      gpu: 16GB
+    tested_resources:
+      - cpu: 4
+        memory: 16GB
+        disk: 100GB
+        gpu:
+          name: T4
+          memory: 16GB
+          count: 1
 """
         )
 
@@ -69,7 +77,8 @@ replica_spec_groups:
         assert presets[0].model == "Qwen/Qwen3-4B"
         assert len(presets[0].replica_spec_groups) == 1
         assert presets[0].replica_spec_groups[0].name == "0"
-        assert presets[0].replica_spec_groups[0].replica_specs[0].gpu is not None
+        assert presets[0].replica_spec_groups[0].resources.gpu is not None
+        assert presets[0].replica_spec_groups[0].tested_resources[0].gpu is not None
         assert presets[0].configuration.resources.gpu is not None
 
     @pytest.mark.asyncio
@@ -94,12 +103,31 @@ service:
         - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
 replica_spec_groups:
   - name: router
-    replica_specs:
-      - gpu: 16GB
+    resources:
+      cpu: 4
+    tested_resources:
+      - cpu: 8
+        memory: 16GB
+        disk: 100GB
+        gpu: 0
   - name: worker
-    replica_specs:
-      - gpu: 24GB
-      - gpu: 24GB
+    resources:
+      gpu: 24GB
+    tested_resources:
+      - cpu: 14
+        memory: 64GB
+        disk: 200GB
+        gpu:
+          name: L4
+          memory: 24GB
+          count: 1
+      - cpu: 14
+        memory: 64GB
+        disk: 200GB
+        gpu:
+          name: L4
+          memory: 24GB
+          count: 1
 """
         )
 
@@ -109,7 +137,10 @@ replica_spec_groups:
         assert [group.name for group in presets[0].replica_spec_groups] == ["router", "worker"]
         replica_groups = presets[0].configuration.replica_groups
         assert [group.name for group in replica_groups] == ["router", "worker"]
-        assert all(group.resources.gpu is not None for group in replica_groups)
+        assert replica_groups[0].resources.gpu is not None
+        assert replica_groups[0].resources.gpu.count.min == 0
+        assert replica_groups[0].resources.cpu.count.min == 4
+        assert replica_groups[1].resources.gpu is not None
 
     @pytest.mark.asyncio
     async def test_saves_preset_without_overwriting(self, tmp_path):
@@ -136,7 +167,7 @@ replica_spec_groups:
         assert "SECRET_VALUE" not in text
         assert "preset-service-name" not in text
         assert "creation_policy" not in text
-        assert "resources:" not in text
+        assert "tested_resources:" in text
         assert "HF_HOME=/root/.cache/huggingface" in text
         assert "HF_TOKEN" in text
 
@@ -176,18 +207,44 @@ replica_spec_groups:
             await service.delete_preset("missing")
 
     @pytest.mark.asyncio
-    async def test_skips_invalid_presets(self, tmp_path):
-        (tmp_path / "task.yml").write_text("type: task\ncommands:\n  - echo nope\n")
-        (tmp_path / "missing-model.yml").write_text(
-            """\
-type: service
-commands:
-  - python -m http.server 8000
-port: 8000
-"""
-        )
-        (tmp_path / "mixed-resources.yml").write_text(
-            """\
+    async def test_ignores_non_yaml_files(self, tmp_path):
+        (tmp_path / "notes.txt").write_text("ignored")
+
+        presets = await LocalDirEndpointPresetService(tmp_path).list_presets()
+
+        assert presets == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("filename", "content", "message"),
+        [
+            (
+                "task.yml",
+                "type: task\ncommands:\n  - echo nope\n",
+                "preset must be an endpoint preset",
+            ),
+            (
+                "missing-model.yml",
+                """\
+type: endpoint-preset
+service:
+  commands:
+    - python -m http.server 8000
+  port: 8000
+replica_spec_groups:
+  - resources:
+      gpu: 16GB
+    tested_resources:
+      - cpu: 4
+        memory: 16GB
+        disk: 100GB
+        gpu: 0
+""",
+                "preset must specify a model",
+            ),
+            (
+                "mixed-resources.yml",
+                """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
 service:
@@ -197,12 +254,22 @@ service:
   resources:
     gpu: 24GB
 replica_spec_groups:
-  - replica_specs:
-      - gpu: 16GB
-"""
-        )
-        (tmp_path / "service-profile.yml").write_text(
-            """\
+  - resources:
+      gpu: 16GB
+    tested_resources:
+      - cpu: 4
+        memory: 16GB
+        disk: 100GB
+        gpu:
+          name: T4
+          memory: 16GB
+          count: 1
+""",
+                "preset service object must not specify resources",
+            ),
+            (
+                "service-profile.yml",
+                """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
 service:
@@ -211,12 +278,22 @@ service:
   port: 8000
   creation_policy: reuse
 replica_spec_groups:
-  - replica_specs:
-      - gpu: 16GB
-"""
-        )
-        (tmp_path / "group-resources.yml").write_text(
-            """\
+  - resources:
+      gpu: 16GB
+    tested_resources:
+      - cpu: 4
+        memory: 16GB
+        disk: 100GB
+        gpu:
+          name: T4
+          memory: 16GB
+          count: 1
+""",
+                "preset service object must not specify profile fields",
+            ),
+            (
+                "group-resources.yml",
+                """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
 service:
@@ -230,11 +307,19 @@ service:
 replica_spec_groups:
   - name: worker
     replica_specs:
-      - gpu: 16GB
-"""
-        )
-        (tmp_path / "missing-replica-spec-groups.yml").write_text(
-            """\
+      - cpu: 4
+        memory: 16GB
+        disk: 100GB
+        gpu:
+          name: T4
+          memory: 16GB
+          count: 1
+""",
+                "preset service replica groups must not specify resources",
+            ),
+            (
+                "missing-replica-spec-groups.yml",
+                """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
 service:
@@ -243,10 +328,27 @@ service:
     - name: worker
       count: 1
       image: vllm/vllm-openai:latest
-"""
-        )
-        (tmp_path / "mismatched-replica-spec-groups.yml").write_text(
-            """\
+""",
+                "preset must specify non-empty replica_spec_groups",
+            ),
+            (
+                "loose-resources.yml",
+                """\
+type: endpoint-preset
+model: Qwen/Qwen3-4B
+service:
+  commands:
+    - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
+  port: 8000
+replica_spec_groups:
+  - replica_specs:
+      - gpu: 16GB
+""",
+                "preset tested_resources must use exact replica resources",
+            ),
+            (
+                "mismatched-replica-spec-groups.yml",
+                """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
 service:
@@ -258,28 +360,37 @@ service:
 replica_spec_groups:
   - name: other
     replica_specs:
-      - gpu: 16GB
-"""
-        )
-        (tmp_path / "heterogeneous-group.yml").write_text(
-            """\
+      - cpu: 4
+        memory: 16GB
+        disk: 100GB
+        gpu:
+          name: T4
+          memory: 16GB
+          count: 1
+""",
+                "preset replica_spec_groups must match replica group order",
+            ),
+            (
+                "missing-tested-resources.yml",
+                """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
 service:
   port: 8000
   replicas:
     - name: worker
-      count: 2
+      count: 1
       image: vllm/vllm-openai:latest
 replica_spec_groups:
   - name: worker
-    replica_specs:
-      - gpu: 16GB
-      - gpu: 24GB
-"""
-        )
-        (tmp_path / "bad-replica-group-shape.yml").write_text(
-            """\
+    resources:
+      gpu: 16GB
+""",
+                "preset replica_spec_groups must specify resources and tested_resources",
+            ),
+            (
+                "bad-replica-group-shape.yml",
+                """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
 service:
@@ -289,15 +400,29 @@ service:
 replica_spec_groups:
   - name: worker
     replica_specs:
-      - gpu: 16GB
-"""
-        )
-        (tmp_path / "not-yaml.yml").write_text(":\n")
-        (tmp_path / "notes.txt").write_text("ignored")
+      - cpu: 4
+        memory: 16GB
+        disk: 100GB
+        gpu:
+          name: T4
+          memory: 16GB
+          count: 1
+""",
+                "preset service replica groups must be objects",
+            ),
+            ("not-yaml.yml", ":\n", "while parsing a block mapping"),
+        ],
+    )
+    async def test_invalid_preset_is_skipped_and_logged(
+        self, tmp_path, caplog, filename, content, message
+    ):
+        (tmp_path / filename).write_text(content)
 
         presets = await LocalDirEndpointPresetService(tmp_path).list_presets()
 
         assert presets == []
+        assert filename in caplog.text
+        assert message in caplog.text
 
 
 class TestBuildEndpointPresetFromRun:
@@ -348,9 +473,49 @@ class TestBuildEndpointPresetFromRun:
         assert saved.name == "qwen-learned"
         assert saved.model == "Qwen/Qwen3-4B"
         assert [group.name for group in saved.replica_spec_groups] == ["0"]
-        resources = saved.replica_spec_groups[0].replica_specs[0].pretty_format()
-        assert "cpu=14" in resources
-        assert "gpu=L4:24GB:1" in resources
+        assert "gpu=16GB" in saved.replica_spec_groups[0].resources.pretty_format()
+        tested_resources = saved.replica_spec_groups[0].tested_resources[0].pretty_format()
+        assert "cpu=14" in tested_resources
+        assert "gpu=L4:24GB:1" in tested_resources
+
+    @pytest.mark.asyncio
+    async def test_requires_actual_instance_resources(self, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="qwen-endpoint",
+            status=RunStatus.RUNNING,
+            run_spec=RunSpec(
+                run_name="qwen-endpoint",
+                configuration=ServiceConfiguration.parse_obj(
+                    {
+                        "type": "service",
+                        "name": "qwen-endpoint",
+                        "commands": [
+                            "vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000",
+                        ],
+                        "port": 8000,
+                        "model": "Qwen/Qwen3-4B",
+                        "resources": {"gpu": "16GB"},
+                    }
+                ),
+            ),
+        )
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            registered=True,
+        )
+        await session.refresh(run, attribute_names=["jobs"])
+
+        with pytest.raises(ValueError, match="actual instance resources"):
+            build_endpoint_preset_from_run("qwen-learned", run)
 
     @pytest.mark.asyncio
     async def test_builds_replica_groups_in_service_order(self, session: AsyncSession, tmp_path):
@@ -429,8 +594,10 @@ class TestBuildEndpointPresetFromRun:
         saved = await LocalDirEndpointPresetService(tmp_path).save_preset(preset)
 
         assert [group.name for group in saved.replica_spec_groups] == ["router", "worker"]
-        assert len(saved.replica_spec_groups[0].replica_specs) == 1
-        assert len(saved.replica_spec_groups[1].replica_specs) == 2
+        assert "cpu=4" in saved.replica_spec_groups[0].resources.pretty_format()
+        assert "gpu=24GB" in saved.replica_spec_groups[1].resources.pretty_format()
+        assert len(saved.replica_spec_groups[0].tested_resources) == 1
+        assert len(saved.replica_spec_groups[1].tested_resources) == 2
         assert [group.name for group in saved.configuration.replica_groups] == [
             "router",
             "worker",
@@ -451,9 +618,7 @@ class TestBuildPresetServiceConfiguration:
             name="qwen",
             model="Qwen/Qwen3-4B",
             replica_spec_groups=[
-                EndpointPresetReplicaSpecGroup.parse_obj(
-                    {"name": "0", "replica_specs": [{"gpu": "16GB"}]}
-                )
+                EndpointPresetReplicaSpecGroup.parse_obj(_t4_replica_spec_group())
             ],
             configuration=ServiceConfiguration.parse_obj(
                 {
@@ -497,9 +662,7 @@ class TestBuildPresetServiceConfiguration:
             name="qwen",
             model="Qwen/Qwen3-4B",
             replica_spec_groups=[
-                EndpointPresetReplicaSpecGroup.parse_obj(
-                    {"name": "0", "replica_specs": [{"gpu": "16GB"}]}
-                )
+                EndpointPresetReplicaSpecGroup.parse_obj(_t4_replica_spec_group())
             ],
             configuration=ServiceConfiguration.parse_obj(
                 {
@@ -647,8 +810,16 @@ service:
     - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
   port: 8000
 replica_spec_groups:
-  - replica_specs:
-      - gpu: 16GB
+  - resources:
+      gpu: 16GB
+    tested_resources:
+      - cpu: 4
+        memory: 16GB
+        disk: 100GB
+        gpu:
+          name: T4
+          memory: 16GB
+          count: 1
 """
         )
         user = await create_user(
@@ -722,8 +893,16 @@ service:
     - vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000
   port: 8000
 replica_spec_groups:
-  - replica_specs:
-      - gpu: 16GB
+  - resources:
+      gpu: 16GB
+    tested_resources:
+      - cpu: 4
+        memory: 16GB
+        disk: 100GB
+        gpu:
+          name: T4
+          memory: 16GB
+          count: 1
 """
     )
 
@@ -765,11 +944,7 @@ def _qwen_preset(name: str) -> EndpointPreset:
     return EndpointPreset(
         name=name,
         model="Qwen/Qwen3-4B",
-        replica_spec_groups=[
-            EndpointPresetReplicaSpecGroup.parse_obj(
-                {"name": "0", "replica_specs": [{"gpu": "16GB"}]}
-            )
-        ],
+        replica_spec_groups=[EndpointPresetReplicaSpecGroup.parse_obj(_t4_replica_spec_group())],
         configuration=ServiceConfiguration.parse_obj(
             {
                 "type": "service",
@@ -788,6 +963,21 @@ def _qwen_preset(name: str) -> EndpointPreset:
             }
         ),
     )
+
+
+def _t4_replica_spec_group() -> dict:
+    return {
+        "name": "0",
+        "resources": {"gpu": "16GB"},
+        "tested_resources": [
+            {
+                "cpu": 4,
+                "memory": "16GB",
+                "disk": "100GB",
+                "gpu": {"name": "T4", "memory": "16GB", "count": 1},
+            }
+        ],
+    }
 
 
 def _run_plan_with_offer(available: bool):

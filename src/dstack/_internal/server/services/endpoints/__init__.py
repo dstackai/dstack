@@ -367,7 +367,8 @@ def _endpoint_preset_plan_to_provisioning_plan(
         replica_spec_groups=[
             EndpointPlanReplicaSpecGroup(
                 name=group.name,
-                replica_specs=group.replica_specs,
+                resources=group.resources,
+                tested_resources=group.tested_resources,
             )
             for group in preset_plan.preset.replica_spec_groups
         ],

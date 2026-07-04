@@ -398,7 +398,9 @@ def _print_preset_plan_offers(
     offers.add_column("PRICE", style="grey58")
     offers.add_column()
     offer_num = 0
+    total_offers = 0
     for job_offers in provisioning_plan.job_offers:
+        total_offers += job_offers.total_offers
         for offer in job_offers.offers:
             offer_num += 1
             row = [
@@ -418,6 +420,8 @@ def _print_preset_plan_offers(
                 row.insert(1, job_offers.replica_group)
             offers.add_row(*row, style="secondary")
     console.print(offers)
+    if total_offers > offer_num:
+        console.print(f"[secondary] Shown {offer_num} of {total_offers} offers[/]")
     console.print()
 
 

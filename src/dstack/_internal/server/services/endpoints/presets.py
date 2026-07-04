@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Optional, Sequence
 
 import yaml
-from pydantic import ValidationError
+from pydantic import ValidationError, parse_obj_as
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import (
@@ -20,21 +20,23 @@ from dstack._internal.core.models.endpoint_presets import (
 )
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.profiles import ProfileParams
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.resources import CPUSpec, ResourcesSpec
 from dstack._internal.server import settings
 from dstack._internal.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
-logger = get_logger(__name__)
-
 _SECRET_ENV_PATTERN = re.compile(r"(token|key|secret|password)", re.IGNORECASE)
+logger = get_logger(__name__)
 
 
 class EndpointPresetReplicaSpecGroup(CoreModel):
     """Ordered to match `ServiceConfiguration.replica_groups`; "0" is the implicit group."""
 
     name: str
-    replica_specs: list[ResourcesSpec]
+    resources: ResourcesSpec
+    """Per-replica scheduling requirements used when applying the preset."""
+    tested_resources: list[ResourcesSpec]
+    """Exact resources of the replicas that were running when the preset was verified."""
 
 
 class EndpointPreset(CoreModel):
@@ -135,6 +137,7 @@ class LocalDirEndpointPresetService(EndpointPresetService):
             return None
 
     def _save_preset(self, preset: EndpointPreset, comments: Sequence[str]) -> EndpointPreset:
+        _validate_preset_before_save(preset)
         self._presets_dir.mkdir(parents=True, exist_ok=True)
         data = _preset_to_data(preset)
         content = _format_preset_comments(comments) + yaml.safe_dump(data, sort_keys=False)
@@ -182,6 +185,16 @@ def _get_preset_name_from_path(path: Path) -> str:
     if name.endswith(".dstack"):
         name = name[: -len(".dstack")]
     return name
+
+
+def _validate_preset_before_save(preset: EndpointPreset) -> None:
+    expected_names = [
+        group.name or DEFAULT_REPLICA_GROUP_NAME for group in preset.configuration.replica_groups
+    ]
+    _validate_replica_spec_groups(
+        replica_spec_groups=preset.replica_spec_groups,
+        expected_names=expected_names,
+    )
 
 
 def _get_service_data(data: dict[str, Any]) -> dict[str, Any]:
@@ -244,9 +257,9 @@ def _service_configuration_to_preset_data(
 def _replica_spec_group_to_data(group: EndpointPresetReplicaSpecGroup) -> dict[str, Any]:
     return {
         "name": group.name,
-        "replica_specs": [
-            json.loads(replica_spec.json(exclude_none=True))
-            for replica_spec in group.replica_specs
+        "resources": json.loads(group.resources.json(exclude_none=True)),
+        "tested_resources": [
+            json.loads(resources.json(exclude_none=True)) for resources in group.tested_resources
         ],
     }
 
@@ -304,6 +317,9 @@ def _get_preset_replica_spec_groups(
     expected_names = _get_expected_replica_group_names(service_data)
     if expected_names == [DEFAULT_REPLICA_GROUP_NAME] and "name" not in raw_replica_spec_groups[0]:
         raw_replica_spec_groups[0]["name"] = DEFAULT_REPLICA_GROUP_NAME
+    raw_replica_spec_groups = [
+        _normalize_replica_spec_group(group) for group in raw_replica_spec_groups
+    ]
     replica_spec_groups = [
         EndpointPresetReplicaSpecGroup.parse_obj(group) for group in raw_replica_spec_groups
     ]
@@ -315,6 +331,28 @@ def _get_preset_replica_spec_groups(
         replica_spec_groups=replica_spec_groups,
     )
     return replica_spec_groups
+
+
+def _normalize_replica_spec_group(group: dict[str, Any]) -> dict[str, Any]:
+    if "resources" in group or "tested_resources" in group:
+        if "resources" not in group or "tested_resources" not in group:
+            raise ValueError(
+                "preset replica_spec_groups must specify resources and tested_resources"
+            )
+        if "replica_specs" in group:
+            raise ValueError(
+                "preset replica_spec_groups must not mix replica_specs with resources"
+            )
+        return group
+
+    replica_specs = group.get("replica_specs")
+    if not isinstance(replica_specs, list) or not replica_specs:
+        raise ValueError("preset replica_spec_groups must specify non-empty tested_resources")
+    group = dict(group)
+    group["resources"] = replica_specs[0]
+    group["tested_resources"] = replica_specs
+    group.pop("replica_specs", None)
+    return group
 
 
 def _get_expected_replica_group_names(service_data: dict[str, Any]) -> list[str]:
@@ -346,11 +384,44 @@ def _validate_replica_spec_groups(
             + ", ".join(expected_names)
         )
     for group in replica_spec_groups:
-        if not group.replica_specs:
-            raise ValueError("preset replica_spec_groups must specify non-empty replica_specs")
-        first_resources = group.replica_specs[0].dict()
-        if any(resources.dict() != first_resources for resources in group.replica_specs):
-            raise ValueError("preset replica_specs within one group must have the same resources")
+        if not group.tested_resources:
+            raise ValueError("preset replica_spec_groups must specify non-empty tested_resources")
+        for resources in group.tested_resources:
+            _validate_replica_resources_are_exact(resources)
+
+
+def _validate_replica_resources_are_exact(resources: ResourcesSpec) -> None:
+    cpu = parse_obj_as(CPUSpec, resources.cpu)
+    if not _is_exact_range(cpu.count):
+        _raise_loose_replica_resources()
+    if not _is_exact_range(resources.memory):
+        _raise_loose_replica_resources()
+    if resources.disk is None or not _is_exact_range(resources.disk.size):
+        _raise_loose_replica_resources()
+    if resources.gpu is None or not _is_exact_range(resources.gpu.count):
+        _raise_loose_replica_resources()
+    gpu_count = resources.gpu.count.min
+    if gpu_count == 0:
+        return
+    if resources.gpu.name is None or len(resources.gpu.name) != 1:
+        _raise_loose_replica_resources()
+    if resources.gpu.memory is None or not _is_exact_range(resources.gpu.memory):
+        _raise_loose_replica_resources()
+    if resources.gpu.compute_capability is not None:
+        _raise_loose_replica_resources()
+
+
+def _raise_loose_replica_resources() -> None:
+    raise ValueError("preset tested_resources must use exact replica resources")
+
+
+def _is_exact_range(value) -> bool:
+    return (
+        value is not None
+        and value.min is not None
+        and value.max is not None
+        and value.min == value.max
+    )
 
 
 def _apply_replica_spec_group_resources(
@@ -359,10 +430,8 @@ def _apply_replica_spec_group_resources(
 ) -> None:
     replicas = service_data.get("replicas")
     if not isinstance(replicas, list):
-        service_data["resources"] = replica_spec_groups[0].replica_specs[0].dict()
+        service_data["resources"] = replica_spec_groups[0].resources.dict()
         return
-    resources_by_group = {
-        group.name: group.replica_specs[0].dict() for group in replica_spec_groups
-    }
+    resources_by_group = {group.name: group.resources.dict() for group in replica_spec_groups}
     for group in replicas:
         group["resources"] = resources_by_group[group["name"]]

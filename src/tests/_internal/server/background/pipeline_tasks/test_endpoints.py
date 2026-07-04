@@ -8,9 +8,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.endpoints import EndpointConfiguration, EndpointStatus
 from dstack._internal.core.models.envs import Env
+from dstack._internal.core.models.instances import (
+    Disk,
+    Gpu,
+    InstanceAvailability,
+    InstanceOfferWithAvailability,
+    InstanceRuntime,
+    InstanceType,
+    Resources,
+)
 from dstack._internal.core.models.runs import JobStatus, RunSpec, RunStatus, ServiceSpec
 from dstack._internal.server.background.pipeline_tasks.endpoints import (
     EndpointPipelineItem,
@@ -29,6 +39,7 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_job_runtime_data,
     list_events,
 )
 
@@ -164,9 +175,30 @@ async def _create_backing_service_run(
         run=run,
         status=job_status,
         registered=registered,
+        job_runtime_data=get_job_runtime_data(offer=_instance_offer()),
     )
     await session.commit()
     return run
+
+
+def _instance_offer() -> InstanceOfferWithAvailability:
+    return InstanceOfferWithAvailability(
+        backend=BackendType.AWS,
+        instance=InstanceType(
+            name="g5.xlarge",
+            resources=Resources(
+                cpus=4,
+                memory_mib=16 * 1024,
+                gpus=[Gpu(name="T4", memory_mib=16 * 1024)],
+                spot=False,
+                disk=Disk(size_mib=100 * 1024),
+            ),
+        ),
+        region="us-east-1",
+        price=1.0,
+        availability=InstanceAvailability.AVAILABLE,
+        instance_runtime=InstanceRuntime.SHIM,
+    )
 
 
 async def _create_ready_backing_service_run_for_agent(

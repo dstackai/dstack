@@ -4,7 +4,6 @@ from rich.table import Table
 
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.endpoint_presets import EndpointPreset
-from dstack._internal.core.models.resources import ResourcesSpec
 
 
 def print_endpoint_presets_table(presets: List[EndpointPreset]):
@@ -20,33 +19,59 @@ def get_endpoint_presets_table(presets: List[EndpointPreset]) -> Table:
     table.add_column("RESOURCES")
 
     for preset in presets:
-        add_row_from_dict(
-            table,
-            {
-                "NAME": preset.name,
-                "MODEL": preset.model,
-                "RESOURCES": _format_replica_spec_groups(preset),
-            },
-        )
+        total_replicas = sum(len(group.tested_resources) for group in preset.replica_spec_groups)
+        if total_replicas == 1:
+            add_row_from_dict(
+                table,
+                {
+                    "NAME": preset.name,
+                    "MODEL": preset.model,
+                    "RESOURCES": _format_replica_resources(
+                        preset.replica_spec_groups[0].tested_resources[0]
+                    ),
+                },
+            )
+            continue
+        add_row_from_dict(table, {"NAME": preset.name, "MODEL": preset.model})
+        show_group = len(preset.replica_spec_groups) > 1
+        last_group_index = None
+        for group_index, group in enumerate(preset.replica_spec_groups):
+            for replica_num, replica_spec in enumerate(group.tested_resources):
+                add_row_from_dict(
+                    table,
+                    {
+                        "NAME": _format_replica_name(
+                            group_index=group_index,
+                            group_name=group.name,
+                            replica_num=replica_num,
+                            show_group=show_group,
+                            last_group_index=last_group_index,
+                        ),
+                        "RESOURCES": _format_replica_resources(replica_spec),
+                    },
+                )
+                last_group_index = group_index
     return table
 
 
-def _format_replica_spec_groups(preset: EndpointPreset) -> str:
-    groups = []
-    show_group_names = len(preset.replica_spec_groups) > 1
-    for group in preset.replica_spec_groups:
-        value = _format_replica_specs(group.replica_specs)
-        if show_group_names or group.name != "0":
-            value = f"{group.name}: {value}"
-        groups.append(value)
-    return "; ".join(groups) if groups else "-"
+def _format_replica_name(
+    *,
+    group_index: int,
+    group_name: str,
+    replica_num: int,
+    show_group: bool,
+    last_group_index: int | None,
+) -> str:
+    if not show_group:
+        return f"   replica={replica_num}"
+    if group_index != last_group_index:
+        return f"   group={group_name} replica={replica_num}"
+    padding_width = 3 + len(f"group={group_name}") + 1
+    return f"{' ' * padding_width}replica={replica_num}"
 
 
-def _format_replica_specs(replica_specs: list[ResourcesSpec]) -> str:
-    formatted_specs = [spec.pretty_format() for spec in replica_specs]
-    if not formatted_specs:
-        return "-"
-    unique_specs = set(formatted_specs)
-    if len(unique_specs) == 1 and len(formatted_specs) > 1:
-        return f"{len(formatted_specs)}x {formatted_specs[0]}"
-    return ", ".join(formatted_specs)
+def _format_replica_resources(resources) -> str:
+    formatted = resources.pretty_format()
+    if resources.gpu is not None and resources.gpu.count.min == 0 and resources.gpu.count.max == 0:
+        return formatted.replace(" gpu=0", "").replace("gpu=0", "-")
+    return formatted

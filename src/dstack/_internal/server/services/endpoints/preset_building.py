@@ -38,7 +38,8 @@ def build_endpoint_preset_from_run(name: str, run_model: RunModel) -> EndpointPr
         replica_spec_groups.append(
             EndpointPresetReplicaSpecGroup(
                 name=group_name,
-                replica_specs=[_get_job_resources_spec(job) for job in group_jobs],
+                resources=replica_group.resources,
+                tested_resources=[_get_job_resources_spec(job) for job in group_jobs],
             )
         )
 
@@ -68,9 +69,9 @@ def _get_current_registered_replica_jobs_by_group(
 
 def _get_job_resources_spec(job_model: JobModel) -> ResourcesSpec:
     offer = _get_job_offer(job_model)
-    if offer is not None:
-        return _resources_spec_from_instance_resources(offer.instance.resources)
-    return jobs_services.get_job_spec(job_model).requirements.resources
+    if offer is None:
+        raise ValueError("endpoint preset cannot be built without actual instance resources")
+    return _resources_spec_from_instance_resources(offer.instance.resources)
 
 
 def _get_job_offer(job_model: JobModel) -> InstanceOfferWithAvailability | None:
@@ -107,4 +108,6 @@ def _resources_spec_from_instance_resources(resources: Resources) -> ResourcesSp
         }
         if first_gpu.vendor is not None:
             data["gpu"]["vendor"] = first_gpu.vendor.value
+    else:
+        data["gpu"] = 0
     return ResourcesSpec.parse_obj(data)

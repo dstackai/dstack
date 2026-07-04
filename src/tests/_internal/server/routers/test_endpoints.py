@@ -481,7 +481,8 @@ class TestEndpointPresets:
         assert body[0]["name"] == "qwen"
         assert body[0]["model"] == "Qwen/Qwen3-0.6B"
         assert body[0]["replica_spec_groups"][0]["name"] == "0"
-        assert body[0]["replica_spec_groups"][0]["replica_specs"][0]["gpu"] is not None
+        assert body[0]["replica_spec_groups"][0]["resources"]["gpu"] is not None
+        assert body[0]["replica_spec_groups"][0]["tested_resources"][0]["gpu"] is not None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -567,7 +568,18 @@ def _endpoint_preset_plan() -> EndpointPresetPlan:
         model="Qwen/Qwen3-0.6B",
         replica_spec_groups=[
             EndpointPresetReplicaSpecGroup.parse_obj(
-                {"name": "0", "replica_specs": [{"gpu": "16GB"}]}
+                {
+                    "name": "0",
+                    "resources": {"gpu": "16GB"},
+                    "tested_resources": [
+                        {
+                            "cpu": 4,
+                            "memory": "16GB",
+                            "disk": "100GB",
+                            "gpu": {"name": "T4", "memory": "16GB", "count": 1},
+                        }
+                    ],
+                }
             )
         ],
         configuration=service_configuration,

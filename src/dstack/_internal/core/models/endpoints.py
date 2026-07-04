@@ -107,8 +107,13 @@ class EndpointProvisioningPlanNone(CoreModel):
 
 
 class EndpointPlanReplicaSpecGroup(CoreModel):
+    """Ordered to match service replica groups; "0" is the implicit group."""
+
     name: str
-    replica_specs: list[ResourcesSpec]
+    resources: ResourcesSpec
+    """Per-replica scheduling requirements used for offer matching."""
+    tested_resources: list[ResourcesSpec]
+    """Exact resources of the replicas that were running when the preset was verified."""
 
 
 class EndpointPlanJobOffers(CoreModel):

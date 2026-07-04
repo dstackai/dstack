@@ -33,10 +33,26 @@ Hardware behavior:
 
 - Do not blindly select the cheapest offer.
 - Prefer hardware likely to run the serving image reliably: enough VRAM, enough disk, common CUDA-capable NVIDIA GPUs when using CUDA images, and offers without obvious provisioning instability.
+- Derive scheduling requirements from the model and serving method before looking at
+  concrete offers. Preview offers are placement evidence, not the target hardware spec.
+  Do not copy a preview offer's GPU name, region, instance type, CPU, memory, or disk into
+  the service YAML unless the model/framework actually requires it or you are intentionally
+  avoiding a proven failed class of hardware.
+- Keep service `resources` as broad as correctness allows: minimum GPU memory/count,
+  required CPU/memory/disk, tensor-parallel needs, and endpoint/profile constraints. Exact
+  hardware belongs in the verified run evidence after provisioning, not in the initial plan.
+- After a backend no-capacity or supply-constraint failure, do not just retry the same
+  concrete backend/region/GPU combination. Change the hypothesis or scheduling constraints
+  so dstack can try materially different viable offers, or stop and report why no credible
+  alternative remains.
+- After the final service is running, re-read `dstack run get <run-name> --json` and use
+  the actual latest job submission to identify the backend, region, price, instance type,
+  and resources that really provisioned. Do not infer final hardware from the service YAML,
+  the run name, or the first offer shown in a preview.
 - If a candidate stays in backend provisioning without logs/events progress after several polls, inspect run JSON/events and any available native backend or SSH/TCP evidence, then stop or fail with evidence rather than looping forever.
 - If a backend or dstack provisioning issue is found, create or reference a minimal non-endpoint reproduction in `endpoint-agent-backend-troubleshooting.md` when possible.
 
 Final report:
 
-- On success, include the final service run id, final service run name, the exact final service YAML, recipe/source URLs, and a concise verification summary.
+- On success, include the final service run id, final service run name, the exact final service YAML, recipe/source URLs, the actual provisioned hardware from run JSON, and a concise verification summary.
 - On failure, include the failure summary and enough evidence for the next iteration to improve the harness.
