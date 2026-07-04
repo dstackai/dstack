@@ -236,6 +236,8 @@ class TestClaudeAgentService:
         assert result.error is None
         prompt = captured["request"]["prompt"]
         assert "This is a real deployment investigation" in prompt
+        assert "embedded dstack skill guidance" in prompt
+        assert "embedded dstack-development skill guidance" in prompt
         assert "Do not call hidden server APIs" in prompt
         assert "dstack run get <run-name> --json" in prompt
         assert "https://docs.vllm.ai/" in prompt
