@@ -86,7 +86,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         python3 \
         build-essential
 
-ARG NCCL_VERSION=2.30.7-1
+ARG NCCL_VERSION=2.28.3-1
 
 RUN cd /tmp \
     && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION} \
@@ -167,7 +167,7 @@ RUN cd /tmp \
     && ./efa_installer.sh -y --skip-kmod -g \
     && rm -rf /tmp/aws-efa-installer /var/lib/apt/lists/*
 
-ARG NCCL_VERSION=2.30.7-1
+ARG NCCL_VERSION=2.28.3-1
 
 RUN cd /tmp \
     && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION} \
