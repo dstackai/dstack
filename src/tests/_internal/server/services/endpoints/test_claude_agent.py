@@ -8,6 +8,7 @@ import yaml
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.endpoints.agent.claude as claude_module
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.endpoints import EndpointConfiguration, EndpointStatus
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import SpotPolicy
@@ -32,6 +33,8 @@ async def _create_endpoint_model(
     max_agent_budget: float | None = None,
     max_price: float | None = None,
     spot_policy: SpotPolicy | None = None,
+    backends: list[BackendType] | None = None,
+    fleets: list[str] | None = None,
 ) -> EndpointModel:
     user = await create_user(session=session, name="admin", token="user-token")
     project = await create_project(session=session, owner=user, name="main")
@@ -42,6 +45,8 @@ async def _create_endpoint_model(
         max_agent_budget=max_agent_budget,
         max_price=max_price,
         spot_policy=spot_policy,
+        backends=backends,
+        fleets=fleets,
     )
     endpoint_model = EndpointModel(
         id=uuid.uuid4(),
@@ -157,6 +162,8 @@ class TestClaudeAgentService:
         assert (work_dir / "commands.jsonl").exists()
         assert (work_dir / "progress.jsonl").exists()
         assert (work_dir / "hardware_reasoning.md").exists()
+        assert (work_dir / ".claude" / "skills" / "dstack" / "SKILL.md").exists()
+        assert (work_dir / ".claude" / "skills" / "dstack-prototyping" / "SKILL.md").exists()
         final_report = json.loads((work_dir / "final_report.json").read_text())
         assert final_report["success"] is True
         assert final_report["run_name"] == "qwen-agent-candidate"
@@ -198,15 +205,11 @@ class TestClaudeAgentService:
         assert "- max_price: 0.3" in prompt
         assert "- spot_policy: on-demand" in prompt
         assert "--max-price 0.3 --on-demand" in prompt
-        assert "printf 'n\\n' | dstack apply" in prompt
-        assert "Do not use `dstack ps` table text for machine decisions" in prompt
-        assert "stopped_by_user" in prompt
-        assert "Do not blindly select the cheapest offer" in prompt
         assert "--availability-zone" not in prompt
         assert "--instance " not in prompt
 
     @pytest.mark.asyncio
-    async def test_prompt_includes_real_deployment_harness_context(
+    async def test_prompt_points_to_bundled_skills_and_endpoint_contract(
         self,
         session: AsyncSession,
         tmp_path,
@@ -228,30 +231,70 @@ class TestClaudeAgentService:
                 )
             )
 
-        endpoint_model = await _create_endpoint_model(session)
+        endpoint_model = await _create_endpoint_model(
+            session,
+            max_price=0.5,
+            spot_policy=SpotPolicy.ONDEMAND,
+            backends=[BackendType.RUNPOD],
+            fleets=["endpoint-e2e-runpod"],
+        )
         service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
 
         result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
 
         assert result.error is None
         prompt = captured["request"]["prompt"]
-        assert "This is a real deployment investigation" in prompt
-        assert "embedded dstack skill guidance" in prompt
-        assert "embedded dstack-development skill guidance" in prompt
+        assert "Load and follow `/dstack`" in prompt
+        assert "Load and follow `/dstack-prototyping`" in prompt
+        assert "Bundled Claude Code skills are installed in `.claude/skills`" in prompt
         assert "Do not call hidden server APIs" in prompt
-        assert "dstack run get <run-name> --json" in prompt
-        assert "https://docs.vllm.ai/" in prompt
-        assert "https://docs.sglang.ai/" in prompt
-        assert "https://huggingface.co/Qwen/Qwen3-0.6B" in prompt
-        assert "https://www.wafer.ai/blog/glm52-amd" in prompt
-        assert "https://www.lmsys.org/blog/2026-07-02-agent-assisted-sglang-development/" in prompt
-        assert "Prototypes may be dstack services, tasks, or dev environments" in prompt
-        assert "final verified run reported to the server must be a dstack service" in prompt
-        assert "do not attempt P/D disaggregation" in prompt
+        assert "real model API request" in prompt
+        assert "dstack-development" not in prompt
         assert "progress.jsonl" in prompt
         assert (
-            "Do not write command output, YAML, secrets, long tables, or raw traces here" in prompt
+            "Do not write YAML, command output, long tables, raw traces, or secrets to "
+            "`progress.jsonl`" in prompt
         )
+        assert (
+            "Record each dev environment, task, or service candidate in `candidates.jsonl`"
+            in prompt
+        )
+        assert "verification.json" in prompt
+        assert "service run name must not equal the endpoint name `qwen-endpoint`" in prompt
+        assert "prefer `qwen-endpoint-1`, `qwen-endpoint-2`, etc." in prompt
+        assert "Make each service YAML self-contained" in prompt
+        assert "Do not wait only for log text" in prompt
+        assert "Use normal service logs first" in prompt
+        assert "- backends: runpod" in prompt
+        assert (
+            "- Reuse these CLI flags where applicable: --max-price 0.5 --on-demand --backend runpod --fleet endpoint-e2e-runpod"
+            in prompt
+        )
+        assert "RUNPOD" not in prompt
+        work_dir = tmp_path / str(endpoint_model.id) / "workspace"
+        prototyping_skill = (
+            work_dir / ".claude" / "skills" / "dstack-prototyping" / "SKILL.md"
+        ).read_text()
+        assert "Load `/dstack` first" in prototyping_skill
+        assert "Do not repeat or override `/dstack` command syntax here" in prototyping_skill
+        assert "Start with vLLM and SGLang" in prototyping_skill
+        assert "Use a dev environment when an interactive shell can answer" in prototyping_skill
+        assert "Never collapse tested hardware back into minimum requirements" in prototyping_skill
+        assert "Do not treat `running`, a passed service probe, or clean logs" in prototyping_skill
+        assert (
+            "Retrying the same YAML after the same error is not prototyping" in prototyping_skill
+        )
+        assert "do not name a candidate service exactly like the endpoint" in prototyping_skill
+        assert "Do not use `:latest` for a final serving image" in prototyping_skill
+        assert "poll run JSON and stop waiting on terminal states" in prototyping_skill
+        assert "Use normal logs before diagnostic logs" in prototyping_skill
+        assert "include applicable backend, fleet, price, spot" in prototyping_skill
+        assert "https://recipes.vllm.ai/models.json" in prototyping_skill
+        assert (
+            "https://www.lmsys.org/blog/2026-07-02-agent-assisted-sglang-development"
+            in prototyping_skill
+        )
+        assert "dstack-development" not in prototyping_skill
 
     @pytest.mark.asyncio
     async def test_uses_server_default_agent_budget_when_endpoint_does_not_set_one(
@@ -284,6 +327,68 @@ class TestClaudeAgentService:
 
         assert result.error is None
         assert captured["request"]["options"]["max_budget"] == 4.0
+
+    @pytest.mark.asyncio
+    async def test_reuses_existing_final_report_without_invoking_runner(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        _configure_fake_claude(tmp_path, monkeypatch)
+        endpoint_model = await _create_endpoint_model(session)
+        work_dir = tmp_path / str(endpoint_model.id) / "workspace"
+        work_dir.mkdir(parents=True)
+        run_id = uuid.uuid4()
+        (work_dir / "final_report.json").write_text(
+            json.dumps(
+                {
+                    "success": True,
+                    "run_id": str(run_id),
+                    "run_name": "qwen-agent-candidate",
+                    "service_yaml": "type: service\nname: qwen-agent-candidate\n",
+                    "verification_summary": "Verified before restart.",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        async def runner(workspace, request):
+            raise AssertionError("runner must not be invoked")
+
+        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.error is None
+        assert result.run_id == run_id
+        assert result.run_name == "qwen-agent-candidate"
+        assert result.final_report is not None
+        assert result.final_report.verification_summary == "Verified before restart."
+
+    @pytest.mark.asyncio
+    async def test_returns_in_progress_when_agent_process_is_still_running(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        _configure_fake_claude(tmp_path, monkeypatch)
+        monkeypatch.setattr(claude_module, "_get_running_agent_process_pid", lambda workspace: 123)
+        endpoint_model = await _create_endpoint_model(session)
+
+        async def runner(workspace, request):
+            raise AssertionError("runner must not be invoked")
+
+        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.in_progress is True
+        assert result.error is None
+        assert result.final_report is None
 
     @pytest.mark.asyncio
     async def test_writes_redacted_trace_in_debug_mode(
@@ -643,15 +748,17 @@ printf '%s\\n' '{"type":"result","is_error":false,"result":"done"}'
                 "json_schema": {},
             },
         }
+        (work_dir / "progress.jsonl").write_text(
+            '{"phase":"old","message":"Old progress must not replay"}\n',
+            encoding="utf-8",
+        )
 
         result = await _run_agent_in_subprocess(workspace, request)
 
         assert result.error is None
         assert log_writer.messages == [
-            "Starting endpoint provisioning agent (test-model)",
             "research: Checking recipes with [redacted]",
             "submit: Submitted service candidate",
-            "Endpoint provisioning agent finished",
         ]
 
     @pytest.mark.asyncio

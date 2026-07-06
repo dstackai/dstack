@@ -1,15 +1,22 @@
 import argparse
+import base64
+import sys
 import time
+from typing import Iterable
 
 from rich.live import Live
 
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.services.completion import EndpointNameCompleter
+from dstack._internal.cli.services.completion import (
+    EndpointNameCompleter,
+    EndpointPresetNameCompleter,
+)
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
     confirm_ask,
     console,
+    get_start_time,
 )
 from dstack._internal.cli.utils.endpoint import (
     filter_endpoints_for_listing,
@@ -17,7 +24,10 @@ from dstack._internal.cli.utils.endpoint import (
     print_endpoint,
     print_endpoints_table,
 )
+from dstack._internal.cli.utils.preset import print_endpoint_presets_table
 from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.models.endpoints import Endpoint
+from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.json_utils import pydantic_orjson_dumps_with_indent
 
 
@@ -62,19 +72,38 @@ class EndpointCommand(APIBaseCommand):
                 default=None,
             )
 
-        delete_parser = subparsers.add_parser(
-            "delete",
-            help="Delete endpoints",
+        logs_parser = subparsers.add_parser(
+            "logs",
+            help="Show endpoint logs",
             formatter_class=self._parser.formatter_class,
         )
-        delete_parser.add_argument(
+        logs_parser.add_argument(
             "name",
             help="The name of the endpoint",
         ).completer = EndpointNameCompleter()  # type: ignore[attr-defined]
-        delete_parser.add_argument(
+        logs_parser.add_argument(
+            "--since",
+            help=(
+                "Show only logs newer than the specified date."
+                " Can be a duration (e.g. 10s, 5m, 1d) or an RFC 3339 string (e.g. 2023-09-24T15:30:00Z)."
+            ),
+            type=str,
+        )
+        logs_parser.set_defaults(subfunc=self._logs)
+
+        stop_parser = subparsers.add_parser(
+            "stop",
+            help="Stop an endpoint",
+            formatter_class=self._parser.formatter_class,
+        )
+        stop_parser.add_argument(
+            "name",
+            help="The name of the endpoint",
+        ).completer = EndpointNameCompleter()  # type: ignore[attr-defined]
+        stop_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )
-        delete_parser.set_defaults(subfunc=self._delete)
+        stop_parser.set_defaults(subfunc=self._stop)
 
         get_parser = subparsers.add_parser(
             "get", help="Get an endpoint", formatter_class=self._parser.formatter_class
@@ -90,6 +119,51 @@ class EndpointCommand(APIBaseCommand):
             help="Output in JSON format",
         )
         get_parser.set_defaults(subfunc=self._get)
+
+        preset_parser = subparsers.add_parser(
+            "preset",
+            help="Manage endpoint presets",
+            formatter_class=self._parser.formatter_class,
+        )
+        preset_parser.set_defaults(subfunc=self._preset_list)
+        preset_subparsers = preset_parser.add_subparsers(dest="preset_action")
+
+        preset_list_parser = preset_subparsers.add_parser(
+            "list",
+            help="List endpoint presets",
+            formatter_class=self._parser.formatter_class,
+        )
+        preset_list_parser.set_defaults(subfunc=self._preset_list)
+
+        preset_get_parser = preset_subparsers.add_parser(
+            "get",
+            help="Get an endpoint preset",
+            formatter_class=self._parser.formatter_class,
+        )
+        preset_get_parser.add_argument(
+            "name",
+            help="The name of the endpoint preset",
+        ).completer = EndpointPresetNameCompleter()  # type: ignore[attr-defined]
+        preset_get_parser.add_argument(
+            "--json",
+            action="store_true",
+            help="Output in JSON format",
+        )
+        preset_get_parser.set_defaults(subfunc=self._preset_get)
+
+        preset_delete_parser = preset_subparsers.add_parser(
+            "delete",
+            help="Delete endpoint presets",
+            formatter_class=self._parser.formatter_class,
+        )
+        preset_delete_parser.add_argument(
+            "name",
+            help="The name of the endpoint preset",
+        ).completer = EndpointPresetNameCompleter()  # type: ignore[attr-defined]
+        preset_delete_parser.add_argument(
+            "-y", "--yes", help="Don't ask for confirmation", action="store_true"
+        )
+        preset_delete_parser.set_defaults(subfunc=self._preset_delete)
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
@@ -118,21 +192,65 @@ class EndpointCommand(APIBaseCommand):
             limit=args.last,
         )
 
-    def _delete(self, args: argparse.Namespace):
+    def _logs(self, args: argparse.Namespace):
         try:
-            self.api.client.endpoints.get(project_name=self.api.project, name=args.name)
+            endpoint = self.api.client.endpoints.get(
+                project_name=self.api.project,
+                name=args.name,
+            )
+        except ResourceNotExistsError:
+            console.print("Endpoint not found")
+            exit(1)
+
+        start_time = get_start_time(args.since)
+        try:
+            for log in self._get_endpoint_logs(endpoint=endpoint, start_time=start_time):
+                sys.stdout.buffer.write(log)
+                sys.stdout.buffer.flush()
+        except KeyboardInterrupt:
+            pass
+
+    def _get_endpoint_logs(self, endpoint: Endpoint, start_time) -> Iterable[bytes]:
+        next_token = None
+        while True:
+            resp = self.api.client.logs.poll(
+                project_name=self.api.project,
+                body=PollLogsRequest(
+                    run_name=endpoint.name,
+                    job_submission_id=endpoint.id,
+                    start_time=start_time,
+                    end_time=None,
+                    descending=False,
+                    limit=1000,
+                    diagnose=False,
+                    next_token=next_token,
+                ),
+            )
+            for log in resp.logs:
+                yield base64.b64decode(log.message)
+            next_token = resp.next_token
+            if next_token is None:
+                break
+
+    def _stop(self, args: argparse.Namespace):
+        try:
+            endpoint = self.api.client.endpoints.get(project_name=self.api.project, name=args.name)
         except ResourceNotExistsError:
             console.print(f"Endpoint [code]{args.name}[/] does not exist")
             exit(1)
 
-        if not args.yes and not confirm_ask(f"Delete the endpoint [code]{args.name}[/]?"):
+        if endpoint.status.is_finished():
+            console.print(f"Endpoint [code]{args.name}[/] is already {endpoint.status.value}")
+            return
+
+        if not args.yes and not confirm_ask(f"Stop the endpoint [code]{args.name}[/]?"):
             console.print("\nExiting...")
             return
 
-        with console.status("Deleting endpoint..."):
-            self.api.client.endpoints.delete(project_name=self.api.project, names=[args.name])
+        with console.status("Stopping endpoint..."):
+            self.api.client.endpoints.stop(project_name=self.api.project, names=[args.name])
 
-        console.print(f"Endpoint [code]{args.name}[/] deleted")
+        console.print(f"Endpoint [code]{args.name}[/] stopping")
 
     def _get(self, args: argparse.Namespace):
         try:
@@ -148,3 +266,43 @@ class EndpointCommand(APIBaseCommand):
             print(pydantic_orjson_dumps_with_indent(endpoint.dict(), default=None))
             return
         print_endpoint(endpoint)
+
+    def _preset_list(self, args: argparse.Namespace):
+        presets = self.api.client.endpoint_presets.list(self.api.project)
+        print_endpoint_presets_table(presets)
+
+    def _preset_get(self, args: argparse.Namespace):
+        if not args.json:
+            console.print("Use --json to output the endpoint preset.")
+            exit(1)
+        try:
+            preset = self.api.client.endpoint_presets.get(
+                project_name=self.api.project,
+                name=args.name,
+            )
+        except ResourceNotExistsError:
+            console.print(f"Endpoint preset [code]{args.name}[/] does not exist")
+            exit(1)
+        print(pydantic_orjson_dumps_with_indent(preset.dict(), default=None))
+
+    def _preset_delete(self, args: argparse.Namespace):
+        presets = self.api.client.endpoint_presets.list(self.api.project)
+        if args.name not in {preset.name for preset in presets}:
+            console.print(f"Endpoint preset [code]{args.name}[/] does not exist")
+            exit(1)
+
+        if not args.yes and not confirm_ask(f"Delete the endpoint preset [code]{args.name}[/]?"):
+            console.print("\nExiting...")
+            return
+
+        try:
+            with console.status("Deleting endpoint preset..."):
+                self.api.client.endpoint_presets.delete(
+                    project_name=self.api.project,
+                    names=[args.name],
+                )
+        except ResourceNotExistsError:
+            console.print(f"Endpoint preset [code]{args.name}[/] does not exist")
+            exit(1)
+
+        console.print(f"Endpoint preset [code]{args.name}[/] deleted")

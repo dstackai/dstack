@@ -5,7 +5,7 @@ import uuid
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, NoReturn, Optional, Sequence
 
 import yaml
 from pydantic import ValidationError, parse_obj_as
@@ -17,6 +17,12 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.endpoint_presets import (
     EndpointPreset as EndpointPresetSummary,
+)
+from dstack._internal.core.models.endpoint_presets import (
+    EndpointPresetDetails,
+)
+from dstack._internal.core.models.endpoint_presets import (
+    EndpointPresetReplicaSpecGroup as EndpointPresetReplicaSpecGroupSummary,
 )
 from dstack._internal.core.models.envs import EnvSentinel
 from dstack._internal.core.models.profiles import ProfileParams
@@ -49,16 +55,21 @@ class EndpointPreset(CoreModel):
 
 class EndpointPresetService(ABC):
     @abstractmethod
-    async def list_presets(self) -> list[EndpointPreset]:
+    async def list_presets(self, project_name: str) -> list[EndpointPreset]:
         pass
 
     @abstractmethod
-    async def delete_preset(self, name: str) -> None:
+    async def get_preset(self, project_name: str, name: str) -> Optional[EndpointPreset]:
+        pass
+
+    @abstractmethod
+    async def delete_preset(self, project_name: str, name: str) -> None:
         pass
 
     @abstractmethod
     async def save_preset(
         self,
+        project_name: str,
         preset: EndpointPreset,
         comments: Optional[Sequence[str]] = None,
     ) -> EndpointPreset:
@@ -67,27 +78,32 @@ class EndpointPresetService(ABC):
 
 
 class LocalDirEndpointPresetService(EndpointPresetService):
-    def __init__(self, presets_dir: Path = settings.ENDPOINT_PRESETS_DIR) -> None:
-        self._presets_dir = presets_dir
+    def __init__(self, projects_dir: Path = settings.SERVER_PROJECTS_DIR_PATH) -> None:
+        self._projects_dir = projects_dir
 
-    async def list_presets(self) -> list[EndpointPreset]:
-        return await run_async(self._list_presets)
+    async def list_presets(self, project_name: str) -> list[EndpointPreset]:
+        return await run_async(self._list_presets, project_name)
 
-    async def delete_preset(self, name: str) -> None:
-        return await run_async(self._delete_preset, name)
+    async def get_preset(self, project_name: str, name: str) -> Optional[EndpointPreset]:
+        return await run_async(self._get_preset, project_name, name)
+
+    async def delete_preset(self, project_name: str, name: str) -> None:
+        return await run_async(self._delete_preset, project_name, name)
 
     async def save_preset(
         self,
+        project_name: str,
         preset: EndpointPreset,
         comments: Optional[Sequence[str]] = None,
     ) -> EndpointPreset:
-        return await run_async(self._save_preset, preset, comments or [])
+        return await run_async(self._save_preset, project_name, preset, comments or [])
 
-    def _list_presets(self) -> list[EndpointPreset]:
-        if not self._presets_dir.exists():
+    def _list_presets(self, project_name: str) -> list[EndpointPreset]:
+        presets_dir = self._get_project_presets_dir(project_name)
+        if not presets_dir.exists():
             return []
         presets = []
-        for path in sorted(self._presets_dir.iterdir()):
+        for path in sorted(presets_dir.iterdir()):
             if path.suffix not in [".yml", ".yaml"]:
                 continue
             preset = self._load_preset(path)
@@ -95,10 +111,22 @@ class LocalDirEndpointPresetService(EndpointPresetService):
                 presets.append(preset)
         return presets
 
-    def _delete_preset(self, name: str) -> None:
-        if not self._presets_dir.exists():
+    def _get_preset(self, project_name: str, name: str) -> Optional[EndpointPreset]:
+        presets_dir = self._get_project_presets_dir(project_name)
+        if not presets_dir.exists():
+            return None
+        for path in presets_dir.iterdir():
+            if path.suffix not in [".yml", ".yaml"]:
+                continue
+            if _get_preset_name_from_path(path) == name:
+                return self._load_preset(path)
+        return None
+
+    def _delete_preset(self, project_name: str, name: str) -> None:
+        presets_dir = self._get_project_presets_dir(project_name)
+        if not presets_dir.exists():
             raise FileNotFoundError(name)
-        for path in self._presets_dir.iterdir():
+        for path in presets_dir.iterdir():
             if path.suffix not in [".yml", ".yaml"]:
                 continue
             if _get_preset_name_from_path(path) == name:
@@ -136,18 +164,24 @@ class LocalDirEndpointPresetService(EndpointPresetService):
             logger.warning("Skipping endpoint preset %s: %s", path, e)
             return None
 
-    def _save_preset(self, preset: EndpointPreset, comments: Sequence[str]) -> EndpointPreset:
+    def _save_preset(
+        self,
+        project_name: str,
+        preset: EndpointPreset,
+        comments: Sequence[str],
+    ) -> EndpointPreset:
         _validate_preset_before_save(preset)
-        self._presets_dir.mkdir(parents=True, exist_ok=True)
+        presets_dir = self._get_project_presets_dir(project_name)
+        presets_dir.mkdir(parents=True, exist_ok=True)
         data = _preset_to_data(preset)
         content = _format_preset_comments(comments) + yaml.safe_dump(data, sort_keys=False)
         base_name = _slugify_preset_name(preset.name)
         suffix = 0
         while True:
             name = base_name if suffix == 0 else f"{base_name}-{suffix + 1}"
-            path = self._presets_dir / f"{name}.dstack.yml"
+            path = presets_dir / f"{name}.dstack.yml"
             try:
-                self._write_preset_file(path=path, content=content)
+                self._write_preset_file(presets_dir=presets_dir, path=path, content=content)
                 break
             except FileExistsError:
                 suffix += 1
@@ -156,8 +190,11 @@ class LocalDirEndpointPresetService(EndpointPresetService):
             raise ValueError(f"saved endpoint preset {path} could not be loaded")
         return saved_preset
 
-    def _write_preset_file(self, path: Path, content: str) -> None:
-        tmp_path = self._presets_dir / f".{path.name}.{uuid.uuid4().hex}.tmp"
+    def _get_project_presets_dir(self, project_name: str) -> Path:
+        return self._projects_dir / project_name / "presets"
+
+    def _write_preset_file(self, presets_dir: Path, path: Path, content: str) -> None:
+        tmp_path = presets_dir / f".{path.name}.{uuid.uuid4().hex}.tmp"
         tmp_path.write_text(content, encoding="utf-8")
         try:
             os.link(tmp_path, path)
@@ -176,7 +213,22 @@ def endpoint_preset_to_api_model(preset: EndpointPreset) -> EndpointPresetSummar
     return EndpointPresetSummary(
         name=preset.name,
         model=preset.model,
-        replica_spec_groups=preset.replica_spec_groups,
+        replica_spec_groups=[
+            EndpointPresetReplicaSpecGroupSummary.parse_obj(group.dict())
+            for group in preset.replica_spec_groups
+        ],
+    )
+
+
+def endpoint_preset_to_api_details(preset: EndpointPreset) -> EndpointPresetDetails:
+    return EndpointPresetDetails(
+        name=preset.name,
+        model=preset.model,
+        replica_spec_groups=[
+            EndpointPresetReplicaSpecGroupSummary.parse_obj(group.dict())
+            for group in preset.replica_spec_groups
+        ],
+        service=preset.configuration,
     )
 
 
@@ -398,20 +450,21 @@ def _validate_replica_resources_are_exact(resources: ResourcesSpec) -> None:
         _raise_loose_replica_resources()
     if resources.disk is None or not _is_exact_range(resources.disk.size):
         _raise_loose_replica_resources()
-    if resources.gpu is None or not _is_exact_range(resources.gpu.count):
+    gpu = resources.gpu
+    if gpu is None or not _is_exact_range(gpu.count):
         _raise_loose_replica_resources()
-    gpu_count = resources.gpu.count.min
+    gpu_count = gpu.count.min
     if gpu_count == 0:
         return
-    if resources.gpu.name is None or len(resources.gpu.name) != 1:
+    if gpu.name is None or len(gpu.name) != 1:
         _raise_loose_replica_resources()
-    if resources.gpu.memory is None or not _is_exact_range(resources.gpu.memory):
+    if gpu.memory is None or not _is_exact_range(gpu.memory):
         _raise_loose_replica_resources()
-    if resources.gpu.compute_capability is not None:
+    if gpu.compute_capability is not None:
         _raise_loose_replica_resources()
 
 
-def _raise_loose_replica_resources() -> None:
+def _raise_loose_replica_resources() -> NoReturn:
     raise ValueError("preset tested_resources must use exact replica resources")
 
 

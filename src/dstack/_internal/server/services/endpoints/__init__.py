@@ -141,7 +141,7 @@ async def list_projects_endpoint_models(
         return []
     filters: list[Any] = [EndpointModel.project_id.in_(p.id for p in projects)]
     if only_active:
-        filters.append(EndpointModel.deleted == False)
+        filters.append(EndpointModel.status.not_in(EndpointStatus.finished_statuses()))
     if prev_created_at is not None:
         if ascending:
             if prev_id is None:
@@ -190,7 +190,9 @@ async def list_project_endpoints(
     names: Optional[List[str]] = None,
 ) -> List[Endpoint]:
     endpoint_models = await list_project_endpoint_models(
-        session=session, project=project, names=names
+        session=session,
+        project=project,
+        names=names,
     )
     return [endpoint_model_to_endpoint(e) for e in endpoint_models]
 
@@ -199,13 +201,10 @@ async def list_project_endpoint_models(
     session: AsyncSession,
     project: ProjectModel,
     names: Optional[List[str]] = None,
-    include_deleted: bool = False,
 ) -> List[EndpointModel]:
     filters = [EndpointModel.project_id == project.id]
     if names is not None:
         filters.append(EndpointModel.name.in_(names))
-    if not include_deleted:
-        filters.append(EndpointModel.deleted == False)
     res = await session.execute(
         select(EndpointModel)
         .where(*filters)
@@ -217,10 +216,14 @@ async def list_project_endpoint_models(
 
 
 async def get_endpoint_by_name(
-    session: AsyncSession, project: ProjectModel, name: str
+    session: AsyncSession,
+    project: ProjectModel,
+    name: str,
 ) -> Optional[Endpoint]:
     endpoint_model = await get_project_endpoint_model_by_name(
-        session=session, project=project, name=name
+        session=session,
+        project=project,
+        name=name,
     )
     if endpoint_model is None:
         return None
@@ -231,14 +234,11 @@ async def get_project_endpoint_model_by_name(
     session: AsyncSession,
     project: ProjectModel,
     name: str,
-    include_deleted: bool = False,
 ) -> Optional[EndpointModel]:
     filters = [
         EndpointModel.name == name,
         EndpointModel.project_id == project.id,
     ]
-    if not include_deleted:
-        filters.append(EndpointModel.deleted == False)
     res = await session.execute(
         select(EndpointModel)
         .where(*filters)
@@ -415,8 +415,27 @@ async def create_endpoint(
             if endpoint_model is not None:
                 if not endpoint_model.status.is_finished():
                     raise ResourceExistsError()
-                endpoint_model.deleted = True
-                endpoint_model.deleted_at = now
+                endpoint_model.user = user
+                endpoint_model.service_run_id = None
+                endpoint_model.service_run = None
+                endpoint_model.configuration = configuration.json()
+                endpoint_model.status = EndpointStatus.SUBMITTED
+                endpoint_model.status_message = None
+                endpoint_model.provisioning_method = None
+                endpoint_model.created_at = now
+                endpoint_model.last_processed_at = now
+                endpoint_model.lock_expires_at = None
+                endpoint_model.lock_token = None
+                endpoint_model.lock_owner = None
+                events.emit(
+                    session,
+                    message=f"Endpoint submitted. Status: {endpoint_model.status.upper()}",
+                    actor=events.UserActor.from_user(user),
+                    targets=[events.Target.from_model(endpoint_model)],
+                )
+                await session.commit()
+                pipeline_hinter.hint_fetch(EndpointModel.__name__)
+                return endpoint_model_to_endpoint(endpoint_model)
         else:
             configuration.name = await generate_endpoint_name(session=session, project=project)
 
@@ -442,7 +461,7 @@ async def create_endpoint(
         return endpoint_model_to_endpoint(endpoint_model)
 
 
-async def delete_endpoints(
+async def stop_endpoints(
     session: AsyncSession,
     project: ProjectModel,
     names: List[str],
@@ -454,15 +473,14 @@ async def delete_endpoints(
         project=project,
         names=names,
     )
-    now = common.get_current_datetime()
     for endpoint_model in endpoint_models:
-        if endpoint_model.to_be_deleted:
+        if endpoint_model.status.is_finished():
             continue
-        endpoint_model.to_be_deleted = True
-        endpoint_model.deletion_requested_at = now
+        endpoint_model.status = EndpointStatus.STOPPING
+        endpoint_model.status_message = None
         events.emit(
             session,
-            message="Endpoint marked for deletion",
+            message="Endpoint marked for stopping",
             actor=events.UserActor.from_user(user),
             targets=[events.Target.from_model(endpoint_model)],
         )
@@ -476,11 +494,12 @@ def endpoint_model_to_endpoint(endpoint_model: EndpointModel) -> Endpoint:
     run_name = None
     url = None
     status = endpoint_model.status
-    if status == EndpointStatus.ACTIVE:
-        status = EndpointStatus.RUNNING
     if endpoint_model.service_run is not None and not endpoint_model.service_run.deleted:
         run_name = endpoint_model.service_run.run_name
-        if endpoint_model.service_run.service_spec is not None:
+        if (
+            status == EndpointStatus.RUNNING
+            and endpoint_model.service_run.service_spec is not None
+        ):
             service_spec = ServiceSpec.__response__.parse_raw(
                 endpoint_model.service_run.service_spec
             )
@@ -496,11 +515,13 @@ def endpoint_model_to_endpoint(endpoint_model: EndpointModel) -> Endpoint:
         last_processed_at=endpoint_model.last_processed_at,
         status=status,
         status_message=endpoint_model.status_message,
-        deleted=endpoint_model.deleted,
-        deleted_at=endpoint_model.deleted_at,
         run_name=run_name,
         url=url,
-        error=endpoint_model.status_message if status == EndpointStatus.FAILED else None,
+        error=(
+            endpoint_model.status_message
+            if endpoint_model.status == EndpointStatus.FAILED
+            else None
+        ),
     )
 
 
@@ -553,7 +574,6 @@ async def generate_endpoint_name(session: AsyncSession, project: ProjectModel) -
     res = await session.execute(
         select(EndpointModel.name).where(
             EndpointModel.project_id == project.id,
-            EndpointModel.deleted == False,
         )
     )
     names = set(res.scalars().all())

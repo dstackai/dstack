@@ -1,0 +1,4 @@
+type: endpoint
+name: endpoint-lifecycle-reapply-smoke
+model: dstack/test-endpoint-no-preset
+preset_policy: reuse

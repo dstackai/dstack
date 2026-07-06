@@ -31,7 +31,6 @@ def _get_endpoint(
         last_processed_at=created_at,
         status=status,
         status_message=status_message,
-        deleted=False,
     )
 
 
@@ -106,11 +105,23 @@ class TestGetEndpointsTable:
         status_column = next(column for column in table.columns if column.header == "STATUS")
         assert status_column._cells == ["[bold sea_green3]running[/]"]
 
-    def test_agenting_status_is_colored(self):
-        table = get_endpoints_table([_get_endpoint(status=EndpointStatus.AGENTING)])
+    def test_clauding_status_is_colored(self):
+        table = get_endpoints_table([_get_endpoint(status=EndpointStatus.CLAUDING)])
 
         status_column = next(column for column in table.columns if column.header == "STATUS")
-        assert status_column._cells == ["[bold medium_purple1]agenting[/]"]
+        assert status_column._cells == ["[bold medium_purple1]clauding[/]"]
+
+    def test_stopping_status_is_colored(self):
+        table = get_endpoints_table([_get_endpoint(status=EndpointStatus.STOPPING)])
+
+        status_column = next(column for column in table.columns if column.header == "STATUS")
+        assert status_column._cells == ["[bold deep_sky_blue1]stopping[/]"]
+
+    def test_stopped_status_is_colored(self):
+        table = get_endpoints_table([_get_endpoint(status=EndpointStatus.STOPPED)])
+
+        status_column = next(column for column in table.columns if column.header == "STATUS")
+        assert status_column._cells == ["[grey62]stopped[/]"]
 
 
 class TestGetEndpointTable:
@@ -164,8 +175,8 @@ class TestFilterEndpointsForListing:
                 created_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
             ),
             _get_endpoint(
-                name="agenting",
-                status=EndpointStatus.AGENTING,
+                name="clauding",
+                status=EndpointStatus.CLAUDING,
                 created_at=datetime(2026, 1, 4, tzinfo=timezone.utc),
             ),
         ]
@@ -173,7 +184,7 @@ class TestFilterEndpointsForListing:
         filtered = filter_endpoints_for_listing(endpoints)
 
         assert [endpoint.name for endpoint in filtered] == [
-            "agenting",
+            "clauding",
             "failed-new",
             "running",
         ]
@@ -204,15 +215,15 @@ class TestFilterEndpointsForListing:
                 created_at=datetime(2026, 1, 3, tzinfo=timezone.utc),
             ),
             _get_endpoint(
-                name="agenting",
-                status=EndpointStatus.AGENTING,
+                name="clauding",
+                status=EndpointStatus.CLAUDING,
                 created_at=datetime(2026, 1, 4, tzinfo=timezone.utc),
             ),
         ]
 
         filtered = filter_endpoints_for_listing(endpoints)
 
-        assert [endpoint.name for endpoint in filtered] == ["agenting", "failed-new"]
+        assert [endpoint.name for endpoint in filtered] == ["clauding", "failed-new"]
 
     def test_all_shows_all_sorted_newest_first(self):
         endpoints = [

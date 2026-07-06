@@ -262,8 +262,6 @@ class TestCreateEndpoint:
         assert body["last_processed_at"] == "2023-01-02T03:04:00+00:00"
         assert body["status"] == "submitted"
         assert body["status_message"] is None
-        assert body["deleted"] is False
-        assert body["deleted_at"] is None
         assert body["run_name"] is None
         assert body["url"] is None
         assert body["error"] is None
@@ -276,7 +274,7 @@ class TestCreateEndpoint:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_recreates_terminal_endpoint(
+    async def test_resubmits_terminal_endpoint(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
@@ -290,6 +288,8 @@ class TestCreateEndpoint:
             user=user,
             status=EndpointStatus.FAILED,
         )
+        previous_endpoint.status_message = "old failure"
+        await session.commit()
 
         response = await client.post(
             f"/api/project/{project.name}/endpoints/create",
@@ -304,16 +304,15 @@ class TestCreateEndpoint:
         )
 
         assert response.status_code == 200, response.json()
-        new_endpoint_id = UUID(response.json()["id"])
-        assert new_endpoint_id != previous_endpoint.id
+        endpoint_id = UUID(response.json()["id"])
+        assert endpoint_id == previous_endpoint.id
         await session.refresh(previous_endpoint)
-        assert previous_endpoint.deleted is True
-        assert previous_endpoint.deleted_at is not None
-        new_endpoint = await session.get(EndpointModel, new_endpoint_id)
-        assert new_endpoint is not None
-        assert new_endpoint.name == previous_endpoint.name
-        assert new_endpoint.status == EndpointStatus.SUBMITTED
-        assert new_endpoint.deleted is False
+        assert previous_endpoint.status == EndpointStatus.SUBMITTED
+        assert previous_endpoint.status_message is None
+        assert previous_endpoint.service_run_id is None
+        assert previous_endpoint.configuration != ""
+        res = await session.execute(select(EndpointModel))
+        assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -382,15 +381,15 @@ class TestGetEndpoint:
         assert response.status_code in [401, 403]
 
 
-class TestDeleteEndpoint:
+class TestStopEndpoint:
     @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
-        response = await client.post("/api/project/main/endpoints/delete")
+        response = await client.post("/api/project/main/endpoints/stop")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_marks_endpoint_for_deletion(
+    async def test_marks_endpoint_for_stopping(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
@@ -398,45 +397,53 @@ class TestDeleteEndpoint:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        create_response = await client.post(
-            f"/api/project/{project.name}/endpoints/create",
-            headers=get_auth_headers(user.token),
-            json={
-                "configuration": {
-                    "type": "endpoint",
-                    "name": "qwen-endpoint",
-                    "model": "Qwen/Qwen3-0.6B",
-                    "env": {"HF_TOKEN": "secret"},
-                }
-            },
+        endpoint_model = await _create_endpoint_model(
+            session=session,
+            project=project,
+            user=user,
+            status=EndpointStatus.RUNNING,
         )
-        assert create_response.status_code == 200, create_response.json()
 
         response = await client.post(
-            f"/api/project/{project.name}/endpoints/delete",
+            f"/api/project/{project.name}/endpoints/stop",
             headers=get_auth_headers(user.token),
-            json={"names": ["qwen-endpoint"]},
+            json={"names": [endpoint_model.name]},
         )
 
         assert response.status_code == 200, response.json()
-        res = await session.execute(select(EndpointModel))
-        endpoint_model = res.scalar_one()
-        assert endpoint_model.to_be_deleted
-        assert endpoint_model.deleted is False
-        assert endpoint_model.deleted_at is None
-
-        get_response = await client.post(
-            f"/api/project/{project.name}/endpoints/get",
-            headers=get_auth_headers(user.token),
-            json={"name": "qwen-endpoint"},
-        )
-        assert get_response.status_code == 200
-
+        await session.refresh(endpoint_model)
+        assert endpoint_model.status == EndpointStatus.STOPPING
         events = await list_events(session)
-        assert [e.message for e in events] == [
-            "Endpoint created. Status: SUBMITTED",
-            "Endpoint marked for deletion",
-        ]
+        assert [e.message for e in events] == ["Endpoint marked for stopping"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_does_not_stop_finished_endpoint(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        endpoint_model = await _create_endpoint_model(
+            session=session,
+            project=project,
+            user=user,
+            status=EndpointStatus.FAILED,
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/endpoints/stop",
+            headers=get_auth_headers(user.token),
+            json={"names": [endpoint_model.name]},
+        )
+
+        assert response.status_code == 200, response.json()
+        await session.refresh(endpoint_model)
+        assert endpoint_model.status == EndpointStatus.FAILED
+        events = await list_events(session)
+        assert events == []
 
 
 class TestEndpointPresets:
@@ -448,6 +455,11 @@ class TestEndpointPresets:
     @pytest.mark.asyncio
     async def test_delete_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/project/main/endpoints/presets/delete")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    async def test_get_returns_40x_if_not_authenticated(self, client: AsyncClient):
+        response = await client.post("/api/project/main/endpoints/presets/get")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
@@ -483,6 +495,7 @@ class TestEndpointPresets:
         assert body[0]["replica_spec_groups"][0]["name"] == "0"
         assert body[0]["replica_spec_groups"][0]["resources"]["gpu"] is not None
         assert body[0]["replica_spec_groups"][0]["tested_resources"][0]["gpu"] is not None
+        assert preset_service.list_project_names == [project.name]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -512,19 +525,66 @@ class TestEndpointPresets:
 
         assert response.status_code == 200, response.json()
         assert preset_service.deleted_names == ["qwen"]
+        assert preset_service.delete_project_names == [project.name]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_gets_endpoint_preset(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        preset_service = _FakeEndpointPresetService([_endpoint_preset_plan().preset])
+        monkeypatch.setattr(
+            "dstack._internal.server.routers.endpoints.get_endpoint_preset_service",
+            lambda: preset_service,
+        )
+
+        response = await client.post(
+            f"/api/project/{project.name}/endpoints/presets/get",
+            headers=get_auth_headers(user.token),
+            json={"name": "qwen"},
+        )
+
+        assert response.status_code == 200, response.json()
+        body = response.json()
+        assert body["name"] == "qwen"
+        assert body["model"] == "Qwen/Qwen3-0.6B"
+        assert body["service"]["type"] == "service"
+        assert body["service"]["name"] == "qwen-endpoint-serving"
+        assert preset_service.get_project_names == [project.name]
 
 
 class _FakeEndpointPresetService:
     def __init__(self, presets):
         self._presets = presets
+        self.list_project_names = []
+        self.get_project_names = []
+        self.delete_project_names = []
         self.deleted_names = []
 
-    async def list_presets(self):
+    async def list_presets(self, project_name):
+        self.list_project_names.append(project_name)
         return self._presets
 
-    async def delete_preset(self, name):
+    async def get_preset(self, project_name, name):
+        self.get_project_names.append(project_name)
+        for preset in self._presets:
+            if preset.name == name:
+                return preset
+        return None
+
+    async def delete_preset(self, project_name, name):
         if name not in {preset.name for preset in self._presets}:
             raise FileNotFoundError(name)
+        self.delete_project_names.append(project_name)
         self.deleted_names.append(name)
 
 

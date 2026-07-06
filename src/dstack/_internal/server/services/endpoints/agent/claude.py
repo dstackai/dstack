@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import json
 import os
 import shutil
@@ -35,12 +36,8 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 _RESOURCE_DIR = Path(__file__).parent / "resources"
-_PROMPT_RESOURCE_NAMES = [
-    "system_prompt.md",
-    "dstack_cli_and_service_authoring.md",
-    "recipes_guide.md",
-    "deployment_harness.md",
-]
+_ENDPOINT_PROMPT_RESOURCE_NAME = "system_prompt.md"
+_AGENT_SKILL_NAMES = ["dstack", "dstack-prototyping"]
 _INHERITED_ENV_NAMES = [
     "PATH",
     "SSL_CERT_FILE",
@@ -57,6 +54,7 @@ _MAX_CAPTURED_OUTPUT_CHARS = 20_000
 _MAX_AGENT_LOG_MESSAGE_CHARS = 4_000
 _AGENT_LOG_BATCH_SIZE = 1
 _AGENT_PROGRESS_LOG_NAME = "progress.jsonl"
+_AGENT_PROCESS_STATE_NAME = "agent_process.json"
 _AGENT_PROGRESS_POLL_SECONDS = 1.0
 _CLAUDE_AGENT_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
 
@@ -110,6 +108,24 @@ class ClaudeAgentService(AgentService):
             return AgentProvisioningResult(
                 error=f"Failed to prepare endpoint agent workspace: {e}"
             )
+
+        existing_report = _load_final_report(workspace)
+        if existing_report is not None:
+            workspace.artifacts.record_report(existing_report)
+            return AgentProvisioningResult(
+                run_id=existing_report.run_id,
+                run_name=existing_report.run_name,
+                final_report=existing_report,
+            )
+
+        running_pid = _get_running_agent_process_pid(workspace)
+        if running_pid is not None:
+            logger.info(
+                "Endpoint agent process %s is already running for endpoint %s",
+                running_pid,
+                endpoint_model.name,
+            )
+            return AgentProvisioningResult(in_progress=True)
 
         runner_result = await self._runner(workspace, _build_agent_request(workspace))
         if runner_result.error is not None:
@@ -294,6 +310,7 @@ def _prepare_workspace(
             endpoint_name=endpoint_model.name,
         ),
     )
+    _install_agent_skills(workspace)
     workspace.artifacts.initialize()
     return workspace
 
@@ -305,6 +322,7 @@ class _AgentArtifactRecorder:
 
     def initialize(self) -> None:
         self._workspace.work_dir.mkdir(parents=True, exist_ok=True)
+        self._command_counter = self._get_last_command_output_num()
         self._update_agent_state(phase="starting")
         for filename in [
             "sources.jsonl",
@@ -452,6 +470,18 @@ class _AgentArtifactRecorder:
                 json.dumps(_redact(record, self._workspace.redacted_values), default=str) + "\n"
             )
 
+    def _get_last_command_output_num(self) -> int:
+        output_dir = self._workspace.work_dir / "command-output"
+        if not output_dir.exists():
+            return 0
+        nums = []
+        for path in output_dir.glob("*.txt"):
+            try:
+                nums.append(int(path.stem))
+            except ValueError:
+                continue
+        return max(nums, default=0)
+
 
 def _write_cli_config(
     *,
@@ -514,33 +544,53 @@ def _build_agent_request(workspace: _AgentWorkspace) -> dict[str, Any]:
 
 
 def _build_prompt(workspace: _AgentWorkspace) -> str:
-    return f"""Deploy endpoint {workspace.endpoint_name!r} for model {workspace.model!r}.
+    return f"""{_load_endpoint_prompt()}
 
-Use the real `dstack` CLI available in this process. Do not use any custom dstack APIs
-or wait for any server-side helper tool. The embedded guidance below is the dstack and
-dstack-development playbook for this run.
+Deploy endpoint {workspace.endpoint_name!r} for model {workspace.model!r}.
 
 {workspace.endpoint_constraints}
+
+Bundled Claude Code skills are installed in `.claude/skills`. Load and follow:
+- `/dstack`
+- `/dstack-prototyping`
 
 Required final service:
 - service YAML type: service
 - service YAML must set `model: {workspace.model}`
+- service run name must not equal the endpoint name `{workspace.endpoint_name}`
+- for sequential service attempts, prefer `{workspace.endpoint_name}-1`, `{workspace.endpoint_name}-2`, etc.
 - submit runs detached with `dstack apply -f <file> -y -d`
 - use concise, unique run names that are useful for debugging
 - the successful final report must include the verified service run `run_id`
-
-{_load_prompt_resources()}
 
 When you have a terminal result, write `final_report.json` in the workspace with the
 same fields requested by the JSON schema, then return only the structured final report.
 """
 
 
-def _load_prompt_resources() -> str:
-    return "\n\n".join(
-        (_RESOURCE_DIR / resource_name).read_text(encoding="utf-8").strip()
-        for resource_name in _PROMPT_RESOURCE_NAMES
-    )
+def _load_endpoint_prompt() -> str:
+    return (_RESOURCE_DIR / _ENDPOINT_PROMPT_RESOURCE_NAME).read_text(encoding="utf-8").strip()
+
+
+def _install_agent_skills(workspace: _AgentWorkspace) -> None:
+    source_dir = _get_packaged_skills_dir()
+    target_dir = workspace.work_dir / ".claude" / "skills"
+    if target_dir.exists():
+        shutil.rmtree(target_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for skill_name in _AGENT_SKILL_NAMES:
+        source = source_dir / skill_name
+        if not (source / "SKILL.md").is_file():
+            raise FileNotFoundError(f"Missing endpoint agent skill: {skill_name}")
+        shutil.copytree(source, target_dir / skill_name)
+
+
+def _get_packaged_skills_dir() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "skills"
+        if (candidate / "dstack" / "SKILL.md").is_file():
+            return candidate
+    raise FileNotFoundError("Could not find packaged dstack skills")
 
 
 def _format_endpoint_constraints(
@@ -601,6 +651,8 @@ def _format_endpoint_constraints(
 
 
 def _format_constraint_value(value: Any) -> str:
+    if isinstance(value, enum.Enum):
+        return str(value.value)
     if hasattr(value, "name") and getattr(value, "project", None) is None:
         return str(value.name)
     if hasattr(value, "json"):
@@ -615,13 +667,10 @@ async def _run_agent_in_subprocess(
     request: dict[str, Any],
 ) -> _AgentRunnerResult:
     cmd = _build_claude_command(request)
-    await _write_agent_log(
-        workspace,
-        _format_agent_start_log(request),
-    )
     workspace.artifacts.mark_running()
     progress_tailer = _AgentProgressLogTailer(workspace)
     progress_task = asyncio.create_task(progress_tailer.run())
+    proc: asyncio.subprocess.Process | None = None
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -630,6 +679,7 @@ async def _run_agent_in_subprocess(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        _write_agent_process_state(workspace, proc.pid)
         assert proc.stdout is not None
         assert proc.stderr is not None
         stdout_task = asyncio.create_task(_read_agent_stdout(proc.stdout, workspace))
@@ -644,6 +694,8 @@ async def _run_agent_in_subprocess(
         with suppress(asyncio.CancelledError):
             await progress_task
         await progress_tailer.flush(include_partial=True)
+        if proc is not None and proc.returncode is not None:
+            _clear_agent_process_state(workspace, proc.pid)
     process_output = _merge_process_outputs(stdout_output, stderr_output)
     _write_trace_record(
         workspace,
@@ -652,7 +704,6 @@ async def _run_agent_in_subprocess(
             "returncode": returncode,
         },
     )
-    await _write_agent_log(workspace, _format_agent_exit_log(returncode))
     await _flush_agent_logs(workspace)
     if process_output.report_data is None:
         process_output.report_data = _load_final_report_artifact(workspace)
@@ -759,7 +810,9 @@ async def _read_agent_stream(
 class _AgentProgressLogTailer:
     def __init__(self, workspace: _AgentWorkspace) -> None:
         self._workspace = workspace
-        self._offset = 0
+        self._offset = (
+            workspace.progress_path.stat().st_size if workspace.progress_path.exists() else 0
+        )
         self._partial = ""
 
     async def run(self) -> None:
@@ -870,20 +923,6 @@ async def _flush_agent_logs(workspace: _AgentWorkspace) -> None:
     await workspace.log_writer.flush()
 
 
-def _format_agent_start_log(request: dict[str, Any]) -> str:
-    options = request["options"]
-    parts = [f"Starting endpoint provisioning agent ({options['model']})"]
-    if options["max_budget"] is not None:
-        parts.append(f"max budget ${options['max_budget']}")
-    return ", ".join(parts)
-
-
-def _format_agent_exit_log(returncode: Optional[int]) -> str:
-    if returncode == 0:
-        return "Endpoint provisioning agent finished"
-    return f"Endpoint provisioning agent exited with code {returncode}"
-
-
 def _truncate_log_message(message: str) -> str:
     if len(message) <= _MAX_AGENT_LOG_MESSAGE_CHARS:
         return message
@@ -915,6 +954,72 @@ def _load_final_report_artifact(workspace: _AgentWorkspace) -> Optional[dict[str
         logger.warning("Endpoint agent final_report.json is not an object: %s", path)
         return None
     return parsed
+
+
+def _load_final_report(workspace: _AgentWorkspace) -> Optional[AgentFinalReport]:
+    report_data = _load_final_report_artifact(workspace)
+    if report_data is None:
+        return None
+    try:
+        return AgentFinalReport.parse_obj(report_data)
+    except ValidationError:
+        logger.warning(
+            "Endpoint agent final_report.json does not match the report schema: %s",
+            workspace.work_dir / "final_report.json",
+            exc_info=True,
+        )
+        return None
+
+
+def _write_agent_process_state(workspace: _AgentWorkspace, pid: int) -> None:
+    path = workspace.work_dir / _AGENT_PROCESS_STATE_NAME
+    data = {
+        "pid": pid,
+        "started_at": _utcnow_iso(),
+    }
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _clear_agent_process_state(workspace: _AgentWorkspace, pid: int) -> None:
+    path = workspace.work_dir / _AGENT_PROCESS_STATE_NAME
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        path.unlink(missing_ok=True)
+        return
+    if data.get("pid") == pid:
+        path.unlink(missing_ok=True)
+
+
+def _get_running_agent_process_pid(workspace: _AgentWorkspace) -> Optional[int]:
+    path = workspace.work_dir / _AGENT_PROCESS_STATE_NAME
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        path.unlink(missing_ok=True)
+        return None
+    pid = data.get("pid")
+    if not isinstance(pid, int):
+        path.unlink(missing_ok=True)
+        return None
+    if _is_process_running(pid):
+        return pid
+    path.unlink(missing_ok=True)
+    return None
+
+
+def _is_process_running(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
 
 
 def _write_trace_record(workspace: _AgentWorkspace, data: dict[str, Any]) -> None:

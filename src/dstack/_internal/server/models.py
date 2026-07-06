@@ -1031,17 +1031,12 @@ class EndpointModel(PipelineModelMixin, BaseModel):
     last_processed_at: Mapped[datetime] = mapped_column(
         NaiveDateTime, default=get_current_datetime
     )
-    to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
-    deletion_requested_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
-    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     __table_args__ = (
+        UniqueConstraint("project_id", "name", name="uq_endpoints_project_id_name"),
         Index(
             "ix_endpoints_pipeline_fetch_q",
             last_processed_at.asc(),
-            postgresql_where=deleted == false(),
-            sqlite_where=deleted == false(),
         ),
     )
 

@@ -3,6 +3,7 @@ name: qwen-endpoint-log-smoke
 
 model: Qwen/Qwen3-0.6B
 preset_policy: create
+max_agent_budget: 3.0
 
 backends: [runpod]
 spot_policy: on-demand

@@ -60,13 +60,6 @@ class RunNameCompleter(BaseAPINameCompleter):
         return [r.name for r in api.runs.list(self.all)]
 
 
-class RunOrEndpointNameCompleter(BaseAPINameCompleter):
-    def fetch_resource_names(self, api: Client) -> Iterable[str]:
-        run_names = [r.name for r in api.runs.list(all=True)]
-        endpoint_names = [r.name for r in api.client.endpoints.list(api.project)]
-        return sorted(set(run_names + endpoint_names))
-
-
 class FleetNameCompleter(BaseAPINameCompleter):
     def fetch_resource_names(self, api: Client) -> Iterable[str]:
         return [r.name for r in api.client.fleets.list(api.project)]

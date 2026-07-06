@@ -30,5 +30,5 @@ class CreateEndpointRequest(CoreModel):
     configuration: EndpointConfiguration
 
 
-class DeleteEndpointsRequest(CoreModel):
+class StopEndpointsRequest(CoreModel):
     names: List[str]

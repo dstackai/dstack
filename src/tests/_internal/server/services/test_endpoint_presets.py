@@ -43,11 +43,15 @@ from dstack._internal.server.testing.common import (
     get_job_runtime_data,
 )
 
+PROJECT_NAME = "test_project"
+
 
 class TestLocalDirEndpointPresetService:
     @pytest.mark.asyncio
     async def test_lists_valid_endpoint_presets(self, tmp_path):
-        (tmp_path / "qwen.dstack.yml").write_text(
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        (presets_dir / "qwen.dstack.yml").write_text(
             """\
 model: Qwen/Qwen3-4B
 type: endpoint-preset
@@ -70,7 +74,7 @@ replica_spec_groups:
 """
         )
 
-        presets = await LocalDirEndpointPresetService(tmp_path).list_presets()
+        presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
 
         assert len(presets) == 1
         assert presets[0].name == "qwen"
@@ -83,7 +87,9 @@ replica_spec_groups:
 
     @pytest.mark.asyncio
     async def test_lists_replica_group_presets_in_group_order(self, tmp_path):
-        (tmp_path / "qwen.yml").write_text(
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        (presets_dir / "qwen.yml").write_text(
             """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
@@ -131,7 +137,7 @@ replica_spec_groups:
 """
         )
 
-        presets = await LocalDirEndpointPresetService(tmp_path).list_presets()
+        presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
 
         assert len(presets) == 1
         assert [group.name for group in presets[0].replica_spec_groups] == ["router", "worker"]
@@ -148,19 +154,21 @@ replica_spec_groups:
         service = LocalDirEndpointPresetService(tmp_path)
 
         saved = await service.save_preset(
+            PROJECT_NAME,
             preset,
             comments=[
                 "endpoint: qwen-endpoint",
                 "run: 00000000-0000-0000-0000-000000000001",
             ],
         )
-        saved_again = await service.save_preset(preset)
+        saved_again = await service.save_preset(PROJECT_NAME, preset)
 
         assert saved.name == "qwen"
         assert saved_again.name == "qwen-2"
-        assert (tmp_path / "qwen.dstack.yml").exists()
-        assert (tmp_path / "qwen-2.dstack.yml").exists()
-        text = (tmp_path / "qwen.dstack.yml").read_text()
+        presets_dir = _project_presets_dir(tmp_path)
+        assert (presets_dir / "qwen.dstack.yml").exists()
+        assert (presets_dir / "qwen-2.dstack.yml").exists()
+        text = (presets_dir / "qwen.dstack.yml").read_text()
         assert text.startswith(
             "# endpoint: qwen-endpoint\n# run: 00000000-0000-0000-0000-000000000001\n"
         )
@@ -174,10 +182,11 @@ replica_spec_groups:
     @pytest.mark.asyncio
     async def test_saved_preset_round_trips(self, tmp_path):
         saved = await LocalDirEndpointPresetService(tmp_path).save_preset(
-            _qwen_preset(name="Qwen/Qwen3-4B vLLM")
+            PROJECT_NAME,
+            _qwen_preset(name="Qwen/Qwen3-4B vLLM"),
         )
 
-        presets = await LocalDirEndpointPresetService(tmp_path).list_presets()
+        presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
 
         assert saved.name == "qwen-qwen3-4b-vllm"
         assert len(presets) == 1
@@ -192,25 +201,27 @@ replica_spec_groups:
     @pytest.mark.asyncio
     async def test_deletes_preset_by_name(self, tmp_path):
         service = LocalDirEndpointPresetService(tmp_path)
-        saved = await service.save_preset(_qwen_preset(name="qwen"))
+        saved = await service.save_preset(PROJECT_NAME, _qwen_preset(name="qwen"))
 
-        await service.delete_preset(saved.name)
+        await service.delete_preset(PROJECT_NAME, saved.name)
 
-        assert await service.list_presets() == []
-        assert not (tmp_path / "qwen.dstack.yml").exists()
+        assert await service.list_presets(PROJECT_NAME) == []
+        assert not (_project_presets_dir(tmp_path) / "qwen.dstack.yml").exists()
 
     @pytest.mark.asyncio
     async def test_delete_missing_preset_raises(self, tmp_path):
         service = LocalDirEndpointPresetService(tmp_path)
 
         with pytest.raises(FileNotFoundError):
-            await service.delete_preset("missing")
+            await service.delete_preset(PROJECT_NAME, "missing")
 
     @pytest.mark.asyncio
     async def test_ignores_non_yaml_files(self, tmp_path):
-        (tmp_path / "notes.txt").write_text("ignored")
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        (presets_dir / "notes.txt").write_text("ignored")
 
-        presets = await LocalDirEndpointPresetService(tmp_path).list_presets()
+        presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
 
         assert presets == []
 
@@ -416,9 +427,11 @@ replica_spec_groups:
     async def test_invalid_preset_is_skipped_and_logged(
         self, tmp_path, caplog, filename, content, message
     ):
-        (tmp_path / filename).write_text(content)
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        (presets_dir / filename).write_text(content)
 
-        presets = await LocalDirEndpointPresetService(tmp_path).list_presets()
+        presets = await LocalDirEndpointPresetService(tmp_path).list_presets(PROJECT_NAME)
 
         assert presets == []
         assert filename in caplog.text
@@ -468,7 +481,7 @@ class TestBuildEndpointPresetFromRun:
         await session.refresh(run, attribute_names=["jobs"])
 
         preset = build_endpoint_preset_from_run("qwen-learned", run)
-        saved = await LocalDirEndpointPresetService(tmp_path).save_preset(preset)
+        saved = await LocalDirEndpointPresetService(tmp_path).save_preset(PROJECT_NAME, preset)
 
         assert saved.name == "qwen-learned"
         assert saved.model == "Qwen/Qwen3-4B"
@@ -591,7 +604,7 @@ class TestBuildEndpointPresetFromRun:
         await session.refresh(run, attribute_names=["jobs"])
 
         preset = build_endpoint_preset_from_run("qwen-grouped", run)
-        saved = await LocalDirEndpointPresetService(tmp_path).save_preset(preset)
+        saved = await LocalDirEndpointPresetService(tmp_path).save_preset(PROJECT_NAME, preset)
 
         assert [group.name for group in saved.replica_spec_groups] == ["router", "worker"]
         assert "cpu=4" in saved.replica_spec_groups[0].resources.pretty_format()
@@ -694,7 +707,9 @@ class TestBuildPresetServiceConfiguration:
 
     @pytest.mark.asyncio
     async def test_missing_dir_returns_no_presets(self, tmp_path):
-        presets = await LocalDirEndpointPresetService(tmp_path / "missing").list_presets()
+        presets = await LocalDirEndpointPresetService(tmp_path / "missing").list_presets(
+            PROJECT_NAME
+        )
 
         assert presets == []
 
@@ -799,7 +814,9 @@ class TestFindMatchingPreset:
     async def test_skips_preset_with_unresolved_env_sentinel(
         self, session: AsyncSession, tmp_path
     ):
-        (tmp_path / "qwen.yml").write_text(
+        presets_dir = _project_presets_dir(tmp_path)
+        presets_dir.mkdir(parents=True)
+        (presets_dir / "qwen.yml").write_text(
             """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
@@ -884,7 +901,9 @@ replica_spec_groups:
 
 
 def _write_qwen_preset(tmp_path):
-    (tmp_path / "qwen.yml").write_text(
+    presets_dir = _project_presets_dir(tmp_path)
+    presets_dir.mkdir(parents=True)
+    (presets_dir / "qwen.yml").write_text(
         """\
 type: endpoint-preset
 model: Qwen/Qwen3-4B
@@ -905,6 +924,10 @@ replica_spec_groups:
           count: 1
 """
     )
+
+
+def _project_presets_dir(projects_dir):
+    return projects_dir / PROJECT_NAME / "presets"
 
 
 def _instance_offer(

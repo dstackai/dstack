@@ -40,12 +40,6 @@ def upgrade() -> None:
         sa.Column(
             "last_processed_at", dstack._internal.server.models.NaiveDateTime(), nullable=False
         ),
-        sa.Column("to_be_deleted", sa.Boolean(), server_default=sa.false(), nullable=False),
-        sa.Column(
-            "deletion_requested_at", dstack._internal.server.models.NaiveDateTime(), nullable=True
-        ),
-        sa.Column("deleted", sa.Boolean(), nullable=False),
-        sa.Column("deleted_at", dstack._internal.server.models.NaiveDateTime(), nullable=True),
         sa.Column(
             "lock_expires_at", dstack._internal.server.models.NaiveDateTime(), nullable=True
         ),
@@ -64,14 +58,13 @@ def upgrade() -> None:
             ["user_id"], ["users.id"], name=op.f("fk_endpoints_user_id_users"), ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_endpoints")),
+        sa.UniqueConstraint("project_id", "name", name="uq_endpoints_project_id_name"),
     )
     with op.batch_alter_table("endpoints", schema=None) as batch_op:
         batch_op.create_index(
             "ix_endpoints_pipeline_fetch_q",
             [sa.literal_column("last_processed_at ASC")],
             unique=False,
-            postgresql_where=sa.text("deleted IS FALSE"),
-            sqlite_where=sa.text("deleted = 0"),
         )
         batch_op.create_index(batch_op.f("ix_endpoints_status"), ["status"], unique=False)
 
@@ -119,8 +112,6 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f("ix_endpoints_status"))
         batch_op.drop_index(
             "ix_endpoints_pipeline_fetch_q",
-            postgresql_where=sa.text("deleted IS FALSE"),
-            sqlite_where=sa.text("deleted = 0"),
         )
 
     op.drop_table("endpoints")

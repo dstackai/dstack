@@ -75,7 +75,7 @@ async def find_preset_planning_result(
     endpoint_model = endpoint_configuration.model.lower()
     presets = [
         preset
-        for preset in await preset_service.list_presets()
+        for preset in await preset_service.list_presets(project.name)
         if preset.model.lower() == endpoint_model
     ]
     if not presets:

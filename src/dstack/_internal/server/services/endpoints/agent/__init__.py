@@ -21,6 +21,7 @@ class AgentProvisioningResult:
     run_name: Optional[str] = None
     error: Optional[str] = None
     final_report: Optional[AgentFinalReport] = None
+    in_progress: bool = False
 
 
 class AgentService(ABC):

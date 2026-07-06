@@ -26,7 +26,7 @@ def filter_endpoints_for_listing(
     latest_finished = None
     filtered = []
     for endpoint in endpoints:
-        if endpoint.status.is_finished():
+        if _is_endpoint_finished(endpoint):
             if not include_latest_finished:
                 continue
             if latest_finished is None:
@@ -63,7 +63,13 @@ def get_endpoint_table(
     table.add_row(th("User"), endpoint.user)
     table.add_row(th("Endpoint"), endpoint.name)
     table.add_row(th("Model"), endpoint.configuration.model)
-    table.add_row(th("Status"), _format_endpoint_status(endpoint.status, endpoint.status_message))
+    table.add_row(
+        th("Status"),
+        _format_endpoint_status(
+            endpoint.status,
+            endpoint.status_message,
+        ),
+    )
     table.add_row(th("Run"), endpoint.run_name or "-")
     table.add_row(th("URL"), endpoint.url or "-")
     table.add_row(th("Created"), format_date(endpoint.created_at))
@@ -92,7 +98,10 @@ def get_endpoints_table(
         row = {
             "NAME": endpoint.name,
             "MODEL": endpoint.configuration.model,
-            "STATUS": _format_endpoint_status(endpoint.status, endpoint.status_message),
+            "STATUS": _format_endpoint_status(
+                endpoint.status,
+                endpoint.status_message,
+            ),
             "RUN": endpoint.run_name or "-",
             "URL": endpoint.url or "-",
             "CREATED": format_date(endpoint.created_at),
@@ -110,9 +119,10 @@ def _format_endpoint_status(
     color_map = {
         EndpointStatus.SUBMITTED: "grey",
         EndpointStatus.PROVISIONING: "deep_sky_blue1",
-        EndpointStatus.AGENTING: "medium_purple1",
+        EndpointStatus.CLAUDING: "medium_purple1",
         EndpointStatus.RUNNING: "sea_green3",
-        EndpointStatus.ACTIVE: "sea_green3",
+        EndpointStatus.STOPPING: "deep_sky_blue1",
+        EndpointStatus.STOPPED: "grey62",
         EndpointStatus.FAILED: "indian_red1",
     }
     if status_value == "no offers":
@@ -128,13 +138,15 @@ def _get_endpoint_status_value(
     status: EndpointStatus,
     status_message: Optional[str],
 ) -> str:
-    if status == EndpointStatus.ACTIVE:
-        return EndpointStatus.RUNNING.value
     if status == EndpointStatus.FAILED:
         failure_reason = _get_endpoint_failure_reason(status_message)
         if failure_reason is not None:
             return failure_reason
     return status.value
+
+
+def _is_endpoint_finished(endpoint: Endpoint) -> bool:
+    return endpoint.status.is_finished()
 
 
 def _get_endpoint_failure_reason(status_message: Optional[str]) -> Optional[str]:

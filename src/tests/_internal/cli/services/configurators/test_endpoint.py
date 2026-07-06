@@ -6,23 +6,28 @@ from rich.console import Console
 
 import dstack._internal.cli.services.configurators.endpoint as endpoint_configurator_module
 from dstack._internal.cli.services.configurators.endpoint import (
+    EndpointConfigurator,
     _get_apply_confirm_message,
     _make_endpoint_url_absolute,
     _print_endpoint_plan,
     _print_finished_endpoint_message,
     _print_submitted_endpoint_message,
 )
+from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.endpoints import (
     Endpoint,
     EndpointConfiguration,
     EndpointPlan,
+    EndpointPlanJobOffers,
+    EndpointPlanReplicaSpecGroup,
     EndpointPresetPolicy,
     EndpointProvisioningPlanAgent,
     EndpointProvisioningPlanNone,
     EndpointProvisioningPlanPreset,
     EndpointStatus,
 )
+from dstack._internal.core.models.resources import ResourcesSpec
 
 
 def _get_endpoint_plan(
@@ -68,7 +73,6 @@ def _get_current_endpoint() -> Endpoint:
         created_at=datetime.now(timezone.utc),
         last_processed_at=datetime.now(timezone.utc),
         status=EndpointStatus.RUNNING,
-        deleted=False,
     )
 
 
@@ -99,8 +103,8 @@ class TestPrintEndpointPlan:
 
         output = console.export_text()
         assert "Project        main" in output
-        assert "Endpoint       qwen-endpoint" in output
-        assert "Resources      -" in output
+        assert "Endpoint" not in output
+        assert "Resources" not in output
         assert "Spot policy    auto" in output
         assert "Max price      off" in output
         assert "Preset policy  reuse-or-create" in output
@@ -109,6 +113,40 @@ class TestPrintEndpointPlan:
         assert "Model" not in output
         assert "Action" not in output
         assert "Provisioning" not in output
+
+    def test_prints_preset_without_resources_property(self, monkeypatch: pytest.MonkeyPatch):
+        console = _patch_console(monkeypatch)
+        resources = ResourcesSpec.parse_obj({"gpu": "16GB", "disk": "60GB"})
+        plan = _get_endpoint_plan(
+            EndpointProvisioningPlanPreset(
+                preset_name="qwen-vllm",
+                service_name="qwen-endpoint-serving",
+                replica_spec_groups=[
+                    EndpointPlanReplicaSpecGroup(
+                        name="0",
+                        resources=resources,
+                        tested_resources=[resources],
+                    )
+                ],
+                job_offers=[
+                    EndpointPlanJobOffers(
+                        replica_group="0",
+                        resources=resources,
+                        spot=False,
+                        max_price=0.5,
+                        offers=[],
+                        total_offers=0,
+                        max_offer_price=None,
+                    )
+                ],
+            )
+        )
+
+        _print_endpoint_plan(plan)
+
+        output = console.export_text()
+        assert "Resources" not in output
+        assert "Preset         qwen-vllm" in output
 
     def test_prints_agent_reason_when_preset_has_no_offers(self, monkeypatch: pytest.MonkeyPatch):
         console = _patch_console(monkeypatch)
@@ -212,3 +250,12 @@ class TestGetApplyConfirmMessage:
             _get_apply_confirm_message(plan, stop_run_name="qwen-endpoint")
             == "Stop and override the run [code]qwen-endpoint[/]?"
         )
+
+
+class TestEndpointConfigurator:
+    def test_delete_configuration_is_not_supported(self):
+        configurator = EndpointConfigurator.__new__(EndpointConfigurator)
+        conf = EndpointConfiguration(name="qwen-endpoint", model="Qwen/Qwen3-0.6B")
+
+        with pytest.raises(ConfigurationError, match="dstack endpoint stop"):
+            configurator.delete_configuration(conf, "endpoint.dstack.yml", command_args=None)

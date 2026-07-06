@@ -19,13 +19,11 @@ from dstack._internal.core.models.runs import (
     ServiceSpec,
 )
 from dstack._internal.server.background.pipeline_tasks.base import (
-    NOW_PLACEHOLDER,
     Fetcher,
     Heartbeater,
     ItemUpdateMap,
     Pipeline,
     PipelineItem,
-    UpdateMapDateTime,
     Worker,
     log_lock_token_changed_after_processing,
     log_lock_token_mismatch,
@@ -35,7 +33,6 @@ from dstack._internal.server.background.pipeline_tasks.base import (
 )
 from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import EndpointModel, ProjectModel, RunModel, UserModel
-from dstack._internal.server.services import events
 from dstack._internal.server.services import runs as runs_services
 from dstack._internal.server.services.endpoints import (
     emit_endpoint_status_change_event,
@@ -67,7 +64,6 @@ _MAX_AGENT_STATUS_MESSAGE_CHARS = 500
 @dataclass
 class EndpointPipelineItem(PipelineItem):
     status: EndpointStatus
-    to_be_deleted: bool
 
 
 class EndpointPipeline(Pipeline[EndpointPipelineItem]):
@@ -158,19 +154,15 @@ class EndpointFetcher(Fetcher[EndpointPipelineItem]):
                 res = await session.execute(
                     select(EndpointModel)
                     .where(
-                        or_(
-                            EndpointModel.status.in_(
-                                [
-                                    EndpointStatus.SUBMITTED,
-                                    EndpointStatus.PROVISIONING,
-                                    EndpointStatus.AGENTING,
-                                    EndpointStatus.RUNNING,
-                                    EndpointStatus.ACTIVE,
-                                ]
-                            ),
-                            EndpointModel.to_be_deleted == True,
+                        EndpointModel.status.in_(
+                            [
+                                EndpointStatus.SUBMITTED,
+                                EndpointStatus.PROVISIONING,
+                                EndpointStatus.CLAUDING,
+                                EndpointStatus.RUNNING,
+                                EndpointStatus.STOPPING,
+                            ]
                         ),
-                        EndpointModel.deleted == False,
                         or_(
                             EndpointModel.last_processed_at <= now - self._min_processing_interval,
                             EndpointModel.last_processed_at == EndpointModel.created_at,
@@ -193,7 +185,6 @@ class EndpointFetcher(Fetcher[EndpointPipelineItem]):
                             EndpointModel.lock_token,
                             EndpointModel.lock_expires_at,
                             EndpointModel.status,
-                            EndpointModel.to_be_deleted,
                         )
                     )
                 )
@@ -214,7 +205,6 @@ class EndpointFetcher(Fetcher[EndpointPipelineItem]):
                             lock_token=lock_token,
                             prev_lock_expired=prev_lock_expired,
                             status=endpoint_model.status,
-                            to_be_deleted=endpoint_model.to_be_deleted,
                         )
                     )
                 await session.commit()
@@ -241,12 +231,7 @@ class EndpointWorker(Worker[EndpointPipelineItem]):
             log_lock_token_mismatch(logger, item)
             return
 
-        if endpoint_model.to_be_deleted:
-            result = await _process_to_be_deleted_endpoint(
-                endpoint_model=endpoint_model,
-                pipeline_hinter=self._pipeline_hinter,
-            )
-        elif endpoint_model.status == EndpointStatus.SUBMITTED:
+        if endpoint_model.status == EndpointStatus.SUBMITTED:
             result = await _process_submitted_endpoint(
                 endpoint_model=endpoint_model,
                 pipeline_hinter=self._pipeline_hinter,
@@ -256,12 +241,17 @@ class EndpointWorker(Worker[EndpointPipelineItem]):
                 endpoint_model=endpoint_model,
                 pipeline_hinter=self._pipeline_hinter,
             )
-        elif endpoint_model.status == EndpointStatus.AGENTING:
-            result = await _process_agenting_endpoint(
+        elif endpoint_model.status == EndpointStatus.CLAUDING:
+            result = await _process_clauding_endpoint(
                 endpoint_model=endpoint_model,
                 pipeline_hinter=self._pipeline_hinter,
             )
-        elif endpoint_model.status in (EndpointStatus.RUNNING, EndpointStatus.ACTIVE):
+        elif endpoint_model.status == EndpointStatus.STOPPING:
+            result = await _process_stopping_endpoint(
+                endpoint_model=endpoint_model,
+                pipeline_hinter=self._pipeline_hinter,
+            )
+        elif endpoint_model.status == EndpointStatus.RUNNING:
             result = await _process_running_endpoint(endpoint_model)
         else:
             result = _ProcessResult()
@@ -322,21 +312,13 @@ async def _apply_process_result(
         if len(updated_ids) == 0:
             log_lock_token_changed_after_processing(logger, item)
             return
-        if result.update_map.get("deleted"):
-            events.emit(
-                session,
-                "Endpoint deleted",
-                actor=events.SystemActor(),
-                targets=[events.Target.from_model(endpoint_model)],
-            )
-        else:
-            emit_endpoint_status_change_event(
-                session=session,
-                endpoint_model=endpoint_model,
-                old_status=endpoint_model.status,
-                new_status=update_map.get("status", endpoint_model.status),
-                status_message=update_map.get("status_message", endpoint_model.status_message),
-            )
+        emit_endpoint_status_change_event(
+            session=session,
+            endpoint_model=endpoint_model,
+            old_status=endpoint_model.status,
+            new_status=update_map.get("status", endpoint_model.status),
+            status_message=update_map.get("status_message", endpoint_model.status_message),
+        )
 
 
 class _EndpointUpdateMap(ItemUpdateMap, total=False):
@@ -344,8 +326,6 @@ class _EndpointUpdateMap(ItemUpdateMap, total=False):
     status_message: Optional[str]
     service_run_id: uuid.UUID
     provisioning_method: Optional[str]
-    deleted: bool
-    deleted_at: UpdateMapDateTime
 
 
 @dataclass
@@ -383,10 +363,6 @@ async def _process_submitted_endpoint(
     endpoint_model: EndpointModel,
     pipeline_hinter: PipelineHinterProtocol,
 ) -> _ProcessResult:
-    conflict_result = await _get_active_serving_run_name_conflict(endpoint_model)
-    if conflict_result is not None:
-        return conflict_result
-
     try:
         submission_result = await _submit_endpoint_from_preset(
             endpoint_id=endpoint_model.id,
@@ -416,7 +392,7 @@ async def _process_submitted_endpoint(
     if _should_provision_with_agent(endpoint_model):
         logger.info("Provisioning endpoint %s with server agent", endpoint_model.name)
         update_map = _EndpointUpdateMap(
-            status=EndpointStatus.AGENTING,
+            status=EndpointStatus.CLAUDING,
             status_message=None,
             provisioning_method="agent",
         )
@@ -473,7 +449,7 @@ async def _process_provisioning_endpoint(
 ) -> _ProcessResult:
     if endpoint_model.service_run is None:
         if endpoint_model.provisioning_method == "agent":
-            return await _process_agenting_endpoint(
+            return await _process_clauding_endpoint(
                 endpoint_model=endpoint_model,
                 pipeline_hinter=pipeline_hinter,
             )
@@ -506,7 +482,7 @@ async def _process_provisioning_endpoint(
     )
 
 
-async def _process_agenting_endpoint(
+async def _process_clauding_endpoint(
     endpoint_model: EndpointModel,
     pipeline_hinter: PipelineHinterProtocol,
 ) -> _ProcessResult:
@@ -531,7 +507,7 @@ async def _process_agent_verified_endpoint(endpoint_model: EndpointModel) -> _Pr
             }
         )
     if readiness.model_base_url is None or readiness.model_name is None:
-        return _ProcessResult(update_map={"status": EndpointStatus.AGENTING})
+        return _ProcessResult(update_map={"status": EndpointStatus.CLAUDING})
     await _save_agent_endpoint_preset(
         endpoint_model=endpoint_model,
         run_model=run_model,
@@ -562,6 +538,13 @@ async def _provision_endpoint_with_agent(
         endpoint_model=endpoint_model,
         pipeline_hinter=pipeline_hinter,
     )
+    if result.in_progress:
+        return _ProcessResult(
+            update_map={
+                "status": EndpointStatus.CLAUDING,
+                "status_message": None,
+            }
+        )
     if result.error is not None:
         return _ProcessResult(
             update_map={
@@ -681,7 +664,7 @@ async def _provision_endpoint_with_agent(
     if readiness.model_base_url is None or readiness.model_name is None:
         return _ProcessResult(
             update_map={
-                "status": EndpointStatus.AGENTING,
+                "status": EndpointStatus.CLAUDING,
                 "status_message": None,
                 "service_run_id": run_model.id,
             }
@@ -736,6 +719,29 @@ async def _process_running_endpoint(endpoint_model: EndpointModel) -> _ProcessRe
     return _ProcessResult(update_map={"status_message": None})
 
 
+async def _process_stopping_endpoint(
+    endpoint_model: EndpointModel,
+    pipeline_hinter: PipelineHinterProtocol,
+) -> _ProcessResult:
+    run_model = endpoint_model.service_run
+    # TODO: When the Claude agent service exposes cancellation, interrupt a live
+    # agent process here instead of waiting for it to notice/finish.
+    if run_model is None or run_model.deleted or run_model.status.is_finished():
+        return _get_stopped_result()
+    if run_model.status != RunStatus.TERMINATING:
+        logger.info(
+            "Stopping backing run %s before stopping endpoint %s",
+            run_model.run_name,
+            endpoint_model.name,
+        )
+        await _stop_backing_run(
+            endpoint_model=endpoint_model,
+            run_name=run_model.run_name,
+            pipeline_hinter=pipeline_hinter,
+        )
+    return _ProcessResult()
+
+
 async def _try_save_agent_endpoint_preset(
     endpoint_model: EndpointModel,
     model_name: str,
@@ -759,6 +765,7 @@ async def _save_agent_endpoint_preset(
     try:
         preset = build_endpoint_preset_from_run(name=preset_name, run_model=run_model)
         saved_preset = await get_endpoint_preset_service().save_preset(
+            endpoint_model.project.name,
             preset,
             comments=[
                 "Generated by dstack endpoint agent.",
@@ -835,8 +842,6 @@ async def _submit_endpoint_from_preset(
             select(EndpointModel)
             .where(
                 EndpointModel.id == endpoint_id,
-                EndpointModel.deleted == False,
-                EndpointModel.to_be_deleted == False,
                 EndpointModel.status == EndpointStatus.SUBMITTED,
             )
             .options(joinedload(EndpointModel.project).joinedload(ProjectModel.backends))
@@ -861,6 +866,14 @@ async def _submit_endpoint_from_preset(
             if preset_planning_result.unprovisionable is not None:
                 unprovisionable_preset_name = preset_planning_result.unprovisionable.preset.name
             return _PresetSubmissionResult(unprovisionable_preset_name=unprovisionable_preset_name)
+        conflict_message = await _get_active_run_name_conflict_message(
+            session=session,
+            project=endpoint_model.project,
+            run_name=preset_plan.run_plan.run_spec.run_name,
+            linked_run_id=endpoint_model.service_run_id,
+        )
+        if conflict_message is not None:
+            raise ServerClientError(conflict_message)
         run = await runs_services.apply_plan(
             session=session,
             user=endpoint_model.user,
@@ -881,6 +894,29 @@ async def _submit_endpoint_from_preset(
         return _PresetSubmissionResult(
             submission=_PresetSubmission(run_id=run.id, preset_name=preset_plan.preset.name)
         )
+
+
+async def _get_active_run_name_conflict_message(
+    *,
+    session,
+    project: ProjectModel,
+    run_name: Optional[str],
+    linked_run_id: Optional[uuid.UUID],
+) -> Optional[str]:
+    if run_name is None:
+        return None
+    run_model = await runs_services.get_run_model_by_name(
+        session=session,
+        project=project,
+        run_name=run_name,
+    )
+    if run_model is None:
+        return None
+    if linked_run_id == run_model.id:
+        return None
+    if run_model.status.is_finished():
+        return None
+    return f"Run name '{run_name}' is taken by an existing run"
 
 
 def _get_no_provisioning_path_message(
@@ -911,43 +947,6 @@ def _get_no_provisioning_path_message(
     return f"Preset policy create requires the server agent, but {agent_unavailable_reason}"
 
 
-async def _process_to_be_deleted_endpoint(
-    endpoint_model: EndpointModel,
-    pipeline_hinter: PipelineHinterProtocol,
-) -> _ProcessResult:
-    run_model = await _get_backing_run_for_deletion(endpoint_model)
-    if run_model is None:
-        return _get_deleted_result()
-    if not run_model.status.is_finished():
-        if run_model.status != RunStatus.TERMINATING:
-            logger.info(
-                "Stopping backing run %s before deleting endpoint %s",
-                run_model.run_name,
-                endpoint_model.name,
-            )
-            await _stop_backing_run(
-                endpoint_model=endpoint_model,
-                run_name=run_model.run_name,
-                pipeline_hinter=pipeline_hinter,
-            )
-        return _ProcessResult()
-
-    logger.info(
-        "Deleting finished backing run %s before deleting endpoint %s",
-        run_model.run_name,
-        endpoint_model.name,
-    )
-    await _delete_backing_run(endpoint_model=endpoint_model, run_name=run_model.run_name)
-    return _get_deleted_result()
-
-
-async def _get_backing_run_for_deletion(endpoint_model: EndpointModel) -> Optional[RunModel]:
-    run_model = endpoint_model.service_run
-    if run_model is not None and not run_model.deleted:
-        return run_model
-    return None
-
-
 async def _stop_backing_run(
     endpoint_model: EndpointModel,
     run_name: str,
@@ -964,20 +963,10 @@ async def _stop_backing_run(
         )
 
 
-async def _delete_backing_run(endpoint_model: EndpointModel, run_name: str) -> None:
-    async with get_session_ctx() as session:
-        await runs_services.delete_runs(
-            session=session,
-            user=endpoint_model.user,
-            project=endpoint_model.project,
-            runs_names=[run_name],
-        )
-
-
-def _get_deleted_result() -> _ProcessResult:
+def _get_stopped_result() -> _ProcessResult:
     return _ProcessResult(
         update_map={
-            "deleted": True,
-            "deleted_at": NOW_PLACEHOLDER,
+            "status": EndpointStatus.STOPPED,
+            "status_message": None,
         }
     )

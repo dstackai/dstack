@@ -5,20 +5,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.endpoints as endpoints_services
 from dstack._internal.core.errors import ResourceNotExistsError
-from dstack._internal.core.models.endpoint_presets import EndpointPreset
+from dstack._internal.core.models.endpoint_presets import EndpointPreset, EndpointPresetDetails
 from dstack._internal.core.models.endpoints import Endpoint, EndpointPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
-from dstack._internal.server.schemas.endpoint_presets import DeleteEndpointPresetsRequest
+from dstack._internal.server.schemas.endpoint_presets import (
+    DeleteEndpointPresetsRequest,
+    GetEndpointPresetRequest,
+)
 from dstack._internal.server.schemas.endpoints import (
     CreateEndpointRequest,
-    DeleteEndpointsRequest,
     GetEndpointPlanRequest,
     GetEndpointRequest,
     ListEndpointsRequest,
+    StopEndpointsRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services.endpoints.presets import (
+    endpoint_preset_to_api_details,
     endpoint_preset_to_api_model,
     get_endpoint_preset_service,
 )
@@ -63,7 +67,10 @@ async def list_project_endpoints(
 ):
     _, project = user_project
     return CustomORJSONResponse(
-        await endpoints_services.list_project_endpoints(session=session, project=project)
+        await endpoints_services.list_project_endpoints(
+            session=session,
+            project=project,
+        )
     )
 
 
@@ -121,15 +128,15 @@ async def create_endpoint(
     )
 
 
-@project_router.post("/delete", summary="Delete endpoints")
-async def delete_endpoints(
-    body: DeleteEndpointsRequest,
+@project_router.post("/stop", summary="Stop endpoints")
+async def stop_endpoints(
+    body: StopEndpointsRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
     pipeline_hinter: PipelineHinterProtocol = Depends(get_pipeline_hinter),
 ):
     user, project = user_project
-    await endpoints_services.delete_endpoints(
+    await endpoints_services.stop_endpoints(
         session=session,
         project=project,
         names=body.names,
@@ -144,9 +151,23 @@ async def delete_endpoints(
 async def list_endpoint_presets(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
-    _, _ = user_project
-    presets = await get_endpoint_preset_service().list_presets()
+    _, project = user_project
+    presets = await get_endpoint_preset_service().list_presets(project.name)
     return CustomORJSONResponse([endpoint_preset_to_api_model(preset) for preset in presets])
+
+
+@project_router.post(
+    "/presets/get", summary="Get endpoint preset", response_model=EndpointPresetDetails
+)
+async def get_endpoint_preset(
+    body: GetEndpointPresetRequest,
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+):
+    _, project = user_project
+    preset = await get_endpoint_preset_service().get_preset(project.name, body.name)
+    if preset is None:
+        raise ResourceNotExistsError()
+    return CustomORJSONResponse(endpoint_preset_to_api_details(preset))
 
 
 @project_router.post("/presets/delete", summary="Delete endpoint presets")
@@ -154,10 +175,10 @@ async def delete_endpoint_presets(
     body: DeleteEndpointPresetsRequest,
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
-    _, _ = user_project
+    _, project = user_project
     preset_service = get_endpoint_preset_service()
     try:
         for name in body.names:
-            await preset_service.delete_preset(name)
+            await preset_service.delete_preset(project.name, name)
     except FileNotFoundError:
         raise ResourceNotExistsError()

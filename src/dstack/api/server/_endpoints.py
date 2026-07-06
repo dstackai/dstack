@@ -5,9 +5,9 @@ from pydantic import parse_obj_as
 from dstack._internal.core.models.endpoints import Endpoint, EndpointConfiguration, EndpointPlan
 from dstack._internal.server.schemas.endpoints import (
     CreateEndpointRequest,
-    DeleteEndpointsRequest,
     GetEndpointPlanRequest,
     GetEndpointRequest,
+    StopEndpointsRequest,
 )
 from dstack.api.server._group import APIClientGroup
 
@@ -44,6 +44,6 @@ class EndpointsAPIClient(APIClientGroup):
         resp = self._request(f"/api/project/{project_name}/endpoints/create", body=body.json())
         return parse_obj_as(Endpoint.__response__, resp.json())
 
-    def delete(self, project_name: str, names: List[str]) -> None:
-        body = DeleteEndpointsRequest(names=names)
-        self._request(f"/api/project/{project_name}/endpoints/delete", body=body.json())
+    def stop(self, project_name: str, names: List[str]) -> None:
+        body = StopEndpointsRequest(names=names)
+        self._request(f"/api/project/{project_name}/endpoints/stop", body=body.json())

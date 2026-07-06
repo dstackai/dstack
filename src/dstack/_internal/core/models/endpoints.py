@@ -19,15 +19,15 @@ from dstack._internal.core.models.resources import ResourcesSpec
 class EndpointStatus(str, Enum):
     SUBMITTED = "submitted"
     PROVISIONING = "provisioning"
-    AGENTING = "agenting"
+    CLAUDING = "clauding"
     RUNNING = "running"
-    # Legacy status used by early endpoint prototypes. New code writes RUNNING.
-    ACTIVE = "active"
+    STOPPING = "stopping"
+    STOPPED = "stopped"
     FAILED = "failed"
 
     @classmethod
     def finished_statuses(cls) -> list["EndpointStatus"]:
-        return [cls.FAILED]
+        return [cls.STOPPED, cls.FAILED]
 
     def is_finished(self) -> bool:
         return self in self.finished_statuses()
@@ -94,8 +94,6 @@ class Endpoint(CoreModel):
     last_processed_at: datetime
     status: EndpointStatus
     status_message: Optional[str] = None
-    deleted: bool
-    deleted_at: Optional[datetime] = None
     run_name: Optional[str] = None
     url: Optional[str] = None
     error: Optional[str] = None

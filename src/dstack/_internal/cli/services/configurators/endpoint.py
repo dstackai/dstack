@@ -19,7 +19,7 @@ from dstack._internal.cli.utils.common import (
 )
 from dstack._internal.cli.utils.endpoint import get_endpoints_table
 from dstack._internal.cli.utils.rich import MultiItemStatus
-from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.endpoints import (
     AnyEndpointProvisioningPlan,
@@ -83,7 +83,7 @@ class EndpointConfigurator(
                     console.print("Use --force to apply anyway.")
                     return
             else:
-                # TODO: Replace v1 stop/delete/recreate with endpoint in-place update
+                # TODO: Replace v1 stop/recreate with endpoint in-place update
                 # via service rolling deployment once endpoint versioning exists.
                 console.print(
                     f"Endpoint [code]{current_resource.name}[/] already exists."
@@ -110,18 +110,20 @@ class EndpointConfigurator(
             return
 
         if current_resource is not None:
-            with console.status("Deleting existing endpoint..."):
-                self.api.client.endpoints.delete(
+            with console.status("Stopping existing endpoint..."):
+                self.api.client.endpoints.stop(
                     project_name=self.api.project,
                     names=[current_resource.name],
                 )
                 while True:
                     try:
-                        self.api.client.endpoints.get(
+                        endpoint = self.api.client.endpoints.get(
                             project_name=self.api.project,
                             name=current_resource.name,
                         )
                     except ResourceNotExistsError:
+                        break
+                    if endpoint.status.is_finished():
                         break
                     time.sleep(1)
 
@@ -150,27 +152,10 @@ class EndpointConfigurator(
         configuration_path: str,
         command_args: argparse.Namespace,
     ):
-        if conf.name is None:
-            console.print("[error]Configuration specifies no endpoint to delete[/]")
-            exit(1)
-
-        try:
-            self.api.client.endpoints.get(
-                project_name=self.api.project,
-                name=conf.name,
-            )
-        except ResourceNotExistsError:
-            console.print(f"Endpoint [code]{conf.name}[/] does not exist")
-            exit(1)
-
-        if not command_args.yes and not confirm_ask(f"Delete the endpoint [code]{conf.name}[/]?"):
-            console.print("\nExiting...")
-            return
-
-        with console.status("Deleting endpoint..."):
-            self.api.client.endpoints.delete(project_name=self.api.project, names=[conf.name])
-
-        console.print(f"Endpoint [code]{conf.name}[/] deleted")
+        raise ConfigurationError(
+            "`dstack delete` does not support endpoint configurations. "
+            "Use `dstack endpoint stop <name>`."
+        )
 
     @classmethod
     def register_args(cls, parser: argparse.ArgumentParser):
@@ -234,7 +219,11 @@ def _apply_profile(conf: EndpointConfiguration, profile: Profile):
 
 
 def _is_endpoint_apply_finished(endpoint: Endpoint) -> bool:
-    return endpoint.status in (EndpointStatus.RUNNING, EndpointStatus.FAILED)
+    return endpoint.status in (
+        EndpointStatus.RUNNING,
+        EndpointStatus.STOPPED,
+        EndpointStatus.FAILED,
+    )
 
 
 def _get_apply_status(endpoint: Endpoint) -> str:
@@ -265,8 +254,6 @@ def _print_endpoint_plan(plan: EndpointPlan, no_fleets: bool = False):
     if plan.configuration_path is not None:
         props.add_row(th("Configuration"), plan.configuration_path)
     props.add_row(th("Type"), plan.configuration.type)
-    props.add_row(th("Endpoint"), plan.configuration.name or "(generated)")
-    props.add_row(th("Resources"), _format_resources(plan))
     props.add_row(th("Spot policy"), _format_spot_policy(plan))
     props.add_row(th("Max price"), _format_max_price(plan))
     props.add_row(th("Preset policy"), plan.preset_policy.value)
@@ -287,6 +274,8 @@ def _print_endpoint_plan(plan: EndpointPlan, no_fleets: bool = False):
         console.print(f"[{style}]{plan.provisioning_plan.reason}[/]")
         console.print()
     elif isinstance(plan.provisioning_plan, EndpointProvisioningPlanAgent):
+        # TODO: Consider showing initial candidate offers for agent provisioning as
+        # non-binding context. Do not present them as selected resources/final hardware.
         if plan.provisioning_plan.reason is not None:
             console.print(f"[warning]{plan.provisioning_plan.reason}[/]")
             console.print()
@@ -316,21 +305,6 @@ def _get_non_terminal_current_resource(plan: EndpointPlan) -> Endpoint | None:
     if plan.current_resource is None or plan.current_resource.status.is_finished():
         return None
     return plan.current_resource
-
-
-def _format_resources(plan: EndpointPlan) -> str:
-    if not isinstance(plan.provisioning_plan, EndpointProvisioningPlanPreset):
-        return "-"
-    resources = [
-        (job_offers.replica_group, job_offers.resources.pretty_format())
-        for job_offers in plan.provisioning_plan.job_offers
-    ]
-    if not resources:
-        return "-"
-    resource_values = {resource for _, resource in resources}
-    if len(resource_values) == 1:
-        return resources[0][1]
-    return "\n".join(f"{replica_group}: {resource}" for replica_group, resource in resources)
 
 
 def _format_spot_policy(plan: EndpointPlan) -> str:
