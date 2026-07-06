@@ -15,7 +15,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
 )
-from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.core.models.runs import RunSpec, RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server import settings
 from dstack._internal.server.models import EndpointModel
@@ -31,6 +31,8 @@ from dstack._internal.server.services.endpoints.presets import (
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_project,
+    create_repo,
+    create_run,
     create_user,
     get_auth_headers,
     list_events,
@@ -379,6 +381,48 @@ class TestGetEndpoint:
     async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
         response = await client.post("/api/project/main/endpoints/get")
         assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_stopped_endpoint_hides_linked_run_name(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        endpoint_model = await _create_endpoint_model(
+            session=session,
+            project=project,
+            user=user,
+            status=EndpointStatus.STOPPED,
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+            repo_name="qwen-endpoint-serving-repo",
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="qwen-endpoint-serving",
+            status=RunStatus.TERMINATED,
+        )
+        endpoint_model.service_run_id = run.id
+        await session.commit()
+
+        response = await client.post(
+            f"/api/project/{project.name}/endpoints/get",
+            headers=get_auth_headers(user.token),
+            json={"name": endpoint_model.name},
+        )
+
+        assert response.status_code == 200, response.json()
+        assert response.json()["status"] == "stopped"
+        assert response.json()["run_name"] is None
 
 
 class TestStopEndpoint:

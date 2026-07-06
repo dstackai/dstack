@@ -494,7 +494,11 @@ def endpoint_model_to_endpoint(endpoint_model: EndpointModel) -> Endpoint:
     run_name = None
     url = None
     status = endpoint_model.status
-    if endpoint_model.service_run is not None and not endpoint_model.service_run.deleted:
+    if (
+        status != EndpointStatus.STOPPED
+        and endpoint_model.service_run is not None
+        and not endpoint_model.service_run.deleted
+    ):
         run_name = endpoint_model.service_run.run_name
         if (
             status == EndpointStatus.RUNNING

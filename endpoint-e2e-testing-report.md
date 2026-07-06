@@ -378,6 +378,11 @@ Stop result:
 Result: `dstack endpoint stop` stopped the backing service run, terminated the RunPod instance, and
 left the endpoint visible as `stopped`.
 
+Follow-up UX cleanup: stopped endpoints now hide the linked service run in `dstack endpoint` and
+`get --json` (`RUN` displays `-`, `run_name` is `null`). The internal `service_run_id` remains in
+the database for lifecycle/history purposes, but the user-facing field represents the current live
+backing service, not old run history.
+
 ## Assessment
 
 This was the first meaningful proof that the endpoint idea can work end to end: endpoint config in, real agent work, real service deployed, real model request verified, endpoint running, preset saved.
