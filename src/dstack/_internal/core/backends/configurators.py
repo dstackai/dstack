@@ -137,6 +137,12 @@ try:
 except ImportError:
     pass
 
+try:
+    from dstack._internal.core.backends.slurm.configurator import SlurmConfigurator
+
+    _CONFIGURATOR_CLASSES.append(SlurmConfigurator)
+except ImportError:
+    pass
 
 try:
     from dstack._internal.core.backends.vastai.configurator import VastAIConfigurator

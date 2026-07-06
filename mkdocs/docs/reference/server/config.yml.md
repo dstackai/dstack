@@ -176,6 +176,34 @@ to configure [backends](../../concepts/backends.md) and other [server-level sett
         type:
             required: true
 
+##### `projects[n].backends[type=slurm]` { #slurm data-toc-label="slurm" }
+
+#SCHEMA# dstack._internal.core.backends.slurm.models.SlurmBackendFileConfigWithCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: slurm-
+
+###### `projects[n].backends[type=slurm].clusters[n]` { #slurm-clusters data-toc-label="clusters" }
+
+#SCHEMA# dstack._internal.core.backends.slurm.models.SlurmClusterFileConfig
+    overrides:
+        show_root_heading: false
+        item_id_prefix: slurm-clusters-
+
+###### `projects[n].backends[type=slurm].clusters[n].gpu_partitions[n]` { #slurm-clusters-gpu_partitions data-toc-label="gpu_partitions" }
+
+#SCHEMA# dstack._internal.core.backends.slurm.models.SlurmGPUPartitionConfig
+    overrides:
+        show_root_heading: false
+
+###### `projects[n].backends[type=slurm].clusters[n].private_key` { #slurm-clusters-private_key data-toc-label="private_key" }
+
+#SCHEMA# dstack._internal.core.backends.slurm.models.SlurmPrivateKeyFileConfig
+    overrides:
+        show_root_heading: false
+
 ##### `projects[n].backends[type=vastai]` { #vastai data-toc-label="vastai" }
 
 #SCHEMA# dstack._internal.core.backends.vastai.models.VastAIBackendConfigWithCreds

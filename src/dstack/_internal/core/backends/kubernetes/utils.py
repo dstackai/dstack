@@ -13,10 +13,8 @@ from typing import (
     Union,
     cast,
 )
-from uuid import UUID
 
 import yaml
-from cachetools import TTLCache
 from kubernetes.client import V1Status, VersionApi
 from kubernetes.client.exceptions import ApiException
 from kubernetes.watch import Watch
@@ -33,8 +31,6 @@ from dstack._internal.core.backends.kubernetes.models import (
     KubernetesProxyJumpConfig,
 )
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.instances import InstanceOffer
-from dstack._internal.core.models.runs import Job, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -197,30 +193,6 @@ def kubeconfig_data_to_kubeconfig_dict(kubeconfig_data: str) -> dict:
 
 def kubeconfig_dict_to_kubeconfig(kubeconfig_dict: dict) -> Kubeconfig:
     return Kubeconfig.__response__.parse_obj(kubeconfig_dict)
-
-
-class SkipOfferCache:
-    """
-    `SkipOfferCache` is used to track (run/job, offer) pairs that failed to provision.
-
-    The current implementation tracks _any_ job of the specific run (identified by `Run.id`)
-    on the specific cluster (identified by `InstanceOffer.region`, that is, a kubeconfig context).
-    """
-
-    def __init__(self, *, ttl: int, maxsize: int = 1000) -> None:
-        self._cache = TTLCache[tuple[UUID, str], Literal[True]](maxsize=maxsize, ttl=ttl)
-
-    def add(self, run: Run, job: Job, offer: InstanceOffer) -> None:
-        self._cache[self._build_key(run, job, offer)] = True
-
-    def check(self, run: Run, job: Job, offer: InstanceOffer) -> bool:
-        return self._build_key(run, job, offer) in self._cache
-
-    def _build_key(self, run: Run, job: Job, offer: InstanceOffer) -> tuple[UUID, str]:
-        # The current implementation uses only Run.id ignoring the job/job spec.
-        # A more sophisticated implementation could use some parts of the job spec
-        # (e.g., requirements, volumes) instead.
-        return (run.id, offer.region)
 
 
 def call_api_method(

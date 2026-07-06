@@ -25,6 +25,7 @@ class BackendType(str, enum.Enum):
         VASTAI (BackendType): Vast.ai Marketplace
         VERDA (BackendType): Verda Cloud
         VULTR (BackendType): Vultr
+        SLURM (BackendType): Slurm
     """
 
     AMDDEVCLOUD = "amddevcloud"
@@ -50,3 +51,4 @@ class BackendType(str, enum.Enum):
     VASTAI = "vastai"
     VERDA = "verda"
     VULTR = "vultr"
+    SLURM = "slurm"
