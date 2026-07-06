@@ -7,6 +7,19 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
+
+	"github.com/dstackai/dstack/runner/internal/common/log"
+)
+
+const (
+	// EBS attach is asynchronous: AttachVolume returning success only means AWS
+	// accepted the request. The guest kernel still needs time to enumerate the
+	// NVMe device and populate its serial, so a lookup right after attach can
+	// legitimately miss the device. Poll until it appears instead of failing on
+	// the first miss.
+	deviceResolveTimeout  = 30 * time.Second
+	deviceResolveInterval = 500 * time.Millisecond
 )
 
 type AWSBackend struct{}
@@ -24,52 +37,31 @@ func NewAWSBackend() *AWSBackend {
 // * Red Hat and CentOS: may increment trailing letters in some versions – not supported.
 // * Other legacy systems: /dev/sda => /dev/sda.
 // More: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
-func (e *AWSBackend) GetRealDeviceName(volumeID, deviceName string) (string, error) {
-	// Run the lsblk command to get block device information
-	// On AWS, SERIAL contains volume id.
-	cmd := exec.CommandContext(context.TODO(), "lsblk", "-o", "NAME,SERIAL")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to list block devices: %w", err)
-	}
-
-	baseDevice := ""
-
-	// Parse the output to find the device that matches the volume ID
-	lines := strings.Split(out.String(), "\n")
-	for _, line := range lines {
-		fields := strings.Fields(line)
-		if len(fields) == 2 && strings.HasPrefix(fields[1], "vol") {
-			serial := strings.TrimPrefix(fields[1], "vol")
-			if "vol-"+serial == volumeID {
-				baseDevice = "/dev/" + fields[0]
-			}
+func (e *AWSBackend) GetRealDeviceName(ctx context.Context, volumeID, deviceName string) (string, error) {
+	// Resolve the base device, polling until it is enumerated by the guest
+	// kernel or the timeout elapses. This tolerates the delay between AWS
+	// reporting the volume as attached and the NVMe device becoming visible.
+	deadline := time.Now().Add(deviceResolveTimeout)
+	var baseDevice string
+	for {
+		var err error
+		baseDevice, err = e.resolveBaseDevice(ctx, volumeID, deviceName)
+		if err != nil {
+			return "", err
 		}
-	}
-
-	// If no match is found, fall back to mapping AWS device name
-	if baseDevice == "" && deviceName != "" {
-		// Try mapping deviceName to possible OS device names
-		mappedDevices := []string{
-			deviceName,
-			strings.Replace(deviceName, "/dev/sd", "/dev/xvd", 1), // sdX => xvdX
+		if baseDevice != "" {
+			break
 		}
-		for _, dev := range mappedDevices {
-			if _, err := os.Stat(dev); err == nil {
-				baseDevice = dev
-				break
-			}
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("volume %s not found among block devices after %s", volumeID, deviceResolveTimeout)
 		}
-	}
-
-	if baseDevice == "" {
-		return "", fmt.Errorf("volume %s not found among block devices", volumeID)
+		log.Debug(ctx, "volume not yet visible among block devices, retrying", "volume", volumeID)
+		time.Sleep(deviceResolveInterval)
 	}
 
 	// Run lsblk again to check for partitions on the base device
-	cmd = exec.CommandContext(context.TODO(), "lsblk", "-ln", "-o", "NAME", baseDevice)
-	out.Reset()
+	cmd := exec.CommandContext(ctx, "lsblk", "-ln", "-o", "NAME", baseDevice)
+	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to list partitions for device %s: %w", baseDevice, err)
@@ -80,4 +72,47 @@ func (e *AWSBackend) GetRealDeviceName(volumeID, deviceName string) (string, err
 	}
 
 	return baseDevice, nil
+}
+
+// resolveBaseDevice returns the base block device matching volumeID (via the
+// NVMe serial reported by lsblk), falling back to mapping the AWS deviceName.
+// An empty string with a nil error means the device is not present yet and the
+// caller may retry.
+func (e *AWSBackend) resolveBaseDevice(ctx context.Context, volumeID, deviceName string) (string, error) {
+	// Run the lsblk command to get block device information
+	// On AWS, SERIAL contains volume id.
+	cmd := exec.CommandContext(ctx, "lsblk", "-o", "NAME,SERIAL")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to list block devices: %w", err)
+	}
+
+	// Parse the output to find the device that matches the volume ID
+	lines := strings.Split(out.String(), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && strings.HasPrefix(fields[1], "vol") {
+			serial := strings.TrimPrefix(fields[1], "vol")
+			if "vol-"+serial == volumeID {
+				return "/dev/" + fields[0], nil
+			}
+		}
+	}
+
+	// If no match is found, fall back to mapping AWS device name
+	if deviceName != "" {
+		// Try mapping deviceName to possible OS device names
+		mappedDevices := []string{
+			deviceName,
+			strings.Replace(deviceName, "/dev/sd", "/dev/xvd", 1), // sdX => xvdX
+		}
+		for _, dev := range mappedDevices {
+			if _, err := os.Stat(dev); err == nil {
+				return dev, nil
+			}
+		}
+	}
+
+	return "", nil
 }
