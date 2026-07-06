@@ -234,14 +234,15 @@ class VerdaCompute(
 
 
 def _get_vm_image_id(instance_offer: InstanceOfferWithAvailability) -> str:
-    # https://api.verda.com/v1/images
+    # https://api.datacrunch.io/v1/docs#tag/images/GET/v1/images
     if len(instance_offer.instance.resources.gpus) > 0 and instance_offer.instance.resources.gpus[
         0
     ].name in ["V100", "A6000"]:
+        # * A6000: Verda returns "Operating system is not valid for this instance type" for newer images
         # Ubuntu 22.04 + CUDA 12.0 + Docker
         return "2088da25-bb0d-41cc-a191-dccae45d96fd"
-    # Ubuntu 24.04 + CUDA 12.8 Open + Docker
-    return "77777777-4f48-4249-82b3-f199fb9b701b"
+    # Ubuntu 24.04 + CUDA 13.0 Open + Docker
+    return "2404f580-1300-1111-82b3-f199fb9b701b"
 
 
 def _create_ssh_key(client: VerdaClient, name: str, public_key: str) -> str:

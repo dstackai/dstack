@@ -155,7 +155,7 @@ def get_dev_env_run_plan_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.14-base-ubuntu24.04"
+        image_name = "dstackai/base:0.15-base-ubuntu24.04"
 
     run_spec = {
         "configuration": {
@@ -397,7 +397,7 @@ def get_dev_env_run_dict(
                 " && tail -f /dev/null"
             ),
         ]
-        image_name = "dstackai/base:0.14-base-ubuntu24.04"
+        image_name = "dstackai/base:0.15-base-ubuntu24.04"
 
     return {
         "id": run_id,
