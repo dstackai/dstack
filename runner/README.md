@@ -68,7 +68,7 @@ Build the runner and shim and upload them to S3 using `just` (see [`justfile`](j
 > These variables are required and must be set before running any upload commands.
 
 ```shell
-just upload
+just upload-runner
 ```
 
 To use the built shim and runner with the `dstack` server, pass the URLs via `DSTACK_SHIM_DOWNLOAD_URL` and `DSTACK_RUNNER_DOWNLOAD_URL`:
