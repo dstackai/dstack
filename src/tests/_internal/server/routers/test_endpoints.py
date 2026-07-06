@@ -139,7 +139,7 @@ class TestEndpointPlan:
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         agent_service = Mock()
         agent_service.is_enabled.return_value = True
@@ -177,6 +177,51 @@ class TestEndpointPlan:
             "agent_model": "test-agent",
             "max_budget": 2.0,
             "reason": None,
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_no_agent_plan_for_project_user(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        agent_service = Mock()
+        agent_service.is_enabled.return_value = True
+
+        with (
+            patch(
+                "dstack._internal.server.services.endpoints.find_preset_planning_result",
+                new=AsyncMock(return_value=EndpointPresetPlanningResult()),
+            ),
+            patch(
+                "dstack._internal.server.services.endpoints.get_agent_service",
+                return_value=agent_service,
+            ),
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/endpoints/get_plan",
+                headers=get_auth_headers(user.token),
+                json={
+                    "configuration": {
+                        "type": "endpoint",
+                        "name": "qwen-endpoint",
+                        "model": "Qwen/Qwen3-0.6B",
+                    },
+                },
+            )
+
+        assert response.status_code == 200, response.json()
+        assert response.json()["provisioning_plan"] == {
+            "type": "none",
+            "reason": (
+                "No matching endpoint presets found. "
+                "Creating endpoint presets with the server agent requires project admin "
+                "permissions."
+            ),
         }
 
     @pytest.mark.asyncio
@@ -236,7 +281,7 @@ class TestCreateEndpoint:
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
 
         response = await client.post(
@@ -282,7 +327,7 @@ class TestCreateEndpoint:
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         previous_endpoint = await _create_endpoint_model(
             session=session,
@@ -318,13 +363,77 @@ class TestCreateEndpoint:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_rejects_duplicate_non_terminal_endpoint(
+    async def test_rejects_project_user_when_create_requires_agent(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+
+        with patch(
+            "dstack._internal.server.services.endpoints.find_preset_planning_result",
+            new=AsyncMock(return_value=EndpointPresetPlanningResult()),
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/endpoints/create",
+                headers=get_auth_headers(user.token),
+                json={
+                    "configuration": {
+                        "type": "endpoint",
+                        "name": "qwen-endpoint",
+                        "model": "Qwen/Qwen3-0.6B",
+                    }
+                },
+            )
+
+        assert response.status_code == 403
+        assert response.json()["msg"] == (
+            "Creating endpoint presets with the server agent requires project admin permissions."
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_allows_project_user_when_matching_preset_exists(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+
+        with patch(
+            "dstack._internal.server.services.endpoints.find_preset_planning_result",
+            new=AsyncMock(
+                return_value=EndpointPresetPlanningResult(provisionable=_endpoint_preset_plan())
+            ),
+        ):
+            response = await client.post(
+                f"/api/project/{project.name}/endpoints/create",
+                headers=get_auth_headers(user.token),
+                json={
+                    "configuration": {
+                        "type": "endpoint",
+                        "name": "qwen-endpoint",
+                        "model": "Qwen/Qwen3-0.6B",
+                    }
+                },
+            )
+
+        assert response.status_code == 200, response.json()
+        assert response.json()["status"] == "submitted"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_rejects_duplicate_non_terminal_endpoint(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         await _create_endpoint_model(
             session=session,

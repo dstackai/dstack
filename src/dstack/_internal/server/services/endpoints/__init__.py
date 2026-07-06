@@ -6,7 +6,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import ResourceExistsError, ServerClientError
+from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
 from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.endpoints import (
     Endpoint,
@@ -21,6 +21,7 @@ from dstack._internal.core.models.endpoints import (
     EndpointStatus,
 )
 from dstack._internal.core.models.runs import ServiceSpec
+from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.db import get_db, is_db_postgres, is_db_sqlite
 from dstack._internal.server.models import (
@@ -42,11 +43,18 @@ from dstack._internal.server.services.endpoints.planning import (
 )
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.pipelines import PipelineHinterProtocol
-from dstack._internal.server.services.projects import list_user_project_models
+from dstack._internal.server.services.projects import (
+    get_user_project_role,
+    list_user_project_models,
+)
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+_ENDPOINT_AGENT_ADMIN_REQUIRED_MESSAGE = (
+    "Creating endpoint presets with the server agent requires project admin permissions."
+)
 
 
 def switch_endpoint_status(
@@ -289,11 +297,17 @@ async def get_endpoint_plan(
         configuration.preset_policy != EndpointPresetPolicy.REUSE
         and get_agent_service().is_enabled()
     ):
-        provisioning_plan = _agent_plan_to_provisioning_plan(
-            get_agent_service().get_plan(),
-            max_budget=get_effective_max_agent_budget(configuration),
-            reason=_get_unprovisionable_preset_reason(unprovisionable_preset_plan),
-        )
+        if can_use_endpoint_agent(user=user, project=project):
+            provisioning_plan = _agent_plan_to_provisioning_plan(
+                get_agent_service().get_plan(),
+                max_budget=get_effective_max_agent_budget(configuration),
+                reason=_get_unprovisionable_preset_reason(unprovisionable_preset_plan),
+            )
+        else:
+            provisioning_plan = _get_agent_forbidden_provisioning_plan(
+                configuration.preset_policy,
+                unprovisionable_preset_plan=unprovisionable_preset_plan,
+            )
     return EndpointPlan(
         project_name=project.name,
         user=user.name,
@@ -304,6 +318,16 @@ async def get_endpoint_plan(
         preset_policy=configuration.preset_policy,
         provisioning_plan=provisioning_plan,
     )
+
+
+def can_use_endpoint_agent(user: UserModel, project: ProjectModel) -> bool:
+    if user.global_role == GlobalRole.ADMIN:
+        return True
+    return get_user_project_role(user=user, project=project) == ProjectRole.ADMIN
+
+
+def get_endpoint_agent_admin_required_message() -> str:
+    return _ENDPOINT_AGENT_ADMIN_REQUIRED_MESSAGE
 
 
 def _agent_plan_to_provisioning_plan(
@@ -346,6 +370,24 @@ def _get_no_provisioning_plan(
     return EndpointProvisioningPlanNone(
         reason=(f"Preset policy create requires the server agent, but {agent_unavailable_reason}")
     )
+
+
+def _get_agent_forbidden_provisioning_plan(
+    preset_policy: EndpointPresetPolicy,
+    unprovisionable_preset_plan: Optional[EndpointPresetPlan] = None,
+) -> EndpointProvisioningPlanNone:
+    preset_reason = _get_unprovisionable_preset_reason(unprovisionable_preset_plan)
+    if preset_reason is not None:
+        return EndpointProvisioningPlanNone(
+            reason=f"{preset_reason} {_ENDPOINT_AGENT_ADMIN_REQUIRED_MESSAGE}"
+        )
+    if preset_policy == EndpointPresetPolicy.REUSE_OR_CREATE:
+        return EndpointProvisioningPlanNone(
+            reason=(
+                f"No matching endpoint presets found. {_ENDPOINT_AGENT_ADMIN_REQUIRED_MESSAGE}"
+            )
+        )
+    return EndpointProvisioningPlanNone(reason=_ENDPOINT_AGENT_ADMIN_REQUIRED_MESSAGE)
 
 
 def _get_unprovisionable_preset_reason(
@@ -395,6 +437,12 @@ async def create_endpoint(
     pipeline_hinter: PipelineHinterProtocol,
 ) -> Endpoint:
     _validate_endpoint_configuration(configuration)
+    await _check_can_submit_endpoint_configuration(
+        session=session,
+        project=project,
+        user=user,
+        configuration=configuration,
+    )
 
     lock_namespace = f"endpoint_names_{project.name}"
     if is_db_sqlite():
@@ -459,6 +507,29 @@ async def create_endpoint(
         await session.commit()
         pipeline_hinter.hint_fetch(EndpointModel.__name__)
         return endpoint_model_to_endpoint(endpoint_model)
+
+
+async def _check_can_submit_endpoint_configuration(
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    configuration: EndpointConfiguration,
+) -> None:
+    if configuration.preset_policy == EndpointPresetPolicy.REUSE:
+        return
+    if can_use_endpoint_agent(user=user, project=project):
+        return
+    if configuration.preset_policy == EndpointPresetPolicy.REUSE_OR_CREATE:
+        preset_planning_result = await find_preset_planning_result(
+            session=session,
+            project=project,
+            user=user,
+            endpoint_name=configuration.name,
+            endpoint_configuration=configuration,
+        )
+        if preset_planning_result.provisionable is not None:
+            return
+    raise ForbiddenError(_ENDPOINT_AGENT_ADMIN_REQUIRED_MESSAGE)
 
 
 async def stop_endpoints(

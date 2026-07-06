@@ -55,6 +55,12 @@ logger = get_logger(__name__)
 CASCADE_DEFAULT_WITH_DELETE_ORPHAN = "save-update, merge, delete-orphan, delete"
 
 
+class EndpointAgentAttemptStatus(enum.Enum):
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
 class NaiveDateTime(TypeDecorator):
     """
     A custom type decorator that ensures datetime objects are offset-naive when stored in the database
@@ -1058,6 +1064,41 @@ class EndpointRunSubmissionModel(BaseModel):
     __table_args__ = (
         UniqueConstraint("run_id", name="uq_endpoint_run_submissions_run_id"),
         Index("ix_endpoint_run_submissions_endpoint_id", endpoint_id),
+    )
+
+
+class EndpointAgentAttemptModel(BaseModel):
+    __tablename__ = "endpoint_agent_attempts"
+
+    endpoint_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("endpoints.id", ondelete="CASCADE"), primary_key=True
+    )
+    endpoint: Mapped["EndpointModel"] = relationship()
+
+    attempt_num: Mapped[int] = mapped_column(Integer, primary_key=True)
+    status: Mapped[EndpointAgentAttemptStatus] = mapped_column(
+        EnumAsString(EndpointAgentAttemptStatus, 100), index=True
+    )
+    workspace_path: Mapped[str] = mapped_column(Text)
+
+    pid: Mapped[Optional[int]] = mapped_column(Integer)
+    process_host: Mapped[Optional[str]] = mapped_column(String(255))
+
+    progress_log_offset: Mapped[int] = mapped_column(BigInteger, default=0)
+    stdout_log_offset: Mapped[int] = mapped_column(BigInteger, default=0)
+    stderr_log_offset: Mapped[int] = mapped_column(BigInteger, default=0)
+
+    max_agent_budget: Mapped[Optional[float]] = mapped_column(Float)
+    spent_agent_budget: Mapped[Optional[float]] = mapped_column(Float)
+    status_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
+    __table_args__ = (
+        Index("ix_endpoint_agent_attempts_endpoint_id", endpoint_id),
+        Index("ix_endpoint_agent_attempts_endpoint_status", endpoint_id, status),
     )
 
 

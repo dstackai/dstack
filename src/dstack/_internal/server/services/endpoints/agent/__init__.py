@@ -19,6 +19,7 @@ class AgentPlan:
 class AgentProvisioningResult:
     run_id: Optional[uuid.UUID] = None
     run_name: Optional[str] = None
+    candidate_run_ids: tuple[uuid.UUID, ...] = ()
     error: Optional[str] = None
     final_report: Optional[AgentFinalReport] = None
     in_progress: bool = False

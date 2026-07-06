@@ -32,10 +32,18 @@ from dstack._internal.server.background.pipeline_tasks.base import (
     set_unlock_update_map_fields,
 )
 from dstack._internal.server.db import get_db, get_session_ctx
-from dstack._internal.server.models import EndpointModel, ProjectModel, RunModel, UserModel
+from dstack._internal.server.models import (
+    EndpointModel,
+    EndpointRunSubmissionModel,
+    ProjectModel,
+    RunModel,
+    UserModel,
+)
 from dstack._internal.server.services import runs as runs_services
 from dstack._internal.server.services.endpoints import (
+    can_use_endpoint_agent,
     emit_endpoint_status_change_event,
+    get_endpoint_agent_admin_required_message,
     get_endpoint_configuration,
     record_endpoint_run_submission,
 )
@@ -256,8 +264,8 @@ class EndpointWorker(Worker[EndpointPipelineItem]):
         else:
             result = _ProcessResult()
 
-        run_to_stop = await _get_backing_run_to_stop_after_failure(endpoint_model, result)
-        if run_to_stop is not None:
+        runs_to_stop = await _get_endpoint_runs_to_stop_after_failure(endpoint_model, result)
+        for run_to_stop in runs_to_stop:
             logger.info(
                 "Stopping backing run %s after endpoint %s failed",
                 run_to_stop.run_name,
@@ -281,7 +289,14 @@ async def _refetch_locked_endpoint(item: EndpointPipelineItem) -> Optional[Endpo
                 EndpointModel.lock_token == item.lock_token,
             )
             .options(joinedload(EndpointModel.project).joinedload(ProjectModel.backends))
-            .options(joinedload(EndpointModel.user).load_only(UserModel.name, UserModel.token))
+            .options(joinedload(EndpointModel.project).joinedload(ProjectModel.members))
+            .options(
+                joinedload(EndpointModel.user).load_only(
+                    UserModel.name,
+                    UserModel.global_role,
+                    UserModel.token,
+                )
+            )
             .options(joinedload(EndpointModel.service_run).selectinload(RunModel.jobs))
         )
         return res.unique().scalar_one_or_none()
@@ -304,13 +319,19 @@ async def _apply_process_result(
             .where(
                 EndpointModel.id == endpoint_model.id,
                 EndpointModel.lock_token == endpoint_model.lock_token,
+                EndpointModel.status == item.status,
             )
             .values(**update_map)
             .returning(EndpointModel.id)
         )
         updated_ids = list(res.scalars().all())
         if len(updated_ids) == 0:
-            log_lock_token_changed_after_processing(logger, item)
+            if await _link_reported_service_run_to_stopping_endpoint(session, item, result):
+                return
+            logger.info(
+                "Endpoint %s changed while being processed; ignoring stale result",
+                endpoint_model.name,
+            )
             return
         emit_endpoint_status_change_event(
             session=session,
@@ -319,6 +340,43 @@ async def _apply_process_result(
             new_status=update_map.get("status", endpoint_model.status),
             status_message=update_map.get("status_message", endpoint_model.status_message),
         )
+
+
+async def _link_reported_service_run_to_stopping_endpoint(
+    session,
+    item: EndpointPipelineItem,
+    result: "_ProcessResult",
+) -> bool:
+    service_run_id = result.update_map.get("service_run_id")
+    if service_run_id is None:
+        return False
+
+    update_map = _EndpointUpdateMap(service_run_id=service_run_id)
+    set_processed_update_map_fields(update_map)
+    set_unlock_update_map_fields(update_map)
+
+    resolve_now_placeholders(update_map, now=get_current_datetime())
+    res = await session.execute(
+        update(EndpointModel)
+        .where(
+            EndpointModel.id == item.id,
+            EndpointModel.lock_token == item.lock_token,
+            EndpointModel.status == EndpointStatus.STOPPING,
+            EndpointModel.service_run_id.is_(None),
+        )
+        .values(**update_map)
+        .returning(EndpointModel.id)
+    )
+    updated_ids = list(res.scalars().all())
+    if len(updated_ids) == 0:
+        log_lock_token_changed_after_processing(logger, item)
+        return False
+    logger.info(
+        "Linked reported service run %s to stopping endpoint %s",
+        service_run_id,
+        item.id,
+    )
+    return True
 
 
 class _EndpointUpdateMap(ItemUpdateMap, total=False):
@@ -345,18 +403,39 @@ class _PresetSubmissionResult:
     unprovisionable_preset_name: Optional[str] = None
 
 
-async def _get_backing_run_to_stop_after_failure(
+async def _get_endpoint_runs_to_stop_after_failure(
     endpoint_model: EndpointModel,
     result: _ProcessResult,
-) -> Optional[RunModel]:
+) -> list[RunModel]:
     if result.update_map.get("status") != EndpointStatus.FAILED:
-        return None
-    run_model = endpoint_model.service_run
-    if run_model is None or run_model.deleted:
-        return None
-    if run_model.status.is_finished() or run_model.status == RunStatus.TERMINATING:
-        return None
-    return run_model
+        return []
+    return [
+        run
+        for run in await _get_endpoint_unfinished_runs(endpoint_model)
+        if run.status != RunStatus.TERMINATING
+    ]
+
+
+async def _get_endpoint_unfinished_runs(endpoint_model: EndpointModel) -> list[RunModel]:
+    runs: list[RunModel] = []
+    seen_run_ids: set[uuid.UUID] = set()
+    if endpoint_model.service_run is not None:
+        runs.append(endpoint_model.service_run)
+        seen_run_ids.add(endpoint_model.service_run.id)
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            select(RunModel)
+            .join(
+                EndpointRunSubmissionModel,
+                EndpointRunSubmissionModel.run_id == RunModel.id,
+            )
+            .where(
+                EndpointRunSubmissionModel.endpoint_id == endpoint_model.id,
+                RunModel.deleted == False,
+            )
+        )
+        runs.extend(run for run in res.unique().scalars().all() if run.id not in seen_run_ids)
+    return [run for run in runs if not run.deleted and not run.status.is_finished()]
 
 
 async def _process_submitted_endpoint(
@@ -415,6 +494,7 @@ def _should_provision_with_agent(endpoint_model: EndpointModel) -> bool:
     return (
         endpoint_configuration.preset_policy != EndpointPresetPolicy.REUSE
         and get_agent_service().is_enabled()
+        and can_use_endpoint_agent(user=endpoint_model.user, project=endpoint_model.project)
     )
 
 
@@ -537,6 +617,10 @@ async def _provision_endpoint_with_agent(
     result = await agent_service.provision_endpoint(
         endpoint_model=endpoint_model,
         pipeline_hinter=pipeline_hinter,
+    )
+    await _record_agent_candidate_run_submissions(
+        endpoint_model=endpoint_model,
+        candidate_run_ids=result.candidate_run_ids,
     )
     if result.in_progress:
         return _ProcessResult(
@@ -705,6 +789,48 @@ async def _record_endpoint_run_submission(endpoint_id: uuid.UUID, run_id: uuid.U
         await session.commit()
 
 
+async def _record_agent_candidate_run_submissions(
+    *,
+    endpoint_model: EndpointModel,
+    candidate_run_ids: Sequence[uuid.UUID],
+) -> None:
+    if len(candidate_run_ids) == 0:
+        return
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            select(RunModel).where(
+                RunModel.id.in_(candidate_run_ids),
+                RunModel.project_id == endpoint_model.project_id,
+                RunModel.user_id == endpoint_model.user_id,
+                RunModel.deleted == False,
+            )
+        )
+        runs_by_id = {run.id: run for run in res.scalars().all()}
+        for run_id in candidate_run_ids:
+            if run_id not in runs_by_id:
+                logger.info(
+                    "Ignoring endpoint %s candidate run %s because it is not a live run "
+                    "owned by the endpoint user/project",
+                    endpoint_model.name,
+                    run_id,
+                )
+                continue
+            try:
+                await record_endpoint_run_submission(
+                    session=session,
+                    endpoint_id=endpoint_model.id,
+                    run_id=run_id,
+                )
+            except ServerClientError as e:
+                logger.info(
+                    "Ignoring endpoint %s candidate run %s: %s",
+                    endpoint_model.name,
+                    run_id,
+                    e.msg,
+                )
+        await session.commit()
+
+
 async def _process_running_endpoint(endpoint_model: EndpointModel) -> _ProcessResult:
     readiness = _get_backing_service_readiness(endpoint_model)
     if readiness.failed_message is not None:
@@ -723,12 +849,14 @@ async def _process_stopping_endpoint(
     endpoint_model: EndpointModel,
     pipeline_hinter: PipelineHinterProtocol,
 ) -> _ProcessResult:
-    run_model = endpoint_model.service_run
     # TODO: When the Claude agent service exposes cancellation, interrupt a live
     # agent process here instead of waiting for it to notice/finish.
-    if run_model is None or run_model.deleted or run_model.status.is_finished():
+    run_models = await _get_endpoint_unfinished_runs(endpoint_model)
+    if not run_models:
         return _get_stopped_result()
-    if run_model.status != RunStatus.TERMINATING:
+    for run_model in run_models:
+        if run_model.status == RunStatus.TERMINATING:
+            continue
         logger.info(
             "Stopping backing run %s before stopping endpoint %s",
             run_model.run_name,
@@ -930,6 +1058,11 @@ def _get_no_provisioning_path_message(
         )
         if endpoint_configuration.preset_policy == EndpointPresetPolicy.REUSE:
             return reason
+        if get_agent_service().is_enabled() and not can_use_endpoint_agent(
+            user=endpoint_model.user,
+            project=endpoint_model.project,
+        ):
+            return f"{reason} {get_endpoint_agent_admin_required_message()}"
         agent_unavailable_reason = get_agent_unavailable_reason()
         if endpoint_configuration.preset_policy == EndpointPresetPolicy.REUSE_OR_CREATE:
             return (
@@ -938,6 +1071,16 @@ def _get_no_provisioning_path_message(
             )
     if endpoint_configuration.preset_policy == EndpointPresetPolicy.REUSE:
         return _NO_MATCHING_PRESET_MESSAGE
+    if get_agent_service().is_enabled() and not can_use_endpoint_agent(
+        user=endpoint_model.user,
+        project=endpoint_model.project,
+    ):
+        if endpoint_configuration.preset_policy == EndpointPresetPolicy.REUSE_OR_CREATE:
+            return (
+                "No matching endpoint presets found. "
+                f"{get_endpoint_agent_admin_required_message()}"
+            )
+        return get_endpoint_agent_admin_required_message()
     agent_unavailable_reason = get_agent_unavailable_reason()
     if endpoint_configuration.preset_policy == EndpointPresetPolicy.REUSE_OR_CREATE:
         return (

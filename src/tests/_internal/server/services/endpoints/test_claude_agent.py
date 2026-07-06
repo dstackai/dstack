@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import pytest
 import yaml
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.endpoints.agent.claude as claude_module
@@ -13,7 +14,11 @@ from dstack._internal.core.models.endpoints import EndpointConfiguration, Endpoi
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.server import settings
-from dstack._internal.server.models import EndpointModel
+from dstack._internal.server.models import (
+    EndpointAgentAttemptModel,
+    EndpointAgentAttemptStatus,
+    EndpointModel,
+)
 from dstack._internal.server.services.endpoints.agent.claude import (
     ClaudeAgentService,
     _AgentRunnerResult,
@@ -74,6 +79,46 @@ def _configure_fake_claude(tmp_path, monkeypatch: pytest.MonkeyPatch) -> str:
 
 class TestClaudeAgentService:
     @pytest.mark.asyncio
+    async def test_default_runner_starts_agent_detached(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        _configure_fake_claude(tmp_path, monkeypatch)
+        monkeypatch.setattr(settings, "SERVER_URL", "http://127.0.0.1:8000")
+        started = {}
+
+        def start_agent(workspace, request):
+            started["workspace"] = workspace
+            started["request"] = request
+            return 12345
+
+        monkeypatch.setattr(claude_module, "_start_agent_subprocess_detached", start_agent)
+        endpoint_model = await _create_endpoint_model(session, max_agent_budget=1.5)
+        service = ClaudeAgentService(workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.in_progress is True
+        assert result.error is None
+        attempt_root = tmp_path / str(endpoint_model.id) / "1"
+        assert started["workspace"].root_dir == attempt_root
+        assert started["request"]["cwd"] == str(attempt_root / "workspace")
+        assert started["request"]["options"]["max_budget"] == 1.5
+        res = await session.execute(
+            select(EndpointAgentAttemptModel).where(
+                EndpointAgentAttemptModel.endpoint_id == endpoint_model.id
+            )
+        )
+        attempt = res.scalar_one()
+        assert attempt.attempt_num == 1
+        assert attempt.status == EndpointAgentAttemptStatus.RUNNING
+        assert attempt.pid == 12345
+        assert attempt.workspace_path == str(attempt_root)
+
+    @pytest.mark.asyncio
     async def test_invokes_agent_with_isolated_dstack_cli_context(
         self,
         session: AsyncSession,
@@ -116,10 +161,11 @@ class TestClaudeAgentService:
             "successful final report must include the verified service run `run_id`"
             in captured["request"]["prompt"]
         )
-        assert captured["request"]["cwd"] == str(tmp_path / str(endpoint_model.id) / "workspace")
+        attempt_root = tmp_path / str(endpoint_model.id) / "1"
+        assert captured["request"]["cwd"] == str(attempt_root / "workspace")
         env = captured["request"]["env"]
         assert env["ANTHROPIC_API_KEY"] == "agent-secret"
-        assert env["HOME"] == str(tmp_path / str(endpoint_model.id) / "home")
+        assert env["HOME"] == str(attempt_root / "home")
         assert env["DSTACK_PROJECT"] == "main"
         assert env["HF_TOKEN"] == "hf-secret"
         assert "DATABASE_URL" not in env
@@ -138,9 +184,7 @@ class TestClaudeAgentService:
         assert command[command.index("--permission-mode") + 1] == "bypassPermissions"
         assert "--max-budget-usd" in command
         assert command[command.index("--max-budget-usd") + 1] == "1.5"
-        config = yaml.safe_load(
-            (tmp_path / str(endpoint_model.id) / "home" / ".dstack" / "config.yml").read_text()
-        )
+        config = yaml.safe_load((attempt_root / "home" / ".dstack" / "config.yml").read_text())
         assert config == {
             "projects": [
                 {
@@ -151,7 +195,7 @@ class TestClaudeAgentService:
                 }
             ],
         }
-        work_dir = tmp_path / str(endpoint_model.id) / "workspace"
+        work_dir = attempt_root / "workspace"
         state = json.loads((work_dir / "agent_state.json").read_text())
         assert state["endpoint_name"] == "qwen-endpoint"
         assert state["model"] == "Qwen/Qwen3-0.6B"
@@ -271,7 +315,7 @@ class TestClaudeAgentService:
             in prompt
         )
         assert "RUNPOD" not in prompt
-        work_dir = tmp_path / str(endpoint_model.id) / "workspace"
+        work_dir = tmp_path / str(endpoint_model.id) / "1" / "workspace"
         prototyping_skill = (
             work_dir / ".claude" / "skills" / "dstack-prototyping" / "SKILL.md"
         ).read_text()
@@ -354,10 +398,11 @@ class TestClaudeAgentService:
             encoding="utf-8",
         )
 
-        async def runner(workspace, request):
-            raise AssertionError("runner must not be invoked")
+        def start_agent(workspace, request):
+            raise AssertionError("agent process must not be started")
 
-        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
+        monkeypatch.setattr(claude_module, "_start_agent_subprocess_detached", start_agent)
+        service = ClaudeAgentService(workspace_base_dir=tmp_path)
 
         result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
 
@@ -368,6 +413,94 @@ class TestClaudeAgentService:
         assert result.final_report.verification_summary == "Verified before restart."
 
     @pytest.mark.asyncio
+    async def test_waits_for_claude_result_after_final_report_while_process_runs(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        _configure_fake_claude(tmp_path, monkeypatch)
+        monkeypatch.setattr(
+            claude_module,
+            "_get_running_agent_process_pid",
+            lambda workspace, attempt=None: 123,
+        )
+        endpoint_model = await _create_endpoint_model(session)
+        work_dir = tmp_path / str(endpoint_model.id) / "workspace"
+        work_dir.mkdir(parents=True)
+        (work_dir / "final_report.json").write_text(
+            json.dumps(
+                {
+                    "success": True,
+                    "run_id": str(uuid.uuid4()),
+                    "run_name": "qwen-agent-candidate",
+                    "service_yaml": "type: service\nname: qwen-agent-candidate\n",
+                    "verification_summary": "Verified before Claude exited.",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        service = ClaudeAgentService(workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.in_progress is True
+        assert result.final_report is None
+
+    @pytest.mark.asyncio
+    async def test_reconciles_claude_cost_from_result_stream(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        _configure_fake_claude(tmp_path, monkeypatch)
+        endpoint_model = await _create_endpoint_model(session)
+        work_dir = tmp_path / str(endpoint_model.id) / "workspace"
+        work_dir.mkdir(parents=True)
+        run_id = uuid.uuid4()
+        (work_dir / "final_report.json").write_text(
+            json.dumps(
+                {
+                    "success": True,
+                    "run_id": str(run_id),
+                    "run_name": "qwen-agent-candidate",
+                    "service_yaml": "type: service\nname: qwen-agent-candidate\n",
+                    "verification_summary": "Verified before restart.",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (work_dir / "agent_stdout.jsonl").write_text(
+            json.dumps(
+                {
+                    "type": "result",
+                    "is_error": False,
+                    "total_cost_usd": 0.42,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        service = ClaudeAgentService(workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.error is None
+        assert result.run_id == run_id
+        res = await session.execute(
+            select(EndpointAgentAttemptModel).where(
+                EndpointAgentAttemptModel.endpoint_id == endpoint_model.id
+            )
+        )
+        attempt = res.scalar_one()
+        assert attempt.status == EndpointAgentAttemptStatus.SUCCEEDED
+        assert attempt.spent_agent_budget == 0.42
+
+    @pytest.mark.asyncio
     async def test_returns_in_progress_when_agent_process_is_still_running(
         self,
         session: AsyncSession,
@@ -376,13 +509,18 @@ class TestClaudeAgentService:
     ):
         monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
         _configure_fake_claude(tmp_path, monkeypatch)
-        monkeypatch.setattr(claude_module, "_get_running_agent_process_pid", lambda workspace: 123)
+        monkeypatch.setattr(
+            claude_module,
+            "_get_running_agent_process_pid",
+            lambda workspace, attempt=None: 123,
+        )
         endpoint_model = await _create_endpoint_model(session)
 
-        async def runner(workspace, request):
-            raise AssertionError("runner must not be invoked")
+        def start_agent(workspace, request):
+            raise AssertionError("agent process must not be started")
 
-        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
+        monkeypatch.setattr(claude_module, "_start_agent_subprocess_detached", start_agent)
+        service = ClaudeAgentService(workspace_base_dir=tmp_path)
 
         result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
 
@@ -423,7 +561,7 @@ class TestClaudeAgentService:
         result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
 
         assert result.error is None
-        trace_path = tmp_path / str(endpoint_model.id) / "trace.jsonl"
+        trace_path = tmp_path / str(endpoint_model.id) / "1" / "trace.jsonl"
         trace = trace_path.read_text()
         assert "agent-secret" not in trace
         assert "hf-secret" not in trace
@@ -455,7 +593,7 @@ class TestClaudeAgentService:
             result.error == "Server agent failed before returning a verification report: bad key"
         )
         assert result.final_report is None
-        work_dir = tmp_path / str(endpoint_model.id) / "workspace"
+        work_dir = tmp_path / str(endpoint_model.id) / "1" / "workspace"
         state = json.loads((work_dir / "agent_state.json").read_text())
         assert state["phase"] == "failure"
         agent_error = json.loads((work_dir / "agent_error.json").read_text())
