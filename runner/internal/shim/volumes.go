@@ -58,7 +58,7 @@ func formatAndMountVolume(ctx context.Context, volume VolumeInfo) error {
 	if err != nil {
 		return fmt.Errorf("get backend: %w", err)
 	}
-	deviceName, err := backend.GetRealDeviceName(volume.VolumeId, volume.DeviceName)
+	deviceName, err := backend.GetRealDeviceName(ctx, volume.VolumeId, volume.DeviceName)
 	if err != nil {
 		return fmt.Errorf("get real device name: %w", err)
 	}
