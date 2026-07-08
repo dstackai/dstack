@@ -613,6 +613,8 @@ class GatewayModel(PipelineModelMixin, BaseModel):
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     status: Mapped[GatewayStatus] = mapped_column(EnumAsString(GatewayStatus, 100))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
+    desired_replica_count: Mapped[Optional[int]] = mapped_column(Integer)
+    """Only `None` for pre-0.20.27 gateways that were never scaled"""
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     to_be_deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
     forbid_new_services: Mapped[bool] = mapped_column(Boolean, server_default=false())
@@ -642,7 +644,8 @@ class GatewayModel(PipelineModelMixin, BaseModel):
         foreign_keys="GatewayComputeModel.gateway_id",
     )
     """
-    Relationship with gateway computes for 0.20.25+ gateways.
+    Relationship with gateway computes.
+    Pre-0.20.25 gateways can have an extra compute model referenced by `GatewayModel.gateway_compute`.
     Use `get_gateway_compute_models()` for version-agnostic gateway compute retrieval.
     """
 
@@ -667,6 +670,8 @@ class GatewayComputeModel(PipelineModelMixin, BaseModel):
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     status: Mapped[GatewayReplicaStatus] = mapped_column(EnumAsString(GatewayReplicaStatus, 100))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
+    scale_in: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    """Indicates that replica termination is requested due to the gateway scaling in"""
     replica_num: Mapped[int] = mapped_column(Integer, server_default="0")
     instance_id: Mapped[Optional[str]] = mapped_column(String(100))
     ip_address: Mapped[Optional[str]] = mapped_column(String(100))

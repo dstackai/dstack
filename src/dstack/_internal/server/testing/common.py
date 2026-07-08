@@ -45,6 +45,7 @@ from dstack._internal.core.models.fleets import (
     SSHParams,
 )
 from dstack._internal.core.models.gateways import (
+    GATEWAY_REPLICAS_DEFAULT,
     GatewayComputeConfiguration,
     GatewayConfiguration,
     GatewayReplicaStatus,
@@ -644,6 +645,7 @@ async def create_gateway(
     region: str = "us",
     wildcard_domain: Optional[str] = None,
     status: Optional[GatewayStatus] = GatewayStatus.SUBMITTED,
+    replicas: Optional[int] = None,
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     forbid_new_services: bool = False,
     populate_configuration: bool = True,
@@ -663,6 +665,7 @@ async def create_gateway(
             backend=backend.type,
             region=region,
             domain=wildcard_domain,
+            replicas=replicas,
         ).json()
     gateway = GatewayModel(
         project_id=project_id,
@@ -672,6 +675,7 @@ async def create_gateway(
         wildcard_domain=wildcard_domain,
         configuration=configuration,
         status=status,
+        desired_replica_count=replicas if replicas is not None else GATEWAY_REPLICAS_DEFAULT,
         last_processed_at=last_processed_at,
         forbid_new_services=forbid_new_services,
     )

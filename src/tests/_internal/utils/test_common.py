@@ -1,3 +1,4 @@
+import itertools
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
@@ -8,6 +9,7 @@ from dstack._internal.utils.common import (
     batched,
     concat_url_path,
     format_duration_multiunit,
+    get_lowest_unused_nums,
     has_duplicates,
     local_time,
     make_proxy_url,
@@ -312,6 +314,28 @@ class TestPrettyResources:
             )
             == "cpu=2 mem=8GB disk=100GB gpu=nvidia:0.."
         )
+
+
+class TestGetLowestUnusedNums:
+    @pytest.mark.parametrize(
+        ("used_nums", "count", "expected"),
+        [
+            (set(), 1, [0]),
+            (set(), 3, [0, 1, 2]),
+            ({0, 1, 2}, 3, [3, 4, 5]),
+            ({0, 2, 4}, 3, [1, 3, 5]),
+            ({1, 2, 3}, 2, [0, 4]),
+        ],
+    )
+    def test_get_lowest_unused_nums(
+        self, used_nums: set[int], count: int, expected: list[int]
+    ) -> None:
+        assert list(itertools.islice(get_lowest_unused_nums(used_nums), count)) == expected
+
+    def test_does_not_mutate_used_nums(self) -> None:
+        used_nums = {0, 1}
+        next(get_lowest_unused_nums(used_nums))
+        assert used_nums == {0, 1}
 
 
 class TestSizeofFmt:

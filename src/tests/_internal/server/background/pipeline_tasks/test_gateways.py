@@ -1,17 +1,14 @@
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from dstack._internal.core.errors import BackendNotAvailable
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
-    GatewayConfiguration,
     GatewayReplicaStatus,
     GatewayStatus,
 )
@@ -21,7 +18,8 @@ from dstack._internal.server.background.pipeline_tasks.gateways import (
     GatewayPipelineItem,
     GatewayWorker,
 )
-from dstack._internal.server.models import GatewayModel
+from dstack._internal.server.models import GatewayComputeModel, GatewayModel
+from dstack._internal.server.services.gateways import get_gateway_compute_models
 from dstack._internal.server.testing.common import (
     create_backend,
     create_gateway,
@@ -63,6 +61,19 @@ def _gateway_to_pipeline_item(gateway_model: GatewayModel) -> GatewayPipelineIte
     )
 
 
+async def _fetch_all_gateway_computes(
+    session: AsyncSession, gateway_id: uuid.UUID
+) -> list[GatewayComputeModel]:
+    res = await session.execute(
+        select(GatewayModel)
+        .where(GatewayModel.id == gateway_id)
+        .options(selectinload(GatewayModel.gateway_computes))
+        .options(selectinload(GatewayModel.gateway_compute))
+    )
+    gateway = res.unique().scalar_one()
+    return get_gateway_compute_models(gateway)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestGatewayFetcher:
@@ -100,6 +111,15 @@ class TestGatewayFetcher:
         )
         to_be_deleted.to_be_deleted = True
 
+        running_with_missing_replica = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            name="running-with-missing-replica",
+            status=GatewayStatus.RUNNING,
+            last_processed_at=stale - timedelta(seconds=4),
+        )
+
         just_created = await create_gateway(
             session=session,
             project_id=project.id,
@@ -111,12 +131,12 @@ class TestGatewayFetcher:
         just_created.created_at = now
         just_created.last_processed_at = now
 
-        ineligible_status = await create_gateway(
+        failed = await create_gateway(
             session=session,
             project_id=project.id,
             backend_id=backend.id,
-            name="ineligible-status",
-            status=GatewayStatus.RUNNING,
+            name="failed",
+            status=GatewayStatus.FAILED,
             last_processed_at=stale,
         )
         recent = await create_gateway(
@@ -149,12 +169,14 @@ class TestGatewayFetcher:
             submitted.id,
             provisioning.id,
             to_be_deleted.id,
+            running_with_missing_replica.id,
             just_created.id,
         }
         assert {(item.id, item.status, item.to_be_deleted) for item in items} == {
             (submitted.id, GatewayStatus.SUBMITTED, False),
             (provisioning.id, GatewayStatus.PROVISIONING, False),
             (to_be_deleted.id, GatewayStatus.RUNNING, True),
+            (running_with_missing_replica.id, GatewayStatus.RUNNING, False),
             (just_created.id, GatewayStatus.SUBMITTED, False),
         }
 
@@ -162,20 +184,27 @@ class TestGatewayFetcher:
             submitted,
             provisioning,
             to_be_deleted,
+            running_with_missing_replica,
             just_created,
-            ineligible_status,
+            failed,
             recent,
             locked,
         ]:
             await session.refresh(gateway)
 
-        fetched_gateways = [submitted, provisioning, to_be_deleted, just_created]
+        fetched_gateways = [
+            submitted,
+            provisioning,
+            to_be_deleted,
+            running_with_missing_replica,
+            just_created,
+        ]
         assert all(gateway.lock_owner == GatewayPipeline.__name__ for gateway in fetched_gateways)
         assert all(gateway.lock_expires_at is not None for gateway in fetched_gateways)
         assert all(gateway.lock_token is not None for gateway in fetched_gateways)
         assert len({gateway.lock_token for gateway in fetched_gateways}) == 1
 
-        assert ineligible_status.lock_owner is None
+        assert failed.lock_owner is None
         assert recent.lock_owner is None
         assert locked.lock_owner == "OtherPipeline"
 
@@ -223,12 +252,84 @@ class TestGatewayFetcher:
         assert middle.lock_owner == GatewayPipeline.__name__
         assert newest.lock_owner is None
 
+    @pytest.mark.parametrize("legacy_compute", [False, True])
+    async def test_fetch_excludes_running_gateway_when_replica_count_matches(
+        self, test_db, session: AsyncSession, fetcher: GatewayFetcher, legacy_compute: bool
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        stale = get_current_datetime() - timedelta(minutes=1)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+            last_processed_at=stale,
+        )
+        if legacy_compute:
+            compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                status=GatewayReplicaStatus.RUNNING,
+            )
+            gateway.gateway_compute_id = compute.id
+        else:
+            await create_gateway_compute(
+                session=session,
+                gateway_id=gateway.id,
+                status=GatewayReplicaStatus.RUNNING,
+            )
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+
+        assert items == []
+
+    @pytest.mark.parametrize("legacy_compute", [False, True])
+    async def test_fetch_includes_running_gateway_when_replica_count_not_matches(
+        self, test_db, session: AsyncSession, fetcher: GatewayFetcher, legacy_compute: bool
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        stale = get_current_datetime() - timedelta(minutes=1)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=2,
+            last_processed_at=stale,
+        )
+        if legacy_compute:
+            compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                status=GatewayReplicaStatus.RUNNING,
+            )
+            gateway.gateway_compute_id = compute.id
+        else:
+            await create_gateway_compute(
+                session=session,
+                gateway_id=gateway.id,
+                status=GatewayReplicaStatus.RUNNING,
+            )
+        await session.commit()
+
+        items = await fetcher.fetch(limit=10)
+        assert {item.id for item in items} == {gateway.id}
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
 class TestGatewayWorkerSubmitted:
+    @pytest.mark.parametrize("populate_configuration", [True, False])
     async def test_submitted_to_provisioning(
-        self, test_db, session: AsyncSession, worker: GatewayWorker
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayWorker,
+        populate_configuration: bool,
     ):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -237,70 +338,26 @@ class TestGatewayWorkerSubmitted:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.SUBMITTED,
-        )
-        config = GatewayConfiguration(
-            name=gateway.name,
-            backend=BackendType.AWS,
-            region=gateway.region,
             replicas=2,
+            populate_configuration=populate_configuration,
         )
-        gateway.configuration = config.json()
         gateway.lock_token = uuid.uuid4()
         gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
         await session.commit()
 
-        with patch(
-            "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
-        ) as m:
-            m.return_value = (backend, Mock())
-            await worker.process(_gateway_to_pipeline_item(gateway))
+        await worker.process(_gateway_to_pipeline_item(gateway))
 
         await session.refresh(gateway)
-        res = await session.execute(
-            select(GatewayModel)
-            .where(GatewayModel.id == gateway.id)
-            .options(selectinload(GatewayModel.gateway_computes))
-        )
-        gateway = res.unique().scalar_one()
         assert gateway.status == GatewayStatus.PROVISIONING
-        computes = sorted(gateway.gateway_computes, key=lambda c: c.replica_num)
+        computes = sorted(
+            await _fetch_all_gateway_computes(session, gateway.id), key=lambda c: c.replica_num
+        )
         assert len(computes) == 2
         assert computes[0].status == GatewayReplicaStatus.SUBMITTED
         assert computes[0].replica_num == 0
         assert computes[1].status == GatewayReplicaStatus.SUBMITTED
         assert computes[1].replica_num == 1
         assert all(c.ip_address is None for c in computes)
-
-    async def test_marks_gateway_as_failed_if_backend_not_available(
-        self, test_db, session: AsyncSession, worker: GatewayWorker
-    ):
-        project = await create_project(session=session)
-        backend = await create_backend(session=session, project_id=project.id)
-        gateway = await create_gateway(
-            session=session,
-            project_id=project.id,
-            backend_id=backend.id,
-            status=GatewayStatus.SUBMITTED,
-        )
-        gateway.lock_token = uuid.uuid4()
-        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
-        await session.commit()
-
-        with patch(
-            "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
-        ) as m:
-            m.side_effect = BackendNotAvailable()
-            await worker.process(_gateway_to_pipeline_item(gateway))
-
-        await session.refresh(gateway)
-        assert gateway.status == GatewayStatus.FAILED
-        assert gateway.status_message == "Backend not available"
-        events = await list_events(session)
-        assert len(events) == 1
-        assert (
-            events[0].message
-            == "Gateway status changed SUBMITTED -> FAILED (Backend not available)"
-        )
 
 
 @pytest.mark.asyncio
@@ -362,6 +419,7 @@ class TestGatewayWorkerProvisioning:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.PROVISIONING,
+            replicas=2,
         )
         await create_gateway_compute(
             session,
@@ -399,6 +457,7 @@ class TestGatewayWorkerProvisioning:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.PROVISIONING,
+            replicas=2,
         )
         await create_gateway_compute(
             session,
@@ -510,6 +569,356 @@ class TestGatewayWorkerProvisioning:
         assert gateway.last_processed_at > original_last_processed_at
         events = await list_events(session)
         assert len(events) == 0
+
+    @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_still_provisioning_when_scale_out_adds_new_replicas(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayWorker,
+        legacy_compute: bool,
+        populate_configuration: bool,
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+            replicas=2,
+            populate_configuration=populate_configuration,
+        )
+        if legacy_compute:
+            gateway_compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                ip_address="1.1.1.1",
+                status=GatewayReplicaStatus.RUNNING,
+                populate_configuration=populate_configuration,
+            )
+            gateway.gateway_compute_id = gateway_compute.id
+        else:
+            await create_gateway_compute(
+                session,
+                gateway_id=gateway.id,
+                ip_address="1.1.1.1",
+                status=GatewayReplicaStatus.RUNNING,
+                replica_num=0,
+                populate_configuration=populate_configuration,
+            )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.PROVISIONING
+        computes = sorted(
+            await _fetch_all_gateway_computes(session, gateway.id), key=lambda c: c.replica_num
+        )
+        assert [c.replica_num for c in computes] == [0, 1]
+        assert computes[1].status == GatewayReplicaStatus.SUBMITTED
+        events = await list_events(session)
+        assert len(events) == 0
+
+    async def test_provisioning_to_running_when_scale_in_removes_surplus_replicas(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+            replicas=1,
+        )
+        older = await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address="1.1.1.1",
+            status=GatewayReplicaStatus.PROVISIONING,
+            replica_num=0,
+        )
+        older.created_at = datetime(2025, 1, 1)
+        newer = await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address="2.2.2.2",
+            status=GatewayReplicaStatus.RUNNING,
+            replica_num=1,
+        )
+        newer.created_at = datetime(2025, 1, 2)
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.RUNNING
+        await session.refresh(older)
+        await session.refresh(newer)
+        assert older.scale_in is True
+        assert newer.scale_in is False
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway status changed PROVISIONING -> RUNNING"
+
+    async def test_ignores_previously_scaled_in_replica_when_determining_status(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.PROVISIONING,
+            replicas=1,
+        )
+        await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address="1.1.1.1",
+            status=GatewayReplicaStatus.RUNNING,
+            replica_num=0,
+        )
+        scaled_in_compute = await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            ip_address="2.2.2.2",
+            status=GatewayReplicaStatus.TERMINATING,
+            active=False,
+            replica_num=1,
+        )
+        scaled_in_compute.scale_in = True
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.RUNNING
+        events = await list_events(session)
+        assert len(events) == 1
+        assert events[0].message == "Gateway status changed PROVISIONING -> RUNNING"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestGatewayWorkerRunning:
+    @pytest.mark.parametrize("legacy_compute", [False, True])
+    async def test_no_scaling_when_replica_count_matches(
+        self, test_db, session: AsyncSession, worker: GatewayWorker, legacy_compute: bool
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+        )
+        if legacy_compute:
+            compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                status=GatewayReplicaStatus.RUNNING,
+            )
+            gateway.gateway_compute_id = compute.id
+        else:
+            await create_gateway_compute(
+                session,
+                gateway_id=gateway.id,
+                status=GatewayReplicaStatus.RUNNING,
+                replica_num=0,
+            )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        original_last_processed_at = gateway.last_processed_at
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.RUNNING
+        assert gateway.last_processed_at > original_last_processed_at
+        computes = await _fetch_all_gateway_computes(session, gateway.id)
+        assert len(computes) == 1
+        assert computes[0].scale_in is False
+
+    @pytest.mark.parametrize("legacy_compute", [False, True])
+    @pytest.mark.parametrize("populate_configuration", [True, False])
+    async def test_scales_out_when_desired_replica_count_increased(
+        self,
+        test_db,
+        session: AsyncSession,
+        worker: GatewayWorker,
+        legacy_compute: bool,
+        populate_configuration: bool,
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=3,
+            populate_configuration=populate_configuration,
+        )
+        if legacy_compute:
+            gateway_compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                status=GatewayReplicaStatus.RUNNING,
+                populate_configuration=populate_configuration,
+            )
+            gateway.gateway_compute_id = gateway_compute.id
+        else:
+            await create_gateway_compute(
+                session,
+                gateway_id=gateway.id,
+                status=GatewayReplicaStatus.RUNNING,
+                replica_num=0,
+                populate_configuration=populate_configuration,
+            )
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.RUNNING
+        computes = sorted(
+            await _fetch_all_gateway_computes(session, gateway.id), key=lambda c: c.replica_num
+        )
+        assert [c.replica_num for c in computes] == [0, 1, 2]
+        assert [c.status for c in computes] == [
+            GatewayReplicaStatus.RUNNING,
+            GatewayReplicaStatus.SUBMITTED,
+            GatewayReplicaStatus.SUBMITTED,
+        ]
+
+    async def test_scales_in_oldest_replicas_when_desired_replica_count_decreased(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+        )
+        compute0 = await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=0
+        )
+        compute0.created_at = datetime(2025, 1, 1)
+        compute1 = await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=1
+        )
+        compute1.created_at = datetime(2025, 1, 2)
+        compute2 = await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=2
+        )
+        compute2.created_at = datetime(2025, 1, 3)
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.RUNNING
+        await session.refresh(compute0)
+        await session.refresh(compute1)
+        await session.refresh(compute2)
+        assert compute0.scale_in is True
+        assert compute1.scale_in is True
+        assert compute2.scale_in is False
+
+    async def test_scale_in_prefers_less_advanced_replicas_over_older_running_ones(
+        self, test_db, session: AsyncSession, worker: GatewayWorker
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+            replicas=1,
+        )
+        running = await create_gateway_compute(
+            session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=0
+        )
+        running.created_at = datetime(2025, 1, 1)
+        submitted = await create_gateway_compute(
+            session,
+            gateway_id=gateway.id,
+            status=GatewayReplicaStatus.SUBMITTED,
+            replica_num=1,
+            ip_address=None,
+            instance_id=None,
+            region=None,
+            configuration=get_gateway_compute_configuration().json(),
+        )
+        submitted.created_at = datetime(2025, 1, 2)
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(running)
+        await session.refresh(submitted)
+        assert running.scale_in is False
+        assert submitted.scale_in is True
+
+    @pytest.mark.parametrize("legacy_compute", [False, True])
+    async def test_no_scaling_for_legacy_gateway_without_desired_replica_count(
+        self, test_db, session: AsyncSession, worker: GatewayWorker, legacy_compute: bool
+    ):
+        project = await create_project(session=session)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            status=GatewayStatus.RUNNING,
+        )
+        if legacy_compute:
+            compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+                status=GatewayReplicaStatus.RUNNING,
+            )
+            gateway.gateway_compute_id = compute.id
+        else:
+            await create_gateway_compute(
+                session, gateway_id=gateway.id, status=GatewayReplicaStatus.RUNNING, replica_num=0
+            )
+        gateway.desired_replica_count = None
+        gateway.lock_token = uuid.uuid4()
+        gateway.lock_expires_at = datetime(2025, 1, 2, 3, 4, tzinfo=timezone.utc)
+        await session.commit()
+
+        await worker.process(_gateway_to_pipeline_item(gateway))
+
+        await session.refresh(gateway)
+        assert gateway.status == GatewayStatus.RUNNING
+        computes = await _fetch_all_gateway_computes(session, gateway.id)
+        assert len(computes) == 1
+        assert computes[0].scale_in is False
 
 
 @pytest.mark.asyncio
@@ -650,6 +1059,7 @@ class TestGatewayWorkerDeleted:
             project_id=project.id,
             backend_id=backend.id,
             status=GatewayStatus.RUNNING,
+            replicas=2,
         )
         await create_gateway_compute(
             session=session,

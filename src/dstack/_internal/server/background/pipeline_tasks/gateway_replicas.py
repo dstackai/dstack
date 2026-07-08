@@ -157,6 +157,7 @@ class GatewayReplicaFetcher(Fetcher[GatewayReplicaPipelineItem]):
                             and_(
                                 GatewayComputeModel.status == GatewayReplicaStatus.RUNNING,
                                 or_(
+                                    GatewayComputeModel.scale_in == True,
                                     GatewayModel.to_be_deleted == True,
                                     GatewayModel.status == GatewayStatus.FAILED,
                                     # Gateway was hard-deleted (unexpected, fetch to log an error)
@@ -317,24 +318,32 @@ def _get_loaded_gateway_model(replica_model: GatewayComputeModel) -> Optional[Ga
     return gateway_model
 
 
-def _mark_terminating_if_gateway_terminating(
+def _mark_terminating_if_needed(
     gateway_model: GatewayModel, replica_model: GatewayComputeModel
 ) -> Optional[_GatewayReplicaUpdateMap]:
     if gateway_model.to_be_deleted or gateway_model.status == GatewayStatus.FAILED:
-        if replica_model.status == GatewayReplicaStatus.SUBMITTED:
-            new_status = GatewayReplicaStatus.TERMINATED
-            deleted = True
-        else:
-            new_status = GatewayReplicaStatus.TERMINATING
-            deleted = False
-        logger.info(
-            "%s replica %d: marked %s, gateway is being deleted or failed",
-            fmt(gateway_model),
-            replica_model.replica_num,
-            new_status.value,
-        )
-        return _GatewayReplicaUpdateMap(status=new_status, active=False, deleted=deleted)
-    return None
+        status_message = None
+    elif replica_model.scale_in:
+        status_message = "Scaled in"
+    else:
+        return
+    if replica_model.status == GatewayReplicaStatus.SUBMITTED:
+        new_status = GatewayReplicaStatus.TERMINATED
+        deleted = True
+    else:
+        new_status = GatewayReplicaStatus.TERMINATING
+        deleted = False
+    logger.info(
+        "%s replica %d: marked %s (%s)",
+        fmt(gateway_model),
+        replica_model.replica_num,
+        new_status.value,
+        status_message or "-",
+    )
+    update_map = _GatewayReplicaUpdateMap(status=new_status, active=False, deleted=deleted)
+    if status_message:
+        update_map["status_message"] = status_message
+    return update_map
 
 
 async def _commit_update(
@@ -369,6 +378,7 @@ async def _process_submitted_item(item: GatewayReplicaPipelineItem):
             GatewayComputeModel.backend_id,
             GatewayComputeModel.configuration,
             GatewayComputeModel.ssh_public_key,
+            GatewayComputeModel.scale_in,
         ],
         gateway_fields=_GATEWAY_FIELDS_MIN
         + [
@@ -385,7 +395,7 @@ async def _process_submitted_item(item: GatewayReplicaPipelineItem):
     if gateway_model is None:
         await _commit_update(item, replica_model, update_map={})
         return
-    if update_map := _mark_terminating_if_gateway_terminating(gateway_model, replica_model):
+    if update_map := _mark_terminating_if_needed(gateway_model, replica_model):
         await _commit_update(item, replica_model, update_map=update_map)
         return
     update_map = await _provision_gateway_replica(gateway_model, replica_model)
@@ -477,6 +487,7 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
         + [
             GatewayComputeModel.ip_address,
             GatewayComputeModel.ssh_private_key,
+            GatewayComputeModel.scale_in,
         ],
         gateway_fields=_GATEWAY_FIELDS_MIN,
     )
@@ -486,7 +497,7 @@ async def _process_provisioning_item(item: GatewayReplicaPipelineItem):
     if gateway_model is None:
         await _commit_update(item, replica_model, update_map={})
         return
-    if update_map := _mark_terminating_if_gateway_terminating(gateway_model, replica_model):
+    if update_map := _mark_terminating_if_needed(gateway_model, replica_model):
         await _commit_update(item, replica_model, update_map=update_map)
         return
     error = await _connect_and_configure_gateway_replica(gateway_model, replica_model)
@@ -553,7 +564,10 @@ async def _connect_and_configure_gateway_replica(
 async def _process_running_item(item: GatewayReplicaPipelineItem):
     replica_model = await _load_gateway_replica(
         item,
-        replica_fields=_REPLICA_FIELDS_MIN,
+        replica_fields=_REPLICA_FIELDS_MIN
+        + [
+            GatewayComputeModel.scale_in,
+        ],
         gateway_fields=_GATEWAY_FIELDS_MIN,
     )
     if replica_model is None:
@@ -562,7 +576,7 @@ async def _process_running_item(item: GatewayReplicaPipelineItem):
     if gateway_model is None:
         await _commit_update(item, replica_model, update_map={})
         return
-    if update_map := _mark_terminating_if_gateway_terminating(gateway_model, replica_model):
+    if update_map := _mark_terminating_if_needed(gateway_model, replica_model):
         await _commit_update(item, replica_model, update_map=update_map)
         return
     logger.warning(

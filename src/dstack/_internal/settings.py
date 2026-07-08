@@ -50,3 +50,8 @@ class FeatureFlags:
     """If DSTACK_FF_CLI_PRINT_JOB_CONNECTION_INFO enabled, `dstack apply` command prints server-provided
     IDE URL(s) and SSH command(s) before job logs (for dev-environments only).
     """
+    GATEWAY_SCALING = os.getenv("DSTACK_FF_GATEWAY_SCALING") is not None
+    """Allows in-place update of gateway `replicas`.
+    Has limited applicability at the current stage — without a state sync mechanism, newly started
+    gateway replicas are not aware of existing services.
+    """
