@@ -723,8 +723,16 @@ def _load_agent_error(workspace: "_AgentWorkspace") -> Optional[str]:
 
 
 def get_claude_agent_unavailable_reason() -> Optional[str]:
-    if not settings.AGENT_ANTHROPIC_API_KEY:
-        return "DSTACK_AGENT_ANTHROPIC_API_KEY is not set."
+    if settings.AGENT_ANTHROPIC_API_KEY and settings.AGENT_CLAUDE_USE_EXISTING_AUTH:
+        return (
+            "DSTACK_AGENT_ANTHROPIC_API_KEY and "
+            "DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH cannot both be set."
+        )
+    if not settings.AGENT_ANTHROPIC_API_KEY and not _should_use_existing_claude_auth():
+        return (
+            "DSTACK_AGENT_ANTHROPIC_API_KEY is not set. Set it or opt in to existing "
+            "Claude CLI auth with DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH=1."
+        )
     if _get_claude_executable() is None:
         if settings.AGENT_CLAUDE_PATH is not None:
             return (
@@ -736,6 +744,9 @@ def get_claude_agent_unavailable_reason() -> Optional[str]:
             "DSTACK_AGENT_CLAUDE_PATH."
         )
     return None
+
+
+_existing_auth_warning_logged = False
 
 
 class _AgentWorkspace:
@@ -750,6 +761,7 @@ class _AgentWorkspace:
         redacted_values: Sequence[str],
         endpoint_name: str,
         model: str,
+        dstack_home_dir: Optional[Path] = None,
         endpoint_constraints: str = "",
         max_price: Optional[float] = None,
         spot_policy: Optional[str] = None,
@@ -758,6 +770,7 @@ class _AgentWorkspace:
     ) -> None:
         self.root_dir = root_dir
         self.home_dir = home_dir
+        self.dstack_home_dir = dstack_home_dir or home_dir
         self.work_dir = work_dir
         self.trace_path = trace_path
         self.env = env
@@ -854,13 +867,14 @@ def _prepare_workspace(
     )
 
     env = _build_agent_env(
-        home_dir=agent_home_dir,
+        home_dir=_get_claude_process_home_dir(agent_home_dir),
         project_name=endpoint_model.project.name,
         server_url=settings.SERVER_URL,
         token=token,
         endpoint_env=endpoint_env,
         bin_dir=bin_dir,
     )
+    _warn_if_using_existing_claude_auth()
     redacted_values = _get_redacted_values(
         [
             token,
@@ -873,6 +887,7 @@ def _prepare_workspace(
     workspace = _AgentWorkspace(
         root_dir=root_dir,
         home_dir=home_dir,
+        dstack_home_dir=agent_home_dir,
         work_dir=work_dir,
         trace_path=trace_path,
         env=env,
@@ -913,6 +928,12 @@ def _prepare_agent_home_dir(*, root_dir: Path, home_dir: Path) -> Path:
             short_home_dir.unlink()
     short_home_dir.symlink_to(home_dir, target_is_directory=True)
     return short_home_dir
+
+
+def _get_claude_process_home_dir(agent_home_dir: Path) -> Path:
+    if _should_use_existing_claude_auth():
+        return Path.home()
+    return agent_home_dir
 
 
 def _get_short_agent_home_dir(root_dir: Path) -> Path:
@@ -1112,13 +1133,16 @@ def _build_agent_env(
     env["PATH"] = str(bin_dir) if not path else os.pathsep.join([str(bin_dir), path])
     env.update(
         {
-            "ANTHROPIC_API_KEY": settings.AGENT_ANTHROPIC_API_KEY or "",
             "HOME": str(home_dir),
             "DSTACK_PROJECT": project_name,
             "DSTACK_ENDPOINT_SERVER_URL": server_url,
             "DSTACK_ENDPOINT_BEARER_TOKEN": token,
         }
     )
+    if settings.AGENT_ANTHROPIC_API_KEY:
+        env["ANTHROPIC_API_KEY"] = settings.AGENT_ANTHROPIC_API_KEY
+    elif _should_use_existing_claude_auth() and os.environ.get("USER"):
+        env["USER"] = os.environ["USER"]
     env.update(endpoint_env)
     return env
 
@@ -1214,6 +1238,9 @@ def _install_agent_helper_scripts(workspace: _AgentWorkspace) -> None:
     scripts = {
         "progress": _get_agent_progress_script(),
     }
+    if _should_use_existing_claude_auth():
+        scripts["dstack"] = _get_agent_home_script("dstack", workspace.dstack_home_dir)
+        scripts["ssh"] = _get_agent_home_script("ssh", workspace.dstack_home_dir)
     for name, script in scripts.items():
         script_path = bin_dir / name
         script_path.write_text(script, encoding="utf-8")
@@ -1246,6 +1273,24 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+"""
+
+
+def _get_agent_home_script(command: str, home_dir: Path) -> str:
+    real_command = shutil.which(command)
+    if real_command is None:
+        return f"""#!{sys.executable}
+import sys
+
+print("Endpoint agent could not find the real {command} executable.", file=sys.stderr)
+raise SystemExit(127)
+"""
+    return f"""#!{sys.executable}
+import os
+import sys
+
+os.environ["HOME"] = {json.dumps(str(home_dir))}
+os.execv({json.dumps(real_command)}, [{json.dumps(real_command)}, *sys.argv[1:]])
 """
 
 
@@ -1450,7 +1495,6 @@ def _build_claude_command(request: dict[str, Any]) -> list[str]:
     cmd = [
         _get_claude_executable() or "claude",
         "-p",
-        "--bare",
         "--output-format",
         "stream-json",
         "--verbose",
@@ -1468,6 +1512,10 @@ def _build_claude_command(request: dict[str, Any]) -> list[str]:
         json.dumps(options["json_schema"]),
         request["prompt"],
     ]
+    if not _should_use_existing_claude_auth():
+        cmd[2:2] = ["--bare"]
+    else:
+        cmd[2:2] = ["--setting-sources", "project,local"]
     if options["max_turns"] is not None:
         cmd[2:2] = ["--max-turns", str(options["max_turns"])]
     return cmd
@@ -1477,6 +1525,23 @@ def _get_claude_executable() -> Optional[str]:
     if settings.AGENT_CLAUDE_PATH is not None:
         return shutil.which(settings.AGENT_CLAUDE_PATH)
     return shutil.which("claude")
+
+
+def _should_use_existing_claude_auth() -> bool:
+    return settings.AGENT_CLAUDE_USE_EXISTING_AUTH and not settings.AGENT_ANTHROPIC_API_KEY
+
+
+def _warn_if_using_existing_claude_auth() -> None:
+    global _existing_auth_warning_logged
+    if not _should_use_existing_claude_auth() or _existing_auth_warning_logged:
+        return
+    logger.warning(
+        "DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH=1 is enabled. This mode is intended "
+        "only for local development. Production servers must set "
+        "DSTACK_AGENT_ANTHROPIC_API_KEY. Claude will run without --bare and may read "
+        "the server user's Claude CLI auth and settings."
+    )
+    _existing_auth_warning_logged = True
 
 
 async def _read_agent_stdout(

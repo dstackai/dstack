@@ -60,6 +60,10 @@ Do not rewrite previous `submissions.jsonl` lines; the latest line for a run is
 the current record. Stop runs you no longer need unless they are still needed for
 attach/SSH debugging, logs, or backend diagnosis.
 
+After stopping a task or service, do not wait for it to disappear from
+`dstack ps`. Confirm that the run reached a terminal status such as `stopped`,
+`terminated`, or `failed`, then continue.
+
 # Run Names
 
 Do not use the endpoint name itself as a submitted run name.

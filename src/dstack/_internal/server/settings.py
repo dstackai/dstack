@@ -33,6 +33,14 @@ SERVER_PROJECTS_DIR_PATH = SERVER_DIR_PATH / "projects"
 
 AGENT_ANTHROPIC_API_KEY = _getenv_non_empty("DSTACK_AGENT_ANTHROPIC_API_KEY")
 AGENT_CLAUDE_PATH = _getenv_non_empty("DSTACK_AGENT_CLAUDE_PATH")
+# Development-only opt-in. Do not set together with
+# DSTACK_AGENT_ANTHROPIC_API_KEY. Production servers should set
+# DSTACK_AGENT_ANTHROPIC_API_KEY instead. Existing Claude CLI auth requires
+# running without `claude --bare`, so the agent may read the server user's
+# Claude CLI auth/settings.
+AGENT_CLAUDE_USE_EXISTING_AUTH = environ.get_bool(
+    "DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH", default=False
+)
 AGENT_ANTHROPIC_MODEL = os.getenv("DSTACK_AGENT_ANTHROPIC_MODEL", "claude-opus-4-8")
 
 DATABASE_URL = os.getenv(

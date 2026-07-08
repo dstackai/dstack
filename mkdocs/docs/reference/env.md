@@ -162,6 +162,14 @@ slows down processing and may cause CPU spikes due to frequent SSH-connection es
       `https://dstack.example.com/{arch}/{version}/dstack-runner`.
      * `DSTACK_SHIM_DOWNLOAD_URL` – Overrides `dstack-shim` binary download URL. The URL can contain `{version}` and/or `{arch}` placeholders,
       see `DSTACK_RUNNER_DOWNLOAD_URL` for the details.
+     * `DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH` – Allows the endpoint agent to use
+       the server user's existing Claude CLI authentication when
+       `DSTACK_AGENT_ANTHROPIC_API_KEY` is not set. This is only for local
+       development. Do not set it together with `DSTACK_AGENT_ANTHROPIC_API_KEY`.
+       Production servers must use `DSTACK_AGENT_ANTHROPIC_API_KEY`.
+       This mode runs Claude without `--bare`, so Claude may read the server
+       user's Claude CLI auth and settings. It also passes the server process
+       `USER` to Claude because existing Claude CLI auth requires it.
      * `DSTACK_DEFAULT_CREDS_DISABLED` – Disables default credentials detection if set. Defaults to `None`.
 
 ## CLI

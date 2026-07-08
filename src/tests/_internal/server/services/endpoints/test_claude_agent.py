@@ -490,9 +490,12 @@ class TestClaudeAgentService:
         agent_home = Path(env["HOME"])
         assert agent_home != session_root / "home"
         assert agent_home.resolve() == session_root / "home"
+        assert captured["workspace"].home_dir == session_root / "home"
+        assert captured["workspace"].dstack_home_dir == agent_home
         control_sock_path = agent_home / ".dstack" / "ssh" / f"{'x' * 60}.control.sock"
         assert len(str(control_sock_path)) < 104
         assert stat.S_IMODE((session_root / "home" / ".ssh").stat().st_mode) == 0o700
+        assert not (session_root / "bin" / "dstack").exists()
         assert env["DSTACK_PROJECT"] == "main"
         assert env["DSTACK_ENDPOINT_SERVER_URL"] == "http://127.0.0.1:8000"
         assert env["DSTACK_ENDPOINT_BEARER_TOKEN"] == "user-token"
@@ -508,6 +511,8 @@ class TestClaudeAgentService:
         assert '"format"' not in schema_text
         command = _build_claude_command(captured["request"])
         assert command[0] == claude_path
+        assert "--bare" in command
+        assert "--setting-sources" not in command
         assert command[command.index("--tools") + 1] == captured["request"]["options"]["tools"]
         assert "--permission-mode" in command
         assert command[command.index("--permission-mode") + 1] == "bypassPermissions"
@@ -536,6 +541,7 @@ class TestClaudeAgentService:
         progress_helper = session_root / "bin" / "progress"
         assert progress_helper.exists()
         assert not (session_root / "bin" / "dstack").exists()
+        assert not (session_root / "bin" / "ssh").exists()
         progress_result = subprocess.run(
             [str(progress_helper), "Checked model config."],
             cwd=work_dir,
@@ -554,6 +560,61 @@ class TestClaudeAgentService:
         final_report = json.loads((work_dir / "final_report.json").read_text())
         assert final_report["success"] is True
         assert final_report["run_name"] == "qwen-endpoint-1"
+
+    @pytest.mark.asyncio
+    async def test_existing_claude_auth_uses_real_home_for_claude_and_short_home_for_dstack(
+        self,
+        session: AsyncSession,
+        tmp_path,
+        monkeypatch,
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", None)
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_USE_EXISTING_AUTH", True)
+        monkeypatch.setattr(claude_module, "_existing_auth_warning_logged", False)
+        _configure_fake_claude(tmp_path, monkeypatch)
+        monkeypatch.setattr(settings, "SERVER_URL", "http://127.0.0.1:8000")
+        captured = {}
+        run_id = uuid.uuid4()
+
+        async def runner(workspace, request):
+            captured["workspace"] = workspace
+            captured["request"] = request
+            return _AgentRunnerResult(
+                report=AgentFinalReport(
+                    success=True,
+                    run_id=run_id,
+                    run_name="qwen-endpoint-1",
+                    service_yaml="type: service\nname: qwen-endpoint-1\n",
+                )
+            )
+
+        endpoint_model = await _create_endpoint_model(session)
+        service = ClaudeAgentService(runner=runner, workspace_base_dir=tmp_path)
+
+        result = await service.provision_endpoint(endpoint_model, pipeline_hinter=None)
+
+        assert result.error is None
+        session_root = tmp_path / str(endpoint_model.id) / "1"
+        env = captured["request"]["env"]
+        workspace = captured["workspace"]
+        assert env["HOME"] == str(Path.home())
+        assert "ANTHROPIC_API_KEY" not in env
+        assert workspace.home_dir == session_root / "home"
+        assert workspace.dstack_home_dir != workspace.home_dir
+        assert workspace.dstack_home_dir.resolve() == workspace.home_dir
+        wrapper = session_root / "bin" / "dstack"
+        assert wrapper.exists()
+        wrapper_text = wrapper.read_text()
+        assert f'os.environ["HOME"] = "{workspace.dstack_home_dir}"' in wrapper_text
+        assert str(workspace.home_dir) not in wrapper_text
+        ssh_wrapper = session_root / "bin" / "ssh"
+        assert ssh_wrapper.exists()
+        ssh_wrapper_text = ssh_wrapper.read_text()
+        assert f'os.environ["HOME"] = "{workspace.dstack_home_dir}"' in ssh_wrapper_text
+        assert str(workspace.home_dir) not in ssh_wrapper_text
+        command = _build_claude_command(captured["request"])
+        assert "--bare" not in command
+        assert command[command.index("--setting-sources") + 1] == "project,local"
 
     @pytest.mark.asyncio
     async def test_includes_endpoint_profile_constraints_in_prompt(
@@ -784,10 +845,108 @@ class TestClaudeAgentService:
 
     def test_returns_error_when_agent_key_is_blank(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "")
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_USE_EXISTING_AUTH", False)
 
         assert get_claude_agent_unavailable_reason() == (
-            "DSTACK_AGENT_ANTHROPIC_API_KEY is not set."
+            "DSTACK_AGENT_ANTHROPIC_API_KEY is not set. Set it or opt in to existing "
+            "Claude CLI auth with DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH=1."
         )
+
+    def test_existing_claude_auth_opt_in_enables_agent_without_api_key(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_PATH", None)
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", None)
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_USE_EXISTING_AUTH", True)
+        monkeypatch.setenv("USER", "server-user")
+        monkeypatch.setattr(
+            claude_module.shutil,
+            "which",
+            lambda name: f"/usr/local/bin/{name}" if name in {"claude", "dstack", "ssh"} else None,
+        )
+
+        command = _build_claude_command(
+            {
+                "prompt": "prompt",
+                "options": {
+                    "allowed_tools": "Bash",
+                    "disallowed_tools": "",
+                    "model": "test-model",
+                    "max_turns": None,
+                    "json_schema": {},
+                },
+            }
+        )
+        env = claude_module._build_agent_env(
+            home_dir=claude_module._get_claude_process_home_dir(Path("/tmp/agent-home")),
+            project_name="main",
+            server_url="http://127.0.0.1:8000",
+            token="token",
+            endpoint_env={},
+            bin_dir=Path("/tmp/agent-bin"),
+        )
+        dstack_home_dir = tmp_path / "short-home"
+        workspace = _AgentWorkspace(
+            root_dir=tmp_path,
+            home_dir=tmp_path / "home",
+            work_dir=tmp_path / "work",
+            trace_path=None,
+            env=env,
+            redacted_values=[],
+            endpoint_name="qwen-endpoint",
+            model="Qwen/Qwen3-0.6B",
+            dstack_home_dir=dstack_home_dir,
+        )
+
+        assert get_claude_agent_unavailable_reason() is None
+        assert command[0] == "/usr/local/bin/claude"
+        assert "--bare" not in command
+        assert command[command.index("--setting-sources") + 1] == "project,local"
+        assert env["HOME"] == str(Path.home())
+        assert env["USER"] == "server-user"
+        assert "ANTHROPIC_API_KEY" not in env
+        claude_module._install_agent_helper_scripts(workspace)
+        wrapper = tmp_path / "bin" / "dstack"
+        assert wrapper.exists()
+        wrapper_text = wrapper.read_text()
+        assert str(dstack_home_dir) in wrapper_text
+        assert str(tmp_path / "home") not in wrapper_text
+        ssh_wrapper = tmp_path / "bin" / "ssh"
+        assert ssh_wrapper.exists()
+        ssh_wrapper_text = ssh_wrapper.read_text()
+        assert str(dstack_home_dir) in ssh_wrapper_text
+        assert str(tmp_path / "home") not in ssh_wrapper_text
+
+    def test_returns_error_when_api_key_and_existing_claude_auth_are_both_set(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_PATH", None)
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_USE_EXISTING_AUTH", True)
+
+        assert get_claude_agent_unavailable_reason() == (
+            "DSTACK_AGENT_ANTHROPIC_API_KEY and "
+            "DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH cannot both be set."
+        )
+
+    def test_existing_claude_auth_logs_development_warning_once(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", None)
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_USE_EXISTING_AUTH", True)
+        monkeypatch.setattr(claude_module, "_existing_auth_warning_logged", False)
+
+        claude_module._warn_if_using_existing_claude_auth()
+        claude_module._warn_if_using_existing_claude_auth()
+
+        messages = [
+            record.message
+            for record in caplog.records
+            if "DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH=1 is enabled" in record.message
+        ]
+        assert len(messages) == 1
+        assert "only for local development" in messages[0]
+        assert "Production servers must set DSTACK_AGENT_ANTHROPIC_API_KEY" in messages[0]
 
     def test_falls_back_to_claude_in_path(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(settings, "AGENT_CLAUDE_PATH", None)

@@ -73,7 +73,7 @@ async def abort_agent_endpoint(endpoint_model: EndpointModel) -> bool:
 
 
 def get_agent_service() -> AgentService:
-    if settings.AGENT_ANTHROPIC_API_KEY:
+    if _has_claude_agent_auth():
         from dstack._internal.server.services.endpoints.agent.claude import (
             ClaudeAgentService,
             get_claude_agent_unavailable_reason,
@@ -87,10 +87,14 @@ def get_agent_service() -> AgentService:
 
 
 def get_agent_unavailable_reason() -> Optional[str]:
-    if not settings.AGENT_ANTHROPIC_API_KEY:
+    if not _has_claude_agent_auth():
         return "DSTACK_AGENT_ANTHROPIC_API_KEY is not set."
     from dstack._internal.server.services.endpoints.agent.claude import (
         get_claude_agent_unavailable_reason,
     )
 
     return get_claude_agent_unavailable_reason()
+
+
+def _has_claude_agent_auth() -> bool:
+    return bool(settings.AGENT_ANTHROPIC_API_KEY or settings.AGENT_CLAUDE_USE_EXISTING_AUTH)
