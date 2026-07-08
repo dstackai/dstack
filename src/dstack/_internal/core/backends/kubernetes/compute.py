@@ -1131,6 +1131,7 @@ def _create_job_pod(
     tolerations: list[client.V1Toleration] = []
     volumes_: list[client.V1Volume] = []
     volume_mounts: list[client.V1VolumeMount] = []
+    env_vars: list[client.V1EnvVar] = []
 
     resources_spec = job_spec.requirements.resources
     assert isinstance(resources_spec.cpu, CPUSpec)
@@ -1138,21 +1139,23 @@ def _create_job_pod(
         resources_requests["cpu"] = str(cpu_min)
     if (cpu_max := resources_spec.cpu.count.max) is not None:
         resources_limits["cpu"] = str(cpu_max)
-    if (gpu_spec := resources_spec.gpu) is not None:
-        if (gpu_request := get_gpu_request_from_gpu_spec(gpu_spec)) > 0:
-            gpu_resource, node_affinity, node_taint = _get_pod_spec_parameters_for_gpu(
-                api, gpu_spec
+    gpu_spec = resources_spec.gpu
+    if gpu_spec is not None and (gpu_request := get_gpu_request_from_gpu_spec(gpu_spec)) > 0:
+        gpu_resource, node_affinity, node_taint = _get_pod_spec_parameters_for_gpu(api, gpu_spec)
+        logger.debug("Requesting GPU resource: %s=%d", gpu_resource, gpu_request)
+        resources_requests[gpu_resource] = str(gpu_request)
+        # Limit must be set (GPU resources cannot be overcommitted) and must be equal to request.
+        resources_limits[gpu_resource] = str(gpu_request)
+        # It should be NoSchedule, but we also add NoExecute toleration just in case.
+        for effect in [TaintEffect.NO_SCHEDULE, TaintEffect.NO_EXECUTE]:
+            tolerations.append(
+                client.V1Toleration(key=node_taint, operator=Operator.EXISTS, effect=effect)
             )
-            logger.debug("Requesting GPU resource: %s=%d", gpu_resource, gpu_request)
-            resources_requests[gpu_resource] = str(gpu_request)
-            # Limit must be set (GPU resources cannot be overcommitted)
-            # and must be equal to request.
-            resources_limits[gpu_resource] = str(gpu_request)
-            # It should be NoSchedule, but we also add NoExecute toleration just in case.
-            for effect in [TaintEffect.NO_SCHEDULE, TaintEffect.NO_EXECUTE]:
-                tolerations.append(
-                    client.V1Toleration(key=node_taint, operator=Operator.EXISTS, effect=effect)
-                )
+    else:
+        # Prevents GPU allocation if NVIDIA_VISIBLE_DEVICES with a value such as "all" is baked
+        # into the image (NVIDIA images and images based on them including dstackai/base)
+        # See https://github.com/NVIDIA/k8s-device-plugin/issues/61
+        env_vars.append(client.V1EnvVar(name="NVIDIA_VISIBLE_DEVICES", value="void"))
     if (memory_min := resources_spec.memory.min) is not None:
         resources_requests["memory"] = format_memory(memory_min)
     if (memory_max := resources_spec.memory.max) is not None:
@@ -1272,6 +1275,7 @@ def _create_job_pod(
                         limits=resources_limits,
                     ),
                     volume_mounts=volume_mounts,
+                    env=env_vars,
                 )
             ],
             image_pull_secrets=(
