@@ -80,6 +80,7 @@ _AGENT_STDERR_LOG_NAME = "agent_stderr.jsonl"
 _AGENT_PROGRESS_POLL_SECONDS = 1.0
 _AGENT_PROCESS_ABORT_GRACE_SECONDS = 1.0
 _CLAUDE_AGENT_TOOLS = "Bash,Read,Write,Edit,WebFetch,WebSearch,StructuredOutput"
+_CLAUDE_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 _AGENT_ABORT_MESSAGE = "Endpoint stop requested"
 _AGENT_BIN_DIR_NAME = "bin"
 _AGENT_PROGRESS_ENV = "DSTACK_ENDPOINT_PROGRESS_LOG"
@@ -733,6 +734,11 @@ def get_claude_agent_unavailable_reason() -> Optional[str]:
             "DSTACK_AGENT_ANTHROPIC_API_KEY is not set. Set it or opt in to existing "
             "Claude CLI auth with DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH=1."
         )
+    if (
+        settings.AGENT_CLAUDE_EFFORT is not None
+        and settings.AGENT_CLAUDE_EFFORT not in _CLAUDE_EFFORT_LEVELS
+    ):
+        return f"DSTACK_AGENT_CLAUDE_EFFORT must be one of: {', '.join(_CLAUDE_EFFORT_LEVELS)}."
     if _get_claude_executable() is None:
         if settings.AGENT_CLAUDE_PATH is not None:
             return (
@@ -1516,6 +1522,8 @@ def _build_claude_command(request: dict[str, Any]) -> list[str]:
         cmd[2:2] = ["--bare"]
     else:
         cmd[2:2] = ["--setting-sources", "project,local"]
+    if settings.AGENT_CLAUDE_EFFORT is not None:
+        cmd[2:2] = ["--effort", settings.AGENT_CLAUDE_EFFORT]
     if options["max_turns"] is not None:
         cmd[2:2] = ["--max-turns", str(options["max_turns"])]
     return cmd
@@ -1926,14 +1934,18 @@ async def _terminate_process_group(pgid: int) -> bool:
     await asyncio.sleep(_AGENT_PROCESS_ABORT_GRACE_SECONDS)
     if not _is_process_group_running(pgid):
         return True
-    _send_process_group_signal(pgid, signal.SIGKILL)
+    _send_process_group_signal(pgid, _get_kill_signal())
     await asyncio.sleep(0)
     return not _is_process_group_running(pgid)
 
 
 def _send_process_group_signal(pgid: int, sig: signal.Signals) -> bool:
+    killpg: Optional[Callable[[int, signal.Signals], None]] = getattr(os, "killpg", None)
     try:
-        os.killpg(pgid, sig)
+        if killpg is not None:
+            killpg(pgid, sig)
+        else:
+            os.kill(pgid, sig)
     except ProcessLookupError:
         return False
     except PermissionError:
@@ -1996,14 +2008,21 @@ def _is_process_running(pid: int) -> bool:
 
 
 def _is_process_group_running(pgid: int) -> bool:
+    killpg: Optional[Callable[[int, int], None]] = getattr(os, "killpg", None)
+    if killpg is None:
+        return _is_process_running(pgid)
     try:
-        os.killpg(pgid, 0)
+        killpg(pgid, 0)
     except ProcessLookupError:
         return False
     except PermissionError:
         live_process_found = _has_non_zombie_process_in_group(pgid)
         return True if live_process_found is None else live_process_found
     return True
+
+
+def _get_kill_signal() -> signal.Signals:
+    return getattr(signal, "SIGKILL", signal.SIGTERM)
 
 
 def _has_non_zombie_process_in_group(pgid: int) -> Optional[bool]:

@@ -87,6 +87,11 @@ def _configure_fake_claude(tmp_path, monkeypatch: pytest.MonkeyPatch) -> str:
     return str(claude_path)
 
 
+@pytest.fixture(autouse=True)
+def _clear_claude_effort(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "AGENT_CLAUDE_EFFORT", None)
+
+
 class TestClaudeAgentService:
     @pytest.mark.asyncio
     async def test_default_runner_starts_agent_detached(
@@ -513,6 +518,7 @@ class TestClaudeAgentService:
         assert command[0] == claude_path
         assert "--bare" in command
         assert "--setting-sources" not in command
+        assert "--effort" not in command
         assert command[command.index("--tools") + 1] == captured["request"]["options"]["tools"]
         assert "--permission-mode" in command
         assert command[command.index("--permission-mode") + 1] == "bypassPermissions"
@@ -615,6 +621,7 @@ class TestClaudeAgentService:
         command = _build_claude_command(captured["request"])
         assert "--bare" not in command
         assert command[command.index("--setting-sources") + 1] == "project,local"
+        assert "--effort" not in command
 
     @pytest.mark.asyncio
     async def test_includes_endpoint_profile_constraints_in_prompt(
@@ -850,6 +857,43 @@ class TestClaudeAgentService:
         assert get_claude_agent_unavailable_reason() == (
             "DSTACK_AGENT_ANTHROPIC_API_KEY is not set. Set it or opt in to existing "
             "Claude CLI auth with DSTACK_AGENT_CLAUDE_USE_EXISTING_AUTH=1."
+        )
+
+    @pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh", "max"])
+    def test_claude_command_includes_configured_effort(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch, effort: str
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_USE_EXISTING_AUTH", False)
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_EFFORT", effort)
+        _configure_fake_claude(tmp_path, monkeypatch)
+
+        command = _build_claude_command(
+            {
+                "prompt": "prompt",
+                "options": {
+                    "allowed_tools": "Bash",
+                    "disallowed_tools": "",
+                    "model": "test-model",
+                    "max_turns": None,
+                    "json_schema": {},
+                },
+            }
+        )
+
+        assert get_claude_agent_unavailable_reason() is None
+        assert command[command.index("--effort") + 1] == effort
+
+    def test_returns_error_when_claude_effort_is_invalid(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(settings, "AGENT_ANTHROPIC_API_KEY", "agent-secret")
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_USE_EXISTING_AUTH", False)
+        monkeypatch.setattr(settings, "AGENT_CLAUDE_EFFORT", "turbo")
+        _configure_fake_claude(tmp_path, monkeypatch)
+
+        assert get_claude_agent_unavailable_reason() == (
+            "DSTACK_AGENT_CLAUDE_EFFORT must be one of: low, medium, high, xhigh, max."
         )
 
     def test_existing_claude_auth_opt_in_enables_agent_without_api_key(

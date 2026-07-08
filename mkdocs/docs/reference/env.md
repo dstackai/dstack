@@ -170,6 +170,10 @@ slows down processing and may cause CPU spikes due to frequent SSH-connection es
        This mode runs Claude without `--bare`, so Claude may read the server
        user's Claude CLI auth and settings. It also passes the server process
        `USER` to Claude because existing Claude CLI auth requires it.
+     * `DSTACK_AGENT_CLAUDE_EFFORT` – Passes Claude CLI `--effort` for endpoint
+       agent sessions. Supported values are `low`, `medium`, `high`, `xhigh`,
+       and `max`. If unset, dstack does not pass `--effort` and Claude CLI uses
+       its default.
      * `DSTACK_DEFAULT_CREDS_DISABLED` – Disables default credentials detection if set. Defaults to `None`.
 
 ## CLI
