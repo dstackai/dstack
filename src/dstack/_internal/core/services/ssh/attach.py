@@ -1,5 +1,8 @@
 import atexit
+import hashlib
+import os
 import re
+import stat
 import time
 from pathlib import Path
 from typing import Optional, Union
@@ -26,6 +29,12 @@ logger = get_logger(__name__)
 
 # ssh -L option format: [bind_address:]port:host:hostport
 _SSH_TUNNEL_REGEX = re.compile(r"(?:[\w.-]+:)?(?P<local_port>\d+):localhost:(?P<remote_port>\d+)")
+# Use a fixed short POSIX temp root for OpenSSH ControlPath. tempfile.gettempdir()
+# can point to long per-user paths on macOS and reintroduce the socket length failure.
+_CONTROL_SOCKET_BASE_DIR = Path("/tmp")
+_CONTROL_SOCKET_DIR_MODE = 0o700
+_CONTROL_SOCKET_HASH_LENGTH = 24
+_CONTROL_SOCKET_MAX_PATH_BYTES = 103
 
 
 class BaseSSHAttach:
@@ -38,7 +47,10 @@ class BaseSSHAttach:
 
     @classmethod
     def get_control_sock_path(cls, run_name: str) -> Path:
-        return ConfigManager().dstack_ssh_dir / f"{run_name}.control.sock"
+        config_manager = ConfigManager()
+        if os.name != "posix" or not hasattr(os, "getuid"):
+            return config_manager.dstack_ssh_dir / f"{run_name}.control.sock"
+        return _get_control_sock_path(config_manager.dstack_ssh_dir, run_name)
 
     @classmethod
     def reuse_ports_lock(cls, run_name: str) -> Optional[PortsLock]:
@@ -147,6 +159,84 @@ class BaseSSHAttach:
         for host in self.hosts:
             update_ssh_config(self.ssh_config_path, host, {})
         self._hosts_added_to_ssh_config = False
+
+
+def _get_control_sock_path(dstack_ssh_dir: Path, run_name: str) -> Path:
+    key = f"{dstack_ssh_dir.resolve(strict=False)}\0{run_name}".encode()
+    digest = hashlib.sha256(key).hexdigest()[:_CONTROL_SOCKET_HASH_LENGTH]
+    sock_name = f"{digest}.sock"
+    short_control_sock_path = _CONTROL_SOCKET_BASE_DIR / f"dstack-ssh-{os.getuid()}" / sock_name
+    try:
+        _ensure_control_socket_dir(short_control_sock_path.parent)
+        short_path_error = _get_control_sock_path_length_error(short_control_sock_path)
+    except SSHError as e:
+        short_path_error = str(e)
+    if short_path_error is None:
+        return short_control_sock_path
+
+    # Preserve the old location as a fallback for environments where /tmp cannot be used.
+    # This fallback is only valid if the resulting Unix socket path is still short enough
+    # for OpenSSH.
+    legacy_control_sock_path = dstack_ssh_dir / f"{run_name}.control.sock"
+    legacy_path_error = _get_control_sock_path_length_error(legacy_control_sock_path)
+    if legacy_path_error is None:
+        return legacy_control_sock_path
+
+    raise SSHError(
+        "Cannot create SSH control socket: "
+        f"short path failed ({short_path_error}); "
+        f"fallback path failed ({legacy_path_error})"
+    )
+
+
+def _ensure_control_socket_dir(runtime_dir: Path) -> None:
+    base_dir = runtime_dir.parent
+    # Follow /tmp if it is a symlink (macOS), but require unsafe shared dirs to be sticky.
+    try:
+        st = base_dir.stat()
+    except OSError as e:
+        raise SSHError(f"Cannot access SSH control socket base directory {base_dir}: {e}") from e
+    if not stat.S_ISDIR(st.st_mode):
+        raise SSHError(f"Unsafe SSH control socket base directory {base_dir}: not a directory")
+    mode = stat.S_IMODE(st.st_mode)
+    if mode & 0o022 and not (st.st_mode & stat.S_ISVTX):
+        raise SSHError(f"Unsafe SSH control socket base directory {base_dir}: unsafe permissions")
+
+    created = False
+    try:
+        runtime_dir.mkdir(mode=_CONTROL_SOCKET_DIR_MODE)
+        created = True
+    except FileExistsError:
+        pass
+    except OSError as e:
+        raise SSHError(f"Cannot create SSH control socket directory {runtime_dir}: {e}") from e
+    if created:
+        try:
+            runtime_dir.chmod(_CONTROL_SOCKET_DIR_MODE)
+        except OSError as e:
+            raise SSHError(f"Cannot secure SSH control socket directory {runtime_dir}: {e}") from e
+    try:
+        st = runtime_dir.lstat()
+    except OSError as e:
+        raise SSHError(f"Cannot access SSH control socket directory {runtime_dir}: {e}") from e
+    if not stat.S_ISDIR(st.st_mode):
+        raise SSHError(f"Unsafe SSH control socket directory {runtime_dir}: not a directory")
+    if st.st_uid != os.getuid():
+        raise SSHError(f"Unsafe SSH control socket directory {runtime_dir}: wrong owner")
+    if stat.S_IMODE(st.st_mode) & 0o077:
+        raise SSHError(f"Unsafe SSH control socket directory {runtime_dir}: unsafe permissions")
+
+
+def _get_control_sock_path_length_error(path: Path) -> Optional[str]:
+    # OpenSSH uses Unix-domain sockets for ControlPath. macOS rejects paths at 104 bytes,
+    # so use 103 as the conservative cross-platform ceiling and count encoded bytes.
+    path_length = len(os.fsencode(path))
+    if path_length > _CONTROL_SOCKET_MAX_PATH_BYTES:
+        return (
+            f"{path} is too long for an SSH control socket "
+            f"({path_length} bytes > {_CONTROL_SOCKET_MAX_PATH_BYTES})"
+        )
+    return None
 
 
 class SSHAttach(BaseSSHAttach):
