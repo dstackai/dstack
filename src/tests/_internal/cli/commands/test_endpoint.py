@@ -90,8 +90,7 @@ class TestEndpointCommand:
         logs = list(command._get_endpoint_logs(endpoint=endpoint, start_time=None))
 
         assert len(logs) == 1
-        assert logs[0].startswith(b"[")
-        assert logs[0].endswith(b"] agent log\n")
+        assert logs[0].message == "agent log\n"
         request = command.api.client.logs.requests[0]
         assert request.run_name == endpoint.name
         assert request.job_submission_id == endpoint.id
@@ -131,8 +130,8 @@ class TestEndpointCommand:
 
         logs = command._get_endpoint_logs(endpoint=endpoint, start_time=None, watch=True)
 
-        assert next(logs).endswith(b"] first\n")
-        assert next(logs).endswith(b"] second\n")
+        assert next(logs).message == "first\n"
+        assert next(logs).message == "second\n"
 
     def test_stop_endpoint(self):
         endpoint = _get_endpoint()

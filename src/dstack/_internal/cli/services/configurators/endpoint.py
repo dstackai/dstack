@@ -9,7 +9,11 @@ from dstack._internal.cli.services.configurators.base import (
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator,
 )
-from dstack._internal.cli.services.endpoint_logs import EndpointLogPoller
+from dstack._internal.cli.services.endpoint_logs import (
+    EndpointLogPoller,
+    EndpointLogRecord,
+    print_endpoint_log,
+)
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import (
     NO_OFFERS_WARNING,
@@ -215,9 +219,9 @@ class EndpointConfigurator(
             exit(1)
 
 
-def _print_endpoint_log_batch(logs: list[bytes]) -> None:
+def _print_endpoint_log_batch(logs: list[EndpointLogRecord]) -> None:
     for log in logs:
-        console.out(log.decode(errors="replace"), end="")
+        print_endpoint_log(log)
 
 
 def _apply_profile(conf: EndpointConfiguration, profile: Profile):

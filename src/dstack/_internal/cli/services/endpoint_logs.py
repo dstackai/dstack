@@ -1,13 +1,23 @@
 import base64
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
+from rich.text import Text
+
+from dstack._internal.cli.utils.common import console
 from dstack._internal.core.models.endpoints import Endpoint
 from dstack._internal.core.models.logs import LogEvent
 from dstack._internal.server.schemas.logs import PollLogsRequest
 
 _ENDPOINT_LOG_WATCH_OVERLAP = timedelta(seconds=20)
+
+
+@dataclass(frozen=True)
+class EndpointLogRecord:
+    timestamp: datetime
+    message: str
 
 
 class EndpointLogPoller:
@@ -18,8 +28,8 @@ class EndpointLogPoller:
         self._latest_printed_at: Optional[datetime] = None
         self._seen_log_counts: Counter[tuple[datetime, str, str]] = Counter()
 
-    def poll(self) -> list[bytes]:
-        logs: list[bytes] = []
+    def poll(self) -> list[EndpointLogRecord]:
+        logs: list[EndpointLogRecord] = []
         next_token = None
         batch_log_counts: Counter[tuple[datetime, str, str]] = Counter()
         while True:
@@ -39,7 +49,7 @@ class EndpointLogPoller:
             for log in resp.logs:
                 if not self._should_print(log, batch_log_counts=batch_log_counts):
                     continue
-                logs.append(_format_log(log))
+                logs.append(_decode_log(log))
             next_token = resp.next_token
             if next_token is None:
                 break
@@ -71,6 +81,17 @@ def _log_key(log: LogEvent) -> tuple[datetime, str, str]:
     return (log.timestamp, log.log_source.value, log.message)
 
 
-def _format_log(log: LogEvent) -> bytes:
+def print_endpoint_log(log: EndpointLogRecord) -> None:
     timestamp = log.timestamp.astimezone().strftime("%Y-%m-%d %H:%M:%S")
-    return f"[{timestamp}] ".encode() + base64.b64decode(log.message)
+    console.print(
+        Text(f"[{timestamp}]", style="log.time"),
+        Text(log.message.rstrip("\r\n"), style="log.message"),
+        soft_wrap=True,
+    )
+
+
+def _decode_log(log: LogEvent) -> EndpointLogRecord:
+    return EndpointLogRecord(
+        timestamp=log.timestamp,
+        message=base64.b64decode(log.message).decode(errors="replace"),
+    )

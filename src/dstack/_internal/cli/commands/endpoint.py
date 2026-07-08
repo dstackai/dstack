@@ -1,5 +1,4 @@
 import argparse
-import sys
 import time
 from typing import Iterable
 
@@ -10,7 +9,11 @@ from dstack._internal.cli.services.completion import (
     EndpointNameCompleter,
     EndpointPresetNameCompleter,
 )
-from dstack._internal.cli.services.endpoint_logs import EndpointLogPoller
+from dstack._internal.cli.services.endpoint_logs import (
+    EndpointLogPoller,
+    EndpointLogRecord,
+    print_endpoint_log,
+)
 from dstack._internal.cli.utils.common import (
     LIVE_TABLE_PROVISION_INTERVAL_SECS,
     LIVE_TABLE_REFRESH_RATE_PER_SEC,
@@ -224,14 +227,13 @@ class EndpointCommand(APIBaseCommand):
             for log in self._get_endpoint_logs(
                 endpoint=endpoint, start_time=start_time, watch=args.watch
             ):
-                sys.stdout.buffer.write(log)
-                sys.stdout.buffer.flush()
+                print_endpoint_log(log)
         except KeyboardInterrupt:
             pass
 
     def _get_endpoint_logs(
         self, endpoint: Endpoint, start_time, watch: bool = False
-    ) -> Iterable[bytes]:
+    ) -> Iterable[EndpointLogRecord]:
         poller = EndpointLogPoller(api=self.api, endpoint=endpoint, start_time=start_time)
         while True:
             yield from poller.poll()
