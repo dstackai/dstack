@@ -29,7 +29,7 @@ class TestProjectAdd:
             APIClientMock.assert_called_once_with(base_url="http://127.0.0.1:31313", token="token")
             api_client_mock.projects.get.assert_called_with("project")
         assert exit_code == 0
-        assert yaml.load(cli_config_path.read_text(), yaml.FullLoader) == {
+        assert yaml.safe_load(cli_config_path.read_text()) == {
             "projects": [
                 {
                     "default": True,
